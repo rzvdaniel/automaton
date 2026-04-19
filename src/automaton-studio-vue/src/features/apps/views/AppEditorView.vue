@@ -79,35 +79,11 @@ const appNameAutoUpdated = ref(false)
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
 
-// Active view tab (code, console, logs, usage, or settings)
-const activeTab = ref<'code' | 'settings' | 'console' | 'logs' | 'usage' | 'ai-console'>('code')
-const BUILD_VIEW_MODE_STORAGE_KEY = 'app-editor-build-view-mode'
-type BuildViewMode = 'visual' | 'code'
+// Active view tab
+const activeTab = ref<'build' | 'code' | 'monitor' | 'settings'>('build')
 
-function loadBuildViewMode(): BuildViewMode {
-  try {
-    const saved = localStorage.getItem(BUILD_VIEW_MODE_STORAGE_KEY)
-    if (saved === 'visual' || saved === 'code') {
-      return saved
-    }
-  } catch {
-    // Fallback to default
-  }
-  return 'visual'
-}
-
-const buildViewMode = ref<BuildViewMode>(loadBuildViewMode())
-
-watch(buildViewMode, (mode) => {
-  try {
-    localStorage.setItem(BUILD_VIEW_MODE_STORAGE_KEY, mode)
-  } catch {
-    // Ignore storage write errors
-  }
-})
-
-// Active sub-tab in logs view
-const activeLogsTab = ref<'build' | 'runtime'>('build')
+// Active sub-tab in monitor view
+const activeMonitorTab = ref<'console' | 'ai-console' | 'build-logs' | 'runtime-logs' | 'usage'>('console')
 
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
@@ -118,10 +94,13 @@ const liveBuildSession = ref<ChatSession | null>(null)
 const liveBuildMessages = ref<ChatMessage[]>([])
 const liveBuildIsBusy = ref(false)
 
-// Refresh runtime logs whenever the user navigates to that view
-watch([activeTab, activeLogsTab], ([tab, logsTab]) => {
-  if (tab === 'logs' && logsTab === 'runtime') {
+// Refresh runtime logs and usage whenever the user navigates to those monitor sub-tabs
+watch([activeTab, activeMonitorTab], ([tab, monitorTab]) => {
+  if (tab === 'monitor' && monitorTab === 'runtime-logs') {
     nextTick(() => runtimeLogsRef.value?.loadLogs())
+  }
+  if (tab === 'monitor' && monitorTab === 'usage') {
+    usageRefreshTick.value += 1
   }
 })
 
@@ -375,12 +354,6 @@ async function refreshChatStats() {
     }
   }
 }
-
-watch(activeTab, (tab) => {
-  if (tab === 'usage') {
-    usageRefreshTick.value += 1
-  }
-})
 
 // Warn before leaving with unsaved changes
 function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -974,50 +947,34 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               />
               <Tag v-else value="Draft" severity="warn" />
             </div>
-            <!-- Tab buttons for Build/Console/Settings -->
+            <!-- Tab buttons for Build/Code/Monitor/Settings -->
             <div class="view-tabs">
+              <button
+                class="view-tab"
+                :class="{ active: activeTab === 'build' }"
+                @click="activeTab = 'build'"
+              >
+                <i class="pi pi-eye"></i>
+                Build
+              </button>
               <button
                 class="view-tab"
                 :class="{ active: activeTab === 'code' }"
                 @click="activeTab = 'code'"
               >
-                <i class="pi pi-code"></i>
-                Build
+                <i class="pi pi-file-edit"></i>
+                Code
               </button>
               <button
                 class="view-tab"
-                :class="{ active: activeTab === 'console' }"
-                @click="activeTab = 'console'"
+                :class="{ active: activeTab === 'monitor' }"
+                @click="activeTab = 'monitor'"
               >
-                <i class="pi pi-terminal"></i>
-                Console
+                <i class="pi pi-chart-bar"></i>
+                Monitor
                 <span v-if="editorStore.consoleEntries?.length > 0" class="console-badge">
                   {{ editorStore.consoleEntries.length }}
                 </span>
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'ai-console' }"
-                @click="activeTab = 'ai-console'"
-              >
-                <i class="pi pi-desktop"></i>
-                AI Console
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'logs' }"
-                @click="activeTab = 'logs'"
-              >
-                <i class="pi pi-history"></i>
-                Logs
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'usage' }"
-                @click="activeTab = 'usage'"
-              >
-                <i class="pi pi-chart-line"></i>
-                Usage
               </button>
               <button
                 class="view-tab"
@@ -1032,28 +989,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         </div>
 
         <div class="header-right">
-          <!-- Runner Selector (only in code view) -->
-          <template v-if="activeTab === 'code'">
-            <div class="build-mode-toggle">
-              <button
-                class="view-tab"
-                :class="{ active: buildViewMode === 'visual' }"
-                @click="buildViewMode = 'visual'"
-              >
-                <i class="pi pi-eye"></i>
-                Visual
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: buildViewMode === 'code' }"
-                @click="buildViewMode = 'code'"
-              >
-                <i class="pi pi-file-edit"></i>
-                Code
-              </button>
-            </div>
+          <!-- Build and Code tabs: show action buttons -->
+          <template v-if="activeTab === 'build' || activeTab === 'code'">
+            <!-- Runner selector -->
             <div class="flex align-items-center gap-2">
-              <label class="text-sm text-color-secondary">Runner:</label>
+              <span
+                v-tooltip.bottom="'Choose which runner executes this app\'s backend'"
+                class="text-sm text-color-secondary runner-label"
+              >Runs on:</span>
               <RunnerSelector
                 v-model="selectedRunnerId"
                 :disabled="editorStore.isSaving"
@@ -1081,6 +1024,16 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             </div>
 
             <Button
+              v-if="editorStore.hasUnsavedChanges && activeTab === 'code'"
+              label="Save All"
+              icon="pi pi-save"
+              :loading="editorStore.isSaving"
+              outlined
+              severity="secondary"
+              @click="handleSaveAll"
+            />
+
+            <Button
               v-tooltip.bottom="'Open full-screen preview'"
               icon="pi pi-eye"
               label="Preview"
@@ -1088,109 +1041,127 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               severity="secondary"
               @click="editorStore.openPreviewOverlay()"
             />
+
+            <!-- Publish CTA -->
+            <template v-if="editorStore.isPublished">
+              <a
+                :href="`/web/${editorStore.publicUrl}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="no-underline"
+              >
+                <Button
+                  v-tooltip.bottom="'Open published app in new tab'"
+                  label="Open"
+                  icon="pi pi-external-link"
+                  outlined
+                  severity="secondary"
+                />
+              </a>
+              <Button
+                label="Unpublish"
+                icon="pi pi-cloud-download"
+                outlined
+                severity="secondary"
+                @click="handleUnpublish"
+              />
+            </template>
             <Button
-              v-if="editorStore.hasUnsavedChanges && buildViewMode === 'code'"
-              label="Save All"
-              icon="pi pi-save"
-              :loading="editorStore.isSaving"
-              @click="handleSaveAll"
+              v-else
+              label="Publish App"
+              icon="pi pi-cloud-upload"
+              severity="success"
+              @click="showPublishDialog = true"
             />
+
+            <!-- Deploy Backend (only when app has backend scripts) -->
+            <template v-if="editorStore.hasBackendFolder">
+              <Button
+                v-tooltip.bottom="'Push backend scripts to runner'"
+                label="Deploy Backend"
+                icon="pi pi-server"
+                outlined
+                severity="secondary"
+                :loading="editorStore.isDeployingBackend"
+                :disabled="editorStore.isDeployingBackend"
+                @click="handleDeployBackend"
+              />
+              <span v-if="editorStore.deployStatusMessage" class="text-sm text-color-secondary">
+                {{ editorStore.deployStatusMessage }}
+              </span>
+            </template>
           </template>
-          <a
-            v-if="editorStore.isPublished"
-            :href="`/web/${editorStore.publicUrl}`"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="no-underline"
-          >
-            <Button
-              v-tooltip.bottom="'Open published app in new tab'"
-              label="Open"
-              icon="pi pi-external-link"
-              outlined
-              severity="secondary"
-            />
-          </a>
-          <Button
-            v-if="editorStore.isPublished"
-            label="Unpublish"
-            icon="pi pi-cloud-download"
-            outlined
-            severity="secondary"
-            @click="handleUnpublish"
-          />
-          <Button
-            v-else
-            label="Publish"
-            icon="pi pi-cloud-upload"
-            @click="showPublishDialog = true"
-          />
-          <div v-if="editorStore.hasBackendFolder" class="deploy-backend-wrapper">
-            <Button
-              v-tooltip.bottom="'Push backend scripts to runner'"
-              label="Deploy Backend"
-              icon="pi pi-server"
-              outlined
-              severity="secondary"
-              :loading="editorStore.isDeployingBackend"
-              :disabled="editorStore.isDeployingBackend"
-              @click="handleDeployBackend"
-            />
-            <span class="deploy-status-label" :class="{ 'deploy-status-label--hidden': !editorStore.deployStatusMessage }">
-              {{ editorStore.deployStatusMessage ?? '\u00a0' }}
-            </span>
-          </div>
         </div>
       </div>
 
-      <!-- Console View -->
-      <div v-show="activeTab === 'console'" class="console-view">
-        <ConsolePanel />
-      </div>
-
-      <!-- AI Console View -->
-      <div v-show="activeTab === 'ai-console'" class="ai-console-view">
-        <AiConsoleView
-          :messages="liveBuildMessages"
-          :session="liveBuildSession"
-          :is-busy="liveBuildIsBusy"
-        />
-      </div>
-
-      <!-- Logs View -->
-      <div v-show="activeTab === 'logs'" class="logs-view">
-        <div class="logs-view-tabs">
+      <!-- Monitor View -->
+      <div v-show="activeTab === 'monitor'" class="monitor-view">
+        <div class="monitor-tabs">
           <button
             class="logs-sub-tab"
-            :class="{ active: activeLogsTab === 'build' }"
-            @click="activeLogsTab = 'build'"
+            :class="{ active: activeMonitorTab === 'console' }"
+            @click="activeMonitorTab = 'console'"
           >
-            <i class="pi pi-sparkles"></i> AI Build Logs
+            <i class="pi pi-terminal"></i> Console
+            <span v-if="editorStore.consoleEntries?.length > 0" class="console-badge">
+              {{ editorStore.consoleEntries.length }}
+            </span>
           </button>
           <button
             class="logs-sub-tab"
-            :class="{ active: activeLogsTab === 'runtime' }"
-            @click="activeLogsTab = 'runtime'"
+            :class="{ active: activeMonitorTab === 'ai-console' }"
+            @click="activeMonitorTab = 'ai-console'"
+          >
+            <i class="pi pi-desktop"></i> AI Console
+          </button>
+          <button
+            class="logs-sub-tab"
+            :class="{ active: activeMonitorTab === 'build-logs' }"
+            @click="activeMonitorTab = 'build-logs'"
+          >
+            <i class="pi pi-sparkles"></i> Build Logs
+          </button>
+          <button
+            class="logs-sub-tab"
+            :class="{ active: activeMonitorTab === 'runtime-logs' }"
+            @click="activeMonitorTab = 'runtime-logs'"
           >
             <i class="pi pi-server"></i> Runtime Logs
           </button>
+          <button
+            class="logs-sub-tab"
+            :class="{ active: activeMonitorTab === 'usage' }"
+            @click="activeMonitorTab = 'usage'"
+          >
+            <i class="pi pi-chart-line"></i> Usage
+          </button>
         </div>
-        <div class="logs-view-content">
+        <div class="monitor-content">
+          <ConsolePanel v-show="activeMonitorTab === 'console'" />
+          <div v-show="activeMonitorTab === 'ai-console'" class="ai-console-view">
+            <AiConsoleView
+              :messages="liveBuildMessages"
+              :session="liveBuildSession"
+              :is-busy="liveBuildIsBusy"
+            />
+          </div>
           <AppBuildLogs
-            v-if="activeLogsTab === 'build'"
+            v-show="activeMonitorTab === 'build-logs'"
             ref="buildLogsRef"
             :app-id="resolvedAppId"
             :live-active-session="liveBuildSession"
             :live-messages="liveBuildMessages"
             :live-is-busy="liveBuildIsBusy"
           />
-          <AppRuntimeLogs v-else ref="runtimeLogsRef" :app-id="resolvedAppId" />
+          <AppRuntimeLogs
+            v-show="activeMonitorTab === 'runtime-logs'"
+            ref="runtimeLogsRef"
+            :app-id="resolvedAppId"
+          />
+          <div v-show="activeMonitorTab === 'usage'" class="usage-view">
+            <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
+          </div>
         </div>
-      </div>
-
-      <!-- Usage View -->
-      <div v-show="activeTab === 'usage'" class="usage-view">
-        <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
       </div>
 
       <!-- Settings View -->
@@ -1198,8 +1169,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         <AppSettings />
       </div>
 
-      <!-- Build View - single shared layout for Visual and Code modes -->
-      <div v-show="activeTab === 'code'" class="build-content-wrapper">
+      <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
+      <div v-show="activeTab === 'build' || activeTab === 'code'" class="build-content-wrapper">
         <Splitter
           class="build-outer-splitter"
           layout="horizontal"
@@ -1210,14 +1181,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
           <!-- Left: main workspace (visual or code) -->
           <SplitterPanel :size="100 - rightPanelSize" :min-size="40" class="splitter-panel">
             <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
-              <!-- Visual mode workspace -->
-              <div v-show="buildViewMode === 'visual'" class="build-visual-view">
+              <!-- Visual mode workspace - shown in Build tab -->
+              <div v-show="activeTab === 'build'" class="build-visual-view">
                 <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" />
               </div>
 
-              <!-- Code mode: file tree + editor -->
+              <!-- Code mode: file tree + editor - shown in Code tab -->
               <Splitter
-                v-show="buildViewMode === 'code'"
+                v-show="activeTab === 'code'"
                 class="editor-layout"
                 layout="horizontal"
                 :gutter-size="8"
@@ -1529,38 +1500,34 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   padding: 1rem;
 }
 
-/* Deploy backend button + inline status */
-.deploy-backend-wrapper {
-  position: relative;
-}
-
-.deploy-status-label {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 2px;
-  font-size: 0.7rem;
-  color: var(--p-surface-400);
+/* Runner label in header */
+.runner-label {
   white-space: nowrap;
 }
 
-.deploy-status-label--hidden {
-  visibility: hidden;
-}
-
-/* Console view container */
-.console-view {
+/* Monitor view */
+.monitor-view {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-/* AI Console (terminal) view container */
-.ai-console-view {
+.monitor-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+.monitor-content {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+:global(.app-dark) .monitor-tabs {
+  border-color: var(--p-surface-700);
 }
 
 /* Console badge in tab */
@@ -1602,13 +1569,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   gap: 0.5rem;
 }
 
-.build-mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.125rem;
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
+/* AI Console (terminal) view container */
+.ai-console-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .build-content-wrapper {
@@ -1791,20 +1757,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   background-color: var(--p-primary-600);
 }
 
-/* Logs view */
-.logs-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.logs-view-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-}
-
+/* Logs sub-tab (reused inside Monitor view tabs) */
 .logs-sub-tab {
   display: flex;
   align-items: center;
@@ -1830,10 +1783,4 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   color: var(--p-primary-500);
 }
 
-.logs-view-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
 </style>

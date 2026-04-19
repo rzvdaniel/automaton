@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
-import Tag from 'primevue/tag'
-import ToggleButton from 'primevue/togglebutton'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { computed, ref } from 'vue'
@@ -144,16 +142,7 @@ function handleSplitterResizing(): void {
 }
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
-const isMockBackendEnabled = computed({
-  get: () => editorStore.previewUseMockBackend,
-  set: (value: boolean) => {
-    editorStore.setPreviewBackendMode(value ? 'mock' : 'real')
-    void editorStore.refreshPreview()
-  },
-})
-const backendModeLabel = computed(() =>
-  editorStore.previewUseMockBackend ? 'Mock Backend' : 'Real Backend',
-)
+const isAdvancedExpanded = ref(false)
 
 const previewViewportStyle = computed(() => {
   if (editorStore.previewMode === 'desktop') {
@@ -176,34 +165,9 @@ const previewViewportStyle = computed(() => {
 
 <template>
   <div class="build-visual-workspace">
+    <!-- Controls bar -->
     <div class="preview-header">
       <div class="flex align-items-center gap-2">
-        <i class="pi pi-eye text-color-secondary"></i>
-        <span class="font-semibold">Live Preview</span>
-        <div class="ui-test-summary">
-          <Tag :value="`Pass ${uiPassCount}`" severity="success" rounded class="summary-tag clickable" :class="{ active: isPassFilterActive }" @click="focusPassedLogs" />
-          <Tag :value="`Fail ${uiFailCount}`" :severity="uiFailCount > 0 ? 'danger' : 'secondary'" rounded class="summary-tag clickable" :class="{ active: isFailFilterActive }" @click="focusFailedLogs" />
-          <Tag value="All Logs" severity="secondary" rounded class="summary-tag clickable" :class="{ active: isAllFilterActive }" @click="focusAllLogs" />
-          <span v-if="lastUiTestAction" class="last-action text-sm text-color-secondary">
-            Last: {{ lastUiTestAction }}
-          </span>
-        </div>
-      </div>
-      <div class="flex align-items-center gap-2">
-        <Tag
-          :value="backendModeLabel"
-          :severity="editorStore.previewUseMockBackend ? 'warning' : 'success'"
-          rounded
-        />
-        <ToggleButton
-          v-model="isMockBackendEnabled"
-          on-label="Real"
-          off-label="Mock"
-          on-icon="pi pi-server"
-          off-icon="pi pi-clone"
-          :disabled="editorStore.isLoadingPreview"
-          aria-label="Toggle preview backend mode"
-        />
         <SelectButton
           :model-value="editorStore.previewMode"
           :options="previewModes"
@@ -225,17 +189,60 @@ const previewViewportStyle = computed(() => {
           :loading="editorStore.isLoadingPreview"
           @click="editorStore.refreshPreview()"
         />
-        <Button
-          icon="pi pi-arrows-alt-v"
-          text
-          severity="secondary"
-          v-tooltip.bottom="'Maximize Preview (90/10)'"
-          @click="maximizePreview"
-        />
       </div>
     </div>
 
+    <!-- Collapsed: preview fills all space -->
+    <div v-if="!isAdvancedExpanded" class="preview-only">
+      <div class="preview-content">
+        <div
+          class="preview-viewport"
+          :class="editorStore.previewMode"
+          :style="previewViewportStyle"
+        >
+          <div v-if="isHeavyRenderingSuspended" class="preview-loading">
+            <iframe
+              v-if="editorStore.previewUrl"
+              :key="editorStore.previewUrl"
+              :src="editorStore.previewUrl"
+              class="preview-iframe"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
+              title="App Preview"
+            />
+            <div class="preview-resize-overlay">
+              <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
+              <p class="mt-2 text-color-secondary">Resizing preview...</p>
+            </div>
+          </div>
+          <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
+            <i class="pi pi-spin pi-spinner text-3xl"></i>
+            <p class="mt-2">Loading preview...</p>
+          </div>
+          <div v-else-if="!editorStore.previewUrl" class="preview-empty">
+            <i class="pi pi-eye-slash text-3xl text-color-secondary"></i>
+            <p class="mt-2 text-color-secondary">No preview available</p>
+          </div>
+          <iframe
+            v-else
+            :key="editorStore.previewUrl"
+            :src="editorStore.previewUrl"
+            class="preview-iframe"
+            :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
+            title="App Preview"
+          />
+        </div>
+      </div>
+      <!-- Advanced tools toggle bar (collapsed) -->
+      <button class="advanced-toggle-bar" @click="isAdvancedExpanded = true">
+        <i class="pi pi-chevron-up"></i>
+        <span>Show Advanced Tools</span>
+      </button>
+    </div>
+
+    <!-- Expanded: splitter so user can drag -->
     <Splitter
+      v-else
       :key="splitterRenderKey"
       class="visual-splitter"
       layout="vertical"
@@ -243,7 +250,7 @@ const previewViewportStyle = computed(() => {
       @resize="handleSplitterResizing"
       @resizeend="handleSplitterResize"
     >
-      <SplitterPanel :size="splitterSizes[0]" :min-size="45" class="splitter-panel">
+      <SplitterPanel :size="splitterSizes[0]" :min-size="30" class="splitter-panel">
         <div class="preview-content">
           <div
             class="preview-viewport"
@@ -286,6 +293,11 @@ const previewViewportStyle = computed(() => {
       </SplitterPanel>
 
       <SplitterPanel :size="splitterSizes[1]" :min-size="12" class="splitter-panel">
+        <!-- Advanced tools toggle bar (expanded) -->
+        <button class="advanced-toggle-bar" @click="isAdvancedExpanded = false">
+          <i class="pi pi-chevron-down"></i>
+          <span>Hide Advanced Tools</span>
+        </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
           <span class="text-sm text-color-secondary">Resizing logs...</span>
@@ -320,10 +332,47 @@ const previewViewportStyle = computed(() => {
   will-change: auto;
 }
 
+.preview-only {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Show/Hide Advanced Tools toggle bar */
+.advanced-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.4rem 1rem;
+  border: none;
+  border-top: 1px solid var(--p-surface-200);
+  background: var(--p-surface-50);
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.advanced-toggle-bar:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.advanced-toggle-bar i {
+  font-size: 0.7rem;
+}
+
 .splitter-panel {
   min-height: 0 !important;
   overflow: hidden;
   will-change: flex-basis;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .preview-content {
@@ -335,31 +384,6 @@ const previewViewportStyle = computed(() => {
   overflow: auto;
   padding: 0.75rem;
   height: 100%;
-}
-
-.ui-test-summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin-left: 0.5rem;
-}
-
-.last-action {
-  margin-left: 0.25rem;
-  max-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.summary-tag.clickable {
-  cursor: pointer;
-}
-
-.summary-tag.clickable.active {
-  outline: 2px solid var(--p-primary-400);
-  outline-offset: 1px;
-  box-shadow: 0 0 0 1px var(--p-primary-100) inset;
 }
 
 .preview-viewport {
@@ -427,6 +451,15 @@ const previewViewportStyle = computed(() => {
 
 :global(.app-dark) .preview-header {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .advanced-toggle-bar {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .advanced-toggle-bar:hover {
+  background: var(--p-surface-700);
 }
 
 :global(.app-dark) .preview-viewport {
