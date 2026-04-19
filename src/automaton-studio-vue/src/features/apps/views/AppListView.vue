@@ -395,7 +395,6 @@ const handleRetry = async () => {
           outlined
           @click="viewPublicApps"
         />
-        <Button label="New App" icon="pi pi-plus" @click="openCreateDialog" />
       </div>
     </div>
 
@@ -431,13 +430,23 @@ const handleRetry = async () => {
                 :model-display-names="aiModelDisplayNames"
                 :loading="isLoadingModels"
               />
-              <Button
-                label="Generate App"
-                icon="pi pi-sparkles"
-                :disabled="!aiDescription || isCreating"
-                :loading="isCreating"
-                @click="handleGenerateApp"
-              />
+              <div class="flex align-items-center gap-2">
+                <Button
+                  label="Start from scratch"
+                  icon="pi pi-plus"
+                  severity="secondary"
+                  outlined
+                  :disabled="isCreating"
+                  @click="openCreateDialog"
+                />
+                <Button
+                  label="Create with AI"
+                  icon="pi pi-sparkles"
+                  :disabled="!aiDescription || isCreating"
+                  :loading="isCreating"
+                  @click="handleGenerateApp"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -704,18 +713,6 @@ const handleRetry = async () => {
             autofocus
             @keyup.enter="handleCreateApp"
           />
-        </div>
-        
-        <div class="flex flex-column gap-2">
-          <label for="runner-select" class="font-semibold">Default Runner (optional)</label>
-          <RunnerSelector
-            id="runner-select"
-            v-model="selectedRunnerId"
-            :disabled="isCreating"
-          />
-          <small class="text-color-secondary">
-            Optional: select a default runner to use for preview and initial execution.
-          </small>
         </div>
       </div>
       <template #footer>

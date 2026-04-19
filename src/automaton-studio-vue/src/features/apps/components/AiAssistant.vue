@@ -326,10 +326,16 @@ onMounted(async () => {
   
   // Auto-send initial prompt if provided (e.g., from "Generate App" button)
   if (props.initialPrompt) {
+    emit('initialPromptConsumed')
+
+    // If no AI keys are configured, stay on sessions view so the banner is visible
+    if (hasNoKeys.value) {
+      return
+    }
+
     contextStartNotice.value = 'New app context started from Apps prompt.'
     userInput.value = props.initialPrompt
     currentView.value = 'chat'
-    emit('initialPromptConsumed')
     // Small delay to ensure UI is ready
     setTimeout(() => {
       sendMessage()
@@ -793,12 +799,12 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Input area always visible -->
       <div class="input-area">
-        <div class="prompt-box">
+        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys }">
           <Textarea
             v-model="userInput"
-            placeholder="Ask AI a question..."
+            :placeholder="hasNoKeys ? 'Add an AI key to start chatting...' : 'Ask AI a question...'"
             class="prompt-textarea"
-            :disabled="isBusy"
+            :disabled="isBusy || hasNoKeys"
             :auto-resize="true"
             rows="2"
             @keydown="handleKeyPress"
@@ -826,12 +832,12 @@ function handleKeyPress(event: KeyboardEvent) {
               />
               <Button
                 v-else
-                v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+                v-tooltip.top="hasNoKeys ? 'No AI key configured' : !selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
                 icon="pi pi-send"
                 size="small"
                 text
                 rounded
-                :disabled="!userInput.trim() || !selectedModel"
+                :disabled="!userInput.trim() || !selectedModel || hasNoKeys"
                 @click="sendMessage"
               />
             </div>
@@ -1060,12 +1066,12 @@ function handleKeyPress(event: KeyboardEvent) {
 
       <!-- Input area -->
       <div class="input-area">
-        <div class="prompt-box">
+        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys }">
           <Textarea
             v-model="userInput"
-            placeholder="Describe what you want..."
+            :placeholder="hasNoKeys ? 'Add an AI key to start chatting...' : 'Describe what you want...'"
             class="prompt-textarea"
-            :disabled="isBusy"
+            :disabled="isBusy || hasNoKeys"
             :auto-resize="true"
             rows="2"
             @keydown="handleKeyPress"
@@ -1093,12 +1099,12 @@ function handleKeyPress(event: KeyboardEvent) {
               />
               <Button
                 v-else
-                v-tooltip.top="!selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
+                v-tooltip.top="hasNoKeys ? 'No AI key configured' : !selectedModel ? 'Please select an AI model' : 'Send (Enter)'"
                 icon="pi pi-send"
                 size="small"
                 text
                 rounded
-                :disabled="!userInput.trim() || !selectedModel"
+                :disabled="!userInput.trim() || !selectedModel || hasNoKeys"
                 @click="sendMessage"
               />
             </div>
@@ -1740,6 +1746,12 @@ function handleKeyPress(event: KeyboardEvent) {
   border-color: var(--p-primary-400);
 }
 
+.prompt-box--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--p-surface-100) !important;
+}
+
 .prompt-textarea {
   border: none !important;
   box-shadow: none !important;
@@ -1796,6 +1808,10 @@ function handleKeyPress(event: KeyboardEvent) {
 :global(.app-dark) .prompt-box {
   border-color: var(--p-surface-600);
   background: var(--p-surface-800);
+}
+
+:global(.app-dark) .prompt-box--disabled {
+  background: var(--p-surface-900) !important;
 }
 
 :global(.app-dark) .prompt-box:focus-within {
