@@ -91,6 +91,10 @@ public class BillingController : BaseController
             .Select(u => new { u.Id, u.StripeSubscriptionId })
             .FirstOrDefaultAsync(u => u.Id == userId);
 
+        var hasByokKeys = await _db.AiApiKeys
+            .AsNoTracking()
+            .AnyAsync(k => k.UserId == userId);
+
         var isCurrentMonth = allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year;
         var currentCost = (isCurrentMonth ? allowance?.CurrentMonthCostUsd : 0m) ?? 0m;
         var limit = allowance?.MonthlyCostLimitUsd ?? 0m;
@@ -106,6 +110,7 @@ public class BillingController : BaseController
             hasActiveSubscription = !string.IsNullOrEmpty(user?.StripeSubscriptionId),
             canCreateProjects   = allowance?.SubscriptionPlan?.CanCreateProjects ?? false,
             canCreateOrganizations = allowance?.SubscriptionPlan?.CanCreateOrganizations ?? false,
+            hasByokKeys,
         });
     }
 }

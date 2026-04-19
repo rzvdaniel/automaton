@@ -63,8 +63,7 @@ async function goToPortal() {
     <Message v-else-if="error" severity="error" :closable="false">{{ error }}</Message>
 
     <template v-else-if="status">
-      <!-- Cards row -->
-      <div class="billing-grid mb-5">
+      <div class="billing-cards mb-5">
 
         <!-- Current Plan Card -->
         <Card class="billing-card">
@@ -75,37 +74,81 @@ async function goToPortal() {
               <Tag v-if="status.hasActiveSubscription" value="Active" severity="success" class="ml-2" />
             </div>
             <div class="billing-card-meta">
-              <span>${{ status.priceUsd.toFixed(2) }} / month</span>
-              <span class="billing-card-divider">·</span>
-              <span>${{ status.monthlyCostLimitUsd.toFixed(2) }} AI budget</span>
+              <span v-if="status.priceUsd > 0">${{ status.priceUsd.toFixed(2) }} / month</span>
+              <span v-else>Free</span>
             </div>
           </template>
         </Card>
 
-        <!-- Usage Card -->
+        <!-- AI Usage Card -->
         <Card class="billing-card">
           <template #content>
-            <div class="billing-card-label">AI Usage This Month</div>
-            <div class="billing-card-value">
-              ${{ status.currentMonthCostUsd.toFixed(2) }}
-              <span class="billing-card-of">/ ${{ status.monthlyCostLimitUsd.toFixed(2) }}</span>
+            <div class="billing-card-label">AI Usage</div>
+
+            <!-- BYOK: user has own keys, no managed budget -->
+            <template v-if="status.hasByokKeys && status.monthlyCostLimitUsd === 0">
+              <div class="billing-card-value byok-value">
+                <i class="pi pi-key" style="color: var(--p-green-500)"></i>
+                External (BYOK)
+              </div>
+              <div class="billing-card-meta">Using your own API keys — no AI charges</div>
+              <Button
+                label="Manage AI Keys"
+                icon="pi pi-key"
+                size="small"
+                text
+                class="mt-2 pl-0"
+                @click="router.push('/ai-keys')"
+              />
+            </template>
+
+            <!-- Paid: managed AI budget -->
+            <template v-else-if="status.monthlyCostLimitUsd > 0">
+              <div class="billing-card-value">
+                ${{ status.currentMonthCostUsd.toFixed(2) }}
+                <span class="billing-card-of">/ ${{ status.monthlyCostLimitUsd.toFixed(2) }} included</span>
+              </div>
+              <ProgressBar
+                :value="usagePercent"
+                :show-value="false"
+                class="billing-progress mb-2"
+                :class="`progress-${usageSeverity}`"
+              />
+              <div class="billing-card-meta">
+                <span
+                  :class="{
+                    'text-orange-500 font-semibold': usagePercent >= 80,
+                    'text-red-500 font-semibold': usagePercent >= 100,
+                  }"
+                >{{ usagePercent }}% used</span>
+                <span class="billing-card-divider">·</span>
+                <span>${{ (status.monthlyCostLimitUsd - status.currentMonthCostUsd).toFixed(2) }} remaining</span>
+              </div>
+            </template>
+
+            <!-- Free, no keys, no budget -->
+            <template v-else>
+              <div class="billing-card-value" style="font-size: 1rem; font-weight: 500; color: var(--p-text-muted-color)">
+                No AI access configured
+              </div>
+              <div class="billing-card-meta mb-3">Add your own API key or upgrade for managed AI</div>
+              <div class="flex gap-2">
+                <Button label="Add AI Key" icon="pi pi-key" size="small" outlined @click="router.push('/ai-keys')" />
+                <Button label="Upgrade" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
+              </div>
+            </template>
+          </template>
+        </Card>
+
+        <!-- Infrastructure Card -->
+        <Card class="billing-card">
+          <template #content>
+            <div class="billing-card-label">Infrastructure</div>
+            <div class="billing-card-value" style="font-size: 1.1rem">
+              <i class="pi pi-server mr-2 text-color-secondary"></i>
+              Self-hosted
             </div>
-            <ProgressBar
-              :value="usagePercent"
-              :show-value="false"
-              class="billing-progress mb-2"
-              :class="`progress-${usageSeverity}`"
-            />
-            <div class="billing-card-meta">
-              <span
-                :class="{
-                  'text-orange-500 font-semibold': usagePercent >= 80,
-                  'text-red-500 font-semibold': usagePercent >= 100,
-                }"
-              >{{ usagePercent }}% used</span>
-              <span class="billing-card-divider">·</span>
-              <span>${{ (status.monthlyCostLimitUsd - status.currentMonthCostUsd).toFixed(2) }} remaining</span>
-            </div>
+            <div class="billing-card-meta">Using your own runners — no infrastructure charges</div>
           </template>
         </Card>
 
@@ -137,16 +180,26 @@ async function goToPortal() {
   max-width: 760px;
 }
 
-.billing-grid {
+.billing-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
 }
 
+@media (max-width: 900px) {
+  .billing-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 600px) {
-  .billing-grid {
+  .billing-cards {
     grid-template-columns: 1fr;
   }
+}
+
+.byok-value {
+  gap: 0.5rem;
 }
 
 .billing-card {

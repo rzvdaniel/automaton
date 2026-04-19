@@ -17,6 +17,7 @@ export interface BillingStatusResponse {
   hasActiveSubscription: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
+  hasByokKeys: boolean
 }
 
 const billingService = {
