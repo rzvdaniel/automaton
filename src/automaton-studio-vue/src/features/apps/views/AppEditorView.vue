@@ -25,13 +25,11 @@ import PublishDialog from '../components/PublishDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
-import ConsolePanel from '../components/ConsolePanel.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
-import AiConsoleView from '../components/AiConsoleView.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -84,7 +82,7 @@ const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 const activeTab = ref<'build' | 'code' | 'monitor' | 'settings'>('build')
 
 // Active sub-tab in monitor view
-const activeMonitorTab = ref<'console' | 'ai-console' | 'build-logs' | 'runtime-logs' | 'usage'>('console')
+const activeMonitorTab = ref<'build-logs' | 'execution-history' | 'usage'>('build-logs')
 
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
@@ -97,7 +95,7 @@ const liveBuildIsBusy = ref(false)
 
 // Refresh runtime logs and usage whenever the user navigates to those monitor sub-tabs
 watch([activeTab, activeMonitorTab], ([tab, monitorTab]) => {
-  if (tab === 'monitor' && monitorTab === 'runtime-logs') {
+  if (tab === 'monitor' && monitorTab === 'execution-history') {
     nextTick(() => runtimeLogsRef.value?.loadLogs())
   }
   if (tab === 'monitor' && monitorTab === 'usage') {
@@ -973,9 +971,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               >
                 <i class="pi pi-chart-bar"></i>
                 Monitor
-                <span v-if="editorStore.consoleEntries?.length > 0" class="console-badge">
-                  {{ editorStore.consoleEntries.length }}
-                </span>
               </button>
               <button
                 class="view-tab"
@@ -1101,23 +1096,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         <div class="monitor-tabs">
           <button
             class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'console' }"
-            @click="activeMonitorTab = 'console'"
-          >
-            <i class="pi pi-terminal"></i> Console
-            <span v-if="editorStore.consoleEntries?.length > 0" class="console-badge">
-              {{ editorStore.consoleEntries.length }}
-            </span>
-          </button>
-          <button
-            class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'ai-console' }"
-            @click="activeMonitorTab = 'ai-console'"
-          >
-            <i class="pi pi-desktop"></i> AI Console
-          </button>
-          <button
-            class="logs-sub-tab"
             :class="{ active: activeMonitorTab === 'build-logs' }"
             @click="activeMonitorTab = 'build-logs'"
           >
@@ -1125,10 +1103,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
           </button>
           <button
             class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'runtime-logs' }"
-            @click="activeMonitorTab = 'runtime-logs'"
+            :class="{ active: activeMonitorTab === 'execution-history' }"
+            @click="activeMonitorTab = 'execution-history'"
           >
-            <i class="pi pi-server"></i> Runtime Logs
+            <i class="pi pi-server"></i> Execution History
           </button>
           <button
             class="logs-sub-tab"
@@ -1139,14 +1117,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
           </button>
         </div>
         <div class="monitor-content">
-          <ConsolePanel v-show="activeMonitorTab === 'console'" />
-          <div v-show="activeMonitorTab === 'ai-console'" class="ai-console-view">
-            <AiConsoleView
-              :messages="liveBuildMessages"
-              :session="liveBuildSession"
-              :is-busy="liveBuildIsBusy"
-            />
-          </div>
           <AppBuildLogs
             v-show="activeMonitorTab === 'build-logs'"
             ref="buildLogsRef"
@@ -1156,7 +1126,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             :live-is-busy="liveBuildIsBusy"
           />
           <AppRuntimeLogs
-            v-show="activeMonitorTab === 'runtime-logs'"
+            v-show="activeMonitorTab === 'execution-history'"
             ref="runtimeLogsRef"
             :app-id="resolvedAppId"
           />

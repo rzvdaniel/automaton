@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
+import ConsolePanel from './ConsolePanel.vue'
 import LiveUiLogPanel from './LiveUiLogPanel.vue'
 
 const props = withDefaults(
@@ -147,6 +148,7 @@ function handleSplitterResizing(): void {
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
 const isAdvancedExpanded = ref(false)
+const activeLogTab = ref<'ui-logs' | 'backend-logs'>('ui-logs')
 
 // Backend connection status
 const backendConnected = computed(() => !!props.runnerId)
@@ -323,10 +325,10 @@ const previewViewportStyle = computed(() => {
             </div>
         </div>
       </div>
-      <!-- Advanced tools toggle bar (collapsed) -->
+      <!-- Logs toggle bar (collapsed) -->
       <button class="advanced-toggle-bar" @click="isAdvancedExpanded = true">
         <i class="pi pi-chevron-up"></i>
-        <span>Show Advanced Tools</span>
+        <span>Show Logs</span>
       </button>
     </div>
 
@@ -418,16 +420,38 @@ const previewViewportStyle = computed(() => {
       </SplitterPanel>
 
       <SplitterPanel :size="splitterSizes[1]" :min-size="12" class="splitter-panel">
-        <!-- Advanced tools toggle bar (expanded) -->
+        <!-- Logs toggle bar (expanded) -->
         <button class="advanced-toggle-bar" @click="isAdvancedExpanded = false">
           <i class="pi pi-chevron-down"></i>
-          <span>Hide Advanced Tools</span>
+          <span>Hide Logs</span>
         </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
           <span class="text-sm text-color-secondary">Resizing logs...</span>
         </div>
-        <LiveUiLogPanel v-else class="logs-panel" />
+        <div v-else class="logs-tabbed-container">
+          <div class="logs-tab-bar">
+            <button
+              class="logs-tab"
+              :class="{ active: activeLogTab === 'ui-logs' }"
+              @click="activeLogTab = 'ui-logs'"
+            >
+              <i class="pi pi-wave-pulse"></i>
+              Live UI Logs
+            </button>
+            <button
+              class="logs-tab"
+              :class="{ active: activeLogTab === 'backend-logs' }"
+              @click="activeLogTab = 'backend-logs'"
+            >
+              <i class="pi pi-server"></i>
+              Live Backend Logs
+              <span v-if="editorStore.consoleEntries.length > 0" class="logs-tab-badge">{{ editorStore.consoleEntries.length }}</span>
+            </button>
+          </div>
+          <LiveUiLogPanel v-show="activeLogTab === 'ui-logs'" class="logs-panel" />
+          <ConsolePanel v-show="activeLogTab === 'backend-logs'" class="logs-panel" />
+        </div>
       </SplitterPanel>
     </Splitter>
   </div>
@@ -646,7 +670,7 @@ const previewViewportStyle = computed(() => {
 }
 
 
-/* Show/Hide Advanced Tools toggle bar */
+/* Show/Hide Logs toggle bar */
 .advanced-toggle-bar {
   display: flex;
   align-items: center;
@@ -744,7 +768,64 @@ const previewViewportStyle = computed(() => {
 }
 
 .logs-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.logs-tabbed-container {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+
+.logs-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+.logs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--p-text-muted-color);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.logs-tab:hover {
+  color: var(--p-text-color);
+}
+
+.logs-tab.active {
+  color: var(--p-primary-color);
+  border-bottom-color: var(--p-primary-color);
+}
+
+.logs-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--p-primary-color);
+  color: #fff;
+  line-height: 1;
 }
 
 .logs-placeholder {
@@ -776,6 +857,14 @@ const previewViewportStyle = computed(() => {
 
 :global(.app-dark) .logs-placeholder {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .logs-tab-bar {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .logs-tab:hover {
+  color: var(--p-text-color);
 }
 
 :global(.build-visual-workspace .p-splitter-gutter) {
