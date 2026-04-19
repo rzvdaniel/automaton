@@ -93,7 +93,7 @@ public class BillingController : BaseController
 
         var hasByokKeys = await _db.AiApiKeys
             .AsNoTracking()
-            .AnyAsync(k => k.UserId == userId);
+            .AnyAsync(k => k.CreatedByUserId == userId);
 
         var isCurrentMonth = allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year;
         var currentCost = (isCurrentMonth ? allowance?.CurrentMonthCostUsd : 0m) ?? 0m;
