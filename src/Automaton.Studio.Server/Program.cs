@@ -32,6 +32,10 @@ using System.Text.Json.Serialization;
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
 
+// Log the effective environment and connection string at startup for troubleshooting
+Console.WriteLine($"ASPNETCORE_ENVIRONMENT={applicationBuilder.Environment.EnvironmentName}");
+Console.WriteLine($"Using MySqlConnection: {configurationManager.GetConnectionString("MySqlConnection")}");
+
 // Use the WebApplicationBuilder's built configuration so environment-specific files
 // (e.g. appsettings.Development.json) and user secrets are included automatically.
 var configurationService = new ConfigurationService(applicationBuilder.Configuration);

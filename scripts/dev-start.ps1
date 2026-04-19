@@ -12,6 +12,16 @@
     Requires Python with fastapi and uvicorn installed:
       pip install fastapi "uvicorn[standard]"
 
+        New: If you pass `-AutoInstall` the script will attempt to install missing
+        Python and frontend packages when possible:
+            - Uses `python -m pip install fastapi "uvicorn[standard]"` when Python
+                is present but FastAPI/uvicorn are missing.
+            - Runs `npm install` in the Vue project when Node/npm are present but
+                frontend dependencies (vite) are missing.
+
+        Note: The script will NOT install Node.js itself; install Node from
+        https://nodejs.org if not present.
+
     AppData is NOT managed by this script. Copy app files manually into
     src\Automaton.Studio.Server\AppData as needed.
 
@@ -19,13 +29,21 @@
     Path to the main Automaton repository.
     Auto-detected from git worktree list if not supplied.
 
+.PARAMETER AutoInstall
+    When supplied the script will attempt to auto-install missing Python
+    packages (FastAPI/uvicorn) and frontend dependencies (`npm install`) if
+    the corresponding package managers (`python` and `npm`) are available.
+    Use this for convenience on developer machines. Omit to require manual
+    installation in controlled environments.
+
 .EXAMPLE
     .\scripts\dev-start.ps1
     .\scripts\dev-start.ps1 -MainRepo "C:\Work\automaton"
 #>
 
 param(
-    [string]$MainRepo = ""
+    [string]$MainRepo = "",
+    [switch]$AutoInstall
 )
 
 Set-StrictMode -Version Latest
@@ -84,8 +102,21 @@ if (-not $pythonOk) {
     python -c "import uvicorn" 2>&1 | Out-String | Out-Null; $uvicornOk = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = $prev
     if (-not $fastapiOk -or -not $uvicornOk) {
-        Write-Warn "FastAPI or uvicorn not installed. App controller execution will not work."
-        Write-Warn "Run once to fix:  pip install fastapi `"uvicorn[standard]`""
+        if ($AutoInstall) {
+            Write-Step "Attempting to install FastAPI and uvicorn via pip..."
+            try {
+                python -m pip install --upgrade pip
+                python -m pip install fastapi "uvicorn[standard]"
+                python -c "import fastapi" 2>&1 | Out-String | Out-Null; $fastapiOk = ($LASTEXITCODE -eq 0)
+                python -c "import uvicorn" 2>&1 | Out-String | Out-Null; $uvicornOk = ($LASTEXITCODE -eq 0)
+                if ($fastapiOk -and $uvicornOk) { Write-Ok "FastAPI prerequisites OK (installed)" } else { Write-Warn "FastAPI install attempted but imports still fail." }
+            } catch {
+                Write-Warn "Auto-install of FastAPI failed: $_"
+            }
+        } else {
+            Write-Warn "FastAPI or uvicorn not installed. App controller execution will not work."
+            Write-Warn "Run once to fix:  pip install fastapi \"uvicorn[standard]\" or re-run with -AutoInstall"
+        }
     } else {
         Write-Ok "FastAPI prerequisites OK"
     }
@@ -107,6 +138,35 @@ if ($pythonOk -and $fastapiOk -and $uvicornOk) {
     Start-Sleep -Seconds 3
 } else {
     Write-Warn "Skipping FastAPI window - prerequisites not met."
+}
+
+# ---------- Node / Vite checks for frontend --------------------------------
+$nodeOk = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+$npmOk  = $null -ne (Get-Command npm -ErrorAction SilentlyContinue)
+$viteBin = Join-Path $VueProject "node_modules\.bin\vite"
+if (-not $nodeOk -or -not $npmOk) {
+    Write-Warn "Node.js and/or npm not found. Vue frontend will not start."
+    Write-Warn "Install Node.js (includes npm) from https://nodejs.org/"
+} else {
+    if (-not (Test-Path $viteBin)) {
+        if ($AutoInstall) {
+            Write-Step "Installing frontend dependencies (npm install)..."
+            $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            try {
+                Push-Location $VueProject
+                npm install
+                Pop-Location
+                Write-Ok "npm install completed"
+            } catch {
+                Write-Warn "npm install failed: $_"
+                Pop-Location -ErrorAction SilentlyContinue
+            } finally { $ErrorActionPreference = $prev }
+        } else {
+            Write-Warn "Frontend dependencies missing. Run 'npm install' in $VueProject or re-run with -AutoInstall"
+        }
+    } else {
+        Write-Ok "Frontend dependencies appear installed"
+    }
 }
 
 # ---------- 4. Automaton.Runner ---------------------------------------------

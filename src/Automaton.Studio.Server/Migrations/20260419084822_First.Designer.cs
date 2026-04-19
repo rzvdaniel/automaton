@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Automaton.Studio.Server.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260322161443_AddTotalApiCallsToAiChatSession")]
-    partial class AddTotalApiCallsToAiChatSession
+    [Migration("20260419084822_First")]
+    partial class First
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -34,8 +34,19 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("AiProviderId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("BaseUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("DefaultModel")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -163,6 +174,12 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("varchar(200)");
 
                     b.Property<int>("TotalApiCalls")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalCacheCreationTokens")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalCacheReadTokens")
                         .HasColumnType("int");
 
                     b.Property<int>("TotalInputTokens")
