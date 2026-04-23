@@ -20,7 +20,7 @@ type App = {
 const apps: App[] = [
   {
     title: 'Pac-Man',
-    description: 'The classic arcade game. Built with Automaton.',
+    description: 'Classic arcade game. Runs instantly.',
     image: '🕹️',
     category: 'games',
     action: 'Play',
@@ -28,7 +28,7 @@ const apps: App[] = [
   },
   {
     title: 'Snake',
-    description: 'Eat the food, grow longer, beat your high score.',
+    description: 'Eat the food, grow longer. Beat your high score.',
     image: '🐍',
     category: 'games',
     action: 'Play',
@@ -36,7 +36,7 @@ const apps: App[] = [
   },
   {
     title: 'Tetris',
-    description: 'A simple Tetris clone. Clean and addictive.',
+    description: 'Simple Tetris clone. Clean and addictive.',
     image: '🧩',
     category: 'games',
     action: 'Play',
@@ -44,7 +44,7 @@ const apps: App[] = [
   },
   {
     title: 'Flappy Bird',
-    description: 'How far can you go? Good luck!',
+    description: 'How far can you go? Good luck.',
     image: '🐦',
     category: 'games',
     action: 'Play',
@@ -91,12 +91,18 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
   <section id="apps" class="showcase-section">
     <div class="container">
       <div class="section-header">
-        <span class="section-label">
-          <i class="pi pi-th-large" />
-          Showcase
-        </span>
-        <h2 class="section-title">Explore what's built with Automaton</h2>
-        <p class="section-subtitle">Real apps from real developers. Open, simple, and useful.</p>
+        <div class="section-header-left">
+          <span class="section-label">
+            <i class="pi pi-th-large" />
+            Showcase
+          </span>
+          <h2 class="section-title">Try real apps built with Automaton</h2>
+          <p class="section-subtitle">Open them. Use them. See how they work.</p>
+          <p class="showcase-built-by">Built by developers using Automaton</p>
+        </div>
+        <a href="/apps" class="view-all-link">
+          View all apps <i class="pi pi-arrow-right" />
+        </a>
       </div>
 
       <div class="category-tabs">
@@ -114,9 +120,11 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
       <div class="apps-grid">
         <div v-for="app in filteredApps()" :key="app.title" class="app-card">
           <div class="app-preview" :style="{ '--app-color': app.color }">
+            <span class="instant-badge">⚡ Instant</span>
             <span class="app-emoji">{{ app.image }}</span>
           </div>
           <div class="app-info">
+            <div class="app-built-badge">Built with Automaton</div>
             <h3 class="app-title">{{ app.title }}</h3>
             <p class="app-desc">{{ app.description }}</p>
             <div class="app-footer">
@@ -134,9 +142,10 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
       </div>
 
       <div class="showcase-cta">
-        <a href="/apps" class="btn btn-secondary">
-          View all apps
-          <i class="pi pi-arrow-right" />
+        <p class="showcase-cta-text">Want to build something like this?</p>
+        <a href="#install" class="btn btn-primary">
+          <i class="pi pi-download" />
+          Install CLI
         </a>
       </div>
     </div>
@@ -156,6 +165,42 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 .section-header .section-subtitle {
   margin: 12px auto 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  gap: 16px;
+}
+
+.section-header-left {
+  text-align: left;
+}
+
+.view-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+
+.view-all-link:hover {
+  opacity: 0.75;
+}
+
+.showcase-built-by {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 .category-tabs {
@@ -206,6 +251,7 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 }
 
 .app-preview {
+  position: relative;
   height: 140px;
   background: linear-gradient(
     135deg,
@@ -218,12 +264,34 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
   border-bottom: 1px solid var(--color-border);
 }
 
+.instant-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--color-accent);
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
 .app-emoji {
   font-size: 3rem;
 }
 
 .app-info {
   padding: 16px;
+}
+
+.app-built-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
 }
 
 .app-title {
@@ -276,8 +344,16 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 .showcase-cta {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   margin-top: 48px;
+}
+
+.showcase-cta-text {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 @media (max-width: 1024px) {

@@ -20,6 +20,9 @@
           <a href="https://github.com" target="_blank" class="social-link" aria-label="GitHub">
             <i class="pi pi-github" />
           </a>
+          <a href="https://discord.com" target="_blank" class="social-link" aria-label="Discord">
+            <i class="pi pi-discord" />
+          </a>
         </div>
       </div>
 
@@ -28,31 +31,32 @@
           <h4 class="footer-col-title">Product</h4>
           <a href="/apps" class="footer-link">Apps</a>
           <a href="/docs" class="footer-link">Docs</a>
-          <a href="#how-it-works" class="footer-link">How it works</a>
+          <a href="/pricing" class="footer-link">Pricing</a>
           <a href="#install" class="footer-link">CLI</a>
+          <a href="#" class="footer-link">Changelog</a>
         </div>
         <div class="footer-col">
           <h4 class="footer-col-title">Resources</h4>
           <a href="/docs" class="footer-link">Getting started</a>
           <a href="/docs#backend" class="footer-link">Backend guide</a>
           <a href="/docs#deploy" class="footer-link">Deploy guide</a>
-          <a href="https://github.com" target="_blank" class="footer-link">GitHub</a>
+          <a href="/docs#examples" class="footer-link">Examples</a>
         </div>
         <div class="footer-col">
           <h4 class="footer-col-title">Company</h4>
           <a href="#" class="footer-link">About</a>
           <a href="mailto:hello@automaton.app" class="footer-link">Contact</a>
-          <a href="#" class="footer-link">Privacy</a>
           <a href="#" class="footer-link">Terms</a>
+          <a href="#" class="footer-link">Privacy</a>
         </div>
       </div>
     </div>
 
     <div class="footer-bottom">
       <div class="container footer-bottom-inner">
-        <span>© 2024 Automaton. Built by a solo developer.</span>
+        <span>© 2024 Automaton.</span>
         <span class="indie-note">
-          Made with ❤️ — open to collaboration. <a href="mailto:hello@automaton.app">Get in touch →</a>
+          Built by a solo developer. Open to collaboration. <a href="mailto:hello@automaton.app">Get in touch →</a>
         </span>
       </div>
     </div>

@@ -14,8 +14,8 @@ import AppFooter from '@/components/AppFooter.vue'
     <AppNav />
     <main>
       <HeroSection />
-      <HowItWorksSection />
       <ShowcaseSection />
+      <HowItWorksSection />
       <WhySection />
       <BackendSection />
       <InstallSection />

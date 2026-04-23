@@ -3,38 +3,32 @@ const reasons = [
   {
     icon: 'pi-lock-open',
     title: 'No lock-in',
-    description: 'Your app runs anywhere. Standard HTML, JS, and Python. Export anytime. We never own your code.',
+    description: 'Your code is yours. Runs anywhere.',
     color: 'green',
   },
   {
     icon: 'pi-wrench',
     title: 'Bring your own AI',
-    description: 'Build with GitHub Copilot, Claude Code, or any tool you prefer. Automaton is your runtime, not your IDE.',
+    description: 'Use Copilot, Claude, or anything else.',
     color: 'accent',
   },
   {
     icon: 'pi-server',
-    title: 'Cloud or local — your choice',
-    description: 'Deploy to Automaton Cloud for instant hosting, or connect your own Runner for full control. Switch anytime.',
+    title: 'Cloud or local',
+    description: 'Deploy to Automaton Cloud or your own Runner.',
     color: 'blue',
   },
   {
     icon: 'pi-bolt',
     title: 'Zero DevOps',
-    description: 'No Kubernetes, no Docker required, no CI pipelines to configure. Run one command and your app is live.',
+    description: 'No containers. No pipelines. No config files.',
     color: 'green',
   },
   {
     icon: 'pi-share-alt',
     title: 'Instant sharing',
-    description: 'Every app gets a public URL automatically. Share your project with a single link — no extra setup.',
+    description: 'Every app gets a public URL automatically.',
     color: 'accent',
-  },
-  {
-    icon: 'pi-code',
-    title: 'Structured runtime',
-    description: 'Opinionated /ui + /backend structure means your app always works consistently across machines and runners.',
-    color: 'blue',
   },
 ]
 </script>
@@ -47,17 +41,19 @@ const reasons = [
           <i class="pi pi-star" />
           Why Automaton
         </span>
-        <h2 class="section-title">Infrastructure for the AI-era developer</h2>
-        <p class="section-subtitle">Not a builder. Not a platform. A runtime layer that gets out of your way.</p>
+        <h2 class="section-title">Built for how developers work today</h2>
+        <p class="section-subtitle">Not a builder. Not a platform. Just a runtime that gets out of your way.</p>
       </div>
 
-      <div class="reasons-grid">
-        <div v-for="reason in reasons" :key="reason.title" class="reason-card">
+      <div class="reasons-strip">
+        <div v-for="reason in reasons" :key="reason.title" class="reason-item">
           <div class="reason-icon-wrap" :class="`reason-${reason.color}`">
             <i :class="`pi ${reason.icon}`" />
           </div>
-          <h3 class="reason-title">{{ reason.title }}</h3>
-          <p class="reason-desc">{{ reason.description }}</p>
+          <div class="reason-body">
+            <h3 class="reason-title">{{ reason.title }}</h3>
+            <p class="reason-desc">{{ reason.description }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -79,34 +75,51 @@ const reasons = [
   margin: 12px auto 0;
 }
 
-.reasons-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-
-.reason-card {
-  padding: 28px 24px;
-  border-radius: var(--radius);
+.reasons-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  transition: border-color 0.2s, transform 0.2s;
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
-.reason-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.12);
+.reason-item {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px 20px;
+  border-right: 1px solid var(--color-border);
+  transition: background 0.2s;
+}
+
+.reason-item:last-child {
+  border-right: none;
+}
+
+.reason-item:hover {
+  background: var(--color-surface-2);
 }
 
 .reason-icon-wrap {
-  width: 40px;
-  height: 40px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  margin-top: 2px;
+}
+
+.reason-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .reason-green {
@@ -125,27 +138,30 @@ const reasons = [
 }
 
 .reason-title {
-  font-size: 0.98rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 8px;
 }
 
 .reason-desc {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted);
-  line-height: 1.65;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
-  .reasons-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .reasons-strip {
+    flex-direction: column;
   }
-}
 
-@media (max-width: 600px) {
-  .reasons-grid {
-    grid-template-columns: 1fr;
+  .reason-item {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    min-width: 100%;
+  }
+
+  .reason-item:last-child {
+    border-bottom: none;
   }
 }
 </style>

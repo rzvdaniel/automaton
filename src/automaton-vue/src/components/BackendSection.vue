@@ -11,32 +11,29 @@
             <i class="pi pi-database" />
             Backend
           </span>
-          <h2 class="section-title">Backend made simple</h2>
+          <h2 class="section-title">Backend, simplified</h2>
           <p class="section-subtitle">
-            No server configuration. No DevOps. Just put your Python files in
-            <code>/backend</code> — Automaton handles the rest.
+            Put your Python code in <code>/backend</code>.
+            We handle the rest.
           </p>
 
           <ul class="backend-steps">
             <li>
               <span class="step-num">1</span>
               <div>
-                <strong>Put Python files in <code>/backend</code></strong>
-                <p>Use FastAPI. Standard Python. No magic imports.</p>
+                <strong>Add FastAPI in <code>/backend</code></strong>
               </div>
             </li>
             <li>
               <span class="step-num">2</span>
               <div>
-                <strong>Expose endpoints under <code>/api/*</code></strong>
-                <p>Your frontend calls <code>fetch("/api/...")</code> — works everywhere.</p>
+                <strong>Use <code>/api</code> routes</strong>
               </div>
             </li>
             <li>
               <span class="step-num">3</span>
               <div>
-                <strong>Deploy — backend runs automatically</strong>
-                <p>On Automaton Cloud or your own Runner. Your choice.</p>
+                <strong>Deploy — it just works</strong>
               </div>
             </li>
           </ul>

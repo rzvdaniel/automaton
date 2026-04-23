@@ -8,43 +8,48 @@
     <div class="hero-glow" aria-hidden="true" />
 
     <div class="container hero-inner">
-      <div class="hero-badge">
-        <span class="badge-dot" />
-        Deploy in seconds — no DevOps required
-      </div>
-
-      <h1 class="hero-title">
-        Build with your tools.<br />
-        <span class="hero-accent">Ship instantly.</span>
-      </h1>
-
-      <p class="hero-subtitle">
-        Use GitHub Copilot, Claude Code, or your favorite stack.
-        Automaton turns your code into a live, shareable app — no config, no containers.
-      </p>
-
-      <div class="hero-actions">
-        <a href="#install" class="btn btn-primary btn-lg">
-          <i class="pi pi-download" />
-          Install CLI
-        </a>
-        <a href="/apps" class="btn btn-secondary btn-lg">
-          Explore apps
-          <i class="pi pi-arrow-right" />
-        </a>
-      </div>
-
-      <div class="hero-tools">
-        <span class="tools-label">Works with</span>
-        <div class="tools-list">
-          <span class="tool-badge">GitHub Copilot</span>
-          <span class="tool-badge">Claude Code</span>
-          <span class="tool-badge">Cursor</span>
-          <span class="tool-badge">Any IDE</span>
+      <!-- Left: text -->
+      <div class="hero-text">
+        <div class="hero-badge">
+          <span class="badge-dot" />
+          Deploy in seconds — no DevOps required
         </div>
+
+        <h1 class="hero-title">
+          Build with your tools.<br />
+          <span class="hero-accent">Ship instantly.</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          Use GitHub Copilot, Claude, or your own stack.
+          Automaton turns your code into a live, shareable app — no DevOps.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#install" class="btn btn-primary btn-lg">
+            <i class="pi pi-download" />
+            Install CLI
+          </a>
+          <a href="/apps" class="btn btn-secondary btn-lg">
+            Explore apps
+            <i class="pi pi-arrow-right" />
+          </a>
+        </div>
+
+        <div class="hero-tools">
+          <span class="tools-label">Works with</span>
+          <div class="tools-list">
+            <span class="tool-badge">GitHub Copilot</span>
+            <span class="tool-badge">Claude</span>
+            <span class="tool-badge">Cursor</span>
+            <span class="tool-badge">Any IDE</span>
+          </div>
+        </div>
+
+        <p class="hero-no-lock">✓ No lock-in. Run locally or in the cloud.</p>
       </div>
 
-      <!-- Terminal preview -->
+      <!-- Right: terminal -->
       <div class="hero-terminal">
         <div class="terminal-bar">
           <span class="dot red" />
@@ -81,24 +86,34 @@
   position: relative;
   padding: 80px 0 100px;
   overflow: hidden;
+  background-image:
+    linear-gradient(rgba(124, 106, 245, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 106, 245, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
 
 .hero-glow {
   position: absolute;
-  top: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
+  top: -100px;
+  right: -100px;
+  width: 700px;
   height: 600px;
-  background: radial-gradient(ellipse, rgba(124, 106, 245, 0.18) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(124, 106, 245, 0.22) 0%, transparent 65%);
   pointer-events: none;
 }
 
 .hero-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.hero-text {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .hero-badge {
@@ -159,12 +174,25 @@
   gap: 12px;
   margin-top: 36px;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
 .btn-lg {
   padding: 14px 28px;
   font-size: 0.95rem;
+}
+
+.hero-no-lock {
+  margin-top: 14px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.hero-no-lock {
+  margin-top: 16px;
+  font-size: 0.82rem;
+  color: var(--color-green);
+  font-weight: 500;
 }
 
 .hero-tools {
@@ -199,11 +227,29 @@
   color: var(--color-text-muted);
 }
 
+@media (max-width: 900px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .hero-text {
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-actions {
+    justify-content: center;
+  }
+
+  .hero-tools {
+    justify-content: center;
+  }
+}
+
 /* Terminal */
 .hero-terminal {
-  margin-top: 56px;
   width: 100%;
-  max-width: 580px;
   border-radius: var(--radius);
   background: #0d0d14;
   border: 1px solid var(--color-border);

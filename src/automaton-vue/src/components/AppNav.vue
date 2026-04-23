@@ -7,6 +7,7 @@ const mobileMenuOpen = ref(false)
 const navLinks = [
   { label: 'Apps', href: '/apps' },
   { label: 'Docs', href: '/docs' },
+  { label: 'Pricing', href: '/pricing' },
   { label: 'GitHub', href: 'https://github.com', external: true },
 ]
 </script>
