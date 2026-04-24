@@ -98,7 +98,6 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
           </span>
           <h2 class="section-title">Try real apps built with Automaton</h2>
           <p class="section-subtitle">Open them. Use them. See how they work.</p>
-          <p class="showcase-built-by">Built by developers using Automaton</p>
         </div>
         <a href="/apps" class="view-all-link">
           View all apps <i class="pi pi-arrow-right" />
@@ -154,7 +153,7 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 <style scoped>
 .showcase-section {
-  padding: 100px 0;
+  padding: 20px 0;
   border-top: 1px solid var(--color-border);
 }
 

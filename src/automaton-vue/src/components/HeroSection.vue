@@ -10,13 +10,8 @@
     <div class="container hero-inner">
       <!-- Left: text -->
       <div class="hero-text">
-        <div class="hero-badge">
-          <span class="badge-dot" />
-          Deploy in seconds — no DevOps required
-        </div>
-
         <h1 class="hero-title">
-          Build with your tools.<br />
+          <span class="hero-title-line">Build with your tools.</span><br />
           <span class="hero-accent">Ship instantly.</span>
         </h1>
 
@@ -84,7 +79,7 @@
 <style scoped>
 .hero {
   position: relative;
-  padding: 80px 0 100px;
+  padding: 10px 0 10px;
   overflow: hidden;
   background-image:
     linear-gradient(rgba(124, 106, 245, 0.05) 1px, transparent 1px),
@@ -116,41 +111,18 @@
   text-align: left;
 }
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-radius: 20px;
-  background: var(--color-accent-soft);
-  border: 1px solid rgba(124, 106, 245, 0.3);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-accent);
-  margin-bottom: 28px;
-}
-
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-green);
-  box-shadow: 0 0 6px var(--color-green);
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
 
 .hero-title {
-  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-size: clamp(2.2rem, 4.5vw, 3.4rem);
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.03em;
   color: var(--color-text);
   max-width: 700px;
+}
+
+.hero-title-line {
+  white-space: nowrap;
 }
 
 .hero-accent {
@@ -164,7 +136,7 @@
   font-size: clamp(1rem, 2vw, 1.15rem);
   color: var(--color-text-muted);
   max-width: 560px;
-  margin-top: 20px;
+  margin-top: 16px;
   line-height: 1.7;
 }
 
@@ -172,7 +144,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 36px;
+  margin-top: 28px;
   flex-wrap: wrap;
 }
 
@@ -230,7 +202,7 @@
 @media (max-width: 900px) {
   .hero-inner {
     grid-template-columns: 1fr;
-    gap: 40px;
+    gap: 20px;
   }
 
   .hero-text {
