@@ -1,90 +1,104 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import flappyBirdImage from '@/assets/images/flappy-birds.png'
+import pacManImage from '@/assets/images/pac-man.png'
+import snakeImage from '@/assets/images/snake.png'
+import tetrisImage from '@/assets/images/tetris.png'
 
 const activeCategory = ref('games')
 
 const categories = [
-  { id: 'games', label: '🎮 Games' },
-  { id: 'tools', label: '🛠 Tools' },
+  { id: 'games', label: 'Games', icon: 'pi pi-microsoft' },
+  { id: 'tools', label: 'Tools', icon: 'pi pi-wrench' },
 ]
 
 type App = {
   title: string
   description: string
-  image: string
+  image?: string
+  icon?: string
   category: string
   action: string
   color: string
+  tagline: string
 }
 
 const apps: App[] = [
   {
     title: 'Pac-Man',
     description: 'Classic arcade game. Runs instantly.',
-    image: '🕹️',
+    image: pacManImage,
     category: 'games',
-    action: 'Play',
+    action: 'Play now',
     color: '#febc2e',
+    tagline: 'Built with Automaton',
   },
   {
     title: 'Snake',
-    description: 'Eat the food, grow longer. Beat your high score.',
-    image: '🐍',
+    description: 'Eat, grow, and beat your high score.',
+    image: snakeImage,
     category: 'games',
-    action: 'Play',
+    action: 'Play now',
     color: '#3ddc84',
+    tagline: 'Built with Automaton',
   },
   {
     title: 'Tetris',
-    description: 'Simple Tetris clone. Clean and addictive.',
-    image: '🧩',
+    description: 'A simple Tetris clone. Clean and addictive.',
+    image: tetrisImage,
     category: 'games',
-    action: 'Play',
+    action: 'Play now',
     color: '#4da6ff',
+    tagline: 'Built with Automaton',
   },
   {
     title: 'Flappy Bird',
     description: 'How far can you go? Good luck.',
-    image: '🐦',
+    image: flappyBirdImage,
     category: 'games',
-    action: 'Play',
+    action: 'Play now',
     color: '#7c6af5',
+    tagline: 'Built with Automaton',
   },
   {
     title: 'Poker Planning',
     description: 'Agile planning poker made simple.',
-    image: '🃏',
+    icon: 'pi pi-users',
     category: 'tools',
     action: 'Open',
     color: '#7c6af5',
+    tagline: 'Team tool',
   },
   {
     title: 'Base64 Converter',
     description: 'Encode and decode Base64 strings instantly.',
-    image: '🔐',
+    icon: 'pi pi-lock',
     category: 'tools',
     action: 'Open',
     color: '#4da6ff',
+    tagline: 'Developer tool',
   },
   {
     title: 'JSON Formatter',
     description: 'Format, validate and beautify your JSON.',
-    image: '{ }',
+    icon: 'pi pi-code',
     category: 'tools',
     action: 'Open',
     color: '#3ddc84',
+    tagline: 'Developer tool',
   },
   {
     title: 'UUID Generator',
     description: 'Generate UUIDs v4 in one click.',
-    image: '🆔',
+    icon: 'pi pi-hashtag',
     category: 'tools',
     action: 'Open',
     color: '#febc2e',
+    tagline: 'Utility',
   },
 ]
 
-const filteredApps = () => apps.filter((a) => a.category === activeCategory.value)
+const filteredApps = computed(() => apps.filter((app) => app.category === activeCategory.value))
 </script>
 
 <template>
@@ -112,32 +126,39 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
           :class="{ active: activeCategory === cat.id }"
           @click="activeCategory = cat.id"
         >
-          {{ cat.label }}
+          <i :class="cat.icon" />
+          <span>{{ cat.label }}</span>
         </button>
       </div>
 
       <div class="apps-grid">
-        <div v-for="app in filteredApps()" :key="app.title" class="app-card">
+        <article v-for="app in filteredApps" :key="app.title" class="app-card">
           <div class="app-preview" :style="{ '--app-color': app.color }">
-            <span class="instant-badge">⚡ Instant</span>
-            <span class="app-emoji">{{ app.image }}</span>
+            <span class="instant-badge">
+              <i class="pi pi-bolt" />
+              Instant
+            </span>
+            <img v-if="app.image" :src="app.image" :alt="`${app.title} preview`" class="app-thumbnail" />
+            <div v-else class="app-tool-art" aria-hidden="true">
+              <div class="tool-grid"></div>
+              <span class="tool-icon-wrap">
+                <i :class="app.icon" />
+              </span>
+            </div>
           </div>
           <div class="app-info">
-            <div class="app-built-badge">Built with Automaton</div>
+            <div class="app-built-badge">{{ app.tagline }}</div>
             <h3 class="app-title">{{ app.title }}</h3>
             <p class="app-desc">{{ app.description }}</p>
             <div class="app-footer">
-              <span class="app-author">
-                <span class="author-avatar">A</span>
-                by automaton
-              </span>
+              <span class="app-author">Built with Automaton</span>
               <a href="#" class="btn btn-secondary app-action-btn">
                 {{ app.action }}
-                <i class="pi pi-external-link" style="font-size:0.75rem" />
+                <i class="pi pi-arrow-right" />
               </a>
             </div>
           </div>
-        </div>
+        </article>
       </div>
 
       <div class="showcase-cta">
@@ -219,6 +240,9 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 }
 
 .cat-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 18px;
   border-radius: 999px;
   font-size: 0.84rem;
@@ -233,122 +257,166 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 .cat-tab.active,
 .cat-tab:hover {
-  background: rgba(124, 106, 245, 0.16);
-  border-color: rgba(124, 106, 245, 0.4);
-  color: var(--color-text);
+  background: linear-gradient(135deg, rgba(124, 106, 245, 0.26), rgba(124, 106, 245, 0.14));
+  border-color: rgba(124, 106, 245, 0.46);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(124, 106, 245, 0.16);
 }
 
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  gap: 18px;
 }
 
 .app-card {
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: linear-gradient(180deg, rgba(20, 20, 28, 0.95), rgba(14, 14, 20, 0.98));
   border: 1px solid var(--color-border);
   overflow: hidden;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, background 0.2s;
   cursor: pointer;
 }
 
 .app-card:hover {
   transform: translateY(-3px);
   border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
 .app-preview {
   position: relative;
   height: 140px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--app-color) 12%, var(--color-surface-2)),
-    var(--color-surface-2)
-  );
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--app-color) 22%, transparent), transparent 38%),
+    linear-gradient(180deg, rgba(11, 14, 25, 0.96), rgba(10, 11, 17, 0.98));
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid var(--color-border);
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .instant-badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
   border-radius: 6px;
   font-size: 0.7rem;
   font-weight: 700;
-  background: var(--color-accent);
+  background: rgba(18, 22, 31, 0.92);
   color: #fff;
   letter-spacing: 0.02em;
+  z-index: 1;
 }
 
-.app-emoji {
-  font-size: 3rem;
+.app-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 12px;
+  display: block;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.app-tool-art {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--app-color) 26%, rgba(255, 255, 255, 0.04)), rgba(12, 14, 22, 0.96)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tool-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.3;
+}
+
+.tool-icon-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.75rem;
+  color: var(--app-color);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--app-color) 34%, transparent);
 }
 
 .app-info {
-  padding: 16px;
+  padding: 16px 14px 12px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .app-built-badge {
   display: inline-block;
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  color: var(--color-accent);
-  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  margin-bottom: 8px;
   letter-spacing: 0.02em;
 }
 
 .app-title {
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .app-desc {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
+  font-size: 0.92rem;
+  color: rgba(234, 236, 245, 0.84);
   line-height: 1.5;
-  margin-bottom: 16px;
+  min-height: 3em;
+  margin-bottom: 18px;
 }
 
 .app-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .app-author {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.author-avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--color-accent-soft);
-  border: 1px solid rgba(124, 106, 245, 0.3);
-  color: var(--color-accent);
-  font-size: 0.7rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .app-action-btn {
-  padding: 5px 12px;
+  padding: 7px 12px;
   font-size: 0.78rem;
   gap: 4px;
+  border-color: rgba(124, 106, 245, 0.34);
+  background: rgba(124, 106, 245, 0.18);
+  color: #fff;
+}
+
+.app-action-btn:hover {
+  background: rgba(124, 106, 245, 0.3);
+  border-color: rgba(124, 106, 245, 0.45);
 }
 
 .showcase-cta {
@@ -380,6 +448,10 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
   .category-tabs {
     flex-wrap: wrap;
+  }
+
+  .app-title {
+    font-size: 1.08rem;
   }
 }
 
