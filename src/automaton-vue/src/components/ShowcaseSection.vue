@@ -153,41 +153,50 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 <style scoped>
 .showcase-section {
-  padding: 20px 0;
+  padding: 12px 0 20px;
   border-top: 1px solid var(--color-border);
 }
 
 .section-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.section-header .section-subtitle {
-  margin: 12px auto 0;
-}
-
-.section-header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 40px;
-  gap: 16px;
+  margin-bottom: 20px;
+  gap: 20px;
 }
 
 .section-header-left {
   text-align: left;
 }
 
+.section-header-left .section-label {
+  margin-bottom: 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.section-header-left .section-title {
+  font-size: clamp(1.75rem, 3.4vw, 2.35rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.section-header-left .section-subtitle {
+  margin-top: 8px;
+  font-size: 0.98rem;
+  max-width: 460px;
+}
+
 .view-all-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-accent);
   text-decoration: none;
   white-space: nowrap;
-  margin-top: 8px;
+  margin-top: 0;
   transition: opacity 0.2s;
 }
 
@@ -204,28 +213,29 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 
 .category-tabs {
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 48px;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 26px;
 }
 
 .cat-tab {
-  padding: 8px 20px;
-  border-radius: 20px;
-  font-size: 0.88rem;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
-  background: var(--color-surface);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
   transition: all 0.2s;
+  line-height: 1;
 }
 
 .cat-tab.active,
 .cat-tab:hover {
-  background: var(--color-accent-soft);
+  background: rgba(124, 106, 245, 0.16);
   border-color: rgba(124, 106, 245, 0.4);
-  color: var(--color-accent);
+  color: var(--color-text);
 }
 
 .apps-grid {
@@ -358,6 +368,18 @@ const filteredApps = () => apps.filter((a) => a.category === activeCategory.valu
 @media (max-width: 1024px) {
   .apps-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .category-tabs {
+    flex-wrap: wrap;
   }
 }
 
