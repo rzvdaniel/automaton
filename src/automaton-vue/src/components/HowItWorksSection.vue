@@ -1,32 +1,20 @@
 <script setup lang="ts">
 const steps = [
   {
-    number: '01',
     icon: 'pi-code',
-    title: 'Build',
-    subtitle: 'Build with your tools',
-    description: 'Use Copilot, Claude, or any IDE. Follow a simple /ui + /backend structure.',
-    detail: null,
-    color: 'accent',
+    title: 'Build with your tools',
+    description: 'Use Copilot, Claude, or any IDE. Just follow a simple /ui + /backend structure.',
   },
   {
-    number: '02',
     icon: 'pi-upload',
-    title: 'Deploy',
-    subtitle: 'Run one command',
+    title: 'Run one command',
     description: 'We detect your app and deploy it instantly.',
-    detail: null,
     code: 'automaton deploy',
-    color: 'blue',
   },
   {
-    number: '03',
     icon: 'pi-globe',
-    title: 'Done',
-    subtitle: 'Your app is live',
+    title: 'Your app is live',
     description: 'Get a public URL. Backend runs on cloud or your own Runner.',
-    detail: null,
-    color: 'green',
   },
 ]
 </script>
@@ -34,32 +22,33 @@ const steps = [
 <template>
   <section id="how-it-works" class="how-section">
     <div class="container">
-      <div class="section-header">
-        <h2 class="section-title">From code to live in seconds</h2>
-        <p class="section-subtitle">No pipelines. No setup. Just deploy.</p>
-      </div>
-
       <div class="steps-card">
-        <template v-for="(step, index) in steps" :key="step.number">
-          <div class="step-item" :class="`step-${step.color}`">
-            <div class="step-circle" :class="`circle-${step.color}`">{{ index + 1 }}</div>
-            <div class="step-icon-wrap" :class="`icon-${step.color}`">
-              <i :class="`pi ${step.icon}`" />
-            </div>
-            <div class="step-body">
-              <div class="step-eyebrow">{{ step.title }}</div>
-              <h3 class="step-title">{{ step.subtitle }}</h3>
-              <p class="step-desc">{{ step.description }}</p>
-              <div v-if="step.code" class="step-code">
-                <i class="pi pi-bolt" style="font-size:0.75rem; color: var(--color-blue)" />
-                {{ step.code }}
+        <div class="section-copy">
+          <h2 class="section-title">From code to live in seconds</h2>
+          <p class="section-subtitle">No pipelines. No setup. Just deploy.</p>
+        </div>
+
+        <div class="steps-row">
+          <template v-for="(step, index) in steps" :key="step.title">
+            <article class="step-item">
+              <div class="step-number">{{ index + 1 }}</div>
+              <div class="step-icon-wrap">
+                <i :class="`pi ${step.icon}`" />
               </div>
+              <div class="step-body">
+                <h3 class="step-title">{{ step.title }}</h3>
+                <p class="step-desc">{{ step.description }}</p>
+                <div v-if="step.code" class="step-code">
+                  <span class="step-code-prompt">$</span>
+                  {{ step.code }}
+                </div>
+              </div>
+            </article>
+            <div v-if="index < steps.length - 1" class="step-arrow">
+              <i class="pi pi-arrow-right" />
             </div>
-          </div>
-          <div v-if="index < steps.length - 1" class="step-arrow">
-            <i class="pi pi-arrow-right" />
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
     </div>
   </section>
@@ -67,133 +56,136 @@ const steps = [
 
 <style scoped>
 .how-section {
-  padding: 100px 0;
-  border-top: 1px solid var(--color-border);
+  padding: 5px 0 10px;
 }
 
-.section-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.section-header .section-subtitle {
-  margin: 8px auto 0;
-}
-
-/* Single card wrapping all steps */
 .steps-card {
+  padding: 24px 26px 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at 96% 18%, rgba(124, 106, 245, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(13, 17, 25, 0.96), rgba(10, 13, 19, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.section-copy {
+  margin-bottom: 26px;
+}
+
+.section-title {
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.section-subtitle {
+  margin-top: 6px;
+  font-size: 0.98rem;
+  color: rgba(233, 236, 245, 0.72);
+}
+
+.steps-row {
   display: flex;
   align-items: center;
-  gap: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 40px 32px;
+  gap: 20px;
 }
 
 .step-item {
   flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px 58px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 0 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #4f36b3;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .step-arrow {
   flex-shrink: 0;
-  color: var(--color-text-muted);
-  opacity: 0.4;
-  font-size: 1.1rem;
-  padding: 0 8px;
-}
-
-.step-circle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 0.85rem;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: rgba(124, 106, 245, 0.44);
+  font-size: 1rem;
+  margin-top: 24px;
 }
-
-.circle-accent { background: var(--color-accent-soft); color: var(--color-accent); border: 1px solid rgba(124, 106, 245, 0.3); }
-.circle-blue   { background: var(--color-blue-soft);   color: var(--color-blue);   border: 1px solid rgba(77, 166, 255, 0.3); }
-.circle-green  { background: var(--color-green-soft);  color: var(--color-green);  border: 1px solid rgba(61, 220, 132, 0.3); }
 
 .step-icon-wrap {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
+  position: relative;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  color: #8f6cff;
+  font-size: 2rem;
 }
-
-.icon-accent { background: var(--color-accent-soft); color: var(--color-accent); }
-.icon-blue   { background: var(--color-blue-soft);   color: var(--color-blue); }
-.icon-green  { background: var(--color-green-soft);  color: var(--color-green); }
 
 .step-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
 }
-
-.step-eyebrow {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-text-muted);
-}
-
-.step-accent .step-eyebrow { color: var(--color-accent); }
-.step-blue   .step-eyebrow { color: var(--color-blue); }
-.step-green  .step-eyebrow { color: var(--color-green); }
 
 .step-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--color-text);
-  margin: 0;
+  line-height: 1.25;
 }
 
 .step-desc {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  margin-top: 4px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(233, 236, 245, 0.64);
 }
 
 .step-code {
+  order: -1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.4);
+  width: min(100%, 200px);
+  margin-bottom: 1px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(124, 106, 245, 0.22);
+  background: rgba(15, 17, 27, 0.82);
+  color: #b897ff;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  color: var(--color-text);
-  border: 1px solid rgba(77, 166, 255, 0.2);
-  width: fit-content;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.step-code-prompt {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 @media (max-width: 900px) {
-  .steps-card {
+  .steps-row {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 0;
-    padding: 28px 24px;
   }
 
   .step-item {
-    padding: 16px 0;
     width: 100%;
+    padding: 18px 0;
   }
 
   .step-item:not(:last-child) {
@@ -202,6 +194,27 @@ const steps = [
 
   .step-arrow {
     display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .steps-card {
+    padding: 22px 20px;
+  }
+
+  .step-item {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .step-icon-wrap {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 4px;
+  }
+
+  .step-body {
+    grid-column: 2;
   }
 }
 </style>

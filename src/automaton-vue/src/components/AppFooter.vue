@@ -1,7 +1,3 @@
-<script setup lang="ts">
-// Footer
-</script>
-
 <template>
   <footer class="site-footer">
     <div class="container footer-inner">
@@ -10,15 +6,13 @@
           <span>⚡</span>
           <span>Automaton</span>
         </div>
-        <p class="footer-tagline">
-          The fastest way to turn your code into a live app.
-        </p>
+        <p class="footer-tagline">The fastest way to turn your code into a live app.</p>
         <div class="footer-social">
-          <a href="https://twitter.com" target="_blank" class="social-link" aria-label="Twitter">
-            <i class="pi pi-twitter" />
-          </a>
           <a href="https://github.com" target="_blank" class="social-link" aria-label="GitHub">
             <i class="pi pi-github" />
+          </a>
+          <a href="https://twitter.com" target="_blank" class="social-link" aria-label="Twitter">
+            <i class="pi pi-twitter" />
           </a>
           <a href="https://discord.com" target="_blank" class="social-link" aria-label="Discord">
             <i class="pi pi-discord" />
@@ -26,38 +20,34 @@
         </div>
       </div>
 
-      <div class="footer-links">
-        <div class="footer-col">
-          <h4 class="footer-col-title">Product</h4>
-          <a href="/apps" class="footer-link">Apps</a>
-          <a href="/docs" class="footer-link">Docs</a>
-          <a href="/pricing" class="footer-link">Pricing</a>
-          <a href="#install" class="footer-link">CLI</a>
-          <a href="#" class="footer-link">Changelog</a>
-        </div>
-        <div class="footer-col">
-          <h4 class="footer-col-title">Resources</h4>
-          <a href="/docs" class="footer-link">Getting started</a>
-          <a href="/docs#backend" class="footer-link">Backend guide</a>
-          <a href="/docs#deploy" class="footer-link">Deploy guide</a>
-          <a href="/docs#examples" class="footer-link">Examples</a>
-        </div>
-        <div class="footer-col">
-          <h4 class="footer-col-title">Company</h4>
-          <a href="#" class="footer-link">About</a>
-          <a href="mailto:hello@automaton.app" class="footer-link">Contact</a>
-          <a href="#" class="footer-link">Terms</a>
-          <a href="#" class="footer-link">Privacy</a>
-        </div>
+      <div class="footer-col">
+        <h4 class="footer-col-title">Product</h4>
+        <a href="/apps" class="footer-link">Apps</a>
+        <a href="#install" class="footer-link">CLI</a>
+        <a href="/pricing" class="footer-link">Pricing</a>
+        <a href="#" class="footer-link">Changelog</a>
       </div>
-    </div>
 
-    <div class="footer-bottom">
-      <div class="container footer-bottom-inner">
-        <span>© 2024 Automaton.</span>
-        <span class="indie-note">
-          Built by a solo developer. Open to collaboration. <a href="mailto:hello@automaton.app">Get in touch →</a>
-        </span>
+      <div class="footer-col">
+        <h4 class="footer-col-title">Resources</h4>
+        <a href="/docs" class="footer-link">Docs</a>
+        <a href="/docs#backend" class="footer-link">Backend Guide</a>
+        <a href="/docs#deploy" class="footer-link">Deploy Guide</a>
+        <a href="/docs#examples" class="footer-link">Examples</a>
+      </div>
+
+      <div class="footer-col">
+        <h4 class="footer-col-title">Company</h4>
+        <a href="#" class="footer-link">About</a>
+        <a href="mailto:hello@automaton.app" class="footer-link">Contact</a>
+        <a href="#" class="footer-link">Terms</a>
+        <a href="#" class="footer-link">Privacy</a>
+      </div>
+
+      <div class="footer-side">
+        <p class="footer-side-copy">Built by a solo developer. Open to collaboration.</p>
+        <a href="mailto:hello@automaton.app" class="footer-cta">Get in touch <i class="pi pi-arrow-right" /></a>
+        <div class="footer-copyright">© 2024 Automaton</div>
       </div>
     </div>
   </footer>
@@ -65,43 +55,34 @@
 
 <style scoped>
 .site-footer {
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
 }
 
 .footer-inner {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 48px;
-  padding-top: 64px;
-  padding-bottom: 48px;
-}
-
-.footer-brand {
-  grid-column: 1;
-}
-
-.footer-links {
-  grid-column: 2 / -1;
-  display: contents;
+  grid-template-columns: 1.2fr 0.8fr 0.9fr 0.8fr 1fr;
+  gap: 28px;
+  padding-top: 28px;
+  padding-bottom: 32px;
 }
 
 .footer-logo {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--color-text);
   margin-bottom: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .footer-tagline {
+  max-width: 230px;
+  margin-bottom: 18px;
   font-size: 0.86rem;
-  color: var(--color-text-muted);
   line-height: 1.6;
-  max-width: 240px;
-  margin-bottom: 20px;
+  color: rgba(233, 236, 245, 0.68);
 }
 
 .footer-social {
@@ -112,40 +93,37 @@
 .social-link {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--color-text-muted);
-  font-size: 0.9rem;
   transition: color 0.2s, border-color 0.2s;
 }
 
 .social-link:hover {
   color: var(--color-text);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .footer-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .footer-col-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 4px;
 }
 
 .footer-link {
   font-size: 0.875rem;
-  color: var(--color-text-muted);
+  color: rgba(233, 236, 245, 0.68);
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -154,49 +132,51 @@
   color: var(--color-text);
 }
 
-.footer-bottom {
-  border-top: 1px solid var(--color-border);
-}
-
-.footer-bottom-inner {
+.footer-side {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 20px;
-  padding-bottom: 24px;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-.indie-note a {
-  color: var(--color-accent);
+.footer-side-copy,
+.footer-copyright {
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: rgba(233, 236, 245, 0.68);
+}
+
+.footer-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text);
   text-decoration: none;
 }
 
-.indie-note a:hover {
-  text-decoration: underline;
+.footer-cta:hover {
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .footer-inner {
     grid-template-columns: 1fr 1fr;
-    gap: 32px;
   }
 
-  .footer-brand {
+  .footer-brand,
+  .footer-side {
     grid-column: 1 / -1;
-  }
-
-  .footer-links {
-    display: contents;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .footer-inner {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
 }
 </style>

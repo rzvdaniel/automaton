@@ -147,26 +147,18 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
             </div>
           </div>
           <div class="app-info">
-            <div class="app-built-badge">{{ app.tagline }}</div>
+            <!-- <div class="app-built-badge">{{ app.tagline }}</div> -->
             <h3 class="app-title">{{ app.title }}</h3>
             <p class="app-desc">{{ app.description }}</p>
             <div class="app-footer">
               <span class="app-author">Built with Automaton</span>
               <a href="#" class="btn btn-secondary app-action-btn">
                 {{ app.action }}
-                <i class="pi pi-arrow-right" />
+                <span class="app-action-arrow" aria-hidden="true">▶</span>
               </a>
             </div>
           </div>
         </article>
-      </div>
-
-      <div class="showcase-cta">
-        <p class="showcase-cta-text">Want to build something like this?</p>
-        <a href="#install" class="btn btn-primary">
-          <i class="pi pi-download" />
-          Install CLI
-        </a>
       </div>
     </div>
   </section>
@@ -174,7 +166,7 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
 
 <style scoped>
 .showcase-section {
-  padding: 12px 0 20px;
+  padding: 18px 0 10px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -295,7 +287,6 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -408,7 +399,7 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
 .app-action-btn {
   padding: 7px 12px;
   font-size: 0.78rem;
-  gap: 4px;
+  gap: 6px;
   border-color: rgba(124, 106, 245, 0.34);
   background: rgba(124, 106, 245, 0.18);
   color: #fff;
@@ -417,6 +408,12 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
 .app-action-btn:hover {
   background: rgba(124, 106, 245, 0.3);
   border-color: rgba(124, 106, 245, 0.45);
+}
+
+.app-action-arrow {
+  font-size: 0.7rem;
+  line-height: 1;
+  transform: translateX(1px);
 }
 
 .showcase-cta {

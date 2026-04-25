@@ -4,7 +4,6 @@ import HeroSection from '@/components/HeroSection.vue'
 import HowItWorksSection from '@/components/HowItWorksSection.vue'
 import ShowcaseSection from '@/components/ShowcaseSection.vue'
 import WhySection from '@/components/WhySection.vue'
-import BackendSection from '@/components/BackendSection.vue'
 import InstallSection from '@/components/InstallSection.vue'
 import AppFooter from '@/components/AppFooter.vue'
 </script>
@@ -17,7 +16,6 @@ import AppFooter from '@/components/AppFooter.vue'
       <ShowcaseSection />
       <HowItWorksSection />
       <WhySection />
-      <BackendSection />
       <InstallSection />
     </main>
     <AppFooter />

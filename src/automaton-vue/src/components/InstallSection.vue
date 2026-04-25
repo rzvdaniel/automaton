@@ -1,18 +1,10 @@
-<script setup lang="ts">
-// Install / CTA section
-</script>
-
 <template>
   <section id="install" class="install-section">
     <div class="container">
       <div class="install-card">
         <div class="install-glow" aria-hidden="true" />
 
-        <!-- Left: content -->
-        <div class="install-content">
-          <h2 class="install-title">Ship your first app in minutes</h2>
-          <p class="install-subtitle">Install the CLI and deploy instantly.</p>
-
+        <div class="install-command-wrap">
           <div class="install-command">
             <span class="install-prompt">$</span>
             <span class="install-cmd">npm install -g @automaton/cli</span>
@@ -20,6 +12,11 @@
               <i class="pi pi-copy" />
             </button>
           </div>
+        </div>
+
+        <div class="install-content">
+          <h2 class="install-title">Ship your first app in minutes</h2>
+          <p class="install-subtitle">Install the CLI and deploy instantly.</p>
 
           <div class="install-actions">
             <a href="#install" class="btn btn-primary btn-lg">
@@ -28,19 +25,15 @@
             </a>
             <a href="/docs" class="btn btn-secondary btn-lg">
               <i class="pi pi-book" />
-              Read docs
+              Read the docs
             </a>
           </div>
-          <p class="install-note">No account required to start.</p>
         </div>
 
-        <!-- Right: rocket illustration -->
         <div class="install-rocket" aria-hidden="true">
-          <div class="rocket-glow" />
-          <div class="rocket-emoji">🚀</div>
-          <div class="rocket-trail">
-            <span /><span /><span />
-          </div>
+          <div class="rocket-outline"></div>
+          <div class="rocket-trail trail-one"></div>
+          <div class="rocket-trail trail-two"></div>
         </div>
       </div>
     </div>
@@ -49,78 +42,78 @@
 
 <style scoped>
 .install-section {
-  padding: 100px 0;
+  padding: 10px 0 30px;
 }
 
 .install-card {
   position: relative;
-  border-radius: 20px;
-  background: var(--color-surface);
-  border: 1px solid rgba(124, 106, 245, 0.2);
-  padding: 64px 56px;
-  overflow: hidden;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 32px;
+  grid-template-columns: 290px minmax(0, 1fr) 210px;
+  gap: 28px;
   align-items: center;
+  padding: 34px 24px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(151, 111, 255, 0.32);
+  background:
+    radial-gradient(circle at 85% 50%, rgba(159, 104, 255, 0.2), transparent 30%),
+    linear-gradient(180deg, rgba(43, 21, 82, 0.98), rgba(29, 16, 54, 0.98));
 }
 
 .install-glow {
   position: absolute;
-  top: -80px;
-  left: -80px;
-  width: 500px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(124, 106, 245, 0.18) 0%, transparent 65%);
+  right: -80px;
+  bottom: -120px;
+  width: 360px;
+  height: 260px;
+  background: radial-gradient(ellipse, rgba(182, 112, 255, 0.22) 0%, transparent 66%);
   pointer-events: none;
 }
 
-.install-content {
+.install-command-wrap,
+.install-content,
+.install-rocket {
   position: relative;
   z-index: 1;
-  text-align: left;
 }
 
-.install-title {
-  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--color-text);
-  margin-bottom: 10px;
-}
-
-.install-subtitle {
-  font-size: 1rem;
-  color: var(--color-text-muted);
-  margin-bottom: 28px;
+.install-command-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
 }
 
 .install-command {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 18px;
-  border-radius: var(--radius);
-  background: #0d0d14;
-  border: 1px solid var(--color-border);
+  min-height: 74px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(9, 11, 18, 0.88);
   font-family: var(--font-mono);
   font-size: 0.9rem;
-  margin-bottom: 28px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .install-prompt {
-  color: var(--color-accent);
+  color: #ffffff;
   font-weight: 700;
 }
 
 .install-cmd {
-  color: var(--color-text);
+  flex: 1;
+  min-width: 0;
+  color: #8ef0a1;
 }
 
 .copy-btn {
   background: none;
   border: none;
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.68);
   cursor: pointer;
   padding: 2px 4px;
   transition: color 0.2s;
@@ -131,6 +124,20 @@
   color: var(--color-text);
 }
 
+.install-title {
+  font-size: clamp(1.9rem, 3.2vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.install-subtitle {
+  font-size: 1rem;
+  color: rgba(240, 240, 245, 0.78);
+  margin-bottom: 22px;
+}
+
 .install-actions {
   display: flex;
   align-items: center;
@@ -138,78 +145,92 @@
   flex-wrap: wrap;
 }
 
-.install-note {
-  margin-top: 16px;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-/* Rocket illustration */
 .install-rocket {
   position: relative;
-  width: 180px;
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 100%;
+  min-height: 160px;
 }
 
-.rocket-glow {
+.rocket-outline {
   position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse, rgba(124, 106, 245, 0.3) 0%, transparent 70%);
+  right: 58px;
+  top: 8px;
+  width: 74px;
+  height: 132px;
+  border: 3px solid rgba(225, 202, 255, 0.92);
+  border-radius: 44px 44px 18px 18px;
+  transform: rotate(22deg);
+  filter: drop-shadow(0 0 18px rgba(190, 125, 255, 0.45));
+}
+
+.rocket-outline::before,
+.rocket-outline::after {
+  content: '';
+  position: absolute;
+}
+
+.rocket-outline::before {
+  width: 24px;
+  height: 36px;
+  left: -18px;
+  bottom: 28px;
+  border: 3px solid rgba(225, 202, 255, 0.92);
+  border-top: none;
+  border-radius: 0 0 18px 18px;
+  transform: skewY(28deg);
+}
+
+.rocket-outline::after {
+  width: 20px;
+  height: 20px;
+  top: 28px;
+  left: 24px;
+  border: 3px solid rgba(225, 202, 255, 0.92);
   border-radius: 50%;
-}
-
-.rocket-emoji {
-  font-size: 5rem;
-  transform: rotate(-45deg);
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 0 20px rgba(124, 106, 245, 0.5));
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: rotate(-45deg) translateY(0); }
-  50% { transform: rotate(-45deg) translateY(-8px); }
+  box-shadow: 0 0 16px rgba(199, 144, 255, 0.45);
 }
 
 .rocket-trail {
   position: absolute;
-  bottom: 30px;
-  right: 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  transform: rotate(-45deg);
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(182, 112, 255, 0), rgba(182, 112, 255, 0.7));
+  transform: rotate(22deg);
+  filter: blur(1px);
 }
 
-.rocket-trail span {
-  display: block;
-  height: 3px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, rgba(124, 106, 245, 0.6));
+.trail-one {
+  width: 118px;
+  right: 16px;
+  bottom: 48px;
 }
 
-.rocket-trail span:nth-child(1) { width: 40px; }
-.rocket-trail span:nth-child(2) { width: 28px; opacity: 0.6; }
-.rocket-trail span:nth-child(3) { width: 18px; opacity: 0.3; }
-
-@media (max-width: 768px) {
-  .install-card {
-    grid-template-columns: 1fr;
-    padding: 40px 28px;
-  }
-
-  .install-rocket {
-    display: none;
-  }
+.trail-two {
+  width: 74px;
+  right: 60px;
+  bottom: 28px;
+  opacity: 0.55;
 }
 
 .btn-lg {
-  padding: 14px 28px;
+  padding: 14px 24px;
   font-size: 0.95rem;
+}
+
+@media (max-width: 900px) {
+  .install-card {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 24px 18px;
+  }
+
+  .install-rocket {
+    min-height: 120px;
+  }
+
+  .rocket-outline {
+    right: 18px;
+    top: -4px;
+  }
 }
 </style>
