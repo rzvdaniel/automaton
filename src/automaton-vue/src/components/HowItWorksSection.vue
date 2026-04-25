@@ -56,7 +56,7 @@ const steps = [
 
 <style scoped>
 .how-section {
-  padding: 5px 0 10px;
+  padding: 15px 0 15px;
 }
 
 .steps-card {

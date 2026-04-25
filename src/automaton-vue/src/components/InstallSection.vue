@@ -57,7 +57,7 @@ import installRocketImage from '@/assets/images/install-rocket.png'
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(151, 111, 255, 0.32);
-  background: #25124b;
+  background: #100621;
 }
 
 .install-art {
@@ -91,7 +91,7 @@ import installRocketImage from '@/assets/images/install-rocket.png'
   align-items: center;
   gap: 12px;
   min-height: 76px;
-  padding: 0 22px;
+  padding: 0 20px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(9, 11, 18, 0.88);
@@ -154,8 +154,8 @@ import installRocketImage from '@/assets/images/install-rocket.png'
 }
 
 .btn-lg {
-  padding: 14px 24px;
-  font-size: 0.95rem;
+  padding: 10px 18px;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 900px) {

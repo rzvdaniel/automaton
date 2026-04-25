@@ -34,14 +34,14 @@
         <div class="hero-tools">
           <span class="tools-label">Works with</span>
           <div class="tools-list">
-            <span class="tool-badge">GitHub Copilot</span>
-            <span class="tool-badge">Claude</span>
-            <span class="tool-badge">Cursor</span>
-            <span class="tool-badge">Any IDE</span>
+            <span class="tool-badge"><i class="pi pi-github" /> GitHub Copilot</span>
+            <span class="tool-badge"><i class="pi pi-sparkles" /> Claude</span>
+            <span class="tool-badge"><i class="pi pi-box" /> Cursor</span>
+            <span class="tool-badge"><i class="pi pi-code" /> Any IDE</span>
           </div>
         </div>
 
-        <p class="hero-no-lock">✓ No lock-in. Run locally or in the cloud.</p>
+        <p class="hero-no-lock"><span class="hero-check">✓</span> No lock-in. Run locally or in the cloud.</p>
       </div>
 
       <!-- Right: terminal -->
@@ -79,7 +79,7 @@
 <style scoped>
 .hero {
   position: relative;
-  padding: 10px 0 10px;
+  padding: 10px 0 15px;
   overflow: hidden;
   background-image:
     linear-gradient(rgba(124, 106, 245, 0.05) 1px, transparent 1px),
@@ -149,22 +149,19 @@
 }
 
 .btn-lg {
-  padding: 14px 28px;
-  font-size: 0.95rem;
-}
-
-.hero-no-lock {
-  margin-top: 14px;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  font-weight: 500;
+  padding: 10px 18px;
+  font-size: 0.85rem;
 }
 
 .hero-no-lock {
   margin-top: 16px;
   font-size: 0.82rem;
-  color: var(--color-green);
+  color: var(--color-text-muted);
   font-weight: 500;
+}
+
+.hero-check {
+  color: var(--color-green);
 }
 
 .hero-tools {
@@ -185,18 +182,22 @@
 .tools-list {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 18px;
   flex-wrap: wrap;
 }
 
 .tool-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.78rem;
-  font-weight: 600;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  font-weight: 500;
   color: var(--color-text-muted);
+}
+
+.tool-badge i {
+  font-size: 0.88rem;
+  color: rgba(233, 236, 245, 0.72);
 }
 
 @media (max-width: 900px) {
