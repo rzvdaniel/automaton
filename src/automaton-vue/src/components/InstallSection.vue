@@ -1,8 +1,12 @@
+<script setup lang="ts">
+import installRocketImage from '@/assets/images/install-rocket.png'
+</script>
+
 <template>
   <section id="install" class="install-section">
     <div class="container">
       <div class="install-card">
-        <div class="install-glow" aria-hidden="true" />
+        <img class="install-art" :src="installRocketImage" alt="" aria-hidden="true" />
 
         <div class="install-command-wrap">
           <div class="install-command">
@@ -31,9 +35,6 @@
         </div>
 
         <div class="install-rocket" aria-hidden="true">
-          <div class="rocket-outline"></div>
-          <div class="rocket-trail trail-one"></div>
-          <div class="rocket-trail trail-two"></div>
         </div>
       </div>
     </div>
@@ -48,25 +49,25 @@
 .install-card {
   position: relative;
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr) 210px;
-  gap: 28px;
+  grid-template-columns: 330px minmax(0, 1fr) 310px;
+  gap: 34px;
   align-items: center;
-  padding: 34px 24px;
-  border-radius: 18px;
+  min-height: 190px;
+  padding: 15px 10px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(151, 111, 255, 0.32);
-  background:
-    radial-gradient(circle at 85% 50%, rgba(159, 104, 255, 0.2), transparent 30%),
-    linear-gradient(180deg, rgba(43, 21, 82, 0.98), rgba(29, 16, 54, 0.98));
+  background: #25124b;
 }
 
-.install-glow {
+.install-art {
   position: absolute;
-  right: -80px;
-  bottom: -120px;
-  width: 360px;
-  height: 260px;
-  background: radial-gradient(ellipse, rgba(182, 112, 255, 0.22) 0%, transparent 66%);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -89,9 +90,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 74px;
-  padding: 0 20px;
-  border-radius: 14px;
+  min-height: 76px;
+  padding: 0 22px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(9, 11, 18, 0.88);
   font-family: var(--font-mono);
@@ -125,17 +126,18 @@
 }
 
 .install-title {
-  font-size: clamp(1.9rem, 3.2vw, 2.55rem);
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   color: var(--color-text);
   margin-bottom: 8px;
+  line-height: 1.2;
 }
 
 .install-subtitle {
   font-size: 1rem;
   color: rgba(240, 240, 245, 0.78);
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .install-actions {
@@ -148,68 +150,7 @@
 .install-rocket {
   position: relative;
   width: 100%;
-  min-height: 160px;
-}
-
-.rocket-outline {
-  position: absolute;
-  right: 58px;
-  top: 8px;
-  width: 74px;
-  height: 132px;
-  border: 3px solid rgba(225, 202, 255, 0.92);
-  border-radius: 44px 44px 18px 18px;
-  transform: rotate(22deg);
-  filter: drop-shadow(0 0 18px rgba(190, 125, 255, 0.45));
-}
-
-.rocket-outline::before,
-.rocket-outline::after {
-  content: '';
-  position: absolute;
-}
-
-.rocket-outline::before {
-  width: 24px;
-  height: 36px;
-  left: -18px;
-  bottom: 28px;
-  border: 3px solid rgba(225, 202, 255, 0.92);
-  border-top: none;
-  border-radius: 0 0 18px 18px;
-  transform: skewY(28deg);
-}
-
-.rocket-outline::after {
-  width: 20px;
-  height: 20px;
-  top: 28px;
-  left: 24px;
-  border: 3px solid rgba(225, 202, 255, 0.92);
-  border-radius: 50%;
-  box-shadow: 0 0 16px rgba(199, 144, 255, 0.45);
-}
-
-.rocket-trail {
-  position: absolute;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(182, 112, 255, 0), rgba(182, 112, 255, 0.7));
-  transform: rotate(22deg);
-  filter: blur(1px);
-}
-
-.trail-one {
-  width: 118px;
-  right: 16px;
-  bottom: 48px;
-}
-
-.trail-two {
-  width: 74px;
-  right: 60px;
-  bottom: 28px;
-  opacity: 0.55;
+  min-height: 110px;
 }
 
 .btn-lg {
@@ -224,13 +165,13 @@
     padding: 24px 18px;
   }
 
-  .install-rocket {
-    min-height: 120px;
+  .install-art {
+    width: 100%;
+    opacity: 0.34;
   }
 
-  .rocket-outline {
-    right: 18px;
-    top: -4px;
+  .install-rocket {
+    display: none;
   }
 }
 </style>

@@ -95,9 +95,9 @@ const steps = [
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: 38px 58px minmax(0, 1fr);
+  grid-template-columns: 38px 70px minmax(0, 1fr);
   align-items: start;
-  gap: 16px;
+  gap: 14px;
 }
 
 .step-number {
@@ -126,13 +126,19 @@ const steps = [
 
 .step-icon-wrap {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 68px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #8f6cff;
-  font-size: 2rem;
+  font-size: 2.55rem;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(143, 108, 255, 0.26);
+}
+
+.step-icon-wrap :deep(.pi) {
+  font-size: inherit;
 }
 
 .step-body {

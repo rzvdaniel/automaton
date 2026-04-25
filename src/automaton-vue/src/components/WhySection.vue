@@ -67,20 +67,25 @@ const reasons = [
   min-width: 170px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   padding: 14px 8px;
 }
 
 .reason-icon-wrap {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
-  margin-top: 2px;
+  font-size: 1.65rem;
+  line-height: 1;
+  margin-top: -1px;
+}
+
+.reason-icon-wrap :deep(.pi) {
+  font-size: inherit;
 }
 
 .reason-body {
@@ -91,10 +96,12 @@ const reasons = [
 
 .reason-green {
   color: #18dc7b;
+  text-shadow: 0 0 16px rgba(24, 220, 123, 0.18);
 }
 
 .reason-accent {
   color: #b06cff;
+  text-shadow: 0 0 16px rgba(176, 108, 255, 0.22);
 }
 
 .reason-title {
