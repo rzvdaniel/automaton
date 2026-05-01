@@ -1,6 +1,9 @@
 name: automaton-prod
 
-# Production stack: Traefik + MySQL + API + Studio + Website + Runner
+# Production stack: Traefik + MySQL + API + Studio + Website
+#
+# Runners are deployed independently — see docker-compose.runner.yml or
+# https://hub.docker.com/r/rzvdaniel/automaton-runner
 #
 # Prerequisites on the Hetzner server:
 #   1. Clone this repo to /opt/automaton
@@ -145,36 +148,10 @@ services:
       - "traefik.http.routers.website.tls.certresolver=letsencrypt"
       - "traefik.http.services.website.loadbalancer.server.port=80"
 
-  # ── Runner ────────────────────────────────────────────────────────────────────
-  runner:
-    build:
-      context: ./src
-      dockerfile: Automaton.Runner/Dockerfile
-    image: automaton-prod-runner:latest
-    container_name: automaton-prod-runner
-    restart: unless-stopped
-    environment:
-      DOTNET_ENVIRONMENT: Production
-      AUTOMATON_SERVER_URL: http://api:8080
-      AUTOMATON_API_KEY: ${AUTOMATON_API_KEY}
-      AUTOMATON_RUNNER_NAME: ${AUTOMATON_RUNNER_NAME:-prod-runner}
-      RUNNER_SCRIPTS_DIR: /app/data/apps
-    volumes:
-      - prod-runner-config:/home/automaton/.config/AutomatonRunner
-      - prod-runner-logs:/app/logs
-      - prod-runner-data:/app/data
-    networks:
-      - automaton-prod
-    depends_on:
-      - api
-
 volumes:
   prod-mysql-data:
   prod-api-appdata:
   prod-api-logs:
-  prod-runner-config:
-  prod-runner-logs:
-  prod-runner-data:
   traefik-certs:
 
 networks:

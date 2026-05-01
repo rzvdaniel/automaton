@@ -313,17 +313,20 @@ WEBSITE_DOMAIN=automaton.monster
 ACME_EMAIL=your-email@example.com
 
 # MySQL — use strong, unique passwords
+# The MySQL Docker container automatically creates the database and user
+# on first startup using these values. No manual database creation needed.
 MYSQL_ROOT_PASSWORD=a-very-strong-root-password
 MYSQL_DATABASE=automaton
 MYSQL_USER=automaton_user
 MYSQL_PASSWORD=a-very-strong-user-password
 
-# Runner API key — leave empty for now, fill in after Step 12
-AUTOMATON_API_KEY=
-AUTOMATON_RUNNER_NAME=prod-runner
 ```
 
 Save and close.
+
+> **Runners are deployed separately.** The `.env` file for the main stack does not need
+> runner settings. Runners use their own `docker-compose.runner.yml` and their own `.env`
+> file on whatever server they run on — see Step 14.
 
 ---
 
@@ -355,9 +358,7 @@ ufw status
 
 ---
 
-## Step 12 — Start the Stack (Without the Runner)
-
-The runner needs an API key that doesn't exist yet. Start everything else first:
+## Step 12 — Start the Stack
 
 ```bash
 cd /opt/automaton
@@ -401,7 +402,12 @@ the certificates and refresh.
 
 ---
 
-## Step 14 — Create a Runner API Key
+## Step 14 — Deploy a Runner (on any server)
+
+Runners are independent — they only need network access to the API. You can run them on
+the same server as the stack or on a completely different machine.
+
+### 14.1 — Create a Runner API Key
 
 1. Open https://studio.automaton.monster in your browser
 2. Register the first admin account
@@ -409,40 +415,66 @@ the certificates and refresh.
 4. Create a new key with the **Runner** scope
 5. Copy the key (it starts with `ak_runner_...`)
 
-Now add it to the `.env` file:
+### 14.2 — Set up the runner `.env`
+
+On the server where you want to run the runner (can be the same or different server):
 
 ```bash
-nano /opt/automaton/.env
+mkdir -p /opt/automaton-runner
+cd /opt/automaton-runner
+nano .env
 ```
 
-Set:
+Add:
 
 ```env
+AUTOMATON_SERVER_URL=https://api.automaton.monster
 AUTOMATON_API_KEY=ak_runner_your_actual_key_here
+AUTOMATON_RUNNER_NAME=runner-1
 ```
 
----
+> Set `AUTOMATON_SERVER_URL` to your public API domain. If the runner is on the same
+> server as the stack, you can use `http://api:8080` and attach it to the `automaton-prod`
+> Docker network instead.
 
-## Step 15 — Start the Runner
+### 14.3 — Start the runner
+
+The easiest way is to pull the pre-built image from Docker Hub — no repo clone or build needed:
 
 ```bash
-cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d runner
+docker run -d \
+  --name automaton-runner \
+  --restart unless-stopped \
+  --env-file .env \
+  rzvdaniel/automaton-runner:latest
 ```
 
-Verify it connected to the API:
+Alternatively, if you want to build from source, clone the repo and use Docker Compose:
 
 ```bash
-docker compose -f docker-compose.prod.yml logs runner
+git clone https://github.com/rzvdaniel/automaton.git /opt/automaton-runner
+cd /opt/automaton-runner
+docker compose -f docker-compose.runner.yml up -d --build
 ```
 
-You should see something like `Connected to Automaton server` or `SignalR connection established`.
+Verify it connected:
+
+```bash
+docker logs -f automaton-runner
+# or, if using Docker Compose:
+docker compose -f docker-compose.runner.yml logs -f runner
+```
+
+You should see `Connected to Automaton server` or `SignalR connection established`.
 
 In Studio, go to **Runners** — your runner should appear as online.
 
+> To add more runners on other servers, repeat this step on each machine with a different
+> `AUTOMATON_RUNNER_NAME` and the same (or a different) API key.
+
 ---
 
-## Step 16 — Re-enable Cloudflare "Always Use HTTPS"
+## Step 15 — Re-enable Cloudflare "Always Use HTTPS"
 
 Now that Let's Encrypt certificates are issued:
 
