@@ -19,7 +19,7 @@ services:
 
   # ── Reverse Proxy ────────────────────────────────────────────────────────────
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.3
     container_name: automaton-traefik
     restart: unless-stopped
     environment:
