@@ -17,6 +17,24 @@ name: automaton-prod
 
 services:
 
+  # ── Docker Socket Proxy ───────────────────────────────────────────────────────
+  # Sits between Traefik and the Docker socket. Fixes API version negotiation issues
+  # with Docker 26+ and limits what Traefik can access (security best practice).
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: automaton-socket-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      SERVICES: 1
+      TASKS: 1
+      POST: 0
+    networks:
+      - socket-proxy
+
   # ── Reverse Proxy ────────────────────────────────────────────────────────────
   traefik:
     image: traefik:v3.3
@@ -25,6 +43,7 @@ services:
     command:
       - "--api.dashboard=false"
       - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=automaton-prod"
       # Entrypoints
@@ -43,10 +62,12 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-certs:/letsencrypt
     networks:
       - automaton-prod
+      - socket-proxy
+    depends_on:
+      - socket-proxy
 
   # ── Database ─────────────────────────────────────────────────────────────────
   mysql:
@@ -156,4 +177,6 @@ volumes:
 
 networks:
   automaton-prod:
+    driver: bridge
+  socket-proxy:
     driver: bridge
