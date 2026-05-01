@@ -97,7 +97,11 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... your-email@example.com
 
 4. Go to **SSL/TLS → Overview** and set the encryption mode to **Full (strict)**
 
-5. Go to **SSL/TLS → Edge Certificates** and make sure **Always Use HTTPS** is **OFF** for now.
+5. Temporarily set **all A records to DNS only (grey cloud)** — click the orange cloud icon next to each record to turn it grey.
+   > This allows Let's Encrypt to reach the server directly for the HTTP-01 ACME challenge.
+   > You will re-enable the proxy (orange cloud) after certs are issued (Step 15).
+
+6. Go to **SSL/TLS → Edge Certificates** and make sure **Always Use HTTPS** is **OFF** for now.
    > We need port 80 to be reachable by Let's Encrypt when first starting Traefik.
    > You can turn it back on after the first successful deployment.
 
@@ -474,12 +478,13 @@ In Studio, go to **Runners** — your runner should appear as online.
 
 ---
 
-## Step 15 — Re-enable Cloudflare "Always Use HTTPS"
+## Step 15 — Re-enable Cloudflare Proxy and "Always Use HTTPS"
 
 Now that Let's Encrypt certificates are issued:
 
-1. Go to Cloudflare → your domain → **SSL/TLS → Edge Certificates**
-2. Enable **Always Use HTTPS**
+1. Go to Cloudflare → your domain → **DNS**
+2. Click the grey cloud icon next to each A record (`@`, `www`, `api`, `studio`) to turn it back to **orange (Proxied)**
+3. Go to **SSL/TLS → Edge Certificates** and enable **Always Use HTTPS**
 
 ---
 
