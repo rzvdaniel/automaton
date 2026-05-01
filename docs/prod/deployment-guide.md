@@ -19,7 +19,49 @@ Docker Compose, with Traefik as the reverse proxy and Cloudflare for DNS and TLS
 - A Cloudflare account → https://www.cloudflare.com
 - A domain name managed by Cloudflare (e.g. `automaton.monster`)
 - A GitHub account with access to the Automaton repository
-- An SSH key pair on your local machine
+- An SSH key pair on your local machine (see Step 0 below)
+
+---
+
+## Step 0 — Generate an SSH Key Pair (on your local machine)
+
+SSH keys let you log in to the server securely without a password. You need to do this
+**once on your local machine** before creating the Hetzner server.
+
+**On Linux / macOS / Windows (PowerShell or Git Bash):**
+
+```bash
+ssh-keygen -t ed25519 -C "your-email@example.com"
+```
+
+- When asked `Enter file in which to save the key`, press **Enter** to accept the default
+  location (`~/.ssh/id_ed25519`)
+- When asked for a passphrase, either set one (more secure) or press **Enter** to skip
+
+This creates two files:
+
+| File | Description |
+|------|-------------|
+| `~/.ssh/id_ed25519` | **Private key** — stays on your machine, never share this |
+| `~/.ssh/id_ed25519.pub` | **Public key** — this is what you give to Hetzner |
+
+To see the public key (you'll need to paste it into Hetzner in Step 1):
+
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+It looks like:
+
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... your-email@example.com
+```
+
+> **Why `ed25519`?** It's the modern, most secure SSH key type. Hetzner accepts it and
+> it is in OpenSSH format by default. Avoid `rsa` (older, slower) unless forced to.
+
+> **Windows note:** If you're on Windows and don't have Git Bash, open PowerShell —
+> `ssh-keygen` is built into Windows 10/11.
 
 ---
 
