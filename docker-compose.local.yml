@@ -1,0 +1,125 @@
+name: automaton-local
+
+# Local full-stack container test.
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build
+#
+# Optional runner:
+#   set LOCAL_AUTOMATON_API_KEY to a Runner/FullAccess key created in this local API,
+#   then run: docker compose -f docker-compose.local.yml up -d runner
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: automaton-local-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
+      MYSQL_USER: ${MYSQL_USER:-automaton_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-AutomatonPass123!}
+    ports:
+      - "${MYSQL_LOCAL_PORT:-3310}:3306"
+    volumes:
+      - local-mysql-data:/var/lib/mysql
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - automaton-local
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-AutomatonRoot123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    image: automaton-local-api:latest
+    container_name: automaton-local-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+      Cors__AllowedOrigins__0: http://localhost:5173
+      Cors__AllowedOrigins__1: http://localhost:5174
+      JwtOptions__Issuer: http://localhost:7091
+      AppConfig__WebsiteUrl: http://localhost:5173
+    ports:
+      - "${API_LOCAL_PORT:-7091}:8080"
+    volumes:
+      - local-api-appdata:/app/AppData
+      - local-api-logs:/app/Logs
+    networks:
+      - automaton-local
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  studio:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.studio
+      args:
+        VITE_API_BASE_URL: http://localhost:${API_LOCAL_PORT:-7091}
+        VITE_APP_TITLE: Automaton Studio (Docker Local)
+        VITE_ENABLE_MOCK_API: "false"
+        VITE_SUBSCRIPTIONS_ENABLED: "true"
+    image: automaton-local-studio:latest
+    container_name: automaton-local-studio
+    restart: unless-stopped
+    ports:
+      - "${STUDIO_LOCAL_PORT:-5173}:80"
+    networks:
+      - automaton-local
+    depends_on:
+      - api
+
+  website:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.website
+    image: automaton-local-website:latest
+    container_name: automaton-local-website
+    restart: unless-stopped
+    ports:
+      - "${WEBSITE_LOCAL_PORT:-5174}:80"
+    networks:
+      - automaton-local
+
+  runner:
+    build:
+      context: ./src
+      dockerfile: Automaton.Runner/Dockerfile
+    image: automaton-local-runner:latest
+    container_name: automaton-local-runner
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      AUTOMATON_SERVER_URL: http://api:8080
+      AUTOMATON_API_KEY: ${LOCAL_AUTOMATON_API_KEY:-}
+      AUTOMATON_RUNNER_NAME: ${LOCAL_AUTOMATON_RUNNER_NAME:-local-docker-runner}
+      RUNNER_SCRIPTS_DIR: /app/data/apps
+    volumes:
+      - local-runner-config:/home/automaton/.config/AutomatonRunner
+      - local-runner-logs:/app/logs
+      - local-runner-data:/app/data
+    networks:
+      - automaton-local
+    depends_on:
+      - api
+
+volumes:
+  local-mysql-data:
+  local-api-appdata:
+  local-api-logs:
+  local-runner-config:
+  local-runner-logs:
+  local-runner-data:
+
+networks:
+  automaton-local:
+    driver: bridge

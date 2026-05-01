@@ -1,0 +1,182 @@
+name: automaton-prod
+
+# Production stack: Traefik + MySQL + API + Studio + Website + Runner
+#
+# Prerequisites on the Hetzner server:
+#   1. Clone this repo to /opt/automaton
+#   2. Copy .env.prod.example to .env and fill in all values
+#   3. docker compose -f docker-compose.prod.yml up -d --build
+#
+# Traefik will obtain Let's Encrypt TLS certificates automatically via HTTP challenge.
+# Cloudflare note: disable "Always Use HTTPS" page rule during first startup so that
+# Let's Encrypt can reach /.well-known/acme-challenge/ over HTTP. Re-enable after certs
+# are issued, or switch to DNS challenge using CLOUDFLARE_DNS_API_TOKEN (see Traefik docs).
+
+services:
+
+  # ── Reverse Proxy ────────────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.1
+    container_name: automaton-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=automaton-prod"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirect all HTTP → HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # Let's Encrypt via HTTP-01 challenge
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - automaton-prod
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: automaton-prod-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}
+      MYSQL_USER: ${MYSQL_USER:-automaton_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - prod-mysql-data:/var/lib/mysql
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - automaton-prod
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── API ───────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    image: automaton-prod-api:latest
+    container_name: automaton-prod-api
+    restart: unless-stopped
+    environment:
+      # Must be env vars — read before the config pipeline starts
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Connection string stays here so ${MYSQL_PASSWORD} comes from .env (not hardcoded in JSON)
+      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD};
+      # Everything else (CORS, JWT, RSA keys, HMAC, encryption key, Stripe, email, etc.)
+      # is in /opt/automaton/config/appsettings.Production.json on the server.
+    volumes:
+      - prod-api-appdata:/app/AppData
+      - prod-api-logs:/app/Logs
+      # appsettings.Production.json lives on the server (outside the repo), never committed.
+      # Create it at /opt/automaton/config/appsettings.Production.json — see .env.prod.example for structure.
+      - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
+    networks:
+      - automaton-prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=8080"
+
+  # ── Studio (Vue frontend) ─────────────────────────────────────────────────────
+  # VITE_ vars are baked into the static build at image-build time.
+  # They are not secrets — they are just public URLs.
+  studio:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.studio
+      args:
+        VITE_API_BASE_URL: https://${API_DOMAIN}
+        VITE_APP_TITLE: Automaton Studio
+        VITE_ENABLE_MOCK_API: "false"
+        VITE_SUBSCRIPTIONS_ENABLED: "true"
+    image: automaton-prod-studio:latest
+    container_name: automaton-prod-studio
+    restart: unless-stopped
+    networks:
+      - automaton-prod
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.studio.rule=Host(`${STUDIO_DOMAIN}`)"
+      - "traefik.http.routers.studio.entrypoints=websecure"
+      - "traefik.http.routers.studio.tls.certresolver=letsencrypt"
+      - "traefik.http.services.studio.loadbalancer.server.port=80"
+
+  # ── Website (marketing/static) ────────────────────────────────────────────────
+  website:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.website
+    image: automaton-prod-website:latest
+    container_name: automaton-prod-website
+    restart: unless-stopped
+    networks:
+      - automaton-prod
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.website.rule=Host(`${WEBSITE_DOMAIN}`) || Host(`www.${WEBSITE_DOMAIN}`)"
+      - "traefik.http.routers.website.entrypoints=websecure"
+      - "traefik.http.routers.website.tls.certresolver=letsencrypt"
+      - "traefik.http.services.website.loadbalancer.server.port=80"
+
+  # ── Runner ────────────────────────────────────────────────────────────────────
+  runner:
+    build:
+      context: ./src
+      dockerfile: Automaton.Runner/Dockerfile
+    image: automaton-prod-runner:latest
+    container_name: automaton-prod-runner
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      AUTOMATON_SERVER_URL: http://api:8080
+      AUTOMATON_API_KEY: ${AUTOMATON_API_KEY}
+      AUTOMATON_RUNNER_NAME: ${AUTOMATON_RUNNER_NAME:-prod-runner}
+      RUNNER_SCRIPTS_DIR: /app/data/apps
+    volumes:
+      - prod-runner-config:/home/automaton/.config/AutomatonRunner
+      - prod-runner-logs:/app/logs
+      - prod-runner-data:/app/data
+    networks:
+      - automaton-prod
+    depends_on:
+      - api
+
+volumes:
+  prod-mysql-data:
+  prod-api-appdata:
+  prod-api-logs:
+  prod-runner-config:
+  prod-runner-logs:
+  prod-runner-data:
+  traefik-certs:
+
+networks:
+  automaton-prod:
+    driver: bridge

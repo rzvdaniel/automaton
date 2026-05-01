@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'
-import appsService from '@/features/apps/services/apps.service'
+import { appsService } from '@/features/apps/services/apps.service'
 import type { App } from '@/features/apps/types/apps.types'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 
@@ -261,4 +261,3 @@ function openApp(app: App) {
   opacity: 0;
 }
 </style>
-

@@ -4,8 +4,9 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // GitHub Pages base path (repository name) for production
-  const base = mode === 'production' ? '/automaton/' : '/'
+  // GitHub Pages base path (repository name) for production.
+  // Override via VITE_BASE_PATH env var (e.g. '/' for Docker builds).
+  const base = process.env.VITE_BASE_PATH ?? (mode === 'production' ? '/automaton/' : '/')
 
   return {
     base,
