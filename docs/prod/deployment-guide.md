@@ -139,23 +139,23 @@ Running everything as `root` is a security risk. Create a dedicated user:
 
 ```bash
 # Create user
-adduser deploy
+adduser automaton
 
 # Add to docker group so it can run docker without sudo
-usermod -aG docker deploy
+usermod -aG docker automaton
 
 # Copy your SSH key to the new user
-mkdir -p /home/deploy/.ssh
-cp /root/.ssh/authorized_keys /home/deploy/.ssh/
-chown -R deploy:deploy /home/deploy/.ssh
-chmod 700 /home/deploy/.ssh
-chmod 600 /home/deploy/.ssh/authorized_keys
+mkdir -p /home/automaton/.ssh
+cp /root/.ssh/authorized_keys /home/automaton/.ssh/
+chown -R automaton:automaton /home/automaton/.ssh
+chmod 700 /home/automaton/.ssh
+chmod 600 /home/automaton/.ssh/authorized_keys
 ```
 
-Disconnect and reconnect as the deploy user:
+Disconnect and reconnect as the automaton user:
 
 ```bash
-ssh deploy@65.21.10.42
+ssh automaton@65.21.10.42
 ```
 
 ---
@@ -167,7 +167,7 @@ The repository goes to `/opt/automaton`. This is also where Docker Compose will 
 ```bash
 # Create the directory
 sudo mkdir -p /opt/automaton
-sudo chown deploy:deploy /opt/automaton
+sudo chown automaton:automaton /opt/automaton
 
 # Clone the repository
 git clone https://github.com/rzvdaniel/automaton.git /opt/automaton
@@ -193,7 +193,7 @@ This directory holds files that are NOT in the repository (secrets):
 
 ```bash
 sudo mkdir -p /opt/automaton/config
-sudo chown deploy:deploy /opt/automaton/config
+sudo chown automaton:automaton /opt/automaton/config
 ```
 
 ---

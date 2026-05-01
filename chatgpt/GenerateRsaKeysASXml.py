@@ -35,8 +35,12 @@ key = RSA.generate(2048)
 public_key_xml = generate_public_key_xml(key)
 with open('publickey.xml', 'w') as file:
     file.write(public_key_xml)
+print(f"Public key written to: publickey.xml")
+print(public_key_xml)
 
 # Export private key
 private_key_xml = generate_private_key_xml(key)
 with open('privatekey.xml', 'w') as file:
     file.write(private_key_xml)
+print(f"\nPrivate key written to: privatekey.xml")
+print(private_key_xml)
