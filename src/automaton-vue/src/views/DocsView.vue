@@ -154,17 +154,18 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
                 <div class="step-title">Install the CLI</div>
                 <div class="code-block">
                   <span class="code-prompt">$</span>
-                  <span class="code-text">npm install -g @automaton/cli</span>
+                  <span class="code-text">dotnet tool install -g Automaton.Cli</span>
                 </div>
+                <p class="step-body">Requires <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>. Alternatively use the installer script for your platform — see the CLI reference in Studio docs.</p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">3</div>
               <div>
-                <div class="step-title">Log in</div>
+                <div class="step-title">Configure server and API key</div>
                 <div class="code-block">
                   <span class="code-prompt">$</span>
-                  <span class="code-text">automaton login --server https://api.automaton.monster --key your-api-key</span>
+                  <span class="code-text">automaton config --server https://api.automaton.monster --key your-api-key</span>
                 </div>
                 <p class="step-body">Get an API key from <strong>Settings → API Keys → New Key</strong> (scope: execute).</p>
               </div>
@@ -214,7 +215,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
               Automaton structure and backend/frontend contract. Then run <code>automaton deploy</code>
-              when ready.
+              when ready. For the full list of CLI commands and options, see the
+              <strong>Documentation → Automaton CLI</strong> page inside Studio.
             </span>
           </div>
         </div>

@@ -11,7 +11,7 @@ import installRocketImage from '@/assets/images/install-rocket.png'
         <div class="install-command-wrap">
           <div class="install-command">
             <span class="install-prompt">$</span>
-            <span class="install-cmd">npm install -g @automaton/cli</span>
+            <span class="install-cmd">dotnet tool install -g Automaton.Cli</span>
             <button class="copy-btn" title="Copy">
               <i class="pi pi-copy" />
             </button>

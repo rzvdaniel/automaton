@@ -14,6 +14,7 @@ import cliAiToolsRaw from '../content/cli-ai-tools.md?raw'
 import mcpRaw from '../content/mcp.md?raw'
 import templatesRaw from '../content/templates.md?raw'
 import troubleshootingRaw from '../content/troubleshooting.md?raw'
+import automatonCliRaw from '../content/automaton-cli.md?raw'
 
 type DocItem = {
   slug: string
@@ -36,6 +37,7 @@ const docs: DocItem[] = [
   { slug: 'mcp', label: 'MCP Server', summary: 'Recommended when supported', group: 'Workflows', content: mcpRaw },
   { slug: 'templates', label: 'Templates', summary: 'Start from examples', group: 'Workflows', content: templatesRaw },
   { slug: 'troubleshooting', label: 'Troubleshooting', summary: 'Common errors and fixes', group: 'Reference', content: troubleshootingRaw },
+  { slug: 'automaton-cli', label: 'Automaton CLI', summary: 'All commands and options', group: 'Reference', content: automatonCliRaw },
 ]
 
 const docsByGroup = computed(() => {
