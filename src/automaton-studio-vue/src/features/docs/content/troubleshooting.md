@@ -1,0 +1,73 @@
+# Troubleshooting
+
+Common problems and how to fix them.
+
+---
+
+## Backend deploy fails immediately
+
+**Symptom:** Clicking Deploy Backend shows an error right away.
+
+**Causes and fixes:**
+
+- **No runner connected** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, the backend cannot be deployed. Start a runner or check the runner connection.
+- **Python syntax error** — A syntax error in any `backend/*.py` file will stop the deploy. Check the deploy log for the file and line number.
+- **Missing `handle()` export** — Every controller file must export a top-level `handle(action_name, inputs)` function. A file that is missing `handle` will cause the deploy to fail.
+
+---
+
+## `callController` throws in the frontend
+
+**Symptom:** The frontend throws an error when calling `window.automatonApi.callController(...)`.
+
+**Causes and fixes:**
+
+- **Backend not deployed** — Changes to Python files need a Deploy Backend step before they take effect. Deploy, then reload the preview.
+- **Wrong controller or action name** — The controller name is the filename without `.py`. The action name is the method name on the controller class. Check spelling.
+- **Action returned an error** — `callController` throws when the backend returns `{ success: false, ... }`. Add `try/catch` around every call and log `err.message` to see the backend error.
+- **Local development without mocks** — When running locally (not in the Automaton preview), `callController` reads from `backend/mocks/{controller}.{action}.json`. If that file is missing, the call throws. Add a mock file.
+
+---
+
+## Runner shows as Offline or Unknown
+
+**Symptom:** The Runners page shows a runner as Offline or Unknown even after it started.
+
+**Causes and fixes:**
+
+- **Server URL mismatch** — The runner must be configured with the same server URL that the Studio is using. Check `AUTOMATON_SERVER_URL` in the runner config.
+- **API key not valid** — Confirm the runner API key is active (it should have runner scope, not execute scope). Rotate the key in API Keys settings if needed.
+- **Firewall / network issue** — The runner connects outbound over HTTPS to the Studio server. Make sure port 443 (or the port your server uses) is not blocked.
+- **Runner crashed on startup** — Run the runner manually (`automaton-runner` or `docker compose logs runner`) and look for startup errors.
+
+---
+
+## AI chat does not respond (App Editor)
+
+**Symptom:** Typing a prompt in the App Editor AI chat produces no response.
+
+**Fix:** Go to **Settings → AI Keys** and confirm that at least one valid AI provider key is saved. The editor will not make any AI requests until a key is configured.
+
+---
+
+## `automaton deploy` fails with authentication error
+
+**Symptom:** `automaton deploy` exits with a 401 or 403 error.
+
+**Fixes:**
+
+- Run `automaton login --server <url> --key <your-key>` again to refresh the stored credentials.
+- Confirm the API key has `execute` scope (not read-only).
+- Confirm the server URL in `automaton.json` matches the server you logged into.
+
+---
+
+## Frontend loads but shows blank content
+
+**Symptom:** The app loads without an error but the page is empty.
+
+**Causes and fixes:**
+
+- **Entry point mismatch** — The default frontend entry point is `frontend/index.html` for plain apps and `dist/index.html` for framework apps. Confirm your files are in the right place.
+- **Framework build not run** — For React or Vue apps, run `npm run build` before deploying, or set `"build": "npm run build"` in `automaton.json` so the CLI does it automatically.
+- **JavaScript error on load** — Open the browser console in the preview and look for errors.

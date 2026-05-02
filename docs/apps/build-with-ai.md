@@ -1,40 +1,143 @@
-# Building Automaton Apps with AI Coding Tools
+# Building Automaton Apps with AI
 
-Automaton apps are frontend-agnostic static web apps with Python backends. You can build them
-inside your preferred AI coding environment — VS Code with GitHub Copilot, Claude Code,
-or any tool that supports MCP — keep the project in Git, and deploy it to Automaton when ready.
+Automaton apps are frontend-agnostic static web apps with Python backends. There are three ways
+to build them, depending on how much local tooling you want to use.
 
 ---
 
-## Prerequisites
+## Three Ways to Build
 
-1. **A running Automaton server** — local (`https://localhost:7091`) or hosted
-2. **An API key with execute scope** — create one at **API Keys** → **New Key** → scope: `execute`
+| Path | Where you work | Best for |
+|---|---|---|
+| **1. Studio App Editor** | Browser — Automaton Studio | Fastest start, quick prototypes |
+| **2. Local IDE + CLI** | Your editor (Cursor, VS Code, etc.) | Full Git workflow, larger apps |
+| **3. MCP** | VS Code Agent / Claude Code | Most accurate AI guidance when supported |
+
+Paths 2 and 3 overlap — MCP is an optional enhancement to the local IDE workflow. You can use
+Path 2 without MCP by pointing your AI tool to the `llms.txt` file instead.
+
+---
+
+## Path 1: Studio App Editor
+
+The fastest way to go from idea to running app. No local setup, no CLI, no Git required.
+
+1. Open **Automaton Studio** → **Apps** → **New App**.
+2. Open the app in the **App Editor**.
+3. Add your own AI API key under **Settings** → **AI Keys** (OpenAI, Anthropic, Gemini, etc.).
+4. Describe what you want in the **AI Chat** panel. The editor generates frontend and backend files.
+5. Click **Deploy Backend** when the backend changes.
+6. Click **Publish** when ready.
+
+The App Editor is the fastest path to a working prototype. When the app grows or you want full
+Git and tooling control, switch to the CLI workflow.
+
+Studio documentation is available at `/docs` inside Automaton Studio.
+
+---
+
+## Path 2: Local IDE + CLI
+
+Build the app in your preferred editor, keep it in Git, and deploy to Automaton when ready.
+
+### Prerequisites
+
+1. **A running Automaton server** — local (`https://localhost:7091`) or hosted (`https://api.automaton.monster`)
+2. **An API key** — create one at **API Keys** → **New Key** → scope: `execute`
    - Format: `ak_execute_xxx`
-3. **One-time MCP configuration** per tool if you want the AI to understand Automaton structure automatically
+3. **Automaton CLI** — install once: `npm install -g automaton-cli`
 
-MCP is strongly recommended when your tool supports it because it gives the AI the most accurate
-Automaton-specific guidance. It is not required. If you prefer a tool or workflow without MCP,
-use the starter prompt below and deploy with the CLI.
+### Teach your AI the Automaton structure
 
-On first use, create or link the app and keep `automaton.json` in your project root. On every
-subsequent session, the AI can read that file and continue working on the same app.
+AI tools have no prior knowledge of the Automaton app contract. Point your tool to the
+`llms.txt` file so it follows the correct structure automatically:
 
-`automaton.json` example (written by the AI, not by you):
+```
+https://automaton.monster/llms.txt
+```
+
+The file links to detailed instructions covering frontend structure, backend controller pattern,
+`callController()` usage, mock responses, and ready-to-paste starter prompts.
+
+Start your session with a prompt like:
+
+```text
+Read https://automaton.monster/llms.txt, then build an Automaton app for Poker Planning.
+```
+
+Or paste the generic starter prompt directly if your tool does not fetch URLs:
+
+```text
+Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python
+backend controllers in backend/. Each controller file must export handle(action_name, inputs)
+and return { success, data, error }. Frontend code must call
+window.automatonApi.callController(controller, action, inputs) and use try/catch because the
+function returns data directly and throws on errors. Use backend/shared/ for shared helpers,
+backend/requirements.txt for extra Python packages,
+backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the
+project root, and deploy with automaton deploy.
+```
+
+Starter prompts for specific stacks (plain HTML, React, Vue) are available at
+`https://automaton.monster/llms/automaton-starter-prompts.md`.
+
+### AI-readable reference files
+
+| File | Purpose |
+|---|---|
+| [`/llms.txt`](https://automaton.monster/llms.txt) | Entry point — start here |
+| [`/llms/automaton-apps-overview.md`](https://automaton.monster/llms/automaton-apps-overview.md) | Rules, workflow, recommended structure |
+| [`/llms/automaton-frontend-structure.md`](https://automaton.monster/llms/automaton-frontend-structure.md) | Plain HTML, React, Vue layouts |
+| [`/llms/automaton-backend-controllers.md`](https://automaton.monster/llms/automaton-backend-controllers.md) | Python controller contract |
+| [`/llms/automaton-starter-prompts.md`](https://automaton.monster/llms/automaton-starter-prompts.md) | Copy-paste prompts per stack |
+
+### `automaton.json`
+
+Created by the AI (or manually) at the project root. Commit it to Git.
+
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "name": "My App"
+  "name": "My App",
+  "server": "https://api.automaton.monster"
 }
 ```
 
+Add `build` and `deployDir` for framework apps:
+
+```json
+{
+  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "build": "npm run build",
+  "deployDir": "dist"
+}
+```
+
+### Deploy
+
+```bash
+automaton deploy
+```
+
+This uploads frontend files and triggers backend deployment. Re-run after any change.
+
 ---
 
-## VS Code — GitHub Copilot (Agent Mode)
+## Path 3: MCP
+
+MCP gives the AI the most accurate Automaton-specific guidance by connecting it directly to
+your Automaton server. Use it in tools that support MCP alongside the local IDE workflow.
+
+If your tool does not support MCP — or you are in a session without MCP configured — use
+`https://automaton.monster/llms.txt` instead (Path 2 above).
+
+### VS Code — GitHub Copilot (Agent Mode)
 
 **Requires:** VS Code 1.99+ and the GitHub Copilot extension.
 
-### Setup
+#### Setup
 
 Create `.vscode/mcp.json` in your workspace (or add to user settings):
 
@@ -56,7 +159,7 @@ Create `.vscode/mcp.json` in your workspace (or add to user settings):
 > If your server uses a self-signed certificate, trust the dev certificate in your browser
 > first (`https://localhost:7091` → accept the warning) so VS Code can connect.
 
-### Using Copilot
+#### Using Copilot
 
 1. Open Copilot Chat (`Ctrl+Alt+I`)
 2. Switch to **Agent** mode using the dropdown next to the input box
@@ -76,7 +179,7 @@ Copilot can:
 
 When the project is ready, run `automaton deploy` to upload the frontend and deploy the backend.
 
-### Iterating
+#### Iterating
 
 Open `automaton.json` to see the appId, then in Copilot Chat:
 
@@ -88,11 +191,11 @@ Copilot reads existing files via `read_file` and `list_files`, updates only what
 
 ---
 
-## Claude Code
+### Claude Code
 
 **Requires:** Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
 
-### Setup (one-time per server)
+#### Setup (one-time per server)
 
 ```bash
 claude mcp add automaton \
@@ -107,7 +210,7 @@ Verify the server is registered:
 claude mcp list
 ```
 
-### Using Claude Code
+#### Using Claude Code
 
 In your project folder:
 
@@ -131,7 +234,7 @@ Claude Code can:
 
 When the project is ready, run `automaton deploy`.
 
-### Switching Projects
+#### Switching Projects
 
 Each project folder has its own `automaton.json`. Claude Code reads from the current working
 directory — `cd` to a different project and it automatically targets a different app.
@@ -139,75 +242,6 @@ directory — `cd` to a different project and it automatically targets a differe
 ```bash
 cd /path/to/app-1   # works on app-1
 cd /path/to/app-2   # works on app-2 — no reconfiguration needed
-```
-
----
-
-## GitHub Copilot CLI
-
-**Requires:** GitHub CLI (`gh`) with the Copilot extension (`gh extension install github/gh-copilot`)
-
-The Copilot CLI (`gh copilot suggest`, `gh copilot explain`) is a terminal assistant — it does not
-connect to MCP servers directly. The recommended workflow is to use it to write code locally, then
-push to Automaton via zip upload.
-
-## Starter Prompt for Tools Without MCP
-
-Paste this into Cursor, Claude Code, Copilot Chat, or another AI tool if MCP is not configured:
-
-```text
-Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python backend controllers in backend/. Each controller file must export handle(action_name, inputs) and return { success, data, error }. Frontend code must call window.automatonApi.callController(controller, action, inputs) and use try/catch because the function returns data directly and throws on errors. Use backend/shared/ for shared helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.
-```
-
-### Workflow
-
-**1. Generate the app locally**
-
-```bash
-gh copilot suggest "Create a simple weather dashboard HTML app with a Python backend that returns mock weather data"
-```
-
-Follow Copilot's suggestions to create the files in a local folder.
-
-**2. Upload to Automaton**
-
-First, create an app in the Automaton UI and copy its ID from the URL or settings page.
-
-Then push the files:
-
-```bash
-cd /path/to/my-app
-zip -r /tmp/app.zip . --exclude "*.git*"
-
-curl -X POST "https://localhost:7091/api/apps/{appId}/upload" \
-  -H "X-API-Key: ak_execute_xxx" \
-  -F "file=@/tmp/app.zip"
-```
-
-**3. Deploy the backend**
-
-After uploading, trigger backend deployment from the Automaton UI (Apps → your app → Deploy
-Backend), or call the API:
-
-```bash
-curl -X POST "https://localhost:7091/api/apps/{appId}/execute/deploy" \
-  -H "X-API-Key: ak_execute_xxx"
-```
-
-### Iterating with Copilot CLI
-
-Use `gh copilot suggest` to generate changes, apply them to local files, then re-upload:
-
-```bash
-# Merge — only updated files overwrite existing app files
-curl -X POST "https://localhost:7091/api/apps/{appId}/upload" \
-  -H "X-API-Key: ak_execute_xxx" \
-  -F "file=@/tmp/app.zip"
-
-# Full replacement — clears all app files first
-curl -X POST "https://localhost:7091/api/apps/{appId}/upload?clean=true" \
-  -H "X-API-Key: ak_execute_xxx" \
-  -F "file=@/tmp/app.zip"
 ```
 
 ---
@@ -293,11 +327,12 @@ No API key, no runner, no Automaton server needed for frontend development.
 
 ## Comparison
 
-| | VS Code + Copilot | Claude Code | Copilot CLI |
-|---|---|---|---|
-| MCP integration | ✅ Native (Agent mode) | ✅ Native | ❌ (zip upload instead) |
-| Auto-creates app | ✅ | ✅ | ❌ (manual in UI) |
-| `automaton.json` | ✅ Written by Copilot | ✅ Written by Claude | ❌ Not applicable |
-| Multi-app support | ✅ Per-folder | ✅ Per-folder | ✅ appId in curl |
-| Local Git history | Optional | Optional | ✅ Natural fit |
-| Best for | Daily dev in VS Code | Terminal-first workflow | Generating & batch uploading |
+| | Studio App Editor | Local IDE + CLI (llms.txt) | VS Code Copilot (MCP) | Claude Code (MCP) |
+|---|---|---|---|---|
+| Local setup required | ❌ | ✅ | ✅ | ✅ |
+| Git workflow | ❌ | ✅ | ✅ | ✅ |
+| MCP integration | N/A | ❌ (llms.txt instead) | ✅ Native | ✅ Native |
+| AI knows Automaton structure | ✅ Built-in | ✅ Via llms.txt | ✅ Via MCP | ✅ Via MCP |
+| Auto-creates `automaton.json` | ✅ | ✅ | ✅ | ✅ |
+| Multi-app support | ✅ Per app | ✅ Per folder | ✅ Per folder | ✅ Per folder |
+| Best for | Quick prototypes | Any IDE, any AI tool | Daily dev in VS Code | Terminal-first workflow |

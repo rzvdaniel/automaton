@@ -13,6 +13,7 @@ import appEditorRaw from '../content/app-editor.md?raw'
 import cliAiToolsRaw from '../content/cli-ai-tools.md?raw'
 import mcpRaw from '../content/mcp.md?raw'
 import templatesRaw from '../content/templates.md?raw'
+import troubleshootingRaw from '../content/troubleshooting.md?raw'
 
 type DocItem = {
   slug: string
@@ -34,6 +35,7 @@ const docs: DocItem[] = [
   { slug: 'cli-ai-tools', label: 'CLI + AI tools', summary: 'Cursor, Claude, Copilot', group: 'Workflows', content: cliAiToolsRaw },
   { slug: 'mcp', label: 'MCP Server', summary: 'Recommended when supported', group: 'Workflows', content: mcpRaw },
   { slug: 'templates', label: 'Templates', summary: 'Start from examples', group: 'Workflows', content: templatesRaw },
+  { slug: 'troubleshooting', label: 'Troubleshooting', summary: 'Common errors and fixes', group: 'Reference', content: troubleshootingRaw },
 ]
 
 const docsByGroup = computed(() => {

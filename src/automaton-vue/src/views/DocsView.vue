@@ -70,12 +70,23 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">1</div>
               <div>
-                <div class="step-title">Create an app</div>
-                <p class="step-body">Go to <strong>Apps → New App</strong>. Give it a name.</p>
+                <div class="step-title">Add your AI API key</div>
+                <p class="step-body">
+                  Go to <strong>Settings → AI Keys → Add Key</strong> and enter your key for
+                  OpenAI, Anthropic, Google Gemini, or another supported provider.
+                  The AI chat will not respond until at least one key is configured.
+                </p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">2</div>
+              <div>
+                <div class="step-title">Create an app</div>
+                <p class="step-body">Go to <strong>Apps → New App</strong>. Give it a name, then open it in the <strong>App Editor</strong>.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
               <div>
                 <div class="step-title">Describe what you want to build</div>
                 <p class="step-body">
@@ -85,17 +96,18 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               </div>
             </div>
             <div class="step">
-              <div class="step-num">3</div>
+              <div class="step-num">4</div>
               <div>
                 <div class="step-title">Deploy the backend</div>
                 <p class="step-body">
-                  Click <strong>Deploy Backend</strong> to push the Python controllers to your runner.
+                  Click <strong>Deploy Backend</strong> whenever Python backend files change.
+                  Frontend-only changes take effect immediately without a deploy.
                   The live preview updates automatically.
                 </p>
               </div>
             </div>
             <div class="step">
-              <div class="step-num">4</div>
+              <div class="step-num">5</div>
               <div>
                 <div class="step-title">Publish</div>
                 <p class="step-body">
@@ -129,6 +141,16 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">1</div>
               <div>
+                <div class="step-title">Create an app in the Studio</div>
+                <p class="step-body">
+                  Go to <strong>Apps → New App</strong> in Automaton Studio. Copy the app ID from
+                  the URL or the app settings page — you'll need it in <code>automaton.json</code>.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div>
                 <div class="step-title">Install the CLI</div>
                 <div class="code-block">
                   <span class="code-prompt">$</span>
@@ -137,7 +159,7 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               </div>
             </div>
             <div class="step">
-              <div class="step-num">2</div>
+              <div class="step-num">3</div>
               <div>
                 <div class="step-title">Log in</div>
                 <div class="code-block">
@@ -148,24 +170,29 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               </div>
             </div>
             <div class="step">
-              <div class="step-num">3</div>
+              <div class="step-num">4</div>
               <div>
-                <div class="step-title">Link the app, then build locally</div>
+                <div class="step-title">Build locally</div>
                 <p class="step-body">
-                  Create the app in the Studio UI. Then keep your local project in Git and let
-                  <code>automaton.json</code> link that folder to the app. Your frontend can be plain
-                  HTML/CSS/JS or any framework that builds static files such as React, Vue, or Angular.
+                  Keep your project in Git. Your frontend can be plain HTML/CSS/JS or any framework
+                  that builds static files (React, Vue, Angular). <code>automaton.json</code> at the
+                  project root links the folder to the app.
                 </p>
                 <p class="step-body">
-                  If you are using an external AI tool, point it to
-                  <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
-                  so it follows the required Automaton app structure instead of guessing. If you want a guided walkthrough,
-                  use the Studio documentation section.
+                  If you are using an AI tool, start the session with:
+                </p>
+                <div class="prompt-example">
+                  "Read https://automaton.monster/llms.txt, then build an Automaton app for [your idea]."
+                </div>
+                <p class="step-body">
+                  This tells the AI the required file structure, backend contract, and frontend API.
+                  If your tool <strong>can't fetch URLs</strong>, use the Studio docs
+                  (<strong>Documentation → CLI + AI tools</strong>) to copy a ready-made starter prompt instead.
                 </p>
               </div>
             </div>
             <div class="step">
-              <div class="step-num">4</div>
+              <div class="step-num">5</div>
               <div>
                 <div class="step-title">Deploy</div>
                 <div class="code-block">

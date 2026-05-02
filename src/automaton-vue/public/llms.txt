@@ -2,13 +2,56 @@
 
 If you are an AI assistant helping a user build an app for Automaton, start here.
 
-Read these files in order:
+## Minimum contract (read this even if you don't fetch the linked files)
+
+Automaton apps are frontend-agnostic static web apps with Python backends.
+
+**Backend** — Python controllers in `backend/`. Every controller file must export:
+```python
+def handle(action_name: str, inputs: dict) -> dict:
+    ...
+```
+Every action must return exactly:
+```python
+{"success": True,  "data": <payload>, "error": ""}   # success
+{"success": False, "data": None,      "error": "..."}  # failure
+```
+
+**Frontend** — call backend actions with:
+```javascript
+try {
+  const data = await window.automatonApi.callController('controller', 'action', inputs)
+  // data is the backend "data" payload directly
+} catch (err) {
+  // callController throws on error — always use try/catch
+}
+```
+
+**Project root** — keep `automaton.json` in the project root and commit it to Git:
+```json
+{
+  "appId": "your-app-id",
+  "name": "My App",
+  "server": "https://api.automaton.monster"
+}
+```
+
+**Deploy** — `automaton deploy` uploads files and pushes backend to the runner.
+
+---
+
+## Linked files (read these for full structure and examples)
+
+Read these files in order for complete guidance:
 - /llms/automaton-apps-overview.md
 - /llms/automaton-frontend-structure.md
 - /llms/automaton-backend-controllers.md
 - /llms/automaton-starter-prompts.md
 
-Use the workflow that fits the user's toolchain:
-- App Editor inside Automaton Studio for the fastest browser-first path
-- Local IDE + CLI deploy as the default developer workflow
-- MCP when the AI tool supports it for the most accurate Automaton-specific guidance
+---
+
+## Workflow that fits the user's toolchain
+
+- **App Editor inside Automaton Studio** — fastest browser-first path, no local setup
+- **Local IDE + CLI deploy** — default developer workflow, keep project in Git
+- **MCP** — when the AI tool supports it, gives the most accurate Automaton-specific guidance
