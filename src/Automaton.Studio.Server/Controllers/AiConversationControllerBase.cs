@@ -105,6 +105,7 @@ public abstract class AiConversationControllerBase : BaseController
 
         Guid userId = Guid.Empty;
         Guid? sessionId = null;
+        bool isSystemKey = false;
         _effectiveVerificationStrategy = null;
         _effectiveExecutionPolicy = null;
         var pendingUpdates = new ConcurrentQueue<ConversationUpdatedEvent>();
@@ -135,22 +136,16 @@ public abstract class AiConversationControllerBase : BaseController
             var modelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(provider, model);
             var modelExtraBodyJson = await _providerMetadataService.GetModelExtraBodyJsonAsync(provider, model);
 
-            var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
+            (var apiKey, isSystemKey) = await _aiApiKeyService.GetDecryptedApiKeyWithSourceAsync(userId, provider);
             if (string.IsNullOrEmpty(apiKey))
             {
                 await WriteErrorEvent($"No API key configured for provider '{provider}'.");
                 return;
             }
 
-            if (!_rateLimitService.CheckAndRecordRequest(userId.ToString()))
-            {
-                await WriteErrorEvent("Rate limit exceeded. Please try again later.");
-                return;
-            }
-
             _logger.LogInformation(
-                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}",
-                userId, provider, model);
+                "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, systemKey={IsSystemKey}",
+                userId, provider, model, isSystemKey);
 
             // 2. Resolve session
             sessionId = await ResolveSessionAsync(request, userId, provider, model);
@@ -258,7 +253,11 @@ public abstract class AiConversationControllerBase : BaseController
                 // Persist usage metrics even when generation fails so spent tokens are not lost.
                 await FlushPendingTokenUsageAsync(updatesSnapshot, sessionId.Value, userId);
 
-                await WriteErrorEvent(result.ErrorMessage ?? "Conversation failed");
+                var errorMsg = result.ErrorMessage ?? "Conversation failed";
+                if (IsRateLimitError(errorMsg))
+                    await WriteErrorEvent(RateLimitMessage(isSystemKey), "RATE_LIMIT");
+                else
+                    await WriteErrorEvent(errorMsg);
             }
         }
         catch (OperationCanceledException)
@@ -277,7 +276,10 @@ public abstract class AiConversationControllerBase : BaseController
             // Persist token usage for unexpected failures as best-effort accounting.
             await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
 
-            await WriteErrorEvent(ex.Message);
+            if (IsRateLimitError(ex.Message))
+                await WriteErrorEvent(RateLimitMessage(isSystemKey), "RATE_LIMIT");
+            else
+                await WriteErrorEvent(ex.Message);
         }
         finally
         {
@@ -285,6 +287,21 @@ public abstract class AiConversationControllerBase : BaseController
                 _mcpClient.ConversationUpdated -= eventHandler;
         }
     }
+
+    private static bool IsRateLimitError(string? message)
+    {
+        if (string.IsNullOrEmpty(message)) return false;
+        return message.Contains("rate_limit",        StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("rate limited",      StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("429",               StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("Too Many Requests", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("Rate limit",        StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string RateLimitMessage(bool isSystemKey) =>
+        isSystemKey
+            ? "The shared demo key has hit the provider's rate limit. Add your own API key to continue without restrictions."
+            : "Your API key has hit the provider's rate limit. Please wait a moment and try again.";
 
     // ── Session management ────────────────────────────────────────────────
 
@@ -568,8 +585,13 @@ public abstract class AiConversationControllerBase : BaseController
         }
     }
 
-    protected async Task WriteErrorEvent(string message) =>
-        await WriteEvent("error", new { error = "Something went wrong. Please try again in a moment." });
+    protected async Task WriteErrorEvent(string message, string? errorCode = null)
+    {
+        var payload = errorCode != null
+            ? (object)new { error = message, errorCode }
+            : new { error = message };
+        await WriteEvent("error", payload);
+    }
 
     protected async Task WriteEvent(string eventType, object data)
     {

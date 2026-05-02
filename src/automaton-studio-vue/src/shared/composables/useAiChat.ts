@@ -63,6 +63,8 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   const currentProvider = computed(() =>
     availableProviders.value.find((p) => p.providerName === selectedProvider.value),
   )
+  /** True when the active provider has no personal user key — falling back to the shared admin/demo key. */
+  const isUsingSharedKey = computed(() => !!currentProvider.value && !currentProvider.value.hasStoredKeys && !currentProvider.value.hasEnvironmentKey && (currentProvider.value.hasSystemKey ?? false))
   const availableModels = computed(() => {
     const models: string[] = []
     for (const provider of availableProviders.value) {
@@ -162,7 +164,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
       const userProviders = await getAvailableProviders(true)
 
       const providers = userProviders.filter(
-        (p) => (p.hasStoredKeys || p.hasEnvironmentKey) && p.supportedModels.length > 0,
+        (p) => (p.hasStoredKeys || p.hasSystemKey || p.hasEnvironmentKey) && p.supportedModels.length > 0,
       )
       availableProviders.value = providers
 
@@ -521,6 +523,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
             role: 'assistant',
             type: 'codeError',
             content: data.error,
+            errorCode: data.errorCode,
             timestamp: new Date(),
           })
         },
@@ -834,6 +837,7 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
     error,
     hasMessages,
     currentProvider,
+    isUsingSharedKey,
     conversationMode,
 
     // Session state

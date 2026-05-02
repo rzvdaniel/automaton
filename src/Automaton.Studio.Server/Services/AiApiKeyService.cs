@@ -121,6 +121,16 @@ public class AiApiKeyService
     /// </summary>
     public async Task<string?> GetDecryptedApiKeyForProviderAsync(Guid userId, string providerName)
     {
+        var (key, _) = await GetDecryptedApiKeyWithSourceAsync(userId, providerName);
+        return key;
+    }
+
+    /// <summary>
+    /// Get decrypted API key for a specific provider, also indicating whether a system/admin key was used.
+    /// Checks the user's own keys first, then falls back to admin/system keys (CreatedByUserId == null).
+    /// </summary>
+    public async Task<(string? Key, bool IsSystemKey)> GetDecryptedApiKeyWithSourceAsync(Guid userId, string providerName)
+    {
         logger.LogInformation("Looking up API key for provider '{ProviderName}' for user {UserId}", providerName, userId);
 
         // 1. Prefer user's own key
@@ -129,6 +139,8 @@ public class AiApiKeyService
             .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
             .FirstOrDefaultAsync();
 
+        var isSystemKey = false;
+
         // 2. Fall back to admin/system keys
         if (key == null)
         {
@@ -136,12 +148,13 @@ public class AiApiKeyService
                 .Where(k => k.ProviderName == providerName && k.IsActive && k.CreatedByUserId == null)
                 .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
                 .FirstOrDefaultAsync();
+            isSystemKey = key != null;
         }
 
         if (key == null)
         {
             logger.LogWarning("No active API key found for provider '{ProviderName}' (user {UserId} or system)", providerName, userId);
-            return null;
+            return (null, false);
         }
 
         try
@@ -150,15 +163,15 @@ public class AiApiKeyService
             await dbContext.SaveChangesAsync();
 
             var decryptedKey = DecryptApiKey(key.EncryptedApiKey);
-            logger.LogInformation("Successfully retrieved API key for provider '{ProviderName}'", providerName);
-            return decryptedKey;
+            logger.LogInformation("Successfully retrieved API key for provider '{ProviderName}' (systemKey={IsSystemKey})", providerName, isSystemKey);
+            return (decryptedKey, isSystemKey);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to decrypt API key for provider '{ProviderName}' (key id: {KeyId}). " +
                 "This usually means the AiApiEncryptionKey in appsettings does not match the key used when the API key was stored.",
                 providerName, key.Id);
-            return null;
+            return (null, false);
         }
     }
 
@@ -243,9 +256,11 @@ public class AiApiKeyService
 
         foreach (var dbProvider in dbProviders)
         {
-            var storedKeysForProvider = groupedKeys
+            var allKeysForProvider = groupedKeys
                 .FirstOrDefault(g => string.Equals(g.Key, dbProvider.Name, StringComparison.OrdinalIgnoreCase))
                 ?.ToList() ?? new List<AiApiKey>();
+            var userKeysForProvider = allKeysForProvider.Where(k => k.CreatedByUserId == userId).ToList();
+            var systemKeysForProvider = allKeysForProvider.Where(k => k.CreatedByUserId == null).ToList();
             var hasEnvironmentKey = envKeys.TryGetValue(dbProvider.Name, out var envKey) && !string.IsNullOrEmpty(envKey);
 
             providers.Add(new AiProviderInfo
@@ -256,10 +271,11 @@ public class AiApiKeyService
                 IconName = dbProvider.IconName,
                 ApiKeyHelpUrl = dbProvider.ApiKeyHelpUrl,
                 IsActive = dbProvider.IsActive,
-                HasStoredKeys = storedKeysForProvider.Any(),
-                StoredKeyCount = storedKeysForProvider.Count,
+                HasStoredKeys = userKeysForProvider.Any(),
+                HasSystemKey = systemKeysForProvider.Any(),
+                StoredKeyCount = userKeysForProvider.Count,
                 HasEnvironmentKey = hasEnvironmentKey,
-                StoredKeys = storedKeysForProvider.Select(k => new AiApiKeyModel
+                StoredKeys = userKeysForProvider.Select(k => new AiApiKeyModel
                 {
                     Id = k.Id,
                     Name = k.Name,
@@ -319,7 +335,7 @@ public class AiApiKeyService
             return providers;
 
         return providers
-            .Where(p => p.HasStoredKeys || p.HasEnvironmentKey)
+            .Where(p => p.HasStoredKeys || p.HasSystemKey || p.HasEnvironmentKey)
             .ToList();
     }
 
@@ -419,6 +435,7 @@ public class AiProviderInfo
     public bool IsActive { get; set; }
 
     public bool HasStoredKeys { get; set; }
+    public bool HasSystemKey { get; set; }
     public int StoredKeyCount { get; set; }
     public bool HasEnvironmentKey { get; set; }
     public List<AiApiKeyModel> StoredKeys { get; set; } = new();

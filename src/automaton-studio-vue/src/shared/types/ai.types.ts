@@ -28,6 +28,7 @@ export interface AiProvider {
   apiKeyHelpUrl?: string
   isActive?: boolean
   hasStoredKeys: boolean
+  hasSystemKey: boolean
   storedKeyCount: number
   hasEnvironmentKey: boolean
   supportedModels: string[]
@@ -116,6 +117,7 @@ export interface SseDoneEvent {
 
 export interface SseErrorEvent {
   error: string
+  errorCode?: string
 }
 
 // ============================================
@@ -192,6 +194,7 @@ export interface ChatMessage {
   
   // For error messages
   error?: string
+  errorCode?: string
   
   // For streaming messages
   isStreaming?: boolean

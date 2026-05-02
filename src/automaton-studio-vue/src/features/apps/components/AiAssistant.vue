@@ -99,6 +99,7 @@ const {
   updateSessionTitle,
   deleteSession,
   conversationMode,
+  isUsingSharedKey,
 } = useAiChat(props.resourceType, props.resourceId, {
   // Callback when AI tools are executed
   onToolExecuted: async (toolName, args, result, toolCallId) => {
@@ -818,6 +819,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 :available-models="availableModels"
                 :model-display-names="modelDisplayNames"
                 :disabled="isBusy"
+                :shared-key="isUsingSharedKey"
                 compact
               />
               <Button
@@ -989,8 +991,22 @@ function handleKeyPress(event: KeyboardEvent) {
                       v-if="group.message.reasoningContent"
                       :content="group.message.reasoningContent"
                     />
+                    <!-- Rate-limit notice (works for both shared and personal keys) -->
+                    <template v-if="group.message.errorCode === 'RATE_LIMIT'">
+                      <div class="rate-limit-notice">
+                        <i class="pi pi-info-circle"></i>
+                        <span>{{ group.message.content }}</span>
+                      </div>
+                      <!-- Upgrade CTA only shown when using the shared demo key -->
+                      <div v-if="isUsingSharedKey" class="upgrade-key-cta">
+                        <router-link to="/ai-keys" class="upgrade-key-link">
+                          <i class="pi pi-key"></i> Add your own API key
+                        </router-link>
+                        <span class="upgrade-key-hint">Free on OpenRouter — takes 30 seconds.</span>
+                      </div>
+                    </template>
                     <!-- Use v-for single-item to bind extractVersionSummary result as a template variable -->
-                    <template v-for="extracted in [extractVersionSummary(group.message.content)]" :key="gIdx">
+                    <template v-else v-for="extracted in [extractVersionSummary(group.message.content)]" :key="gIdx">
                       <div v-if="extracted.text" class="message-text">
                         {{ extracted.text }}
                       </div>
@@ -1085,6 +1101,7 @@ function handleKeyPress(event: KeyboardEvent) {
                 :available-models="availableModels"
                 :model-display-names="modelDisplayNames"
                 :disabled="isBusy"
+                :shared-key="isUsingSharedKey"
                 compact
               />
               <Button
@@ -1626,6 +1643,50 @@ function handleKeyPress(event: KeyboardEvent) {
     background: var(--p-surface-800);
     border-color: var(--p-surface-700);
   }
+}
+
+.rate-limit-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--p-orange-600);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+
+  .app-dark & {
+    color: var(--p-orange-400);
+  }
+}
+
+.upgrade-key-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.upgrade-key-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background-color: var(--p-primary-500);
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: var(--p-primary-600);
+  }
+}
+
+.upgrade-key-hint {
+  font-size: 0.75rem;
+  color: var(--p-surface-500);
 }
 
 .tool-call-line {

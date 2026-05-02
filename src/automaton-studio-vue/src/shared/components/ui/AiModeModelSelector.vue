@@ -17,11 +17,17 @@ const props = withDefaults(
      * default = outlined button + full labels ("Autonomous" / "Human-in-the-middle") — used on landing cards
      */
     compact?: boolean
+    /**
+     * When true, a "Demo" badge is shown next to the model selector to indicate the shared
+     * admin key is being used rather than the user's own key.
+     */
+    sharedKey?: boolean
   }>(),
   {
     disabled: false,
     loading: false,
     compact: false,
+    sharedKey: false,
   },
 )
 
@@ -73,5 +79,35 @@ function toggleMode() {
       :loading="loading"
       @update:model-value="(val: string) => emit('update:model', val)"
     />
+    <span
+      v-if="sharedKey"
+      v-tooltip.top="'Using shared demo key. Add your own API key for unlimited use.'"
+      class="demo-badge"
+    >Demo</span>
   </div>
 </template>
+
+<style scoped>
+.ai-mode-model-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.demo-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.75rem;
+  background-color: var(--p-yellow-100);
+  color: var(--p-yellow-800);
+  cursor: default;
+  white-space: nowrap;
+}
+
+:global(.app-dark) .demo-badge {
+  background-color: var(--p-yellow-900);
+  color: var(--p-yellow-200);
+}
+</style>
