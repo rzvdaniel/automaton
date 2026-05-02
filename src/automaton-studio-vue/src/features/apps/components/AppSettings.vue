@@ -56,14 +56,22 @@ const mcpVscodeConfig = computed(() =>
       automaton: {
         type: 'http',
         url: `${serverBase.value}/api/mcp`,
-        headers: { 'X-API-Key': 'ak_execute_xxx' },
+        headers: { 'X-API-Key': 'your-api-key' },
       },
     },
   }, null, 2)
 )
 
+const cliLoginCommand = computed(() =>
+  `automaton login --server ${serverBase.value} --key your-api-key`
+)
+
+const starterPrompt = computed(() =>
+  'Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python backend controllers in backend/. Each controller file must export handle(action_name, inputs) and return { success, data, error }. Frontend code must call window.automatonApi.callController(controller, action, inputs) and use try/catch because the function returns data directly and throws on errors. Use backend/shared/ for shared helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.'
+)
+
 const mcpClaudeCommand = computed(() =>
-  `claude mcp add automaton --transport http "${serverBase.value}/api/mcp" --header "X-API-Key: ak_execute_xxx"`
+  `claude mcp add automaton --transport http "${serverBase.value}/api/mcp" --header "X-API-Key: your-api-key"`
 )
 
 // Local form state
@@ -743,7 +751,9 @@ async function handleSaveTemplateStatus() {
               <p class="text-color-secondary mt-0 mb-0">
                 Build this app locally with your own tools, then push updates with
                 <code class="connect-code">automaton deploy</code>.
-                Or connect an AI coding assistant via MCP to write and deploy files automatically.
+                Or connect an AI coding assistant via MCP so it understands the Automaton structure
+                while you keep the project in your local workspace. MCP is recommended, but it is
+                not required.
               </p>
 
               <!-- automaton.json -->
@@ -770,7 +780,8 @@ async function handleSaveTemplateStatus() {
               <div>
                 <div class="font-semibold mb-1">2. Deploy with the CLI</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  Install once, then run from your project folder whenever you want to push changes.
+                  Install once, log in with an execute-scope API key, then run from your project
+                  folder whenever you want to push changes.
                 </p>
                 <div class="connect-snippet">
                   <pre>npm install -g @automaton/cli</pre>
@@ -778,6 +789,14 @@ async function handleSaveTemplateStatus() {
                     :icon="copiedItem === 'npm' ? 'pi pi-check' : 'pi pi-copy'"
                     text rounded size="small" class="connect-copy-btn"
                     @click="copyText('npm install -g @automaton/cli', 'npm')"
+                  />
+                </div>
+                <div class="connect-snippet mt-2">
+                  <pre>{{ cliLoginCommand }}</pre>
+                  <Button
+                    :icon="copiedItem === 'login' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText(cliLoginCommand, 'login')"
                   />
                 </div>
                 <div class="connect-snippet mt-2">
@@ -794,9 +813,10 @@ async function handleSaveTemplateStatus() {
               <div>
                 <div class="font-semibold mb-1">3. Connect an AI coding assistant (MCP)</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  Add Automaton as an MCP server so GitHub Copilot Agent or Claude Code can write
-                  and deploy files for this app without you running any commands.
-                  Get an API key from <strong>Settings → API Keys</strong> (scope: execute).
+                  Add Automaton as an MCP server so GitHub Copilot Agent or Claude Code can learn
+                  this app's structure automatically. Use an API key from <strong>Settings → API Keys</strong>
+                  with scope: <strong>execute</strong>, and deploy the finished project with
+                  <code class="connect-code">automaton deploy</code>.
                 </p>
                 <div class="text-sm font-medium mb-1 text-color-secondary">VS Code / GitHub Copilot — <code class="connect-code">.vscode/mcp.json</code></div>
                 <div class="connect-snippet">
@@ -818,18 +838,42 @@ async function handleSaveTemplateStatus() {
                 </div>
               </div>
 
+              <div>
+                <div class="font-semibold mb-1">4. Starter prompt for tools without MCP</div>
+                <p class="text-color-secondary text-sm mb-2">
+                  If your AI tool does not support MCP, paste this prompt so it follows the Automaton
+                  structure accurately.
+                </p>
+                <div class="connect-snippet">
+                  <pre>{{ starterPrompt }}</pre>
+                  <Button
+                    :icon="copiedItem === 'prompt' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText(starterPrompt, 'prompt')"
+                  />
+                </div>
+              </div>
+
               <!-- Structure reference -->
               <div>
                 <div class="font-semibold mb-1">Required file structure</div>
                 <div class="connect-tree">
                   <div><span class="ct-file">automaton.json</span></div>
-                  <div><span class="ct-dir">frontend/</span></div>
-                  <div class="pl-3"><span class="ct-file">index.html</span> <span class="ct-comment">← entry point (required)</span></div>
-                  <div class="pl-3"><span class="ct-file">*.css / *.js / pages/</span></div>
+                  <div><span class="ct-dir">frontend/</span> <span class="ct-comment">← plain static apps</span></div>
+                  <div class="pl-3"><span class="ct-file">index.html</span> <span class="ct-comment">← entry point for plain static apps</span></div>
+                  <div class="pl-3"><span class="ct-file">*.css / *.js / assets/</span></div>
+                  <div><span class="ct-dir">src/</span> <span class="ct-comment">← framework source code can stay in the repo</span></div>
+                  <div><span class="ct-dir">dist/</span> <span class="ct-comment">← common build output; use build + deployDir</span></div>
                   <div><span class="ct-dir">backend/</span></div>
-                  <div class="pl-3"><span class="ct-file">controller.py</span> <span class="ct-comment">← one file per resource</span></div>
+                  <div class="pl-3"><span class="ct-file">controller.py</span> <span class="ct-comment">← exports handle(action_name, inputs)</span></div>
                   <div class="pl-3"><span class="ct-file">requirements.txt</span> <span class="ct-comment">← optional pip deps</span></div>
+                  <div class="pl-3"><span class="ct-dir">shared/</span> <span class="ct-comment">← shared Python helpers</span></div>
+                  <div class="pl-3"><span class="ct-dir">mocks/</span> <span class="ct-comment">← local mock responses</span></div>
                 </div>
+                <p class="text-color-secondary text-sm mt-2 mb-0">
+                  Frontend code should call backend actions with <code class="connect-code">window.automatonApi.callController(controller, action, inputs)</code>.
+                  The call returns the backend data payload directly and throws on error, so use <code class="connect-code">try/catch</code>.
+                </p>
               </div>
             </div>
           </template>

@@ -626,30 +626,47 @@ const handleRetry = async () => {
           <!-- CLI path -->
           <div v-else-if="quickStartPath === 'cli'" class="qs-content">
             <p class="text-color-secondary text-sm mt-0 mb-3">
-              Build locally with any editor (Cursor, VS Code…), deploy with one command.
+              Build locally with any editor (Cursor, VS Code…), keep the project in Git,
+              and deploy with one command. MCP is recommended when supported, but not required.
             </p>
             <div class="qs-code mb-2">npm install -g @automaton/cli</div>
             <div class="qs-code mb-3">automaton deploy</div>
             <p class="text-color-secondary text-sm mb-2">
-              Your project needs a <code class="qs-inline-code">frontend/index.html</code> as the entry point
-              and optionally a <code class="qs-inline-code">backend/</code> folder for Python controllers.
+              Plain static apps can live in <code class="qs-inline-code">frontend/</code>. Framework apps
+              can keep their source code in the repo and deploy the built output, typically from
+              <code class="qs-inline-code">dist/</code>. Python backend code lives in
+              <code class="qs-inline-code">backend/</code>.
             </p>
             <div class="qs-tree mb-3">
-              <div><span class="qs-tree-dir">frontend/</span></div>
-              <div class="pl-3"><span class="qs-tree-file">index.html</span> <span class="qs-tree-comment">← required</span></div>
+              <div><span class="qs-tree-file">automaton.json</span> <span class="qs-tree-comment">← commit this</span></div>
+              <div><span class="qs-tree-dir">frontend/</span> <span class="qs-tree-comment">← plain static apps</span></div>
+              <div class="pl-3"><span class="qs-tree-file">index.html</span> <span class="qs-tree-comment">← entry point for plain static apps</span></div>
+              <div><span class="qs-tree-dir">src/</span> <span class="qs-tree-comment">← framework source code</span></div>
+              <div><span class="qs-tree-dir">dist/</span> <span class="qs-tree-comment">← common build output</span></div>
               <div><span class="qs-tree-dir">backend/</span></div>
-              <div class="pl-3"><span class="qs-tree-file">mycontroller.py</span> <span class="qs-tree-comment">← optional</span></div>
+              <div class="pl-3"><span class="qs-tree-file">todos.py</span> <span class="qs-tree-comment">← exports handle(action_name, inputs)</span></div>
             </div>
             <a href="https://www.npmjs.com/package/@automaton/cli" target="_blank" rel="noopener" class="p-button p-button-sm p-button-secondary p-button-outlined" style="text-decoration:none">
               <i class="pi pi-external-link mr-1" />CLI docs
             </a>
+            <p class="text-sm font-semibold mt-3 mb-1">Starter prompt for tools without MCP:</p>
+            <div class="qs-code qs-code--block">
+              Build this as an Automaton app. Use any static frontend stack that fits the task.
+              Put Python backend controllers in backend/. Each controller file must export
+              handle(action_name, inputs) and return { success, data, error }. Frontend code must call
+              window.automatonApi.callController(controller, action, inputs) and use try/catch because
+              the function returns data directly and throws on errors. Use backend/shared/ for shared
+              helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json
+              for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.
+            </div>
           </div>
 
           <!-- MCP path -->
           <div v-else class="qs-content">
             <p class="text-color-secondary text-sm mt-0 mb-3">
               Connect Automaton as an MCP server to GitHub Copilot Agent or Claude Code.
-              The AI writes and deploys files without you touching the terminal.
+              The AI can understand the required Automaton structure while you keep working in your
+              local project. This is the most accurate path when your tool supports MCP.
             </p>
             <p class="text-sm font-semibold mb-1">VS Code / GitHub Copilot — add to <code class="qs-inline-code">.vscode/mcp.json</code>:</p>
             <div class="qs-code qs-code--block mb-3">
@@ -670,7 +687,10 @@ const handleRetry = async () => {
                 style="color: var(--p-primary-500)"
                 @click="router.push('/apikeys')"
               >Settings → API Keys</strong> (scope: <em>execute</em>).
-              Then open Copilot Chat in Agent mode and describe your app.
+              Then tell the AI that backend controllers live in <code class="qs-inline-code">backend/</code>,
+              export <code class="qs-inline-code">handle(action_name, inputs)</code>, and frontend code should use
+              <code class="qs-inline-code">window.automatonApi.callController(...)</code> with <code class="qs-inline-code">try/catch</code>.
+              When the project is ready, run <code class="qs-inline-code">automaton deploy</code>.
             </p>
           </div>
         </template>

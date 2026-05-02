@@ -1,8 +1,8 @@
 # Building Automaton Apps with AI Coding Tools
 
-Automaton apps are HTML/CSS/JavaScript apps with optional Python backends. You can build them
-entirely inside your preferred AI coding environment — VS Code with GitHub Copilot, Claude Code,
-or any tool that supports MCP — and push them to Automaton without opening the browser editor.
+Automaton apps are frontend-agnostic static web apps with Python backends. You can build them
+inside your preferred AI coding environment — VS Code with GitHub Copilot, Claude Code,
+or any tool that supports MCP — keep the project in Git, and deploy it to Automaton when ready.
 
 ---
 
@@ -11,11 +11,14 @@ or any tool that supports MCP — and push them to Automaton without opening the
 1. **A running Automaton server** — local (`https://localhost:7091`) or hosted
 2. **An API key with execute scope** — create one at **API Keys** → **New Key** → scope: `execute`
    - Format: `ak_execute_xxx`
-3. **One-time MCP configuration** per tool (see below)
+3. **One-time MCP configuration** per tool if you want the AI to understand Automaton structure automatically
 
-On first use, the AI will call `create_app` automatically and write an `automaton.json` file to
-your project root. On every subsequent session, it reads that file and continues working on the
-same app — no manual setup per project.
+MCP is strongly recommended when your tool supports it because it gives the AI the most accurate
+Automaton-specific guidance. It is not required. If you prefer a tool or workflow without MCP,
+use the starter prompt below and deploy with the CLI.
+
+On first use, create or link the app and keep `automaton.json` in your project root. On every
+subsequent session, the AI can read that file and continue working on the same app.
 
 `automaton.json` example (written by the AI, not by you):
 ```json
@@ -61,21 +64,24 @@ Create `.vscode/mcp.json` in your workspace (or add to user settings):
 4. Start with a prompt describing what to build:
 
 ```
-Build a simple todo list app. Use a Python backend to store and retrieve todos.
-Use the automaton tools to write the files directly.
+Build this as an Automaton app. Use a Python backend in backend/ to store and retrieve todos.
+Each backend controller must export handle(action_name, inputs), and frontend code should call
+window.automatonApi.callController(...).
 ```
 
-Copilot will:
-- Call `create_app` if `automaton.json` doesn't exist yet
-- Write `index.html`, CSS, JS, and `backend/*.py` files via `write_file`
-- Call `deploy_backend` to push the Python files to the runner
+Copilot can:
+- Create or link the app if `automaton.json` doesn't exist yet
+- Generate the project in your local workspace
+- Follow the Automaton backend/controller contract automatically through MCP guidance
+
+When the project is ready, run `automaton deploy` to upload the frontend and deploy the backend.
 
 ### Iterating
 
 Open `automaton.json` to see the appId, then in Copilot Chat:
 
 ```
-Add a "clear completed" button that calls backend/todo.py → clear_completed()
+Add a "clear completed" button that calls backend/todos.py → clear_completed()
 ```
 
 Copilot reads existing files via `read_file` and `list_files`, updates only what changed.
@@ -113,14 +119,17 @@ claude
 Then describe what to build:
 
 ```
-Build a leaderboard app. Store scores in a Python backend. Show the top 10 scores on the page.
-Use the automaton MCP tools to write and deploy the files.
+Build this as an Automaton app. Store scores in a Python backend in backend/.
+Each controller must export handle(action_name, inputs), and frontend code should call
+window.automatonApi.callController(...). Keep the project local and prepare it for automaton deploy.
 ```
 
-Claude Code will:
-- Check for `automaton.json` → create the app if it doesn't exist
-- Write all files to Automaton via the MCP tools
-- Call `deploy_backend` when backend files are ready
+Claude Code can:
+- Check for `automaton.json` and link or create the app
+- Generate the local project with the correct Automaton structure
+- Reuse the same project folder across sessions
+
+When the project is ready, run `automaton deploy`.
 
 ### Switching Projects
 
@@ -141,6 +150,14 @@ cd /path/to/app-2   # works on app-2 — no reconfiguration needed
 The Copilot CLI (`gh copilot suggest`, `gh copilot explain`) is a terminal assistant — it does not
 connect to MCP servers directly. The recommended workflow is to use it to write code locally, then
 push to Automaton via zip upload.
+
+## Starter Prompt for Tools Without MCP
+
+Paste this into Cursor, Claude Code, Copilot Chat, or another AI tool if MCP is not configured:
+
+```text
+Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python backend controllers in backend/. Each controller file must export handle(action_name, inputs) and return { success, data, error }. Frontend code must call window.automatonApi.callController(controller, action, inputs) and use try/catch because the function returns data directly and throws on errors. Use backend/shared/ for shared helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.
+```
 
 ### Workflow
 
@@ -199,40 +216,65 @@ curl -X POST "https://localhost:7091/api/apps/{appId}/upload?clean=true" \
 
 ```
 my-app/
-├── automaton.json          ← written by the AI on first run (commit this)
-├── index.html              ← required entry point
-├── *.css / *.js / assets/  ← frontend — any structure you prefer
+├── automaton.json          ← app link + optional build/deploy config (commit this)
+├── frontend/               ← plain static apps can live here
+│   ├── index.html          ← entry point for plain static apps
+│   └── *.css / *.js / assets/
+├── src/                    ← framework source code can stay in the repo
+├── dist/                   ← common build output for framework apps
 └── backend/
-    ├── *.py                ← Python controllers (filename = controller name)
+  ├── *.py                ← Python controllers (filename = controller name)
     ├── requirements.txt    ← pip dependencies (optional)
+  ├── shared/             ← shared Python helpers
     └── mocks/
         └── {ctrl}.{action}.json   ← local dev mock responses
 ```
 
+Notes:
+- Plain static apps can live directly in `frontend/`
+- Framework apps such as React, Vue, or Angular can keep source code in the repo and deploy the built output, typically from `dist/`
+- Use `build` and `deployDir` in `automaton.json` when the deployable frontend lives somewhere other than the default path
+
 ## Python Controller Pattern
 
 ```python
-# backend/todo.py
-def list_todos(inputs):
-    return {'todos': []}
+# backend/todos.py
+class TodosController:
+  def list(self, inputs: dict) -> dict:
+    return {"success": True, "data": {"items": []}, "error": ""}
 
-def add_todo(inputs):
-    text = inputs.get('text', '')
-    return {'added': True, 'text': text}
+  def create(self, inputs: dict) -> dict:
+    title = inputs.get("title", "").strip()
+    if not title:
+      return {"success": False, "data": None, "error": "title is required"}
+    return {"success": True, "data": {"title": title}, "error": ""}
+
+_controller = TodosController()
+
+def handle(action_name: str, inputs: dict) -> dict:
+  method = getattr(_controller, action_name, None)
+  if method is None:
+    return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+  return method(inputs)
 ```
+
+Each backend controller file must export `handle(action_name, inputs)` and return the standard
+response envelope: `{ success, data, error }`.
 
 ## Calling a Backend Controller from the Frontend
 
 ```javascript
-// Calls backend/todo.py → list_todos()
-const result = await window.automatonApi.callController('todo', 'list_todos', {});
-
-// Calls backend/todo.py → add_todo()
-await window.automatonApi.callController('todo', 'add_todo', { text: 'Buy milk' });
+try {
+  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
+  console.log(data.items)
+} catch (err) {
+  console.error(err.message)
+}
 ```
 
-`window.automatonApi` is provided by Automaton at runtime. In local development, the dev
-polyfill in `index.html` reads from `backend/mocks/` automatically — no server needed.
+`window.automatonApi` is provided by Automaton at runtime. `callController()` returns the backend
+`data` payload directly and throws on error, so always use `try/catch`. In local development, the
+dev polyfill in `index.html` reads from `backend/mocks/` automatically — no server needed.
 
 ---
 

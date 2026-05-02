@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 // Import feature routes
 import { authRoutes } from '@/features/auth/routes'
 import { dashboardRoutes } from '@/features/dashboard/routes'
+import { docsRoutes } from '@/features/docs/routes'
 import { flowsRoutes } from '@/features/flows/routes'
 import { appsRoutes } from '@/features/apps/routes'
 import { stepsRoutes } from '@/features/steps/routes'
@@ -31,6 +32,7 @@ const router = createRouter({
     // Features
     ...flowsRoutes,
     ...appsRoutes,
+    ...docsRoutes,
     ...stepsRoutes,
     ...runnersRoutes,
     ...projectsRoutes,

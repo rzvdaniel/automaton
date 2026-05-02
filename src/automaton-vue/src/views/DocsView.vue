@@ -16,8 +16,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
         <div class="docs-header">
           <h1 class="docs-title">Building apps with Automaton</h1>
           <p class="docs-subtitle">
-            Automaton apps are HTML/CSS/JavaScript frontends with optional Python backends.
-            Pick the workflow that fits how you already work.
+            Automaton apps are frontend-agnostic static web apps with Python backends.
+            Build with the tools you already like, then deploy to Automaton when ready.
           </p>
         </div>
 
@@ -121,6 +121,7 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <p>
               Build your app locally with any editor, then push it to Automaton with one command.
               Works with Cursor, VS Code, WebStorm, or plain vim — whatever you prefer.
+              MCP is recommended when your tool supports it, but it is not required.
             </p>
           </div>
 
@@ -149,19 +150,20 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">3</div>
               <div>
-                <div class="step-title">Create an app from the Studio, then build locally</div>
+                <div class="step-title">Link the app, then build locally</div>
                 <p class="step-body">
-                  Create the app in the Studio UI (or run <code>automaton apps create "My App"</code>).
-                  An <code>automaton.json</code> file will appear in your project root — this links the folder to the app.
+                  Create the app in the Studio UI. Then keep your local project in Git and let
+                  <code>automaton.json</code> link that folder to the app. Your frontend can be plain
+                  HTML/CSS/JS or any framework that builds static files such as React, Vue, or Angular.
                 </p>
                 <div class="structure-block">
                   <div class="structure-line"><span class="file">automaton.json</span> <span class="comment">← created automatically</span></div>
-                  <div class="structure-line"><span class="dir">frontend/</span></div>
-                  <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← entry point (required)</span></div>
-                  <div class="structure-line indent"><span class="dir">js/</span></div>
-                  <div class="structure-line indent"><span class="dir">styles/</span></div>
+                  <div class="structure-line"><span class="dir">frontend/</span> <span class="comment">← plain static apps can live here</span></div>
+                  <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← entry point for plain static apps</span></div>
+                  <div class="structure-line"><span class="dir">src/</span> <span class="comment">← framework source code can stay in the repo</span></div>
+                  <div class="structure-line"><span class="dir">dist/</span> <span class="comment">← typical build output for framework apps</span></div>
                   <div class="structure-line"><span class="dir">backend/</span></div>
-                  <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← Python controller</span></div>
+                  <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← Python controller with handle(action_name, inputs)</span></div>
                   <div class="structure-line indent"><span class="file">requirements.txt</span> <span class="comment">← pip deps (optional)</span></div>
                 </div>
               </div>
@@ -186,9 +188,27 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <i class="pi pi-info-circle" />
             <span>
               <strong>Using Cursor or VS Code?</strong> Ask the AI to "build an Automaton app"
-              and point it at this structure. The AI will write <code>frontend/index.html</code>
-              and <code>backend/*.py</code>, then you run <code>automaton deploy</code> when ready.
+              and tell it the frontend may be any static-output stack, the backend lives in
+              <code>backend/</code>, and frontend code should call
+              <code>window.automatonApi.callController(...)</code>. Then run
+              <code>automaton deploy</code> when ready.
             </span>
+          </div>
+
+          <div class="ref-section">
+            <h2 class="ref-title">Starter prompt for tools without MCP</h2>
+            <p class="ref-subtitle">
+              Paste this into Cursor, Claude Code, Copilot Chat, or another AI tool if MCP is not configured.
+            </p>
+            <div class="prompt-example">
+              "Build this as an Automaton app. Use any static frontend stack that fits the task.
+              Put Python backend controllers in backend/. Each controller file must export
+              handle(action_name, inputs) and return { success, data, error }. Frontend code must call
+              window.automatonApi.callController(controller, action, inputs) and use try/catch because
+              the function returns data directly and throws on errors. Use backend/shared/ for shared
+              helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json
+              for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy."
+            </div>
           </div>
         </div>
 
@@ -198,8 +218,9 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <span class="path-badge path-badge-purple">AI-native</span>
             <p>
               Connect Automaton as an MCP server so your AI coding assistant (GitHub Copilot Agent,
-              Claude Code) can write files <em>directly into Automaton</em> and deploy in one shot —
-              no CLI step needed.
+              Claude Code) can understand the required Automaton structure while you keep working in
+              your local project. This is the most accurate path when your tool supports MCP. Use the
+              Automaton CLI to upload and deploy the app.
             </p>
           </div>
 
@@ -255,16 +276,17 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">3</div>
               <div>
-                <div class="step-title">Ask the AI to build and deploy</div>
+                <div class="step-title">Ask the AI to scaffold the project</div>
                 <div class="prompt-example">
-                  "Build a leaderboard app. Store scores in a Python SQLite backend.
-                  Use the automaton tools to write the files and deploy."
+                  "Build this as an Automaton app. Use any static frontend stack that fits the task.
+                  Put Python backend controllers in backend/. Each controller must export
+                  handle(action_name, inputs), and frontend code should call
+                  window.automatonApi.callController(...)."
                 </div>
                 <p class="step-body">
-                  The AI will call <code>create_app</code>, write all files, and call
-                  <code>deploy_backend</code> — without you running any commands.
-                  An <code>automaton.json</code> is written to your project so future sessions
-                  continue working on the same app.
+                  The AI can create or link the app, understand the required structure, and generate
+                  the project in your local workspace. Commit <code>automaton.json</code> to the repo,
+                  then run <code>automaton deploy</code> to upload the frontend and deploy the backend.
                 </p>
               </div>
             </div>
@@ -274,7 +296,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <i class="pi pi-info-circle" />
             <span>
               The AI learns the correct file structure from the MCP server's instructions.
-              You don't need to explain <code>frontend/</code> or <code>backend/</code> — it already knows.
+              You still keep the project locally and use the CLI for deploy, but you usually do not
+              need to re-explain the Automaton structure on every session.
             </span>
           </div>
         </div>
@@ -282,23 +305,27 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
         <!-- ── App Structure reference ────────────────────────── -->
         <div class="ref-section">
           <h2 class="ref-title">App structure reference</h2>
-          <p class="ref-subtitle">All three paths produce the same structure on the server.</p>
+          <p class="ref-subtitle">All three paths target the same backend contract and deploy model.</p>
           <div class="structure-block structure-block-large">
             <div class="structure-line"><span class="file">automaton.json</span> <span class="comment">← app ID + name (commit this)</span></div>
-            <div class="structure-line"><span class="dir">frontend/</span></div>
-            <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← required entry point</span></div>
-            <div class="structure-line indent"><span class="file">*.css / *.js</span> <span class="comment">← any structure you like</span></div>
-            <div class="structure-line indent"><span class="dir">pages/</span> <span class="comment">← additional HTML pages</span></div>
+            <div class="structure-line"><span class="dir">frontend/</span> <span class="comment">← plain static apps can live here</span></div>
+            <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← entry point for plain static apps</span></div>
+            <div class="structure-line indent"><span class="file">*.css / *.js / assets/</span> <span class="comment">← any structure you like</span></div>
+            <div class="structure-line"><span class="dir">src/</span> <span class="comment">← framework source code can stay in the repo</span></div>
+            <div class="structure-line"><span class="dir">dist/</span> <span class="comment">← common build output; use build + deployDir in automaton.json</span></div>
             <div class="structure-line"><span class="dir">backend/</span></div>
-            <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← filename = controller name</span></div>
+            <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← filename = controller name; exports handle(...)</span></div>
             <div class="structure-line indent"><span class="file">requirements.txt</span> <span class="comment">← pip deps (optional)</span></div>
+            <div class="structure-line indent"><span class="dir">mocks/</span> <span class="comment">← local mock responses for frontend development</span></div>
             <div class="structure-line indent"><span class="dir">shared/</span> <span class="comment">← shared Python modules</span></div>
             <div class="structure-line"><span class="dir">data/</span> <span class="comment">← SQLite databases (auto-created by runner)</span></div>
           </div>
 
           <div class="ref-rule">
             <i class="pi pi-exclamation-triangle" />
-            All HTML/CSS/JS must be inside <code>frontend/</code>. The server serves <code>frontend/index.html</code> as the app entry point.
+            Plain static apps can live in <code>frontend/</code>. Framework apps can keep their source
+            code in the repo and deploy the built output, typically from <code>dist/</code>, by using
+            <code>build</code> and <code>deployDir</code> in <code>automaton.json</code>.
           </div>
         </div>
 
@@ -333,8 +360,12 @@ def handle(action_name: str, inputs: dict) -> dict:
           <p class="ref-subtitle" style="margin-top: 1rem">Calling it from the frontend:</p>
           <div class="code-block code-block-multi">
 <pre>// frontend/js/api.js
-const result = await window.automatonApi.callController('todos', 'list', {});
-console.log(result.items);  // result is already the data object</pre>
+try {
+  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
+  console.log(data.items) // callController returns the data payload directly
+} catch (err) {
+  console.error(err.message)
+}</pre>
           </div>
         </div>
 
