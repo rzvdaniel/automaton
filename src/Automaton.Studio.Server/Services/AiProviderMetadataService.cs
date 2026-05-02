@@ -157,6 +157,18 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
+    /// Returns the ExtraBodyJson configured for the specified model, or null if none is set.
+    /// Used to inject provider-specific request body parameters (e.g. {"reasoning":{"enabled":true}} for OpenRouter).
+    /// </summary>
+    public async Task<string?> GetModelExtraBodyJsonAsync(string providerName, string modelId)
+    {
+        return await dbContext.AiModels
+            .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)
+            .Select(m => m.ExtraBodyJson)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
     /// Get all active provider names
     /// </summary>
     public async Task<IReadOnlyList<string>> GetActiveProviderNamesAsync()

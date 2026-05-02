@@ -54,6 +54,7 @@ const formData = ref({
   supportsVision: false,
   costPer1MTokensInput: undefined as number | undefined,
   costPer1MTokensOutput: undefined as number | undefined,
+  extraBodyJson: '' as string | undefined,
   sortOrder: 0,
 })
 const formErrors = ref<Record<string, string>>({})
@@ -176,6 +177,7 @@ async function handleSave() {
         supportsVision: formData.value.supportsVision,
         costPer1MTokensInput: formData.value.costPer1MTokensInput,
         costPer1MTokensOutput: formData.value.costPer1MTokensOutput,
+        extraBodyJson: formData.value.extraBodyJson || undefined,
         sortOrder: formData.value.sortOrder,
       }
       await adminAiProvidersService.updateModel(editingModel.value.id, request)
@@ -194,6 +196,7 @@ async function handleSave() {
         supportsVision: formData.value.supportsVision,
         costPer1MTokensInput: formData.value.costPer1MTokensInput,
         costPer1MTokensOutput: formData.value.costPer1MTokensOutput,
+        extraBodyJson: formData.value.extraBodyJson || undefined,
         sortOrder: formData.value.sortOrder,
       }
       await adminAiProvidersService.createModel(providerId.value, request)
@@ -568,6 +571,18 @@ async function toggleModelVisibility(model: AiModelAdmin) {
               />
             </div>
           </div>
+        </div>
+
+        <!-- Extra Body JSON -->
+        <div>
+          <label class="font-medium block mb-2">Extra Body JSON</label>
+          <Textarea
+            v-model="formData.extraBodyJson"
+            rows="3"
+            class="w-full font-mono text-sm"
+            placeholder='{"reasoning": {"enabled": true}}'
+          />
+          <small class="text-color-secondary">Optional JSON merged into the API request body for provider-specific parameters (e.g. OpenRouter reasoning models).</small>
         </div>
       </div>
 

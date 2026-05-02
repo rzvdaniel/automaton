@@ -103,4 +103,11 @@ public class ConversationRequest
     /// Alternative to temperature — controls diversity by limiting the cumulative probability mass.
     /// </summary>
     public float? TopP { get; set; }
+
+    /// <summary>
+    /// Optional JSON object merged into the top-level request body for provider-specific parameters.
+    /// Example: {"reasoning": {"enabled": true}} for OpenRouter reasoning models.
+    /// Sourced from AiModel.ExtraBodyJson in the database.
+    /// </summary>
+    public string? ExtraBodyJson { get; set; }
 }

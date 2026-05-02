@@ -204,21 +204,56 @@ sudo chown automaton:automaton /opt/automaton/config
 
 ## Step 8 — Generate RSA Keys
 
-The API uses RSA keys for JWT token signing. Generate them using the helper script
-included in the repo:
+The API uses RSA keys for JWT token signing. Run all commands below in order.
+
+**1. Install the required Python package** (Ubuntu 23.04+ blocks `pip3` system-wide — use `apt`):
+
+```bash
+sudo apt install -y python3-cryptography
+```
+
+**2. Generate the keys:**
 
 ```bash
 cd /opt/automaton
 python3 chatgpt/GenerateRsaKeysASXml.py
 ```
 
-This prints two XML blobs: the **private key** and the **public key**. Keep them in a
-safe place — you will paste them into `appsettings.Production.json` in the next step.
+This writes `publickey.xml` and `privatekey.xml` to `/opt/automaton/`.
 
-If Python is not installed:
+**3. Inject the keys into `appsettings.Production.json`** (run after completing Step 9):
 
 ```bash
-apt install python3 -y
+python3 - <<'EOF'
+import json
+
+config_path = "/opt/automaton/config/appsettings.Production.json"
+
+with open("/opt/automaton/publickey.xml") as f:
+    pub = f.read().strip()
+with open("/opt/automaton/privatekey.xml") as f:
+    priv = f.read().strip()
+
+with open(config_path) as f:
+    config = json.load(f)
+
+if "RsaSettings" not in config["AuthenticationSettings"]:
+    config["AuthenticationSettings"]["RsaSettings"] = {}
+
+config["AuthenticationSettings"]["RsaSettings"]["RsaPrivateKey"] = priv
+config["AuthenticationSettings"]["RsaSettings"]["RsaPublicKey"] = pub
+
+with open(config_path, "w") as f:
+    json.dump(config, f, indent=2)
+
+print("Done. Keys updated.")
+EOF
+```
+
+**4. Restart the API to pick up the new keys:**
+
+```bash
+docker compose -f docker-compose.prod.yml restart api
 ```
 
 ---
@@ -480,11 +515,15 @@ In Studio, go to **Runners** — your runner should appear as online.
 
 ## Step 15 — Re-enable Cloudflare Proxy and "Always Use HTTPS"
 
-Now that Let's Encrypt certificates are issued:
+Now that the stack is verified working and Let's Encrypt certificates are issued:
 
 1. Go to Cloudflare → your domain → **DNS**
 2. Click the grey cloud icon next to each A record (`@`, `www`, `api`, `studio`) to turn it back to **orange (Proxied)**
 3. Go to **SSL/TLS → Edge Certificates** and enable **Always Use HTTPS**
+4. Verify the URLs still work through Cloudflare:
+   - https://api.automaton.monster/
+   - https://studio.automaton.monster
+   - https://automaton.monster
 
 ---
 

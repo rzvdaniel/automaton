@@ -77,7 +77,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         var model = string.IsNullOrEmpty(request.Model) ? DefaultModel : request.Model;
         var apiKey = request.ApiKey ?? string.Empty;
 
-        var client = BuildChatClient(model, apiKey);
+        var client = BuildChatClient(model, apiKey, request.ExtraBodyJson);
 
         var toolList = tools.ToList();
         var chatTools = BuildChatTools(toolList);
@@ -483,12 +483,14 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         });
     }
 
-    private ChatClient BuildChatClient(string model, string apiKey)
+    private ChatClient BuildChatClient(string model, string apiKey, string? extraBodyJson = null)
     {
         var options = new OpenAIClientOptions
         {
             Endpoint = new Uri($"{_baseUrl}/")
         };
+        if (!string.IsNullOrWhiteSpace(extraBodyJson))
+            options.AddPolicy(new JsonBodyMergePolicy(extraBodyJson), System.ClientModel.Primitives.PipelinePosition.PerCall);
         var openAiClient = new OpenAIClient(new ApiKeyCredential(apiKey), options);
         return openAiClient.GetChatClient(model);
     }
@@ -625,5 +627,72 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         public string Id { get; set; } = string.Empty;
         public string FunctionName { get; set; } = string.Empty;
         public StringBuilder ArgumentsBuilder { get; } = new();
+    }
+
+    /// <summary>
+    /// Pipeline policy that merges a JSON object into the request body before it is sent.
+    /// Used for provider-specific extra parameters (e.g. {"reasoning":{"enabled":true}} on OpenRouter).
+    /// </summary>
+    private sealed class JsonBodyMergePolicy : System.ClientModel.Primitives.PipelinePolicy
+    {
+        private readonly JsonDocument _extra;
+
+        public JsonBodyMergePolicy(string extraBodyJson)
+        {
+            _extra = JsonDocument.Parse(extraBodyJson);
+        }
+
+        public override void Process(
+            System.ClientModel.Primitives.PipelineMessage message,
+            IReadOnlyList<System.ClientModel.Primitives.PipelinePolicy> pipeline,
+            int currentIndex)
+        {
+            MergeBody(message);
+            ProcessNext(message, pipeline, currentIndex);
+        }
+
+        public override async ValueTask ProcessAsync(
+            System.ClientModel.Primitives.PipelineMessage message,
+            IReadOnlyList<System.ClientModel.Primitives.PipelinePolicy> pipeline,
+            int currentIndex)
+        {
+            MergeBody(message);
+            await ProcessNextAsync(message, pipeline, currentIndex);
+        }
+
+        private void MergeBody(System.ClientModel.Primitives.PipelineMessage message)
+        {
+            if (message.Request.Content is null) return;
+
+            using var ms = new System.IO.MemoryStream();
+            message.Request.Content.WriteTo(ms, default);
+            ms.Position = 0;
+
+            try
+            {
+                using var original = JsonDocument.Parse(ms);
+                using var merged = new System.IO.MemoryStream();
+                using (var writer = new Utf8JsonWriter(merged))
+                {
+                    writer.WriteStartObject();
+                    // Write all original fields
+                    foreach (var prop in original.RootElement.EnumerateObject())
+                        prop.WriteTo(writer);
+                    // Merge extra fields (skipping any that already exist)
+                    foreach (var prop in _extra.RootElement.EnumerateObject())
+                    {
+                        if (!original.RootElement.TryGetProperty(prop.Name, out _))
+                            prop.WriteTo(writer);
+                    }
+                    writer.WriteEndObject();
+                }
+                message.Request.Content = System.ClientModel.BinaryContent.Create(
+                    BinaryData.FromBytes(merged.ToArray()));
+            }
+            catch
+            {
+                // If body isn't valid JSON, send it unmodified
+            }
+        }
     }
 }

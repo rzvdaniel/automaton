@@ -44,7 +44,8 @@ public class AiApiKeyService
             CreatedAt = DateTime.UtcNow,
             Description = description,
             IsActive = true,
-            CreatedByUserId = userId,
+            // Guid.Empty signals a system/admin key — store as null so the "system key" query works
+            CreatedByUserId = userId == Guid.Empty ? (Guid?)null : userId,
             BaseUrl = baseUrl,
             DefaultModel = defaultModel
         };

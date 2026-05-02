@@ -133,6 +133,7 @@ public abstract class AiConversationControllerBase : BaseController
             var aiConfig = await _settingsService.GetEffectiveConfigAsync();
 
             var modelMaxTokens = await _providerMetadataService.GetModelMaxTokensAsync(provider, model);
+            var modelExtraBodyJson = await _providerMetadataService.GetModelExtraBodyJsonAsync(provider, model);
 
             var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(userId, provider);
             if (string.IsNullOrEmpty(apiKey))
@@ -221,7 +222,8 @@ public abstract class AiConversationControllerBase : BaseController
                 MaxRateLimitRetries = aiConfig.RateLimitRetry.MaxRetries,
                 RateLimitRetryInitialDelaySeconds = aiConfig.RateLimitRetry.InitialDelaySeconds,
                 StreamingTimeoutMinutes = aiConfig.Streaming.TimeoutMinutes,
-                Mode = request.Mode
+                Mode = request.Mode,
+                ExtraBodyJson = modelExtraBodyJson
             };
 
             var result = await _mcpClient.StartConversationAsync(conversationRequest, cancellationToken);

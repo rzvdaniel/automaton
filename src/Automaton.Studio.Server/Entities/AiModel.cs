@@ -52,6 +52,13 @@ public class AiModel
     [Column(TypeName = "decimal(10, 6)")]
     public decimal? CostPer1MTokensOutput { get; set; }
 
+    /// <summary>
+    /// Optional JSON object merged into the request body for provider-specific parameters.
+    /// Example: {"reasoning": {"enabled": true}} for OpenRouter reasoning models.
+    /// </summary>
+    [MaxLength(2000)]
+    public string? ExtraBodyJson { get; set; }
+
     public int SortOrder { get; set; } = 0;
 
     [Required]

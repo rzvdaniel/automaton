@@ -321,6 +321,7 @@ public class AdminAiProvidersController : ControllerBase
                 SupportsVision = m.SupportsVision,
                 CostPer1MTokensInput = m.CostPer1MTokensInput,
                 CostPer1MTokensOutput = m.CostPer1MTokensOutput,
+                ExtraBodyJson = m.ExtraBodyJson,
                 SortOrder = m.SortOrder,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt
@@ -358,6 +359,7 @@ public class AdminAiProvidersController : ControllerBase
                 SupportsVision = m.SupportsVision,
                 CostPer1MTokensInput = m.CostPer1MTokensInput,
                 CostPer1MTokensOutput = m.CostPer1MTokensOutput,
+                ExtraBodyJson = m.ExtraBodyJson,
                 SortOrder = m.SortOrder,
                 CreatedAt = m.CreatedAt,
                 UpdatedAt = m.UpdatedAt
@@ -426,6 +428,7 @@ public class AdminAiProvidersController : ControllerBase
             SupportsVision = request.SupportsVision,
             CostPer1MTokensInput = request.CostPer1MTokensInput,
             CostPer1MTokensOutput = request.CostPer1MTokensOutput,
+            ExtraBodyJson = request.ExtraBodyJson,
             SortOrder = request.SortOrder,
             CreatedAt = DateTime.UtcNow
         };
@@ -452,6 +455,7 @@ public class AdminAiProvidersController : ControllerBase
             SupportsVision = newModel.SupportsVision,
             CostPer1MTokensInput = newModel.CostPer1MTokensInput,
             CostPer1MTokensOutput = newModel.CostPer1MTokensOutput,
+            ExtraBodyJson = newModel.ExtraBodyJson,
             SortOrder = newModel.SortOrder,
             CreatedAt = newModel.CreatedAt,
             UpdatedAt = newModel.UpdatedAt
@@ -518,6 +522,7 @@ public class AdminAiProvidersController : ControllerBase
         if (request.SupportsVision.HasValue) model.SupportsVision = request.SupportsVision.Value;
         if (request.CostPer1MTokensInput.HasValue) model.CostPer1MTokensInput = request.CostPer1MTokensInput.Value;
         if (request.CostPer1MTokensOutput.HasValue) model.CostPer1MTokensOutput = request.CostPer1MTokensOutput.Value;
+        if (request.ExtraBodyJson != null) model.ExtraBodyJson = string.IsNullOrWhiteSpace(request.ExtraBodyJson) ? null : request.ExtraBodyJson;
         if (request.SortOrder.HasValue) model.SortOrder = request.SortOrder.Value;
 
         model.UpdatedAt = DateTime.UtcNow;
@@ -840,6 +845,7 @@ public class AiModelAdminResponse
     public bool SupportsVision { get; set; }
     public decimal? CostPer1MTokensInput { get; set; }
     public decimal? CostPer1MTokensOutput { get; set; }
+    public string? ExtraBodyJson { get; set; }
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -859,6 +865,7 @@ public class AdminCreateAiModelRequest
     public bool SupportsVision { get; set; } = false;
     public decimal? CostPer1MTokensInput { get; set; }
     public decimal? CostPer1MTokensOutput { get; set; }
+    public string? ExtraBodyJson { get; set; }
     public int SortOrder { get; set; } = 0;
 }
 
@@ -876,6 +883,7 @@ public class AdminUpdateAiModelRequest
     public bool? SupportsVision { get; set; }
     public decimal? CostPer1MTokensInput { get; set; }
     public decimal? CostPer1MTokensOutput { get; set; }
+    public string? ExtraBodyJson { get; set; }
     public int? SortOrder { get; set; }
 }
 

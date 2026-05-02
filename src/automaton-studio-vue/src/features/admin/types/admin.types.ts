@@ -79,13 +79,11 @@ export interface AiModelAdmin {
   supportsVision: boolean
   costPer1MTokensInput?: number
   costPer1MTokensOutput?: number
+  extraBodyJson?: string
   sortOrder: number
   createdAt: string
   updatedAt?: string
 }
-
-/**
- * Create AI Model request
  * Matches AdminCreateAiModelRequest from backend
  */
 export interface CreateAiModelRequest {
@@ -101,6 +99,7 @@ export interface CreateAiModelRequest {
   supportsVision: boolean
   costPer1MTokensInput?: number
   costPer1MTokensOutput?: number
+  extraBodyJson?: string
   sortOrder: number
 }
 
@@ -121,6 +120,7 @@ export interface UpdateAiModelRequest {
   supportsVision?: boolean
   costPer1MTokensInput?: number
   costPer1MTokensOutput?: number
+  extraBodyJson?: string
   sortOrder?: number
 }
 
