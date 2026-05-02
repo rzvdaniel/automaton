@@ -200,10 +200,17 @@ const handleDismissWelcome = () => {
 
       <!-- Runners -->
       <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full stat-card">
+        <Card
+          class="h-full stat-card"
+          :class="{ 'stat-card-warning': dashboardStore.runnersOnline === 0 && !dashboardStore.isLoading }"
+          @click="router.push('/runners')"
+        >
           <template #content>
             <div class="flex align-items-center gap-3">
-              <div class="stat-icon stat-icon-blue">
+              <div
+                class="stat-icon"
+                :class="dashboardStore.runnersOnline === 0 && !dashboardStore.isLoading ? 'stat-icon-warning' : 'stat-icon-blue'"
+              >
                 <i class="pi pi-desktop text-xl"></i>
               </div>
               <div>
@@ -211,7 +218,14 @@ const handleDismissWelcome = () => {
                 <div class="text-2xl font-bold">
                   {{ dashboardStore.runnersOnline }} / {{ dashboardStore.runnersTotal }}
                 </div>
-                <div class="text-color-secondary text-xs">Online</div>
+                <div
+                  v-if="dashboardStore.runnersOnline === 0 && !dashboardStore.isLoading"
+                  class="text-xs"
+                  style="color: var(--p-orange-500)"
+                >
+                  Needed for backend deploy
+                </div>
+                <div v-else class="text-color-secondary text-xs">Online</div>
               </div>
             </div>
           </template>
@@ -397,6 +411,15 @@ const handleDismissWelcome = () => {
   color: var(--p-blue-600);
 }
 
+.stat-icon-warning {
+  background-color: var(--p-orange-100);
+  color: var(--p-orange-600);
+}
+
+.stat-card-warning {
+  border-left: 3px solid var(--p-orange-400);
+}
+
 :global(.app-dark) .stat-icon-primary {
   background-color: var(--p-primary-900);
   color: var(--p-primary-400);
@@ -415,6 +438,11 @@ const handleDismissWelcome = () => {
 :global(.app-dark) .stat-icon-blue {
   background-color: var(--p-blue-900);
   color: var(--p-blue-400);
+}
+
+:global(.app-dark) .stat-icon-warning {
+  background-color: var(--p-orange-900);
+  color: var(--p-orange-400);
 }
 
 /* Recent app cards */

@@ -16,7 +16,6 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
-import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
@@ -245,16 +244,6 @@ const handleGenerateApp = async () => {
   }
 }
 
-const handleViewExamples = () => {
-  // TODO: Navigate to examples page or open modal with templates
-  toast.add({
-    severity: 'info',
-    summary: 'Coming Soon',
-    detail: 'Example apps will be available soon',
-    life: 3000,
-  })
-}
-
 const handleCreateApp = async () => {
   if (!newAppName.value.trim()) {
     toast.add({
@@ -419,6 +408,24 @@ const handleRetry = async () => {
           </div>
           <div class="flex-1">
             <div class="font-semibold mb-2">What would you like to build?</div>
+            <!-- No AI key notice -->
+            <Message
+              v-if="!isLoadingModels && aiAvailableModels.length === 0"
+              severity="warn"
+              :closable="false"
+              class="mb-2"
+            >
+              No AI key configured.
+              <Button
+                label="Add AI Key"
+                link
+                size="small"
+                class="p-0 ml-1"
+                style="vertical-align: baseline"
+                @click="router.push('/ai-keys')"
+              />
+              to enable AI generation.
+            </Message>
             <Textarea
               v-model="aiDescription"
               rows="3"
@@ -446,7 +453,7 @@ const handleRetry = async () => {
                 <Button
                   label="Create with AI"
                   icon="pi pi-sparkles"
-                  :disabled="!aiDescription || isCreating"
+                  :disabled="!aiDescription || isCreating || aiAvailableModels.length === 0"
                   :loading="isCreating"
                   @click="handleGenerateApp"
                 />
@@ -629,7 +636,8 @@ const handleRetry = async () => {
               Build locally with any editor (Cursor, VS Code…), keep the project in Git,
               and deploy with one command. MCP is recommended when supported, but not required.
             </p>
-            <div class="qs-code mb-2">npm install -g @automaton/cli</div>
+            <div class="qs-code mb-2">dotnet tool install -g Automaton.Cli</div>
+            <div class="qs-code mb-2">automaton config</div>
             <div class="qs-code mb-3">automaton deploy</div>
             <p class="text-color-secondary text-sm mb-2">
               Automaton apps need to follow a specific project structure, backend controller pattern,
@@ -638,9 +646,14 @@ const handleRetry = async () => {
               before it starts generating files.
             </p>
             <div class="qs-links mb-3">
-              <a href="https://www.npmjs.com/package/@automaton/cli" target="_blank" rel="noopener" class="p-button p-button-sm p-button-secondary p-button-outlined" style="text-decoration:none">
-                <i class="pi pi-external-link mr-1" />CLI docs
-              </a>
+              <Button
+                label="CLI Reference"
+                icon="pi pi-book"
+                size="small"
+                severity="secondary"
+                outlined
+                @click="router.push('/docs/automaton-cli')"
+              />
               <Button
                 label="Open Studio documentation"
                 icon="pi pi-book"

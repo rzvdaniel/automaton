@@ -67,24 +67,24 @@ function handleDismiss() {
             <div class="step-item">
               <div class="step-number">1</div>
               <div class="step-content">
-                <span class="step-title">Create App</span>
-                <span class="step-desc">Start with a blank canvas or AI</span>
+                <span class="step-title">Add AI Key</span>
+                <span class="step-desc">Settings → AI Keys → Add Key</span>
               </div>
             </div>
             <i class="pi pi-arrow-right step-arrow"></i>
             <div class="step-item">
               <div class="step-number">2</div>
               <div class="step-content">
-                <span class="step-title">Build</span>
-                <span class="step-desc">Design your UI and add backend logic</span>
+                <span class="step-title">Create App</span>
+                <span class="step-desc">Describe what to build and let AI generate it</span>
               </div>
             </div>
             <i class="pi pi-arrow-right step-arrow"></i>
             <div class="step-item">
               <div class="step-number">3</div>
               <div class="step-content">
-                <span class="step-title">Publish</span>
-                <span class="step-desc">Share your app with a public URL</span>
+                <span class="step-title">Deploy &amp; Publish</span>
+                <span class="step-desc">Deploy backend, then share with a public URL</span>
               </div>
             </div>
           </div>
@@ -113,7 +113,14 @@ function handleDismiss() {
         </div>
 
         <!-- CTA -->
-        <div class="welcome-cta mt-4">
+        <div class="welcome-cta mt-4 flex gap-2">
+          <Button
+            label="Add AI Key"
+            icon="pi pi-key"
+            severity="secondary"
+            outlined
+            @click="router.push('/ai-keys')"
+          />
           <Button
             label="Create Your First App"
             icon="pi pi-plus"
