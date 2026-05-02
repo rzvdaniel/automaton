@@ -67,7 +67,7 @@
             <span class="output-check">✓</span> Deploying to Automaton Cloud...
           </div>
           <div class="terminal-line success">
-            🚀 Live at <span class="terminal-url">https://automaton.app/app/my-app</span>
+            🚀 Live at <span class="terminal-url">https://automaton.monster/app/my-app</span>
           </div>
           <div class="terminal-cursor" />
         </div>

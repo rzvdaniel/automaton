@@ -6,8 +6,17 @@ Use this path when you want to stay in Cursor, Claude Code, Copilot Chat, or ano
 
 1. Create or link the app.
 2. Keep the project in Git.
-3. Use your AI tool to scaffold and edit the app.
-4. Deploy with `automaton deploy`.
+3. Point your AI tool to [llms.txt](https://automaton.monster/llms.txt) so it follows the required Automaton app structure.
+4. Use your AI tool to scaffold and edit the app.
+5. Deploy with `automaton deploy`.
+
+## AI-readable files
+
+- [llms.txt](https://automaton.monster/llms.txt)
+- [llms/automaton-apps-overview.md](https://automaton.monster/llms/automaton-apps-overview.md)
+- [llms/automaton-frontend-structure.md](https://automaton.monster/llms/automaton-frontend-structure.md)
+- [llms/automaton-backend-controllers.md](https://automaton.monster/llms/automaton-backend-controllers.md)
+- [llms/automaton-starter-prompts.md](https://automaton.monster/llms/automaton-starter-prompts.md)
 
 ## Starter prompt
 

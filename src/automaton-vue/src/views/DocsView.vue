@@ -156,16 +156,12 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
                   <code>automaton.json</code> link that folder to the app. Your frontend can be plain
                   HTML/CSS/JS or any framework that builds static files such as React, Vue, or Angular.
                 </p>
-                <div class="structure-block">
-                  <div class="structure-line"><span class="file">automaton.json</span> <span class="comment">← created automatically</span></div>
-                  <div class="structure-line"><span class="dir">frontend/</span> <span class="comment">← plain static apps can live here</span></div>
-                  <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← entry point for plain static apps</span></div>
-                  <div class="structure-line"><span class="dir">src/</span> <span class="comment">← framework source code can stay in the repo</span></div>
-                  <div class="structure-line"><span class="dir">dist/</span> <span class="comment">← typical build output for framework apps</span></div>
-                  <div class="structure-line"><span class="dir">backend/</span></div>
-                  <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← Python controller with handle(action_name, inputs)</span></div>
-                  <div class="structure-line indent"><span class="file">requirements.txt</span> <span class="comment">← pip deps (optional)</span></div>
-                </div>
+                <p class="step-body">
+                  If you are using an external AI tool, point it to
+                  <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+                  so it follows the required Automaton app structure instead of guessing. If you want a guided walkthrough,
+                  use the Studio documentation section.
+                </p>
               </div>
             </div>
             <div class="step">
@@ -187,28 +183,12 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
           <div class="tip-box">
             <i class="pi pi-info-circle" />
             <span>
-              <strong>Using Cursor or VS Code?</strong> Ask the AI to "build an Automaton app"
-              and tell it the frontend may be any static-output stack, the backend lives in
-              <code>backend/</code>, and frontend code should call
-              <code>window.automatonApi.callController(...)</code>. Then run
-              <code>automaton deploy</code> when ready.
+              <strong>Using Cursor or VS Code?</strong> Point the AI to
+              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              before it starts generating files. That keeps the project aligned with the required
+              Automaton structure and backend/frontend contract. Then run <code>automaton deploy</code>
+              when ready.
             </span>
-          </div>
-
-          <div class="ref-section">
-            <h2 class="ref-title">Starter prompt for tools without MCP</h2>
-            <p class="ref-subtitle">
-              Paste this into Cursor, Claude Code, Copilot Chat, or another AI tool if MCP is not configured.
-            </p>
-            <div class="prompt-example">
-              "Build this as an Automaton app. Use any static frontend stack that fits the task.
-              Put Python backend controllers in backend/. Each controller file must export
-              handle(action_name, inputs) and return { success, data, error }. Frontend code must call
-              window.automatonApi.callController(controller, action, inputs) and use try/catch because
-              the function returns data directly and throws on errors. Use backend/shared/ for shared
-              helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json
-              for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy."
-            </div>
           </div>
         </div>
 
@@ -302,70 +282,68 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
           </div>
         </div>
 
-        <!-- ── App Structure reference ────────────────────────── -->
+        <!-- ── Developer + AI guidance ────────────────────────── -->
         <div class="ref-section">
-          <h2 class="ref-title">App structure reference</h2>
-          <p class="ref-subtitle">All three paths target the same backend contract and deploy model.</p>
-          <div class="structure-block structure-block-large">
-            <div class="structure-line"><span class="file">automaton.json</span> <span class="comment">← app ID + name (commit this)</span></div>
-            <div class="structure-line"><span class="dir">frontend/</span> <span class="comment">← plain static apps can live here</span></div>
-            <div class="structure-line indent"><span class="file">index.html</span> <span class="comment">← entry point for plain static apps</span></div>
-            <div class="structure-line indent"><span class="file">*.css / *.js / assets/</span> <span class="comment">← any structure you like</span></div>
-            <div class="structure-line"><span class="dir">src/</span> <span class="comment">← framework source code can stay in the repo</span></div>
-            <div class="structure-line"><span class="dir">dist/</span> <span class="comment">← common build output; use build + deployDir in automaton.json</span></div>
-            <div class="structure-line"><span class="dir">backend/</span></div>
-            <div class="structure-line indent"><span class="file">todos.py</span> <span class="comment">← filename = controller name; exports handle(...)</span></div>
-            <div class="structure-line indent"><span class="file">requirements.txt</span> <span class="comment">← pip deps (optional)</span></div>
-            <div class="structure-line indent"><span class="dir">mocks/</span> <span class="comment">← local mock responses for frontend development</span></div>
-            <div class="structure-line indent"><span class="dir">shared/</span> <span class="comment">← shared Python modules</span></div>
-            <div class="structure-line"><span class="dir">data/</span> <span class="comment">← SQLite databases (auto-created by runner)</span></div>
+          <h2 class="ref-title">For developers and AI tools</h2>
+          <p class="ref-subtitle">
+            The public docs stay high-level. If you want the exact app structure, backend contract,
+            starter prompts, and framework-specific guidance, use the AI-readable instruction files.
+          </p>
+
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div>
+                <div class="step-title">Point your AI tool to <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></div>
+                <p class="step-body">
+                  That file links to detailed instructions for app structure, backend controllers,
+                  frontend integration, and starter prompts for plain HTML/CSS/JS, React, and Vue workflows.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div>
+                <div class="step-title">Use the Automaton Studio docs center for deeper guidance</div>
+                <p class="step-body">
+                  Inside Automaton Studio, the Documentation section organizes quick starts, App Editor,
+                  CLI workflows, MCP setup, and templates in one place.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div>
+                <div class="step-title">Choose the right detail level</div>
+                <p class="step-body">
+                  Non-technical users can stay with the workflow tabs above. Developers can use the
+                  AI-readable files to reduce hallucinations and keep external tools aligned with Automaton.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div class="ref-rule">
-            <i class="pi pi-exclamation-triangle" />
-            Plain static apps can live in <code>frontend/</code>. Framework apps can keep their source
-            code in the repo and deploy the built output, typically from <code>dist/</code>, by using
-            <code>build</code> and <code>deployDir</code> in <code>automaton.json</code>.
-          </div>
-        </div>
-
-        <!-- ── Python backend quick reference ─────────────────── -->
-        <div class="ref-section">
-          <h2 class="ref-title">Python controller pattern</h2>
-          <p class="ref-subtitle">One file per resource. Filename becomes the controller name.</p>
-          <div class="code-block code-block-multi">
-<pre># backend/todos.py
-
-class TodosController:
-    def list(self, inputs: dict) -> dict:
-        # ... read from DB ...
-        return {"success": True, "data": {"items": [...]}, "error": ""}
-
-    def create(self, inputs: dict) -> dict:
-        title = inputs.get("title", "").strip()
-        if not title:
-            return {"success": False, "data": None, "error": "title is required"}
-        # ... insert into DB ...
-        return {"success": True, "data": {"id": 1, "title": title}, "error": ""}
-
-_controller = TodosController()
-
-def handle(action_name: str, inputs: dict) -> dict:
-    method = getattr(_controller, action_name, None)
-    if method is None:
-        return {"success": False, "data": None, "error": f"Unknown action '{action_name}'"}
-    return method(inputs)</pre>
+          <div class="tool-sections">
+            <div class="tool-section">
+              <div class="tool-label"><i class="pi pi-file" /> AI-readable files</div>
+              <ul class="link-list">
+                <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-apps-overview.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-frontend-structure.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-frontend-structure.md</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-backend-controllers.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-backend-controllers.md</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-starter-prompts.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-starter-prompts.md</a></li>
+              </ul>
+            </div>
           </div>
 
-          <p class="ref-subtitle" style="margin-top: 1rem">Calling it from the frontend:</p>
-          <div class="code-block code-block-multi">
-<pre>// frontend/js/api.js
-try {
-  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
-  console.log(data.items) // callController returns the data payload directly
-} catch (err) {
-  console.error(err.message)
-}</pre>
+          <div class="tip-box">
+            <i class="pi pi-info-circle" />
+            <span>
+              MCP is still the most accurate option when supported, but the
+              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              files give external AI tools a reliable fallback without overwhelming non-technical users
+              on the public website.
+            </span>
           </div>
         </div>
 
@@ -531,6 +509,16 @@ try {
   font-size: 0.85em;
 }
 
+.docs-link {
+  color: #8ab4ff;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+}
+
+.docs-link:hover {
+  color: #b7ccff;
+}
+
 /* ── Code blocks ── */
 .code-block {
   display: flex;
@@ -570,35 +558,6 @@ try {
   color: #8ef0a1;
 }
 
-/* ── Structure tree ── */
-.structure-block {
-  background: rgba(9,11,18,0.88);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 14px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.8;
-  margin: 10px 0;
-}
-
-.structure-block-large {
-  font-size: 0.85rem;
-}
-
-.structure-line {
-  display: flex;
-  gap: 10px;
-}
-
-.structure-line.indent {
-  padding-left: 20px;
-}
-
-.file { color: #c9d1d9; }
-.dir  { color: #79c0ff; }
-.comment { color: #6a737d; }
-
 /* ── Tool sections ── */
 .tool-sections { display: flex; flex-direction: column; gap: 20px; }
 .tool-section { margin-top: 12px; }
@@ -610,6 +569,15 @@ try {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.link-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.link-list li + li {
+  margin-top: 0.55rem;
 }
 
 /* ── Prompt example ── */

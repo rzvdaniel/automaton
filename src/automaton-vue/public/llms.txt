@@ -1,0 +1,14 @@
+# Automaton AI instructions
+
+If you are an AI assistant helping a user build an app for Automaton, start here.
+
+Read these files in order:
+- /llms/automaton-apps-overview.md
+- /llms/automaton-frontend-structure.md
+- /llms/automaton-backend-controllers.md
+- /llms/automaton-starter-prompts.md
+
+Use the workflow that fits the user's toolchain:
+- App Editor inside Automaton Studio for the fastest browser-first path
+- Local IDE + CLI deploy as the default developer workflow
+- MCP when the AI tool supports it for the most accurate Automaton-specific guidance

@@ -632,33 +632,30 @@ const handleRetry = async () => {
             <div class="qs-code mb-2">npm install -g @automaton/cli</div>
             <div class="qs-code mb-3">automaton deploy</div>
             <p class="text-color-secondary text-sm mb-2">
-              Plain static apps can live in <code class="qs-inline-code">frontend/</code>. Framework apps
-              can keep their source code in the repo and deploy the built output, typically from
-              <code class="qs-inline-code">dist/</code>. Python backend code lives in
-              <code class="qs-inline-code">backend/</code>.
+              Automaton apps need to follow a specific project structure, backend controller pattern,
+              and frontend integration contract. If you are using an external AI tool without MCP,
+              point it to <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
+              before it starts generating files.
             </p>
-            <div class="qs-tree mb-3">
-              <div><span class="qs-tree-file">automaton.json</span> <span class="qs-tree-comment">← commit this</span></div>
-              <div><span class="qs-tree-dir">frontend/</span> <span class="qs-tree-comment">← plain static apps</span></div>
-              <div class="pl-3"><span class="qs-tree-file">index.html</span> <span class="qs-tree-comment">← entry point for plain static apps</span></div>
-              <div><span class="qs-tree-dir">src/</span> <span class="qs-tree-comment">← framework source code</span></div>
-              <div><span class="qs-tree-dir">dist/</span> <span class="qs-tree-comment">← common build output</span></div>
-              <div><span class="qs-tree-dir">backend/</span></div>
-              <div class="pl-3"><span class="qs-tree-file">todos.py</span> <span class="qs-tree-comment">← exports handle(action_name, inputs)</span></div>
+            <div class="qs-links mb-3">
+              <a href="https://www.npmjs.com/package/@automaton/cli" target="_blank" rel="noopener" class="p-button p-button-sm p-button-secondary p-button-outlined" style="text-decoration:none">
+                <i class="pi pi-external-link mr-1" />CLI docs
+              </a>
+              <Button
+                label="Open Studio documentation"
+                icon="pi pi-book"
+                size="small"
+                severity="secondary"
+                outlined
+                @click="router.push('/docs')"
+              />
             </div>
-            <a href="https://www.npmjs.com/package/@automaton/cli" target="_blank" rel="noopener" class="p-button p-button-sm p-button-secondary p-button-outlined" style="text-decoration:none">
-              <i class="pi pi-external-link mr-1" />CLI docs
-            </a>
-            <p class="text-sm font-semibold mt-3 mb-1">Starter prompt for tools without MCP:</p>
-            <div class="qs-code qs-code--block">
-              Build this as an Automaton app. Use any static frontend stack that fits the task.
-              Put Python backend controllers in backend/. Each controller file must export
-              handle(action_name, inputs) and return { success, data, error }. Frontend code must call
-              window.automatonApi.callController(controller, action, inputs) and use try/catch because
-              the function returns data directly and throws on errors. Use backend/shared/ for shared
-              helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json
-              for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.
-            </div>
+            <p class="text-color-secondary text-sm mb-2">
+              Use <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
+              when you want the exact structure and AI instructions. Use
+              <button type="button" class="qs-inline-link" @click="router.push('/docs')">Studio documentation</button>
+              when you want a more guided walkthrough with quick starts and examples.
+            </p>
           </div>
 
           <!-- MCP path -->
@@ -975,19 +972,31 @@ const handleRetry = async () => {
   font-size: 0.83em;
 }
 
-.qs-tree {
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.8rem;
-  line-height: 1.7;
+.qs-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.qs-tree-dir  { color: #79c0ff; }
-.qs-tree-file { color: #e6edf3; }
-.qs-tree-comment { color: #8b949e; }
+.qs-link,
+.qs-inline-link {
+  color: var(--p-primary-500);
+  font-weight: 600;
+}
+
+.qs-link:hover,
+.qs-inline-link:hover {
+  color: var(--p-primary-400);
+}
+
+.qs-inline-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
 
 .template-card .template-thumbnail {
   position: relative;
