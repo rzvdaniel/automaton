@@ -35,7 +35,36 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'templates' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+
+// Connect section state
+const copiedItem = ref<string | null>(null)
+function copyText(text: string, key: string) {
+  navigator.clipboard.writeText(text)
+  copiedItem.value = key
+  setTimeout(() => { copiedItem.value = null }, 2000)
+}
+
+const serverBase = computed(() => {
+  const base = import.meta.env.VITE_API_BASE_URL || window.location.origin
+  return base.replace(/\/$/, '')
+})
+
+const mcpVscodeConfig = computed(() =>
+  JSON.stringify({
+    servers: {
+      automaton: {
+        type: 'http',
+        url: `${serverBase.value}/api/mcp`,
+        headers: { 'X-API-Key': 'ak_execute_xxx' },
+      },
+    },
+  }, null, 2)
+)
+
+const mcpClaudeCommand = computed(() =>
+  `claude mcp add automaton --transport http "${serverBase.value}/api/mcp" --header "X-API-Key: ak_execute_xxx"`
+)
 
 // Local form state
 const name = ref('')
@@ -401,6 +430,16 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'templates'"
               />
 
+              <div class="border-top-1 surface-border my-2" />
+              <Button
+                label="Connect to IDE"
+                icon="pi pi-link"
+                text
+                :class="{ 'surface-hover': activeSection === 'connect' }"
+                class="w-full justify-content-start"
+                @click="activeSection = 'connect'"
+              />
+
               <div v-if="!isLinkedToProject" class="border-top-1 surface-border my-2" />
               <Button
                 v-if="!isLinkedToProject"
@@ -696,9 +735,108 @@ async function handleSaveTemplateStatus() {
           </template>
         </Card>
 
+        <!-- Connect to IDE -->
+        <Card v-if="activeSection === 'connect'">
+          <template #title>Connect to IDE</template>
+          <template #content>
+            <div class="flex flex-column gap-5">
+              <p class="text-color-secondary mt-0 mb-0">
+                Build this app locally with your own tools, then push updates with
+                <code class="connect-code">automaton deploy</code>.
+                Or connect an AI coding assistant via MCP to write and deploy files automatically.
+              </p>
+
+              <!-- automaton.json -->
+              <div>
+                <div class="font-semibold mb-1">1. Your app identity (<code class="connect-code">automaton.json</code>)</div>
+                <p class="text-color-secondary text-sm mb-2">
+                  Place this file at the root of your local project. The CLI and MCP tools use it
+                  to know which app to update.
+                </p>
+                <div class="connect-snippet">
+                  <pre>{{ JSON.stringify({ appId: app?.id, name: app?.name }, null, 2) }}</pre>
+                  <Button
+                    :icon="copiedItem === 'json' ? 'pi pi-check' : 'pi pi-copy'"
+                    text
+                    rounded
+                    size="small"
+                    class="connect-copy-btn"
+                    @click="copyText(JSON.stringify({ appId: app?.id, name: app?.name }, null, 2), 'json')"
+                  />
+                </div>
+              </div>
+
+              <!-- CLI -->
+              <div>
+                <div class="font-semibold mb-1">2. Deploy with the CLI</div>
+                <p class="text-color-secondary text-sm mb-2">
+                  Install once, then run from your project folder whenever you want to push changes.
+                </p>
+                <div class="connect-snippet">
+                  <pre>npm install -g @automaton/cli</pre>
+                  <Button
+                    :icon="copiedItem === 'npm' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText('npm install -g @automaton/cli', 'npm')"
+                  />
+                </div>
+                <div class="connect-snippet mt-2">
+                  <pre>automaton deploy</pre>
+                  <Button
+                    :icon="copiedItem === 'deploy' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText('automaton deploy', 'deploy')"
+                  />
+                </div>
+              </div>
+
+              <!-- MCP -->
+              <div>
+                <div class="font-semibold mb-1">3. Connect an AI coding assistant (MCP)</div>
+                <p class="text-color-secondary text-sm mb-2">
+                  Add Automaton as an MCP server so GitHub Copilot Agent or Claude Code can write
+                  and deploy files for this app without you running any commands.
+                  Get an API key from <strong>Settings → API Keys</strong> (scope: execute).
+                </p>
+                <div class="text-sm font-medium mb-1 text-color-secondary">VS Code / GitHub Copilot — <code class="connect-code">.vscode/mcp.json</code></div>
+                <div class="connect-snippet">
+                  <pre>{{ mcpVscodeConfig }}</pre>
+                  <Button
+                    :icon="copiedItem === 'mcp' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText(mcpVscodeConfig, 'mcp')"
+                  />
+                </div>
+                <div class="text-sm font-medium mt-3 mb-1 text-color-secondary">Claude Code</div>
+                <div class="connect-snippet">
+                  <pre>{{ mcpClaudeCommand }}</pre>
+                  <Button
+                    :icon="copiedItem === 'claude' ? 'pi pi-check' : 'pi pi-copy'"
+                    text rounded size="small" class="connect-copy-btn"
+                    @click="copyText(mcpClaudeCommand, 'claude')"
+                  />
+                </div>
+              </div>
+
+              <!-- Structure reference -->
+              <div>
+                <div class="font-semibold mb-1">Required file structure</div>
+                <div class="connect-tree">
+                  <div><span class="ct-file">automaton.json</span></div>
+                  <div><span class="ct-dir">frontend/</span></div>
+                  <div class="pl-3"><span class="ct-file">index.html</span> <span class="ct-comment">← entry point (required)</span></div>
+                  <div class="pl-3"><span class="ct-file">*.css / *.js / pages/</span></div>
+                  <div><span class="ct-dir">backend/</span></div>
+                  <div class="pl-3"><span class="ct-file">controller.py</span> <span class="ct-comment">← one file per resource</span></div>
+                  <div class="pl-3"><span class="ct-file">requirements.txt</span> <span class="ct-comment">← optional pip deps</span></div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Card>
+
         <!-- Danger Zone -->
-        <Card v-if="activeSection === 'danger'">
-          <template #title>
+        <Card v-if="activeSection === 'danger'">          <template #title>
             <span class="text-red-500">Danger Zone</span>
           </template>
           <template #content>
@@ -938,4 +1076,68 @@ async function handleSaveTemplateStatus() {
   border-color: var(--p-red-800);
   background: color-mix(in srgb, var(--p-red-900) 20%, var(--p-surface-ground));
 }
+
+/* ── Connect to IDE section ── */
+.connect-code {
+  background: var(--p-surface-100);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.83em;
+}
+
+:global(.app-dark) .connect-code {
+  background: var(--p-surface-700);
+}
+
+.connect-snippet {
+  position: relative;
+  background: var(--p-surface-900, #111);
+  border: 1px solid var(--p-surface-border);
+  border-radius: 8px;
+  padding: 12px 40px 12px 14px;
+  overflow-x: auto;
+}
+
+:global(.app-dark) .connect-snippet {
+  background: color-mix(in srgb, var(--p-surface-900) 90%, black);
+}
+
+.connect-snippet pre {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #8ef0a1;
+  white-space: pre;
+}
+
+.connect-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0.6;
+}
+
+.connect-copy-btn:hover {
+  opacity: 1;
+}
+
+.connect-tree {
+  background: var(--p-surface-900, #111);
+  border: 1px solid var(--p-surface-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+
+:global(.app-dark) .connect-tree {
+  background: color-mix(in srgb, var(--p-surface-900) 90%, black);
+}
+
+.ct-dir  { color: #79c0ff; }
+.ct-file { color: #c9d1d9; }
+.ct-comment { color: #6a737d; }
 </style>
