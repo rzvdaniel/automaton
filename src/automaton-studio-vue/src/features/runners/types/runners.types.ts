@@ -7,9 +7,9 @@
  * Runner status enum - matches Automaton.Core.Enums.RunnerStatus
  */
 export const RunnerStatus = {
-  None: 0,
-  Online: 1,
-  Offline: 2,
+  None: 'None',
+  Online: 'Online',
+  Offline: 'Offline',
 } as const
 
 export type RunnerStatus = (typeof RunnerStatus)[keyof typeof RunnerStatus]

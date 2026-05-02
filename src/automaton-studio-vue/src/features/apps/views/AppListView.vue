@@ -96,6 +96,7 @@ const activeTabIndex = ref(0)
 const tabItems = ref([
   { label: 'My Apps', icon: 'pi pi-th-large' },
   { label: 'Templates', icon: 'pi pi-star' },
+  { label: 'How to Build', icon: 'pi pi-book' },
 ])
 
 // Templates state
@@ -154,6 +155,9 @@ const statusOptions = ref([
   { label: 'Published', value: 'published' },
   { label: 'Draft', value: 'draft' },
 ])
+
+// Quick-start how-to tab
+const quickStartPath = ref<'editor' | 'cli' | 'mcp'>('editor')
 
 // Create dialog state
 const showCreateDialog = ref(false)
@@ -568,50 +572,110 @@ const handleRetry = async () => {
         </template>
       </Card>
 
-      <!-- Quick Start Section (shown when no apps) -->
-      <Card v-if="!appsStore.hasApps" class="mt-4 quick-start-card">
+    </template><!-- /v-else -->
+    </template><!-- /v-if="activeTabIndex === 0" -->
+
+    <!-- ─── HOW TO BUILD TAB ─────────────────────────────────────────── -->
+    <template v-if="activeTabIndex === 2">
+      <Card class="quick-start-card">
         <template #content>
-          <div class="flex align-items-start gap-3">
-            <div
-              class="flex align-items-center justify-content-center border-round flex-shrink-0"
-              style="
-                width: 48px;
-                height: 48px;
-                background-color: var(--p-yellow-100);
-                color: var(--p-yellow-600);
-              "
+          <div class="quick-start-header mb-3">
+            <i class="pi pi-book text-xl" style="color: var(--p-primary-500)" />
+            <span class="font-semibold ml-2">How to build an app</span>
+          </div>
+
+          <!-- Path tabs -->
+          <div class="qs-tabs mb-4">
+            <button
+              :class="['qs-tab', quickStartPath === 'editor' && 'qs-tab--active']"
+              @click="quickStartPath = 'editor'"
             >
-              <i class="pi pi-lightbulb text-xl"></i>
+              <i class="pi pi-desktop" />
+              <span>AI Editor</span>
+            </button>
+            <button
+              :class="['qs-tab', quickStartPath === 'cli' && 'qs-tab--active']"
+              @click="quickStartPath = 'cli'"
+            >
+              <i class="pi pi-terminal" />
+              <span>CLI + Your IDE</span>
+            </button>
+            <button
+              :class="['qs-tab', quickStartPath === 'mcp' && 'qs-tab--active']"
+              @click="quickStartPath = 'mcp'"
+            >
+              <i class="pi pi-sparkles" />
+              <span>MCP Server</span>
+            </button>
+          </div>
+
+          <!-- Editor path -->
+          <div v-if="quickStartPath === 'editor'" class="qs-content">
+            <p class="text-color-secondary text-sm mt-0 mb-3">
+              The fastest way to get started. Type a description above and the AI writes the app for you.
+            </p>
+            <ol class="qs-steps">
+              <li>Type what you want to build in the text area above</li>
+              <li>Click <strong>Generate</strong> — the app is created and you're taken to the editor</li>
+              <li>The AI writes the files and asks you to <strong>Deploy Backend</strong></li>
+              <li>Preview opens automatically. Click <strong>Publish</strong> to share.</li>
+            </ol>
+            <Button label="Generate with AI" icon="pi pi-sparkles" size="small" class="mt-2" @click="handleGenerateApp" />
+          </div>
+
+          <!-- CLI path -->
+          <div v-else-if="quickStartPath === 'cli'" class="qs-content">
+            <p class="text-color-secondary text-sm mt-0 mb-3">
+              Build locally with any editor (Cursor, VS Code…), deploy with one command.
+            </p>
+            <div class="qs-code mb-2">npm install -g @automaton/cli</div>
+            <div class="qs-code mb-3">automaton deploy</div>
+            <p class="text-color-secondary text-sm mb-2">
+              Your project needs a <code class="qs-inline-code">frontend/index.html</code> as the entry point
+              and optionally a <code class="qs-inline-code">backend/</code> folder for Python controllers.
+            </p>
+            <div class="qs-tree mb-3">
+              <div><span class="qs-tree-dir">frontend/</span></div>
+              <div class="pl-3"><span class="qs-tree-file">index.html</span> <span class="qs-tree-comment">← required</span></div>
+              <div><span class="qs-tree-dir">backend/</span></div>
+              <div class="pl-3"><span class="qs-tree-file">mycontroller.py</span> <span class="qs-tree-comment">← optional</span></div>
             </div>
-            <div class="flex-1">
-              <div class="font-semibold mb-2">Quick Start</div>
-              <p class="text-color-secondary mt-0 mb-3">
-                New to apps? Create your first web app with AI:
-              </p>
-              <ul class="text-color-secondary m-0 mb-4 pl-4">
-                <li class="mb-1">Simple data entry form</li>
-                <li class="mb-1">Dashboard with charts</li>
-                <li>Customer feedback portal</li>
-              </ul>
-              <div class="flex gap-2">
-                <Button
-                  label="Create with AI"
-                  icon="pi pi-sparkles"
-                  @click="handleGenerateApp"
-                />
-                <Button
-                  label="View Examples"
-                  outlined
-                  severity="secondary"
-                  @click="handleViewExamples"
-                />
-              </div>
+            <a href="https://www.npmjs.com/package/@automaton/cli" target="_blank" rel="noopener" class="p-button p-button-sm p-button-secondary p-button-outlined" style="text-decoration:none">
+              <i class="pi pi-external-link mr-1" />CLI docs
+            </a>
+          </div>
+
+          <!-- MCP path -->
+          <div v-else class="qs-content">
+            <p class="text-color-secondary text-sm mt-0 mb-3">
+              Connect Automaton as an MCP server to GitHub Copilot Agent or Claude Code.
+              The AI writes and deploys files without you touching the terminal.
+            </p>
+            <p class="text-sm font-semibold mb-1">VS Code / GitHub Copilot — add to <code class="qs-inline-code">.vscode/mcp.json</code>:</p>
+            <div class="qs-code qs-code--block mb-3">
+              <div>&#123;</div>
+              <div class="pl-3">"servers": &#123; "automaton": &#123;</div>
+              <div class="pl-5">"type": "http",</div>
+              <div class="pl-5">"url": "{{ apiBase }}/api/mcp",</div>
+              <div class="pl-5">"headers": &#123; "X-API-Key": "<em>your-api-key</em>" &#125;</div>
+              <div class="pl-3">&#125; &#125;</div>
+              <div>&#125;</div>
             </div>
+            <p class="text-sm font-semibold mb-1">Claude Code:</p>
+            <div class="qs-code mb-3">claude mcp add automaton --transport http "{{ apiBase }}/api/mcp" --header "X-API-Key: your-api-key"</div>
+            <p class="text-color-secondary text-sm mb-3">
+              Replace <code class="qs-inline-code">your-api-key</code> with a key from
+              <strong
+                class="cursor-pointer"
+                style="color: var(--p-primary-500)"
+                @click="router.push('/apikeys')"
+              >Settings → API Keys</strong> (scope: <em>execute</em>).
+              Then open Copilot Chat in Agent mode and describe your app.
+            </p>
           </div>
         </template>
       </Card>
-    </template>
-    </template><!-- /v-if="activeTabIndex === 0" -->
+    </template><!-- /v-if="activeTabIndex === 2" -->
 
     <!-- ─── TEMPLATES TAB ────────────────────────────────────────────── -->
     <template v-if="activeTabIndex === 1">
@@ -803,8 +867,107 @@ const handleRetry = async () => {
 }
 
 .quick-start-card {
-  max-width: 600px;
+  /* stretch to fill available width — no max-width constraint */
 }
+
+.quick-start-header {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Quick-start tabs ── */
+.qs-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.qs-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--p-surface-border);
+  background: transparent;
+  color: var(--p-text-color);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.qs-tab:hover {
+  border-color: var(--p-primary-500);
+  color: var(--p-primary-500);
+}
+
+.qs-tab--active {
+  border-color: var(--p-primary-500);
+  background: color-mix(in srgb, var(--p-primary-500) 10%, transparent);
+  color: var(--p-primary-500);
+}
+
+/* ── Quick-start content ── */
+.qs-content {
+  /* no width cap — let it breathe inside the full-width card */
+}
+
+.qs-steps {
+  color: var(--p-text-muted-color);
+  font-size: 0.86rem;
+  line-height: 1.7;
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.qs-steps li { margin-bottom: 4px; }
+
+/* Code blocks are always dark regardless of theme — same as every IDE/terminal */
+.qs-code {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: #8ef0a1;
+  overflow-x: auto;
+}
+
+.qs-code--block {
+  color: #e6edf3;
+  line-height: 1.55;
+  font-size: 0.78rem;
+}
+
+.qs-code--block em {
+  color: #ffa657;
+  font-style: normal;
+}
+
+.qs-inline-code {
+  background: color-mix(in srgb, var(--p-primary-500) 12%, var(--p-surface-ground));
+  color: var(--p-primary-400);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.83em;
+}
+
+.qs-tree {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+.qs-tree-dir  { color: #79c0ff; }
+.qs-tree-file { color: #e6edf3; }
+.qs-tree-comment { color: #8b949e; }
 
 .template-card .template-thumbnail {
   position: relative;
