@@ -66,7 +66,7 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
         }
         
         // For other ports, respect the useSsl configuration
-        return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+        return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None;
     }
 
     private async Task<(string subject, string bodyHtml)> RenderEmailAsync(EmailData emailDetails, CancellationToken cancellationToken)

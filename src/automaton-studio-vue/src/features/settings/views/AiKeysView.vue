@@ -178,9 +178,21 @@ function formatDate(dateStr: string) {
     </div>
 
     <!-- Empty state -->
-    <Message v-if="!loading && keys.length === 0" severity="info" :closable="false" class="mb-4">
-      No AI keys yet. Add your first key to start using AI features.
-    </Message>
+    <div v-if="!loading && keys.length === 0" class="ai-keys-empty mb-4">
+      <i class="pi pi-key ai-keys-empty-icon"></i>
+      <h3 class="mt-0 mb-2">No AI keys configured</h3>
+      <p class="text-color-secondary mt-0 mb-3">
+        An AI key lets Automaton call an AI provider on your behalf to generate and edit app code.
+        Without one, the <strong>AI chat in the App Editor</strong> will be disabled.
+      </p>
+      <div class="ai-keys-providers mb-4">
+        <span class="provider-chip">OpenAI</span>
+        <span class="provider-chip">Anthropic</span>
+        <span class="provider-chip">Google Gemini</span>
+        <span class="provider-chip">Any OpenAI-compatible API</span>
+      </div>
+      <Button label="Add Your First Key" icon="pi pi-plus" @click="openDialog" />
+    </div>
 
     <!-- Keys table -->
     <DataTable
@@ -374,5 +386,45 @@ function formatDate(dateStr: string) {
 
 .monospace {
   font-family: monospace;
+}
+
+/* Empty state */
+.ai-keys-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--p-surface-300);
+  border-radius: 8px;
+}
+
+:global(.app-dark) .ai-keys-empty {
+  border-color: var(--p-surface-600);
+}
+
+.ai-keys-empty-icon {
+  font-size: 3rem;
+  color: var(--p-text-muted-color);
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.ai-keys-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.provider-chip {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+  border: 1px solid var(--p-surface-200);
+}
+
+:global(.app-dark) .provider-chip {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
 }
 </style>

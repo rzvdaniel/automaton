@@ -219,13 +219,47 @@ watch(
     <!-- Empty State -->
     <Card v-if="!loading && runners.length === 0">
       <template #content>
-        <div class="text-center py-6">
-          <i class="pi pi-server text-5xl text-color-secondary mb-3" style="display: block"></i>
-          <h3 class="mt-0 mb-2">No runners registered</h3>
-          <p class="text-color-secondary mt-0 mb-4">
-            Deploy a runner to start executing your workflows remotely.
+        <div class="runners-empty-state">
+          <i class="pi pi-server runners-empty-icon"></i>
+          <h3 class="mt-0 mb-1">No runners connected</h3>
+          <p class="text-color-secondary mt-0 mb-0">
+            A runner is a lightweight process that executes your app's backend Python code.
+            Without one, <strong>Deploy Backend</strong> will fail in the App Editor.
           </p>
-          <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+
+          <!-- Docker quick-start -->
+          <div class="runner-quickstart mt-4">
+            <div class="runner-quickstart-label">Quickest setup — Docker:</div>
+            <div class="runner-quickstart-code">
+              <span class="code-line">docker run -d \</span>
+              <span class="code-line pl-2">-e AUTOMATON_SERVER_URL=<em>&lt;your-server-url&gt;</em> \</span>
+              <span class="code-line pl-2">-e AUTOMATON_API_KEY=<em>&lt;runner-api-key&gt;</em> \</span>
+              <span class="code-line pl-2">rzvdaniel/automaton-runner:latest</span>
+            </div>
+            <p class="text-color-secondary text-sm mt-2 mb-0">
+              Get a runner API key from
+              <router-link to="/apikeys" class="runner-link">Settings → API Keys</router-link>
+              (scope: <em>runner</em>). See
+              <a
+                href="https://automaton.monster/docs"
+                target="_blank"
+                rel="noopener"
+                class="runner-link"
+              >full runner docs</a>
+              for Linux service, Windows service, and Docker Compose options.
+            </p>
+          </div>
+
+          <div class="flex gap-2 mt-4 justify-content-center">
+            <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+            <Button
+              label="API Keys"
+              icon="pi pi-key"
+              severity="secondary"
+              outlined
+              @click="$router.push('/apikeys')"
+            />
+          </div>
         </div>
       </template>
     </Card>
@@ -650,5 +684,67 @@ watch(
   background: var(--p-surface-ground);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* Empty state */
+.runners-empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.runners-empty-icon {
+  font-size: 3.5rem;
+  color: var(--p-text-muted-color);
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.runner-quickstart {
+  text-align: left;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.runner-quickstart-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.runner-quickstart-code {
+  display: flex;
+  flex-direction: column;
+  background: var(--p-surface-900);
+  color: var(--p-surface-100);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+:global(.app-dark) .runner-quickstart-code {
+  background: var(--p-surface-800);
+}
+
+.runner-quickstart-code em {
+  color: var(--p-primary-300);
+  font-style: normal;
+}
+
+.code-line {
+  white-space: nowrap;
+}
+
+.runner-link {
+  color: var(--p-primary-500);
+  text-decoration: none;
+}
+
+.runner-link:hover {
+  text-decoration: underline;
 }
 </style>

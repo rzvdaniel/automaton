@@ -65,6 +65,7 @@ async function checkUsernameAvailability() {
 const usernameStatus = computed(() => {
   if (!publicUsername.value) return null
   if (checkingUsername.value) return 'checking'
+  if (usernameAvailable.value === null) return null
   return usernameAvailable.value ? 'available' : 'taken'
 })
 
@@ -132,7 +133,7 @@ function validateForm(): boolean {
   } else if (!/^[a-zA-Z0-9_\-]+$/.test(publicUsername.value)) {
     formErrors.value.publicUsername = 'Public username can only contain letters, numbers, hyphens, and underscores'
     isValid = false
-  } else if (!usernameAvailable.value) {
+  } else if (usernameAvailable.value === false) {
     formErrors.value.publicUsername = 'This public username is already taken'
     isValid = false
   }
@@ -150,6 +151,11 @@ function validateForm(): boolean {
 async function handleSubmit() {
   submitted.value = true
   clearError()
+
+  // Ensure availability has been checked before validating
+  if (publicUsername.value && publicUsername.value.length >= 3) {
+    await checkUsernameAvailability()
+  }
 
   if (!validateForm()) {
     return

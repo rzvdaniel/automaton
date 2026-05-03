@@ -82,6 +82,24 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # =============================================================================
+  # smtp4dev — Local email capture (Development)
+  # =============================================================================
+  # Web UI:   http://localhost:3000  (view captured emails)
+  # SMTP:     localhost:2525         (used by appsettings.Development.json)
+  #
+  # Usage: docker compose -f docker-compose.dev.yml up smtp4dev -d
+  # =============================================================================
+  smtp4dev:
+    image: rnwood/smtp4dev:latest
+    container_name: automaton-smtp4dev
+    restart: unless-stopped
+    ports:
+      - "3000:80"    # Web UI
+      - "2525:25"    # SMTP
+    networks:
+      - automaton-network
+
 volumes:
   mysql-data:
     driver: local

@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import type { App } from '@/features/apps/types/apps.types'
+import Tag from 'primevue/tag'
 
 interface Props {
-  sampleApps: App[]
+  hasAiKeys: boolean
+  hasRunners: boolean
+  hasApps: boolean
+  hasPublishedApp: boolean
+  loading?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { loading: false })
 
 const emit = defineEmits<{
   dismiss: []
@@ -17,115 +21,149 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Show up to 3 sample apps
-const displayedSamples = computed(() => props.sampleApps.slice(0, 3))
+const COLLAPSED_KEY = 'setup-checklist-collapsed'
+const isCollapsed = ref(localStorage.getItem(COLLAPSED_KEY) === 'true')
 
-function navigateToCreateApp() {
-  router.push('/apps')
-}
-
-function openSampleApp(app: App) {
-  if (app.publicUrl) {
-    window.open(`/web/${app.publicUrl}`, '_blank')
-  }
+function toggleCollapsed() {
+  isCollapsed.value = !isCollapsed.value
+  localStorage.setItem(COLLAPSED_KEY, String(isCollapsed.value))
 }
 
 function handleDismiss() {
   emit('dismiss')
 }
+
+const steps = computed(() => [
+  {
+    key: 'ai-key',
+    done: props.hasAiKeys,
+    title: 'Add an AI key',
+    desc: 'Required to use AI generation in the App Editor',
+    action: 'Add Key',
+    route: '/ai-keys',
+  },
+  {
+    key: 'runner',
+    done: props.hasRunners,
+    title: 'Connect a runner',
+    desc: 'Executes your backend Python controllers when deploying',
+    action: 'Set Up Runner',
+    route: '/runners',
+  },
+  {
+    key: 'app',
+    done: props.hasApps,
+    title: 'Create your first app',
+    desc: 'Describe what to build — AI generates the code',
+    action: 'Create App',
+    route: '/apps',
+  },
+  {
+    key: 'publish',
+    done: props.hasPublishedApp,
+    title: 'Publish an app',
+    desc: 'Make it live with a shareable public URL',
+    action: 'Go to Apps',
+    route: '/apps',
+  },
+])
+
+const doneCount = computed(() => steps.value.filter((s) => s.done).length)
+const total = computed(() => steps.value.length)
+const progressPct = computed(() => (doneCount.value / total.value) * 100)
+
+// First incomplete step — shown as a nudge when checklist is collapsed
+const nextStep = computed(() => steps.value.find((s) => !s.done))
 </script>
 
 <template>
-  <Card class="welcome-section mb-4">
+  <Card class="setup-checklist mb-4">
     <template #content>
-      <div class="welcome-content">
-        <!-- Header with dismiss button -->
-        <div class="welcome-header">
-          <div class="welcome-title">
-            <i class="pi pi-sparkles welcome-icon"></i>
-            <div>
-              <h2 class="m-0">Welcome to Automaton</h2>
-              <p class="text-color-secondary mt-1 mb-0">
-                Build web apps with AI-powered backend logic
-              </p>
-            </div>
-          </div>
+      <!-- Header row -->
+      <div class="checklist-header">
+        <div class="checklist-title-row">
+          <i class="pi pi-flag checklist-icon"></i>
+          <span class="font-semibold">Getting Started</span>
+          <span v-if="!loading" class="checklist-progress-text">
+            {{ doneCount }} of {{ total }} complete
+          </span>
+        </div>
+        <div class="flex gap-1">
           <Button
+            :icon="isCollapsed ? 'pi pi-chevron-down' : 'pi pi-chevron-up'"
+            text
+            rounded
+            severity="secondary"
+            size="small"
+            :aria-label="isCollapsed ? 'Expand' : 'Collapse'"
+            @click="toggleCollapsed"
+          />
+          <Button
+            v-tooltip.top="'Hide this checklist'"
             icon="pi pi-times"
             text
             rounded
             severity="secondary"
-            aria-label="Dismiss welcome section"
+            size="small"
+            aria-label="Dismiss"
             @click="handleDismiss"
           />
         </div>
+      </div>
 
-        <!-- Quick start steps -->
-        <div class="quick-start mt-4">
-          <h3 class="text-lg font-medium mb-3">Quick Start</h3>
-          <div class="steps-row">
-            <div class="step-item">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <span class="step-title">Add AI Key</span>
-                <span class="step-desc">Settings → AI Keys → Add Key</span>
-              </div>
-            </div>
-            <i class="pi pi-arrow-right step-arrow"></i>
-            <div class="step-item">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <span class="step-title">Create App</span>
-                <span class="step-desc">Describe what to build and let AI generate it</span>
-              </div>
-            </div>
-            <i class="pi pi-arrow-right step-arrow"></i>
-            <div class="step-item">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <span class="step-title">Deploy &amp; Publish</span>
-                <span class="step-desc">Deploy backend, then share with a public URL</span>
-              </div>
-            </div>
+      <!-- Progress bar -->
+      <div class="progress-track mt-2">
+        <div
+          class="progress-fill"
+          :style="{ width: `${progressPct}%` }"
+          :class="{ 'progress-fill--complete': doneCount === total }"
+        ></div>
+      </div>
+
+      <!-- Collapsed: show next step as a single nudge -->
+      <div v-if="isCollapsed && nextStep" class="collapsed-next mt-3">
+        <span class="text-color-secondary text-sm">Next: </span>
+        <span class="font-medium text-sm">{{ nextStep.title }}</span>
+        <Button
+          :label="nextStep.action"
+          size="small"
+          text
+          class="ml-1 p-0"
+          style="vertical-align: baseline"
+          @click="router.push(nextStep.route)"
+        />
+      </div>
+
+      <!-- Full checklist -->
+      <div v-if="!isCollapsed" class="checklist-steps mt-3">
+        <div
+          v-for="step in steps"
+          :key="step.key"
+          class="step-row"
+          :class="{ 'step-row--done': step.done }"
+        >
+          <i
+            class="step-icon"
+            :class="
+              step.done
+                ? 'pi pi-check-circle step-icon--done'
+                : 'pi pi-circle step-icon--pending'
+            "
+          ></i>
+          <div class="step-body">
+            <span class="step-title">{{ step.title }}</span>
+            <span class="step-desc">{{ step.desc }}</span>
           </div>
-        </div>
-
-        <!-- Sample apps (if available) -->
-        <div v-if="displayedSamples.length > 0" class="sample-apps mt-4">
-          <h3 class="text-lg font-medium mb-3">Explore Sample Apps</h3>
-          <div class="sample-apps-grid">
-            <div
-              v-for="app in displayedSamples"
-              :key="app.id"
-              class="sample-app-card"
-              @click="openSampleApp(app)"
-            >
-              <div class="sample-app-icon">
-                <i class="pi pi-globe"></i>
-              </div>
-              <div class="sample-app-info">
-                <span class="sample-app-name">{{ app.summary || app.name }}</span>
-                <span class="sample-app-desc">{{ app.description || 'Sample application' }}</span>
-              </div>
-              <i class="pi pi-external-link sample-app-link"></i>
-            </div>
-          </div>
-        </div>
-
-        <!-- CTA -->
-        <div class="welcome-cta mt-4 flex gap-2">
           <Button
-            label="Add AI Key"
-            icon="pi pi-key"
+            v-if="!step.done"
+            :label="step.action"
+            size="small"
             severity="secondary"
             outlined
-            @click="router.push('/ai-keys')"
+            class="step-action flex-shrink-0"
+            @click="router.push(step.route)"
           />
-          <Button
-            label="Create Your First App"
-            icon="pi pi-plus"
-            @click="navigateToCreateApp"
-          />
+          <Tag v-else value="Done" severity="success" class="flex-shrink-0" />
         </div>
       </div>
     </template>
@@ -133,185 +171,127 @@ function handleDismiss() {
 </template>
 
 <style scoped>
-.welcome-section {
+.setup-checklist {
   border-left: 4px solid var(--p-primary-500);
 }
 
-.welcome-content {
-  padding: 0.5rem;
-}
-
-.welcome-header {
+.checklist-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
 }
 
-.welcome-title {
+.checklist-title-row {
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.625rem;
 }
 
-.welcome-icon {
-  font-size: 2rem;
+.checklist-icon {
+  font-size: 1.1rem;
   color: var(--p-primary-500);
-  margin-top: 0.25rem;
 }
 
-.welcome-title h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--p-text-color);
+.checklist-progress-text {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  background: var(--p-surface-100);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
 }
 
-/* Quick start steps */
-.steps-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+:global(.app-dark) .checklist-progress-text {
+  background: var(--p-surface-800);
 }
 
-.step-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  flex: 1;
-  min-width: 180px;
+.progress-track {
+  height: 4px;
+  background: var(--p-surface-200);
+  border-radius: 999px;
+  overflow: hidden;
 }
 
-.step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+:global(.app-dark) .progress-track {
+  background: var(--p-surface-700);
+}
+
+.progress-fill {
+  height: 100%;
   background: var(--p-primary-500);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  flex-shrink: 0;
+  border-radius: 999px;
+  transition: width 0.4s ease;
 }
 
-.step-content {
+.progress-fill--complete {
+  background: var(--p-green-500);
+}
+
+.checklist-steps {
   display: flex;
   flex-direction: column;
 }
 
-.step-title {
-  font-weight: 600;
-  color: var(--p-text-color);
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--p-surface-100);
 }
 
-.step-desc {
-  font-size: 0.875rem;
+.step-row:last-child {
+  border-bottom: none;
+}
+
+:global(.app-dark) .step-row {
+  border-bottom-color: var(--p-surface-800);
+}
+
+.step-row--done .step-title {
+  text-decoration: line-through;
   color: var(--p-text-muted-color);
 }
 
-.step-arrow {
-  color: var(--p-text-muted-color);
+.step-row--done .step-desc {
+  opacity: 0.6;
+}
+
+.step-icon {
+  font-size: 1.15rem;
   flex-shrink: 0;
 }
 
-/* Sample apps grid */
-.sample-apps-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1rem;
+.step-icon--done {
+  color: var(--p-green-500);
 }
 
-.sample-app-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--p-surface-200);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.step-icon--pending {
+  color: var(--p-surface-400);
 }
 
-.sample-app-card:hover {
-  border-color: var(--p-primary-500);
-  transform: translateY(-2px);
-}
-
-:global(.app-dark) .sample-app-card {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .sample-app-card:hover {
-  border-color: var(--p-primary-500);
-}
-
-.sample-app-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--p-primary-100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-:global(.app-dark) .sample-app-icon {
-  background: var(--p-primary-900);
-}
-
-.sample-app-icon i {
-  font-size: 1.25rem;
-  color: var(--p-primary-500);
-}
-
-.sample-app-info {
+.step-body {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
 }
 
-.sample-app-name {
+.step-title {
   font-weight: 600;
+  font-size: 0.875rem;
   color: var(--p-text-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
-.sample-app-desc {
-  font-size: 0.75rem;
+.step-desc {
+  font-size: 0.8rem;
   color: var(--p-text-muted-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  margin-top: 0.1rem;
 }
 
-.sample-app-link {
-  color: var(--p-text-muted-color);
-  flex-shrink: 0;
-}
-
-/* CTA */
-.welcome-cta {
-  display: flex;
-  gap: 1rem;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .step-arrow {
-    display: none;
-  }
-
-  .steps-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .step-item {
-    min-width: auto;
-  }
+.step-action {
+  min-width: 100px;
+  text-align: center;
 }
 </style>

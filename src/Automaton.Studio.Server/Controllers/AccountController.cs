@@ -18,16 +18,19 @@ public class AccountController : BaseController
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
     private readonly IEmailService emailService;
+    private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext, 
         UsersService userManagerService,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILogger<AccountController> logger)
     {
         this.configurationService = configurationService;
         this.dataContext = dataContext;
         this.userManagerService = userManagerService;
         this.emailService = emailService;
+        this.logger = logger;
     }
 
     [HttpPost]
@@ -85,18 +88,26 @@ public class AccountController : BaseController
         await userManagerService.CreateUser(user, registerUserCommand.Password);
         await dataContext.SaveChangesAsync();
 
-        var userDetails = new EmailData { Template = "AutomatonRegisterUser", 
-            From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport }, 
-            To = [new EmailAccount { Email = registerUserCommand.Email, Name = registerUserCommand.Name }],
-            Variables = 
-            {
-                { "FullName", registerUserCommand.Name },
-                { "WebsiteUrl", configurationService.WebsiteUrl },
-                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
-            }
-        };
-       
-        await emailService.Send(userDetails, CancellationToken.None);
+        try
+        {
+            var userDetails = new EmailData { Template = "AutomatonRegisterUser", 
+                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport }, 
+                To = [new EmailAccount { Email = registerUserCommand.Email, Name = registerUserCommand.Name }],
+                Variables = 
+                {
+                    { "FullName", registerUserCommand.Name },
+                    { "WebsiteUrl", configurationService.WebsiteUrl },
+                    { "SupportEmail", configurationService.EmailConfig.EmailSupport }
+                }
+            };
+
+            await emailService.Send(userDetails, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Email delivery failure should not prevent registration from succeeding
+            logger.LogWarning(ex, "Registration email could not be sent to {Email}", registerUserCommand.Email);
+        }
 
         return CreatedAtRoute("User",
             new { controller = "User", userId = registerUserCommand.Email },

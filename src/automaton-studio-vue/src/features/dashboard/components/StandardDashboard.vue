@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -9,14 +9,25 @@ import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
 import WelcomeSection from './WelcomeSection.vue'
+import { getUserAiApiKeys } from '@/shared/services/ai/ai-providers-service'
 
 const router = useRouter()
 const toast = useToast()
 const dashboardStore = useDashboardStore()
 
+// Track whether the user has configured any AI keys
+const hasAiKeys = ref(false)
+
 // Fetch dashboard data on mount
 onMounted(async () => {
   await dashboardStore.fetchDashboard()
+  // Check AI keys in parallel with auto-refresh (lightweight)
+  try {
+    const keys = await getUserAiApiKeys()
+    hasAiKeys.value = keys.length > 0
+  } catch {
+    // Non-critical — checklist just shows step as incomplete
+  }
   // Start auto-refresh every 30 seconds
   dashboardStore.startAutoRefresh(30000)
 })
@@ -97,6 +108,16 @@ const handleRetry = () => {
 const handleDismissWelcome = () => {
   dashboardStore.dismissWelcome()
 }
+
+// Show checklist when: not all 4 setup steps done AND user hasn't dismissed it
+const allSetupDone = computed(
+  () =>
+    hasAiKeys.value &&
+    dashboardStore.runnersOnline > 0 &&
+    dashboardStore.totalApps > 0 &&
+    dashboardStore.publishedApps > 0,
+)
+const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWelcomeDismissed)
 </script>
 
 <template>
@@ -118,10 +139,13 @@ const handleDismissWelcome = () => {
       </div>
     </Message>
 
-    <!-- Welcome Section (dismissible) -->
+    <!-- Setup Checklist (hidden once all 4 steps done or manually dismissed) -->
     <WelcomeSection
-      v-if="!dashboardStore.isWelcomeDismissed"
-      :sample-apps="dashboardStore.sampleApps"
+      v-if="showChecklist && !dashboardStore.isLoading"
+      :has-ai-keys="hasAiKeys"
+      :has-runners="dashboardStore.runnersOnline > 0"
+      :has-apps="dashboardStore.totalApps > 0"
+      :has-published-app="dashboardStore.publishedApps > 0"
       @dismiss="handleDismissWelcome"
     />
 
