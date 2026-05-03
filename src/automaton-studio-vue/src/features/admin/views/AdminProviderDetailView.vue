@@ -4,7 +4,7 @@
  * Three-tab page for a single AI provider: Details | System API Keys | Models.
  * Replaces both the "Edit provider settings" popup and the old keys-only section.
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -27,6 +27,7 @@ import type {
   AiProviderAdmin,
   AiModelAdmin,
   AiApiKeyAdmin,
+  CreateAiProviderRequest,
   UpdateAiProviderRequest,
   CreateAiApiKeyRequest,
   UpdateAiApiKeyRequest,
@@ -38,8 +39,11 @@ const toast = useToast()
 const confirm = useConfirm()
 
 const providerId = route.params.providerId as string
+const isNew = providerId === 'new'
 
-// Active tab (0=Details, 1=System API Keys, 2=Models)
+const pageTitle = computed(() => isNew ? 'Add Provider' : (provider.value?.displayName ?? 'Provider'))
+
+// Active tab (0=Details, 1=Models, 2=API Keys)
 const activeTab = ref(0)
 
 const provider = ref<AiProviderAdmin | null>(null)
@@ -47,8 +51,20 @@ const models = ref<AiModelAdmin[]>([])
 const keys = ref<AiApiKeyAdmin[]>([])
 const loading = ref(false)
 
-// ---- Details tab ----
-const detailsForm = ref<UpdateAiProviderRequest>({})
+// ---- Details tab / Create form ----
+// For new providers: name is editable; for existing: populated from provider
+const detailsForm = ref<CreateAiProviderRequest>({
+  name: '',
+  displayName: '',
+  description: '',
+  baseUrl: '',
+  isActive: true,
+  requiresApiKey: true,
+  environmentKeyName: '',
+  apiKeyHelpUrl: '',
+  iconName: '',
+  sortOrder: 0,
+})
 const detailsErrors = ref<Record<string, string>>({})
 const isSavingDetails = ref(false)
 
@@ -61,7 +77,10 @@ const keyForm = ref<CreateAiApiKeyRequest>({ name: '', apiKey: '', description: 
 const editKeyForm = ref<UpdateAiApiKeyRequest>({ name: '', apiKey: '', description: '', isActive: true })
 const keyErrors = ref<Record<string, string>>({})
 
-onMounted(loadAll)
+onMounted(async () => {
+  if (isNew) return  // form already initialised with defaults
+  loadAll()
+})
 
 async function loadAll() {
   loading.value = true
@@ -84,6 +103,7 @@ async function loadAll() {
 
 function populateDetailsForm(p: AiProviderAdmin) {
   detailsForm.value = {
+    name: p.name,
     displayName: p.displayName,
     description: p.description,
     baseUrl: p.baseUrl,
@@ -100,6 +120,7 @@ function populateDetailsForm(p: AiProviderAdmin) {
 
 function validateDetails(): boolean {
   detailsErrors.value = {}
+  if (isNew && !detailsForm.value.name?.trim()) detailsErrors.value.name = 'Name is required'
   if (!detailsForm.value.displayName?.trim()) detailsErrors.value.displayName = 'Display name is required'
   return Object.keys(detailsErrors.value).length === 0
 }
@@ -108,12 +129,18 @@ async function saveDetails() {
   if (!validateDetails()) return
   isSavingDetails.value = true
   try {
-    await adminAiProvidersService.updateProvider(providerId, detailsForm.value)
-    toast.add({ severity: 'success', summary: 'Saved', detail: 'Provider settings saved', life: 3000 })
-    provider.value = await adminAiProvidersService.getProvider(providerId)
+    if (isNew) {
+      const created = await adminAiProvidersService.createProvider(detailsForm.value)
+      toast.add({ severity: 'success', summary: 'Created', detail: 'Provider created', life: 3000 })
+      router.replace({ name: 'admin-provider-detail', params: { providerId: created.id } })
+    } else {
+      await adminAiProvidersService.updateProvider(providerId, detailsForm.value)
+      toast.add({ severity: 'success', summary: 'Saved', detail: 'Provider settings saved', life: 3000 })
+      provider.value = await adminAiProvidersService.getProvider(providerId)
+    }
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: { message?: string } } }
-    toast.add({ severity: 'error', summary: 'Save Failed', detail: axiosError?.response?.data?.message || 'Failed to save', life: 3000 })
+    toast.add({ severity: 'error', summary: isNew ? 'Create Failed' : 'Save Failed', detail: axiosError?.response?.data?.message || 'Operation failed', life: 3000 })
   } finally {
     isSavingDetails.value = false
   }
@@ -272,9 +299,9 @@ function formatDate(dateStr?: string): string {
         <span class="text-color-secondary text-sm">Administration / AI Providers</span>
       </div>
       <h1 class="text-2xl font-bold m-0">
-        {{ provider?.displayName ?? 'Provider' }}
+        {{ pageTitle }}
       </h1>
-      <p class="text-color-secondary mt-1 mb-0">{{ provider?.name }}</p>
+      <p v-if="!isNew" class="text-color-secondary mt-1 mb-0">{{ provider?.name }}</p>
     </div>
 
     <div v-if="loading" class="flex justify-content-center py-6">
@@ -288,7 +315,13 @@ function formatDate(dateStr?: string): string {
           <!-- ── Tab 1: Details ─────────────────────────────── -->
           <TabPanel header="Details">
             <div class="flex flex-column gap-4 pt-2" style="max-width: 600px">
-              <div class="flex flex-column gap-2">
+              <div v-if="isNew" class="flex flex-column gap-2">
+                <label for="providerName" class="font-medium">Name *</label>
+                <InputText id="providerName" v-model="detailsForm.name" placeholder="e.g., openai" :class="{ 'p-invalid': detailsErrors.name }" />
+                <small class="text-color-secondary">Unique internal identifier — cannot be changed later</small>
+                <small v-if="detailsErrors.name" class="text-red-500">{{ detailsErrors.name }}</small>
+              </div>
+              <div v-else class="flex flex-column gap-2">
                 <label class="font-medium">Name</label>
                 <InputText :model-value="provider?.name" disabled />
                 <small class="text-color-secondary">Cannot be changed after creation</small>
@@ -348,13 +381,13 @@ function formatDate(dateStr?: string): string {
 
               <div class="flex justify-content-end gap-2 pt-2">
                 <Button
-                  label="Reset"
+                  label="Cancel"
                   text
                   :disabled="isSavingDetails"
-                  @click="populateDetailsForm(provider!)"
+                  @click="isNew ? router.push({ name: 'admin-providers' }) : populateDetailsForm(provider!)"
                 />
                 <Button
-                  label="Save Details"
+                  :label="isNew ? 'Create Provider' : 'Save Details'"
                   icon="pi pi-check"
                   :loading="isSavingDetails"
                   @click="saveDetails"
@@ -365,6 +398,11 @@ function formatDate(dateStr?: string): string {
 
           <!-- ── Tab 2: Models ────────────────────────────────── -->
           <TabPanel header="Models">
+            <div v-if="isNew" class="flex flex-column align-items-center justify-content-center py-6 gap-3 text-color-secondary">
+              <i class="pi pi-list text-4xl" />
+              <p class="m-0 font-medium">Create the provider first</p>
+              <p class="m-0 text-sm">Fill in the Details tab and click <strong>Create Provider</strong>, then come back here to add models.</p>
+            </div>
             <div class="pt-2">
               <div class="flex align-items-center justify-content-between mb-3">
                 <p class="text-color-secondary text-sm m-0">
@@ -436,6 +474,11 @@ function formatDate(dateStr?: string): string {
 
           <!-- ── Tab 3: API Keys ──────────────────────────────── -->
           <TabPanel header="API Keys">
+            <div v-if="isNew" class="flex flex-column align-items-center justify-content-center py-6 gap-3 text-color-secondary">
+              <i class="pi pi-key text-4xl" />
+              <p class="m-0 font-medium">Create the provider first</p>
+              <p class="m-0 text-sm">Fill in the Details tab and click <strong>Create Provider</strong>, then come back here to add API keys.</p>
+            </div>
             <div class="pt-2">
               <div class="flex align-items-center justify-content-between mb-3">
                 <p class="text-color-secondary text-sm m-0">
@@ -513,7 +556,7 @@ function formatDate(dateStr?: string): string {
         </div>
         <div class="flex flex-column gap-2">
           <label for="keyValue" class="font-medium">API Key *</label>
-          <Password id="keyValue" v-model="keyForm.apiKey" placeholder="sk-..." :feedback="false" :class="{ 'p-invalid': keyErrors.apiKey }" />
+          <Password id="keyValue" v-model="keyForm.apiKey" placeholder="sk-..." :feedback="false" class="w-full" input-class="w-full" :class="{ 'p-invalid': keyErrors.apiKey }" />
           <small v-if="keyErrors.apiKey" class="text-red-500">{{ keyErrors.apiKey }}</small>
         </div>
         <div class="flex flex-column gap-2">
@@ -536,7 +579,7 @@ function formatDate(dateStr?: string): string {
         </div>
         <div class="flex flex-column gap-2">
           <label for="editKeyValue" class="font-medium">New API Key</label>
-          <Password id="editKeyValue" v-model="editKeyForm.apiKey" placeholder="Leave blank to keep current" :feedback="false" />
+          <Password id="editKeyValue" v-model="editKeyForm.apiKey" placeholder="Leave blank to keep current" :feedback="false" class="w-full" input-class="w-full" />
           <small class="text-color-secondary">Leave blank to keep the existing key value.</small>
         </div>
         <div class="flex flex-column gap-2">

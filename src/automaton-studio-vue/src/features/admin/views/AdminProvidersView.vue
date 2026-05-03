@@ -7,14 +7,9 @@ import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import InputText from 'primevue/inputtext'
-import Textarea from 'primevue/textarea'
-import Checkbox from 'primevue/checkbox'
-import InputNumber from 'primevue/inputnumber'
 import Tag from 'primevue/tag'
 import { adminAiProvidersService } from '../services/adminAiProvidersService'
-import type { AiProviderAdmin, CreateAiProviderRequest } from '../types/admin.types'
+import type { AiProviderAdmin } from '../types/admin.types'
 
 const router = useRouter()
 const toast = useToast()
@@ -22,22 +17,6 @@ const confirm = useConfirm()
 
 const providers = ref<AiProviderAdmin[]>([])
 const loading = ref(false)
-const showCreateDialog = ref(false)
-const isSubmitting = ref(false)
-
-const formData = ref<CreateAiProviderRequest>({
-  name: '',
-  displayName: '',
-  description: '',
-  baseUrl: '',
-  isActive: true,
-  requiresApiKey: true,
-  environmentKeyName: '',
-  apiKeyHelpUrl: '',
-  iconName: '',
-  sortOrder: 0,
-})
-const formErrors = ref<Record<string, string>>({})
 
 const sortedProviders = computed(() =>
   [...providers.value].sort((a, b) => {
@@ -81,35 +60,6 @@ async function loadProviders() {
   }
 }
 
-function openCreateDialog() {
-  formData.value = { name: '', displayName: '', description: '', baseUrl: '', isActive: true, requiresApiKey: true, environmentKeyName: '', apiKeyHelpUrl: '', iconName: '', sortOrder: 0 }
-  formErrors.value = {}
-  showCreateDialog.value = true
-}
-
-function validateForm(): boolean {
-  formErrors.value = {}
-  if (!formData.value.name?.trim()) formErrors.value.name = 'Name is required'
-  if (!formData.value.displayName?.trim()) formErrors.value.displayName = 'Display name is required'
-  return Object.keys(formErrors.value).length === 0
-}
-
-async function handleCreate() {
-  if (!validateForm()) return
-  isSubmitting.value = true
-  try {
-    await adminAiProvidersService.createProvider(formData.value)
-    toast.add({ severity: 'success', summary: 'Created', detail: 'AI provider created', life: 3000 })
-    showCreateDialog.value = false
-    await loadProviders()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: { message?: string } } }
-    toast.add({ severity: 'error', summary: 'Creation Failed', detail: axiosError?.response?.data?.message || 'Failed to create provider', life: 3000 })
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
 function confirmDelete(provider: AiProviderAdmin) {
   confirm.require({
     message: `Delete "${provider.displayName}"? This will also delete all its models.`,
@@ -148,7 +98,7 @@ function goToDetail(provider: AiProviderAdmin) {
           <h1 class="text-2xl font-bold m-0">AI Providers</h1>
           <p class="text-color-secondary mt-1 mb-0">Configure providers, models, and system API keys</p>
         </div>
-        <Button label="Add Provider" icon="pi pi-plus" @click="openCreateDialog" />
+        <Button label="Add Provider" icon="pi pi-plus" @click="router.push({ name: 'admin-provider-detail', params: { providerId: 'new' } })" />
       </div>
     </div>
 
@@ -229,62 +179,6 @@ function goToDetail(provider: AiProviderAdmin) {
       </template>
     </Card>
 
-    <!-- Create Provider Dialog -->
-    <Dialog v-model:visible="showCreateDialog" header="Add AI Provider" modal :style="{ width: '550px' }">
-      <div class="flex flex-column gap-4">
-        <div class="flex flex-column gap-2">
-          <label for="name" class="font-medium">Name *</label>
-          <InputText id="name" v-model="formData.name" placeholder="e.g., openai" :class="{ 'p-invalid': formErrors.name }" />
-          <small class="text-color-secondary">Unique identifier, cannot be changed later</small>
-          <small v-if="formErrors.name" class="text-red-500">{{ formErrors.name }}</small>
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="displayName" class="font-medium">Display Name *</label>
-          <InputText id="displayName" v-model="formData.displayName" placeholder="e.g., OpenAI" :class="{ 'p-invalid': formErrors.displayName }" />
-          <small v-if="formErrors.displayName" class="text-red-500">{{ formErrors.displayName }}</small>
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="description" class="font-medium">Description</label>
-          <Textarea id="description" v-model="formData.description" placeholder="Brief description" :rows="2" />
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="baseUrl" class="font-medium">Base URL</label>
-          <InputText id="baseUrl" v-model="formData.baseUrl" placeholder="https://api.example.com" />
-        </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox id="providerIsActive" v-model="formData.isActive" :binary="true" />
-          <label for="providerIsActive">Visible in chat selectors</label>
-        </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox id="requiresApiKey" v-model="formData.requiresApiKey" :binary="true" />
-          <label for="requiresApiKey">Requires API Key</label>
-        </div>
-        <div v-if="formData.requiresApiKey" class="flex flex-column gap-3 pl-4">
-          <div class="flex flex-column gap-2">
-            <label for="envKeyName" class="font-medium text-sm">Environment Key Name</label>
-            <InputText id="envKeyName" v-model="formData.environmentKeyName" placeholder="e.g., OPENAI_API_KEY" />
-          </div>
-          <div class="flex flex-column gap-2">
-            <label for="apiKeyHelpUrl" class="font-medium text-sm">API Key Help URL</label>
-            <InputText id="apiKeyHelpUrl" v-model="formData.apiKeyHelpUrl" placeholder="Link to API key docs" />
-          </div>
-        </div>
-        <div class="flex gap-4">
-          <div class="flex flex-column gap-2 flex-1">
-            <label for="iconName" class="font-medium">Icon Name</label>
-            <InputText id="iconName" v-model="formData.iconName" placeholder="e.g., openai" />
-          </div>
-          <div class="flex flex-column gap-2" style="width: 120px">
-            <label for="sortOrder" class="font-medium">Sort Order</label>
-            <InputNumber id="sortOrder" v-model="formData.sortOrder" :min="0" />
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancel" text :disabled="isSubmitting" @click="showCreateDialog = false" />
-        <Button label="Create" :loading="isSubmitting" @click="handleCreate" />
-      </template>
-    </Dialog>
 
   </div>
 </template>
