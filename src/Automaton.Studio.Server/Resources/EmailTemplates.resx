@@ -169,6 +169,7 @@
               &lt;center&gt;
                 &lt;a href="{{ LoginUrl }}" class="button"&gt;Sign In to Your Account&lt;/a&gt;
               &lt;/center&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ LoginUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ LoginUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you have any questions or need assistance, our support team is here to help at &lt;a href="mailto:{{ SupportEmail }}" style="color: #4F46E5; text-decoration: none;"&gt;{{ SupportEmail }}&lt;/a&gt;.&lt;/p&gt;
             &lt;/td&gt;
@@ -245,6 +246,7 @@
               &lt;center&gt;
                 &lt;a href="{{ InviteUrl }}" class="button"&gt;Accept Invitation&lt;/a&gt;
               &lt;/center&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ InviteUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InviteUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;If you didn't expect this invitation or have concerns, you can safely ignore this email. The invitation will expire if not accepted.&lt;/p&gt;
             &lt;/td&gt;
@@ -327,12 +329,14 @@
               &lt;center&gt;
                 &lt;a href="{{ SetupPasswordUrl }}" class="button-secondary"&gt;Create Password&lt;/a&gt;
               &lt;/center&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ SetupPasswordUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ SetupPasswordUrl }}&lt;/a&gt;&lt;/p&gt;
               &lt;p style="font-size: 14px; color: #6b7280; margin-top: 20px;"&gt;&lt;strong&gt;After creating your password:&lt;/strong&gt; You'll be automatically logged in and can then accept the invitation to join &lt;strong&gt;{{ OrganizationName }}&lt;/strong&gt; from your dashboard.&lt;/p&gt;
               {% else %}
               &lt;p&gt;Click the button below to accept the invitation:&lt;/p&gt;
               &lt;center&gt;
                 &lt;a href="{{ InvitationUrl }}" class="button"&gt;Accept Invitation&lt;/a&gt;
               &lt;/center&gt;
+              &lt;p style="font-size: 13px; color: #6b7280; margin-top: 8px;"&gt;If the button doesn't work, copy and paste this link into your browser: &lt;a href="{{ InvitationUrl }}" style="color: #4F46E5; text-decoration: none; word-break: break-all;"&gt;{{ InvitationUrl }}&lt;/a&gt;&lt;/p&gt;
               {% endif %}
               &lt;div class="divider"&gt;&lt;/div&gt;
               &lt;p style="font-size: 14px; color: #6b7280;"&gt;&lt;strong&gt;Note:&lt;/strong&gt; This invitation will expire in {{ ExpirationHours }} hours. If you didn't expect this invitation, you can safely ignore this email.&lt;/p&gt;
