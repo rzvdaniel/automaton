@@ -136,6 +136,11 @@ const contextStartNotice = ref<string | null>(null)
 const isPreparingSession = ref(false)
 // Combined "busy" flag: true when preparing the session OR when the AI is generating
 const isBusy = computed(() => isPreparingSession.value || isGenerating.value)
+// Show the generic "Working..." spinner only when busy but no streaming message has arrived yet.
+// Once any streaming message exists (including retry notifications), that message IS the status indicator.
+const showWorkingIndicator = computed(() =>
+  isBusy.value && !messages.value.some((m) => m.role === 'assistant' && m.isStreaming),
+)
 const sortedSessions = computed(() => {
   // Active session always floats to the top; the rest are already sorted by updatedAt from the server
   const active = sessions.value.find(s => s.isActive)
@@ -1033,8 +1038,8 @@ function handleKeyPress(event: KeyboardEvent) {
             </div>
           </template>
 
-          <!-- Generating indicator -->
-          <div v-if="isBusy" class="timeline">
+          <!-- Generating indicator — only shown before the first streaming chunk arrives -->
+          <div v-if="showWorkingIndicator" class="timeline">
             <div class="timeline-item">
               <div class="timeline-bullet">•</div>
               <div class="timeline-content">
