@@ -159,13 +159,64 @@ public class AiProviderMetadataService
     /// <summary>
     /// Returns the ExtraBodyJson configured for the specified model, or null if none is set.
     /// Used to inject provider-specific request body parameters (e.g. {"reasoning":{"enabled":true}} for OpenRouter).
+    /// Provider-level ExtraBodyJson is used as the base; model-level values are merged on top (model wins on conflict).
     /// </summary>
     public async Task<string?> GetModelExtraBodyJsonAsync(string providerName, string modelId)
     {
-        return await dbContext.AiModels
+        var row = await dbContext.AiModels
             .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)
-            .Select(m => m.ExtraBodyJson)
+            .Select(m => new { m.ExtraBodyJson, ProviderExtraBodyJson = m.Provider.ExtraBodyJson })
             .FirstOrDefaultAsync();
+
+        if (row == null)
+            return null;
+
+        // If only one level is set, return it directly
+        if (string.IsNullOrWhiteSpace(row.ProviderExtraBodyJson))
+            return row.ExtraBodyJson;
+
+        if (string.IsNullOrWhiteSpace(row.ExtraBodyJson))
+            return row.ProviderExtraBodyJson;
+
+        // Both are set — merge: provider fields are the base, model fields override
+        try
+        {
+            using var providerDoc = System.Text.Json.JsonDocument.Parse(row.ProviderExtraBodyJson);
+            using var modelDoc = System.Text.Json.JsonDocument.Parse(row.ExtraBodyJson);
+
+            using var ms = new System.IO.MemoryStream();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(ms))
+            {
+                writer.WriteStartObject();
+                // Provider fields first (base)
+                foreach (var prop in providerDoc.RootElement.EnumerateObject())
+                    prop.WriteTo(writer);
+                // Model fields on top (override duplicates)
+                foreach (var prop in modelDoc.RootElement.EnumerateObject())
+                    prop.WriteTo(writer);
+                writer.WriteEndObject();
+            }
+            return System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        }
+        catch
+        {
+            // Malformed JSON — return model-level value as fallback
+            return row.ExtraBodyJson ?? row.ProviderExtraBodyJson;
+        }
+    }
+
+    /// <summary>
+    /// Returns whether the specified model supports tool/function calling.
+    /// Defaults to true when the model is not found so existing models are not broken.
+    /// </summary>
+    public async Task<bool> GetModelSupportsToolsAsync(string providerName, string modelId)
+    {
+        var supportsTools = await dbContext.AiModels
+            .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)
+            .Select(m => (bool?)m.SupportsTools)
+            .FirstOrDefaultAsync();
+
+        return supportsTools ?? true;
     }
 
     /// <summary>

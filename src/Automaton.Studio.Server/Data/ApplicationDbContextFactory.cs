@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace Automaton.Studio.Server.Data;
 
@@ -10,14 +11,20 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonFile($"appsettings.{environment}.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var connectionString = configuration.GetConnectionString("MySqlConnection")
+            ?? throw new InvalidOperationException("Connection string 'MySqlConnection' not found.");
+
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        
-        // Use a connection string for design-time operations
-        // This is only used during migration generation, not at runtime
-        optionsBuilder.UseMySql(
-            "Server=localhost;Database=automaton;User=root;Password=password;",
-            new MySqlServerVersion(new Version(8, 0, 36))
-        );
+        optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 
         return new ApplicationDbContext(optionsBuilder.Options);
     }

@@ -163,7 +163,9 @@ public class AiApiKeyService
             await dbContext.SaveChangesAsync();
 
             var decryptedKey = DecryptApiKey(key.EncryptedApiKey);
-            logger.LogInformation("Successfully retrieved API key for provider '{ProviderName}' (systemKey={IsSystemKey})", providerName, isSystemKey);
+            logger.LogInformation(
+                "Selected API key {KeyId} ('{KeyName}') for provider '{ProviderName}' (systemKey={IsSystemKey}, keyLength={KeyLen})",
+                key.Id, key.Name, providerName, isSystemKey, decryptedKey?.Length ?? 0);
             return (decryptedKey, isSystemKey);
         }
         catch (Exception ex)

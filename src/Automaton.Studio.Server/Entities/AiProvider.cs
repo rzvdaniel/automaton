@@ -38,6 +38,14 @@ public class AiProvider
     [MaxLength(50)]
     public string? IconName { get; set; } // "openai", "anthropic", "google" for UI icon
 
+    /// <summary>
+    /// JSON object merged into every request body for all models of this provider.
+    /// Use for provider-wide parameters (e.g. OpenRouter routing hints).
+    /// Model-level ExtraBodyJson is merged on top, with model values taking precedence.
+    /// </summary>
+    [MaxLength(2000)]
+    public string? ExtraBodyJson { get; set; }
+
     public int SortOrder { get; set; } = 0;
 
     [Required]

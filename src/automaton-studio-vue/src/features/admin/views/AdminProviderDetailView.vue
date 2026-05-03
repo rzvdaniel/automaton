@@ -64,6 +64,7 @@ const detailsForm = ref<CreateAiProviderRequest>({
   apiKeyHelpUrl: '',
   iconName: '',
   sortOrder: 0,
+  extraBodyJson: '',
 })
 const detailsErrors = ref<Record<string, string>>({})
 const isSavingDetails = ref(false)
@@ -113,6 +114,7 @@ function populateDetailsForm(p: AiProviderAdmin) {
     apiKeyHelpUrl: p.apiKeyHelpUrl,
     iconName: p.iconName,
     sortOrder: p.sortOrder,
+    extraBodyJson: p.extraBodyJson,
   }
 }
 
@@ -377,6 +379,12 @@ function formatDate(dateStr?: string): string {
                   <label for="sortOrder" class="font-medium">Sort Order</label>
                   <InputNumber id="sortOrder" v-model="detailsForm.sortOrder" :min="0" />
                 </div>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="providerExtraBodyJson" class="font-medium">Extra Body JSON <span class="text-color-secondary font-normal text-sm">(applied to all models)</span></label>
+                <Textarea id="providerExtraBodyJson" v-model="detailsForm.extraBodyJson" :rows="3" placeholder='{"route": "fallback"}' />
+                <small class="text-color-secondary">JSON merged into every request for this provider. Model-level Extra Body JSON overrides on conflict.</small>
               </div>
 
               <div class="flex justify-content-end gap-2 pt-2">

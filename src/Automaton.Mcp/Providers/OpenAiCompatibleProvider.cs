@@ -61,9 +61,25 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             _logger.LogInformation("{Provider} conversation cancelled by client", ProviderName);
             throw;
         }
+        catch (ClientResultException crex)
+        {
+            // Extract the full response body from the raw HTTP response so the actual API error
+            // (e.g. "model not found", "tools not supported") is visible in logs.
+            // crex.Message is only the SDK generic string; the real detail is in the response body.
+            string? rawBody = null;
+            try { rawBody = crex.GetRawResponse()?.Content.ToString(); } catch { /* ignore */ }
+            _logger.LogError(
+                "{Provider} API error {Status} for model '{Model}'. KeyLength={KeyLen}. Body: {Body}",
+                ProviderName,
+                crex.Status,
+                request.Model,
+                request.ApiKey?.Length ?? 0,
+                rawBody ?? crex.Message);
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling {Provider} API", ProviderName);
+            _logger.LogError(ex, "{Provider} Error calling {Provider} API for model '{Model}'", ProviderName, ProviderName, request.Model);
             throw;
         }
     }
@@ -106,7 +122,9 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 break;
             }
 
-            var options = chatTools.Count > 0 && !breakAfterPlanPresentation
+            var includeTools = request.SupportsTools && chatTools.Count > 0 && !breakAfterPlanPresentation;
+
+            var options = includeTools
                 ? new ChatCompletionOptions { Tools = { } }
                 : new ChatCompletionOptions();
 
@@ -117,7 +135,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             if (request.TopP.HasValue)
                 options.TopP = request.TopP.Value;
 
-            if (chatTools.Count > 0 && !breakAfterPlanPresentation)
+            if (includeTools)
             {
                 foreach (var tool in chatTools)
                     options.Tools.Add(tool);
@@ -151,8 +169,8 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 })
                 .Build();
 
-            (string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)
-                streamResult = (string.Empty, string.Empty, new List<ToolCallAccumulator>(), null, null, null, null);
+            (string finalText, string reasoningText, string? reasoningFieldName, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)
+                streamResult = (string.Empty, string.Empty, null, new List<ToolCallAccumulator>(), null, null, null, null);
             await retryPipeline.ExecuteAsync(async ct =>
             {
                 streamResult = await StreamOnceAsync(client, messages, options, request.ConversationId, request.StreamingTimeoutMinutes, ct);
@@ -164,6 +182,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
             var finalText = streamResult.finalText;
             var reasoningText = streamResult.reasoningText;
+            var reasoningFieldName = streamResult.reasoningFieldName;
             var toolCalls = streamResult.toolCalls;
             var responseModel = streamResult.responseModel ?? model;
 
@@ -207,10 +226,11 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
             }
 
             // Append assistant message (with tool calls) to conversation.
-            // Thinking models (e.g. Moonshot kimi-k2.5) require reasoning_content to be echoed
-            // back in the assistant message — the OpenAI SDK doesn't support this natively.
-            // We build raw JSON and round-trip through ModelReaderWriter so the field is preserved
-            // in SerializedAdditionalRawData and re-sent to the API on the next call.
+            // Thinking models require the reasoning field to be echoed back — field name and format differ by provider:
+            //   Kimi / Moonshot: "reasoning_content": "<text>"
+            //   OpenRouter:      "reasoning_details": [{"type":"thinking","thinking":"<text>"}]
+            // The OpenAI SDK doesn't support these natively, so we build raw JSON and round-trip through
+            // ModelReaderWriter so the field is preserved in SerializedAdditionalRawData and re-sent to the API.
             ChatMessage assistantMessage;
             if (!string.IsNullOrEmpty(reasoningText))
             {
@@ -220,13 +240,33 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                     type = "function",
                     function = new { name = tc.FunctionName, arguments = tc.ArgumentsBuilder.ToString() }
                 });
-                var msgJson = JsonSerializer.Serialize(new
+                string msgJson;
+                if (reasoningFieldName == "reasoning")
                 {
-                    role = "assistant",
-                    reasoning_content = reasoningText,
-                    content = string.IsNullOrWhiteSpace(finalText) ? "" : finalText,
-                    tool_calls = toolCallNodes
-                });
+                    // OpenRouter: reasoning_details is an array of typed thinking blocks
+                    var reasoningDetails = new[]
+                    {
+                        new Dictionary<string, string> { ["type"] = "thinking", ["thinking"] = reasoningText }
+                    };
+                    msgJson = JsonSerializer.Serialize(new
+                    {
+                        role = "assistant",
+                        reasoning_details = reasoningDetails,
+                        content = string.IsNullOrWhiteSpace(finalText) ? "" : finalText,
+                        tool_calls = toolCallNodes
+                    });
+                }
+                else
+                {
+                    // Kimi / Moonshot: reasoning_content is a plain string
+                    msgJson = JsonSerializer.Serialize(new
+                    {
+                        role = "assistant",
+                        reasoning_content = reasoningText,
+                        content = string.IsNullOrWhiteSpace(finalText) ? "" : finalText,
+                        tool_calls = toolCallNodes
+                    });
+                }
                 assistantMessage = System.ClientModel.Primitives.ModelReaderWriter.Read<ChatMessage>(
                     BinaryData.FromString(msgJson),
                     System.ClientModel.Primitives.ModelReaderWriterOptions.Json)!;
@@ -317,7 +357,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         return new ProviderResult(responseBuilder.ToString().Trim(), iterationCount);
     }
 
-    private async Task<(string finalText, string reasoningText, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)>
+    private async Task<(string finalText, string reasoningText, string? reasoningFieldName, List<ToolCallAccumulator> toolCalls, int? inputTokens, int? outputTokens, string? responseModel, int? cacheReadTokens)>
         StreamOnceAsync(ChatClient client, List<ChatMessage> messages, ChatCompletionOptions options,
             string conversationId, int streamingTimeoutMinutes, CancellationToken cancellationToken)
     {
@@ -328,6 +368,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         int? outputTokens = null;
         int? cacheReadTokens = null;
         string? responseModel = null;
+        string? reasoningFieldName = null;
         var lastEmitTime = DateTime.UtcNow;
         const int emitIntervalMs = 100;
 
@@ -351,16 +392,33 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 using var doc = JsonDocument.Parse(rawBytes);
                 var root = doc.RootElement;
 
-                // reasoning_content — thinking models (e.g. kimi-k2.5)
+                // Reasoning content — field name varies by provider:
+                //   Kimi / Moonshot: delta.reasoning_content (string)
+                //   OpenRouter:      delta.reasoning (string)
                 if (root.TryGetProperty("choices", out var choices) &&
                     choices.GetArrayLength() > 0 &&
-                    choices[0].TryGetProperty("delta", out var delta) &&
-                    delta.TryGetProperty("reasoning_content", out var rc) &&
-                    rc.ValueKind == JsonValueKind.String)
+                    choices[0].TryGetProperty("delta", out var delta))
                 {
-                    var rcText = rc.GetString();
-                    if (!string.IsNullOrEmpty(rcText))
-                        reasoningText.Append(rcText);
+                    if (delta.TryGetProperty("reasoning_content", out var rc) &&
+                        rc.ValueKind == JsonValueKind.String)
+                    {
+                        var rcText = rc.GetString();
+                        if (!string.IsNullOrEmpty(rcText))
+                        {
+                            reasoningText.Append(rcText);
+                            reasoningFieldName = "reasoning_content";
+                        }
+                    }
+                    else if (delta.TryGetProperty("reasoning", out var ro) &&
+                             ro.ValueKind == JsonValueKind.String)
+                    {
+                        var roText = ro.GetString();
+                        if (!string.IsNullOrEmpty(roText))
+                        {
+                            reasoningText.Append(roText);
+                            reasoningFieldName = "reasoning";
+                        }
+                    }
                 }
 
                 // Cache hit tokens — usage chunk (last chunk in stream)
@@ -421,7 +479,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
                 responseModel = chunk.Model;
         }
 
-        return (currentText.ToString(), reasoningText.ToString(),
+        return (currentText.ToString(), reasoningText.ToString(), reasoningFieldName,
                 toolCallAccumulators.Values.OrderBy(t => t.Index).ToList(),
                 inputTokens, outputTokens, responseModel, cacheReadTokens);
     }

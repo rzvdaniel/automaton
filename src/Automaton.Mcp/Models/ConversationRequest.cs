@@ -110,4 +110,11 @@ public class ConversationRequest
     /// Sourced from AiModel.ExtraBodyJson in the database.
     /// </summary>
     public string? ExtraBodyJson { get; set; }
+
+    /// <summary>
+    /// When false, tools are not sent to the model even if the tool provider has registered them.
+    /// Set to false for reasoning-only models that reject requests containing a tools array.
+    /// Sourced from AiModel.SupportsTools in the database. Defaults to true.
+    /// </summary>
+    public bool SupportsTools { get; set; } = true;
 }

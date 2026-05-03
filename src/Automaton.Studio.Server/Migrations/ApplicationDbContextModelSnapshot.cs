@@ -343,6 +343,10 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<string>("ExtraBodyJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
                     b.Property<string>("IconName")
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)");

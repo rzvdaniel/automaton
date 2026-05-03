@@ -27,6 +27,8 @@ export interface AiProviderAdmin {
   hasSystemKey: boolean
   /** True when at least one active model has isDefault = true for this provider. */
   hasDefaultModel: boolean
+  /** JSON merged into every request body for all models of this provider. */
+  extraBodyJson?: string
 }
 
 /**
@@ -44,6 +46,7 @@ export interface CreateAiProviderRequest {
   apiKeyHelpUrl?: string
   iconName?: string
   sortOrder: number
+  extraBodyJson?: string
 }
 
 /**
@@ -61,6 +64,7 @@ export interface UpdateAiProviderRequest {
   apiKeyHelpUrl?: string
   iconName?: string
   sortOrder?: number
+  extraBodyJson?: string
 }
 
 /**

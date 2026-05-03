@@ -59,6 +59,7 @@ public class AdminAiProvidersController : ControllerBase
                 ApiKeyHelpUrl = p.ApiKeyHelpUrl,
                 IconName = p.IconName,
                 SortOrder = p.SortOrder,
+                ExtraBodyJson = p.ExtraBodyJson,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
                 ModelCount = p.Models.Count,
@@ -93,6 +94,7 @@ public class AdminAiProvidersController : ControllerBase
                 ApiKeyHelpUrl = p.ApiKeyHelpUrl,
                 IconName = p.IconName,
                 SortOrder = p.SortOrder,
+                ExtraBodyJson = p.ExtraBodyJson,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
                 ModelCount = p.Models.Count,
@@ -134,6 +136,7 @@ public class AdminAiProvidersController : ControllerBase
             ApiKeyHelpUrl = request.ApiKeyHelpUrl,
             IconName = request.IconName,
             SortOrder = request.SortOrder,
+            ExtraBodyJson = request.ExtraBodyJson,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -155,6 +158,7 @@ public class AdminAiProvidersController : ControllerBase
             ApiKeyHelpUrl = provider.ApiKeyHelpUrl,
             IconName = provider.IconName,
             SortOrder = provider.SortOrder,
+            ExtraBodyJson = provider.ExtraBodyJson,
             CreatedAt = provider.CreatedAt,
             UpdatedAt = provider.UpdatedAt,
             ModelCount = 0,
@@ -196,6 +200,8 @@ public class AdminAiProvidersController : ControllerBase
         if (request.ApiKeyHelpUrl != null) provider.ApiKeyHelpUrl = request.ApiKeyHelpUrl;
         if (request.IconName != null) provider.IconName = request.IconName;
         if (request.SortOrder.HasValue) provider.SortOrder = request.SortOrder.Value;
+        // Allow clearing ExtraBodyJson by sending empty string; null means "don't change"
+        if (request.ExtraBodyJson != null) provider.ExtraBodyJson = string.IsNullOrWhiteSpace(request.ExtraBodyJson) ? null : request.ExtraBodyJson;
 
         provider.UpdatedAt = DateTime.UtcNow;
 
@@ -675,9 +681,12 @@ public class AdminAiProvidersController : ControllerBase
 
         if (systemKeyCount == 1)
         {
+            // Prefer a model that supports tool calling — reasoning-only models reject requests
+            // with tools and will immediately 400 every conversation.
             var preferredModel = await dbContext.AiModels
                 .Where(m => m.AiProviderId == providerId && m.IsActive)
-                .OrderByDescending(m => m.IsDefault)
+                .OrderByDescending(m => m.SupportsTools)
+                .ThenByDescending(m => m.IsDefault)
                 .ThenBy(m => m.SortOrder)
                 .FirstOrDefaultAsync();
 
@@ -892,6 +901,8 @@ public class AiProviderAdminResponse
     public bool HasSystemKey { get; set; }
     /// <summary>True when at least one active model has IsDefault = true for this provider.</summary>
     public bool HasDefaultModel { get; set; }
+    /// <summary>JSON merged into every request body for all models of this provider.</summary>
+    public string? ExtraBodyJson { get; set; }
 }
 
 public class AdminCreateAiProviderRequest
@@ -906,6 +917,7 @@ public class AdminCreateAiProviderRequest
     public string? ApiKeyHelpUrl { get; set; }
     public string? IconName { get; set; }
     public int SortOrder { get; set; } = 0;
+    public string? ExtraBodyJson { get; set; }
 }
 
 public class AdminUpdateAiProviderRequest
@@ -920,6 +932,7 @@ public class AdminUpdateAiProviderRequest
     public string? ApiKeyHelpUrl { get; set; }
     public string? IconName { get; set; }
     public int? SortOrder { get; set; }
+    public string? ExtraBodyJson { get; set; }
 }
 
 public class AiModelAdminResponse
