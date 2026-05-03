@@ -57,3 +57,10 @@ export async function createAiApiKey(request: {
 export async function deleteAiApiKey(keyId: string): Promise<void> {
   await axios.delete(`/api/aiApiKeys/${keyId}`)
 }
+
+/**
+ * Update an AI API key (name and description only — key value cannot be changed)
+ */
+export async function updateAiApiKey(keyId: string, request: { name?: string; description?: string }): Promise<void> {
+  await axios.put(`/api/aiApiKeys/${keyId}`, request)
+}

@@ -12,6 +12,16 @@ export const settingsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/AiKeysView.vue'),
   },
   {
+    path: '/ai-keys/add',
+    name: 'ai-keys-add',
+    component: () => import('./views/AiKeyFormView.vue'),
+  },
+  {
+    path: '/ai-keys/:id/edit',
+    name: 'ai-keys-edit',
+    component: () => import('./views/AiKeyFormView.vue'),
+  },
+  {
     path: '/pricing',
     name: 'pricing',
     component: () => import('./views/PricingView.vue'),
