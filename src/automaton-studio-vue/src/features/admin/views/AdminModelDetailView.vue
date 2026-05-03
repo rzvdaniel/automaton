@@ -37,7 +37,7 @@ const form = ref<CreateAiModelRequest>({
   isActive: true,
   isDefault: false,
   isPlanningModel: false,
-  maxTokens: 0,
+  maxTokens: null as number | null,
   supportsStreaming: true,
   supportsTools: false,
   supportsVision: false,
@@ -80,7 +80,7 @@ onMounted(async () => {
         isActive: model.isActive,
         isDefault: model.isDefault,
         isPlanningModel: model.isPlanningModel,
-        maxTokens: model.maxTokens,
+        maxTokens: model.maxTokens ?? null,
         supportsStreaming: model.supportsStreaming,
         supportsTools: model.supportsTools,
         supportsVision: model.supportsVision,
@@ -93,7 +93,7 @@ onMounted(async () => {
       const [defs] = await Promise.all([defaults])
       globalDefaults.value = defs
       // Default maxTokens from global config
-      form.value.maxTokens = defs.defaultMaxOutputTokens ?? 65536
+      form.value.maxTokens = defs.defaultMaxOutputTokens ?? null
     }
   } catch {
     toast.add({ severity: 'error', summary: 'Load Failed', detail: 'Failed to load model data', life: 3000 })
@@ -106,7 +106,6 @@ function validate(): boolean {
   formErrors.value = {}
   if (!form.value.modelId?.trim()) formErrors.value.modelId = 'Model ID is required'
   if (!form.value.displayName?.trim()) formErrors.value.displayName = 'Display name is required'
-  if (!form.value.maxTokens || form.value.maxTokens < 1) formErrors.value.maxTokens = 'Max tokens must be > 0'
   return Object.keys(formErrors.value).length === 0
 }
 
@@ -266,7 +265,7 @@ async function handleSave() {
         <template #content>
           <div class="flex flex-column gap-4">
             <div class="flex flex-column gap-2" style="max-width: 240px">
-              <label for="maxTokens" class="font-medium">Max Output Tokens *</label>
+              <label for="maxTokens" class="font-medium">Max Output Tokens</label>
               <InputNumber
                 id="maxTokens"
                 v-model="form.maxTokens"

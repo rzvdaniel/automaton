@@ -48,7 +48,7 @@ const formData = ref({
   isActive: true,
   isDefault: false,
   isPlanningModel: false,
-  maxTokens: 0,
+  maxTokens: null as number | null,
   supportsStreaming: true,
   supportsTools: false,
   supportsVision: false,
@@ -111,7 +111,7 @@ function openCreateDialog() {
     isActive: true,
     isDefault: false,
     isPlanningModel: false,
-    maxTokens: globalDefaults.value.defaultMaxOutputTokens ?? 65536,
+    maxTokens: globalDefaults.value.defaultMaxOutputTokens ?? null,
     supportsStreaming: true,
     supportsTools: false,
     supportsVision: false,
@@ -132,7 +132,7 @@ function openEditDialog(model: AiModelAdmin) {
     isActive: model.isActive,
     isDefault: model.isDefault,
     isPlanningModel: model.isPlanningModel,
-    maxTokens: model.maxTokens,
+    maxTokens: model.maxTokens ?? null,
     supportsStreaming: model.supportsStreaming,
     supportsTools: model.supportsTools,
     supportsVision: model.supportsVision,
@@ -359,7 +359,7 @@ async function toggleModelVisibility(model: AiModelAdmin) {
 
           <Column field="maxTokens" header="Max Tokens" style="width: 110px">
             <template #body="{ data }">
-              <span class="text-sm">{{ data.maxTokens.toLocaleString() }}</span>
+              <span class="text-sm">{{ data.maxTokens != null ? data.maxTokens.toLocaleString() : '—' }}</span>
             </template>
           </Column>
 

@@ -317,7 +317,7 @@ public class GoogleProvider : IAiProvider
         string apiKey,
         SystemPromptParts? promptParts,
         string? systemPromptFallback,
-        int maxTokens,
+        int? maxTokens,
         List<Dictionary<string, object>> contents,
         List<ProviderTool> tools,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -498,7 +498,7 @@ public class GoogleProvider : IAiProvider
     private static Dictionary<string, object?> BuildRequestBody(
         SystemPromptParts? promptParts,
         string? systemPromptFallback,
-        int maxTokens,
+        int? maxTokens,
         List<Dictionary<string, object>> contents,
         List<ProviderTool> tools)
     {

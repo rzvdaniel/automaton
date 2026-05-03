@@ -27,6 +27,11 @@ public class AnthropicProvider : IAiProvider
     /// 10 messages = last 5 turns, typically 2,000-5,000 tokens saved per call.
     /// </summary>
     private const int MaxConversationHistoryMessages = 10;
+    /// <summary>
+    /// Fallback output token cap used when no model-specific MaxTokens is configured.
+    /// 8192 is within the output limit of all current Claude models.
+    /// </summary>
+    private const int AnthropicDefaultMaxTokens = 8192;
 
     /// <inheritdoc />
     public string ProviderName => "Anthropic";
@@ -156,7 +161,7 @@ public class AnthropicProvider : IAiProvider
                 var messageParams = new MessageParameters
                 {
                     Model = request.Model ?? DefaultModel,
-                    MaxTokens = request.MaxTokens,
+                    MaxTokens = request.MaxTokens ?? AnthropicDefaultMaxTokens,
                     System = systemMessage,
                     Messages = messages,
                     Tools = (!breakAfterPlanPresentation && anthropicTools.Count > 0) ? anthropicTools : null,

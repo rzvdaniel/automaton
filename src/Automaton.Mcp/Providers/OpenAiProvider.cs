@@ -422,7 +422,7 @@ public class OpenAiProvider : IAiProvider
     private async Task<ResponsesApiResult> CreateResponsesAsync(
         string model,
         string apiKey,
-        int maxTokens,
+        int? maxTokens,
         List<object> input,
         List<Dictionary<string, object?>> tools,
         CancellationToken cancellationToken)

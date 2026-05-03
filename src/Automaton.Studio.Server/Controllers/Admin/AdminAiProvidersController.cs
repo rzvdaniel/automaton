@@ -478,7 +478,7 @@ public class AdminAiProvidersController : ControllerBase
             IsActive = request.IsActive,
             IsDefault = request.IsDefault,
             IsPlanningModel = request.IsPlanningModel,
-            MaxTokens = request.MaxTokens ?? (await settingsService.GetEffectiveConfigAsync()).DefaultMaxOutputTokens,
+            MaxTokens = request.MaxTokens,
             SupportsStreaming = request.SupportsStreaming,
             SupportsTools = request.SupportsTools,
             SupportsVision = request.SupportsVision,
@@ -946,7 +946,7 @@ public class AiModelAdminResponse
     public bool IsActive { get; set; }
     public bool IsDefault { get; set; }
     public bool IsPlanningModel { get; set; }
-    public int MaxTokens { get; set; }
+    public int? MaxTokens { get; set; }
     public bool SupportsStreaming { get; set; }
     public bool SupportsTools { get; set; }
     public bool SupportsVision { get; set; }

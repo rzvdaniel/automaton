@@ -66,7 +66,7 @@ public class ConversationRequest
     /// Defaults to <c>AiProvidersConfig.DefaultMaxOutputTokens</c> (configurable, default 32768) if not set.
     /// This field is always overridden by <c>AiConversationControllerBase</c> before the request is dispatched.
     /// </summary>
-    public int MaxTokens { get; set; } = 65536;
+    public int? MaxTokens { get; set; }
 
     /// <summary>
     /// Maximum retries on a rate-limit response. Sourced from AiProviders:RateLimitRetry:MaxRetries.

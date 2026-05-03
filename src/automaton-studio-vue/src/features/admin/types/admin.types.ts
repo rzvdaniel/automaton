@@ -81,7 +81,7 @@ export interface AiModelAdmin {
   isActive: boolean
   isDefault: boolean
   isPlanningModel: boolean
-  maxTokens: number
+  maxTokens: number | null
   supportsStreaming: boolean
   supportsTools: boolean
   supportsVision: boolean
@@ -101,7 +101,7 @@ export interface CreateAiModelRequest {
   isActive: boolean
   isDefault: boolean
   isPlanningModel: boolean
-  maxTokens: number
+  maxTokens?: number | null
   supportsStreaming: boolean
   supportsTools: boolean
   supportsVision: boolean

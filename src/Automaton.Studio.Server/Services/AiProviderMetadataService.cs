@@ -142,18 +142,16 @@ public class AiProviderMetadataService
     }
 
     /// <summary>
-    /// Returns the MaxTokens configured for the specified model.
-    /// Falls back to <c>AiProvidersConfig.DefaultMaxOutputTokens</c> when the model is not found in the database.
+    /// Returns the MaxTokens configured for the specified model, or <c>null</c> if none is set.
+    /// A <c>null</c> return means "let the provider decide" — callers should omit the max-tokens
+    /// field from the API request (except Anthropic, which requires it).
     /// </summary>
-    public async Task<int> GetModelMaxTokensAsync(string providerName, string modelId)
+    public async Task<int?> GetModelMaxTokensAsync(string providerName, string modelId)
     {
-        var maxTokens = await dbContext.AiModels
+        return await dbContext.AiModels
             .Where(m => m.Provider.Name == providerName && m.ModelId == modelId && m.IsActive)
-            .Select(m => (int?)m.MaxTokens)
+            .Select(m => m.MaxTokens)
             .FirstOrDefaultAsync();
-
-        var config = await settingsService.GetEffectiveConfigAsync();
-        return maxTokens ?? config.DefaultMaxOutputTokens;
     }
 
     /// <summary>
