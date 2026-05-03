@@ -386,9 +386,15 @@ public class AdminAiProvidersController : ControllerBase
         if (existingModel != null)
             return BadRequest($"A model with ID '{request.ModelId}' already exists for this provider.");
 
-        // If this model is set as default, unset the global default across all providers
+        // If this model is set as default, require a system API key for the provider
         if (request.IsDefault)
         {
+            var hasSystemKey = await aiApiKeyService.HasSystemApiKeyAsync(provider.Name);
+
+            if (!hasSystemKey)
+                return BadRequest($"Cannot set '{provider.Name}' as the global default: no system API key exists for this provider. " +
+                                  "Add an API key with 'For all users' scope first.");
+
             var existingDefaults = await dbContext.AiModels
                 .Where(m => m.IsDefault)
                 .ToListAsync();
@@ -485,9 +491,18 @@ public class AdminAiProvidersController : ControllerBase
             model.ModelId = request.ModelId;
         }
 
-        // If setting as default, unset the global default across all providers
+        // If setting as default, require a system API key for the provider
         if (request.IsDefault == true && !model.IsDefault)
         {
+            var provider = await dbContext.AiProviders.FindAsync(model.AiProviderId);
+            var providerName = provider?.Name ?? string.Empty;
+
+            var hasSystemKey = await aiApiKeyService.HasSystemApiKeyAsync(providerName);
+
+            if (!hasSystemKey)
+                return BadRequest($"Cannot set '{providerName}' as the global default: no system API key exists for this provider. " +
+                                  "Add an API key with 'For all users' scope first.");
+
             var existingDefaults = await dbContext.AiModels
                 .Where(m => m.IsDefault && m.Id != id)
                 .ToListAsync();
@@ -568,7 +583,7 @@ public class AdminAiProvidersController : ControllerBase
             return NotFound("Provider not found");
 
         var keys = await dbContext.AiApiKeys
-            .Where(k => k.AiProviderId == providerId)
+            .Where(k => k.AiProviderId == providerId && k.CreatedByUserId == null)
             .OrderByDescending(k => k.CreatedAt)
             .Select(k => new AiApiKeyAdminResponse
             {
@@ -578,7 +593,8 @@ public class AdminAiProvidersController : ControllerBase
                 Description = k.Description,
                 CreatedAt = k.CreatedAt,
                 LastUsedAt = k.LastUsedAt,
-                IsActive = k.IsActive
+                IsActive = k.IsActive,
+                IsSystemKey = k.CreatedByUserId == null
             })
             .ToListAsync();
 
@@ -608,6 +624,35 @@ public class AdminAiProvidersController : ControllerBase
             apiKey: request.ApiKey,
             description: request.Description);
 
+        // If this is the only active system key across all providers, automatically set
+        // the provider's preferred model as the global default so the system is usable immediately.
+        var systemKeyCount = await dbContext.AiApiKeys
+            .CountAsync(k => k.IsActive && k.CreatedByUserId == null);
+
+        if (systemKeyCount == 1)
+        {
+            var preferredModel = await dbContext.AiModels
+                .Where(m => m.AiProviderId == providerId && m.IsActive)
+                .OrderByDescending(m => m.IsDefault)
+                .ThenBy(m => m.SortOrder)
+                .FirstOrDefaultAsync();
+
+            if (preferredModel != null && !preferredModel.IsDefault)
+            {
+                // Clear any existing global default first
+                await dbContext.AiModels
+                    .Where(m => m.IsDefault)
+                    .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsDefault, false));
+
+                preferredModel.IsDefault = true;
+                await dbContext.SaveChangesAsync();
+
+                logger.LogInformation(
+                    "Auto-promoted model '{ModelId}' of provider '{ProviderName}' as global default (first system key)",
+                    preferredModel.ModelId, provider.Name);
+            }
+        }
+
         return CreatedAtAction(nameof(GetProviderKeys), new { providerId }, new AiApiKeyAdminResponse
         {
             Id = entity.Id,
@@ -616,7 +661,8 @@ public class AdminAiProvidersController : ControllerBase
             Description = entity.Description,
             CreatedAt = entity.CreatedAt,
             LastUsedAt = entity.LastUsedAt,
-            IsActive = entity.IsActive
+            IsActive = entity.IsActive,
+            IsSystemKey = entity.IsSystemKey
         });
     }
 
@@ -896,6 +942,8 @@ public class AiApiKeyAdminResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? LastUsedAt { get; set; }
     public bool IsActive { get; set; }
+    /// <summary>True when the key was added by an admin and is available to all users.</summary>
+    public bool IsSystemKey { get; set; }
 }
 
 public class AdminCreateAiApiKeyRequest

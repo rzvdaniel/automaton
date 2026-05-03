@@ -46,9 +46,16 @@ public class AiApiKey
     public string? Description { get; set; }
 
     /// <summary>
-    /// The user who created this key. Null for admin/system keys (added via admin panel).
+    /// The user who created this key. Null for system keys added via the admin panel.
     /// </summary>
     public Guid? CreatedByUserId { get; set; }
+
+    /// <summary>
+    /// True when this key was added by an admin and is available to all users.
+    /// Computed from <see cref="CreatedByUserId"/> being null — do not use in EF Core LINQ queries.
+    /// </summary>
+    [NotMapped]
+    public bool IsSystemKey => !CreatedByUserId.HasValue;
 
     /// <summary>
     /// Optional base URL for custom OpenAI-compatible providers (e.g. Kimi, DeepSeek).

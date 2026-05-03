@@ -183,6 +183,8 @@ export interface AiApiKeyAdmin {
   createdAt: string
   lastUsedAt?: string
   isActive: boolean
+  /** True when the key was added by an admin and is available to all users. */
+  isSystemKey: boolean
 }
 
 /**

@@ -190,34 +190,37 @@ public class SystemAiService : ISystemAiService
 
     private async Task<(string Provider, string Model, string ApiKey)> ResolveProviderAsync(Guid? userId)
     {
-        string providerName;
-        string model;
+        var resolvedUserId = userId ?? Guid.Empty;
 
-        // Prefer the globally-designated default model — it determines both provider and model
+        // Prefer the globally-designated default model — it determines both provider and model.
+        // If the user has no accessible key for that provider (e.g. it is a personal admin key),
+        // fall through to the generic fallback so the user can still use a system/demo key.
         var globalDefault = await _providerMetadataService.GetGlobalDefaultModelAsync();
         if (globalDefault.HasValue)
         {
-            providerName = globalDefault.Value.ProviderName;
-            model = globalDefault.Value.ModelId;
-        }
-        else
-        {
-            // Fallback: first provider with an active API key, then its preferred model
-            providerName = await _aiApiKeyService.GetFirstProviderWithActiveKeyAsync();
-            if (string.IsNullOrWhiteSpace(providerName))
-                throw new InvalidOperationException("No active AI provider with API keys is configured.");
+            var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(resolvedUserId, globalDefault.Value.ProviderName);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+                return (globalDefault.Value.ProviderName, globalDefault.Value.ModelId, apiKey);
 
-            model = await _providerMetadataService.GetPreferredModelAsync(providerName);
-            if (string.IsNullOrWhiteSpace(model))
-                throw new InvalidOperationException($"No active AI models configured for provider '{providerName}'.");
+            _logger.LogDebug(
+                "Global default provider '{Provider}' has no accessible API key for user {UserId}, falling back to first available provider.",
+                globalDefault.Value.ProviderName, resolvedUserId);
         }
 
-        var resolvedUserId = userId ?? Guid.Empty;
-        var apiKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(resolvedUserId, providerName);
-        if (string.IsNullOrWhiteSpace(apiKey))
+        // Fallback: first provider with an active API key, then its preferred model
+        var providerName = await _aiApiKeyService.GetFirstProviderWithActiveKeyAsync();
+        if (string.IsNullOrWhiteSpace(providerName))
+            throw new InvalidOperationException("No active AI provider with API keys is configured.");
+
+        var model = await _providerMetadataService.GetPreferredModelAsync(providerName);
+        if (string.IsNullOrWhiteSpace(model))
+            throw new InvalidOperationException($"No active AI models configured for provider '{providerName}'.");
+
+        var fallbackKey = await _aiApiKeyService.GetDecryptedApiKeyForProviderAsync(resolvedUserId, providerName);
+        if (string.IsNullOrWhiteSpace(fallbackKey))
             throw new InvalidOperationException($"No active API key found for provider '{providerName}'.");
 
-        return (providerName, model, apiKey);
+        return (providerName, model, fallbackKey);
     }
 
     private static Guid? TryParseUserId(string? userId)

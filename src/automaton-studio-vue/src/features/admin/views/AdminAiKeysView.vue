@@ -188,7 +188,8 @@ function confirmDeleteKey(key: AiApiKeyAdmin) {
       <div>
         <h1 class="m-0 text-3xl font-bold">AI API Keys</h1>
         <p class="text-color-secondary mt-1 mb-0">
-          Manage API keys for all AI providers
+          Manage system-level API keys shared with all users. Personal keys are managed from
+          <a href="/ai-keys" class="text-primary">AI Keys</a> in user settings.
         </p>
       </div>
       <Button label="Add API Key" icon="pi pi-plus" @click="openCreateDialog" />

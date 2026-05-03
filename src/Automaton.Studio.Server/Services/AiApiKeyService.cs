@@ -349,6 +349,16 @@ public class AiApiKeyService
             .FirstOrDefaultAsync();
     }
 
+    /// <summary>
+    /// Returns true when the provider has at least one active system key
+    /// (a key added by an admin and available to all users).
+    /// </summary>
+    public async Task<bool> HasSystemApiKeyAsync(string providerName)
+    {
+        return await dbContext.AiApiKeys
+            .AnyAsync(k => k.ProviderName == providerName && k.IsActive && k.CreatedByUserId == null);
+    }
+
     public bool HasAnyActiveKeys()
     {
         return dbContext.AiApiKeys.Any(k => k.IsActive);
