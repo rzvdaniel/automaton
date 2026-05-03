@@ -62,7 +62,9 @@ public class AdminAiProvidersController : ControllerBase
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
                 ModelCount = p.Models.Count,
-                ActiveModelCount = p.Models.Count(m => m.IsActive)
+                ActiveModelCount = p.Models.Count(m => m.IsActive),
+                HasSystemKey = dbContext.AiApiKeys.Any(k => k.ProviderName == p.Name && k.IsActive && k.CreatedByUserId == null),
+                HasDefaultModel = p.Models.Any(m => m.IsActive && m.IsDefault)
             })
             .ToListAsync();
 
@@ -94,7 +96,9 @@ public class AdminAiProvidersController : ControllerBase
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,
                 ModelCount = p.Models.Count,
-                ActiveModelCount = p.Models.Count(m => m.IsActive)
+                ActiveModelCount = p.Models.Count(m => m.IsActive),
+                HasSystemKey = dbContext.AiApiKeys.Any(k => k.ProviderName == p.Name && k.IsActive && k.CreatedByUserId == null),
+                HasDefaultModel = p.Models.Any(m => m.IsActive && m.IsDefault)
             })
             .FirstOrDefaultAsync();
 
@@ -154,7 +158,9 @@ public class AdminAiProvidersController : ControllerBase
             CreatedAt = provider.CreatedAt,
             UpdatedAt = provider.UpdatedAt,
             ModelCount = 0,
-            ActiveModelCount = 0
+            ActiveModelCount = 0,
+            HasSystemKey = false,
+            HasDefaultModel = false
         });
     }
 
@@ -288,6 +294,44 @@ public class AdminAiProvidersController : ControllerBase
             PlanningModel = planningModel,
             DefaultMaxOutputTokens = (await settingsService.GetEffectiveConfigAsync()).DefaultMaxOutputTokens
         });
+    }
+
+    /// <summary>
+    /// Get a single AI model by ID
+    /// </summary>
+    [HttpGet("~/api/admin/ai-models/{id}")]
+    public async Task<ActionResult<AiModelAdminResponse>> GetModel(Guid id)
+    {
+        var model = await dbContext.AiModels
+            .Where(m => m.Id == id)
+            .Select(m => new AiModelAdminResponse
+            {
+                Id = m.Id,
+                AiProviderId = m.AiProviderId,
+                ProviderName = m.Provider.Name,
+                ModelId = m.ModelId,
+                DisplayName = m.DisplayName,
+                Description = m.Description,
+                IsActive = m.IsActive,
+                IsDefault = m.IsDefault,
+                IsPlanningModel = m.IsPlanningModel,
+                MaxTokens = m.MaxTokens,
+                SupportsStreaming = m.SupportsStreaming,
+                SupportsTools = m.SupportsTools,
+                SupportsVision = m.SupportsVision,
+                CostPer1MTokensInput = m.CostPer1MTokensInput,
+                CostPer1MTokensOutput = m.CostPer1MTokensOutput,
+                ExtraBodyJson = m.ExtraBodyJson,
+                SortOrder = m.SortOrder,
+                CreatedAt = m.CreatedAt,
+                UpdatedAt = m.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        if (model == null)
+            return NotFound();
+
+        return Ok(model);
     }
 
     /// <summary>
@@ -844,6 +888,10 @@ public class AiProviderAdminResponse
     public DateTime? UpdatedAt { get; set; }
     public int ModelCount { get; set; }
     public int ActiveModelCount { get; set; }
+    /// <summary>True when at least one active system (all-users) API key exists for this provider.</summary>
+    public bool HasSystemKey { get; set; }
+    /// <summary>True when at least one active model has IsDefault = true for this provider.</summary>
+    public bool HasDefaultModel { get; set; }
 }
 
 public class AdminCreateAiProviderRequest

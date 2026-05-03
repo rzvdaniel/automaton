@@ -71,6 +71,15 @@ class AdminAiProvidersService {
   }
 
   /**
+   * Get a single AI model by ID
+   * GET /api/admin/ai-models/{id}
+   */
+  async getModel(modelId: string): Promise<AiModelAdmin> {
+    const { data } = await apiClient.get<AiModelAdmin>(`/api/admin/ai-models/${modelId}`)
+    return data
+  }
+
+  /**
    * Get all models for a provider
    * GET /api/admin/ai-providers/{providerId}/models
    */

@@ -36,6 +36,8 @@ const pageTitle = computed(() => {
     settings: 'Settings',
     'admin-providers': 'Admin',
     'admin-models': 'Admin',
+    'admin-provider-detail': 'Admin',
+    'admin-model-detail': 'Admin',
   }
   return titleMap[name] || name.charAt(0).toUpperCase() + name.slice(1)
 })

@@ -23,6 +23,10 @@ export interface AiProviderAdmin {
   updatedAt?: string
   modelCount: number
   activeModelCount: number
+  /** True when at least one active system (all-users) API key exists for this provider. */
+  hasSystemKey: boolean
+  /** True when at least one active model has isDefault = true for this provider. */
+  hasDefaultModel: boolean
 }
 
 /**

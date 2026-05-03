@@ -6,8 +6,9 @@
  */
 import AdminLayout from './views/AdminLayout.vue'
 import AdminProvidersView from './views/AdminProvidersView.vue'
+import AdminProviderDetailView from './views/AdminProviderDetailView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
-import AdminAiKeysView from './views/AdminAiKeysView.vue'
+import AdminModelDetailView from './views/AdminModelDetailView.vue'
 import AdminAiSettingsView from './views/AdminAiSettingsView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
@@ -30,25 +31,25 @@ export const adminRoutes: RouteRecordRaw[] = [
         path: 'ai-providers',
         name: 'admin-providers',
         component: AdminProvidersView,
-        meta: {
-          title: 'AI Providers',
-        },
+        meta: { title: 'AI Providers' },
+      },
+      {
+        path: 'ai-providers/:providerId',
+        name: 'admin-provider-detail',
+        component: AdminProviderDetailView,
+        meta: { title: 'Provider Detail' },
       },
       {
         path: 'ai-providers/:providerId/models',
         name: 'admin-models',
         component: AdminModelsView,
-        meta: {
-          title: 'AI Models',
-        },
+        meta: { title: 'AI Models' },
       },
       {
-        path: 'ai-keys',
-        name: 'admin-ai-keys',
-        component: AdminAiKeysView,
-        meta: {
-          title: 'API Keys',
-        },
+        path: 'ai-providers/:providerId/models/:modelId',
+        name: 'admin-model-detail',
+        component: AdminModelDetailView,
+        meta: { title: 'Model Detail' },
       },
       {
         path: 'ai-settings',
