@@ -14,7 +14,7 @@ import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import Tag from 'primevue/tag'
 import { adminAiProvidersService } from '../services/adminAiProvidersService'
-import type { AiProviderAdmin, CreateAiProviderRequest, UpdateAiProviderRequest } from '../types/admin.types'
+import type { AiProviderAdmin, CreateAiProviderRequest } from '../types/admin.types'
 
 const router = useRouter()
 const toast = useToast()
@@ -23,8 +23,6 @@ const confirm = useConfirm()
 const providers = ref<AiProviderAdmin[]>([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
-const showEditDialog = ref(false)
-const selectedProvider = ref<AiProviderAdmin | null>(null)
 const isSubmitting = ref(false)
 
 const formData = ref<CreateAiProviderRequest>({
@@ -89,24 +87,6 @@ function openCreateDialog() {
   showCreateDialog.value = true
 }
 
-function openEditDialog(provider: AiProviderAdmin) {
-  selectedProvider.value = provider
-  formData.value = {
-    name: provider.name,
-    displayName: provider.displayName,
-    description: provider.description,
-    baseUrl: provider.baseUrl,
-    isActive: provider.isActive,
-    requiresApiKey: provider.requiresApiKey,
-    environmentKeyName: provider.environmentKeyName,
-    apiKeyHelpUrl: provider.apiKeyHelpUrl,
-    iconName: provider.iconName,
-    sortOrder: provider.sortOrder,
-  }
-  formErrors.value = {}
-  showEditDialog.value = true
-}
-
 function validateForm(): boolean {
   formErrors.value = {}
   if (!formData.value.name?.trim()) formErrors.value.name = 'Name is required'
@@ -125,33 +105,6 @@ async function handleCreate() {
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: { message?: string } } }
     toast.add({ severity: 'error', summary: 'Creation Failed', detail: axiosError?.response?.data?.message || 'Failed to create provider', life: 3000 })
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-async function handleUpdate() {
-  if (!selectedProvider.value || !validateForm()) return
-  isSubmitting.value = true
-  try {
-    const req: UpdateAiProviderRequest = {
-      displayName: formData.value.displayName,
-      description: formData.value.description,
-      baseUrl: formData.value.baseUrl,
-      isActive: formData.value.isActive,
-      requiresApiKey: formData.value.requiresApiKey,
-      environmentKeyName: formData.value.environmentKeyName,
-      apiKeyHelpUrl: formData.value.apiKeyHelpUrl,
-      iconName: formData.value.iconName,
-      sortOrder: formData.value.sortOrder,
-    }
-    await adminAiProvidersService.updateProvider(selectedProvider.value.id, req)
-    toast.add({ severity: 'success', summary: 'Updated', detail: 'Provider updated', life: 3000 })
-    showEditDialog.value = false
-    await loadProviders()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: { message?: string } } }
-    toast.add({ severity: 'error', summary: 'Update Failed', detail: axiosError?.response?.data?.message || 'Failed to update provider', life: 3000 })
   } finally {
     isSubmitting.value = false
   }
@@ -252,22 +205,13 @@ function goToDetail(provider: AiProviderAdmin) {
             <template #body="{ data }">
               <div class="flex gap-1 justify-content-center">
                 <Button
-                  icon="pi pi-cog"
-                  text
-                  rounded
-                  severity="info"
-                  size="small"
-                  title="Manage provider (models & keys)"
-                  @click="goToDetail(data)"
-                />
-                <Button
                   icon="pi pi-pencil"
                   text
                   rounded
                   severity="warning"
                   size="small"
                   title="Edit provider settings"
-                  @click="openEditDialog(data)"
+                  @click="goToDetail(data)"
                 />
                 <Button
                   icon="pi pi-trash"
@@ -342,61 +286,6 @@ function goToDetail(provider: AiProviderAdmin) {
       </template>
     </Dialog>
 
-    <!-- Edit Provider Dialog -->
-    <Dialog v-model:visible="showEditDialog" header="Edit AI Provider" modal :style="{ width: '550px' }">
-      <div class="flex flex-column gap-4">
-        <div class="flex flex-column gap-2">
-          <label class="font-medium">Name</label>
-          <InputText :model-value="formData.name" disabled />
-          <small class="text-color-secondary">Cannot be changed after creation</small>
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="editDisplayName" class="font-medium">Display Name *</label>
-          <InputText id="editDisplayName" v-model="formData.displayName" :class="{ 'p-invalid': formErrors.displayName }" />
-          <small v-if="formErrors.displayName" class="text-red-500">{{ formErrors.displayName }}</small>
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="editDescription" class="font-medium">Description</label>
-          <Textarea id="editDescription" v-model="formData.description" :rows="2" />
-        </div>
-        <div class="flex flex-column gap-2">
-          <label for="editBaseUrl" class="font-medium">Base URL</label>
-          <InputText id="editBaseUrl" v-model="formData.baseUrl" />
-        </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox id="editProviderIsActive" v-model="formData.isActive" :binary="true" />
-          <label for="editProviderIsActive">Visible in chat selectors</label>
-        </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox id="editRequiresApiKey" v-model="formData.requiresApiKey" :binary="true" />
-          <label for="editRequiresApiKey">Requires API Key</label>
-        </div>
-        <div v-if="formData.requiresApiKey" class="flex flex-column gap-3 pl-4">
-          <div class="flex flex-column gap-2">
-            <label for="editEnvKeyName" class="font-medium text-sm">Environment Key Name</label>
-            <InputText id="editEnvKeyName" v-model="formData.environmentKeyName" />
-          </div>
-          <div class="flex flex-column gap-2">
-            <label for="editApiKeyHelpUrl" class="font-medium text-sm">API Key Help URL</label>
-            <InputText id="editApiKeyHelpUrl" v-model="formData.apiKeyHelpUrl" />
-          </div>
-        </div>
-        <div class="flex gap-4">
-          <div class="flex flex-column gap-2 flex-1">
-            <label for="editIconName" class="font-medium">Icon Name</label>
-            <InputText id="editIconName" v-model="formData.iconName" />
-          </div>
-          <div class="flex flex-column gap-2" style="width: 120px">
-            <label for="editSortOrder" class="font-medium">Sort Order</label>
-            <InputNumber id="editSortOrder" v-model="formData.sortOrder" :min="0" />
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancel" text :disabled="isSubmitting" @click="showEditDialog = false" />
-        <Button label="Save" :loading="isSubmitting" @click="handleUpdate" />
-      </template>
-    </Dialog>
   </div>
 </template>
 
