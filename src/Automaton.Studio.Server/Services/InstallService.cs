@@ -53,8 +53,8 @@ public class InstallService
             To = [new EmailAccount { Email = installCommand.Email, Name = installCommand.Name }],
             Variables =
             {
-                { "FullName", installCommand.Name },
-                { "WebsiteUrl", configurationService.WebsiteUrl },
+                { "Name", installCommand.Name },
+                { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
                 { "SupportEmail", configurationService.EmailConfig.EmailSupport }
             }
         };

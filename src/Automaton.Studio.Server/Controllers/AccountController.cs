@@ -95,8 +95,8 @@ public class AccountController : BaseController
                 To = [new EmailAccount { Email = registerUserCommand.Email, Name = registerUserCommand.Name }],
                 Variables = 
                 {
-                    { "FullName", registerUserCommand.Name },
-                    { "WebsiteUrl", configurationService.WebsiteUrl },
+                    { "Name", registerUserCommand.Name },
+                    { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
                     { "SupportEmail", configurationService.EmailConfig.EmailSupport }
                 }
             };

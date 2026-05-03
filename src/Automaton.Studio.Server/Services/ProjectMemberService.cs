@@ -163,11 +163,12 @@ public class ProjectMemberService
 
                 var variables = new Dictionary<string, string>
                 {
+                    { "Name", user.Name ?? request.Email },
                     { "ProjectName", project.DisplayName },
                     { "ProjectDescription", project.Description ?? string.Empty },
                     { "InviterName", userContextService.GetUserName() ?? string.Empty },
                     { "Role", request.Role.ToString() },
-                    { "InvitationUrl", invitationUrl },
+                    { "InviteUrl", invitationUrl },
                     { "ExpirationHours", "24" },
                     { "SupportEmail", configurationService.EmailConfig.EmailSupport },
                     { "RequirePasswordSetup", requirePasswordSetup ? "true" : "false" }
