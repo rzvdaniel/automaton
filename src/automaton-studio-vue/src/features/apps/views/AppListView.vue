@@ -41,6 +41,7 @@ const aiModel = ref<string>('')
 const aiAvailableModels = ref<string[]>([])
 const aiModelDisplayNames = ref<Record<string, string>>({})
 const isLoadingModels = ref(false)
+const aiIsUsingSharedKey = ref(false)
 
 onMounted(async () => {
   isLoadingModels.value = true
@@ -76,6 +77,10 @@ onMounted(async () => {
         aiModel.value = models[0]!
       }
     }
+
+    // Detect if the selected model's provider is using a shared/demo key
+    const selectedProvider = providers.find((p) => p.supportedModels.includes(aiModel.value))
+    aiIsUsingSharedKey.value = !!selectedProvider && !selectedProvider.hasStoredKeys && !selectedProvider.hasEnvironmentKey && (selectedProvider.hasSystemKey ?? false)
   } catch {
     // Models unavailable — user can still type the prompt
   } finally {
@@ -440,6 +445,7 @@ const handleRetry = async () => {
                 :available-models="aiAvailableModels"
                 :model-display-names="aiModelDisplayNames"
                 :loading="isLoadingModels"
+                :shared-key="aiIsUsingSharedKey"
               />
               <div class="flex align-items-center gap-2">
                 <Button
