@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import { marked } from 'marked'
 
 import homeRaw from '../content/home.md?raw'
@@ -26,6 +27,7 @@ type DocItem = {
 
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
 
 const docs: DocItem[] = [
   { slug: 'home', label: 'Home', summary: 'Start here', group: 'Overview', content: homeRaw },
@@ -56,7 +58,74 @@ const currentDoc = computed(() => {
   return docs.find(doc => doc.slug === currentSlug.value) || docs[0]!
 })
 
-const currentHtml = computed(() => marked.parse(currentDoc.value.content) as string)
+const currentHtml = computed(() => {
+  const html = marked.parse(currentDoc.value.content) as string
+  const template = document.createElement('template')
+  template.innerHTML = html
+
+  const preBlocks = template.content.querySelectorAll('pre')
+  preBlocks.forEach((pre) => {
+    const code = pre.querySelector('code')
+    if (!code) {
+      return
+    }
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'docs-code-block'
+
+    if (code.classList.contains('language-text')) {
+      wrapper.classList.add('docs-code-block--wrap')
+    }
+
+    const actions = document.createElement('div')
+    actions.className = 'docs-code-actions'
+
+    const copyButton = document.createElement('button')
+    copyButton.type = 'button'
+    copyButton.className = 'docs-code-copy'
+    copyButton.setAttribute('data-copy-code', 'true')
+    copyButton.setAttribute('aria-label', 'Copy code block')
+    copyButton.innerHTML = '<i class="pi pi-copy" aria-hidden="true"></i>'
+
+    actions.appendChild(copyButton)
+    pre.parentNode?.insertBefore(wrapper, pre)
+    wrapper.appendChild(actions)
+    wrapper.appendChild(pre)
+  })
+
+  return template.innerHTML
+})
+
+async function handleDocsClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const copyButton = target?.closest('[data-copy-code="true"]') as HTMLElement | null
+  if (!copyButton) {
+    return
+  }
+
+  const code = copyButton.closest('.docs-code-block')?.querySelector('pre code')
+  const text = code?.textContent ?? ''
+  if (!text) {
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'Code block copied to clipboard',
+      life: 2000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Copy failed',
+      detail: 'Could not copy the code block',
+      life: 3000,
+    })
+  }
+}
 
 function openDoc(slug: string) {
   router.push(slug === 'home' ? '/docs' : `/docs/${slug}`)
@@ -111,7 +180,7 @@ function openDoc(slug: string) {
                 @click="openDoc('home')"
               />
             </div>
-            <article class="docs-markdown" v-html="currentHtml" />
+            <article class="docs-markdown" v-html="currentHtml" @click="handleDocsClick" />
           </template>
         </Card>
       </section>
@@ -209,6 +278,38 @@ function openDoc(slug: string) {
   border-radius: 4px;
 }
 
+.docs-content :deep(.docs-code-block) {
+  position: relative;
+  margin: 1rem 0;
+  padding-right: 3rem;
+}
+
+.docs-content :deep(.docs-code-actions) {
+  position: absolute;
+  top: 0.5rem;
+  right: 0;
+  z-index: 1;
+}
+
+.docs-content :deep(.docs-code-copy) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: rgba(22, 27, 34, 0.9);
+  color: #e6edf3;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.docs-content :deep(.docs-code-copy:hover) {
+  border-color: #58a6ff;
+  background: rgba(30, 41, 59, 0.95);
+}
+
 .docs-content :deep(pre) {
   background: #161b22;
   color: #e6edf3;
@@ -218,10 +319,38 @@ function openDoc(slug: string) {
   overflow-x: auto;
 }
 
+.docs-content :deep(.docs-code-block pre) {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+}
+
 .docs-content :deep(pre code) {
   background: transparent;
   color: inherit;
   padding: 0;
+}
+
+.docs-content :deep(.docs-code-block--wrap pre) {
+  overflow-x: visible;
+}
+
+.docs-content :deep(.docs-code-block--wrap pre code) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .docs-content :deep(.docs-code-block) {
+    padding-right: 0;
+    padding-top: 2.5rem;
+  }
+
+  .docs-content :deep(.docs-code-actions) {
+    top: 0;
+    right: 0;
+  }
 }
 
 @media (max-width: 960px) {

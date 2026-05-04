@@ -43,6 +43,7 @@ try {
 ## Linked files (read these for full structure and examples)
 
 Read these files in order for complete guidance:
+- /llms/automaton-cli-deploy.md
 - /llms/automaton-apps-overview.md
 - /llms/automaton-frontend-structure.md
 - /llms/automaton-backend-controllers.md

@@ -45,6 +45,7 @@ For the full CLI reference — all commands, options, `automaton.json` fields, a
 ## AI-readable files
 
 - [llms.txt](https://automaton.monster/llms.txt)
+- [llms/automaton-cli-deploy.md](https://automaton.monster/llms/automaton-cli-deploy.md)
 - [llms/automaton-apps-overview.md](https://automaton.monster/llms/automaton-apps-overview.md)
 - [llms/automaton-frontend-structure.md](https://automaton.monster/llms/automaton-frontend-structure.md)
 - [llms/automaton-backend-controllers.md](https://automaton.monster/llms/automaton-backend-controllers.md)
@@ -53,7 +54,7 @@ For the full CLI reference — all commands, options, `automaton.json` fields, a
 ## Starter prompt
 
 ```text
-Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python backend controllers in backend/. Each controller file must export handle(action_name, inputs) and return { success, data, error }. Frontend code must call window.automatonApi.callController(controller, action, inputs) and use try/catch because the function returns data directly and throws on errors. Use backend/shared/ for shared helpers, backend/requirements.txt for extra Python packages, backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the project root, and deploy with automaton deploy.
+Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.
 ```
 
 ## MCP recommendation
