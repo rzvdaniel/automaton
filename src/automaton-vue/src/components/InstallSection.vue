@@ -1,5 +1,22 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import installRocketImage from '@/assets/images/install-rocket.png'
+
+const installCommand = 'dotnet tool install -g Automaton.Cli'
+const copied = ref(false)
+
+async function copyInstallCommand() {
+  try {
+    await navigator.clipboard.writeText(installCommand)
+    copied.value = true
+    window.setTimeout(() => {
+      copied.value = false
+    }, 1500)
+  } catch {
+    copied.value = false
+  }
+}
 </script>
 
 <template>
@@ -11,22 +28,27 @@ import installRocketImage from '@/assets/images/install-rocket.png'
         <div class="install-command-wrap">
           <div class="install-command">
             <span class="install-prompt">$</span>
-            <span class="install-cmd">dotnet tool install -g Automaton.Cli</span>
-            <button class="copy-btn" title="Copy">
-              <i class="pi pi-copy" />
+            <span class="install-cmd">{{ installCommand }}</span>
+            <button class="copy-btn" :title="copied ? 'Copied' : 'Copy'" @click="copyInstallCommand">
+              <i :class="copied ? 'pi pi-check' : 'pi pi-copy'" />
             </button>
           </div>
+          <div class="install-note">Prefer direct downloads? Use the packaged builds on the CLI page.</div>
         </div>
 
         <div class="install-content">
           <h2 class="install-title">Ship your first app in minutes</h2>
-          <p class="install-subtitle">Install the CLI and deploy instantly.</p>
+          <p class="install-subtitle">Install with NuGet, grab direct builds, or copy the exact deploy commands.</p>
 
           <div class="install-actions">
-            <a href="#install" class="btn btn-primary btn-lg">
+            <RouterLink to="/cli" class="btn btn-primary btn-lg">
               <i class="pi pi-download" />
-              Install CLI
-            </a>
+              Open CLI Guide
+            </RouterLink>
+            <RouterLink to="/cli#downloads" class="btn btn-secondary btn-lg">
+              <i class="pi pi-box" />
+              Download binaries
+            </RouterLink>
             <a href="/docs" class="btn btn-secondary btn-lg">
               <i class="pi pi-book" />
               Read the docs
@@ -76,6 +98,13 @@ import installRocketImage from '@/assets/images/install-rocket.png'
 .install-rocket {
   position: relative;
   z-index: 1;
+}
+
+.install-note {
+  margin-top: 8px;
+  padding-left: 4px;
+  color: rgba(240, 240, 245, 0.64);
+  font-size: 0.8rem;
 }
 
 .install-command-top {

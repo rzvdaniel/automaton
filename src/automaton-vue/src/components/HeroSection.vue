@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Hero section
+import { RouterLink } from 'vue-router'
 </script>
 
 <template>
@@ -21,10 +21,14 @@
         </p>
 
         <div class="hero-actions">
-          <a href="#install" class="btn btn-primary btn-lg">
+          <RouterLink to="/cli" class="btn btn-primary btn-lg">
             <i class="pi pi-download" />
             Install CLI
-          </a>
+          </RouterLink>
+          <RouterLink to="/cli#downloads" class="btn btn-secondary btn-lg">
+            Download builds
+            <i class="pi pi-arrow-right" />
+          </RouterLink>
           <a href="/apps" class="btn btn-secondary btn-lg">
             Explore apps
             <i class="pi pi-arrow-right" />

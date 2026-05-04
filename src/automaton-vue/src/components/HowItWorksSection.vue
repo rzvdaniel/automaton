@@ -49,6 +49,17 @@ const steps = [
             </div>
           </template>
         </div>
+
+        <div class="steps-footer">
+          <a href="/cli#workflow" class="steps-link">
+            See the full CLI workflow
+            <i class="pi pi-arrow-right" />
+          </a>
+          <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="steps-link steps-link-muted">
+            Read llms.txt
+            <i class="pi pi-external-link" />
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -89,6 +100,29 @@ const steps = [
   display: flex;
   align-items: center;
   gap: 20px;
+}
+
+.steps-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.steps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #d7d2ff;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.steps-link-muted {
+  color: rgba(233, 236, 245, 0.74);
 }
 
 .step-item {

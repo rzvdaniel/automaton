@@ -19,6 +19,11 @@ const router = createRouter({
       name: 'docs',
       component: () => import('@/views/DocsView.vue'),
     },
+    {
+      path: '/cli',
+      name: 'cli',
+      component: () => import('@/views/CliView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

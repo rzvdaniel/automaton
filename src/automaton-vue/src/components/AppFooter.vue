@@ -23,7 +23,7 @@
       <div class="footer-col">
         <h4 class="footer-col-title">Product</h4>
         <a href="/apps" class="footer-link">Apps</a>
-        <a href="#install" class="footer-link">CLI</a>
+        <a href="/cli" class="footer-link">CLI</a>
         <a href="/pricing" class="footer-link">Pricing</a>
         <a href="#" class="footer-link">Changelog</a>
       </div>
@@ -31,9 +31,9 @@
       <div class="footer-col">
         <h4 class="footer-col-title">Resources</h4>
         <a href="/docs" class="footer-link">Docs</a>
-        <a href="/docs#backend" class="footer-link">Backend Guide</a>
-        <a href="/docs#deploy" class="footer-link">Deploy Guide</a>
-        <a href="/docs#examples" class="footer-link">Examples</a>
+        <a href="/cli#downloads" class="footer-link">CLI Downloads</a>
+        <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="footer-link">llms.txt</a>
+        <a href="/cli#workflow" class="footer-link">Deploy Guide</a>
       </div>
 
       <div class="footer-col">

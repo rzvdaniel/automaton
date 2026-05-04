@@ -6,6 +6,7 @@ const mobileMenuOpen = ref(false)
 
 const navLinks = [
   { label: 'Apps', href: '/apps' },
+  { label: 'CLI', href: '/cli' },
   { label: 'Docs', href: '/docs' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'GitHub', href: 'https://github.com', external: true },
@@ -21,20 +22,22 @@ const navLinks = [
       </RouterLink>
 
       <nav class="nav-links desktop-only">
-        <a
+        <component
           v-for="link in navLinks"
           :key="link.label"
-          :href="link.href"
+          :is="link.external ? 'a' : RouterLink"
+          :to="link.external ? undefined : link.href"
+          :href="link.external ? link.href : undefined"
           :target="link.external ? '_blank' : undefined"
           class="nav-link"
         >
           {{ link.label }}
-        </a>
+        </component>
       </nav>
 
       <div class="nav-actions desktop-only">
         <a href="#" class="btn btn-secondary btn-sm">Sign in</a>
-        <a href="#install" class="btn btn-primary btn-sm">Get Started</a>
+        <RouterLink to="/cli" class="btn btn-primary btn-sm">Get Started</RouterLink>
       </div>
 
       <button class="mobile-menu-btn mobile-only" @click="mobileMenuOpen = !mobileMenuOpen">
@@ -43,12 +46,20 @@ const navLinks = [
     </div>
 
     <div v-if="mobileMenuOpen" class="mobile-menu">
-      <a v-for="link in navLinks" :key="link.label" :href="link.href" class="mobile-nav-link">
+      <component
+        :is="link.external ? 'a' : RouterLink"
+        v-for="link in navLinks"
+        :key="link.label"
+        :to="link.external ? undefined : link.href"
+        :href="link.external ? link.href : undefined"
+        :target="link.external ? '_blank' : undefined"
+        class="mobile-nav-link"
+      >
         {{ link.label }}
-      </a>
+      </component>
       <div class="mobile-menu-actions">
         <a href="#" class="btn btn-secondary" style="width:100%; justify-content:center">Sign in</a>
-        <a href="#install" class="btn btn-primary" style="width:100%; justify-content:center">Get Started</a>
+        <RouterLink to="/cli" class="btn btn-primary" style="width:100%; justify-content:center">Get Started</RouterLink>
       </div>
     </div>
   </header>

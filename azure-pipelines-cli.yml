@@ -1,0 +1,147 @@
+# Azure DevOps Pipeline for Automaton CLI
+# Produces and publishes the .NET global tool package to NuGet.org.
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - azure-pipelines-cli.yml
+      - src/Automaton.Cli/**
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - azure-pipelines-cli.yml
+      - src/Automaton.Cli/**
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '9.0.x'
+  cliProjectPath: 'src/Automaton.Cli/Automaton.Cli.csproj'
+  artifactName: 'automaton-cli-packages'
+  nugetSourceUrl: 'https://api.nuget.org/v3/index.json'
+
+stages:
+  - stage: BuildAndPackage
+    displayName: 'Build and Package Automaton CLI'
+    jobs:
+      - job: BuildCli
+        displayName: 'Build CLI tool package'
+        steps:
+          - checkout: self
+            displayName: 'Checkout repository'
+
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '$(dotnetVersion)'
+              installationPath: '$(Agent.ToolsDirectory)/dotnet'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore CLI project'
+            inputs:
+              command: 'restore'
+              projects: '$(cliProjectPath)'
+              feedsToUse: 'select'
+              includeNuGetOrg: true
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build CLI project'
+            inputs:
+              command: 'build'
+              projects: '$(cliProjectPath)'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Pack NuGet tool package'
+            inputs:
+              command: 'pack'
+              packagesToPack: '$(cliProjectPath)'
+              arguments: '--configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/nuget'
+
+          - script: |
+              set -euo pipefail
+
+              cat > "$(Build.ArtifactStagingDirectory)/version.json" <<EOF
+              {
+                "buildNumber": "$(Build.BuildNumber)",
+                "buildId": "$(Build.BuildId)",
+                "sourceVersion": "$(Build.SourceVersion)",
+                "sourceBranch": "$(Build.SourceBranchName)",
+                "project": "Automaton.Cli",
+                "generatedAtUtc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              }
+              EOF
+
+              (
+                cd "$(Build.ArtifactStagingDirectory)"
+                find nuget -type f -maxdepth 5 -print0 | sort -z | xargs -0 sha256sum > checksums.txt
+              )
+            displayName: 'Create version manifest and checksums'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish CLI packages artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: '$(artifactName)'
+              publishLocation: 'pipeline'
+
+  - stage: Release
+    displayName: 'Publish CLI Releases'
+    dependsOn: BuildAndPackage
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: PublishNuGet
+        displayName: 'Publish NuGet.org package'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: none
+
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '$(dotnetVersion)'
+              installationPath: '$(Agent.ToolsDirectory)/dotnet'
+
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download CLI packages artifact'
+            inputs:
+              artifact: '$(artifactName)'
+              path: '$(Pipeline.Workspace)/cli-packages'
+
+          - script: |
+              set -euo pipefail
+
+              if [ -z "${NUGET_ORG_API_KEY:-}" ]; then
+                echo "NUGET_ORG_API_KEY is not set. Configure it as a secret pipeline variable."
+                exit 1
+              fi
+
+              shopt -s nullglob
+              packages=("$(Pipeline.Workspace)/cli-packages/nuget"/*.nupkg)
+
+              if [ ${#packages[@]} -eq 0 ]; then
+                echo "No NuGet packages found to publish."
+                exit 1
+              fi
+
+              dotnet nuget push "$(Pipeline.Workspace)/cli-packages/nuget"/*.nupkg \
+                --source "$(nugetSourceUrl)" \
+                --api-key "$NUGET_ORG_API_KEY" \
+                --skip-duplicate
+            displayName: 'Push package to NuGet.org'
+            env:
+              NUGET_ORG_API_KEY: $(NUGET_ORG_API_KEY)
