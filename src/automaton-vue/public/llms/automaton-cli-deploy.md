@@ -15,11 +15,15 @@ Keep the project local, commit it to Git, and deploy the app to Automaton with t
 automaton config --server https://api.automaton.monster --key ak_execute_xxx
 ```
 
-3. Create or link `automaton.json` in the project root:
+3. The AI should create `automaton.json` in the project root automatically when it follows `llms.txt`.
+
+4. If the app already exists in Automaton Studio, link the local project to it:
 
 ```bash
-automaton init --app <app-id>
+automaton link <app-id>
 ```
+
+If the app is being created from scratch locally, skip this step. `link` is only for attaching the local folder to an already-existing app.
 
 ## What the AI should do
 

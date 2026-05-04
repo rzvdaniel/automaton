@@ -39,8 +39,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
           >
             <i class="pi pi-terminal" />
             <div>
-              <div class="tab-name">CLI + Your IDE</div>
-              <div class="tab-desc">Cursor, VS Code, any editor</div>
+              <div class="tab-name">CLI + Your Tools</div>
+              <div class="tab-desc">Editors, coding tools</div>
             </div>
           </button>
           <button
@@ -132,7 +132,7 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <span class="path-badge path-badge-blue">For developers</span>
             <p>
               Build your app locally with any editor, then push it to Automaton with one command.
-              Works with Cursor, VS Code, WebStorm, or plain vim — whatever you prefer.
+              Works with Cursor, VS Code, WebStorm, Claude Code, Codex, or plain vim.
               MCP is recommended when your tool supports it, but it is not required.
             </p>
           </div>
@@ -287,14 +287,11 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               <div>
                 <div class="step-title">Ask the AI to scaffold the project</div>
                 <div class="prompt-example">
-                  "Build this as an Automaton app. Use any static frontend stack that fits the task.
-                  Put Python backend controllers in backend/. Each controller must export
-                  handle(action_name, inputs), and frontend code should call
-                  window.automatonApi.callController(...)."
+                  "Build this [idea] as an Automaton app."
                 </div>
                 <p class="step-body">
                   The AI can create or link the app, understand the required structure, and generate
-                  the project in your local workspace. Commit <code>automaton.json</code> to the repo,
+                  the project in your local workspace. Keep the project in your own Git repo if you want version control,
                   then run <code>automaton deploy</code> to upload the frontend and deploy the backend.
                 </p>
               </div>
@@ -312,49 +309,15 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
         </div>
 
         <!-- ── Developer + AI guidance ────────────────────────── -->
-        <div class="ref-section">
+        <div v-if="activePath === 'cli'" class="ref-section">
           <h2 class="ref-title">For developers and AI tools</h2>
           <p class="ref-subtitle">
             The public docs stay high-level. If you want the exact app structure, backend contract,
             starter prompts, and framework-specific guidance, use the AI-readable instruction files.
           </p>
 
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div>
-                <div class="step-title">Point your AI tool to <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></div>
-                <p class="step-body">
-                  That file links to detailed instructions for app structure, backend controllers,
-                  frontend integration, and starter prompts for plain HTML/CSS/JS, React, and Vue workflows.
-                </p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div>
-                <div class="step-title">Use the Automaton Studio docs center for deeper guidance</div>
-                <p class="step-body">
-                  Inside Automaton Studio, the Documentation section organizes quick starts, App Editor,
-                  CLI workflows, MCP setup, and templates in one place.
-                </p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div>
-                <div class="step-title">Choose the right detail level</div>
-                <p class="step-body">
-                  Non-technical users can stay with the workflow tabs above. Developers can use the
-                  AI-readable files to reduce hallucinations and keep external tools aligned with Automaton.
-                </p>
-              </div>
-            </div>
-          </div>
-
           <div class="tool-sections">
             <div class="tool-section">
-              <div class="tool-label"><i class="pi pi-file" /> AI-readable files</div>
               <ul class="link-list">
                 <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
                 <li><a href="https://automaton.monster/llms/automaton-apps-overview.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
@@ -590,19 +553,10 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
 /* ── Tool sections ── */
 .tool-sections { display: flex; flex-direction: column; gap: 20px; }
 .tool-section { margin-top: 12px; }
-.tool-label {
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: #b09eff;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
 .link-list {
   margin: 0;
-  padding-left: 1.25rem;
+  padding-left: 1.65rem;
 }
 
 .link-list li + li {
@@ -645,8 +599,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
 
 /* ── Reference sections ── */
 .ref-section {
-  margin-top: 56px;
-  padding-top: 48px;
+  margin-top: 40px;
+  padding-top: 20px;
   border-top: 1px solid rgba(255,255,255,0.07);
   max-width: 760px;
 }
@@ -661,6 +615,10 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
   color: var(--color-text-muted);
   font-size: 0.9rem;
   margin: 0 0 14px;
+}
+
+.ref-section .tip-box {
+  margin-top: 24px;
 }
 
 .ref-rule {

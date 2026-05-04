@@ -30,16 +30,6 @@ const installModes = [
     description: 'Best fit when you already have .NET installed and want automatic updates through NuGet.',
     code: 'dotnet tool install -g Automaton.Cli',
   },
-  {
-    title: 'Configure your workspace',
-    description: 'Point the CLI at your Automaton server and API key once.',
-    code: 'automaton config --server https://api.automaton.monster --key your-api-key',
-  },
-  {
-    title: 'Deploy your app',
-    description: 'Push the local app files and backend in one command.',
-    code: 'automaton deploy',
-  },
 ]
 
 const directScripts = [
@@ -69,13 +59,13 @@ const directScripts = [
 const workflowSteps = [
   {
     title: 'Start with the AI-readable contract',
-    description: 'Point your IDE or AI agent to llms.txt before asking it to generate files.',
+    description: 'Point your IDE or AI agent to llms.txt before asking it to generate files. It should create the app structure and automaton.json for you.',
     code: 'Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.',
   },
   {
-    title: 'Create or link the app',
-    description: 'Create the app in Automaton Studio, then link your local project through automaton.json.',
-    code: 'automaton init --app your-app-id',
+    title: 'Optional: link an existing app',
+    description: 'Only do this when you already created the app in Automaton Studio and want this local folder to target that existing app. If the AI already created automaton.json, skip this step.',
+    code: 'automaton link your-app-id',
   },
   {
     title: 'Deploy from your IDE',
@@ -135,9 +125,12 @@ async function copyCode(key: string, code: string) {
 
           <div class="cli-panel">
             <div class="cli-panel-label">Quick start</div>
-            <div class="cli-inline-code">
-              <span class="cli-code-prompt">$</span>
-              <span>dotnet tool install -g Automaton.Cli</span>
+            <div class="cli-inline-code cli-inline-code-stack">
+              <div class="cli-inline-code-line">
+                <span class="cli-code-prompt">$</span>
+                <span>dotnet tool install -g Automaton.Cli</span>
+              </div>
+              <div class="cli-inline-code-comment"># Or use the PowerShell or Bash scripts below</div>
             </div>
             <div class="cli-inline-code">
               <span class="cli-code-prompt">$</span>
@@ -189,7 +182,8 @@ async function copyCode(key: string, code: string) {
           <div class="cli-card">
             <div class="cli-card-head">
               <span class="tag">Install</span>
-              <h2>Primary commands</h2>
+              <h2>Install with NuGet</h2>
+              <p class="cli-card-subtitle">If your AI follows llms.txt, automaton.json should be created automatically. Use init or link only as a manual fallback.</p>
             </div>
 
             <article v-for="mode in installModes" :key="mode.title" class="code-card">
@@ -207,7 +201,7 @@ async function copyCode(key: string, code: string) {
             </article>
           </div>
 
-          <div class="cli-card">
+          <div id="scripts" class="cli-card">
             <div class="cli-card-head">
               <span class="tag">Scripts</span>
               <h2>Portable install scripts</h2>
@@ -322,8 +316,24 @@ async function copyCode(key: string, code: string) {
   overflow-x: auto;
 }
 
+.cli-inline-code-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cli-inline-code-line {
+  display: flex;
+  gap: 10px;
+}
+
 .cli-code-prompt {
   color: rgba(255, 255, 255, 0.68);
+}
+
+.cli-inline-code-comment {
+  color: rgba(233, 236, 245, 0.52);
+  font-size: 0.76rem;
 }
 
 .cli-panel-link {
@@ -440,6 +450,12 @@ async function copyCode(key: string, code: string) {
 .cli-card-head h2 {
   margin-top: 10px;
   font-size: 1.3rem;
+}
+
+.cli-card-subtitle {
+  margin-top: 6px;
+  color: rgba(233, 236, 245, 0.68);
+  font-size: 0.84rem;
 }
 
 .code-card {
