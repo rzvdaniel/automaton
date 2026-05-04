@@ -242,6 +242,17 @@ export const useAppsStore = defineStore('apps', () => {
     }
   }
 
+  async function importApp(file: File): Promise<App> {
+    try {
+      const importedApp = await appsService.importApp(file)
+      apps.value.unshift(importedApp)
+      return importedApp
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err)
+      throw new Error(errorMessage)
+    }
+  }
+
   // Helper to extract error message
   function getErrorMessage(err: unknown): string {
     if (err && typeof err === 'object') {
@@ -299,6 +310,7 @@ export const useAppsStore = defineStore('apps', () => {
     unpublishApp,
     duplicateApp,
     forkTemplate,
+    importApp,
     setSearchFilter,
     setStatusFilter,
     setProjectFilter,

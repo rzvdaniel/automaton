@@ -168,6 +168,8 @@ const showCreateDialog = ref(false)
 const newAppName = ref('')
 const selectedRunnerId = ref<string | null>(null)
 const isCreating = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
+const isImporting = ref(false)
 
 // Publish dialog state
 const showPublishDialog = ref(false)
@@ -295,6 +297,43 @@ const openCreateDialog = () => {
   showCreateDialog.value = true
 }
 
+const openImportDialog = () => {
+  importInput.value?.click()
+}
+
+const handleImportSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file) {
+    return
+  }
+
+  isImporting.value = true
+  try {
+    const app = await appsStore.importApp(file)
+    toast.add({
+      severity: 'success',
+      summary: 'Imported',
+      detail: `App "${app.name}" imported successfully`,
+      life: 4000,
+    })
+    router.push(`/apps/${app.id}`)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to import app'
+    toast.add({
+      severity: 'error',
+      summary: 'Import Failed',
+      detail: message,
+      life: 5000,
+    })
+  } finally {
+    isImporting.value = false
+    if (input) {
+      input.value = ''
+    }
+  }
+}
+
 const viewPublicApps = () => {
   if (authStore.publicUsername) {
     window.open(`/${authStore.publicUsername}`, '_blank')
@@ -380,6 +419,14 @@ const handleRetry = async () => {
 
 <template>
   <div class="apps-view">
+    <input
+      ref="importInput"
+      type="file"
+      accept=".zip,application/zip"
+      class="hidden"
+      @change="handleImportSelected"
+    />
+
     <!-- Page Header -->
     <div class="flex align-items-center justify-content-between mb-5">
       <div>
@@ -387,6 +434,13 @@ const handleRetry = async () => {
         <p class="text-color-secondary mt-1 mb-0">Build and publish web applications</p>
       </div>
       <div class="flex gap-2">
+        <Button
+          label="Import App"
+          icon="pi pi-upload"
+          outlined
+          :loading="isImporting"
+          @click="openImportDialog"
+        />
         <Button
           label="View Public Apps"
           icon="pi pi-external-link"

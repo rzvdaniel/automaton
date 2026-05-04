@@ -166,7 +166,7 @@ const filteredApps = computed(() => apps.filter((app) => app.category === active
 
 <style scoped>
 .showcase-section {
-  padding: 18px 0 10px;
+  padding: 30px 0 10px;
   border-top: 1px solid var(--color-border);
 }
 

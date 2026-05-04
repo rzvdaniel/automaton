@@ -303,6 +303,7 @@ services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<AppFileStorageService>();
+services.AddScoped<AppArchiveService>();
 services.AddSingleton<AppPreviewStorageService>();
 services.AddScoped<AppVersionService>();
 

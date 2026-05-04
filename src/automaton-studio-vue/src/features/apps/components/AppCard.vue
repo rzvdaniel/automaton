@@ -11,6 +11,7 @@ import type { App } from '../types/apps.types'
 import { AccessScope } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
+import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 
 interface Props {
@@ -43,6 +44,7 @@ const appsStore = useAppsStore()
 const projectsStore = useProjectsStore()
 
 const menu = ref()
+const isExporting = ref(false)
 
 const statusBadge = computed(() => ({
   label: props.app.isPublished ? 'Published' : 'Draft',
@@ -139,6 +141,39 @@ const handleDuplicate = async () => {
   }
 }
 
+const handleExport = async () => {
+  isExporting.value = true
+
+  try {
+    const { blob, fileName } = await appsService.exportApp(props.app.id)
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(downloadUrl)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Export Ready',
+      detail: `Downloaded "${fileName}"`,
+      life: 3000,
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to export app'
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+      life: 5000,
+    })
+  } finally {
+    isExporting.value = false
+  }
+}
+
 const handleDelete = async () => {
   confirm.require({
     message: `Are you sure you want to delete "${props.app.name}"? This action cannot be undone.`,
@@ -173,6 +208,12 @@ const toggleMenu = (event: Event) => {
 
 const menuItems = computed(() => {
   const items = [
+    {
+      label: isExporting.value ? 'Exporting...' : 'Export',
+      icon: 'pi pi-download',
+      command: handleExport,
+      disabled: isExporting.value,
+    },
     {
       label: 'Duplicate',
       icon: 'pi pi-copy',

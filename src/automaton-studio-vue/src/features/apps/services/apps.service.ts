@@ -7,6 +7,7 @@ import type {
   App,
   CreateAppRequest,
   PublishAppRequest,
+  ExportAppResponse,
   LinkedStepInfo,
   AppFile,
   FileNode,
@@ -41,6 +42,40 @@ class AppsService {
    */
   async create(request: CreateAppRequest): Promise<App> {
     const { data } = await apiClient.post<App>('/api/apps', request)
+    return data
+  }
+
+  /**
+   * Export an app as a portable zip archive.
+   * GET /api/apps/{id}/export
+   */
+  async exportApp(id: string): Promise<ExportAppResponse> {
+    const response = await apiClient.get<Blob>(`/api/apps/${id}/export`, {
+      responseType: 'blob',
+    })
+
+    const contentDisposition = response.headers['content-disposition'] as string | undefined
+    const fileNameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)
+    const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1].replace(/"/g, '')) : `app-${id}.zip`
+
+    return {
+      blob: response.data,
+      fileName,
+    }
+  }
+
+  /**
+   * Import an exported app bundle into the current user's account.
+   * POST /api/apps/import
+   */
+  async importApp(zipFile: File): Promise<App> {
+    const form = new FormData()
+    form.append('file', zipFile)
+
+    const { data } = await apiClient.post<App>('/api/apps/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
     return data
   }
 

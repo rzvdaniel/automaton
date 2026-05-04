@@ -79,7 +79,7 @@
 <style scoped>
 .hero {
   position: relative;
-  padding: 10px 0 15px;
+  padding: 30px 0 30px;
   overflow: hidden;
   background-image:
     linear-gradient(rgba(124, 106, 245, 0.05) 1px, transparent 1px),

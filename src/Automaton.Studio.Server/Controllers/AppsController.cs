@@ -17,6 +17,7 @@ public class AppsController : BaseController
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
+    private readonly AppArchiveService appArchiveService;
 
     public AppsController(
         AppsService appsService,
@@ -27,6 +28,7 @@ public class AppsController : BaseController
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
         AppVersionService appVersionService,
+        AppArchiveService appArchiveService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -38,6 +40,7 @@ public class AppsController : BaseController
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
+        this.appArchiveService = appArchiveService;
     }
 
     [HttpGet]
@@ -161,6 +164,73 @@ public class AppsController : BaseController
         {
             logger.LogError(ex, "[AppsController] Error forking template app {AppId}", id);
             return StatusCode(500, new { message = "Failed to fork template" });
+        }
+    }
+
+    /// <summary>
+    /// Export an app as a portable zip bundle.
+    /// Includes app files and a manifest with transferable metadata.
+    /// </summary>
+    [HttpGet("{id}/export")]
+    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var archive = await appArchiveService.ExportAsync(id, cancellationToken);
+            if (archive is null)
+            {
+                return NotFound(new { message = "App not found" });
+            }
+
+            return File(archive.Content, "application/zip", archive.FileName);
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(StatusCodes.Status499ClientClosedRequest);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error exporting app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to export app" });
+        }
+    }
+
+    /// <summary>
+    /// Import an exported app bundle into the current user's account.
+    /// </summary>
+    [HttpPost("import")]
+    [RequestSizeLimit(52_428_800)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<Models.AppModel>> Import(IFormFile file, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "No file uploaded or file is empty" });
+            }
+
+            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Only .zip archives are supported" });
+            }
+
+            await using var stream = file.OpenReadStream();
+            var result = await appArchiveService.ImportAsync(stream, file.FileName, cancellationToken);
+            return CreatedAtAction(nameof(Get), new { id = result.App.Id }, result.App);
+        }
+        catch (InvalidDataException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(StatusCodes.Status499ClientClosedRequest);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error importing app archive {FileName}", file?.FileName);
+            return StatusCode(500, new { message = "Failed to import app" });
         }
     }
 
@@ -1085,6 +1155,7 @@ public class AppsController : BaseController
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
+
 }
 
 public class WriteFileRequest

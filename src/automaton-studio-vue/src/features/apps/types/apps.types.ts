@@ -82,6 +82,11 @@ export interface PublishAppRequest {
   executionRunnerId?: string
 }
 
+export interface ExportAppResponse {
+  blob: Blob
+  fileName: string
+}
+
 /**
  * App list filters for UI
  */

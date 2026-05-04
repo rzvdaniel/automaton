@@ -49,6 +49,20 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 - **Options pattern** — strongly-typed config via `IOptions<T>`
 - **Factory** — use factory methods or static `From()` when object construction is complex
 
+## Keep Controllers Thin
+
+- Keep controller action methods focused on HTTP concerns: request validation, auth/policy boundaries, calling services, and returning status codes or DTOs
+- Move business logic, archive/file processing, database orchestration, and cross-step workflows into services
+- Private controller helpers are acceptable only for tiny controller-local concerns such as response shaping or simple argument normalization
+- If a controller action starts traversing files, building archives, coordinating multiple persistence steps, or applying domain rules, extract that logic into a service instead of adding more private controller methods
+
+## No Blocking Async at Boundaries
+
+- Do not use `.Result`, `.Wait()`, or other sync-over-async patterns in controllers or services
+- Keep controller and service flows fully async end to end when I/O is involved
+- If a synchronous method needs async data, prefer converting that method to async rather than blocking on the task
+- Treat sync-over-async in HTTP and service layers as a design smell that should be refactored, not normalized
+
 ## EF Core / Database
 
 - All schema changes require a migration — **always use the CLI, never write migration files by hand**:
