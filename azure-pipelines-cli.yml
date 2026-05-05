@@ -68,10 +68,14 @@ stages:
             inputs:
               command: 'pack'
               packagesToPack: '$(cliProjectPath)'
-              arguments: '--configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/nuget'
+              configuration: '$(buildConfiguration)'
+              nobuild: true
+              packDirectory: '$(Build.ArtifactStagingDirectory)/nuget'
 
           - script: |
               set -euo pipefail
+
+              mkdir -p "$(Build.ArtifactStagingDirectory)/nuget"
 
               cat > "$(Build.ArtifactStagingDirectory)/version.json" <<EOF
               {
@@ -84,10 +88,17 @@ stages:
               }
               EOF
 
-              (
-                cd "$(Build.ArtifactStagingDirectory)"
-                find nuget -type f -maxdepth 5 -print0 | sort -z | xargs -0 sha256sum > checksums.txt
-              )
+              shopt -s nullglob
+              packages=("$(Build.ArtifactStagingDirectory)/nuget"/*.nupkg)
+
+              if [ ${#packages[@]} -eq 0 ]; then
+                echo "No NuGet packages found in $(Build.ArtifactStagingDirectory)/nuget"
+                echo "Contents of $(Build.ArtifactStagingDirectory):"
+                find "$(Build.ArtifactStagingDirectory)" -maxdepth 3 -type f | sort
+                exit 1
+              fi
+
+              sha256sum "${packages[@]}" > "$(Build.ArtifactStagingDirectory)/checksums.txt"
             displayName: 'Create version manifest and checksums'
 
           - task: PublishPipelineArtifact@1
