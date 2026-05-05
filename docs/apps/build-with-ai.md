@@ -115,6 +115,8 @@ Add `build` and `deployDir` for framework apps:
 }
 ```
 
+If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
+
 ### Deploy
 
 ```bash
@@ -174,6 +176,7 @@ window.automatonApi.callController(...).
 
 Copilot can:
 - Create or link the app if `automaton.json` doesn't exist yet
+- Add missing `build` and `deployDir` fields to `automaton.json` when the app builds to `dist/` or another output folder
 - Generate the project in your local workspace
 - Follow the Automaton backend/controller contract automatically through MCP guidance
 
@@ -229,6 +232,7 @@ window.automatonApi.callController(...). Keep the project local and prepare it f
 
 Claude Code can:
 - Check for `automaton.json` and link or create the app
+- Add missing `build` and `deployDir` fields to `automaton.json` when the deployable frontend is built output
 - Generate the local project with the correct Automaton structure
 - Reuse the same project folder across sessions
 
