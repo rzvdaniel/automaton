@@ -9,6 +9,11 @@ public class AutomatonConfig
     public string Name  { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional Automaton server URL for this project.
+    /// </summary>
+    public string? Server { get; set; }
+
+    /// <summary>
     /// Optional build command to run before deploying (e.g. "npm run build").
     /// </summary>
     public string? Build { get; set; }

@@ -6,7 +6,8 @@ namespace Automaton.Cli.Services;
 
 /// <summary>
 /// Reads and writes automaton.json (project-level) and ~/.automaton/config.json (global).
-/// Resolution order for server/api-key: env vars > global config file > prompt.
+/// Resolution order for server: env vars > project config > global config file > prompt.
+/// Resolution order for api-key: env vars > global config file > prompt.
 /// </summary>
 public class ConfigService
 {
@@ -83,11 +84,13 @@ public class ConfigService
         File.WriteAllText(GlobalConfigFile, JsonSerializer.Serialize(config, SerializerOptions));
     }
 
-    public (string server, string apiKey) RequireCredentials()
+    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null)
     {
         var global = LoadGlobalConfig();
 
-        var server = global.Server;
+        var server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")
+            ?? projectConfig?.Server
+            ?? global.Server;
         var apiKey = global.ApiKey;
 
         if (string.IsNullOrWhiteSpace(server))

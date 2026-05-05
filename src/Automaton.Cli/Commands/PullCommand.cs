@@ -30,7 +30,7 @@ public static class PullCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials();
+                var (server, apiKey) = config.RequireCredentials(appConfig);
                 var targetDir = dir ?? cwd;
 
                 AnsiConsole.MarkupLine($"[bold]Pulling[/] [cyan]{appConfig.Name}[/] → {targetDir}");

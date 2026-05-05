@@ -29,7 +29,7 @@ public static class LinkCommand
                 var app = await client.GetAppAsync(appId);
                 var appName = app.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString()! : appId;
 
-                config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = appId, Name = appName });
+                config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = appId, Name = appName, Server = server });
                 AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{appName}[/] ({appId})");
                 AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
             }

@@ -49,8 +49,11 @@ public static class ZipService
     public static Stream CreateZip(string sourceDir)
     {
         var ms = new MemoryStream();
-        using var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true);
-        AddDirectory(archive, sourceDir, sourceDir);
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddDirectory(archive, sourceDir, sourceDir);
+        }
+
         ms.Position = 0;
         return ms;
     }

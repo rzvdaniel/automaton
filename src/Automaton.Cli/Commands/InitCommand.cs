@@ -44,7 +44,7 @@ public static class InitCommand
                     var app = await client.GetAppAsync(appId);
                     var appName = app.TryGetProperty("name", out var n) ? n.GetString()! : appId;
 
-                    config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = appId, Name = appName });
+                    config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = appId, Name = appName, Server = server });
                     AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{appName}[/] ({appId})");
                     AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
                     return;
@@ -66,7 +66,7 @@ public static class InitCommand
                 AnsiConsole.MarkupLine($"[grey]Creating app '{name}'...[/]");
                 var (newAppId, newAppName) = await client.CreateAppAsync(name);
 
-                config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = newAppId, Name = newAppName });
+                config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = newAppId, Name = newAppName, Server = server });
 
                 AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{newAppName}[/]");
                 AnsiConsole.MarkupLine($"[grey]App ID:[/] {newAppId}");

@@ -106,6 +106,36 @@ This avoids manually editing the version before each publish.
 
 Before publishing to NuGet.org, you can test the exact package locally.
 
+### Fast local update workflow when you changed the CLI
+
+If you make more CLI changes and want `dotnet tool update` to replace the globally installed tool, bump the package version in [src/Automaton.Cli/Automaton.Cli.csproj](src/Automaton.Cli/Automaton.Cli.csproj).
+
+Example:
+
+```xml
+<Version>1.0.1</Version>
+```
+
+Then run this from the repository root:
+
+```powershell
+dotnet pack src/Automaton.Cli/Automaton.Cli.csproj --configuration Release --output .tmp/cli-pack
+dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version 1.0.1
+automaton --version
+```
+
+Exact update command:
+
+```powershell
+dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version 1.0.1
+```
+
+Why this matters:
+
+- if the package version does not change, `dotnet tool update` may report that the tool is already installed and keep the old binary
+- bumping the version makes the update deterministic
+- `automaton --version` is the fastest check that the refreshed binary is actually running
+
 ### Pack the CLI locally
 
 From the repository root:
@@ -130,6 +160,13 @@ If it is already installed globally, update it instead:
 
 ```powershell
 dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli
+```
+
+If you did not bump the package version, uninstall/install is more reliable than update:
+
+```powershell
+dotnet tool uninstall --global Automaton.Cli
+dotnet tool install --global --add-source .\.tmp\cli-pack Automaton.Cli
 ```
 
 ### Verify the install
