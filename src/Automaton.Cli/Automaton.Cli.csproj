@@ -15,11 +15,6 @@
     <Version>1.0.0</Version>
     <Authors>Automaton</Authors>
     <Description>Automaton CLI — deploy apps, manage runners, publish versions</Description>
-
-    <!-- Self-contained single-file binary (used by publish scripts) -->
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>false</SelfContained>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
