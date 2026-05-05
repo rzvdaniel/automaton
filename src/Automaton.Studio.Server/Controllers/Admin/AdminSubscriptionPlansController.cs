@@ -59,8 +59,11 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SubscriptionPlanResponse>> CreatePlan([FromBody] CreateSubscriptionPlanRequest req)
     {
+        var isActive = req.IsActive;
+        var isDefault = isActive && req.IsDefault;
+
         // Only one default plan at a time
-        if (req.IsDefault)
+        if (isDefault)
             await _db.SubscriptionPlans
                 .Where(p => p.IsDefault)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsDefault, false));
@@ -74,7 +77,8 @@ public class AdminSubscriptionPlansController : ControllerBase
             PriceUsd               = req.PriceUsd,
             StripeProductId        = req.StripeProductId,
             StripePriceId          = req.StripePriceId,
-            IsDefault              = req.IsDefault,
+            IsDefault              = isDefault,
+            IsActive               = isActive,
             CanCreateProjects      = req.CanCreateProjects,
             CanCreateOrganizations = req.CanCreateOrganizations,
             SortOrder              = req.SortOrder,
@@ -94,7 +98,10 @@ public class AdminSubscriptionPlansController : ControllerBase
         var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == id);
         if (plan == null) return NotFound();
 
-        if (req.IsDefault == true && !plan.IsDefault)
+        var newIsActive = req.IsActive ?? plan.IsActive;
+        var newIsDefault = (req.IsDefault ?? plan.IsDefault) && newIsActive;
+
+        if (newIsDefault && !plan.IsDefault)
             await _db.SubscriptionPlans
                 .Where(p => p.IsDefault && p.Id != id)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsDefault, false));
@@ -105,7 +112,8 @@ public class AdminSubscriptionPlansController : ControllerBase
         if (req.PriceUsd              .HasValue) plan.PriceUsd               = req.PriceUsd.Value;
         if (req.StripeProductId != null) plan.StripeProductId = req.StripeProductId == "" ? null : req.StripeProductId;
         if (req.StripePriceId   != null) plan.StripePriceId   = req.StripePriceId   == "" ? null : req.StripePriceId;
-        if (req.IsDefault             .HasValue) plan.IsDefault              = req.IsDefault.Value;
+        if (req.IsActive              .HasValue) plan.IsActive               = req.IsActive.Value;
+        plan.IsDefault = newIsDefault;
         if (req.CanCreateProjects     .HasValue) plan.CanCreateProjects      = req.CanCreateProjects.Value;
         if (req.CanCreateOrganizations.HasValue) plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
         if (req.SortOrder             .HasValue) plan.SortOrder              = req.SortOrder.Value;
@@ -113,22 +121,6 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(ToResponse(plan));
-    }
-
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> DeletePlan(Guid id)
-    {
-        var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == id);
-        if (plan == null) return NotFound();
-
-        // Detach users from this plan before deleting
-        await _db.UserTokenAllowances
-            .Where(a => a.SubscriptionPlanId == id)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.SubscriptionPlanId, (Guid?)null));
-
-        _db.SubscriptionPlans.Remove(plan);
-        await _db.SaveChangesAsync();
-        return NoContent();
     }
 
     #endregion
@@ -227,6 +219,7 @@ public class AdminSubscriptionPlansController : ControllerBase
         StripeProductId        = p.StripeProductId,
         StripePriceId          = p.StripePriceId,
         IsDefault              = p.IsDefault,
+        IsActive               = p.IsActive,
         CanCreateProjects      = p.CanCreateProjects,
         CanCreateOrganizations = p.CanCreateOrganizations,
         SortOrder              = p.SortOrder,
@@ -247,6 +240,7 @@ public record SubscriptionPlanResponse
     public string? StripeProductId        { get; init; }
     public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; }
+    public bool    IsActive               { get; init; }
     public bool    CanCreateProjects      { get; init; }
     public bool    CanCreateOrganizations { get; init; }
     public int     SortOrder              { get; init; }
@@ -263,6 +257,7 @@ public record CreateSubscriptionPlanRequest
     public string? StripeProductId        { get; init; }
     public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; } = false;
+    public bool    IsActive               { get; init; } = true;
     public bool    CanCreateProjects      { get; init; } = false;
     public bool    CanCreateOrganizations { get; init; } = false;
     public int     SortOrder              { get; init; } = 0;
@@ -277,6 +272,7 @@ public record UpdateSubscriptionPlanRequest
     public string?  StripeProductId        { get; init; }
     public string?  StripePriceId          { get; init; }
     public bool?    IsDefault              { get; init; }
+    public bool?    IsActive               { get; init; }
     public bool?    CanCreateProjects      { get; init; }
     public bool?    CanCreateOrganizations { get; init; }
     public int?     SortOrder              { get; init; }

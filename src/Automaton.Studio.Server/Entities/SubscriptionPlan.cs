@@ -37,6 +37,9 @@ public class SubscriptionPlan
     /// <summary>When true, this plan is automatically assigned to new users.</summary>
     public bool IsDefault { get; set; } = false;
 
+    /// <summary>When false, the plan stays in admin history but is hidden from user-facing pricing and checkout.</summary>
+    public bool IsActive { get; set; } = true;
+
     // ── Feature gates ────────────────────────────────────────────────────────
 
     /// <summary>User can create and manage Projects (multi-asset containers with shared settings).</summary>

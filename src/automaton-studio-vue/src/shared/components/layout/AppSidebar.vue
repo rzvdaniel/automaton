@@ -7,11 +7,13 @@ import ProgressBar from 'primevue/progressbar'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
+import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 
 const router = useRouter()
 const route = useRoute()
 const isExpanded = ref(false)
 const authStore = useAuthStore()
+const { hasPaidPlans, ensureLoaded: ensurePaidPlansLoaded } = usePaidPlansAvailable()
 
 // Load organization roles for access control
 const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
@@ -63,8 +65,13 @@ async function loadBillingStatus() {
 onMounted(async () => {
   // Load organizations to determine user's roles
   await loadOrganizations()
-  await loadBillingStatus()
+  await Promise.all([
+    loadBillingStatus(),
+    ensurePaidPlansLoaded(),
+  ])
 })
+
+const sidebarPlansLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans soon')
 
 const usagePercent = computed(() => billingStatus.value?.percentUsed ?? 0)
 const usageSeverity = computed(() => {
@@ -170,7 +177,7 @@ const sidebarClass = computed(() => ({
         />
         <div class="billing-widget-footer">
           <span class="text-color-secondary">AI: ${{ billingStatus.currentMonthCostUsd.toFixed(2) }} / ${{ billingStatus.monthlyCostLimitUsd.toFixed(2) }}</span>
-          <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate('/pricing')">Upgrade</span>
+          <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate('/pricing')">{{ sidebarPlansLabel }}</span>
         </div>
       </div>
 

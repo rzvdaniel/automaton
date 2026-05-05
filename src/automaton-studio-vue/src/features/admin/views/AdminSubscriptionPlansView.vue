@@ -38,6 +38,7 @@ const planForm = ref<CreateSubscriptionPlanRequest>({
   stripeProductId: '',
   stripePriceId: '',
   isDefault: false,
+  isActive: true,
   canCreateProjects: false,
   canCreateOrganizations: false,
   sortOrder: 0,
@@ -54,7 +55,9 @@ const assigning = ref(false)
 
 const planOptions = computed(() => [
   { label: '— None (remove plan) —', value: null },
-  ...plans.value.map((p) => ({ label: p.priceUsd > 0 ? `${p.name} ($${p.priceUsd}/mo)` : `${p.name} (Free)`, value: p.id })),
+  ...plans.value
+    .filter((plan) => plan.isActive)
+    .map((p) => ({ label: p.priceUsd > 0 ? `${p.name} ($${p.priceUsd}/mo)` : `${p.name} (Free)`, value: p.id })),
 ])
 
 // ── Load ─────────────────────────────────────────────────────────────────────
@@ -97,6 +100,7 @@ function openCreatePlan() {
     stripeProductId: '',
     stripePriceId: '',
     isDefault: false,
+    isActive: true,
     canCreateProjects: false,
     canCreateOrganizations: false,
     sortOrder: 0,
@@ -114,6 +118,7 @@ function openEditPlan(plan: SubscriptionPlan) {
     stripeProductId: plan.stripeProductId ?? '',
     stripePriceId: plan.stripePriceId ?? '',
     isDefault: plan.isDefault,
+    isActive: plan.isActive,
     canCreateProjects: plan.canCreateProjects,
     canCreateOrganizations: plan.canCreateOrganizations,
     sortOrder: plan.sortOrder,
@@ -142,14 +147,21 @@ async function savePlan() {
   }
 }
 
-async function deletePlan(plan: SubscriptionPlan) {
+async function togglePlanActive(plan: SubscriptionPlan) {
   try {
-    await adminSubscriptionPlansService.deletePlan(plan.id)
-    toast.add({ severity: 'success', summary: 'Deleted', detail: `Plan "${plan.name}" deleted`, life: 2000 })
+    await adminSubscriptionPlansService.updatePlan(plan.id, {
+      isActive: !plan.isActive,
+    })
+    toast.add({
+      severity: 'success',
+      summary: plan.isActive ? 'Plan disabled' : 'Plan enabled',
+      detail: `Plan "${plan.name}" is now ${plan.isActive ? 'inactive' : 'active'}.`,
+      life: 2000,
+    })
     loadPlans()
     loadUsers()
   } catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete plan', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update plan status', life: 3000 })
   }
 }
 
@@ -205,7 +217,7 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
       <div class="flex align-items-center justify-content-between mb-3">
         <div>
           <div class="text-xl font-semibold">Subscription Plans</div>
-          <div class="text-color-secondary text-sm">Define tiers with monthly AI spending limits</div>
+          <div class="text-color-secondary text-sm">Define tiers with monthly AI spending limits. Plans are preserved for history and can only be activated or disabled.</div>
         </div>
         <Button label="New Plan" icon="pi pi-plus" size="small" @click="openCreatePlan" />
       </div>
@@ -237,12 +249,24 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
             <Tag v-if="data.isDefault" value="Default" severity="info" />
           </template>
         </Column>
+        <Column header="Status" style="width:100px">
+          <template #body="{ data }">
+            <Tag :value="data.isActive ? 'Active' : 'Inactive'" :severity="data.isActive ? 'success' : 'secondary'" />
+          </template>
+        </Column>
         <Column header="Sort" field="sortOrder" style="width:70px" />
         <Column header="" style="width:120px">
           <template #body="{ data }">
             <div class="flex gap-1">
               <Button icon="pi pi-pencil" text size="small" @click="openEditPlan(data)" />
-              <Button icon="pi pi-trash" text size="small" severity="danger" @click="deletePlan(data)" />
+              <Button
+                :icon="data.isActive ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                text
+                size="small"
+                :severity="data.isActive ? 'secondary' : 'success'"
+                :title="data.isActive ? 'Disable plan' : 'Enable plan'"
+                @click="togglePlanActive(data)"
+              />
             </div>
           </template>
         </Column>
@@ -340,6 +364,10 @@ function usageSeverity(user: UserPlan): 'success' | 'warn' | 'danger' {
       <div class="flex align-items-center gap-2">
         <Checkbox v-model="planForm.isDefault" :binary="true" input-id="isDefault" />
         <label for="isDefault" class="text-sm">Set as default plan for new users</label>
+      </div>
+      <div class="flex align-items-center gap-2">
+        <Checkbox v-model="planForm.isActive" :binary="true" input-id="isActive" />
+        <label for="isActive" class="text-sm">Plan is active and visible to users</label>
       </div>
 
       <div class="font-medium text-sm mt-1">Feature Access</div>

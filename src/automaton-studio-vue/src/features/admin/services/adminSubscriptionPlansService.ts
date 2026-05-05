@@ -29,10 +29,6 @@ class AdminSubscriptionPlansService {
     return response.data
   }
 
-  async deletePlan(id: string): Promise<void> {
-    await apiClient.delete(`/api/admin/subscription-plans/${id}`)
-  }
-
   // ── Users ────────────────────────────────────────────────────────────────
 
   async getUsers(): Promise<UserPlan[]> {

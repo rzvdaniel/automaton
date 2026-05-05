@@ -28,7 +28,7 @@ public class SubscriptionGatewayService : ISubscriptionGatewayService
         // Fall back to the default plan
         var defaultPlan = await _db.SubscriptionPlans
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.IsDefault);
+            .FirstOrDefaultAsync(p => p.IsDefault && p.IsActive);
 
         if (defaultPlan != null)
             return (defaultPlan.CanCreateProjects, defaultPlan.CanCreateOrganizations);

@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
-import api from '@/shared/services/api/axios-instance'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
+import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
 
 interface SubscriptionPlan {
@@ -22,7 +22,7 @@ interface SubscriptionPlan {
 
 const router = useRouter()
 const subscriptionsEnabled = useSubscriptionsEnabled()
-const plans = ref<SubscriptionPlan[]>([])
+const { plans, loading: plansLoading, hasPaidPlans, ensureLoaded } = usePaidPlansAvailable()
 const loading = ref(true)
 const checkoutLoadingId = ref<string | null>(null)
 const currentStatus = ref<BillingStatusResponse | null>(null)
@@ -34,15 +34,20 @@ const pendingPlan = ref<SubscriptionPlan | null>(null)
 onMounted(async () => {
   if (!subscriptionsEnabled) { loading.value = false; return }
   try {
-    const [plansRes] = await Promise.all([
-      api.get<SubscriptionPlan[]>('/api/account/getsubscriptionplans'),
+    await Promise.all([
+      ensureLoaded(),
       billingService.getBillingStatus().then(s => { currentStatus.value = s }).catch(() => {}),
     ])
-    plans.value = plansRes.data
   } finally {
     loading.value = false
   }
 })
+
+const showPlanCatalog = computed(() => subscriptionsEnabled && hasPaidPlans.value)
+const pageTitle = computed(() => showPlanCatalog.value ? 'Choose your plan' : 'Free for now')
+const pageSubtitle = computed(() => showPlanCatalog.value
+  ? 'Upgrade to unlock more AI budget and collaboration features.'
+  : 'Future paid plans will add more capability, like automated runners and higher limits.')
 
 function planFeatures(plan: SubscriptionPlan): string[] {
   const features: string[] = [
@@ -111,20 +116,20 @@ const isDisabled = (plan: SubscriptionPlan) =>
         class="mb-4"
         @click="router.back()"
       />
-      <h1>Choose your plan</h1>
-      <p class="text-color-secondary">Upgrade to unlock more AI budget and collaboration features.</p>
+      <h1>{{ pageTitle }}</h1>
+      <p class="text-color-secondary">{{ pageSubtitle }}</p>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-10">
+    <div v-if="loading || plansLoading" class="flex justify-center py-10">
       <i class="pi pi-spin pi-spinner" style="font-size: 2rem" />
     </div>
 
-    <div v-else-if="!subscriptionsEnabled" class="coming-soon">
+    <div v-else-if="!showPlanCatalog" class="coming-soon">
       <i class="pi pi-clock text-5xl text-color-secondary mb-4" />
-      <h2>Paid plans coming soon</h2>
+      <h2>Paid subscriptions coming later</h2>
       <p class="text-color-secondary">
         Everyone is on the <strong>Free</strong> plan for now.
-        Paid plans will be available shortly — stay tuned!
+        The free plan is here to stay. Future paid plans will add more capability, like automated runners, more included AI usage, and collaboration features.
       </p>
     </div>
 
@@ -162,7 +167,7 @@ const isDisabled = (plan: SubscriptionPlan) =>
       </Card>
     </div>
 
-    <p class="pricing-note text-color-secondary text-sm text-center mt-4">
+    <p v-if="showPlanCatalog" class="pricing-note text-color-secondary text-sm text-center mt-4">
       Payment powered by Stripe. Your subscription activates instantly after checkout.
     </p>
   </div>

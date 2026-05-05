@@ -397,6 +397,27 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.AiProviderId, e.ModelId }).IsUnique();
             });
 
+            modelBuilder.Entity<SubscriptionPlan>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.MonthlyCostLimitUsd).IsRequired().HasColumnType("decimal(10,2)");
+                entity.Property(e => e.PriceUsd).IsRequired().HasColumnType("decimal(10,2)");
+                entity.Property(e => e.StripeProductId).HasMaxLength(100);
+                entity.Property(e => e.StripePriceId).HasMaxLength(100);
+                entity.Property(e => e.IsDefault).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.CanCreateProjects).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.CanCreateOrganizations).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.IsDefault);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.SortOrder);
+            });
+
             modelBuilder.Entity<FlowExecutionLog>(entity =>
             {
                 entity.HasKey(e => e.Id);

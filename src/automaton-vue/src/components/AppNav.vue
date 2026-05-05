@@ -8,7 +8,6 @@ const navLinks = [
   { label: 'Apps', href: '/apps' },
   { label: 'CLI', href: '/cli' },
   { label: 'Docs', href: '/docs' },
-  { label: 'Pricing', href: '/pricing' },
   { label: 'GitHub', href: 'https://github.com', external: true },
 ]
 </script>
@@ -112,6 +111,7 @@ const navLinks = [
   color: var(--color-text-muted);
   font-size: 0.9rem;
   font-weight: 500;
+  cursor: pointer;
   transition: color 0.2s, background 0.2s;
   text-decoration: none;
 }
@@ -163,6 +163,7 @@ const navLinks = [
   color: var(--color-text-muted);
   font-size: 1rem;
   font-weight: 500;
+  cursor: pointer;
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
 }

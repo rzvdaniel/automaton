@@ -9,9 +9,11 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
+import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 
 const router = useRouter()
 const subscriptionsEnabled = useSubscriptionsEnabled()
+const { hasPaidPlans, ensureLoaded } = usePaidPlansAvailable()
 
 const status = ref<BillingStatusResponse | null>(null)
 const loading = ref(true)
@@ -31,7 +33,12 @@ const usageSeverity = computed(() => {
 
 onMounted(async () => {
   try {
-    status.value = await billingService.getBillingStatus()
+    await Promise.all([
+      billingService.getBillingStatus().then((result) => {
+        status.value = result
+      }),
+      ensureLoaded(),
+    ])
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? 'Failed to load billing status'
   } finally {
@@ -49,6 +56,12 @@ async function goToPortal() {
     portalLoading.value = false
   }
 }
+
+const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Plans Soon')
+const aiUpgradeLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans Soon')
+const aiAccessHint = computed(() => hasPaidPlans.value
+  ? 'Add your own API key or upgrade for managed AI'
+  : 'Add your own API key for AI access. Paid subscriptions are coming later.')
 </script>
 
 <template>
@@ -131,10 +144,10 @@ async function goToPortal() {
               <div class="billing-card-value" style="font-size: 1rem; font-weight: 500; color: var(--p-text-muted-color)">
                 No AI access configured
               </div>
-              <div class="billing-card-meta mb-3">Add your own API key or upgrade for managed AI</div>
+              <div class="billing-card-meta mb-3">{{ aiAccessHint }}</div>
               <div class="flex gap-2">
                 <Button label="Add AI Key" icon="pi pi-key" size="small" outlined @click="router.push('/ai-keys')" />
-                <Button label="Upgrade" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
+                <Button :label="aiUpgradeLabel" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
               </div>
             </template>
           </template>
@@ -164,7 +177,7 @@ async function goToPortal() {
           @click="goToPortal"
         />
         <Button
-          label="Change Plan"
+          :label="plansActionLabel"
           icon="pi pi-tag"
           severity="secondary"
           @click="router.push('/pricing')"

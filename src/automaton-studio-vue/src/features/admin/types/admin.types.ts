@@ -247,6 +247,7 @@ export interface SubscriptionPlan {
   stripeProductId?: string
   stripePriceId?: string
   isDefault: boolean
+  isActive: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
   sortOrder: number
@@ -262,6 +263,7 @@ export interface CreateSubscriptionPlanRequest {
   stripeProductId?: string
   stripePriceId?: string
   isDefault: boolean
+  isActive: boolean
   canCreateProjects: boolean
   canCreateOrganizations: boolean
   sortOrder: number
@@ -275,6 +277,7 @@ export interface UpdateSubscriptionPlanRequest {
   stripeProductId?: string
   stripePriceId?: string
   isDefault?: boolean
+  isActive?: boolean
   canCreateProjects?: boolean
   canCreateOrganizations?: boolean
   sortOrder?: number

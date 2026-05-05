@@ -319,7 +319,7 @@ public class UsersService
         {
             var defaultPlan = await _db.SubscriptionPlans
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.IsDefault);
+                .FirstOrDefaultAsync(p => p.IsDefault && p.IsActive);
 
             var limitUsd = defaultPlan?.MonthlyCostLimitUsd ?? 2.00m;
             await _tokenBudgetService.SetAllowanceAsync(userId, limitUsd, Entities.OverageActions.Downgrade);

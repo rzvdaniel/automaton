@@ -286,6 +286,7 @@ public class AccountController : BaseController
     {
         var plans = await db.SubscriptionPlans
             .AsNoTracking()
+            .Where(p => p.IsActive)
             .OrderBy(p => p.SortOrder)
             .ThenBy(p => p.Name)
             .Select(p => new
@@ -298,6 +299,7 @@ public class AccountController : BaseController
                 p.CanCreateProjects,
                 p.CanCreateOrganizations,
                 p.IsDefault,
+                p.IsActive,
                 p.SortOrder
             })
             .ToListAsync();

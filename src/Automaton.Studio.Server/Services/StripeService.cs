@@ -49,6 +49,9 @@ public class StripeService
         var plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId)
             ?? throw new InvalidOperationException("Plan not found");
 
+        if (!plan.IsActive)
+            throw new InvalidOperationException($"Plan '{plan.Name}' is not active.");
+
         if (string.IsNullOrEmpty(plan.StripePriceId))
             throw new InvalidOperationException($"Plan '{plan.Name}' has no Stripe Price ID configured.");
 
@@ -283,7 +286,7 @@ public class StripeService
         var newPriceId = subscription.Items?.Data?.FirstOrDefault()?.Price?.Id;
         if (string.IsNullOrEmpty(newPriceId)) return;
 
-        var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.StripePriceId == newPriceId);
+        var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.StripePriceId == newPriceId && p.IsActive);
         if (plan == null) return;
 
         await AssignPlanAsync(user.Id, plan.Id);
@@ -312,7 +315,7 @@ public class StripeService
 
     private async Task AssignPlanAsync(Guid userId, Guid planId)
     {
-        var plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId);
+        var plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId && p.IsActive);
         if (plan == null) return;
 
         var allowance = await _db.UserTokenAllowances.FirstOrDefaultAsync(a => a.UserId == userId);
@@ -330,7 +333,7 @@ public class StripeService
 
     private async Task DowngradeToFreeAsync(Guid userId)
     {
-        var freePlan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault);
+        var freePlan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault && p.IsActive);
         if (freePlan != null)
             await AssignPlanAsync(userId, freePlan.Id);
     }
