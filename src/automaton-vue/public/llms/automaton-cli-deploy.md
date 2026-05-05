@@ -52,10 +52,13 @@ Example `automaton.json`:
 {
   "appId": "your-app-id",
   "name": "My App",
+  "server": "https://api.automaton.monster",
   "build": "npm run build",
   "deployDir": "dist"
 }
 ```
+
+If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields when the deployable frontend is built output.
 
 ## Default instruction to the AI
 

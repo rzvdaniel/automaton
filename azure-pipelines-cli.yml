@@ -1,6 +1,8 @@
 # Azure DevOps Pipeline for Automaton CLI
 # Produces and publishes the .NET global tool package to NuGet.org.
 
+name: 1.0.$(Date:yyyyMMdd)$(Rev:.r)
+
 trigger:
   branches:
     include:
@@ -71,6 +73,7 @@ stages:
               configuration: '$(buildConfiguration)'
               nobuild: true
               packDirectory: '$(Build.ArtifactStagingDirectory)/nuget'
+              versioningScheme: 'byBuildNumber'
 
           - script: |
               set -euo pipefail

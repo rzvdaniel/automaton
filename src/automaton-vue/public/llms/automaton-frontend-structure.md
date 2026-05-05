@@ -46,10 +46,13 @@ Example:
 {
   "appId": "your-app-id",
   "name": "My App",
+  "server": "https://api.automaton.monster",
   "build": "npm run build",
   "deployDir": "dist"
 }
 ```
+
+If `automaton.json` already exists, add missing `build` and `deployDir` fields instead of assuming deploy from the project root.
 
 ## Frontend to backend calls
 

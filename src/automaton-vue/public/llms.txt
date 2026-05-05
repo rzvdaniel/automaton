@@ -36,7 +36,18 @@ try {
 }
 ```
 
-**Deploy** — `automaton deploy` uploads files and pushes backend to the runner.
+If the app has a build step or deploys from a build output folder, add the missing fields instead of assuming root deploy:
+```json
+{
+  "appId": "your-app-id",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "build": "npm run build",
+  "deployDir": "dist"
+}
+```
+
+**Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner.
 
 ---
 
