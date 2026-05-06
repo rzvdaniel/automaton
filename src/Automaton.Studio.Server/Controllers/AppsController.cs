@@ -50,6 +50,7 @@ public class AppsController : BaseController
     }
 
     [HttpGet("{id}")]
+    [Authorize(Policy = "AllowApiKey")]
     public ActionResult<Models.AppModel> Get(Guid id)
     {
         var app = appsService.Get(id);
@@ -307,6 +308,7 @@ public class AppsController : BaseController
     }
 
     [HttpPost]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Post(Models.NewApp app)
     {
         var appId = await appsService.Create(app);

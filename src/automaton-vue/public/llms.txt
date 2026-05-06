@@ -60,7 +60,7 @@ Choose the simplest frontend stack that fits the requested app.
 - Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs a component-heavy SPA structure, richer routing, or more complex reusable UI.
 - If multiple stacks are equally reasonable and the user gave no preference, ask one short question before scaffolding.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
-- Do not consider the app complete until `automaton.json` exists in the project root.
+- When the user asks to use the Automaton CLI, run `automaton init` or `automaton link` and do not consider the app complete until `automaton.json` exists in the project root, or you have clearly reported why it could not be created.
 
 ---
 
