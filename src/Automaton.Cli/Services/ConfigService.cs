@@ -13,6 +13,8 @@ public class ConfigService
 {
     private const string ProjectConfigFileName = "automaton.json";
     private const string ProjectIgnoreFileName = ".automatonignore";
+    private const string ProjectConfigDirName = ".automaton";
+    private const string ProjectLocalConfigFileName = "config.json";
     private static readonly string GlobalConfigDir  = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton");
     private static readonly string GlobalConfigFile = Path.Combine(GlobalConfigDir, "config.json");
@@ -56,6 +58,36 @@ public class ConfigService
         File.WriteAllText(path, JsonSerializer.Serialize(config, SerializerOptions));
 
         EnsureProjectIgnoreFile(directory);
+    }
+
+    public GlobalConfig LoadProjectLocalConfig(string directory)
+    {
+        var path = GetProjectLocalConfigPath(directory);
+        if (!File.Exists(path)) return new GlobalConfig();
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<GlobalConfig>(json, SerializerOptions) ?? new GlobalConfig();
+        }
+        catch
+        {
+            return new GlobalConfig();
+        }
+    }
+
+    public void SaveProjectLocalConfig(string directory, GlobalConfig config)
+    {
+        var configDir = Path.Combine(directory, ProjectConfigDirName);
+        Directory.CreateDirectory(configDir);
+        File.WriteAllText(GetProjectLocalConfigPath(directory), JsonSerializer.Serialize(config, SerializerOptions));
+
+        EnsureProjectIgnoreFile(directory);
+    }
+
+    public string GetProjectLocalConfigPath(string directory)
+    {
+        return Path.Combine(directory, ProjectConfigDirName, ProjectLocalConfigFileName);
     }
 
     private static void EnsureProjectIgnoreFile(string directory)
@@ -104,14 +136,18 @@ public class ConfigService
         File.WriteAllText(GlobalConfigFile, JsonSerializer.Serialize(config, SerializerOptions));
     }
 
-    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null)
+    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
     {
+        var local = LoadProjectLocalConfig(directory ?? Directory.GetCurrentDirectory());
         var global = LoadGlobalConfig();
 
         var server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")
             ?? projectConfig?.Server
+            ?? local.Server
             ?? global.Server;
-        var apiKey = global.ApiKey;
+        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")
+            ?? local.ApiKey
+            ?? global.ApiKey;
 
         if (string.IsNullOrWhiteSpace(server))
         {

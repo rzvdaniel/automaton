@@ -15,16 +15,19 @@ Keep the project local, commit it to Git, and deploy the app to Automaton with t
 automaton config --server https://api.automaton.monster --key ak_execute_xxx
 ```
 
+That command now saves project-local CLI settings in `./.automaton/config.json` by default. Use `automaton config --global ...` only when you intentionally want shared machine-wide settings.
+
 The CLI also supports keeping `server` in `automaton.json`. Resolution order is:
 
 1. `AUTOMATON_SERVER`
 2. `server` in `automaton.json`
-3. `~/.automaton/config.json`
-4. interactive prompt
+3. `./.automaton/config.json`
+4. `~/.automaton/config.json`
+5. interactive prompt
 
 3. The AI should create `automaton.json` in the project root automatically when it follows `llms.txt`.
 
-The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
+The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
 
 4. If the app already exists in Automaton Studio, link the local project to it:
 

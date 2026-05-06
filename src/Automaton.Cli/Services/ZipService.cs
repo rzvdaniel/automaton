@@ -15,6 +15,7 @@ public static class ZipService
 
     public static readonly string[] DefaultIgnorePatterns =
     {
+        ".automaton/",
         ".git/",
         "node_modules/",
         "obj/",

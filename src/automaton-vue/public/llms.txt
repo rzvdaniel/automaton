@@ -36,6 +36,8 @@ try {
 }
 ```
 
+For plain HTML/CSS/JS apps, prefer keeping `index.html`, CSS, and JS at the project root unless the user explicitly wants a separate frontend source folder.
+
 If the app has a build step or deploys from a build output folder, add the missing fields instead of assuming root deploy:
 ```json
 {
@@ -48,6 +50,17 @@ If the app has a build step or deploys from a build output folder, add the missi
 ```
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner.
+
+## Frontend stack selection
+
+Choose the simplest frontend stack that fits the requested app.
+
+- Default to plain HTML/CSS/JS for small or medium apps, single-page tools, lightweight dashboards, forms, calculators, planning apps, or when the user did not ask for a framework.
+- Use Vite + vanilla HTML/CSS/JS when the app is still framework-free but benefits from modules, a dev server, build tooling, or clearer source organization.
+- Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs a component-heavy SPA structure, richer routing, or more complex reusable UI.
+- If multiple stacks are equally reasonable and the user gave no preference, ask one short question before scaffolding.
+- Do not create empty `backend/` or `data/` folders for frontend-only apps.
+- Do not consider the app complete until `automaton.json` exists in the project root.
 
 ---
 

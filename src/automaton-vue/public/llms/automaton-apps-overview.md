@@ -7,6 +7,8 @@ Use these rules:
 - If `automaton.json` already exists and the app uses a build step, add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
 - Frontend code can be plain HTML/CSS/JS or any framework that outputs static files.
 - Python backend code lives in `backend/`.
+- Do not create empty `backend/` or `data/` folders for frontend-only apps.
+- For plain HTML/CSS/JS apps, prefer root-level frontend files unless the user explicitly wants a separate `frontend/` source folder.
 - Deploy with `automaton deploy`.
 - MCP is recommended when supported, but not required.
 

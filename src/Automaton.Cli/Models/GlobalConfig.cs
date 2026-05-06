@@ -1,7 +1,8 @@
 namespace Automaton.Cli.Models;
 
 /// <summary>
-/// Global CLI configuration stored in ~/.automaton/config.json.
+/// CLI configuration stored either in ./.automaton/config.json for a project
+/// or in ~/.automaton/config.json for shared global use.
 /// All values can also be supplied via environment variables (preferred in CI).
 /// </summary>
 public class GlobalConfig

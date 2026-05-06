@@ -18,7 +18,8 @@ public static class RunnersCommand
         {
             try
             {
-                var (server, apiKey) = config.RequireCredentials();
+                var cwd = Directory.GetCurrentDirectory();
+                var (server, apiKey) = config.RequireCredentials(directory: cwd);
                 using var client = new AutomatonApiClient(server, apiKey);
                 var result = await client.ListRunnersAsync();
 

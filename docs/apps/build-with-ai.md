@@ -129,8 +129,9 @@ Server URL resolution order for CLI deploy is:
 
 1. `AUTOMATON_SERVER`
 2. `server` in `automaton.json`
-3. `~/.automaton/config.json`
-4. interactive prompt
+3. `./.automaton/config.json`
+4. `~/.automaton/config.json`
+5. interactive prompt
 
 If the app has no backend scripts, a successful deploy may finish with `No backend scripts found`.
 

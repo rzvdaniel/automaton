@@ -44,6 +44,7 @@ public class ZipServiceTests
         Assert.That(File.Exists(ignoreFile), Is.True);
 
         var content = File.ReadAllText(ignoreFile);
+        Assert.That(content, Does.Contain(".automaton/"));
         Assert.That(content, Does.Contain("node_modules/"));
         Assert.That(content, Does.Contain("automaton.json"));
         Assert.That(content, Does.Contain(".automatonignore"));
@@ -77,6 +78,8 @@ public class ZipServiceTests
         var projectRoot = CreateTempDirectory();
         File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html></html>");
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(projectRoot, ".automaton"));
+        File.WriteAllText(Path.Combine(projectRoot, ".automaton", "config.json"), "{}");
 
         Directory.CreateDirectory(Path.Combine(projectRoot, "node_modules", "pkg"));
         File.WriteAllText(Path.Combine(projectRoot, "node_modules", "pkg", "index.js"), "console.log('ignored');");
@@ -88,6 +91,7 @@ public class ZipServiceTests
 
         // Assert
         Assert.That(entries, Does.Contain("index.html"));
+        Assert.That(entries, Does.Not.Contain(".automaton/config.json"));
         Assert.That(entries, Does.Not.Contain("automaton.json"));
         Assert.That(entries, Does.Not.Contain("node_modules/pkg/index.js"));
     }

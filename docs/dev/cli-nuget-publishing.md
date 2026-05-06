@@ -106,6 +106,32 @@ This avoids manually editing the version before each publish.
 
 Before publishing to NuGet.org, you can test the exact package locally.
 
+### Local project config vs global config
+
+`automaton config` now writes project-local CLI settings by default:
+
+```text
+./.automaton/config.json
+```
+
+Example:
+
+```powershell
+automaton config --server https://api.automaton.monster --key ak_execute_xxx
+```
+
+If you want shared machine-wide settings instead, use:
+
+```powershell
+automaton config --global --server https://api.automaton.monster --key ak_execute_xxx
+```
+
+The global path remains:
+
+```text
+~/.automaton/config.json
+```
+
 ### Fast local update workflow when you changed the CLI
 
 If you make more CLI changes and want `dotnet tool update` to replace the globally installed tool, bump the package version in [src/Automaton.Cli/Automaton.Cli.csproj](src/Automaton.Cli/Automaton.Cli.csproj).
@@ -135,6 +161,39 @@ Why this matters:
 - if the package version does not change, `dotnet tool update` may report that the tool is already installed and keep the old binary
 - bumping the version makes the update deterministic
 - `automaton --version` is the fastest check that the refreshed binary is actually running
+
+### One-command local reinstall script
+
+For day-to-day local development, you can use:
+
+```powershell
+.\scripts\dev-reinstall-cli.ps1
+```
+
+What it does:
+
+1. runs the CLI test project
+2. packs `src/Automaton.Cli/Automaton.Cli.csproj`
+3. detects the exact version of the freshly packed local `.nupkg`
+4. builds a temporary NuGet config that points only at the local package folder
+5. uninstalls the existing global `Automaton.Cli` tool
+6. installs the freshly packed local tool from the local source only
+7. prints `automaton --version`
+
+The temporary local-only NuGet config matters because `--add-source` alone does not guarantee that `dotnet tool install` will prefer your local package over a higher version from another configured NuGet source.
+
+Optional flags:
+
+```powershell
+.\scripts\dev-reinstall-cli.ps1 -SkipTests
+.\scripts\dev-reinstall-cli.ps1 -Configuration Debug
+```
+
+If PowerShell blocks the script, run:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+```
 
 ### Pack the CLI locally
 
@@ -237,8 +296,9 @@ Use this sequence for reliable releases:
 
 1. `AUTOMATON_SERVER`
 2. `server` in `automaton.json`
-3. `~/.automaton/config.json`
-4. interactive prompt
+3. `./.automaton/config.json`
+4. `~/.automaton/config.json`
+5. interactive prompt
 
 That means a project can be self-contained when `automaton.json` includes:
 
@@ -259,6 +319,7 @@ No backend scripts found
 ### Deploy troubleshooting
 
 - If the CLI still prompts for a server URL, check whether the installed global tool is stale and reinstall or update it from the latest local package.
+- If you expected project-local credentials to be used, check `./.automaton/config.json` in the app folder you are deploying from.
 - If `dotnet tool update` says the tool is already installed, bump the package version first or use uninstall/install.
 - If deploy uploads successfully but backend deploy returns `401`, verify the API key and make sure the local server is running the latest backend build.
 

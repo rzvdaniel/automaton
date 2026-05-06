@@ -30,7 +30,7 @@ public static class PublishCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig);
+                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
 
                 AnsiConsole.MarkupLine($"[bold]Publishing snapshot[/] for [cyan]{appConfig.Name}[/]...");
 

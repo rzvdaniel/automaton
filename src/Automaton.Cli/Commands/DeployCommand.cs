@@ -44,7 +44,7 @@ public static class DeployCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig);
+                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
 
                 AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appConfig.Name}[/] ({appConfig.AppId})");
 

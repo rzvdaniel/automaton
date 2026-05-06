@@ -34,6 +34,7 @@ When the CLI creates or links a project, it also creates `.automatonignore` in t
 
 The CLI excludes a small set of local-only folders when it zips content:
 
+- `.automaton`
 - `.git`
 - `node_modules`
 - `obj`
@@ -50,6 +51,7 @@ Example `.automatonignore`:
 
 ```text
 # Patterns excluded by automaton deploy
+.automaton/
 .git/
 node_modules/
 obj/
