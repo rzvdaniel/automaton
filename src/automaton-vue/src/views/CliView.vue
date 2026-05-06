@@ -74,6 +74,29 @@ const workflowSteps = [
   },
 ]
 
+const backendChecklist = [
+  {
+    title: 'Frontend-only app',
+    detail: 'You can skip runner setup and deploy immediately.',
+    code: 'automaton deploy',
+  },
+  {
+    title: 'Backend app',
+    detail: 'List your connected runners before the first backend deploy.',
+    code: 'automaton runners',
+  },
+  {
+    title: 'Assign once',
+    detail: 'Pick one runner for the app so Python controllers have a target.',
+    code: 'automaton set-runner your-runner-id',
+  },
+  {
+    title: 'Deploy normally',
+    detail: 'After assignment, reuse the same deploy command for every update.',
+    code: 'automaton deploy',
+  },
+]
+
 const copiedKey = ref<string | null>(null)
 
 async function copyCode(key: string, code: string) {
@@ -130,8 +153,8 @@ async function copyCode(key: string, code: string) {
                 <span class="cli-code-prompt">$</span>
                 <span>dotnet tool install -g Automaton.Cli</span>
               </div>
-              <div class="cli-inline-code-comment"># Or use the PowerShell or Bash scripts below</div>
             </div>
+            <p class="cli-inline-code-comment cli-panel-note"># Or use the PowerShell or Bash install scripts further down this page</p>
             <div class="cli-inline-code">
               <span class="cli-code-prompt">$</span>
               <span>automaton config --server https://api.automaton.monster --key your-api-key</span>
@@ -140,6 +163,7 @@ async function copyCode(key: string, code: string) {
               <span class="cli-code-prompt">$</span>
               <span>automaton set-runner your-runner-id</span>
             </div>
+            <div class="cli-inline-code-comment"># Only for apps that include Python backend controllers</div>
             <div class="cli-inline-code">
               <span class="cli-code-prompt">$</span>
               <span>automaton deploy</span>
@@ -251,6 +275,29 @@ async function copyCode(key: string, code: string) {
           </div>
         </div>
       </section>
+
+      <section class="cli-section cli-section-strong">
+        <div class="container">
+          <div class="cli-section-head">
+            <h2 class="section-title cli-section-title">Backend app checklist</h2>
+            <p class="section-subtitle cli-section-subtitle">
+              Only needed for apps that include Python backend controllers. Frontend-only apps can skip this section.
+            </p>
+          </div>
+
+          <div class="backend-checklist-grid">
+            <article v-for="item in backendChecklist" :key="item.title" class="backend-checklist-card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.detail }}</p>
+              <button class="copy-chip workflow-copy" @click="copyCode(`backend-${item.title}`, item.code)">
+                <i :class="copiedKey === `backend-${item.title}` ? 'pi pi-check' : 'pi pi-copy'" />
+                {{ copiedKey === `backend-${item.title}` ? 'Copied' : 'Copy' }}
+              </button>
+              <pre class="workflow-code"><code>{{ item.code }}</code></pre>
+            </article>
+          </div>
+        </div>
+      </section>
     </main>
 
     <AppFooter />
@@ -338,6 +385,10 @@ async function copyCode(key: string, code: string) {
 .cli-inline-code-comment {
   color: rgba(233, 236, 245, 0.52);
   font-size: 0.76rem;
+}
+
+.cli-panel-note {
+  margin: 10px 0 0;
 }
 
 .cli-panel-link {
@@ -527,6 +578,29 @@ async function copyCode(key: string, code: string) {
   gap: 16px;
 }
 
+.backend-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.backend-checklist-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  background: linear-gradient(180deg, rgba(16, 21, 33, 0.98), rgba(10, 13, 21, 0.98));
+}
+
+.backend-checklist-card h3 {
+  font-size: 1rem;
+}
+
+.backend-checklist-card p {
+  margin: 8px 0 12px;
+  color: rgba(233, 236, 245, 0.7);
+  font-size: 0.86rem;
+}
+
 .workflow-card {
   position: relative;
   padding: 18px;
@@ -568,6 +642,10 @@ async function copyCode(key: string, code: string) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .backend-checklist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workflow-grid {
     grid-template-columns: 1fr;
   }
@@ -582,6 +660,10 @@ async function copyCode(key: string, code: string) {
 
 @media (max-width: 640px) {
   .downloads-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .backend-checklist-grid {
     grid-template-columns: 1fr;
   }
 
