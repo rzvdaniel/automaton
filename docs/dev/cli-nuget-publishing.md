@@ -231,6 +231,37 @@ Use this sequence for reliable releases:
 
 ## 5. Quick Command Reference
 
+### Local deploy behavior notes
+
+`automaton deploy` now uses this resolution order for the server URL:
+
+1. `AUTOMATON_SERVER`
+2. `server` in `automaton.json`
+3. `~/.automaton/config.json`
+4. interactive prompt
+
+That means a project can be self-contained when `automaton.json` includes:
+
+```json
+{
+	"appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+	"name": "My App",
+	"server": "https://api.automaton.monster"
+}
+```
+
+`automaton deploy` also deploys backend scripts using the same API key auth path as the frontend upload. If the app has no `backend/` scripts, the expected result is:
+
+```text
+No backend scripts found
+```
+
+### Deploy troubleshooting
+
+- If the CLI still prompts for a server URL, check whether the installed global tool is stale and reinstall or update it from the latest local package.
+- If `dotnet tool update` says the tool is already installed, bump the package version first or use uninstall/install.
+- If deploy uploads successfully but backend deploy returns `401`, verify the API key and make sure the local server is running the latest backend build.
+
 ### Local pack
 
 ```powershell

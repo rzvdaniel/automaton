@@ -15,6 +15,13 @@ Keep the project local, commit it to Git, and deploy the app to Automaton with t
 automaton config --server https://api.automaton.monster --key ak_execute_xxx
 ```
 
+The CLI also supports keeping `server` in `automaton.json`. Resolution order is:
+
+1. `AUTOMATON_SERVER`
+2. `server` in `automaton.json`
+3. `~/.automaton/config.json`
+4. interactive prompt
+
 3. The AI should create `automaton.json` in the project root automatically when it follows `llms.txt`.
 
 4. If the app already exists in Automaton Studio, link the local project to it:
@@ -41,6 +48,8 @@ automaton deploy
 automaton deploy --clean
 automaton deploy --skip-backend
 ```
+
+`automaton deploy` uploads the frontend archive and then deploys backend scripts using the same API key authentication path. If the app has no backend scripts, a successful deploy may end with `No backend scripts found`.
 
 ## Framework apps
 

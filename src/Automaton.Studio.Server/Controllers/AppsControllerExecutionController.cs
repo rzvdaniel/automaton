@@ -38,7 +38,7 @@ public class AppsControllerExecutionController : ControllerBase
     /// Called before deploying so the frontend can warn the user about pending package installation.
     /// </summary>
     [HttpGet("api/apps/{appId:guid}/backend/deploy-info")]
-    [Authorize]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployInfoResponse>> GetDeployInfo(
         Guid appId,
         CancellationToken cancellationToken)
@@ -53,7 +53,7 @@ public class AppsControllerExecutionController : ControllerBase
     /// Called from the app editor "Deploy Backend" button.
     /// </summary>
     [HttpPost("api/apps/{appId:guid}/backend/deploy")]
-    [Authorize]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployBackendResponse>> DeployBackend(
         Guid appId,
         [FromBody] DeployBackendRequest? request,
