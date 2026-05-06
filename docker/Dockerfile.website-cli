@@ -1,0 +1,45 @@
+# Build the portable CLI downloads that the public website serves from public/cli.
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS cli-build
+
+WORKDIR /src
+
+RUN apk add --no-cache zip tar
+
+COPY src/Automaton.Cli/Automaton.Cli.csproj src/Automaton.Cli/
+RUN dotnet restore src/Automaton.Cli/Automaton.Cli.csproj
+
+COPY src/Automaton.Cli/ src/Automaton.Cli/
+
+RUN set -eux; \
+		mkdir -p /cli-dist; \
+		while read -r runtime archive_type; do \
+			[ -n "$runtime" ] || continue; \
+			output_dir="/tmp/automaton-cli/$runtime"; \
+			package_base="/cli-dist/automaton-cli-$runtime"; \
+			rm -rf "$output_dir"; \
+			mkdir -p "$output_dir"; \
+			dotnet publish src/Automaton.Cli/Automaton.Cli.csproj \
+				--configuration Release \
+				--runtime "$runtime" \
+				--self-contained true \
+				--output "$output_dir" \
+				-p:PublishSingleFile=true \
+				-p:EnableCompressionInSingleFile=true \
+				-p:PublishTrimmed=false; \
+			if [ "$archive_type" = "zip" ]; then \
+				(cd "$output_dir" && zip -rq "$package_base.zip" .); \
+			else \
+				tar -C "$output_dir" -czf "$package_base.tar.gz" .; \
+			fi; \
+		done <<'EOF'
+	win-x64 zip
+	linux-x64 tar.gz
+	osx-arm64 tar.gz
+EOF
+
+RUN cd /cli-dist && sha256sum * > checksums.txt
+
+FROM scratch AS cli-artifacts
+
+COPY --from=cli-build /cli-dist/ /cli-dist/

@@ -1,4 +1,4 @@
-# Automaton Production Deployment Guide
+# Automaton Production Server Setup and Initial Deployment Guide
 
 This guide walks you through deploying the full Automaton stack on a Hetzner VPS using
 Docker Compose, with Traefik as the reverse proxy and Cloudflare for DNS and TLS.

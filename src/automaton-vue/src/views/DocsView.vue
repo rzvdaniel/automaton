@@ -156,7 +156,7 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
                   <span class="code-prompt">$</span>
                   <span class="code-text">dotnet tool install -g Automaton.Cli</span>
                 </div>
-                <p class="step-body">Requires <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>. Alternatively use the installer script for your platform — see the CLI reference in Studio docs.</p>
+                <p class="step-body">Requires <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>. No .NET installed? Download a portable CLI build from <a href="/cli#downloads" class="docs-link">the CLI downloads page</a> instead.</p>
               </div>
             </div>
             <div class="step">

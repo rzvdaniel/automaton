@@ -33,12 +33,12 @@ async function copyInstallCommand() {
               <i :class="copied ? 'pi pi-check' : 'pi pi-copy'" />
             </button>
           </div>
-          <div class="install-note">Prefer direct downloads? Use the packaged builds on the CLI page.</div>
+          <div class="install-note">No .NET installed? Use the portable Windows, Linux, or macOS builds on the CLI page.</div>
         </div>
 
         <div class="install-content">
           <h2 class="install-title">Ship your first app in minutes</h2>
-          <p class="install-subtitle">Install with NuGet, grab direct builds, or copy the exact deploy commands.</p>
+          <p class="install-subtitle">Install with NuGet, download a portable CLI build with no .NET required, or copy the exact deploy commands.</p>
 
           <div class="install-actions">
             <RouterLink to="/cli" class="btn btn-primary btn-lg">

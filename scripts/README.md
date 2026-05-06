@@ -55,6 +55,26 @@ sudo ./setup-service.sh
 | `setup-service.ps1` | Windows | Install/uninstall Windows service |
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
+| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API container |
+| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website |
+| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy the full production stack |
+
+---
+
+## 🚢 Production Docker Redeploy Helpers
+
+These helpers wrap `docker compose -f docker-compose.prod.yml ...` for the most common production redeploy flows.
+
+```bash
+cd /opt/automaton
+./scripts/prod-redeploy-api.sh
+./scripts/prod-redeploy-website.sh
+./scripts/prod-redeploy-website.sh --with-cli-assets
+./scripts/prod-redeploy-all.sh
+./scripts/prod-redeploy-all.sh --with-cli-assets
+```
+
+Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
 
 ---
 

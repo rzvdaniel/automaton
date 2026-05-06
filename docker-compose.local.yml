@@ -82,6 +82,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.website
+      args:
+        CLI_ARTIFACTS_IMAGE: automaton-website-cli:latest
     image: automaton-local-website:latest
     container_name: automaton-local-website
     restart: unless-stopped
@@ -89,6 +91,14 @@ services:
       - "${WEBSITE_LOCAL_PORT:-5174}:80"
     networks:
       - automaton-local
+
+  website-cli-assets:
+    profiles:
+      - build-assets
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.website-cli
+    image: automaton-website-cli:latest
 
   runner:
     build:

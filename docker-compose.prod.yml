@@ -157,6 +157,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.website
+      args:
+        CLI_ARTIFACTS_IMAGE: automaton-website-cli:latest
     image: automaton-prod-website:latest
     container_name: automaton-prod-website
     restart: unless-stopped
@@ -168,6 +170,14 @@ services:
       - "traefik.http.routers.website.entrypoints=websecure"
       - "traefik.http.routers.website.tls.certresolver=letsencrypt"
       - "traefik.http.services.website.loadbalancer.server.port=80"
+
+  website-cli-assets:
+    profiles:
+      - build-assets
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.website-cli
+    image: automaton-website-cli:latest
 
 volumes:
   prod-mysql-data:
