@@ -47,6 +47,7 @@ If the app is being created from scratch locally, skip this step. `link` is only
 - Follow the Automaton app structure from `llms.txt` and the linked files.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
 - Use Python backend controllers in `backend/`.
+- If the app includes Python backend controllers, run `automaton runners`, assign a runner with `automaton set-runner <runner-id>`, and do not consider backend deploy complete until that assignment exists or you have clearly reported why it could not be made.
 - Tell the user to deploy with `automaton deploy` after the app is ready.
 
 ## Deploy commands
@@ -55,6 +56,14 @@ If the app is being created from scratch locally, skip this step. `link` is only
 automaton deploy
 automaton deploy --clean
 automaton deploy --skip-backend
+```
+
+For backend apps, assign a runner before the first backend deploy:
+
+```bash
+automaton runners
+automaton set-runner <runner-id>
+automaton deploy
 ```
 
 `automaton deploy` uploads the frontend archive and then deploys backend scripts using the same API key authentication path. If the app has no backend scripts, a successful deploy may end with `No backend scripts found`.

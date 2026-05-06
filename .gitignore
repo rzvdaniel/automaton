@@ -81,3 +81,5 @@ __pycache__/
 *.egg-info/
 
 .tmp/
+
+apps/

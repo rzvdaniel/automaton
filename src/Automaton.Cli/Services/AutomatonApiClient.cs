@@ -52,6 +52,13 @@ public class AutomatonApiClient : IDisposable
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 
+    public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { executionRunnerId = runnerId }, JsonOptions);
+        using var resp = await PutJsonAsync($"api/apps/{appId}/runner", payload, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     // ── File upload ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -126,6 +133,12 @@ public class AutomatonApiClient : IDisposable
     {
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         return await _http.PostAsync(url, content, ct);
+    }
+
+    private async Task<HttpResponseMessage> PutJsonAsync(string url, string json, CancellationToken ct)
+    {
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        return await _http.PutAsync(url, content, ct);
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage resp)

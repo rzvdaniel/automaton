@@ -75,7 +75,8 @@ window.automatonApi.callController(controller, action, inputs) and use try/catch
 function returns data directly and throws on errors. Use backend/shared/ for shared helpers,
 backend/requirements.txt for extra Python packages,
 backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the
-project root, and deploy with automaton deploy.
+project root. If the app has Python backend controllers, run automaton runners, assign a runner
+with automaton set-runner <runner-id>, and then deploy with automaton deploy.
 ```
 
 Starter prompts for specific stacks (plain HTML, React, Vue) are available at
@@ -118,6 +119,13 @@ Add `build` and `deployDir` for framework apps:
 If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
 
 ### Deploy
+
+For backend apps, assign a runner once before the first backend deploy:
+
+```bash
+automaton runners
+automaton set-runner <runner-id>
+```
 
 ```bash
 automaton deploy
@@ -190,7 +198,7 @@ Copilot can:
 - Generate the project in your local workspace
 - Follow the Automaton backend/controller contract automatically through MCP guidance
 
-When the project is ready, run `automaton deploy` to upload the frontend and deploy the backend.
+When the project is ready, run `automaton set-runner <runner-id>` for backend apps, then `automaton deploy` to upload the frontend and deploy the backend.
 
 #### Iterating
 
@@ -246,7 +254,7 @@ Claude Code can:
 - Generate the local project with the correct Automaton structure
 - Reuse the same project folder across sessions
 
-When the project is ready, run `automaton deploy`.
+When the project is ready, run `automaton set-runner <runner-id>` for backend apps, then `automaton deploy`.
 
 #### Switching Projects
 

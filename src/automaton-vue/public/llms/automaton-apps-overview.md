@@ -10,6 +10,7 @@ Use these rules:
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For plain HTML/CSS/JS apps, prefer root-level frontend files unless the user explicitly wants a separate `frontend/` source folder.
 - Deploy with `automaton deploy`.
+- If the app has Python backend controllers, list available runners with `automaton runners`, assign one with `automaton set-runner <runner-id>`, then deploy.
 - MCP is recommended when supported, but not required.
 
 Recommended workflow for most developers:
@@ -17,7 +18,8 @@ Recommended workflow for most developers:
 2. Keep the project in the local repo.
 3. Build with the user's preferred editor or AI tool.
 4. Make sure `automaton.json` includes `build` and `deployDir` when the deployable frontend is not the project root.
-5. Deploy with `automaton deploy`.
+5. For backend apps, assign a runner with `automaton set-runner <runner-id>`.
+6. Deploy with `automaton deploy`.
 
 Minimal `automaton.json`:
 

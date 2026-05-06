@@ -17,6 +17,7 @@ public class RunnersController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<IEnumerable<RunnerDetails>>> Get([FromQuery] Guid? projectId, CancellationToken cancellationToken)
     {
         return Ok(await runnersService.List(projectId, cancellationToken));

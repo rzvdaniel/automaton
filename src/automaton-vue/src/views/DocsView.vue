@@ -195,13 +195,27 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">5</div>
               <div>
+                <div class="step-title">Assign a runner for backend apps</div>
+                <div class="code-block">
+                  <span class="code-prompt">$</span>
+                  <span class="code-text">automaton runners && automaton set-runner your-runner-id</span>
+                </div>
+                <p class="step-body">
+                  Skip this if the app is frontend-only. If the app has Python backend controllers,
+                  assign a runner once before the first backend deploy.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">6</div>
+              <div>
                 <div class="step-title">Deploy</div>
                 <div class="code-block">
                   <span class="code-prompt">$</span>
                   <span class="code-text">automaton deploy</span>
                 </div>
                 <p class="step-body">
-                  Uploads all files and pushes Python controllers to the runner in one step.
+                  Uploads all files and pushes Python controllers to the assigned runner in one step.
                   Run it again any time you make changes.
                 </p>
               </div>
@@ -214,7 +228,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               <strong>Using Cursor or VS Code?</strong> Point the AI to
               <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
-              Automaton structure and backend/frontend contract. Then run <code>automaton deploy</code>
+              Automaton structure and backend/frontend contract. For backend apps, run <code>automaton set-runner</code>
+              once before the first backend deploy. Then run <code>automaton deploy</code>
               when ready. For the full list of CLI commands and options, see the
               <strong>Documentation → Automaton CLI</strong> page inside Studio.
             </span>
@@ -292,7 +307,8 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
                 <p class="step-body">
                   The AI can create or link the app, understand the required structure, and generate
                   the project in your local workspace. Keep the project in your own Git repo if you want version control,
-                  then run <code>automaton deploy</code> to upload the frontend and deploy the backend.
+                  then run <code>automaton set-runner</code> for backend apps and <code>automaton deploy</code>
+                  to upload the frontend and deploy the backend.
                 </p>
               </div>
             </div>

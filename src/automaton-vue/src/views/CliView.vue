@@ -69,8 +69,8 @@ const workflowSteps = [
   },
   {
     title: 'Deploy from your IDE',
-    description: 'Keep working in VS Code, Cursor, or another editor, and redeploy whenever you change the app.',
-    code: 'automaton deploy',
+    description: 'For backend apps, assign a runner once, then redeploy whenever you change the app.',
+    code: 'automaton runners\nautomaton set-runner your-runner-id\nautomaton deploy',
   },
 ]
 
@@ -135,6 +135,10 @@ async function copyCode(key: string, code: string) {
             <div class="cli-inline-code">
               <span class="cli-code-prompt">$</span>
               <span>automaton config --server https://api.automaton.monster --key your-api-key</span>
+            </div>
+            <div class="cli-inline-code">
+              <span class="cli-code-prompt">$</span>
+              <span>automaton set-runner your-runner-id</span>
             </div>
             <div class="cli-inline-code">
               <span class="cli-code-prompt">$</span>

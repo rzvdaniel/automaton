@@ -28,11 +28,12 @@ public static class RunnersCommand
                 {
                     foreach (var r in result.EnumerateArray())
                     {
+                        var id = r.TryGetProperty("id", out var idProperty) ? idProperty.GetString() ?? "?" : "?";
                         var rname = r.TryGetProperty("name", out var n) ? n.GetString() ?? "?" : "?";
                         var connected = r.TryGetProperty("connectionId", out var c) &&
                                         c.ValueKind != JsonValueKind.Null &&
                                         !string.IsNullOrEmpty(c.GetString());
-                        runners.Add((rname, connected ? "connected" : "offline"));
+                        runners.Add(($"{rname} ({id})", connected ? "connected" : "offline"));
                     }
                 }
 
@@ -43,7 +44,7 @@ public static class RunnersCommand
                 }
 
                 var table = new Table();
-                table.AddColumn("Name");
+                table.AddColumn("Runner");
                 table.AddColumn("Status");
 
                 foreach (var (rname, status) in runners)

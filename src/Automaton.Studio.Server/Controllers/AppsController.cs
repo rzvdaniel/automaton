@@ -351,6 +351,7 @@ public class AppsController : BaseController
     }
 
     [HttpPut("{id}/runner")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> UpdateRunner(Guid id, [FromBody] UpdateRunnerRequest request)
     {
         await appsService.UpdateRunner(id, request.ExecutionRunnerId);

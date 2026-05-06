@@ -49,7 +49,7 @@ If the app has a build step or deploys from a build output folder, add the missi
 }
 ```
 
-**Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner.
+**Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, make sure a runner is assigned first with `automaton runners` and `automaton set-runner <runner-id>`.
 
 ## Frontend stack selection
 
