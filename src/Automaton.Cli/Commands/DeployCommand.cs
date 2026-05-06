@@ -69,7 +69,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[grey]Packing:[/] {relDir}");
 
                 // 3. Zip
-                using var zip = ZipService.CreateZip(deployDir);
+                using var zip = ZipService.CreateZip(cwd, deployDir);
                 var sizeMb = zip.Length / 1_048_576.0;
 
                 // 4. Upload

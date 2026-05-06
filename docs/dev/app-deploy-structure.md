@@ -30,6 +30,8 @@ Current CLI behavior is:
 3. otherwise use `frontend/` if it exists
 4. otherwise upload the project root
 
+When the CLI creates or links a project, it also creates `.automatonignore` in the project root if the file does not already exist.
+
 The CLI excludes a small set of local-only folders when it zips content:
 
 - `.git`
@@ -39,6 +41,26 @@ The CLI excludes a small set of local-only folders when it zips content:
 - `.vs`
 - `.idea`
 - `automaton.json`
+
+These defaults are also written into `.automatonignore` so the project has a visible, editable deploy ignore file.
+
+You can add your own exclude patterns to `.automatonignore`, and the CLI will apply them during packaging whether `deployDir` is set or not.
+
+Example `.automatonignore`:
+
+```text
+# Patterns excluded by automaton deploy
+.git/
+node_modules/
+obj/
+bin/
+.vs/
+.idea/
+automaton.json
+.automatonignore
+*.map
+coverage/
+```
 
 If you omit `deployDir` and the CLI falls back to the project root, `node_modules` is still excluded and will not be uploaded.
 
@@ -219,6 +241,7 @@ When an AI creates or updates `automaton.json`, it should follow these rules:
 - if the app is frontend-only and built to `dist/`, set `build` and `deployDir: "dist"`
 - if the app has backend controllers outside `dist/`, do not assume `deployDir: "dist"` is sufficient
 - if the app has both a framework frontend and a Python backend, prepare one deploy directory that contains both runtime outputs
+- add extra deploy-time excludes to `.automatonignore` instead of trying to encode them into `automaton.json`
 - if `automaton.json` already exists, add missing fields instead of replacing valid existing ones
 
 ## Summary

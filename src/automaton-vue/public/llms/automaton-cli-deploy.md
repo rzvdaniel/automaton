@@ -24,6 +24,8 @@ The CLI also supports keeping `server` in `automaton.json`. Resolution order is:
 
 3. The AI should create `automaton.json` in the project root automatically when it follows `llms.txt`.
 
+The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
+
 4. If the app already exists in Automaton Studio, link the local project to it:
 
 ```bash
@@ -36,6 +38,7 @@ If the app is being created from scratch locally, skip this step. `link` is only
 
 - Build the app in the current local project folder.
 - Keep `automaton.json` in the project root.
+- Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
 - Follow the Automaton app structure from `llms.txt` and the linked files.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
 - Use Python backend controllers in `backend/`.

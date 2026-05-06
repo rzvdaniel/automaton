@@ -12,6 +12,7 @@ namespace Automaton.Cli.Services;
 public class ConfigService
 {
     private const string ProjectConfigFileName = "automaton.json";
+    private const string ProjectIgnoreFileName = ".automatonignore";
     private static readonly string GlobalConfigDir  = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton");
     private static readonly string GlobalConfigFile = Path.Combine(GlobalConfigDir, "config.json");
@@ -53,6 +54,25 @@ public class ConfigService
     {
         var path = Path.Combine(directory, ProjectConfigFileName);
         File.WriteAllText(path, JsonSerializer.Serialize(config, SerializerOptions));
+
+        EnsureProjectIgnoreFile(directory);
+    }
+
+    private static void EnsureProjectIgnoreFile(string directory)
+    {
+        var path = Path.Combine(directory, ProjectIgnoreFileName);
+        if (File.Exists(path)) return;
+
+        var lines = new List<string>
+        {
+            "# Patterns excluded by automaton deploy",
+            "# Add one pattern per line. Use a trailing / for directories.",
+            "# Blank lines and lines starting with # are ignored.",
+            string.Empty
+        };
+
+        lines.AddRange(ZipService.DefaultIgnorePatterns);
+        File.WriteAllLines(path, lines);
     }
 
     // ── Global config ─────────────────────────────────────────────────────────

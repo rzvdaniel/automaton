@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Automaton.Cli.Services;
 
@@ -10,14 +11,18 @@ namespace Automaton.Cli.Services;
 /// </summary>
 public static class ZipService
 {
-    private static readonly HashSet<string> ExcludedDirs = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".git", "node_modules", "obj", "bin", ".vs", ".idea"
-    };
+    private const string IgnoreFileName = ".automatonignore";
 
-    private static readonly HashSet<string> ExcludedFiles = new(StringComparer.OrdinalIgnoreCase)
+    public static readonly string[] DefaultIgnorePatterns =
     {
-        "automaton.json"
+        ".git/",
+        "node_modules/",
+        "obj/",
+        "bin/",
+        ".vs/",
+        ".idea/",
+        "automaton.json",
+        ".automatonignore"
     };
 
     /// <summary>
@@ -46,33 +51,95 @@ public static class ZipService
     /// Creates an in-memory zip of <paramref name="sourceDir"/> and returns the stream.
     /// The returned stream is positioned at 0 — caller is responsible for disposing.
     /// </summary>
-    public static Stream CreateZip(string sourceDir)
+    public static Stream CreateZip(string projectRoot, string sourceDir)
     {
+        var ignoreMatcher = CreateIgnoreMatcher(projectRoot);
         var ms = new MemoryStream();
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddDirectory(archive, sourceDir, sourceDir);
+            AddDirectory(archive, sourceDir, sourceDir, ignoreMatcher);
         }
 
         ms.Position = 0;
         return ms;
     }
 
-    private static void AddDirectory(ZipArchive archive, string rootDir, string currentDir)
+    private static void AddDirectory(ZipArchive archive, string rootDir, string currentDir, Matcher ignoreMatcher)
     {
         foreach (var file in Directory.GetFiles(currentDir))
         {
-            var fileName = Path.GetFileName(file);
-            if (ExcludedFiles.Contains(fileName)) continue;
-
             var entryName = Path.GetRelativePath(rootDir, file).Replace('\\', '/');
+            if (IsIgnored(ignoreMatcher, entryName)) continue;
+
             archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
         }
 
         foreach (var dir in Directory.GetDirectories(currentDir))
         {
-            if (ExcludedDirs.Contains(Path.GetFileName(dir))) continue;
-            AddDirectory(archive, rootDir, dir);
+            var relativeDir = Path.GetRelativePath(rootDir, dir).Replace('\\', '/');
+            if (IsIgnored(ignoreMatcher, relativeDir, isDirectory: true)) continue;
+
+            AddDirectory(archive, rootDir, dir, ignoreMatcher);
         }
+    }
+
+    private static Matcher CreateIgnoreMatcher(string projectRoot)
+    {
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+
+        foreach (var pattern in DefaultIgnorePatterns)
+        {
+            AddIgnorePattern(matcher, pattern);
+        }
+
+        foreach (var pattern in LoadCustomIgnorePatterns(projectRoot))
+        {
+            AddIgnorePattern(matcher, pattern);
+        }
+
+        return matcher;
+    }
+
+    private static IEnumerable<string> LoadCustomIgnorePatterns(string projectRoot)
+    {
+        var path = Path.Combine(projectRoot, IgnoreFileName);
+        if (!File.Exists(path)) yield break;
+
+        foreach (var rawLine in File.ReadLines(path))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+                continue;
+
+            if (line.StartsWith("!", StringComparison.Ordinal))
+                throw new InvalidOperationException($"{IgnoreFileName} does not support negation patterns yet: {line}");
+
+            yield return line;
+        }
+    }
+
+    private static void AddIgnorePattern(Matcher matcher, string pattern)
+    {
+        var normalized = pattern.Replace('\\', '/').Trim();
+        if (normalized.StartsWith("./", StringComparison.Ordinal))
+            normalized = normalized[2..];
+
+        if (normalized.EndsWith("/", StringComparison.Ordinal))
+        {
+            normalized = normalized.TrimEnd('/');
+            matcher.AddInclude(normalized);
+            matcher.AddInclude($"{normalized}/**");
+            return;
+        }
+
+        matcher.AddInclude(normalized);
+    }
+
+    private static bool IsIgnored(Matcher matcher, string relativePath, bool isDirectory = false)
+    {
+        if (matcher.Match(relativePath).HasMatches)
+            return true;
+
+        return isDirectory && matcher.Match(relativePath + "/").HasMatches;
     }
 }
