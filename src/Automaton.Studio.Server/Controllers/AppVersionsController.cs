@@ -11,7 +11,6 @@ namespace Automaton.Studio.Server.Controllers;
 /// App versions capture immutable snapshots of app files and custom steps,
 /// typically triggered when new AI chat sessions are created.
 /// </summary>
-[Authorize]
 [ApiController]
 [Route("api/apps/{appId}/versions")]
 public class AppVersionsController : BaseController
@@ -35,21 +34,27 @@ public class AppVersionsController : BaseController
     /// Automatic snapshots are also created before each AI generation via AiAppConversationController.
     /// </summary>
     [HttpPost("snapshot")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<AppVersionDto>> CreateSnapshot(Guid appId, [FromBody] CreateVersionSnapshotRequest? request = null)
     {
         try
         {
-            var userId = GetUserId();
-            if (userId == Guid.Empty)
-            {
-                return Unauthorized(new { message = "User context not available" });
-            }
-
             // Verify the app exists and user has access
             var app = appsService.Get(appId);
             if (app is null)
             {
                 return NotFound(new { message = "App not found" });
+            }
+
+            var userId = GetUserId();
+            if (userId == Guid.Empty && app.UserId.HasValue)
+            {
+                userId = app.UserId.Value;
+            }
+
+            if (userId == Guid.Empty)
+            {
+                return Unauthorized(new { message = "User context not available" });
             }
 
             // Determine trigger type

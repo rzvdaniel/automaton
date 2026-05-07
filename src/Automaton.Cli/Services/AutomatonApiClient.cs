@@ -125,26 +125,40 @@ public class AutomatonApiClient : IDisposable
         using var resp = await _http.GetAsync($"api/apps/{appId}/files/{encoded}", ct);
         await EnsureSuccessAsync(resp);
         var body = await resp.Content.ReadAsStringAsync(ct);
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            var root = doc.RootElement;
+        return UnwrapFileContent(body);
+    }
 
-            if (root.ValueKind == JsonValueKind.Object
-                && root.TryGetProperty("success", out var successProperty)
-                && (successProperty.ValueKind == JsonValueKind.True || successProperty.ValueKind == JsonValueKind.False)
-                && root.TryGetProperty("content", out var contentProperty)
-                && contentProperty.ValueKind == JsonValueKind.String)
+    private static string UnwrapFileContent(string body)
+    {
+        const int maxEnvelopeDepth = 5;
+        var current = body;
+
+        for (var depth = 0; depth < maxEnvelopeDepth; depth++)
+        {
+            try
             {
-                return contentProperty.GetString() ?? string.Empty;
+                using var doc = JsonDocument.Parse(current);
+                var root = doc.RootElement;
+
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("success", out var successProperty)
+                    || (successProperty.ValueKind != JsonValueKind.True && successProperty.ValueKind != JsonValueKind.False)
+                    || !root.TryGetProperty("content", out var contentProperty)
+                    || contentProperty.ValueKind != JsonValueKind.String)
+                {
+                    return current;
+                }
+
+                current = contentProperty.GetString() ?? string.Empty;
+            }
+            catch (JsonException)
+            {
+                // Raw file bodies are not JSON and should be returned unchanged.
+                return current;
             }
         }
-        catch (JsonException)
-        {
-            // Raw file bodies are not JSON and should be returned unchanged.
-        }
 
-        return body;
+        return current;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
