@@ -136,9 +136,10 @@ public class ConfigService
         File.WriteAllText(GlobalConfigFile, JsonSerializer.Serialize(config, SerializerOptions));
     }
 
-    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
+    public (string? server, string? apiKey) ResolveCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
     {
-        var local = LoadProjectLocalConfig(directory ?? Directory.GetCurrentDirectory());
+        var cwd = directory ?? Directory.GetCurrentDirectory();
+        var local = LoadProjectLocalConfig(cwd);
         var global = LoadGlobalConfig();
 
         var server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")
@@ -148,6 +149,15 @@ public class ConfigService
         var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")
             ?? local.ApiKey
             ?? global.ApiKey;
+
+        return (server?.TrimEnd('/'), apiKey);
+    }
+
+    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
+    {
+        var (resolvedServer, resolvedApiKey) = ResolveCredentials(projectConfig, directory);
+        var server = resolvedServer;
+        var apiKey = resolvedApiKey;
 
         if (string.IsNullOrWhiteSpace(server))
         {

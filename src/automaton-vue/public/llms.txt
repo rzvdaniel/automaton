@@ -51,6 +51,36 @@ If the app has a build step or deploys from a build output folder, add the missi
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, make sure a runner is assigned first with `automaton runners` and `automaton set-runner <runner-id>`.
 
+## Autonomous Full Flow
+
+When the AI is asked to build an Automaton app from scratch in a local project, prefer the CLI as the primary execution surface.
+
+Follow this order:
+
+1. Ensure the Automaton CLI is installed.
+2. Run `automaton whoami`.
+3. If the CLI is not authenticated yet, run `automaton login`.
+4. Check whether `automaton.json` exists in the project root.
+5. If it does not exist, run `automaton create --name "<app-name>"`.
+6. Scaffold the app locally using the simplest suitable frontend stack.
+7. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
+8. If no runner is assigned or available, prefer `automaton ensure-local-runner --assign` when Docker is available. If that cannot succeed, clearly report why and stop before backend deploy.
+9. Run `automaton validate` before deploy.
+10. Run `automaton deploy`.
+11. Ask for confirmation before public publish.
+12. After approval, run `automaton publish --yes`.
+13. Run `automaton status` and validate the live app URL.
+
+Completion criteria:
+
+1. `automaton.json` exists in the project root.
+2. The app files exist locally in the repo.
+3. A runner is assigned when backend controllers exist.
+4. `automaton deploy` succeeded.
+5. If the user asked for a live published app, `automaton publish --yes` succeeded.
+
+Prefer MCP only as a secondary enhancement when the tool supports it. MCP should mirror the same flow, not replace the CLI requirement.
+
 ## Frontend stack selection
 
 Choose the simplest frontend stack that fits the requested app.
@@ -79,4 +109,4 @@ Read these files in order for complete guidance:
 
 - **App Editor inside Automaton Studio** — fastest browser-first path, no local setup
 - **Local IDE + CLI deploy** — default developer workflow, keep project in Git
-- **MCP** — when the AI tool supports it, gives the most accurate Automaton-specific guidance
+- **MCP** — secondary structured interface when supported; the CLI should still be enough to complete the job

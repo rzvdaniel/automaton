@@ -10,16 +10,32 @@ Use these rules:
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For plain HTML/CSS/JS apps, prefer root-level frontend files unless the user explicitly wants a separate `frontend/` source folder.
 - Deploy with `automaton deploy`.
-- If the app has Python backend controllers, list available runners with `automaton runners`, assign one with `automaton set-runner <runner-id>`, then deploy.
-- MCP is recommended when supported, but not required.
+- If the app has Python backend controllers, inspect the assignment with `automaton current-runner`, list available runners with `automaton runners`, assign one with `automaton set-runner <runner-id>`, or bootstrap one with `automaton ensure-local-runner --assign`, then deploy.
+- The CLI should be the primary autonomous path. MCP is a secondary enhancement when supported, not a requirement.
 
 Recommended workflow for most developers:
-1. Create or link the app.
-2. Keep the project in the local repo.
-3. Build with the user's preferred editor or AI tool.
-4. Make sure `automaton.json` includes `build` and `deployDir` when the deployable frontend is not the project root.
-5. For backend apps, assign a runner with `automaton set-runner <runner-id>`.
-6. Deploy with `automaton deploy`.
+1. Authenticate with `automaton login` if needed.
+2. Create or link the app.
+3. Run `automaton validate` before deploy.
+4. Keep the project in the local repo.
+5. Build with the user's preferred editor or AI tool.
+6. Make sure `automaton.json` includes `build` and `deployDir` when the deployable frontend is not the project root.
+7. For backend apps, ensure a runner exists and is assigned.
+8. Deploy with `automaton deploy`.
+9. Publish only after user approval.
+
+Canonical autonomous order:
+
+```bash
+automaton whoami
+automaton create --name "My App"
+automaton validate
+automaton current-runner
+automaton ensure-local-runner --assign
+automaton deploy
+automaton publish --yes
+automaton status
+```
 
 Minimal `automaton.json`:
 

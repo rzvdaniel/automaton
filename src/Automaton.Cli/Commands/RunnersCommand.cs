@@ -12,9 +12,14 @@ public static class RunnersCommand
 {
     public static Command Build(ConfigService config)
     {
-        var cmd = new Command("runners", "List runners available on your Automaton account");
+        var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        cmd.SetHandler(async () =>
+        var cmd = new Command("runners", "List runners available on your Automaton account")
+        {
+            jsonOption
+        };
+
+        cmd.SetHandler(async (bool asJson) =>
         {
             try
             {
@@ -23,7 +28,7 @@ public static class RunnersCommand
                 using var client = new AutomatonApiClient(server, apiKey);
                 var result = await client.ListRunnersAsync();
 
-                var runners = new List<(string Name, string Status)>();
+                var runners = new List<object>();
                 if (result.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var r in result.EnumerateArray())
@@ -33,8 +38,20 @@ public static class RunnersCommand
                         var connected = r.TryGetProperty("connectionId", out var c) &&
                                         c.ValueKind != JsonValueKind.Null &&
                                         !string.IsNullOrEmpty(c.GetString());
-                        runners.Add(($"{rname} ({id})", connected ? "connected" : "offline"));
+                        runners.Add(new
+                        {
+                            id,
+                            name = rname,
+                            status = connected ? "connected" : "offline",
+                            connectionId = connected ? c.GetString() : null
+                        });
                     }
+                }
+
+                if (asJson)
+                {
+                    CliJson.Write(new { server, runners });
+                    return;
                 }
 
                 if (runners.Count == 0)
@@ -47,12 +64,14 @@ public static class RunnersCommand
                 table.AddColumn("Runner");
                 table.AddColumn("Status");
 
-                foreach (var (rname, status) in runners)
+                foreach (var runner in runners)
                 {
+                    var status = runner.GetType().GetProperty("status")?.GetValue(runner)?.ToString() ?? "offline";
+                    var label = $"{runner.GetType().GetProperty("name")?.GetValue(runner)} ({runner.GetType().GetProperty("id")?.GetValue(runner)})";
                     var statusMarkup = status == "connected"
                         ? "[green]● connected[/]"
                         : "[grey]○ offline[/]";
-                    table.AddRow(rname, statusMarkup);
+                    table.AddRow(label, statusMarkup);
                 }
 
                 AnsiConsole.Write(table);
@@ -62,7 +81,7 @@ public static class RunnersCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.Exit(1);
             }
-        });
+        }, jsonOption);
 
         return cmd;
     }

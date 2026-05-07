@@ -47,6 +47,8 @@ wwwroot/app-thumbnails/**
 
 #npm
 node_modules/
+src/automaton-vue/dist/
+src/automaton-studio-vue/dist/
 
 #volatile
 App_Data/

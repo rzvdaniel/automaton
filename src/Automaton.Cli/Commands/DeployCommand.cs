@@ -31,14 +31,17 @@ public static class DeployCommand
             ["--dir", "-d"],
             "Directory to upload (overrides deployDir in automaton.json)");
 
+        var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
             cleanOption,
             skipBackendOption,
-            dirOption
+            dirOption,
+            jsonOption
         };
 
-        cmd.SetHandler(async (bool clean, bool skipBackend, string? dir) =>
+        cmd.SetHandler(async (bool clean, bool skipBackend, string? dir, bool asJson) =>
         {
             try
             {
@@ -89,24 +92,53 @@ public static class DeployCommand
                 var skipped = uploadResult.TryGetProperty("skipped", out var s)
                     ? s.GetArrayLength() : 0;
 
-                AnsiConsole.MarkupLine($"[green]✓[/] Uploaded [bold]{written}[/] file(s), {skipped} skipped ({sizeMb:F1} MB)");
+                string? backendMessage = null;
+                var backendSuccess = false;
+                var backendRunnerCount = 0;
+
+                if (!asJson)
+                {
+                    AnsiConsole.MarkupLine($"[green]✓[/] Uploaded [bold]{written}[/] file(s), {skipped} skipped ({sizeMb:F1} MB)");
+                }
 
                 // 5. Deploy backend
                 if (!skipBackend)
                 {
-                    AnsiConsole.MarkupLine("[grey]Deploying backend...[/]");
+                    if (!asJson)
+                    {
+                        AnsiConsole.MarkupLine("[grey]Deploying backend...[/]");
+                    }
                     var deployResult = await client.DeployBackendAsync(appConfig.AppId);
 
-                    var success = deployResult.TryGetProperty("success", out var succ) && succ.GetBoolean();
-                    var message = deployResult.TryGetProperty("message", out var msg) ? msg.GetString() : null;
-                    var runnerCount = deployResult.TryGetProperty("runnerCount", out var rc) ? rc.GetInt32() : 0;
+                    backendSuccess = deployResult.TryGetProperty("success", out var succ) && succ.GetBoolean();
+                    backendMessage = deployResult.TryGetProperty("message", out var msg) ? msg.GetString() : null;
+                    backendRunnerCount = deployResult.TryGetProperty("runnerCount", out var rc) ? rc.GetInt32() : 0;
 
-                    if (success || runnerCount > 0)
-                        AnsiConsole.MarkupLine($"[green]✓[/] {message ?? $"Backend deployed to {runnerCount} runner(s)"}");
-                    else if (deployResult.TryGetProperty("runnerCount", out var rc2) && rc2.GetInt32() == 0)
-                        AnsiConsole.MarkupLine("[yellow]⚠[/] No runner assigned — backend not deployed. Run 'automaton set-runner' first.");
-                    else
-                        AnsiConsole.MarkupLine($"[yellow]⚠[/] {message ?? "Backend deploy returned no info"}");
+                    if (!asJson)
+                    {
+                        if (backendSuccess || backendRunnerCount > 0)
+                            AnsiConsole.MarkupLine($"[green]✓[/] {backendMessage ?? $"Backend deployed to {backendRunnerCount} runner(s)"}");
+                        else if (deployResult.TryGetProperty("runnerCount", out var rc2) && rc2.GetInt32() == 0)
+                            AnsiConsole.MarkupLine("[yellow]⚠[/] No runner assigned — backend not deployed. Run 'automaton set-runner' first.");
+                        else
+                            AnsiConsole.MarkupLine($"[yellow]⚠[/] {backendMessage ?? "Backend deploy returned no info"}");
+                    }
+                }
+
+                if (asJson)
+                {
+                    CliJson.Write(new
+                    {
+                        success = true,
+                        appId = appConfig.AppId,
+                        appName = appConfig.Name,
+                        deployDirectory = deployDir,
+                        clean,
+                        skipBackend,
+                        uploaded = new { written, skipped, sizeMb },
+                        backend = new { attempted = !skipBackend, success = backendSuccess, runnerCount = backendRunnerCount, message = backendMessage }
+                    });
+                    return;
                 }
 
                 AnsiConsole.MarkupLine("[green bold]Deploy complete.[/]");
@@ -116,7 +148,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.Exit(1);
             }
-        }, cleanOption, skipBackendOption, dirOption);
+        }, cleanOption, skipBackendOption, dirOption, jsonOption);
 
         return cmd;
     }

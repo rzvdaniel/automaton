@@ -15,14 +15,16 @@ public static class SetRunnerCommand
     {
         var runnerArgument = new Argument<string?>("runner", () => null, "Runner ID or exact runner name");
         var clearOption = new Option<bool>("--clear", "Clear the assigned runner for the current app");
+        var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
         var cmd = new Command("set-runner", "Assign or clear the execution runner for the current app")
         {
             runnerArgument,
             clearOption,
+            jsonOption,
         };
 
-        cmd.SetHandler(async (string? runner, bool clear) =>
+        cmd.SetHandler(async (string? runner, bool clear, bool asJson) =>
         {
             try
             {
@@ -42,6 +44,11 @@ public static class SetRunnerCommand
                 if (clear)
                 {
                     await client.UpdateAppRunnerAsync(appConfig.AppId, null);
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = true, action = "clear", appId = appConfig.AppId, runnerId = (string?)null });
+                        return;
+                    }
                     AnsiConsole.MarkupLine($"[green]✓[/] Cleared runner assignment for [cyan]{appConfig.Name}[/].");
                     return;
                 }
@@ -82,6 +89,11 @@ public static class SetRunnerCommand
                 var runnerName = selected.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() ?? runnerId : runnerId;
 
                 await client.UpdateAppRunnerAsync(appConfig.AppId, runnerId);
+                if (asJson)
+                {
+                    CliJson.Write(new { success = true, action = "assign", appId = appConfig.AppId, runnerId, runnerName });
+                    return;
+                }
                 AnsiConsole.MarkupLine($"[green]✓[/] Assigned runner [bold]{runnerName}[/] to [cyan]{appConfig.Name}[/].");
             }
             catch (Exception ex)
@@ -89,7 +101,7 @@ public static class SetRunnerCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.Exit(1);
             }
-        }, runnerArgument, clearOption);
+        }, runnerArgument, clearOption, jsonOption);
 
         return cmd;
     }

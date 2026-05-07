@@ -52,11 +52,28 @@ public class AutomatonApiClient : IDisposable
         return JsonDocument.Parse(json).RootElement.Clone();
     }
 
+    public async Task<JsonElement> GetUserProfileAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/User/GetUserProfile", ct);
+        await EnsureSuccessAsync(resp);
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        return JsonDocument.Parse(json).RootElement.Clone();
+    }
+
     public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { executionRunnerId = runnerId }, JsonOptions);
         using var resp = await PutJsonAsync($"api/apps/{appId}/runner", payload, ct);
         await EnsureSuccessAsync(resp);
+    }
+
+    public async Task<JsonElement> CreateApiKeyAsync(string name, string? description, int scope, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { name, description, scope }, JsonOptions);
+        using var resp = await PostJsonAsync("api/ApiKeys", payload, ct);
+        await EnsureSuccessAsync(resp);
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        return JsonDocument.Parse(json).RootElement.Clone();
     }
 
     // ── File upload ───────────────────────────────────────────────────────────
