@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import AppNav from '@/components/AppNav.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import { publicAppConfig } from '@/config/publicAppConfig'
 
 const downloadCards = [
   {
@@ -39,7 +40,7 @@ const directScripts = [
     code: [
       '$release = "$HOME\\automaton-cli"',
       'New-Item -ItemType Directory -Force -Path $release | Out-Null',
-      'Invoke-WebRequest https://automaton.monster/cli/automaton-cli-win-x64.zip -OutFile "$release\\automaton-cli-win-x64.zip"',
+      `Invoke-WebRequest ${publicAppConfig.cliDownloadsBaseUrl}automaton-cli-win-x64.zip -OutFile "$release\\automaton-cli-win-x64.zip"`,
       'Expand-Archive "$release\\automaton-cli-win-x64.zip" -DestinationPath $release -Force',
       '& "$release\\automaton.exe" --help',
     ].join('\n'),
@@ -49,7 +50,7 @@ const directScripts = [
     description: 'Download and extract the Linux build to a local folder.',
     code: [
       'mkdir -p "$HOME/automaton-cli"',
-      'curl -L https://automaton.monster/cli/automaton-cli-linux-x64.tar.gz -o "$HOME/automaton-cli/automaton-cli-linux-x64.tar.gz"',
+      `curl -L ${publicAppConfig.cliDownloadsBaseUrl}automaton-cli-linux-x64.tar.gz -o "$HOME/automaton-cli/automaton-cli-linux-x64.tar.gz"`,
       'tar -xzf "$HOME/automaton-cli/automaton-cli-linux-x64.tar.gz" -C "$HOME/automaton-cli"',
       '"$HOME/automaton-cli/automaton" --help',
     ].join('\n'),
@@ -65,7 +66,7 @@ const quickStartSteps = [
   {
     title: 'Configure auth',
     detail: 'Point the CLI at your server and API key so the local project can talk to Automaton.',
-    code: 'automaton config --server https://api.automaton.monster --key your-api-key',
+    code: `automaton config --server ${publicAppConfig.apiBaseUrl} --key your-api-key`,
   },
   {
     title: 'Create app',
@@ -83,7 +84,7 @@ const workflowSteps = [
   {
     title: 'Start with the AI-readable contract',
     description: 'Point your IDE or AI agent to llms.txt before asking it to generate files. It should create the app structure and automaton.json for you.',
-    code: 'Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.',
+    code: `Read ${publicAppConfig.llmsUrl}, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.`,
   },
   {
     title: 'Connect the local project',
@@ -162,7 +163,7 @@ async function copyCode(key: string, code: string) {
                 <i class="pi pi-compass" />
                 View workflow
               </a>
-              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="btn btn-secondary">
+              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="btn btn-secondary">
                 <i class="pi pi-sparkles" />
                 Open llms.txt
               </a>
@@ -363,7 +364,7 @@ async function copyCode(key: string, code: string) {
                 </div>
                 <div class="resource-links">
                   <a href="/docs" class="btn btn-primary resource-button resource-button-primary">Open Building apps with Automaton</a>
-                  <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="btn btn-secondary resource-button resource-button-secondary">Open AI instructions</a>
+                  <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="btn btn-secondary resource-button resource-button-secondary">Open AI instructions</a>
                 </div>
               </div>
             </article>

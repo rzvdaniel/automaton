@@ -2,6 +2,8 @@
 
 The Automaton CLI (`automaton`) deploys apps, manages versions, and lists runners from the terminal.
 
+It also supports explicit login/logout flows for local development, testing, and account switching.
+
 ---
 
 ## Requirements
@@ -90,6 +92,47 @@ For framework apps (React, Vue, Angular) that need a build step:
 ---
 
 ## Commands
+
+### `automaton login`
+
+Store and validate CLI credentials for the current project by default.
+
+```bash
+automaton login
+automaton login --global
+automaton whoami
+```
+
+By default, credentials are saved to `./.automaton/config.json`. Use `--global` to save them to `~/.automaton/config.json` instead.
+
+---
+
+### `automaton logout`
+
+Clear stored CLI credentials.
+
+```bash
+automaton logout           # clear project-local credentials
+automaton logout --global  # clear global credentials
+automaton logout --all     # clear both
+```
+
+Use this when testing first-run auth flows, switching accounts, or resetting machine-local stored credentials. If `AUTOMATON_SERVER` or `AUTOMATON_API_KEY` are still set in the environment, they will continue to override file-based config.
+
+---
+
+### `automaton whoami`
+
+Show the current authenticated user and resolved server.
+
+```bash
+automaton whoami
+automaton whoami --json
+```
+
+Useful after `automaton login` or `automaton logout` to confirm which credentials are currently active.
+
+---
 
 ### `automaton init`
 

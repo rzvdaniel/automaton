@@ -60,16 +60,17 @@ Follow this order:
 1. Ensure the Automaton CLI is installed.
 2. Run `automaton whoami`.
 3. If the CLI is not authenticated yet, run `automaton login`.
-4. Check whether `automaton.json` exists in the project root.
-5. If it does not exist, run `automaton create --name "<app-name>"`.
-6. Scaffold the app locally using the simplest suitable frontend stack.
-7. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
-8. If no runner is assigned or available, prefer `automaton ensure-local-runner --assign` when Docker is available. If that cannot succeed, clearly report why and stop before backend deploy.
-9. Run `automaton validate` before deploy.
-10. Run `automaton deploy`.
-11. Ask for confirmation before public publish.
-12. After approval, run `automaton publish --yes`.
-13. Run `automaton status` and validate the live app URL.
+4. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all` before logging in again.
+5. Check whether `automaton.json` exists in the project root.
+6. If it does not exist, run `automaton create --name "<app-name>"`.
+7. Scaffold the app locally using the simplest suitable frontend stack.
+8. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
+9. If no runner is assigned or available, prefer `automaton ensure-local-runner --assign` when Docker is available. If that cannot succeed, clearly report why and stop before backend deploy.
+10. Run `automaton validate` before deploy.
+11. Run `automaton deploy`.
+12. Ask for confirmation before public publish.
+13. After approval, run `automaton publish --yes`.
+14. Run `automaton status` and validate the live app URL.
 
 Completion criteria:
 

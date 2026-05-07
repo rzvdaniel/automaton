@@ -85,6 +85,15 @@ public class ConfigService
         EnsureProjectIgnoreFile(directory);
     }
 
+    public bool ClearProjectLocalConfig(string directory)
+    {
+        var path = GetProjectLocalConfigPath(directory);
+        if (!File.Exists(path)) return false;
+
+        File.Delete(path);
+        return true;
+    }
+
     public string GetProjectLocalConfigPath(string directory)
     {
         return Path.Combine(directory, ProjectConfigDirName, ProjectLocalConfigFileName);
@@ -134,6 +143,14 @@ public class ConfigService
     {
         Directory.CreateDirectory(GlobalConfigDir);
         File.WriteAllText(GlobalConfigFile, JsonSerializer.Serialize(config, SerializerOptions));
+    }
+
+    public bool ClearGlobalConfig()
+    {
+        if (!File.Exists(GlobalConfigFile)) return false;
+
+        File.Delete(GlobalConfigFile);
+        return true;
     }
 
     public (string? server, string? apiKey) ResolveCredentials(AutomatonConfig? projectConfig = null, string? directory = null)

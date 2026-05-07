@@ -7,6 +7,7 @@ var config = new ConfigService();
 var root = new RootCommand("Automaton CLI — create, deploy, and publish Automaton apps")
 {
     LoginCommand.Build(config),
+    LogoutCommand.Build(config),
     WhoAmICommand.Build(config),
     CreateCommand.Build(config),
     StatusCommand.Build(config),

@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { publicAppConfig } from '@/config/publicAppConfig'
+</script>
+
 <template>
   <footer class="site-footer">
     <div class="container footer-inner">
@@ -32,7 +36,7 @@
         <h4 class="footer-col-title">Resources</h4>
         <a href="/docs" class="footer-link">Docs</a>
         <a href="/cli#downloads" class="footer-link">CLI Downloads</a>
-        <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="footer-link">llms.txt</a>
+        <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="footer-link">llms.txt</a>
         <a href="/cli#workflow" class="footer-link">Deploy Guide</a>
       </div>
 

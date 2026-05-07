@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { publicAppConfig } from '@/config/publicAppConfig'
+
 const steps = [
   {
     icon: 'pi-code',
@@ -55,7 +57,7 @@ const steps = [
             See the full CLI workflow
             <i class="pi pi-arrow-right" />
           </a>
-          <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="steps-link steps-link-muted">
+          <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="steps-link steps-link-muted">
             Read llms.txt
             <i class="pi pi-external-link" />
           </a>

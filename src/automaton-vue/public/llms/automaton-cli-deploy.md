@@ -18,6 +18,14 @@ automaton login
 automaton whoami
 ```
 
+For testing, account switching, or a clean auth reset:
+
+```bash
+automaton logout
+automaton logout --global
+automaton logout --all
+```
+
 Fallback when the user wants explicit API key configuration:
 
 ```bash
@@ -67,10 +75,11 @@ automaton status
 Interpretation rules:
 
 1. Run `automaton whoami` first so the AI knows whether login is needed.
-2. Use `automaton create` for new apps; reserve `automaton link` for existing remote apps.
-3. Run `automaton validate` before deploy.
-4. If backend controllers exist and no runner is assigned, prefer `automaton ensure-local-runner --assign` when Docker is available.
-5. Ask the user before public publish, then use `automaton publish --yes` only after approval.
+2. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton login`.
+3. Use `automaton create` for new apps; reserve `automaton link` for existing remote apps.
+4. Run `automaton validate` before deploy.
+5. If backend controllers exist and no runner is assigned, prefer `automaton ensure-local-runner --assign` when Docker is available.
+6. Ask the user before public publish, then use `automaton publish --yes` only after approval.
 
 ## What the AI should do
 
@@ -129,3 +138,5 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ```text
 Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Authenticate with automaton login if needed, create or link automaton.json in the project root, ensure a runner exists for backend controllers, run automaton validate before deploy, and only publish after explicit user confirmation.
 ```
+
+If the user asks to switch accounts or reset stored auth during testing, use `automaton logout` before logging in again.

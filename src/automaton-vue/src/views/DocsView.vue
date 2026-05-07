@@ -2,8 +2,22 @@
 import AppNav from '@/components/AppNav.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { ref } from 'vue'
+import { publicAppConfig } from '@/config/publicAppConfig'
 
-const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
+const activePath = ref<'editor' | 'agent' | 'cli' | 'mcp'>('agent')
+const aiCliSetupPrompt = `"Read ${publicAppConfig.llmsUrl} first. Then install Automaton CLI in this environment if needed, or verify that it is already available."`
+const copilotMcpConfig = `{
+  "servers": {
+    "automaton": {
+      "type": "http",
+      "url": "${publicAppConfig.mcpUrl}",
+      "headers": {
+        "X-API-Key": "your-api-key"
+      }
+    }
+  }
+}`
+const claudeMcpCommand = `claude mcp add automaton --transport http "${publicAppConfig.mcpUrl}" --header "X-API-Key: your-api-key"`
 </script>
 
 <template>
@@ -31,6 +45,16 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div>
               <div class="tab-name">AI Editor</div>
               <div class="tab-desc">No setup · fastest start</div>
+            </div>
+          </button>
+          <button
+            :class="['path-tab', activePath === 'agent' && 'active']"
+            @click="activePath = 'agent'"
+          >
+            <i class="pi pi-bolt" />
+            <div>
+              <div class="tab-name">AI + CLI</div>
+              <div class="tab-desc">Minimal setup · AI-driven</div>
             </div>
           </button>
           <button
@@ -126,14 +150,106 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
           </div>
         </div>
 
-        <!-- ── PATH 2: CLI ────────────────────────────────────── -->
+        <!-- ── PATH 2: AI + CLI ───────────────────────────────── -->
+        <div v-if="activePath === 'agent'" class="path-content">
+          <div class="path-intro">
+            <span class="path-badge path-badge-amber">Minimal setup</span>
+            <p>
+              Use your own coding tool, give the AI access to the Automaton CLI, and let it drive
+              the workflow in your local project. This is the best path when you want AI help, Git
+              control, and a real folder on disk instead of building inside the Studio editor.
+            </p>
+          </div>
+
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div>
+                <div class="step-title">Start by pointing the AI to Automaton instructions</div>
+                <div class="prompt-example">
+                  {{ aiCliSetupPrompt }}
+                </div>
+                <p class="step-body">
+                  Today, most coding tools do <strong>not</strong> already know the Automaton CLI or app structure.
+                  Point them to <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+                  first, then let the AI check for <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>, install the global tool when possible, or send you to <a href="/cli#downloads" class="docs-link">the portable CLI downloads page</a> if the environment cannot use the standard install path.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div>
+                <div class="step-title">Let the AI initiate login and handle app linking</div>
+                <p class="step-body">
+                  Tell the AI to run <code>automaton login</code> and guide the flow, then complete the actual
+                  browser auth or credential step yourself when prompted. After login succeeds, the AI can
+                  confirm identity with <code>automaton whoami</code> and create or link the app in the current folder.
+                  The goal is for the workspace to end up linked with <code>automaton.json</code> already written.
+                </p>
+                <p class="step-body">
+                  If you need a clean auth reset for testing or want to switch accounts, ask the AI to run
+                  <code>automaton logout</code>, <code>automaton logout --global</code>, or <code>automaton logout --all</code>
+                  before starting the login flow again.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div>
+                <div class="step-title">Tell the AI to build the app and use the CLI</div>
+                <div class="prompt-example">
+                  "Build an Automaton app for [your idea] in this folder. Use the Automaton CLI to create or link the app, validate it, inspect runner setup, deploy it, and tell me when you need me to complete authentication or approve publish."
+                </div>
+                <p class="step-body">
+                  By this point the AI already has both the project folder and the Automaton rules from
+                  step 1. Now it can generate the files, keep them local, and use the CLI as part of the
+                  end-to-end flow instead of treating deployment as a separate manual step.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div>
+                <div class="step-title">Let the AI validate and prepare backend deploys</div>
+                <p class="step-body">
+                  After the files exist, the AI should run <code>automaton validate</code>, inspect current runner assignment,
+                  and only use runner setup commands when the app includes Python backend controllers.
+                  Frontend-only apps can usually skip that part.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div>
+                <div class="step-title">Let the AI deploy and stop where human approval is needed</div>
+                <p class="step-body">
+                  The AI should run deploy commands itself and only pause when the workflow needs you,
+                  such as interactive login, runner decisions you want to review, or final publish approval.
+                  In practice, this path can go from blank folder to live app with the CLI as the execution layer.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="tip-box">
+            <i class="pi pi-info-circle" />
+            <span>
+              This is the practical default for Copilot, Cursor, Claude Code, and similar tools when
+              MCP is not connected. The AI builds locally, the CLI gives it a reliable deploy path,
+              and <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              teaches the required Automaton structure.
+            </span>
+          </div>
+        </div>
+
+        <!-- ── PATH 3: CLI ────────────────────────────────────── -->
         <div v-if="activePath === 'cli'" class="path-content">
           <div class="path-intro">
             <span class="path-badge path-badge-blue">For developers</span>
             <p>
               Build your app locally with any editor, then push it to Automaton with one command.
-              Works with Cursor, VS Code, WebStorm, Claude Code, Codex, or plain vim.
-              MCP is recommended when your tool supports it, but it is not required.
+              This is the manual path when you want to write the code yourself and use the CLI mainly
+              for linking, validation, deploy, and publish.
             </p>
           </div>
 
@@ -154,8 +270,10 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               <div>
                 <div class="step-title">Login and confirm identity</div>
                 <div class="code-block code-block-multi"><pre>automaton login
-automaton whoami</pre></div>
-                <p class="step-body">Prefer this over manual API key wiring when you want the CLI to drive the app workflow directly.</p>
+automaton whoami
+# optional reset for testing or account switching
+automaton logout</pre></div>
+                <p class="step-body">Prefer this over manual API key wiring when you want the CLI to drive the app workflow directly. Use <code>automaton logout</code> when you need to reset stored auth before testing a fresh login or switching accounts.</p>
               </div>
             </div>
             <div class="step">
@@ -181,15 +299,9 @@ automaton link your-app-id</pre></div>
                   project root links the folder to the app.
                 </p>
                 <p class="step-body">
-                  If you are using an AI tool, start the session with:
-                </p>
-                <div class="prompt-example">
-                  "Read https://automaton.monster/llms.txt, then build an Automaton app for [your idea]."
-                </div>
-                <p class="step-body">
-                  This tells the AI the required file structure, backend contract, and frontend API.
-                  If your tool <strong>can't fetch URLs</strong>, use the Studio docs
-                  (<strong>Documentation → CLI + AI tools</strong>) to copy a ready-made starter prompt instead.
+                  Use this path when the implementation is primarily yours and the CLI is the delivery
+                  layer. If you want the AI to drive the whole flow for you, use <strong>AI + CLI</strong>
+                  instead.
                 </p>
               </div>
             </div>
@@ -241,7 +353,7 @@ automaton status</pre></div>
             <i class="pi pi-info-circle" />
             <span>
               <strong>Using Cursor or VS Code?</strong> Point the AI to
-              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
               Automaton structure and backend/frontend contract. For backend apps, start with <code>automaton current-runner</code>,
               <code>automaton runners</code>, and <code>automaton ensure-local-runner --assign</code> when needed, then run <code>automaton validate</code>
@@ -251,7 +363,7 @@ automaton status</pre></div>
           </div>
         </div>
 
-        <!-- ── PATH 3: MCP ────────────────────────────────────── -->
+        <!-- ── PATH 4: MCP ────────────────────────────────────── -->
         <div v-if="activePath === 'mcp'" class="path-content">
           <div class="path-intro">
             <span class="path-badge path-badge-purple">AI-native</span>
@@ -285,17 +397,7 @@ automaton status</pre></div>
                     <div class="tool-label"><i class="pi pi-github" /> GitHub Copilot (VS Code)</div>
                     <p class="step-body">Create <code>.vscode/mcp.json</code> in your workspace:</p>
                     <div class="code-block code-block-multi">
-<pre>{
-  "servers": {
-    "automaton": {
-      "type": "http",
-      "url": "https://api.automaton.monster/api/mcp",
-      "headers": {
-        "X-API-Key": "your-api-key"
-      }
-    }
-  }
-}</pre>
+<pre>{{ copilotMcpConfig }}</pre>
                     </div>
                     <p class="step-body">Then open Copilot Chat → switch to <strong>Agent mode</strong>.</p>
                   </div>
@@ -304,7 +406,7 @@ automaton status</pre></div>
                     <div class="tool-label"><i class="pi pi-sparkles" /> Claude Code</div>
                     <div class="code-block">
                       <span class="code-prompt">$</span>
-                      <span class="code-text">claude mcp add automaton --transport http "https://api.automaton.monster/api/mcp" --header "X-API-Key: your-api-key"</span>
+                      <span class="code-text">{{ claudeMcpCommand }}</span>
                     </div>
                     <p class="step-body">Then <code>cd</code> to your project and run <code>claude</code>.</p>
                   </div>
@@ -340,7 +442,7 @@ automaton status</pre></div>
         </div>
 
         <!-- ── Developer + AI guidance ────────────────────────── -->
-        <div v-if="activePath === 'cli'" class="ref-section">
+        <div v-if="activePath === 'agent' || activePath === 'cli'" class="ref-section">
           <h2 class="ref-title">For developers and AI tools</h2>
           <p class="ref-subtitle">
             The public docs stay high-level. If you want the exact app structure, backend contract,
@@ -352,8 +454,8 @@ automaton status</pre></div>
               <div class="tool-label"><i class="pi pi-book" /> Developer resources</div>
               <ul class="link-list">
                 <li><a href="/cli" class="docs-link">Automaton CLI overview</a></li>
-                <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-cli-deploy.md" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
+                <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
+                <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
               </ul>
             </div>
           </div>
@@ -361,12 +463,12 @@ automaton status</pre></div>
           <div class="tool-sections">
             <div class="tool-section">
               <ul class="link-list">
-                <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-cli-deploy.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-cli-deploy.md</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-apps-overview.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-frontend-structure.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-frontend-structure.md</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-backend-controllers.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-backend-controllers.md</a></li>
-                <li><a href="https://automaton.monster/llms/automaton-starter-prompts.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-starter-prompts.md</a></li>
+                <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
+                <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-cli-deploy.md</a></li>
+                <li><a :href="publicAppConfig.appsOverviewUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
+                <li><a :href="publicAppConfig.frontendStructureUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-frontend-structure.md</a></li>
+                <li><a :href="publicAppConfig.backendControllersUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-backend-controllers.md</a></li>
+                <li><a :href="publicAppConfig.starterPromptsUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-starter-prompts.md</a></li>
               </ul>
             </div>
           </div>
@@ -375,7 +477,7 @@ automaton status</pre></div>
             <i class="pi pi-info-circle" />
             <span>
               MCP is still the most accurate option when supported, but the
-              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               files give external AI tools a reliable fallback without overwhelming non-technical users
               on the public website.
             </span>

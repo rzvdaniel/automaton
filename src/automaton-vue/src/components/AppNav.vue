@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
+import { publicAppConfig } from '@/config/publicAppConfig'
 
 const mobileMenuOpen = ref(false)
+const route = useRoute()
 
 const navLinks = [
   { label: 'Apps', href: '/apps' },
@@ -10,13 +12,24 @@ const navLinks = [
   { label: 'Docs', href: '/docs' },
   { label: 'GitHub', href: 'https://github.com', external: true },
 ]
+
+function isHomeActive() {
+  return route.path === '/'
+}
+
+function isActiveLink(href: string, external?: boolean) {
+  if (external) return false
+  return route.path === href || route.path.startsWith(`${href}/`)
+}
 </script>
 
 <template>
   <header class="nav-header">
     <div class="container nav-inner">
-      <RouterLink to="/" class="nav-logo">
-        <span class="logo-icon">⚡</span>
+      <RouterLink to="/" :class="['nav-logo', isHomeActive() && 'nav-logo-active']" :aria-current="isHomeActive() ? 'page' : undefined">
+        <span class="logo-icon" aria-hidden="true">
+          <span class="logo-icon-core" />
+        </span>
         <span class="logo-text">Automaton</span>
       </RouterLink>
 
@@ -28,14 +41,15 @@ const navLinks = [
           :to="link.external ? undefined : link.href"
           :href="link.external ? link.href : undefined"
           :target="link.external ? '_blank' : undefined"
-          class="nav-link"
+          :class="['nav-link', isActiveLink(link.href, link.external) && 'nav-link-active']"
+          :aria-current="isActiveLink(link.href, link.external) ? 'page' : undefined"
         >
           {{ link.label }}
         </component>
       </nav>
 
       <div class="nav-actions desktop-only">
-        <a href="#" class="btn btn-secondary btn-sm">Sign in</a>
+        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Sign in</a>
         <RouterLink to="/cli" class="btn btn-primary btn-sm">Get Started</RouterLink>
       </div>
 
@@ -52,12 +66,13 @@ const navLinks = [
         :to="link.external ? undefined : link.href"
         :href="link.external ? link.href : undefined"
         :target="link.external ? '_blank' : undefined"
-        class="mobile-nav-link"
+        :class="['mobile-nav-link', isActiveLink(link.href, link.external) && 'mobile-nav-link-active']"
+        :aria-current="isActiveLink(link.href, link.external) ? 'page' : undefined"
       >
         {{ link.label }}
       </component>
       <div class="mobile-menu-actions">
-        <a href="#" class="btn btn-secondary" style="width:100%; justify-content:center">Sign in</a>
+        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="btn btn-secondary" style="width:100%; justify-content:center">Sign in</a>
         <RouterLink to="/cli" class="btn btn-primary" style="width:100%; justify-content:center">Get Started</RouterLink>
       </div>
     </div>
@@ -82,17 +97,74 @@ const navLinks = [
 }
 
 .nav-logo {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 6px 16px 6px 12px;
+  border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--color-text);
   text-decoration: none;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.nav-logo:hover {
+  background: var(--color-surface-2);
+}
+
+.nav-logo-active {
+  background: rgba(124, 106, 245, 0.16);
+  box-shadow:
+    inset 0 0 0 1px rgba(124, 106, 245, 0.4),
+    0 0 0 1px rgba(124, 106, 245, 0.08);
+}
+
+.nav-logo-active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -8px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c6af5, #4da6ff);
 }
 
 .logo-icon {
-  font-size: 1.3rem;
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7c6af5 0%, #4da6ff 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 18px rgba(77, 166, 255, 0.16);
+}
+
+.logo-icon::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.logo-icon-core {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: rgba(9, 12, 18, 0.92);
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .logo-text {
@@ -106,6 +178,7 @@ const navLinks = [
 }
 
 .nav-link {
+  position: relative;
   padding: 6px 14px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
@@ -119,6 +192,25 @@ const navLinks = [
 .nav-link:hover {
   color: var(--color-text);
   background: var(--color-surface-2);
+}
+
+.nav-link-active {
+  color: var(--color-text);
+  background: rgba(124, 106, 245, 0.16);
+  box-shadow:
+    inset 0 0 0 1px rgba(124, 106, 245, 0.4),
+    0 0 0 1px rgba(124, 106, 245, 0.08);
+}
+
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -8px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c6af5, #4da6ff);
 }
 
 .nav-actions {
@@ -166,6 +258,13 @@ const navLinks = [
   cursor: pointer;
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
+}
+
+.mobile-nav-link-active {
+  color: var(--color-text);
+  border-bottom-color: rgba(124, 106, 245, 0.38);
+  background: rgba(124, 106, 245, 0.08);
+  box-shadow: inset 3px 0 0 #7c6af5;
 }
 
 .mobile-menu-actions {
