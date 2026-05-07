@@ -32,6 +32,27 @@ const iframeRef = ref<HTMLIFrameElement>()
 
 const slug = computed(() => route.params.slug as string)
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function getPublishedAppBaseUrls(responseUrl?: string): { apiBaseUrl: string; filesBaseUrl: string } {
+  const fallbackOrigin = window.location.origin
+  const publishedResponseUrl = responseUrl ? new URL(responseUrl, fallbackOrigin) : null
+  const configuredBaseUrl = apiClient.defaults.baseURL
+    ? new URL(String(apiClient.defaults.baseURL), fallbackOrigin)
+    : null
+
+  const apiBaseUrl = trimTrailingSlash(
+    publishedResponseUrl?.origin ?? configuredBaseUrl?.origin ?? fallbackOrigin,
+  )
+
+  return {
+    apiBaseUrl,
+    filesBaseUrl: `${apiBaseUrl}/api/web/${encodeURIComponent(slug.value)}/files/`,
+  }
+}
+
 // Check if user needs to authenticate
 const needsAuth = computed(() => {
   return appInfo.value?.requiresAuthentication && !appInfo.value?.isUserAuthenticated
@@ -46,7 +67,8 @@ async function loadApp() {
   error.value = null
 
   try {
-    const { data } = await apiClient.get(`/api/web/${slug.value}`)
+    const response = await apiClient.get(`/api/web/${slug.value}`)
+    const { data } = response
 
     appInfo.value = {
       id: data.id,
@@ -63,14 +85,14 @@ async function loadApp() {
     }
 
     // Inject automatonApi for published apps
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+    const { apiBaseUrl, filesBaseUrl } = getPublishedAppBaseUrls(response.request?.responseURL)
     // Pass the current auth token so authenticated apps can call protected API endpoints.
     // Anonymous apps use credentials:include (cookie fallback) — represented as empty string.
     const authToken = authStore.accessToken
     const publishedScript = `<script>\n${
       rawPublishedScript
         .replace(/__APP_SLUG__/g, jsStr(slug.value))
-        .replace(/__BASE_URL__/g, jsStr(baseUrl))
+        .replace(/__BASE_URL__/g, jsStr(apiBaseUrl))
         .replace(/__AUTH_TOKEN__/g, jsStr(authToken ?? ''))
     }\n<\/script>`
 
@@ -80,21 +102,9 @@ async function loadApp() {
     // Strip any existing automatonApi injection to prevent double-injection
     html = html.replace(/<script\b[^>]*>[\s\S]*?\(function\s*\(\s*window\s*,\s*APP_(?:ID|SLUG)\b[\s\S]*?<\/script>/gi, '')
 
-    // Inject base tag for resolving relative paths to app files
-    const appBaseUrl = `${baseUrl}/apps/${slug.value}/`
-    const baseTag = `<base href="${appBaseUrl}">`
-
-    // Add cache-busting using app version/updated timestamp for published apps
-    // This ensures files are cached between page loads but refresh when app is republished
-    const cacheBuster = data.version || new Date(data.updated || Date.now()).getTime()
-    html = html.replace(
-      /(<link[^>]+href=["'])([^"'?]+\.css)(["'])/gi,
-      `$1$2?v=${cacheBuster}$3`
-    )
-    html = html.replace(
-      /(<script[^>]+src=["'])([^"'?]+\.js)(["'])/gi,
-      `$1$2?v=${cacheBuster}$3`
-    )
+    // Resolve all relative file references through the published file endpoint so
+    // the viewer uses the same asset-serving behavior as the public app itself.
+    const baseTag = `<base href="${filesBaseUrl}">`
 
     // Inject script and base tag into HTML
     if (html.includes('<head>')) {
