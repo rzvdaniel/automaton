@@ -36,7 +36,10 @@ public class LocalAppValidationServiceTests
         Directory.CreateDirectory(binDir);
         var fakePython = Path.Combine(binDir, "python");
         await File.WriteAllTextAsync(fakePython, "#!/bin/sh\necho Python 9.9.9\n");
-        File.SetUnixFileMode(fakePython, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(fakePython, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
 
         var configService = new ConfigService();
         var projectService = new LocalAppProjectService(configService);

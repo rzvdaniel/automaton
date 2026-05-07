@@ -129,7 +129,15 @@ public class LocalAppExecutionService(PythonRuntimeService pythonRuntimeService)
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         start.Stop();
 
-        return CreateResultFromResponse(document.RootElement, options.ControllerName, options.ActionName, options.Mode, start.Elapsed, mockPath, controllerPath: null, pythonRuntime: null);
+        return CreateResultFromResponse(
+            document.RootElement,
+            options.ControllerName,
+            options.ActionName,
+            options.Mode,
+            start.Elapsed,
+            mockPath,
+            controllerPath: null,
+            pythonRuntime: null);
     }
 
     private async Task<LocalAppExecutionResult> ExecutePythonAsync(LocalAppContext context, string controllerPath, PythonRuntimeInfo runtime, LocalAppExecutionOptions options, CancellationToken cancellationToken)
@@ -223,14 +231,32 @@ public class LocalAppExecutionService(PythonRuntimeService pythonRuntimeService)
             };
         }
 
-        var result = CreateResultFromResponse(responseProperty, options.ControllerName, options.ActionName, options.Mode, start.Elapsed, mockPath: null, controllerPath, runtime);
-        result.StdOut = ReadString(payload.Document, "stdout");
-        result.StdErr = MergeText(ReadString(payload.Document, "stderr"), payload.ProcessError);
-        result.Traceback = ReadString(payload.Document, "traceback");
-        return result;
+        return CreateResultFromResponse(
+            responseProperty,
+            options.ControllerName,
+            options.ActionName,
+            options.Mode,
+            start.Elapsed,
+            mockPath: null,
+            controllerPath,
+            runtime,
+            ReadString(payload.Document, "stdout"),
+            MergeText(ReadString(payload.Document, "stderr"), payload.ProcessError),
+            ReadString(payload.Document, "traceback"));
     }
 
-    private static LocalAppExecutionResult CreateResultFromResponse(JsonElement response, string controllerName, string actionName, string mode, TimeSpan duration, string? mockPath, string? controllerPath, PythonRuntimeInfo? pythonRuntime)
+    private static LocalAppExecutionResult CreateResultFromResponse(
+        JsonElement response,
+        string controllerName,
+        string actionName,
+        string mode,
+        TimeSpan duration,
+        string? mockPath,
+        string? controllerPath,
+        PythonRuntimeInfo? pythonRuntime,
+        string? stdOut = null,
+        string? stdErr = null,
+        string? traceback = null)
     {
         if (!TryReadStandardResponse(response, out var success, out var data, out var error, out var malformedMessage))
         {
@@ -246,7 +272,10 @@ public class LocalAppExecutionService(PythonRuntimeService pythonRuntimeService)
                 FailureReason = LocalAppFailureReasons.MalformedResponse,
                 MockPath = mockPath,
                 ControllerPath = controllerPath,
-                PythonRuntime = pythonRuntime
+                PythonRuntime = pythonRuntime,
+                StdOut = stdOut,
+                StdErr = stdErr,
+                Traceback = traceback
             };
         }
 
@@ -261,7 +290,10 @@ public class LocalAppExecutionService(PythonRuntimeService pythonRuntimeService)
             Error = error,
             MockPath = mockPath,
             ControllerPath = controllerPath,
-            PythonRuntime = pythonRuntime
+            PythonRuntime = pythonRuntime,
+            StdOut = stdOut,
+            StdErr = stdErr,
+            Traceback = traceback
         };
     }
 

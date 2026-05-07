@@ -225,13 +225,23 @@ public class LocalAppDevServer(LocalAppExecutionService executionService)
 
     private static void PrintStartupSummary(LocalAppContext context, LocalAppDevServerOptions options, string previewUrl)
     {
+        var mockCount = Directory.Exists(context.MocksPath)
+            ? Directory.GetFiles(context.MocksPath, "*.json", SearchOption.TopDirectoryOnly).Length
+            : 0;
+        var mockSummary = options.Mode switch
+        {
+            LocalAppExecutionModes.MockOnly => $"required ({mockCount} file(s))",
+            LocalAppExecutionModes.MockFallback => $"fallback ({mockCount} file(s))",
+            _ => mockCount == 0 ? "disabled" : $"available ({mockCount} file(s))"
+        };
+
         AnsiConsole.MarkupLine("[bold]Automaton local app runtime[/]");
         AnsiConsole.MarkupLine($"App: [cyan]{Markup.Escape(context.DisplayName)}[/]");
         AnsiConsole.MarkupLine($"Mode: [cyan]{Markup.Escape(options.Mode)}[/]");
         AnsiConsole.MarkupLine($"Preview: [link]{previewUrl}[/]");
         AnsiConsole.MarkupLine($"API bridge: [link]{previewUrl}/__automaton[/]");
         AnsiConsole.MarkupLine($"Controllers: {(Directory.Exists(context.BackendPath) ? "[green]enabled[/]" : "[yellow]none[/]")}");
-        AnsiConsole.MarkupLine($"Mocks: [cyan]{Markup.Escape(options.Mode)}[/]");
+        AnsiConsole.MarkupLine($"Mocks: [cyan]{Markup.Escape(mockSummary)}[/]");
         AnsiConsole.MarkupLine($"Database: [grey]{Markup.Escape(Path.GetRelativePath(context.RootPath, context.DataPath))}[/]");
         AnsiConsole.MarkupLine("[grey]Press Ctrl+C to stop.[/]");
     }

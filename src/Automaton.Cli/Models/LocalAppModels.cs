@@ -59,20 +59,20 @@ public sealed class LocalAppDevServerOptions
 
 public sealed class LocalAppExecutionResult
 {
-    public required string ControllerName { get; set; }
-    public required string ActionName { get; set; }
-    public required string Mode { get; set; }
-    public required TimeSpan Duration { get; set; }
-    public required bool Success { get; set; }
-    public required object? Data { get; set; }
-    public required string Error { get; set; }
-    public string? FailureReason { get; set; }
-    public string? Traceback { get; set; }
-    public string? StdOut { get; set; }
-    public string? StdErr { get; set; }
-    public string? MockPath { get; set; }
-    public string? ControllerPath { get; set; }
-    public PythonRuntimeInfo? PythonRuntime { get; set; }
+    public required string ControllerName { get; init; }
+    public required string ActionName { get; init; }
+    public required string Mode { get; init; }
+    public required TimeSpan Duration { get; init; }
+    public required bool Success { get; init; }
+    public required object? Data { get; init; }
+    public required string Error { get; init; }
+    public string? FailureReason { get; init; }
+    public string? Traceback { get; init; }
+    public string? StdOut { get; init; }
+    public string? StdErr { get; init; }
+    public string? MockPath { get; init; }
+    public string? ControllerPath { get; init; }
+    public PythonRuntimeInfo? PythonRuntime { get; init; }
 }
 
 public static class LocalAppExecutionModes
