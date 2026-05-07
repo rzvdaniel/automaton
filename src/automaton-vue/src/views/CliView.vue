@@ -56,6 +56,29 @@ const directScripts = [
   },
 ]
 
+const quickStartSteps = [
+  {
+    title: 'Install CLI',
+    detail: 'Start with the .NET global tool, or use the portable builds further down this page.',
+    code: 'dotnet tool install -g Automaton.Cli',
+  },
+  {
+    title: 'Configure auth',
+    detail: 'Point the CLI at your server and API key so the local project can talk to Automaton.',
+    code: 'automaton config --server https://api.automaton.monster --key your-api-key',
+  },
+  {
+    title: 'Create app',
+    detail: 'Create a linked app in the current folder so automaton.json is written locally.',
+    code: 'automaton create --name "My App"',
+  },
+  {
+    title: 'Deploy',
+    detail: 'Upload the app from your local workflow. Backend apps need a runner before the first backend deploy.',
+    code: 'automaton deploy',
+  },
+]
+
 const workflowSteps = [
   {
     title: 'Start with the AI-readable contract',
@@ -63,14 +86,14 @@ const workflowSteps = [
     code: 'Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.',
   },
   {
-    title: 'Optional: link an existing app',
-    description: 'Only do this when you already created the app in Automaton Studio and want this local folder to target that existing app. If the AI already created automaton.json, skip this step.',
-    code: 'automaton link your-app-id',
+    title: 'Connect the local project',
+    description: 'Create a new linked app in the current folder, or link to an existing one when the remote app already exists.',
+    code: 'automaton create --name "My App"\n# or\nautomaton link your-app-id',
   },
   {
     title: 'Deploy from your IDE',
-    description: 'For backend apps, assign a runner once, then redeploy whenever you change the app.',
-    code: 'automaton runners\nautomaton set-runner your-runner-id\nautomaton deploy',
+    description: 'Deploy the app from your local workflow. For backend apps, make sure a runner is assigned before the first backend deploy.',
+    code: 'automaton deploy',
   },
 ]
 
@@ -131,9 +154,9 @@ async function copyCode(key: string, code: string) {
             </p>
 
             <div class="cli-hero-actions">
-              <a href="#downloads" class="btn btn-primary">
+              <a href="#install" class="btn btn-primary">
                 <i class="pi pi-download" />
-                Download CLI
+                Install CLI
               </a>
               <a href="#workflow" class="btn btn-secondary">
                 <i class="pi pi-compass" />
@@ -144,31 +167,6 @@ async function copyCode(key: string, code: string) {
                 Open llms.txt
               </a>
             </div>
-          </div>
-
-          <div class="cli-panel">
-            <div class="cli-panel-label">Quick start</div>
-            <div class="cli-inline-code cli-inline-code-stack">
-              <div class="cli-inline-code-line">
-                <span class="cli-code-prompt">$</span>
-                <span>dotnet tool install -g Automaton.Cli</span>
-              </div>
-            </div>
-            <p class="cli-inline-code-comment cli-panel-note"># Or use the PowerShell or Bash install scripts further down this page</p>
-            <div class="cli-inline-code">
-              <span class="cli-code-prompt">$</span>
-              <span>automaton config --server https://api.automaton.monster --key your-api-key</span>
-            </div>
-            <div class="cli-inline-code">
-              <span class="cli-code-prompt">$</span>
-              <span>automaton set-runner your-runner-id</span>
-            </div>
-            <div class="cli-inline-code-comment"># Only for apps that include Python backend controllers</div>
-            <div class="cli-inline-code">
-              <span class="cli-code-prompt">$</span>
-              <span>automaton deploy</span>
-            </div>
-            <a href="/docs" class="cli-panel-link">See docs for CLI + AI tools <i class="pi pi-arrow-right" /></a>
           </div>
         </div>
       </section>
@@ -205,8 +203,8 @@ async function copyCode(key: string, code: string) {
         </div>
       </section>
 
-      <section class="cli-section">
-        <div class="container cli-grid-two">
+      <section id="install" class="cli-section">
+        <div class="container cli-stack">
           <div class="cli-card">
             <div class="cli-card-head">
               <span class="tag">Install</span>
@@ -235,20 +233,47 @@ async function copyCode(key: string, code: string) {
               <h2>Portable install scripts</h2>
             </div>
 
-            <article v-for="script in directScripts" :key="script.title" class="code-card">
-              <div class="code-card-header">
-                <div>
-                  <h3>{{ script.title }}</h3>
-                  <p>{{ script.description }}</p>
+            <div class="script-grid">
+              <article v-for="script in directScripts" :key="script.title" class="code-card script-card">
+                <div class="code-card-header script-card-header">
+                  <div>
+                    <h3>{{ script.title }}</h3>
+                    <p>{{ script.description }}</p>
+                  </div>
+                  <button class="copy-chip" @click="copyCode(script.title, script.code)">
+                    <i :class="copiedKey === script.title ? 'pi pi-check' : 'pi pi-copy'" />
+                    {{ copiedKey === script.title ? 'Copied' : 'Copy' }}
+                  </button>
                 </div>
-                <button class="copy-chip" @click="copyCode(script.title, script.code)">
-                  <i :class="copiedKey === script.title ? 'pi pi-check' : 'pi pi-copy'" />
-                  {{ copiedKey === script.title ? 'Copied' : 'Copy' }}
-                </button>
-              </div>
-              <pre class="code-card-body"><code>{{ script.code }}</code></pre>
+                <pre class="code-card-body script-code"><code>{{ script.code }}</code></pre>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cli-section cli-section-strong">
+        <div class="container">
+          <div class="cli-section-head">
+            <h2 class="section-title cli-section-title">Quick start</h2>
+            <p class="section-subtitle cli-section-subtitle">
+              The shortest path from install to first deploy. For the full CLI + your tools flow, open the docs page.
+            </p>
+          </div>
+
+          <div class="backend-checklist-grid">
+            <article v-for="item in quickStartSteps" :key="item.title" class="backend-checklist-card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.detail }}</p>
+              <button class="copy-chip workflow-copy" @click="copyCode(`quickstart-${item.title}`, item.code)">
+                <i :class="copiedKey === `quickstart-${item.title}` ? 'pi pi-check' : 'pi pi-copy'" />
+                {{ copiedKey === `quickstart-${item.title}` ? 'Copied' : 'Copy' }}
+              </button>
+              <pre class="workflow-code"><code>{{ item.code }}</code></pre>
             </article>
           </div>
+
+          <a href="/docs" class="cli-panel-link cli-quickstart-link">See detailed CLI + your tools docs <i class="pi pi-arrow-right" /></a>
         </div>
       </section>
 
@@ -298,6 +323,53 @@ async function copyCode(key: string, code: string) {
           </div>
         </div>
       </section>
+
+      <section class="cli-section cli-section-strong">
+        <div class="container cli-grid-two">
+          <div class="cli-card">
+            <div class="cli-card-head">
+              <span class="tag">Why CLI</span>
+              <h2>What the CLI is for</h2>
+              <p class="cli-card-subtitle">Use it when you want local development, Git control, and one command to upload or redeploy the app.</p>
+            </div>
+
+            <article class="code-card">
+              <div class="code-card-header">
+                <div>
+                  <h3>Best fit</h3>
+                  <p>The CLI is the bridge between your local project and Automaton hosting.</p>
+                </div>
+              </div>
+              <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
+- Keep the project in your repo
+- Create or link the Automaton app
+- Deploy frontend files and backend controllers
+- Reuse the same flow every time you update the app</code></pre>
+            </article>
+          </div>
+
+          <div class="cli-card">
+            <div class="cli-card-head">
+              <span class="tag">Next step</span>
+              <h2>Where to go deeper</h2>
+              <p class="cli-card-subtitle">Keep this page high-level. Use the public docs for the full developer workflow, and the AI instructions only when your coding tool needs them.</p>
+            </div>
+
+            <article class="code-card">
+              <div class="code-card-header code-card-header-stack">
+                <div>
+                  <h3>Detailed references</h3>
+                  <p>Use the public docs for the end-to-end developer flow. If you are working with Copilot, Claude Code, or another coding agent, open the AI instructions as a secondary reference.</p>
+                </div>
+                <div class="resource-links">
+                  <a href="/docs" class="btn btn-primary resource-button resource-button-primary">Open Building apps with Automaton</a>
+                  <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="btn btn-secondary resource-button resource-button-secondary">Open AI instructions</a>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
     </main>
 
     <AppFooter />
@@ -313,18 +385,15 @@ async function copyCode(key: string, code: string) {
 }
 
 .cli-hero-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
-  gap: 24px;
-  align-items: stretch;
+  display: block;
 }
 
 .cli-title {
-  max-width: 820px;
+  max-width: 1080px;
 }
 
 .cli-subtitle {
-  max-width: 720px;
+  max-width: 920px;
   margin-top: 14px;
   color: rgba(233, 236, 245, 0.78);
   font-size: 1.04rem;
@@ -337,60 +406,6 @@ async function copyCode(key: string, code: string) {
   flex-wrap: wrap;
 }
 
-.cli-panel {
-  padding: 22px;
-  border-radius: 18px;
-  border: 1px solid rgba(124, 106, 245, 0.28);
-  background: linear-gradient(180deg, rgba(16, 18, 29, 0.98), rgba(10, 12, 20, 0.98));
-  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.28);
-}
-
-.cli-panel-label {
-  margin-bottom: 14px;
-  color: rgba(233, 236, 245, 0.62);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.cli-inline-code {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  color: #d8f7de;
-  overflow-x: auto;
-}
-
-.cli-inline-code-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cli-inline-code-line {
-  display: flex;
-  gap: 10px;
-}
-
-.cli-code-prompt {
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.cli-inline-code-comment {
-  color: rgba(233, 236, 245, 0.52);
-  font-size: 0.76rem;
-}
-
-.cli-panel-note {
-  margin: 10px 0 0;
-}
-
 .cli-panel-link {
   display: inline-flex;
   align-items: center;
@@ -399,6 +414,10 @@ async function copyCode(key: string, code: string) {
   color: #d7d2ff;
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.cli-quickstart-link {
+  margin-top: 18px;
 }
 
 .cli-section {
@@ -491,6 +510,12 @@ async function copyCode(key: string, code: string) {
   gap: 18px;
 }
 
+.cli-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .cli-card {
   padding: 20px;
   border-radius: 18px;
@@ -520,8 +545,25 @@ async function copyCode(key: string, code: string) {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.code-card + .code-card {
-  margin-top: 14px;
+
+.script-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.script-card {
+  height: 100%;
+}
+
+.script-card-header {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.script-code {
+  font-size: 0.74rem;
+  line-height: 1.5;
 }
 
 .code-card-header {
@@ -530,6 +572,38 @@ async function copyCode(key: string, code: string) {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 10px;
+}
+
+.code-card-header-stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.resource-links {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.resource-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.resource-button-primary {
+  flex: 1 1 auto;
+}
+
+.resource-button-secondary {
+  flex: 0 0 auto;
+  padding-inline: 12px;
 }
 
 .code-card-header h3 {
@@ -652,8 +726,11 @@ async function copyCode(key: string, code: string) {
 }
 
 @media (max-width: 900px) {
-  .cli-hero-inner,
   .cli-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .script-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -669,6 +746,15 @@ async function copyCode(key: string, code: string) {
 
   .code-card-header {
     flex-direction: column;
+  }
+
+  .resource-links {
+    flex-wrap: wrap;
+  }
+
+  .resource-button-primary,
+  .resource-button-secondary {
+    flex: 1 1 100%;
   }
 }
 </style>

@@ -141,16 +141,6 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">1</div>
               <div>
-                <div class="step-title">Create an app in the Studio</div>
-                <p class="step-body">
-                  Go to <strong>Apps → New App</strong> in Automaton Studio. Copy the app ID from
-                  the URL or the app settings page — you'll need it in <code>automaton.json</code>.
-                </p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div>
                 <div class="step-title">Install the CLI</div>
                 <div class="code-block">
                   <span class="code-prompt">$</span>
@@ -160,14 +150,25 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               </div>
             </div>
             <div class="step">
+              <div class="step-num">2</div>
+              <div>
+                <div class="step-title">Login and confirm identity</div>
+                <div class="code-block code-block-multi"><pre>automaton login
+automaton whoami</pre></div>
+                <p class="step-body">Prefer this over manual API key wiring when you want the CLI to drive the app workflow directly.</p>
+              </div>
+            </div>
+            <div class="step">
               <div class="step-num">3</div>
               <div>
-                <div class="step-title">Configure server and API key</div>
-                <div class="code-block">
-                  <span class="code-prompt">$</span>
-                  <span class="code-text">automaton config --server https://api.automaton.monster --key your-api-key</span>
-                </div>
-                <p class="step-body">Get an API key from <strong>Settings → API Keys → New Key</strong> (scope: execute).</p>
+                <div class="step-title">Create or link the app</div>
+                <div class="code-block code-block-multi"><pre>automaton create --name "My App"
+# or
+automaton link your-app-id</pre></div>
+                <p class="step-body">
+                  Use <code>create</code> for a new app in the current folder. Use <code>link</code>
+                  only when the remote app already exists.
+                </p>
               </div>
             </div>
             <div class="step">
@@ -195,28 +196,42 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             <div class="step">
               <div class="step-num">5</div>
               <div>
-                <div class="step-title">Assign a runner for backend apps</div>
-                <div class="code-block">
-                  <span class="code-prompt">$</span>
-                  <span class="code-text">automaton runners && automaton set-runner your-runner-id</span>
-                </div>
+                <div class="step-title">Validate before deploy</div>
+                <div class="code-block code-block-multi"><pre>automaton validate
+automaton status</pre></div>
                 <p class="step-body">
-                  Skip this if the app is frontend-only. If the app has Python backend controllers,
-                  assign a runner once before the first backend deploy.
+                  Run the preflight check first so missing config, missing remote app links, or missing
+                  backend runner assignments fail before upload.
                 </p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">6</div>
               <div>
-                <div class="step-title">Deploy</div>
-                <div class="code-block">
-                  <span class="code-prompt">$</span>
-                  <span class="code-text">automaton deploy</span>
-                </div>
+                <div class="step-title">Handle backend runners when needed</div>
+                <div class="code-block code-block-multi"><pre>automaton current-runner
+automaton runners
+automaton ensure-local-runner --assign
+# or
+automaton set-runner your-runner-id</pre></div>
+                <p class="step-body">
+                  Skip this if the app is frontend-only. If the app has Python backend controllers,
+                  inspect the current assignment first, then provision or assign a runner before the
+                  first backend deploy.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">7</div>
+              <div>
+                <div class="step-title">Deploy, then publish when approved</div>
+                <div class="code-block code-block-multi"><pre>automaton deploy
+automaton publish --yes
+automaton status</pre></div>
                 <p class="step-body">
                   Uploads all files and pushes Python controllers to the assigned runner in one step.
-                  Run it again any time you make changes.
+                  Run it again any time you make changes. Publish only after user approval, then use
+                  <code>status</code> to confirm the live URL and current version.
                 </p>
               </div>
             </div>
@@ -228,9 +243,9 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
               <strong>Using Cursor or VS Code?</strong> Point the AI to
               <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
-              Automaton structure and backend/frontend contract. For backend apps, run <code>automaton set-runner</code>
-              once before the first backend deploy. Then run <code>automaton deploy</code>
-              when ready. For the full list of CLI commands and options, see the
+              Automaton structure and backend/frontend contract. For backend apps, start with <code>automaton current-runner</code>,
+              <code>automaton runners</code>, and <code>automaton ensure-local-runner --assign</code> when needed, then run <code>automaton validate</code>
+              before deploy. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
               <strong>Documentation → Automaton CLI</strong> page inside Studio.
             </span>
           </div>
@@ -332,10 +347,22 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
             starter prompts, and framework-specific guidance, use the AI-readable instruction files.
           </p>
 
+          <div class="tool-sections docs-resource-grid">
+            <div class="tool-section">
+              <div class="tool-label"><i class="pi pi-book" /> Developer resources</div>
+              <ul class="link-list">
+                <li><a href="/cli" class="docs-link">Automaton CLI overview</a></li>
+                <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-cli-deploy.md" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
+              </ul>
+            </div>
+          </div>
+
           <div class="tool-sections">
             <div class="tool-section">
               <ul class="link-list">
                 <li><a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
+                <li><a href="https://automaton.monster/llms/automaton-cli-deploy.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-cli-deploy.md</a></li>
                 <li><a href="https://automaton.monster/llms/automaton-apps-overview.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
                 <li><a href="https://automaton.monster/llms/automaton-frontend-structure.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-frontend-structure.md</a></li>
                 <li><a href="https://automaton.monster/llms/automaton-backend-controllers.md" target="_blank" rel="noopener" class="docs-link">llms/automaton-backend-controllers.md</a></li>
@@ -384,6 +411,10 @@ const activePath = ref<'editor' | 'cli' | 'mcp'>('editor')
   font-size: 1.05rem;
   line-height: 1.6;
   margin: 0;
+}
+
+.docs-resource-grid {
+  margin-bottom: 20px;
 }
 
 /* ── Path tabs ── */
