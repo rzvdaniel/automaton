@@ -22,6 +22,7 @@ var root = new RootCommand("Automaton CLI — create, deploy, and publish Automa
     RunnersCommand.Build(config),
     SetRunnerCommand.Build(config),
     ConfigCommand.Build(config),
+    AppCommand.Build(config),
 };
 
 root.Name = "automaton";

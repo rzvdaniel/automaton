@@ -12,4 +12,7 @@ public class GlobalConfig
 
     /// <summary>AUTOMATON_API_KEY env var overrides this.</summary>
     public string? ApiKey { get; set; }
+
+    /// <summary>AUTOMATON_PYTHON env var overrides this.</summary>
+    public string? PythonPath { get; set; }
 }

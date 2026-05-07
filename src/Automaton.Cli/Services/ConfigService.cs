@@ -135,7 +135,8 @@ public class ConfigService
         return new GlobalConfig
         {
             Server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")  ?? file.Server,
-            ApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY") ?? file.ApiKey
+            ApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY") ?? file.ApiKey,
+            PythonPath = Environment.GetEnvironmentVariable("AUTOMATON_PYTHON") ?? file.PythonPath
         };
     }
 

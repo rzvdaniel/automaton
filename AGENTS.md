@@ -111,6 +111,21 @@ npm run lint       # ESLint
 npm run format     # Prettier
 ```
 
+### Local App Runtime (CLI)
+
+From an app folder, the CLI can now validate, invoke, and preview Automaton apps locally without changing the app contract:
+
+```bash
+cd path/to/app
+
+automaton app validate                # local structure + Python/runtime checks
+automaton app invoke todos list       # direct controller invocation
+automaton app dev --mock-fallback     # preview server + local API bridge
+automaton app dev --mock-only         # force backend/mocks/*.json
+```
+
+The local runtime serves the frontend, injects `window.automatonApi`, executes `backend/<controller>.py` locally via `handle(action_name, inputs)`, and keeps using the app-local `data/` directory for persistence.
+
 ### Backend (ASP.NET Core)
 
 ```bash

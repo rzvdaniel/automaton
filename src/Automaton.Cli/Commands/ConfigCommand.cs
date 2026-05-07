@@ -20,6 +20,7 @@ public static class ConfigCommand
     {
         var serverOption = new Option<string?>("--server", "Automaton server URL (e.g. https://automaton.example.com)");
         var keyOption    = new Option<string?>(["--key", "-k"], "API key (ak_execute_xxx)");
+        var pythonOption = new Option<string?>("--python", "Preferred Python executable for local app commands");
         var showOption   = new Option<bool>("--show", "Print current configuration");
         var localOption  = new Option<bool>("--local", "Read or write ./.automaton/config.json for the current project (default)");
         var globalOption = new Option<bool>("--global", "Read or write ~/.automaton/config.json instead of project-local config");
@@ -28,12 +29,13 @@ public static class ConfigCommand
         {
             serverOption,
             keyOption,
+            pythonOption,
             showOption,
             localOption,
             globalOption
         };
 
-        cmd.SetHandler((string? server, string? key, bool show, bool local, bool global) =>
+        cmd.SetHandler((string? server, string? key, string? python, bool show, bool local, bool global) =>
         {
             if (local && global)
             {
@@ -60,6 +62,7 @@ public static class ConfigCommand
 
                 AddRow(table, "server", current.Server, "AUTOMATON_SERVER", sourcePath);
                 AddRow(table, "api-key", MaskKey(current.ApiKey), "AUTOMATON_API_KEY", sourcePath);
+                AddRow(table, "python", current.PythonPath, "AUTOMATON_PYTHON", sourcePath);
 
                 AnsiConsole.Write(table);
                 return;
@@ -68,7 +71,8 @@ public static class ConfigCommand
             var updated = new GlobalConfig
             {
                 Server = server ?? current.Server,
-                ApiKey = key    ?? current.ApiKey
+                ApiKey = key    ?? current.ApiKey,
+                PythonPath = python ?? current.PythonPath
             };
 
             if (useLocal)
@@ -82,7 +86,7 @@ public static class ConfigCommand
                 AnsiConsole.MarkupLine("[green]✓[/] Configuration saved to ~/.automaton/config.json");
             }
 
-        }, serverOption, keyOption, showOption, localOption, globalOption);
+        }, serverOption, keyOption, pythonOption, showOption, localOption, globalOption);
 
         return cmd;
     }
