@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
@@ -18,12 +19,32 @@ public static class WhoAmICommand
 
         cmd.SetHandler(async (bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.RequireCredentials(directory: cwd);
+                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(credentialsCheck);
 
-                using var client = new AutomatonApiClient(server, apiKey);
+                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Whoami failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                using var client = new AutomatonApiClient(server!, apiKey!);
                 var user = await client.GetUserProfileAsync();
 
                 var id = user.TryGetProperty("id", out var idProperty) ? idProperty.GetGuid().ToString() : null;
@@ -33,10 +54,12 @@ public static class WhoAmICommand
                 var roles = user.TryGetProperty("roles", out var rolesProperty) && rolesProperty.ValueKind == JsonValueKind.Array
                     ? rolesProperty.EnumerateArray().Select(role => role.GetString()).Where(role => !string.IsNullOrWhiteSpace(role)).ToArray()
                     : Array.Empty<string?>();
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {name ?? email ?? id}"));
+                var result = new CommandDiagnosticResult { Success = true, Summary = "Whoami complete", Checks = checks, NextSteps = [] };
 
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, authMode = "apiKey", server, user = new { id, name, email, publicUsername, roles } });
+                    CliJson.Write(new { success = true, summary = result.Summary, checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = result.NextSteps, authMode = "apiKey", server, user = new { id, name, email, publicUsername, roles } });
                     return;
                 }
 
@@ -54,8 +77,18 @@ public static class WhoAmICommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, false, ex.Message));
+                nextSteps.Add("Run automaton login to refresh or set credentials");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Whoami failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, jsonOption);
 

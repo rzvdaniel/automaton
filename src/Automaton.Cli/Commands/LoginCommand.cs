@@ -24,6 +24,9 @@ public static class LoginCommand
 
         cmd.SetHandler(async (string? server, string? key, bool global, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
@@ -34,13 +37,26 @@ public static class LoginCommand
 
                 if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(key))
                 {
-                    throw new InvalidOperationException("Server URL and API key are required.");
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, "server URL and API key are required"));
+                    nextSteps.Add("Provide --server and --key, or answer both prompts");
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
                 }
 
                 server = server.TrimEnd('/');
 
                 using var client = new AutomatonApiClient(server, key);
                 var user = await client.GetUserProfileAsync();
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, $"credentials validated against {server}"));
 
                 var updated = new GlobalConfig { Server = server, ApiKey = key };
                 if (global)
@@ -55,12 +71,17 @@ public static class LoginCommand
                 var userName = user.TryGetProperty("name", out var name) ? name.GetString() : null;
                 var email = user.TryGetProperty("email", out var emailProperty) ? emailProperty.GetString() : null;
                 var userId = user.TryGetProperty("id", out var idProperty) ? idProperty.GetGuid().ToString() : null;
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {userName ?? email ?? userId}"));
+                var result = new CommandDiagnosticResult { Success = true, Summary = "Login complete", Checks = checks, NextSteps = [] };
 
                 if (asJson)
                 {
                     CliJson.Write(new
                     {
                         success = true,
+                        summary = result.Summary,
+                        checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                        nextSteps = result.NextSteps,
                         authMode = "apiKey",
                         storage = global ? "global" : "local",
                         server,
@@ -76,8 +97,18 @@ public static class LoginCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
+                nextSteps.Add("Verify the server URL and API key, then rerun automaton login");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, serverOption, keyOption, globalOption, jsonOption);
 

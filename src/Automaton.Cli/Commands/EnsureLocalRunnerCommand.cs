@@ -35,25 +35,53 @@ public static class EnsureLocalRunnerCommand
 
         cmd.SetHandler(async (string runnerName, string image, string containerName, bool assign, bool force, int waitSeconds, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
+                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(credentialsCheck);
 
-                using var client = new AutomatonApiClient(server, apiKey);
+                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Ensure local runner failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                using var client = new AutomatonApiClient(server!, apiKey!);
 
                 var existing = await FindRunnerByNameAsync(client, runnerName);
                 if (existing != null)
                 {
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, true, $"reusing existing runner {existing.Value.id}"));
                     if (assign && appConfig != null)
                     {
                         await client.UpdateAppRunnerAsync(appConfig.AppId, existing.Value.id);
+                        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, $"runner assigned to {appConfig.AppId}"));
                     }
+                    else if (assign)
+                    {
+                        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, "runner ready, but no linked app was available to assign", IsWarning: true));
+                    }
+
+                    var reused = new CommandDiagnosticResult { Success = true, Summary = "Local runner ready", Checks = checks, NextSteps = [] };
 
                     if (asJson)
                     {
-                        CliJson.Write(new { success = true, reusedExisting = true, runnerId = existing.Value.id, runnerName = existing.Value.name, assigned = assign && appConfig != null });
+                        CliJson.Write(new { success = true, summary = reused.Summary, checks = reused.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = reused.NextSteps, reusedExisting = true, runnerId = existing.Value.id, runnerName = existing.Value.name, assigned = assign && appConfig != null });
                         return;
                     }
 
@@ -62,6 +90,7 @@ public static class EnsureLocalRunnerCommand
                 }
 
                 await EnsureDockerAvailableAsync();
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Docker, true, "docker is available"));
 
                 var apiKeyResult = await client.CreateApiKeyAsync($"{runnerName} runner key", "Created by automaton ensure-local-runner", ApiKeyScopes.Runner);
                 var runnerApiKey = apiKeyResult.GetProperty("apiKey").GetString();
@@ -70,6 +99,7 @@ public static class EnsureLocalRunnerCommand
                 {
                     throw new InvalidOperationException("Server did not return a runner API key.");
                 }
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerApiKey, true, "runner API key created"));
 
                 if (force)
                 {
@@ -95,23 +125,35 @@ public static class EnsureLocalRunnerCommand
 
                 args.Add(image);
                 var containerId = await RunDockerAsync(args, ignoreFailure: false);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, $"runner container started: {containerName}"));
 
                 var ensured = await WaitForRunnerAsync(client, runnerName, waitSeconds);
                 if (ensured == null)
                 {
                     throw new InvalidOperationException("Runner container started, but the runner did not appear online within the wait window.");
                 }
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerOnline, true, $"runner online: {ensured.Value.id}"));
 
                 if (assign && appConfig != null)
                 {
                     await client.UpdateAppRunnerAsync(appConfig.AppId, ensured.Value.id);
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, $"runner assigned to {appConfig.AppId}"));
                 }
+                else if (assign)
+                {
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, "runner ready, but no linked app was available to assign", IsWarning: true));
+                }
+
+                var ensuredResult = new CommandDiagnosticResult { Success = true, Summary = "Local runner ready", Checks = checks, NextSteps = [] };
 
                 if (asJson)
                 {
                     CliJson.Write(new
                     {
                         success = true,
+                        summary = ensuredResult.Summary,
+                        checks = ensuredResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                        nextSteps = ensuredResult.NextSteps,
                         runnerId = ensured.Value.id,
                         runnerName = ensured.Value.name,
                         containerName,
@@ -130,8 +172,25 @@ public static class EnsureLocalRunnerCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.Docker)
+                    ? checks.Any(check => check.Name == CommandDiagnosticCheckNames.RunnerStart)
+                        ? CommandDiagnosticCheckNames.RunnerOnline
+                        : CommandDiagnosticCheckNames.Docker
+                    : CommandDiagnosticCheckNames.Docker;
+
+                checks.Add(new CommandDiagnosticCheck(checkName, false, ex.Message));
+                nextSteps.Add("Make sure Docker is installed and running");
+                nextSteps.Add("If the container started, inspect it with docker logs automaton-local-runner");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Ensure local runner failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, nameOption, imageOption, containerOption, assignOption, forceOption, waitSecondsOption, jsonOption);
 

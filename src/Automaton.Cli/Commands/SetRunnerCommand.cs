@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
@@ -26,27 +27,61 @@ public static class SetRunnerCommand
 
         cmd.SetHandler(async (string? runner, bool clear, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 if (!clear && string.IsNullOrWhiteSpace(runner))
                 {
-                    AnsiConsole.MarkupLine("[red]Error:[/] Provide a runner ID or exact runner name, or use --clear.");
-                    Environment.Exit(1);
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, false, "provide a runner ID or exact runner name, or use --clear"));
+                    nextSteps.Add("Run automaton runners to see available runners");
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner assignment failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
                     return;
                 }
 
                 var cwd = Directory.GetCurrentDirectory();
-                var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
+                var appConfig = config.TryLoadProjectConfig(cwd);
+                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(appLinkCheck);
+                checks.Add(credentialsCheck);
 
-                using var client = new AutomatonApiClient(server, apiKey);
+                if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner assignment failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                using var client = new AutomatonApiClient(server!, apiKey!);
 
                 if (clear)
                 {
                     await client.UpdateAppRunnerAsync(appConfig.AppId, null);
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, "runner assignment cleared"));
+                    var clearResult = new CommandDiagnosticResult { Success = true, Summary = "Runner cleared", Checks = checks, NextSteps = [] };
                     if (asJson)
                     {
-                        CliJson.Write(new { success = true, action = "clear", appId = appConfig.AppId, runnerId = (string?)null });
+                        CliJson.Write(new { success = true, summary = clearResult.Summary, checks = clearResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = clearResult.NextSteps, action = "clear", appId = appConfig.AppId, runnerId = (string?)null });
                         return;
                     }
                     AnsiConsole.MarkupLine($"[green]✓[/] Cleared runner assignment for [cyan]{appConfig.Name}[/].");
@@ -72,15 +107,35 @@ public static class SetRunnerCommand
 
                 if (matches.Count == 0)
                 {
-                    AnsiConsole.MarkupLine($"[red]Error:[/] Runner '{runner}' not found. Run 'automaton runners' to see available runners.");
-                    Environment.Exit(1);
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, false, $"runner '{runner}' not found"));
+                    nextSteps.Add("Run automaton runners to see available runners");
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner assignment failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
                     return;
                 }
 
                 if (matches.Count > 1)
                 {
-                    AnsiConsole.MarkupLine($"[red]Error:[/] Multiple runners matched '{runner}'. Use the runner ID instead.");
-                    Environment.Exit(1);
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, false, $"multiple runners matched '{runner}'"));
+                    nextSteps.Add("Use the runner ID instead of the runner name");
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner assignment failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -89,17 +144,30 @@ public static class SetRunnerCommand
                 var runnerName = selected.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() ?? runnerId : runnerId;
 
                 await client.UpdateAppRunnerAsync(appConfig.AppId, runnerId);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, true, $"runner resolved: {runnerName}"));
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, $"runner assigned: {runnerId}"));
+                var assignResult = new CommandDiagnosticResult { Success = true, Summary = "Runner assigned", Checks = checks, NextSteps = [] };
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, action = "assign", appId = appConfig.AppId, runnerId, runnerName });
+                    CliJson.Write(new { success = true, summary = assignResult.Summary, checks = assignResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = assignResult.NextSteps, action = "assign", appId = appConfig.AppId, runnerId, runnerName });
                     return;
                 }
                 AnsiConsole.MarkupLine($"[green]✓[/] Assigned runner [bold]{runnerName}[/] to [cyan]{appConfig.Name}[/].");
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, false, ex.Message));
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner assignment failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, runnerArgument, clearOption, jsonOption);
 

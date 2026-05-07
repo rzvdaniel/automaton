@@ -55,6 +55,7 @@ sudo ./setup-service.sh
 | `setup-service.ps1` | Windows | Install/uninstall Windows service |
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
+| `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
 | `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API container |
 | `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website |
 | `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy the full production stack |
@@ -75,6 +76,91 @@ cd /opt/automaton
 ```
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
+
+---
+
+## Local CLI Tool Workflow
+
+Use `dev-reinstall-cli.ps1` when you want to install, update, or remove the locally packed `Automaton.Cli` global tool without touching any remote NuGet source.
+
+```powershell
+cd C:\Work\automaton\scripts
+
+# Pack + install from .\.tmp\cli-pack
+.\dev-reinstall-cli.ps1 -Action install
+
+# Pack + update the already installed global tool
+.\dev-reinstall-cli.ps1 -Action update
+
+# Pack + force uninstall + reinstall
+.\dev-reinstall-cli.ps1 -Action reinstall
+
+# Remove the global tool
+.\dev-reinstall-cli.ps1 -Action uninstall
+
+# Show installed tool version and local package info
+.\dev-reinstall-cli.ps1 -Action status
+```
+
+Notes:
+
+- `install`, `update`, and `reinstall` pack the CLI from `src/Automaton.Cli`
+- the script uses only the local package source under `.tmp\cli-pack`
+- add `-SkipTests` if you want to skip `dotnet test` before packing
+
+### Plain `dotnet` commands
+
+If you prefer not to use the PowerShell helper, you can do the same work directly with `dotnet`.
+
+From the repo root:
+
+```powershell
+cd C:\Work\automaton
+
+# Optional: run the CLI tests first
+dotnet test src\UnitTests\Automaton.Cli.Tests\Automaton.Cli.Tests.csproj
+
+# Rebuild the local package source cleanly
+Remove-Item .\.tmp\cli-pack -Recurse -Force -ErrorAction Ignore
+dotnet pack src\Automaton.Cli\Automaton.Cli.csproj -c Release -o .\.tmp\cli-pack
+```
+
+Install the local package as a global tool:
+
+```powershell
+dotnet tool install --global --add-source .\.tmp\cli-pack Automaton.Cli
+```
+
+Update the already installed global tool from the local package source:
+
+```powershell
+dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli
+```
+
+Force a clean reinstall:
+
+```powershell
+dotnet tool uninstall --global Automaton.Cli
+dotnet tool install --global --add-source .\.tmp\cli-pack Automaton.Cli
+```
+
+Uninstall the global tool:
+
+```powershell
+dotnet tool uninstall --global Automaton.Cli
+```
+
+Check what is installed:
+
+```powershell
+dotnet tool list --global
+automaton --version
+```
+
+Important:
+
+- clean `.tmp\cli-pack` before packing if you want predictable installs and updates
+- the installed package version and `automaton --version` can still differ until CLI package versioning and assembly versioning are unified
 
 ---
 

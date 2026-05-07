@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
@@ -21,11 +22,25 @@ public static class LogoutCommand
 
         cmd.SetHandler((bool global, bool all, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 if (global && all)
                 {
-                    throw new InvalidOperationException("Use either --global or --all, not both.");
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, false, "use either --global or --all, not both"));
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Logout failed", Checks = checks, NextSteps = ["Choose one scope: local (default), --global, or --all"] };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
                 }
 
                 var cwd = Directory.GetCurrentDirectory();
@@ -38,12 +53,21 @@ public static class LogoutCommand
                 var envServer = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_SERVER"));
                 var envApiKey = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
                 var envOverridesActive = envServer || envApiKey;
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, true, $"credentials cleared for scope { (all ? "all" : global ? "global" : "local") }"));
+                if (envOverridesActive)
+                {
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Credentials, true, "environment variables still provide credentials", IsWarning: true));
+                }
+                var result = new CommandDiagnosticResult { Success = true, Summary = "Logout complete", Checks = checks, NextSteps = envOverridesActive ? ["Unset AUTOMATON_SERVER and/or AUTOMATON_API_KEY if you want a fully logged-out state"] : [] };
 
                 if (asJson)
                 {
                     CliJson.Write(new
                     {
                         success = true,
+                        summary = result.Summary,
+                        checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                        nextSteps = result.NextSteps,
                         scope = all ? "all" : global ? "global" : "local",
                         cleared = new { local = clearedLocal, global = clearedGlobal },
                         envOverridesActive,
@@ -77,8 +101,17 @@ public static class LogoutCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, false, ex.Message));
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Logout failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, globalOption, allOption, jsonOption);
 

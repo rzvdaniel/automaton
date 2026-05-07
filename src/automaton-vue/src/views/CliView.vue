@@ -64,9 +64,9 @@ const quickStartSteps = [
     code: 'dotnet tool install -g Automaton.Cli',
   },
   {
-    title: 'Configure auth',
-    detail: 'Point the CLI at your server and API key so the local project can talk to Automaton.',
-    code: `automaton config --server ${publicAppConfig.apiBaseUrl} --key your-api-key`,
+    title: 'Login',
+    detail: 'Prefer CLI login and identity confirmation before creating or linking the app.',
+    code: 'automaton login\nautomaton whoami',
   },
   {
     title: 'Create app',
@@ -74,8 +74,13 @@ const quickStartSteps = [
     code: 'automaton create --name "My App"',
   },
   {
-    title: 'Deploy',
-    detail: 'Upload the app from your local workflow. Backend apps need a runner before the first backend deploy.',
+    title: 'Validate',
+    detail: 'Run a cheap preflight check before upload so obvious config and runner issues fail early.',
+    code: 'automaton validate',
+  },
+  {
+    title: 'Deploy and preview in Studio',
+    detail: 'Deploy from your local workflow, then use Studio preview and logs as the current test loop.',
     code: 'automaton deploy',
   },
 ]
@@ -93,7 +98,7 @@ const workflowSteps = [
   },
   {
     title: 'Deploy from your IDE',
-    description: 'Deploy the app from your local workflow. For backend apps, make sure a runner is assigned before the first backend deploy.',
+    description: 'Run automaton validate, deploy from your local workflow, then preview the app and inspect logs in Automaton Studio before publish.',
     code: 'automaton deploy',
   },
 ]
@@ -258,7 +263,7 @@ async function copyCode(key: string, code: string) {
           <div class="cli-section-head">
             <h2 class="section-title cli-section-title">Quick start</h2>
             <p class="section-subtitle cli-section-subtitle">
-              The shortest path from install to first deploy. For the full CLI + your tools flow, open the docs page.
+              The shortest path from install to Studio preview. For the full CLI + your tools flow, open the docs page.
             </p>
           </div>
 
@@ -283,7 +288,7 @@ async function copyCode(key: string, code: string) {
           <div class="cli-section-head">
             <h2 class="section-title cli-section-title">CLI + AI workflow</h2>
             <p class="section-subtitle cli-section-subtitle">
-              The easiest reliable path is to combine the CLI with the AI-readable project contract and your local IDE.
+              The easiest reliable path is to combine the CLI with the AI-readable project contract and your local IDE, then use Studio for preview and logs.
             </p>
           </div>
 
@@ -331,7 +336,7 @@ async function copyCode(key: string, code: string) {
             <div class="cli-card-head">
               <span class="tag">Why CLI</span>
               <h2>What the CLI is for</h2>
-              <p class="cli-card-subtitle">Use it when you want local development, Git control, and one command to upload or redeploy the app.</p>
+              <p class="cli-card-subtitle">Use it when you want local development, Git control, and a clean path to validate, deploy, preview in Studio, and redeploy.</p>
             </div>
 
             <article class="code-card">
@@ -343,8 +348,10 @@ async function copyCode(key: string, code: string) {
               </div>
               <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
 - Keep the project in your repo
+- Run automaton validate before deploy
 - Create or link the Automaton app
 - Deploy frontend files and backend controllers
+- Preview and inspect logs in Automaton Studio
 - Reuse the same flow every time you update the app</code></pre>
             </article>
           </div>

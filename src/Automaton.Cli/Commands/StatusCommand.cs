@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
@@ -18,12 +19,35 @@ public static class StatusCommand
 
         cmd.SetHandler(async (bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
-                using var client = new AutomatonApiClient(server, apiKey);
+                var appConfig = config.TryLoadProjectConfig(cwd);
+                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(appLinkCheck);
+                checks.Add(credentialsCheck);
+
+                if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Status failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                using var client = new AutomatonApiClient(server!, apiKey!);
                 var app = await client.GetAppAsync(appConfig.AppId);
 
                 var deployDirectory = ZipService.ResolveDeployDirectory(cwd, appConfig.DeployDir);
@@ -38,12 +62,17 @@ public static class StatusCommand
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? $"{server}/web/{publicUrl}" : null;
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
+                var statusResult = new CommandDiagnosticResult { Success = true, Summary = "Status loaded", Checks = checks, NextSteps = [] };
 
                 if (asJson)
                 {
                     CliJson.Write(new
                     {
                         success = true,
+                        summary = statusResult.Summary,
+                        checks = statusResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                        nextSteps = statusResult.NextSteps,
                         project = new
                         {
                             root = cwd,
@@ -83,8 +112,18 @@ public static class StatusCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, false, ex.Message));
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Status failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, jsonOption);
 

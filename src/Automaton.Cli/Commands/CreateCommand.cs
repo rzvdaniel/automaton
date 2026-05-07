@@ -20,10 +20,30 @@ public static class CreateCommand
 
         cmd.SetHandler(async (string? name, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.RequireCredentials(directory: cwd);
+                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(credentialsCheck);
+
+                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -33,11 +53,23 @@ public static class CreateCommand
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
-                    throw new InvalidOperationException("App name is required.");
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, false, "app name is required"));
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = ["Pass --name or answer the app name prompt"] };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
                 }
 
-                using var client = new AutomatonApiClient(server, apiKey);
+                using var client = new AutomatonApiClient(server!, apiKey!);
                 var (appId, appName) = await client.CreateAppAsync(name);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
 
                 config.SaveProjectConfig(cwd, new AutomatonConfig
                 {
@@ -58,8 +90,18 @@ public static class CreateCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, false, ex.Message));
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, nameOption, jsonOption);
 

@@ -1,7 +1,7 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
-using System.Text.Json;
 
 namespace Automaton.Cli.Commands;
 
@@ -31,11 +31,40 @@ public static class PublishCommand
 
         cmd.SetHandler(async (string? message, bool yes, bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var appConfig = config.LoadProjectConfig(cwd);
-                var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
+                var appConfig = config.TryLoadProjectConfig(cwd);
+                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(appLinkCheck);
+                checks.Add(credentialsCheck);
+
+                if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Publish failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new
+                        {
+                            success = failure.Success,
+                            summary = failure.Summary,
+                            checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                            nextSteps = failure.NextSteps,
+                            appId = appConfig?.AppId
+                        });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
 
                 if (!yes)
                 {
@@ -44,13 +73,15 @@ public static class PublishCommand
                     if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
                         && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
                     {
+                        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish cancelled by user"));
+                        var cancelled = new CommandDiagnosticResult { Success = false, Summary = "Publish cancelled", Checks = checks, NextSteps = ["Rerun automaton publish --yes when you are ready to snapshot the app"] };
                         if (asJson)
                         {
-                            CliJson.Write(new { success = false, cancelled = true, appId = appConfig.AppId });
+                            CliJson.Write(new { success = false, cancelled = true, summary = cancelled.Summary, checks = cancelled.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = cancelled.NextSteps, appId = appConfig.AppId });
                             return;
                         }
 
-                        AnsiConsole.MarkupLine("[yellow]Publish cancelled.[/]");
+                        CliDiagnosticsWriter.Write(cancelled);
                         return;
                     }
                 }
@@ -60,15 +91,17 @@ public static class PublishCommand
                     AnsiConsole.MarkupLine($"[bold]Publishing snapshot[/] for [cyan]{appConfig.Name}[/]...");
                 }
 
-                using var client = new AutomatonApiClient(server, apiKey);
+                using var client = new AutomatonApiClient(server!, apiKey!);
                 var result = await client.PublishAsync(appConfig.AppId, message);
 
                 var version = result.TryGetProperty("versionNumber", out var v) ? v.GetInt32().ToString() : "?";
                 var summary = result.TryGetProperty("summary", out var s) ? s.GetString() : message;
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, true, $"version {version} saved"));
+                var publishResult = new CommandDiagnosticResult { Success = true, Summary = "Publish complete", Checks = checks, NextSteps = [] };
 
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, appId = appConfig.AppId, version, summary });
+                    CliJson.Write(new { success = true, summary = publishResult.Summary, checks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = publishResult.NextSteps, appId = appConfig.AppId, version, publishSummary = summary });
                     return;
                 }
 
@@ -76,8 +109,18 @@ public static class PublishCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, ex.Message));
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Publish failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, messageOption, yesOption, jsonOption);
 

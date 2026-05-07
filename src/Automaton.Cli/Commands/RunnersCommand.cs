@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
@@ -21,11 +22,32 @@ public static class RunnersCommand
 
         cmd.SetHandler(async (bool asJson) =>
         {
+            var checks = new List<CommandDiagnosticCheck>();
+            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.RequireCredentials(directory: cwd);
-                using var client = new AutomatonApiClient(server, apiKey);
+                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
+                checks.Add(credentialsCheck);
+
+                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+                {
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner listing failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                    if (asJson)
+                    {
+                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                    }
+                    else
+                    {
+                        CliDiagnosticsWriter.Write(failure);
+                    }
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                using var client = new AutomatonApiClient(server!, apiKey!);
                 var result = await client.ListRunnersAsync();
 
                 var runners = new List<object>();
@@ -48,9 +70,12 @@ public static class RunnersCommand
                     }
                 }
 
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Runners, true, runners.Count == 0 ? "no runners registered" : $"{runners.Count} runner(s) loaded"));
+                var runnersResult = new CommandDiagnosticResult { Success = true, Summary = runners.Count == 0 ? "No runners registered" : "Runners loaded", Checks = checks, NextSteps = runners.Count == 0 ? ["Start and register a runner, or run automaton ensure-local-runner"] : [] };
+
                 if (asJson)
                 {
-                    CliJson.Write(new { server, runners });
+                    CliJson.Write(new { success = true, summary = runnersResult.Summary, checks = runnersResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = runnersResult.NextSteps, server, runners });
                     return;
                 }
 
@@ -78,8 +103,18 @@ public static class RunnersCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                Environment.Exit(1);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Runners, false, ex.Message));
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+                var failure = new CommandDiagnosticResult { Success = false, Summary = "Runner listing failed", Checks = checks, NextSteps = nextSteps.ToList() };
+                if (asJson)
+                {
+                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
+                }
+                else
+                {
+                    CliDiagnosticsWriter.Write(failure);
+                }
+                Environment.ExitCode = 1;
             }
         }, jsonOption);
 

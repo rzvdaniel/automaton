@@ -212,20 +212,20 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div>
                 <div class="step-title">Let the AI validate and prepare backend deploys</div>
                 <p class="step-body">
-                  After the files exist, the AI should run <code>automaton validate</code>, inspect current runner assignment,
-                  and only use runner setup commands when the app includes Python backend controllers.
-                  Frontend-only apps can usually skip that part.
+                  After the files exist, the AI should run <code>automaton validate</code> as a cheap preflight check,
+                  inspect current runner assignment, and only use runner setup commands when the app includes Python
+                  backend controllers. Frontend-only apps can usually skip that part.
                 </p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">5</div>
               <div>
-                <div class="step-title">Let the AI deploy and stop where human approval is needed</div>
+                <div class="step-title">Deploy to Studio, preview there, then publish only when approved</div>
                 <p class="step-body">
-                  The AI should run deploy commands itself and only pause when the workflow needs you,
-                  such as interactive login, runner decisions you want to review, or final publish approval.
-                  In practice, this path can go from blank folder to live app with the CLI as the execution layer.
+                  The AI should run deploy commands itself, then use Automaton Studio as the current test loop:
+                  open the app there, preview it there, inspect logs there, and iterate locally until the preview looks right.
+                  It should only pause when the workflow needs you, such as interactive login or final publish approval.
                 </p>
               </div>
             </div>
@@ -336,14 +336,15 @@ automaton set-runner your-runner-id</pre></div>
             <div class="step">
               <div class="step-num">7</div>
               <div>
-                <div class="step-title">Deploy, then publish when approved</div>
+                <div class="step-title">Deploy to Studio, preview there, then publish when approved</div>
                 <div class="code-block code-block-multi"><pre>automaton deploy
 automaton publish --yes
 automaton status</pre></div>
                 <p class="step-body">
                   Uploads all files and pushes Python controllers to the assigned runner in one step.
-                  Run it again any time you make changes. Publish only after user approval, then use
-                  <code>status</code> to confirm the live URL and current version.
+                  After deploy, use Automaton Studio preview and logs as the current test/debug loop.
+                  Run deploy again any time you make changes. Publish only after user approval, then
+                  use <code>status</code> to confirm the live URL and current version.
                 </p>
               </div>
             </div>

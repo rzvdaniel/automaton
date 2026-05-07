@@ -6,6 +6,8 @@ Use this when the user is building an Automaton app locally in Cursor, Copilot, 
 
 Keep the project local, commit it to Git, and deploy the app to Automaton with the CLI.
 
+For now, treat Automaton Studio as the official preview and debugging environment after each deploy.
+
 ## Required setup
 
 1. Install the Automaton CLI.
@@ -79,7 +81,33 @@ Interpretation rules:
 3. Use `automaton create` for new apps; reserve `automaton link` for existing remote apps.
 4. Run `automaton validate` before deploy.
 5. If backend controllers exist and no runner is assigned, prefer `automaton ensure-local-runner --assign` when Docker is available.
-6. Ask the user before public publish, then use `automaton publish --yes` only after approval.
+6. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
+7. Ask the user before public publish, then use `automaton publish --yes` only after approval.
+
+## Current test and debug loop
+
+Until a dedicated local app runtime exists, this is the intended workflow:
+
+1. build locally in your IDE
+2. run `automaton validate`
+3. run `automaton deploy`
+4. open the app in Automaton Studio
+5. preview it there
+6. inspect app/backend logs there
+7. fix locally and redeploy
+8. publish only after the Studio preview looks correct
+
+## What `automaton validate` is for
+
+`automaton validate` is the cheap preflight check before upload.
+
+Use it to catch obvious problems early, such as:
+
+- missing or invalid `automaton.json`
+- missing app linkage
+- missing frontend entry files or invalid deploy configuration
+- backend controllers that require a runner when none is assigned
+- other structural issues that should fail before deploy starts
 
 ## What the AI should do
 
@@ -91,6 +119,7 @@ Interpretation rules:
 - Use Python backend controllers in `backend/`.
 - If the app includes Python backend controllers, do not consider backend deploy complete until a runner assignment exists or you have clearly reported why it could not be made.
 - Prefer `automaton status` and `automaton validate` as preflight checks before declaring success.
+- After deploy, use Automaton Studio preview and logs as the current test/debug loop before proposing publish.
 - Ask before public publish, then use `automaton publish --yes` after approval.
 
 ## Deploy commands
@@ -138,5 +167,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ```text
 Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Authenticate with automaton login if needed, create or link automaton.json in the project root, ensure a runner exists for backend controllers, run automaton validate before deploy, and only publish after explicit user confirmation.
 ```
+
+When the app is deployed but not yet published, the AI should direct the user to preview it in Automaton Studio and inspect logs there before recommending publish.
 
 If the user asks to switch accounts or reset stored auth during testing, use `automaton logout` before logging in again.

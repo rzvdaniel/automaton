@@ -51,6 +51,8 @@ If the app has a build step or deploys from a build output folder, add the missi
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, make sure a runner is assigned first with `automaton runners` and `automaton set-runner <runner-id>`.
 
+**Current test loop** — After deploy, use Automaton Studio as the current preview and debugging environment: open the app in Studio, preview it there, inspect logs there, iterate, and publish only after explicit user approval.
+
 ## Autonomous Full Flow
 
 When the AI is asked to build an Automaton app from scratch in a local project, prefer the CLI as the primary execution surface.
@@ -66,11 +68,13 @@ Follow this order:
 7. Scaffold the app locally using the simplest suitable frontend stack.
 8. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
 9. If no runner is assigned or available, prefer `automaton ensure-local-runner --assign` when Docker is available. If that cannot succeed, clearly report why and stop before backend deploy.
-10. Run `automaton validate` before deploy.
+10. Run `automaton validate` before deploy as a cheap preflight check.
 11. Run `automaton deploy`.
-12. Ask for confirmation before public publish.
-13. After approval, run `automaton publish --yes`.
-14. Run `automaton status` and validate the live app URL.
+12. Open the app in Automaton Studio, preview it there, and inspect the logs there.
+13. Iterate locally and redeploy until the Studio preview looks correct.
+14. Ask for confirmation before public publish.
+15. After approval, run `automaton publish --yes`.
+16. Run `automaton status` and validate the live app URL.
 
 Completion criteria:
 
