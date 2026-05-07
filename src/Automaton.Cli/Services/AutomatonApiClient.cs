@@ -124,7 +124,27 @@ public class AutomatonApiClient : IDisposable
         var encoded = Uri.EscapeDataString(path);
         using var resp = await _http.GetAsync($"api/apps/{appId}/files/{encoded}", ct);
         await EnsureSuccessAsync(resp);
-        return await resp.Content.ReadAsStringAsync(ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("success", out var successProperty)
+                && (successProperty.ValueKind == JsonValueKind.True || successProperty.ValueKind == JsonValueKind.False)
+                && root.TryGetProperty("content", out var contentProperty)
+                && contentProperty.ValueKind == JsonValueKind.String)
+            {
+                return contentProperty.GetString() ?? string.Empty;
+            }
+        }
+        catch (JsonException)
+        {
+            // Raw file bodies are not JSON and should be returned unchanged.
+        }
+
+        return body;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

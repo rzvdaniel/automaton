@@ -55,15 +55,15 @@ const router = createRouter({
 // Navigation guard for authentication and authorization
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+  const requiresAuth = to.meta.requiresAuth !== false && to.meta.layout !== 'auth'
 
-  // Initialize auth state if not already done
-  if (!authStore.isInitialized) {
+  // Public routes must not force auth initialization because a stale token can
+  // turn an otherwise anonymous page load into a login redirect.
+  if (requiresAuth && !authStore.isInitialized) {
     await authStore.initialize()
   }
 
   // Check if route requires authentication
-  const requiresAuth = to.meta.requiresAuth !== false && to.meta.layout !== 'auth'
-
   // If route requires auth and user is not authenticated
   if (requiresAuth && !authStore.isAuthenticated) {
     // Redirect to login with return URL

@@ -31,10 +31,15 @@ const isAuthLayout = computed(() => route.meta.layout === 'auth')
 // Check if current route uses no layout (full screen apps, etc.)
 const isNoLayout = computed(() => route.meta.layout === 'none')
 
+const shouldInitializeAuthenticatedShell = computed(() => {
+  return route.meta.requiresAuth !== false && !isAuthLayout.value && !isNoLayout.value
+})
+
 onMounted(async () => {
   installPlanLimit()
-  // Only initialize projects store on authenticated pages (not auth/install pages)
-  if (!isAuthLayout.value) {
+  // Public no-layout pages such as published apps must not trigger authenticated
+  // shell bootstrap requests, or they can redirect anonymous visitors to login.
+  if (shouldInitializeAuthenticatedShell.value) {
     await projectsStore.initialize()
     await loadPlanFeatures()
     await loadBudgetBanner()
