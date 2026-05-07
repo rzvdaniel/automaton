@@ -120,28 +120,31 @@ cd C:\Work\automaton
 # Optional: run the CLI tests first
 dotnet test src\UnitTests\Automaton.Cli.Tests\Automaton.Cli.Tests.csproj
 
+# Stamp a unique local package version
+$localCliVersion = "1.0.0-local.$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')).$(git rev-parse --short HEAD)"
+
 # Rebuild the local package source cleanly
 Remove-Item .\.tmp\cli-pack -Recurse -Force -ErrorAction Ignore
-dotnet pack src\Automaton.Cli\Automaton.Cli.csproj -c Release -o .\.tmp\cli-pack
+dotnet pack src\Automaton.Cli\Automaton.Cli.csproj -c Release -o .\.tmp\cli-pack -p:Version=$localCliVersion
 ```
 
 Install the local package as a global tool:
 
 ```powershell
-dotnet tool install --global --add-source .\.tmp\cli-pack Automaton.Cli
+dotnet tool install --global --add-source .\.tmp\cli-pack --version $localCliVersion Automaton.Cli
 ```
 
 Update the already installed global tool from the local package source:
 
 ```powershell
-dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli
+dotnet tool update --global --add-source .\.tmp\cli-pack --version $localCliVersion Automaton.Cli
 ```
 
 Force a clean reinstall:
 
 ```powershell
 dotnet tool uninstall --global Automaton.Cli
-dotnet tool install --global --add-source .\.tmp\cli-pack Automaton.Cli
+dotnet tool install --global --add-source .\.tmp\cli-pack --version $localCliVersion Automaton.Cli
 ```
 
 Uninstall the global tool:
@@ -160,7 +163,8 @@ automaton --version
 Important:
 
 - clean `.tmp\cli-pack` before packing if you want predictable installs and updates
-- the installed package version and `automaton --version` can still differ until CLI package versioning and assembly versioning are unified
+- the helper script and manual flow above both stamp a unique local package version for each pack
+- `automaton --version` now shows that stamped package version as `Version` and the assembly metadata as `Build version`
 
 ---
 

@@ -15,12 +15,18 @@
     <Version>1.0.0</Version>
     <Authors>Automaton</Authors>
     <Description>Automaton CLI — deploy apps, manage runners, publish versions</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README-NUGET.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.10" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="Spectre.Console" Version="0.49.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README-NUGET.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

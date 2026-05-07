@@ -46,6 +46,32 @@ function Get-InstalledCliVersion {
     return $match.Matches[0].Groups['version'].Value
 }
 
+function Get-CliBasePackageVersion {
+    [xml]$projectXml = Get-Content -Path $cliProject -Raw
+    $version = $projectXml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -ExpandProperty Version -First 1
+
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        throw "Could not determine base CLI package version from $cliProject"
+    }
+
+    return $version.Trim()
+}
+
+function Get-LocalPackageVersion {
+    $baseVersion = Get-CliBasePackageVersion
+    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")
+    $gitCommit = (& git rev-parse --short HEAD 2>$null | Select-Object -First 1)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommit)) {
+        $gitCommit = "nogit"
+    }
+
+    $gitCommit = ([System.Text.RegularExpressions.Regex]::Replace($gitCommit.Trim().ToLowerInvariant(), '[^0-9a-z-]', ''))
+    if ([string]::IsNullOrWhiteSpace($gitCommit)) {
+        $gitCommit = "nogit"
+    }
+
+    return "$baseVersion-local.$timestamp.$gitCommit"
+}
 function Remove-InstalledCli {
     $installedVersion = Get-InstalledCliVersion
     if ([string]::IsNullOrWhiteSpace($installedVersion)) {
@@ -61,6 +87,8 @@ function Remove-InstalledCli {
 }
 
 function Build-LocalCliPackage {
+    $packageVersion = Get-LocalPackageVersion
+
     if (Test-Path $packageOutput) {
         Write-Host "Removing existing package output: $packageOutput"
         Remove-Item $packageOutput -Recurse -Force
@@ -68,26 +96,21 @@ function Build-LocalCliPackage {
 
     if (-not $SkipTests) {
         Write-Host "Running CLI tests..."
-        & dotnet test $cliTests --configuration $Configuration --verbosity minimal
+        & dotnet test $cliTests --configuration $Configuration --verbosity minimal | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "dotnet test failed with exit code $LASTEXITCODE"
         }
     }
 
-    Write-Host "Packing CLI..."
-    & dotnet pack $cliProject --configuration $Configuration --output $packageOutput
+    Write-Host "Packing CLI as version $packageVersion..."
+    & dotnet pack $cliProject --configuration $Configuration --output $packageOutput -p:Version=$packageVersion | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet pack failed with exit code $LASTEXITCODE"
     }
 
-    $nupkg = Get-ChildItem $packageOutput -Filter "Automaton.Cli.*.nupkg" | Select-Object -First 1
+    $nupkg = Get-ChildItem $packageOutput -Filter "Automaton.Cli.$packageVersion.nupkg" | Select-Object -First 1
     if (-not $nupkg) {
-        throw "No Automaton.Cli nupkg was produced in $packageOutput"
-    }
-
-    $packageVersion = [System.Text.RegularExpressions.Regex]::Match($nupkg.BaseName, '^Automaton\.Cli\.(.+)$').Groups[1].Value
-    if ([string]::IsNullOrWhiteSpace($packageVersion)) {
-        throw "Could not determine package version from $($nupkg.Name)"
+        throw "No Automaton.Cli nupkg was produced in $packageOutput for version $packageVersion"
     }
 
     return $packageVersion
