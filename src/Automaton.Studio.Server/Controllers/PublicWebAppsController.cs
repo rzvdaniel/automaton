@@ -1,8 +1,10 @@
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -23,17 +25,20 @@ public class PublicWebAppsController : ControllerBase
     private readonly AppFileStorageService _fileStorageService;
     private readonly AppsService _appsService;
     private readonly ILogger<PublicWebAppsController> _logger;
+    private readonly WebAppConfig _webAppConfig;
 
     public PublicWebAppsController(
         ApplicationDbContext context,
         AppFileStorageService fileStorageService,
         AppsService appsService,
-        ILogger<PublicWebAppsController> logger)
+        ILogger<PublicWebAppsController> logger,
+        IOptions<WebAppConfig> webAppConfig)
     {
         _context = context;
         _fileStorageService = fileStorageService;
         _appsService = appsService;
         _logger = logger;
+        _webAppConfig = webAppConfig.Value;
     }
 
     /// <summary>
@@ -116,6 +121,8 @@ public class PublicWebAppsController : ControllerBase
                 htmlContent = GetDefaultHtmlContent();
             }
 
+            WebAppCachePolicy.ApplyHtmlDocumentHeaders(Response);
+
             return Ok(new
             {
                 app.Id,
@@ -194,9 +201,7 @@ public class PublicWebAppsController : ControllerBase
             // Return with appropriate content type
             var contentType = GetContentType(path);
 
-            // Add cache headers
-            Response.Headers.CacheControl = "public, max-age=3600";
-            Response.Headers.XContentTypeOptions = "nosniff";
+            WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, path, _webAppConfig);
 
             return Content(content, contentType);
         }

@@ -135,12 +135,9 @@ public class UserAppsController : ControllerBase
             // Determine content type
             var contentType = GetContentType(path);
 
-            // Add security headers
-            Response.Headers.XContentTypeOptions = "nosniff";
-            
-            // Aggressive caching for published apps (we use version-based cache-busting on frontend)
-            // Files are cached based on configured max-age but URL changes when app version changes
-            Response.Headers.CacheControl = $"public, max-age={webAppConfig.CacheMaxAgeSeconds}";
+            // Smart caching: HTML always revalidates, fingerprinted assets can be immutable,
+            // plain app assets stay fresh without forcing users to add manual cache busting.
+            WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, path, webAppConfig);
 
             // Return with appropriate content type
             return Content(content, contentType, Encoding.UTF8);
