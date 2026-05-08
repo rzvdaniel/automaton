@@ -40,6 +40,8 @@ public class LinkAppServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
     }
 
     [Test]

@@ -136,7 +136,7 @@ automaton sync-ai
 automaton sync-ai --json
 ```
 
-Use this only when the generated `AGENTS.md`, `.github/`, or `.automaton/ai-guidance/` files are missing or stale. It is not required on the normal happy path because `setup`, `new`, and `link` already do this automatically.
+Use this only when the generated `.automaton/agents/`, `.automaton/ai-guidance/`, `AGENTS.md`, `CLAUDE.md`, or `.github/` files are missing or stale. It is not required on the normal happy path because `setup`, `new`, and `link` already do this automatically.
 
 ---
 

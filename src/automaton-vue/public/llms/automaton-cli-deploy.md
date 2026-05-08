@@ -47,7 +47,7 @@ When the user asks to use the Automaton CLI, the AI should prefer `automaton new
 
 The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
 
-`automaton setup`, `automaton new`, and `automaton link` also sync a local AI guidance pack into `.automaton/ai-guidance/` and generate local `AGENTS.md` / `.github/` guidance files. If those generated files are missing or stale, run:
+`automaton setup`, `automaton new`, and `automaton link` also sync a local AI guidance pack into `.automaton/ai-guidance/`, generate canonical tool-neutral files under `.automaton/agents/`, and write compatibility wrappers like `AGENTS.md`, `CLAUDE.md`, and `.github/` guidance files. If those generated files are missing or stale, run:
 
 ```bash
 automaton sync-ai
@@ -130,7 +130,7 @@ Use it to catch obvious problems early, such as:
 - Build the app in the current local project folder.
 - Keep `automaton.json` in the project root.
 - Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
-- Follow the local generated guidance pack after setup. Use `llms.txt` and the linked files as the canonical source and fallback when the tool does not honor local guidance files.
+- Follow the local generated guidance pack after setup. Start with `.automaton/agents/` when present, then use `llms.txt` and the linked files as the detailed canonical source and fallback when the tool does not honor local guidance files.
 - Treat `automaton sync-ai` as the manual refresh path for the generated local guidance pack, not as a required onboarding step.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
 - If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.

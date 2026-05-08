@@ -33,14 +33,24 @@ public class AiGuidancePackServiceTests
 
         Assert.That(result.Mode, Is.EqualTo("app"));
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "manifest.json")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "ai-guidance", "llms.txt")), Is.True);
         Assert.That(File.Exists(result.ManifestPath), Is.True);
 
         using var manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
         Assert.That(manifest.RootElement.GetProperty("mode").GetString(), Is.EqualTo("app"));
         Assert.That(manifest.RootElement.GetProperty("sources").GetArrayLength(), Is.GreaterThanOrEqualTo(6));
+
+        var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
+        Assert.That(agentsContent, Does.Contain(".automaton/agents/instructions.md"));
+
+        var claudeContent = File.ReadAllText(Path.Combine(projectRoot, "CLAUDE.md"));
+        Assert.That(claudeContent, Does.Contain(".automaton/agents/skills/automaton-app/SKILL.md"));
     }
 
     [Test]
