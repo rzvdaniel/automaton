@@ -323,13 +323,11 @@ automaton status</pre></div>
                 <div class="step-title">Handle backend runners when needed</div>
                 <div class="code-block code-block-multi"><pre>automaton current-runner
 automaton runners
-automaton ensure-local-runner --assign
-# or
 automaton set-runner your-runner-id</pre></div>
                 <p class="step-body">
                   Skip this if the app is frontend-only. If the app has Python backend controllers,
-                  inspect the current assignment first, then provision or assign a runner before the
-                  first backend deploy.
+                  inspect the current assignment first, then pick an existing connected runner before the
+                  first backend deploy. If no connected runner exists yet, create or deploy one in Automaton Studio.
                 </p>
               </div>
             </div>
@@ -357,7 +355,7 @@ automaton status</pre></div>
               <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
               Automaton structure and backend/frontend contract. For backend apps, start with <code>automaton current-runner</code>,
-              <code>automaton runners</code>, and <code>automaton ensure-local-runner --assign</code> when needed, then run <code>automaton validate</code>
+              <code>automaton runners</code>, and <code>automaton set-runner &lt;runner-id&gt;</code> when a connected runner exists. If none exists, create or deploy one in Studio, then run <code>automaton validate</code>
               before deploy. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
               <strong>Documentation → Automaton CLI</strong> page inside Studio.
             </span>
@@ -425,7 +423,7 @@ automaton status</pre></div>
                 <p class="step-body">
                   The AI can create or link the app, understand the required structure, and generate
                   the project in your local workspace. Keep the project in your own Git repo if you want version control,
-                  then run <code>automaton set-runner</code> for backend apps and <code>automaton deploy</code>
+                  then pick an existing connected runner with <code>automaton set-runner</code> for backend apps, or create/deploy one in Studio if none exists, and run <code>automaton deploy</code>
                   to upload the frontend and deploy the backend.
                 </p>
               </div>

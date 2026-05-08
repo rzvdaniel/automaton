@@ -53,7 +53,7 @@ If the app has a build step or deploys from a build output folder, add the missi
 
 If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is enough unless `backend/` is copied into that deploy directory. Prepare one deploy-ready folder that contains the built frontend files and `backend/`, or copy `backend/` into `dist/backend/` before deploy.
 
-**Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, make sure a runner is assigned first with `automaton runners` and `automaton set-runner <runner-id>`.
+**Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, pick an existing connected runner first with `automaton runners` and `automaton set-runner <runner-id>`, or create/deploy one in Automaton Studio if none exists.
 
 **Current test loop** — After deploy, use Automaton Studio as the current preview and debugging environment: open the app in Studio, preview it there, inspect logs there, iterate, and publish only after explicit user approval.
 
@@ -71,7 +71,7 @@ Follow this order:
 6. If it does not exist, run `automaton create --name "<app-name>"`.
 7. Scaffold the app locally using the simplest suitable frontend stack.
 8. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
-9. If no runner is assigned or available, prefer `automaton ensure-local-runner --assign` when Docker is available. If that cannot succeed, clearly report why and stop before backend deploy.
+9. If no connected runner is assigned or available, tell the user to create or deploy one in Automaton Studio, or pick an existing connected runner with `automaton set-runner <runner-id>`.
 10. Run `automaton validate` before deploy as a cheap preflight check.
 11. Run `automaton deploy`.
 12. Open the app in Automaton Studio, preview it there, and inspect the logs there.

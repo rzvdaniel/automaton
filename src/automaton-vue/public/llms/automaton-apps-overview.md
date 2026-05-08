@@ -11,7 +11,7 @@ Use these rules:
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For plain HTML/CSS/JS apps, prefer root-level frontend files unless the user explicitly wants a separate `frontend/` source folder.
 - Deploy with `automaton deploy`.
-- If the app has Python backend controllers, inspect the assignment with `automaton current-runner`, list available runners with `automaton runners`, assign one with `automaton set-runner <runner-id>`, or bootstrap one with `automaton ensure-local-runner --assign`, then deploy.
+- If the app has Python backend controllers, inspect the assignment with `automaton current-runner`, list available runners with `automaton runners`, assign an existing connected runner with `automaton set-runner <runner-id>`, or tell the user to create or deploy one in Automaton Studio, then deploy.
 - The CLI should be the primary autonomous path. MCP is a secondary enhancement when supported, not a requirement.
 
 Recommended workflow for most developers:
@@ -32,7 +32,8 @@ automaton whoami
 automaton create --name "My App"
 automaton validate
 automaton current-runner
-automaton ensure-local-runner --assign
+automaton runners
+automaton set-runner <runner-id>
 automaton deploy
 automaton publish --yes
 automaton status

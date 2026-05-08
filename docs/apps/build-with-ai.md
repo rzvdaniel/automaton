@@ -76,7 +76,7 @@ function returns data directly and throws on errors. Use backend/shared/ for sha
 backend/requirements.txt for extra Python packages,
 backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the
 project root. If the app has Python backend controllers, run automaton runners, assign a runner
-with automaton set-runner <runner-id>, and then deploy with automaton deploy.
+with automaton set-runner <runner-id>, or create/deploy one in Automaton Studio if none is connected, and then deploy with automaton deploy.
 ```
 
 Starter prompts for specific stacks (plain HTML, React, Vue) are available at
@@ -120,7 +120,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 
 ### Deploy
 
-For backend apps, assign a runner once before the first backend deploy:
+For backend apps, pick an existing connected runner once before the first backend deploy, or create/deploy one in Automaton Studio if none exists:
 
 ```bash
 automaton runners
@@ -198,7 +198,7 @@ Copilot can:
 - Generate the project in your local workspace
 - Follow the Automaton backend/controller contract automatically through MCP guidance
 
-When the project is ready, run `automaton set-runner <runner-id>` for backend apps, then `automaton deploy` to upload the frontend and deploy the backend.
+When the project is ready, pick an existing connected runner with `automaton set-runner <runner-id>` for backend apps, or create/deploy one in Automaton Studio if none exists, then run `automaton deploy` to upload the frontend and deploy the backend.
 
 #### Iterating
 
@@ -254,7 +254,7 @@ Claude Code can:
 - Generate the local project with the correct Automaton structure
 - Reuse the same project folder across sessions
 
-When the project is ready, run `automaton set-runner <runner-id>` for backend apps, then `automaton deploy`.
+When the project is ready, pick an existing connected runner with `automaton set-runner <runner-id>` for backend apps, or create/deploy one in Automaton Studio if none exists, then run `automaton deploy`.
 
 #### Switching Projects
 

@@ -101,6 +101,51 @@ public class CommandJsonShapeTests
         AssertDiagnosticFailure(output, "Runner assignment failed", CommandDiagnosticCheckNames.RunnerLookup, "checks", "nextSteps");
     }
 
+    [Test]
+    public async Task SetupCommand_WhenCredentialsAreMissing_ReturnsDiagnosticJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var command = SetupCommand.Build(new ConfigService());
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"], Environment.NewLine);
+
+        AssertDiagnosticFailure(output, "Setup failed", CommandDiagnosticCheckNames.Credentials, "checks", "nextSteps");
+    }
+
+    [Test]
+    public async Task NewCommand_WhenNameIsMissing_ReturnsDiagnosticJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var config = new ConfigService();
+        config.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://automaton.monster",
+            ApiKey = "ak_test"
+        });
+        var command = NewCommand.Build(config);
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+
+        AssertDiagnosticFailure(output, "New failed", CommandDiagnosticCheckNames.CreateApp, "checks", "nextSteps");
+    }
+
+    [Test]
+    public async Task LinkCommand_WhenAppIdIsMissing_ReturnsDiagnosticJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var config = new ConfigService();
+        config.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://automaton.monster",
+            ApiKey = "ak_test"
+        });
+        var command = LinkCommand.Build(config);
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+
+        AssertDiagnosticFailure(output, "Link failed", CommandDiagnosticCheckNames.LinkApp, "checks", "nextSteps");
+    }
+
     private static void AssertDiagnosticFailure(string output, string expectedSummary, string expectedCheckName, params string[] requiredTopLevelProperties)
     {
         using var doc = JsonDocument.Parse(output);
@@ -118,21 +163,27 @@ public class CommandJsonShapeTests
         Assert.That(checks.Any(check => string.Equals(check.GetProperty("name").GetString(), expectedCheckName, StringComparison.Ordinal)), Is.True, $"Expected check '{expectedCheckName}' in output: {output}");
     }
 
-    private static async Task<string> InvokeAndCaptureAsync(Command command, string workingDirectory, string[] args)
+    private static async Task<string> InvokeAndCaptureAsync(Command command, string workingDirectory, string[] args, string? input = null)
     {
         var originalOut = Console.Out;
+        var originalIn = Console.In;
         var writer = new StringWriter();
 
         try
         {
             Directory.SetCurrentDirectory(workingDirectory);
             Console.SetOut(writer);
+            if (input != null)
+            {
+                Console.SetIn(new StringReader(input));
+            }
             await command.InvokeAsync(args);
             return writer.ToString().Trim();
         }
         finally
         {
             Console.SetOut(originalOut);
+            Console.SetIn(originalIn);
         }
     }
 

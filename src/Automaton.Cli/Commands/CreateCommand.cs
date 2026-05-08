@@ -20,89 +20,52 @@ public static class CreateCommand
 
         cmd.SetHandler(async (string? name, bool asJson) =>
         {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var cwd = Directory.GetCurrentDirectory();
+            var (server, apiKey) = config.ResolveCredentials(directory: cwd);
 
-            try
+            if (!asJson && string.IsNullOrWhiteSpace(name))
             {
-                var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
-                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
-                checks.Add(credentialsCheck);
+                Console.Write("App name: ");
+                name = Console.ReadLine()?.Trim();
+            }
 
-                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+            var service = new NewAppService(config);
+            var result = await service.CreateAsync(cwd, name, server, apiKey);
+
+            if (asJson)
+            {
+                CliJson.Write(new
                 {
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                    if (asJson)
-                    {
-                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                    }
-                    else
-                    {
-                        CliDiagnosticsWriter.Write(failure);
-                    }
-                    Environment.ExitCode = 1;
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    Console.Write("App name: ");
-                    name = Console.ReadLine()?.Trim();
-                }
-
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, false, "app name is required"));
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = ["Pass --name or answer the app name prompt"] };
-                    if (asJson)
-                    {
-                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                    }
-                    else
-                    {
-                        CliDiagnosticsWriter.Write(failure);
-                    }
-                    Environment.ExitCode = 1;
-                    return;
-                }
-
-                using var client = new AutomatonApiClient(server!, apiKey!);
-                var (appId, appName) = await client.CreateAppAsync(name);
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
-
-                config.SaveProjectConfig(cwd, new AutomatonConfig
-                {
-                    AppId = appId,
-                    Name = appName,
-                    Server = server
+                    success = result.Success,
+                    summary = result.Success ? "Create complete" : result.Summary,
+                    checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                    nextSteps = result.NextSteps,
+                    appId = result.AppId,
+                    name = result.Name,
+                    server = result.Server,
+                    configPath = result.ConfigPath
                 });
-
-                if (asJson)
-                {
-                    CliJson.Write(new { success = true, appId, name = appName, server, configPath = Path.Combine(cwd, "automaton.json") });
-                    return;
-                }
-
-                AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{appName}[/]");
-                AnsiConsole.MarkupLine($"[grey]App ID:[/] {appId}");
-                AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
+                Environment.ExitCode = result.Success ? 0 : 1;
+                return;
             }
-            catch (Exception ex)
+
+            if (!result.Success)
             {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, false, ex.Message));
-                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
-                var failure = new CommandDiagnosticResult { Success = false, Summary = "Create failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                if (asJson)
+                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
                 {
-                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                }
-                else
-                {
-                    CliDiagnosticsWriter.Write(failure);
-                }
+                    Success = false,
+                    Summary = "Create failed",
+                    Checks = result.Checks,
+                    NextSteps = result.NextSteps
+                });
                 Environment.ExitCode = 1;
+                return;
             }
+
+            AnsiConsole.MarkupLine($"[green]✓[/] Created app [bold]{result.Name}[/]");
+            AnsiConsole.MarkupLine($"[grey]App ID:[/] {result.AppId}");
+            AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
+            Environment.ExitCode = 0;
         }, nameOption, jsonOption);
 
         return cmd;

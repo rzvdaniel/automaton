@@ -68,7 +68,7 @@ automaton create --name "My App"
 automaton validate
 automaton current-runner
 automaton runners
-automaton ensure-local-runner --assign
+automaton set-runner <runner-id>
 automaton deploy
 automaton publish --yes
 automaton status
@@ -80,7 +80,7 @@ Interpretation rules:
 2. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton login`.
 3. Use `automaton create` for new apps; reserve `automaton link` for existing remote apps.
 4. Run `automaton validate` before deploy.
-5. If backend controllers exist and no runner is assigned, prefer `automaton ensure-local-runner --assign` when Docker is available.
+5. If backend controllers exist and no connected runner is assigned, pick one with `automaton set-runner <runner-id>` or tell the user to create or deploy one in Automaton Studio.
 6. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
 7. Ask the user before public publish, then use `automaton publish --yes` only after approval.
 
@@ -139,7 +139,6 @@ For backend apps, assign a runner before the first backend deploy:
 automaton current-runner
 automaton runners
 automaton set-runner <runner-id>
-automaton ensure-local-runner --assign
 automaton validate
 automaton deploy
 ```

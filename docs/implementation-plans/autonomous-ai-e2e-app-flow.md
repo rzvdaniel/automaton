@@ -151,22 +151,15 @@ automaton set-runner <runner-id>
 automaton current-runner
 ```
 
-Add:
-
-```bash
-automaton ensure-local-runner
-```
-
 #### Behavior
 
 - `automaton runners` should list runner ids and enough health/status info for autonomous selection
 - `automaton current-runner` should show the runner currently assigned to the linked app
-- `automaton ensure-local-runner` should attempt to provision a supported local runner automatically when Docker is available
-- if Docker is missing or unusable, the command should return a clear actionable error
+- if no suitable connected runner exists, the CLI should clearly tell the user to create or deploy one in Automaton Studio before backend deploy
 
 #### Why this matters
 
-This is the biggest missing piece for backend-app autonomy. App generation is easy. Backend execution without an existing runner is the real blocker.
+Backend execution without an existing runner is the real blocker. The CLI should help users choose an existing connected runner, not provision infrastructure for them.
 
 ### 4. Validation and preflight
 
@@ -268,7 +261,7 @@ Required behavior:
 Required behavior:
 
 - server-side acceptance path for a newly bootstrapped local runner
-- predictable status reporting so the CLI can wait for readiness after `ensure-local-runner`
+- predictable status reporting so the CLI can guide runner selection clearly before backend deploy
 
 ### 4. Validation endpoints or validation-ready existing endpoints
 
@@ -329,7 +322,7 @@ When the AI is asked to build an Automaton app from scratch locally, follow this
 5. If missing, run `automaton create --name "<app-name>"`.
 6. Scaffold the app locally using the simplest suitable frontend stack.
 7. If Python backend controllers exist, run `automaton runners`.
-8. If no suitable runner exists, ask once whether the AI should provision a local runner and run `automaton ensure-local-runner`.
+8. If no suitable connected runner exists, stop and tell the user to create or deploy one in Automaton Studio.
 9. Run `automaton validate`.
 10. Run `automaton deploy`.
 11. Ask for confirmation before public publish.
@@ -342,10 +335,9 @@ The same section should also define what to do when:
 
 1. CLI is missing
 2. login fails
-3. Docker is missing
-4. no runner is available
-5. backend deploy is skipped due to missing runner
-6. publish is blocked pending confirmation
+3. no runner is available
+4. backend deploy is skipped due to missing runner
+5. publish is blocked pending confirmation
 
 ### Add stronger completion criteria
 
@@ -366,7 +358,6 @@ automaton whoami --json
 automaton create --name "My App" --json
 automaton validate --json
 automaton runners --json
-automaton ensure-local-runner --json
 automaton set-runner <runner-id> --json
 automaton deploy --json
 automaton publish --yes --json
@@ -406,12 +397,11 @@ Success criteria:
 
 Deliver:
 
-- `automaton ensure-local-runner`
-- server readiness flow for a newly provisioned local runner
+- better runner selection guidance and early failure when no connected runner exists
 
 Success criteria:
 
-- an AI can complete backend app setup on a Docker-capable machine with no pre-existing runner
+- an AI can clearly determine when a connected runner must be created or deployed outside the CLI
 
 ### Phase 4: Publish + Validation Finishers
 

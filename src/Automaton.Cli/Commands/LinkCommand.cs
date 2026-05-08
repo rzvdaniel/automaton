@@ -9,7 +9,10 @@ public static class LinkCommand
 {
     public static Command Build(ConfigService config)
     {
-        var appIdArgument = new Argument<string>("app-id", "Existing Automaton app ID to link to this directory");
+        var appIdArgument = new Argument<string?>("app-id", () => null, "Existing Automaton app ID to link to this directory")
+        {
+            Arity = ArgumentArity.ZeroOrOne
+        };
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
         var cmd = new Command("link", "Link this directory to an existing Automaton app")
@@ -18,66 +21,54 @@ public static class LinkCommand
             jsonOption
         };
 
-        cmd.SetHandler(async (string appId, bool asJson) =>
+        cmd.SetHandler(async (string? appId, bool asJson) =>
         {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var cwd = Directory.GetCurrentDirectory();
+            var (server, apiKey) = config.ResolveCredentials(directory: cwd);
 
-            try
+            var resolvedAppId = appId;
+            if (!asJson && string.IsNullOrWhiteSpace(resolvedAppId))
             {
-                var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
-                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
-                checks.Add(credentialsCheck);
-
-                if (!credentialsCheck.Success || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
-                {
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Link failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                    if (asJson)
-                    {
-                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                    }
-                    else
-                    {
-                        CliDiagnosticsWriter.Write(failure);
-                    }
-                    Environment.ExitCode = 1;
-                    return;
-                }
-
-                using var client = new AutomatonApiClient(server!, apiKey!);
-
-                AnsiConsole.MarkupLine($"[grey]Fetching app {appId}...[/]");
-                var app = await client.GetAppAsync(appId);
-                var appName = app.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString()! : appId;
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.LinkApp, true, $"linked to app {appId}"));
-
-                config.SaveProjectConfig(cwd, new AutomatonConfig { AppId = appId, Name = appName, Server = server });
-
-                if (asJson)
-                {
-                    CliJson.Write(new { success = true, summary = "Link complete", checks = checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = Array.Empty<string>(), appId, name = appName, server, configPath = Path.Combine(cwd, "automaton.json") });
-                    return;
-                }
-
-                AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{appName}[/] ({appId})");
-                AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
+                Console.Write("App ID: ");
+                resolvedAppId = Console.ReadLine()?.Trim();
             }
-            catch (Exception ex)
+
+            var linkService = new LinkAppService(config);
+            var result = await linkService.LinkAsync(cwd, resolvedAppId, server, apiKey);
+
+            if (asJson)
             {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.LinkApp, false, ex.Message));
-                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
-                var failure = new CommandDiagnosticResult { Success = false, Summary = "Link failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                if (asJson)
+                CliJson.Write(new
                 {
-                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                }
-                else
+                    success = result.Success,
+                    summary = result.Summary,
+                    checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                    nextSteps = result.NextSteps,
+                    appId = result.AppId,
+                    name = result.Name,
+                    server = result.Server,
+                    configPath = result.ConfigPath
+                });
+                Environment.ExitCode = result.Success ? 0 : 1;
+                return;
+            }
+
+            if (!result.Success)
+            {
+                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
                 {
-                    CliDiagnosticsWriter.Write(failure);
-                }
+                    Success = result.Success,
+                    Summary = result.Summary,
+                    Checks = result.Checks,
+                    NextSteps = result.NextSteps
+                });
                 Environment.ExitCode = 1;
+                return;
             }
+
+            AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{result.Name}[/] ({result.AppId})");
+            AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
+            Environment.ExitCode = 0;
         }, appIdArgument, jsonOption);
 
         return cmd;

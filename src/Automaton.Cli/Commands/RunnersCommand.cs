@@ -71,7 +71,7 @@ public static class RunnersCommand
                 }
 
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Runners, true, runners.Count == 0 ? "no runners registered" : $"{runners.Count} runner(s) loaded"));
-                var runnersResult = new CommandDiagnosticResult { Success = true, Summary = runners.Count == 0 ? "No runners registered" : "Runners loaded", Checks = checks, NextSteps = runners.Count == 0 ? ["Start and register a runner, or run automaton ensure-local-runner"] : [] };
+                var runnersResult = new CommandDiagnosticResult { Success = true, Summary = runners.Count == 0 ? "No runners registered" : "Runners loaded", Checks = checks, NextSteps = runners.Count == 0 ? ["Create or deploy a runner in Automaton Studio, then rerun automaton runners"] : [] };
 
                 if (asJson)
                 {
