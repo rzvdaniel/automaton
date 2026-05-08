@@ -40,6 +40,29 @@ Studio documentation is available at `/docs` inside Automaton Studio.
 
 Build the app in your preferred editor, keep it in Git, and deploy to Automaton when ready.
 
+### Default flow: AI-first
+
+Keep this as simple as possible for the user:
+
+1. Install the CLI once.
+2. Run `automaton setup`.
+3. Open your preferred AI tool in the app folder.
+4. Ask it to build and deploy the app to Automaton Studio.
+
+After `automaton setup`, the AI should usually handle the rest: local file generation, app creation or linking, validation, runner checks for backend apps, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+
+### Fallback flow: manual CLI
+
+Use this only when you want to drive the CLI yourself:
+
+1. Install the CLI once.
+2. Run `automaton setup`.
+3. Run `automaton new "My App"` or `automaton link <app-id>`.
+4. Build locally.
+5. Run `automaton validate`.
+6. If `backend/*.py` exists, assign a connected runner.
+7. Run `automaton deploy`.
+
 ### Prerequisites
 
 1. **A running Automaton server** — local (`https://localhost:7091`) or hosted (`https://api.automaton.monster`)
@@ -49,8 +72,7 @@ Build the app in your preferred editor, keep it in Git, and deploy to Automaton 
 
 ### Teach your AI the Automaton structure
 
-AI tools have no prior knowledge of the Automaton app contract. Point your tool to the
-`llms.txt` file so it follows the correct structure automatically:
+If you already ran `automaton setup`, `automaton new`, or `automaton link` in the project, prefer the local generated guidance files first. Use `llms.txt` as the canonical source of truth and as the fallback when the tool does not honor local guidance files yet:
 
 ```
 https://automaton.monster/llms.txt
@@ -59,13 +81,13 @@ https://automaton.monster/llms.txt
 The file links to detailed instructions covering frontend structure, backend controller pattern,
 `callController()` usage, mock responses, and ready-to-paste starter prompts.
 
-Start your session with a prompt like:
+Fallback prompt when the tool does not consume local guidance files:
 
 ```text
 Read https://automaton.monster/llms.txt, then build an Automaton app for Poker Planning.
 ```
 
-If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. If those generated files need a manual refresh later, run `automaton sync-ai`.
+If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
 
 Or paste the generic starter prompt directly if your tool does not fetch URLs:
 
@@ -85,6 +107,8 @@ Starter prompts for specific stacks (plain HTML, React, Vue) are available at
 `https://automaton.monster/llms/automaton-starter-prompts.md`.
 
 ### AI-readable reference files
+
+Use these as the canonical source of truth and the fallback reference set when local generated guidance is unavailable:
 
 | File | Purpose |
 |---|---|
@@ -136,6 +160,8 @@ automaton setup
 automaton link <app-id>
 ```
 
+After `automaton setup`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, run validation, and prepare the app for deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+
 For backend apps, pick an existing connected runner once before the first backend deploy, or create/deploy one in Automaton Studio if none exists:
 
 ```bash
@@ -148,14 +174,6 @@ automaton deploy
 ```
 
 This uploads frontend files and triggers backend deployment. Re-run after any change.
-
-Server URL resolution order for CLI deploy is:
-
-1. `AUTOMATON_SERVER`
-2. `server` in `automaton.json`
-3. `./.automaton/config.json`
-4. `~/.automaton/config.json`
-5. interactive prompt
 
 If the app has no backend scripts, a successful deploy may finish with `No backend scripts found`.
 

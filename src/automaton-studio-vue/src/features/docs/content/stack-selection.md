@@ -39,13 +39,13 @@ That is usually the best fit for:
 
 ## What to tell the AI
 
-Start with the canonical instructions:
+After `automaton setup`, prefer the local generated guidance first. Use these files as the canonical fallback instructions:
 
 - [llms.txt](https://automaton.monster/llms.txt)
 - [Starter prompts](https://automaton.monster/llms/automaton-starter-prompts.md)
 - [Frontend structure](https://automaton.monster/llms/automaton-frontend-structure.md)
 
-For the normal local workflow, the CLI happy path is:
+Manual fallback if you need to drive the CLI yourself:
 
 ```bash
 automaton setup
@@ -62,4 +62,4 @@ Use `automaton sync-ai` only if the generated local guidance files are missing o
 
 - Default to plain HTML/CSS/JS.
 - Use React or Vue when the user asks for them or the app clearly needs a heavier SPA structure.
-- Treat `llms.txt` as the source of truth, not this page.
+- After `automaton setup`, prefer the local generated guidance. Treat `llms.txt` as the canonical fallback, not the default.

@@ -165,30 +165,26 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
             <div class="step">
               <div class="step-num">1</div>
               <div>
-                <div class="step-title">Start by pointing the AI to Automaton instructions</div>
+                <div class="step-title">Start by letting the AI use local Automaton guidance</div>
                 <div class="prompt-example">
                   {{ aiCliSetupPrompt }}
                 </div>
                 <p class="step-body">
-                  Today, most coding tools do <strong>not</strong> already know the Automaton CLI or app structure.
-                  Point them to <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
-                  first, then let the AI check for <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>, install the global tool when possible, or send you to <a href="/cli#downloads" class="docs-link">the portable CLI downloads page</a> if the environment cannot use the standard install path.
+                  After <code>automaton setup</code>, local generated guidance should be the default. Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+                  only as the canonical fallback when the tool does not honor local guidance files yet. The AI can also check for <a href="https://dot.net" target="_blank" rel="noopener" class="docs-link">.NET 9</a>, install the global tool when possible, or send you to <a href="/cli#downloads" class="docs-link">the portable CLI downloads page</a> if the environment cannot use the standard install path.
                 </p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">2</div>
               <div>
-                <div class="step-title">Let the AI initiate login and handle app linking</div>
+                <div class="step-title">Run setup once, then let the AI handle the workflow</div>
                 <p class="step-body">
-                  Tell the AI to run <code>automaton setup</code> and guide the flow, then complete the actual
-                  browser auth or credential step yourself when prompted. After setup succeeds, the AI can
-                  create or link the app in the current folder with <code>automaton new</code> or <code>automaton link</code>.
-                  The goal is for the workspace to end up linked with <code>automaton.json</code> already written and the local guidance pack already synced.
+                  Run <code>automaton setup</code> once and complete the actual browser auth or credential step yourself when prompted. After setup succeeds, the AI should handle most of the rest: create or link the app, generate files, keep <code>automaton.json</code> correct, validate, guide runner setup for backend apps, and deploy.
                 </p>
                 <p class="step-body">
                   If you need a clean auth reset for testing or want to switch accounts, ask the AI to run
-                  <code>automaton logout</code>, <code>automaton logout --global</code>, or <code>automaton logout --all</code>
+                  <code>automaton logout</code> or <code>automaton logout --all</code>
                   before starting the login flow again.
                 </p>
               </div>
@@ -196,9 +192,9 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
             <div class="step">
               <div class="step-num">3</div>
               <div>
-                <div class="step-title">Tell the AI to build the app and use the CLI</div>
+                <div class="step-title">Ask the AI to build and deploy the app</div>
                 <div class="prompt-example">
-                  "Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root with automaton new or automaton link, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner &lt;runner-id&gt;, or tell me to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation."
+                  "Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the remaining workflow yourself: create or link automaton.json, refresh local guidance only if needed, run validation, guide runner assignment for backend apps, and deploy. Only ask me to step in for auth, runner creation outside the CLI, or publish approval."
                 </div>
                 <p class="step-body">
                   By this point the AI already has both the project folder and the Automaton rules from
@@ -210,20 +206,9 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
             <div class="step">
               <div class="step-num">4</div>
               <div>
-                <div class="step-title">Let the AI validate and prepare backend deploys</div>
+                <div class="step-title">Use Studio as the test loop</div>
                 <p class="step-body">
-                  After the files exist, the AI should run <code>automaton validate</code> as a cheap preflight check,
-                  inspect current runner assignment, and only use runner setup commands when the app includes Python
-                  backend controllers. Frontend-only apps can usually skip that part.
-                </p>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">5</div>
-              <div>
-                <div class="step-title">Deploy to Studio, preview there, then publish only when approved</div>
-                <p class="step-body">
-                  The AI should run deploy commands itself, then use Automaton Studio as the current test loop:
+                  The AI should run validation and deploy commands itself, then use Automaton Studio as the current test loop:
                   open the app there, preview it there, inspect logs there, and iterate locally until the preview looks right.
                   It should only pause when the workflow needs you, such as interactive login or final publish approval.
                 </p>
@@ -236,8 +221,8 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
             <span>
               This is the practical default for Copilot, Cursor, Claude Code, and similar tools when
               MCP is not connected. The AI builds locally, the CLI gives it a reliable deploy path,
-              and <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
-              teaches the required Automaton structure.
+              and the local generated guidance should usually be enough after setup. Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              only as the canonical fallback.
             </span>
           </div>
         </div>
@@ -351,12 +336,11 @@ automaton status</pre></div>
           <div class="tip-box">
             <i class="pi pi-info-circle" />
             <span>
-              <strong>Using Cursor or VS Code?</strong> Point the AI to
-              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
-              before it starts generating files. That keeps the project aligned with the required
-              Automaton structure and backend/frontend contract. The current happy path is <code>automaton setup</code>, then <code>automaton new</code> or <code>automaton link</code>, then optional <code>automaton sync-ai</code> only when generated guidance files need a refresh. For backend apps, use <code>automaton current-runner</code>,
-              <code>automaton runners</code>, and <code>automaton set-runner &lt;runner-id&gt;</code> when a connected runner exists. If none exists, create or deploy one in Studio, then run <code>automaton validate</code>
-              before deploy. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
+              <strong>Using Cursor or VS Code?</strong> The default flow is still simple: run <code>automaton setup</code>,
+              then let the AI handle the project workflow. Local generated guidance should usually be enough after setup.
+              Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              only as the canonical fallback when the tool does not honor local guidance files yet. If you want to drive the CLI manually,
+              use the command reference and manual workflow guidance instead. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
               <strong>Documentation → Automaton CLI</strong> page inside Studio.
             </span>
           </div>
@@ -422,9 +406,9 @@ automaton status</pre></div>
                 </div>
                 <p class="step-body">
                   The AI can create or link the app, understand the required structure, and generate
-                  the project in your local workspace. Keep the project in your own Git repo if you want version control,
-                  then pick an existing connected runner with <code>automaton set-runner</code> for backend apps, or create/deploy one in Studio if none exists, and run <code>automaton deploy</code>
-                  to upload the frontend and deploy the backend.
+                  the project in your local workspace. Keep the project in your own Git repo if you want version control.
+                  The AI should usually handle the remaining deploy flow itself and only stop when it needs your help,
+                  such as interactive auth, runner creation outside the CLI, or publish approval.
                 </p>
               </div>
             </div>
@@ -447,12 +431,11 @@ automaton status</pre></div>
             The public docs stay high-level. If you want the exact app structure, backend contract,
             starter prompts, and framework-specific guidance, use the AI-readable instruction files.
           </p>
-
-          <div class="tool-sections docs-resource-grid">
-            <div class="tool-section">
-              <div class="tool-label"><i class="pi pi-book" /> Developer resources</div>
-              <ul class="link-list">
-                <li><a href="/cli" class="docs-link">Automaton CLI overview</a></li>
+              <strong>Using Cursor or VS Code?</strong> The default flow is still simple: run <code>automaton setup</code>,
+              then let the AI handle the project workflow. Local generated guidance should usually be enough after setup.
+              Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
+              only as the canonical fallback when the tool does not honor local guidance files yet. If you want to drive the CLI manually,
+              use the command reference and manual workflow guidance instead. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
                 <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
                 <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
               </ul>

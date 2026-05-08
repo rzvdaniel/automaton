@@ -2,7 +2,7 @@
 
 The Automaton CLI (`automaton`) prepares local app folders, deploys apps, manages versions, and lists runners from the terminal.
 
-The default happy path is `automaton setup`, then `automaton new` or `automaton link`, then `automaton deploy`. Lower-level auth and config commands remain available for testing, debugging, and automation.
+The default user flow is AI-first: run `automaton setup`, then let your AI tool handle the app workflow in the current folder. The direct CLI commands on this page are the manual fallback and the low-level reference for testing, debugging, and automation.
 
 ---
 
@@ -48,16 +48,11 @@ Get an API key from **Settings → API Keys → New Key** (scope: `execute`).
 
 Manual configuration is still available when you need it:
 ```bash
-automaton config --server https://api.automaton.monster --key ak_execute_xxx
+automaton config --key ak_execute_xxx
 automaton config --show
 ```
 
-By default, `automaton setup` stores project-local credentials in `./.automaton/config.json`. Use `automaton setup --global` if you intentionally want shared machine-wide credentials in `~/.automaton/config.json`. Environment variables always take precedence over file-based config (useful for CI/CD):
-
-| Variable | Purpose |
-|---|---|
-| `AUTOMATON_SERVER` | Server URL |
-| `AUTOMATON_API_KEY` | API key |
+By default, `automaton setup` stores project-local credentials in `./.automaton/config.json` and uses the hosted Automaton server automatically. Environment variables are mainly for CI/CD and internal development; normal users do not need them for the standard flow.
 
 ---
 
@@ -100,11 +95,9 @@ Prepare this machine or workspace for Automaton development.
 
 ```bash
 automaton setup
-automaton setup --global
-automaton setup --server https://custom-host
 ```
 
-By default, `setup` uses `https://automaton.monster`, saves credentials locally unless `--global` is used, and also syncs the generated local AI guidance pack.
+By default, `setup` uses the hosted Automaton server, saves credentials locally for the current project, and also syncs the generated local AI guidance pack.
 
 ---
 
@@ -149,15 +142,14 @@ Use this only when the generated `AGENTS.md`, `.github/`, or `.automaton/ai-guid
 
 ### `automaton login`
 
-Store and validate CLI credentials for the current project by default.
+Store and validate CLI credentials directly. Most users should prefer `automaton setup` instead.
 
 ```bash
 automaton login
-automaton login --global
 automaton whoami
 ```
 
-By default, credentials are saved to `./.automaton/config.json`. Use `--global` to save them to `~/.automaton/config.json` instead.
+By default, credentials are saved to `./.automaton/config.json` for the current project. Treat this as a lower-level fallback when you intentionally want to manage credentials outside the normal `setup` flow.
 
 ---
 
@@ -167,11 +159,10 @@ Clear stored CLI credentials.
 
 ```bash
 automaton logout           # clear project-local credentials
-automaton logout --global  # clear global credentials
-automaton logout --all     # clear both
+automaton logout --all     # clear both local and global credentials
 ```
 
-Use this when testing first-run auth flows, switching accounts, or resetting machine-local stored credentials. If `AUTOMATON_SERVER` or `AUTOMATON_API_KEY` are still set in the environment, they will continue to override file-based config.
+Use this when testing first-run auth flows, switching accounts, or resetting machine-local stored credentials.
 
 ---
 
@@ -260,7 +251,6 @@ Set environment variables in your pipeline instead of storing credentials in the
 # GitHub Actions example
 - name: Deploy to Automaton
   env:
-    AUTOMATON_SERVER: https://api.automaton.monster
     AUTOMATON_API_KEY: ${{ secrets.AUTOMATON_API_KEY }}
   run: automaton deploy
 ```

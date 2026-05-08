@@ -55,7 +55,11 @@ If the app is build-based and also has Python backend controllers, do not assume
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, pick an existing connected runner first with `automaton runners` and `automaton set-runner <runner-id>`, or create/deploy one in Automaton Studio if none exists.
 
-**Local AI guidance** — `automaton setup`, `automaton new`, and `automaton link` write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` guidance files. Run `automaton sync-ai` if those generated files need a manual refresh.
+**Local AI guidance** — `automaton setup`, `automaton new`, and `automaton link` write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` guidance files. After that, prefer the local generated guidance by default. Run `automaton sync-ai` only if those generated files need a manual refresh. Use `llms.txt` as the canonical source and as a fallback when the tool does not honor local guidance files yet.
+
+**Happy path** — The real default user flow is: install the CLI once, run `automaton setup`, then let the AI handle most of the project work locally, use `automaton new` for a new app or `automaton link` for an existing one, run `automaton validate`, assign a runner only if `backend/*.py` exists, then run `automaton deploy` and use Automaton Studio for preview and logs.
+
+**After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run validation, guide runner assignment for backend apps, and deploy. The user should only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
 **Current test loop** — After deploy, use Automaton Studio as the current preview and debugging environment: open the app in Studio, preview it there, inspect logs there, iterate, and publish only after explicit user approval.
 
@@ -72,16 +76,17 @@ Follow this order:
 5. If it does not exist and the app is new, run `automaton new "<app-name>"`.
 6. If the app already exists remotely, run `automaton link <app-id>`.
 7. Scaffold or update the app locally using the simplest suitable frontend stack.
-8. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
-9. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
-10. If no connected runner is assigned or available, tell the user to create or deploy one in Automaton Studio, or pick an existing connected runner with `automaton set-runner <runner-id>`.
-11. Run `automaton validate` before deploy as a cheap preflight check.
-12. Run `automaton deploy`.
-13. Open the app in Automaton Studio, preview it there, and inspect the logs there.
-14. Iterate locally and redeploy until the Studio preview looks correct.
-15. Ask for confirmation before public publish.
-16. After approval, run `automaton publish --yes`.
-17. Run `automaton status` and validate the live app URL.
+8. The AI should handle most of the remaining work after `automaton setup`.
+9. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
+10. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
+11. If no connected runner is assigned or available, tell the user to create or deploy one in Automaton Studio, or pick an existing connected runner with `automaton set-runner <runner-id>`.
+12. Run `automaton validate` before deploy as a cheap preflight check.
+13. Run `automaton deploy`.
+14. Open the app in Automaton Studio, preview it there, and inspect the logs there.
+15. Iterate locally and redeploy until the Studio preview looks correct.
+16. Ask for confirmation before public publish.
+17. After approval, run `automaton publish --yes`.
+18. Run `automaton status` and validate the live app URL.
 
 Completion criteria:
 

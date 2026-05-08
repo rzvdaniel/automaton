@@ -69,37 +69,32 @@ const quickStartSteps = [
     code: 'automaton setup',
   },
   {
-    title: 'Create or link app',
-    detail: 'Write automaton.json in the current folder with the current happy-path commands.',
-    code: 'automaton new "My App"\n# or\nautomaton link your-app-id',
-  },
-  {
-    title: 'Validate',
-    detail: 'Run a cheap preflight check before upload so obvious config and runner issues fail early.',
-    code: 'automaton validate',
+    title: 'Open your AI tool',
+    detail: 'After setup, ask the AI to build and deploy the app in the current folder.',
+    code: 'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Then build this app and deploy it to Automaton Studio.',
   },
   {
     title: 'Deploy and preview in Studio',
-    detail: 'Deploy from your local workflow, then use Studio preview and logs as the current test loop.',
-    code: 'automaton deploy',
+    detail: 'The AI should handle deploy; you use Studio preview and logs as the test loop.',
+    code: 'Automaton Studio preview\nAutomaton Studio logs',
   },
 ]
 
 const workflowSteps = [
   {
-    title: 'Start with the AI-readable contract',
-    description: 'Point your IDE or AI agent to llms.txt before asking it to generate files. It should create the app structure and automaton.json for you.',
-    code: `Read ${publicAppConfig.llmsUrl}, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root with automaton new or automaton link, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner <runner-id>, or tell the user to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation.`,
+    title: 'AI-first default',
+    description: 'After setup, let the AI handle the app workflow in the current folder. Local generated guidance should be enough for most tools.',
+    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the remaining workflow yourself: create or link automaton.json, refresh local guidance only if needed, run validation, guide runner assignment for backend apps, and deploy. Only ask me to step in for auth, runner creation outside the CLI, or publish approval.`,
   },
   {
-    title: 'Connect the local project',
-    description: 'Create a new linked app in the current folder, or link to an existing one when the remote app already exists.',
-    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id',
+    title: 'Manual fallback',
+    description: 'Only use this when you want to drive the CLI yourself instead of letting the AI run the flow.',
+    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id\nautomaton validate\nautomaton deploy',
   },
   {
-    title: 'Deploy from your IDE',
-    description: 'Run automaton validate, deploy from your local workflow, then preview the app and inspect logs in Automaton Studio before publish.',
-    code: 'automaton deploy',
+    title: 'Use Studio as the test loop',
+    description: 'After the AI deploys, preview the app and inspect logs in Automaton Studio before publish.',
+    code: 'Automaton Studio preview\nAutomaton Studio logs',
   },
 ]
 
@@ -215,7 +210,7 @@ async function copyCode(key: string, code: string) {
             <div class="cli-card-head">
               <span class="tag">Install</span>
               <h2>Install with NuGet</h2>
-              <p class="cli-card-subtitle">If your AI follows llms.txt, automaton.json should be created automatically. Use setup plus new or link as the manual fallback flow.</p>
+              <p class="cli-card-subtitle">After setup, the AI should usually handle app creation, validation, and deploy. Use the CLI commands directly only as the manual fallback flow.</p>
             </div>
 
             <article v-for="mode in installModes" :key="mode.title" class="code-card">
@@ -349,9 +344,8 @@ async function copyCode(key: string, code: string) {
               <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
 - Keep the project in your repo
 - Start with automaton setup
-- Use automaton new or automaton link to connect the app
-- Run automaton validate before deploy
-- Deploy frontend files and backend controllers
+- Let the AI handle create or link, validation, and deploy by default
+- Use manual CLI commands only when you want the fallback flow
 - Preview and inspect logs in Automaton Studio
 - Reuse the same flow every time you update the app</code></pre>
             </article>

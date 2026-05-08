@@ -6,10 +6,16 @@ Use this section as the starting point for building and deploying apps in Automa
 
 For most developers, the least-friction workflow is:
 
-1. Create or link the app in Automaton.
-2. Keep the project in your local repo.
-3. Build with your preferred editor or AI tool.
-4. Deploy with `automaton deploy`.
+1. Install the CLI once.
+2. Run `automaton setup`.
+3. Let your AI tool build and deploy the app in the current folder.
+
+Manual fallback:
+
+1. Run `automaton new` or `automaton link`.
+2. Run `automaton validate`.
+3. If `backend/*.py` exists, assign a connected runner.
+4. Run `automaton deploy`.
 
 If your AI tool supports MCP, connect Automaton as an MCP server. That gives the AI the most accurate Automaton-specific context. If it does not, use the CLI + AI workflow, the stack guide, and the starter prompt.
 
