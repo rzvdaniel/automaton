@@ -5,6 +5,7 @@ Automaton apps are frontend-agnostic static web apps with Python backends.
 Use these rules:
 - Keep `automaton.json` at the project root and commit it to Git.
 - If `automaton.json` already exists and the app uses a build step, add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
+- If the app is build-based and also has Python backend controllers, make `deployDir` point to a deploy-ready folder that contains both the built frontend files and `backend/`, or copy `backend/` into that deploy directory before deploy.
 - Frontend code can be plain HTML/CSS/JS or any framework that outputs static files.
 - Python backend code lives in `backend/`.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
@@ -47,7 +48,7 @@ Minimal `automaton.json`:
 }
 ```
 
-Build-based `automaton.json`:
+Frontend-only build-based `automaton.json`:
 
 ```json
 {
@@ -56,6 +57,18 @@ Build-based `automaton.json`:
 	"server": "https://api.automaton.monster",
 	"build": "npm run build",
 	"deployDir": "dist"
+}
+```
+
+Frontend-plus-backend build-based `automaton.json`:
+
+```json
+{
+	"appId": "your-app-id",
+	"name": "My App",
+	"server": "https://api.automaton.monster",
+	"build": "npm run build && npm run prepare-deploy",
+	"deployDir": "deploy"
 }
 ```
 

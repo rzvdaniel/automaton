@@ -116,6 +116,8 @@ Use it to catch obvious problems early, such as:
 - Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
 - Follow the Automaton app structure from `llms.txt` and the linked files.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
+- If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.
+- For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then set `deployDir` to that folder.
 - Use Python backend controllers in `backend/`.
 - If the app includes Python backend controllers, do not consider backend deploy complete until a runner assignment exists or you have clearly reported why it could not be made.
 - Prefer `automaton status` and `automaton validate` as preflight checks before declaring success.
@@ -146,9 +148,9 @@ automaton deploy
 
 ## Framework apps
 
-For React, Vue, or other build-based apps, keep the source in the repo and deploy the built output.
+For React, Vue, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
 
-Example `automaton.json`:
+Frontend-only example `automaton.json`:
 
 ```json
 {
@@ -160,7 +162,19 @@ Example `automaton.json`:
 }
 ```
 
-If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields when the deployable frontend is built output.
+Frontend-plus-backend example `automaton.json`:
+
+```json
+{
+  "appId": "your-app-id",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "build": "npm run build && npm run prepare-deploy",
+  "deployDir": "deploy"
+}
+```
+
+If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields when the deployable output is not the project root.
 
 ## Default instruction to the AI
 

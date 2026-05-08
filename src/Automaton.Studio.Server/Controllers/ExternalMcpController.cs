@@ -53,8 +53,6 @@ public class ExternalMcpController : ControllerBase
     private static readonly string[] InstructionFiles =
     [
         "SystemPrompts/ExternalMcpInstructions.md",
-        "SystemPrompts/ExternalMcpBackendInstructions.md",
-        "SystemPrompts/ExternalMcpUiInstructions.md",
     ];
 
     private readonly AppsService _appsService;

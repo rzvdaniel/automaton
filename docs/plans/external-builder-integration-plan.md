@@ -193,20 +193,14 @@ Code, Cursor, and other AI tools can connect directly to an Automaton app.
 | `delete_file` | Delete one or more files |
 | `deploy_backend` | Push `backend/*.py` scripts to the runner |
 
-On `initialize`, the controller reads `SystemPrompts/ExternalMcpAppInstructions.md`, replaces
+On `initialize`, the controller reads the MCP prompt files under `SystemPrompts/`, replaces
 `{server}`, `{appId}`, and `{apiKey}` with the actual request values, and sends the rendered
 instructions to the AI tool. The AI key is read from the `X-API-Key` header or `Bearer ak_xxx`
 token — whichever the developer configured when adding the MCP server.
 
-### 6. Instructions File — `SystemPrompts/ExternalMcpAppInstructions.md`
+### 6. Instructions File — `SystemPrompts/ExternalMcpInstructions.md`
 
-The prompt the AI receives at connection time. Covers:
-- Tech stack and frontend freedom (any folder structure)
-- Backend rules (strict — runner depends on them)
-- `callController` pattern
-- Mock file format for local testing
-- Workflow steps
-- Bulk upload curl commands with real server/appId/apiKey values injected
+The prompt the AI receives at connection time comes from a single MCP instructions file. Shared app-building rules should live in `llms.txt` and the linked `llms/` docs, while the MCP file should stay focused on MCP behavior and tool usage.
 
 Editable without recompiling — marked `CopyToOutputDirectory: PreserveNewest` in the `.csproj`.
 

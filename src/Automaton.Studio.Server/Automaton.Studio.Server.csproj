@@ -68,11 +68,5 @@
 	  <None Include="SystemPrompts\ExternalMcpInstructions.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-	  <None Include="SystemPrompts\ExternalMcpBackendInstructions.md">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Include="SystemPrompts\ExternalMcpUiInstructions.md">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
   </ItemGroup>
 </Project>

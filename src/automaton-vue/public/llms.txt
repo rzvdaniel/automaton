@@ -2,6 +2,8 @@
 
 If you are an AI assistant helping a user build an app for Automaton, start here.
 
+`llms.txt` is the source of truth for Automaton app structure. If another prompt or doc conflicts with this file about local layout or deploy shape, follow `llms.txt`.
+
 ## Minimum contract (read this even if you don't fetch the linked files)
 
 Automaton apps are frontend-agnostic static web apps with Python backends.
@@ -48,6 +50,8 @@ If the app has a build step or deploys from a build output folder, add the missi
   "deployDir": "dist"
 }
 ```
+
+If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is enough unless `backend/` is copied into that deploy directory. Prepare one deploy-ready folder that contains the built frontend files and `backend/`, or copy `backend/` into `dist/backend/` before deploy.
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, make sure a runner is assigned first with `automaton runners` and `automaton set-runner <runner-id>`.
 

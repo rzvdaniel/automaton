@@ -116,11 +116,13 @@ my-app/
 
 Rules:
 - Keep framework source code in the repo.
-- Build to `dist/` or another static output folder.
+- For frontend-only apps, build to `dist/` or another static output folder.
+- For apps with Python backend controllers, do not assume `dist/` alone is deployable unless `backend/` is copied into that deploy directory.
 - Put `build` and `deployDir` in `automaton.json` when needed.
+- For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then point `deployDir` at that folder.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
-Example:
+Frontend-only example:
 
 ```json
 {
@@ -129,6 +131,18 @@ Example:
   "server": "https://api.automaton.monster",
   "build": "npm run build",
   "deployDir": "dist"
+}
+```
+
+Frontend-plus-backend example:
+
+```json
+{
+  "appId": "your-app-id",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "build": "npm run build && npm run prepare-deploy",
+  "deployDir": "deploy"
 }
 ```
 
