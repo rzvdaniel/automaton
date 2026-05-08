@@ -5,13 +5,16 @@ namespace Automaton.Cli.Services;
 public sealed class NewAppService
 {
     private readonly ConfigService _config;
+    private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, string, CancellationToken, Task<(string appId, string name)>> _createAppAsync;
 
     public NewAppService(
         ConfigService config,
-        Func<string, string, string, CancellationToken, Task<(string appId, string name)>>? createAppAsync = null)
+        Func<string, string, string, CancellationToken, Task<(string appId, string name)>>? createAppAsync = null,
+        AiGuidancePackService? aiGuidancePackService = null)
     {
         _config = config;
+        _aiGuidancePackService = aiGuidancePackService ?? new AiGuidancePackService();
         _createAppAsync = createAppAsync ?? CreateAppAsync;
     }
 
@@ -65,6 +68,9 @@ public sealed class NewAppService
                 Server = server
             });
 
+            var guidance = _aiGuidancePackService.Sync(directory);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+
             nextSteps.Add("Run automaton deploy");
 
             return new NewAppResult
@@ -81,8 +87,13 @@ public sealed class NewAppService
         }
         catch (Exception ex)
         {
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, false, ex.Message));
-            nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+            var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp)
+                ? CommandDiagnosticCheckNames.AiGuidance
+                : CommandDiagnosticCheckNames.CreateApp;
+            checks.Add(new CommandDiagnosticCheck(checkName, false, ex.Message));
+            nextSteps.Add(checkName == CommandDiagnosticCheckNames.AiGuidance
+                ? "Fix local file permissions or rerun automaton new"
+                : "Run automaton whoami to confirm the current server and identity");
             return new NewAppResult
             {
                 Success = false,

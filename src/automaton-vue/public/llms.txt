@@ -55,6 +55,8 @@ If the app is build-based and also has Python backend controllers, do not assume
 
 **Deploy** — `automaton deploy` runs `build` when configured, uploads the resolved deploy directory, and pushes backend to the runner. If the app has Python backend controllers, pick an existing connected runner first with `automaton runners` and `automaton set-runner <runner-id>`, or create/deploy one in Automaton Studio if none exists.
 
+**Local AI guidance** — `automaton setup`, `automaton new`, and `automaton link` write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` guidance files. Run `automaton sync-ai` if those generated files need a manual refresh.
+
 **Current test loop** — After deploy, use Automaton Studio as the current preview and debugging environment: open the app in Studio, preview it there, inspect logs there, iterate, and publish only after explicit user approval.
 
 ## Autonomous Full Flow
@@ -64,21 +66,22 @@ When the AI is asked to build an Automaton app from scratch in a local project, 
 Follow this order:
 
 1. Ensure the Automaton CLI is installed.
-2. Run `automaton whoami`.
-3. If the CLI is not authenticated yet, run `automaton login`.
-4. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all` before logging in again.
-5. Check whether `automaton.json` exists in the project root.
-6. If it does not exist, run `automaton create --name "<app-name>"`.
-7. Scaffold the app locally using the simplest suitable frontend stack.
-8. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
-9. If no connected runner is assigned or available, tell the user to create or deploy one in Automaton Studio, or pick an existing connected runner with `automaton set-runner <runner-id>`.
-10. Run `automaton validate` before deploy as a cheap preflight check.
-11. Run `automaton deploy`.
-12. Open the app in Automaton Studio, preview it there, and inspect the logs there.
-13. Iterate locally and redeploy until the Studio preview looks correct.
-14. Ask for confirmation before public publish.
-15. After approval, run `automaton publish --yes`.
-16. Run `automaton status` and validate the live app URL.
+2. Run `automaton setup`.
+3. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all`, then run `automaton setup` again.
+4. Check whether `automaton.json` exists in the project root.
+5. If it does not exist and the app is new, run `automaton new "<app-name>"`.
+6. If the app already exists remotely, run `automaton link <app-id>`.
+7. Scaffold or update the app locally using the simplest suitable frontend stack.
+8. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
+9. If Python backend controllers exist, run `automaton current-runner` or `automaton runners`.
+10. If no connected runner is assigned or available, tell the user to create or deploy one in Automaton Studio, or pick an existing connected runner with `automaton set-runner <runner-id>`.
+11. Run `automaton validate` before deploy as a cheap preflight check.
+12. Run `automaton deploy`.
+13. Open the app in Automaton Studio, preview it there, and inspect the logs there.
+14. Iterate locally and redeploy until the Studio preview looks correct.
+15. Ask for confirmation before public publish.
+16. After approval, run `automaton publish --yes`.
+17. Run `automaton status` and validate the live app URL.
 
 Completion criteria:
 
@@ -99,7 +102,7 @@ Choose the simplest frontend stack that fits the requested app.
 - Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs a component-heavy SPA structure, richer routing, or more complex reusable UI.
 - If multiple stacks are equally reasonable and the user gave no preference, ask one short question before scaffolding.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
-- When the user asks to use the Automaton CLI, run `automaton init` or `automaton link` and do not consider the app complete until `automaton.json` exists in the project root, or you have clearly reported why it could not be created.
+- When the user asks to use the Automaton CLI, run `automaton new` or `automaton link` and do not consider the app complete until `automaton.json` exists in the project root, or you have clearly reported why it could not be created.
 
 ---
 

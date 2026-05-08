@@ -146,6 +146,27 @@ public class CommandJsonShapeTests
         AssertDiagnosticFailure(output, "Link failed", CommandDiagnosticCheckNames.LinkApp, "checks", "nextSteps");
     }
 
+    [Test]
+    public async Task SyncAiCommand_WhenInvokedWithJson_ReturnsSuccessJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var command = SyncAiCommand.Build(new ConfigService());
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+
+        using var doc = JsonDocument.Parse(output);
+        var root = doc.RootElement;
+
+        Assert.That(root.GetProperty("success").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("summary").GetString(), Is.EqualTo("AI guidance sync complete"));
+        Assert.That(root.GetProperty("mode").GetString(), Is.EqualTo(AiGuidanceModes.Project));
+        Assert.That(root.GetProperty("manifestPath").GetString(), Does.Contain("manifest.json"));
+        Assert.That(root.GetProperty("generatedFiles").GetArrayLength(), Is.GreaterThanOrEqualTo(10));
+
+        var checks = root.GetProperty("checks").EnumerateArray().ToList();
+        Assert.That(checks.Any(check => string.Equals(check.GetProperty("name").GetString(), CommandDiagnosticCheckNames.AiGuidance, StringComparison.Ordinal)), Is.True);
+    }
+
     private static void AssertDiagnosticFailure(string output, string expectedSummary, string expectedCheckName, params string[] requiredTopLevelProperties)
     {
         using var doc = JsonDocument.Parse(output);

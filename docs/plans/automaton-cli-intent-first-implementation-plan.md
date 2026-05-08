@@ -25,6 +25,7 @@ Current top-level commands in `Program.cs`:
 - `runners`
 - `set-runner`
 - `config`
+- `sync-ai`
 
 Current gap:
 
@@ -83,7 +84,7 @@ Prepare this machine or workspace for Automaton development.
 - if not authenticated, run the login flow inside setup
 - persist default local config if needed
 - optionally detect whether this directory looks like a workspace root
-- optionally install local AI guidance later
+- sync local AI guidance automatically
 - end with a concise ready-state summary
 
 ### Suggested implementation
@@ -236,8 +237,37 @@ Deliverables:
 
 - hosted server defaulting
 - embedded login flow
+- local AI guidance sync
 - structured JSON/human output
 - tests for authenticated and unauthenticated flows
+
+## 2b. `automaton sync-ai`
+
+### Intent
+
+Refresh or repair the generated local AI guidance pack in the current folder.
+
+### Responsibilities
+
+- regenerate `.automaton/ai-guidance/` from embedded canonical `llms` assets
+- rewrite generated `AGENTS.md` and `.github/` guidance files
+- return the standard diagnostic JSON shape plus mode and generated file metadata
+
+### Suggested implementation
+
+Add:
+
+- `SyncAiCommand.cs`
+- `SyncAiResult.cs`
+
+Reuse:
+
+- `AiGuidancePackService`
+
+Design rule:
+
+- `sync-ai` is optional and manual
+- `setup`, `new`, and `link` still perform the default automatic sync
 
 ## Phase 3: Add `new`
 

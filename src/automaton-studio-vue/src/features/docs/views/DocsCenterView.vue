@@ -7,9 +7,7 @@ import { useToast } from 'primevue/usetoast'
 import { marked } from 'marked'
 
 import homeRaw from '../content/home.md?raw'
-import quickstartHtmlRaw from '../content/quickstart-html.md?raw'
-import quickstartReactRaw from '../content/quickstart-react.md?raw'
-import quickstartVueRaw from '../content/quickstart-vue.md?raw'
+import stackSelectionRaw from '../content/stack-selection.md?raw'
 import appEditorRaw from '../content/app-editor.md?raw'
 import cliAiToolsRaw from '../content/cli-ai-tools.md?raw'
 import mcpRaw from '../content/mcp.md?raw'
@@ -31,9 +29,7 @@ const toast = useToast()
 
 const docs: DocItem[] = [
   { slug: 'home', label: 'Home', summary: 'Start here', group: 'Overview', content: homeRaw },
-  { slug: 'quickstart-html', label: 'HTML/CSS/JS', summary: 'Plain static apps', group: 'Quick Starts', content: quickstartHtmlRaw },
-  { slug: 'quickstart-react', label: 'React', summary: 'React + dist output', group: 'Quick Starts', content: quickstartReactRaw },
-  { slug: 'quickstart-vue', label: 'Vue', summary: 'Vue + dist output', group: 'Quick Starts', content: quickstartVueRaw },
+  { slug: 'stack-selection', label: 'Choose a stack', summary: 'HTML, React, or Vue', group: 'Quick Starts', content: stackSelectionRaw },
   { slug: 'app-editor', label: 'App Editor', summary: 'Browser-first workflow', group: 'Workflows', content: appEditorRaw },
   { slug: 'cli-ai-tools', label: 'CLI + AI tools', summary: 'Cursor, Claude, Copilot', group: 'Workflows', content: cliAiToolsRaw },
   { slug: 'mcp', label: 'MCP Server', summary: 'Recommended when supported', group: 'Workflows', content: mcpRaw },

@@ -46,14 +46,13 @@ The change is in the default UX:
 1. The default hosted server is `https://automaton.monster`.
 2. Most users should not need to type or configure the server explicitly.
 3. Shared app-development guidance lives in `llms.txt` and linked `llms/` files.
-4. The CLI may install local AI guidance files later, but this spec focuses first on reducing onboarding commands.
+4. The CLI should sync local AI guidance automatically during `setup`, `new`, and `link`, while keeping manual refresh optional.
 
 ## Non-Goals
 
 This spec does not:
 
 - remove advanced or scriptable CLI commands
-- define the final local AI agent-pack file layout
 - replace `automaton deploy` or `automaton publish`
 - define a local backend runtime for app execution
 - require breaking changes to existing automation scripts
@@ -153,6 +152,7 @@ These remain available but are not the default onboarding surface:
 - `automaton create`
 - `automaton init`
 - `automaton validate`
+- `automaton sync-ai`
 - `automaton current-runner`
 - `automaton runners`
 
@@ -169,7 +169,8 @@ Missing information should be requested inside the high-level command that needs
 - sign in now?
 - open browser or paste token flow?
 - is this a workspace root for multiple apps?
-- optionally install local AI guidance here?
+
+It should sync local AI guidance automatically without requiring a separate install step.
 
 It should not ask for the server in the standard hosted path.
 
@@ -279,7 +280,7 @@ automaton link <app-id>
 
 ## Future AI-guidance integration
 
-If local AI guidance files are added later, they should be installed by `automaton setup` or `automaton new`, not as a separate required command.
+Local AI guidance files should be synced by `automaton setup`, `automaton new`, or `automaton link`, not as a separate required onboarding command. `automaton sync-ai` exists only as a manual refresh or repair path.
 
 The user should never need to remember a standalone "install prompts" command on the happy path.
 
@@ -333,9 +334,10 @@ Existing commands remain valid.
 
 The new commands should be thin orchestrators over existing logic where possible:
 
-- `setup` wraps or reuses login/config/whoami logic
-- `new` wraps or reuses create/init/link logic
+- `setup` wraps or reuses login/config/whoami logic and syncs local AI guidance
+- `new` wraps or reuses create/init/link logic and syncs local AI guidance
 - `deploy` wraps or reuses validate/runner/deploy logic
+- `sync-ai` wraps the local guidance generator for manual refresh or repair
 
 This keeps implementation incremental and reduces risk.
 
@@ -369,7 +371,7 @@ Improve `automaton deploy` orchestration:
 
 ## Phase 4
 
-Optionally add local AI-guidance installation into `setup` or `new`.
+Add local AI-guidance sync into `setup`, `new`, and `link`, plus an optional `sync-ai` manual refresh command.
 
 ## Acceptance Criteria
 
@@ -387,6 +389,6 @@ This spec is successful when:
 
 1. Should `automaton new` also scaffold starter files in its first version, or should that remain a later enhancement?
 2. Should `automaton deploy` automatically run the equivalent of `validate`, or keep `validate` as a visibly separate recommended step?
-3. Should `setup` install local AI guidance files immediately, or ask first?
+3. Should `sync-ai` ever offer a diff preview, or should it stay a straight overwrite of generated files?
 4. Should workspace-level and app-level setup be different commands, or different modes of `setup`?
 5. Should `create` and `init` remain user-visible long term, or eventually become internal/advanced commands only?

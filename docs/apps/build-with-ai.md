@@ -65,6 +65,8 @@ Start your session with a prompt like:
 Read https://automaton.monster/llms.txt, then build an Automaton app for Poker Planning.
 ```
 
+If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. If those generated files need a manual refresh later, run `automaton sync-ai`.
+
 Or paste the generic starter prompt directly if your tool does not fetch URLs:
 
 ```text
@@ -119,6 +121,20 @@ Add `build` and `deployDir` for framework apps:
 If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
 
 ### Deploy
+
+Recommended local flow for a new app:
+
+```bash
+automaton setup
+automaton new "My App"
+```
+
+For an existing remote app:
+
+```bash
+automaton setup
+automaton link <app-id>
+```
 
 For backend apps, pick an existing connected runner once before the first backend deploy, or create/deploy one in Automaton Studio if none exists:
 

@@ -1,8 +1,8 @@
 # Automaton CLI
 
-The Automaton CLI (`automaton`) deploys apps, manages versions, and lists runners from the terminal.
+The Automaton CLI (`automaton`) prepares local app folders, deploys apps, manages versions, and lists runners from the terminal.
 
-It also supports explicit login/logout flows for local development, testing, and account switching.
+The default happy path is `automaton setup`, then `automaton new` or `automaton link`, then `automaton deploy`. Lower-level auth and config commands remain available for testing, debugging, and automation.
 
 ---
 
@@ -36,22 +36,23 @@ automaton --version
 
 ---
 
-## One-time configuration
+## One-time setup
 
-Store your server URL and API key globally so every project can use them:
+Prepare the current machine or workspace:
 
 ```bash
-automaton config --server https://api.automaton.monster --key ak_execute_xxx
+automaton setup
 ```
 
 Get an API key from **Settings → API Keys → New Key** (scope: `execute`).
 
-Check what is currently configured:
+Manual configuration is still available when you need it:
 ```bash
+automaton config --server https://api.automaton.monster --key ak_execute_xxx
 automaton config --show
 ```
 
-Configuration is stored in `~/.automaton/config.json`. Environment variables always take precedence over the config file (useful for CI/CD):
+By default, `automaton setup` stores project-local credentials in `./.automaton/config.json`. Use `automaton setup --global` if you intentionally want shared machine-wide credentials in `~/.automaton/config.json`. Environment variables always take precedence over file-based config (useful for CI/CD):
 
 | Variable | Purpose |
 |---|---|
@@ -93,6 +94,59 @@ For framework apps (React, Vue, Angular) that need a build step:
 
 ## Commands
 
+### `automaton setup`
+
+Prepare this machine or workspace for Automaton development.
+
+```bash
+automaton setup
+automaton setup --global
+automaton setup --server https://custom-host
+```
+
+By default, `setup` uses `https://automaton.monster`, saves credentials locally unless `--global` is used, and also syncs the generated local AI guidance pack.
+
+---
+
+### `automaton new`
+
+Create a new app and link the current directory.
+
+```bash
+automaton new
+automaton new "My App"
+```
+
+This creates the remote app, writes `automaton.json`, creates `.automatonignore` if missing, and syncs the local AI guidance pack.
+
+---
+
+### `automaton link`
+
+Link the current directory to an existing Automaton app.
+
+```bash
+automaton link
+automaton link 3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+This writes `automaton.json`, creates `.automatonignore` if missing, and syncs the local AI guidance pack.
+
+---
+
+### `automaton sync-ai`
+
+Refresh or repair the generated local AI guidance files in the current folder.
+
+```bash
+automaton sync-ai
+automaton sync-ai --json
+```
+
+Use this only when the generated `AGENTS.md`, `.github/`, or `.automaton/ai-guidance/` files are missing or stale. It is not required on the normal happy path because `setup`, `new`, and `link` already do this automatically.
+
+---
+
 ### `automaton login`
 
 Store and validate CLI credentials for the current project by default.
@@ -131,22 +185,6 @@ automaton whoami --json
 ```
 
 Useful after `automaton login` or `automaton logout` to confirm which credentials are currently active.
-
----
-
-### `automaton init`
-
-Create a new app and write `automaton.json`, or link the current directory to an existing app.
-
-```bash
-# Create a new app (prompts for name if not provided)
-automaton init --name "My App"
-
-# Link to an existing app by ID
-automaton init --app 3fa85f64-5717-4562-b3fc-2c963f66afa6
-```
-
-Use `automaton init --app <id>` when you have already created the app in the Studio UI and just want to connect a local folder to it.
 
 ---
 
@@ -232,18 +270,21 @@ Set environment variables in your pipeline instead of storing credentials in the
 ## Typical workflow
 
 ```bash
-# 1. One-time: configure server + API key
-automaton config --server https://api.automaton.monster --key ak_execute_xxx
+# 1. Prepare the local workspace
+automaton setup
 
-# 2. Create a new app (or use init --app <id> to link existing)
-automaton init --name "Poker Planning"
+# 2. Create a new app (or use link <id> to connect an existing one)
+automaton new "Poker Planning"
 
-# 3. Build your app locally, then deploy
+# 3. Optional: refresh generated guidance only if needed
+automaton sync-ai
+
+# 4. Build your app locally, then deploy
 automaton deploy
 
-# 4. Snapshot before a big change
+# 5. Snapshot before a big change
 automaton publish --message "Initial release"
 
-# 5. Pull server state if you switched machines
+# 6. Pull server state if you switched machines
 automaton pull
 ```

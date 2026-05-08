@@ -36,8 +36,10 @@ public class LinkAppServiceTests
         Assert.That(result.Success, Is.True);
         Assert.That(result.AppId, Is.EqualTo("app-456"));
         Assert.That(result.Name, Is.EqualTo("Linked App"));
+        Assert.That(result.Checks.Any(check => check.Name == "aiGuidance" && check.Success), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.True);
     }
 
     [Test]

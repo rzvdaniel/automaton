@@ -11,7 +11,7 @@ For most developers, the least-friction workflow is:
 3. Build with your preferred editor or AI tool.
 4. Deploy with `automaton deploy`.
 
-If your AI tool supports MCP, connect Automaton as an MCP server. That gives the AI the most accurate Automaton-specific context. If it does not, use one of the quick starts and the starter prompt.
+If your AI tool supports MCP, connect Automaton as an MCP server. That gives the AI the most accurate Automaton-specific context. If it does not, use the CLI + AI workflow, the stack guide, and the starter prompt.
 
 ## What every Automaton app has
 
@@ -22,7 +22,7 @@ If your AI tool supports MCP, connect Automaton as an MCP server. That gives the
 
 ## Use this documentation menu for
 
-- Quick starts for plain HTML/CSS/JS, React, and Vue.
+- A quick stack guide for plain HTML/CSS/JS, React, and Vue.
 - The in-browser App Editor workflow.
 - External AI workflows with CLI and starter prompts.
 - MCP setup.

@@ -26,6 +26,27 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\automaton-vue\public\llms.txt">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\automaton-vue\public\llms\automaton-apps-overview.md">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-apps-overview.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\automaton-vue\public\llms\automaton-backend-controllers.md">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-backend-controllers.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\automaton-vue\public\llms\automaton-cli-deploy.md">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-cli-deploy.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\automaton-vue\public\llms\automaton-frontend-structure.md">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-frontend-structure.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\automaton-vue\public\llms\automaton-starter-prompts.md">
+      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-starter-prompts.md</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="README-NUGET.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 

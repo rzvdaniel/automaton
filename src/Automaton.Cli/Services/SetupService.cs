@@ -8,13 +8,16 @@ public sealed class SetupService
     public const string DefaultHostedServer = "https://automaton.monster";
 
     private readonly ConfigService _config;
+    private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, CancellationToken, Task<JsonElement>> _getUserProfileAsync;
 
     public SetupService(
         ConfigService config,
-        Func<string, string, CancellationToken, Task<JsonElement>>? getUserProfileAsync = null)
+        Func<string, string, CancellationToken, Task<JsonElement>>? getUserProfileAsync = null,
+        AiGuidancePackService? aiGuidancePackService = null)
     {
         _config = config;
+        _aiGuidancePackService = aiGuidancePackService ?? new AiGuidancePackService();
         _getUserProfileAsync = getUserProfileAsync ?? GetUserProfileAsync;
     }
 
@@ -69,6 +72,9 @@ public sealed class SetupService
                 _config.SaveProjectLocalConfig(directory, updated);
             }
 
+            var guidance = _aiGuidancePackService.Sync(directory);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+
             nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");
 
             return new SetupResult
@@ -86,8 +92,13 @@ public sealed class SetupService
         }
         catch (Exception ex)
         {
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
-            nextSteps.Add("Verify the API key, then rerun automaton setup");
+            var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.Authentication)
+                ? CommandDiagnosticCheckNames.AiGuidance
+                : CommandDiagnosticCheckNames.Authentication;
+            checks.Add(new CommandDiagnosticCheck(checkName, false, ex.Message));
+            nextSteps.Add(checkName == CommandDiagnosticCheckNames.AiGuidance
+                ? "Fix local file permissions or rerun automaton setup"
+                : "Verify the API key, then rerun automaton setup");
             return new SetupResult
             {
                 Success = false,

@@ -16,6 +16,7 @@ var root = new RootCommand("Automaton CLI — create, deploy, and publish Automa
 {
     SetupCommand.Build(config),
     NewCommand.Build(config),
+    SyncAiCommand.Build(config),
     LoginCommand.Build(config),
     LogoutCommand.Build(config),
     WhoAmICommand.Build(config),

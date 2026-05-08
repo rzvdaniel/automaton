@@ -181,10 +181,10 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div>
                 <div class="step-title">Let the AI initiate login and handle app linking</div>
                 <p class="step-body">
-                  Tell the AI to run <code>automaton login</code> and guide the flow, then complete the actual
-                  browser auth or credential step yourself when prompted. After login succeeds, the AI can
-                  confirm identity with <code>automaton whoami</code> and create or link the app in the current folder.
-                  The goal is for the workspace to end up linked with <code>automaton.json</code> already written.
+                  Tell the AI to run <code>automaton setup</code> and guide the flow, then complete the actual
+                  browser auth or credential step yourself when prompted. After setup succeeds, the AI can
+                  create or link the app in the current folder with <code>automaton new</code> or <code>automaton link</code>.
+                  The goal is for the workspace to end up linked with <code>automaton.json</code> already written and the local guidance pack already synced.
                 </p>
                 <p class="step-body">
                   If you need a clean auth reset for testing or want to switch accounts, ask the AI to run
@@ -198,7 +198,7 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div>
                 <div class="step-title">Tell the AI to build the app and use the CLI</div>
                 <div class="prompt-example">
-                  "Build an Automaton app for [your idea] in this folder. Use the Automaton CLI to create or link the app, validate it, inspect runner setup, deploy it, and tell me when you need me to complete authentication or approve publish."
+                  "Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root with automaton new or automaton link, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner &lt;runner-id&gt;, or tell me to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation."
                 </div>
                 <p class="step-body">
                   By this point the AI already has both the project folder and the Automaton rules from
@@ -269,22 +269,21 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div class="step-num">2</div>
               <div>
                 <div class="step-title">Login and confirm identity</div>
-                <div class="code-block code-block-multi"><pre>automaton login
-automaton whoami
+                <div class="code-block code-block-multi"><pre>automaton setup
 # optional reset for testing or account switching
 automaton logout</pre></div>
-                <p class="step-body">Prefer this over manual API key wiring when you want the CLI to drive the app workflow directly. Use <code>automaton logout</code> when you need to reset stored auth before testing a fresh login or switching accounts.</p>
+                <p class="step-body">Prefer this over manual API key wiring when you want the CLI to drive the app workflow directly. Use <code>automaton logout</code> when you need to reset stored auth before testing a fresh setup flow or switching accounts.</p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">3</div>
               <div>
                 <div class="step-title">Create or link the app</div>
-                <div class="code-block code-block-multi"><pre>automaton create --name "My App"
+                <div class="code-block code-block-multi"><pre>automaton new "My App"
 # or
 automaton link your-app-id</pre></div>
                 <p class="step-body">
-                  Use <code>create</code> for a new app in the current folder. Use <code>link</code>
+                  Use <code>new</code> for a new app in the current folder. Use <code>link</code>
                   only when the remote app already exists.
                 </p>
               </div>
@@ -309,10 +308,11 @@ automaton link your-app-id</pre></div>
               <div class="step-num">5</div>
               <div>
                 <div class="step-title">Validate before deploy</div>
-                <div class="code-block code-block-multi"><pre>automaton validate
+                <div class="code-block code-block-multi"><pre>automaton sync-ai   # only if generated guidance files are missing or stale
+automaton validate
 automaton status</pre></div>
                 <p class="step-body">
-                  Run the preflight check first so missing config, missing remote app links, or missing
+                  Refresh generated guidance only when needed, then run the preflight check so missing config, missing remote app links, or missing
                   backend runner assignments fail before upload.
                 </p>
               </div>
@@ -354,7 +354,7 @@ automaton status</pre></div>
               <strong>Using Cursor or VS Code?</strong> Point the AI to
               <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               before it starts generating files. That keeps the project aligned with the required
-              Automaton structure and backend/frontend contract. For backend apps, start with <code>automaton current-runner</code>,
+              Automaton structure and backend/frontend contract. The current happy path is <code>automaton setup</code>, then <code>automaton new</code> or <code>automaton link</code>, then optional <code>automaton sync-ai</code> only when generated guidance files need a refresh. For backend apps, use <code>automaton current-runner</code>,
               <code>automaton runners</code>, and <code>automaton set-runner &lt;runner-id&gt;</code> when a connected runner exists. If none exists, create or deploy one in Studio, then run <code>automaton validate</code>
               before deploy. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
               <strong>Documentation → Automaton CLI</strong> page inside Studio.

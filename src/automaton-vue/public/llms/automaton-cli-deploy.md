@@ -11,13 +11,12 @@ For now, treat Automaton Studio as the official preview and debugging environmen
 ## Required setup
 
 1. Install the Automaton CLI.
-2. Authenticate the CLI.
+2. Prepare the current machine or workspace.
 
 Preferred:
 
 ```bash
-automaton login
-automaton whoami
+automaton setup
 ```
 
 For testing, account switching, or a clean auth reset:
@@ -26,6 +25,12 @@ For testing, account switching, or a clean auth reset:
 automaton logout
 automaton logout --global
 automaton logout --all
+```
+
+Then run:
+
+```bash
+automaton setup
 ```
 
 Fallback when the user wants explicit API key configuration:
@@ -46,9 +51,15 @@ The CLI also supports keeping `server` in `automaton.json`. Resolution order is:
 
 3. The AI should create `automaton.json` in the project root automatically when it follows `llms.txt`.
 
-When the user asks to use the Automaton CLI, the AI should prefer `automaton create --name "<app-name>"` for a new app or `automaton link <app-id>` for an existing one, and should not stop before `automaton.json` exists in the project root, unless it clearly reports why that creation/link step failed.
+When the user asks to use the Automaton CLI, the AI should prefer `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing one, and should not stop before `automaton.json` exists in the project root, unless it clearly reports why that creation/link step failed.
 
 The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
+
+`automaton setup`, `automaton new`, and `automaton link` also sync a local AI guidance pack into `.automaton/ai-guidance/` and generate local `AGENTS.md` / `.github/` guidance files. If those generated files are missing or stale, run:
+
+```bash
+automaton sync-ai
+```
 
 4. If the app already exists in Automaton Studio, link the local project to it:
 
@@ -63,8 +74,8 @@ If the app is being created from scratch locally, skip this step. `link` is only
 Use this canonical order:
 
 ```bash
-automaton whoami
-automaton create --name "My App"
+automaton setup
+automaton new "My App"
 automaton validate
 automaton current-runner
 automaton runners
@@ -76,13 +87,14 @@ automaton status
 
 Interpretation rules:
 
-1. Run `automaton whoami` first so the AI knows whether login is needed.
-2. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton login`.
-3. Use `automaton create` for new apps; reserve `automaton link` for existing remote apps.
-4. Run `automaton validate` before deploy.
-5. If backend controllers exist and no connected runner is assigned, pick one with `automaton set-runner <runner-id>` or tell the user to create or deploy one in Automaton Studio.
-6. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
-7. Ask the user before public publish, then use `automaton publish --yes` only after approval.
+1. Run `automaton setup` first so the AI can authenticate and sync local guidance in one step.
+2. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton setup`.
+3. Use `automaton new` for new apps; reserve `automaton link` for existing remote apps.
+4. Run `automaton sync-ai` only when the generated local guidance files need a manual refresh.
+5. Run `automaton validate` before deploy.
+6. If backend controllers exist and no connected runner is assigned, pick one with `automaton set-runner <runner-id>` or tell the user to create or deploy one in Automaton Studio.
+7. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
+8. Ask the user before public publish, then use `automaton publish --yes` only after approval.
 
 ## Current test and debug loop
 
@@ -115,6 +127,7 @@ Use it to catch obvious problems early, such as:
 - Keep `automaton.json` in the project root.
 - Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
 - Follow the Automaton app structure from `llms.txt` and the linked files.
+- Treat `automaton sync-ai` as the manual refresh path for the generated local guidance pack, not as a required onboarding step.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
 - If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.
 - For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then set `deployDir` to that folder.
@@ -178,7 +191,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ## Default instruction to the AI
 
 ```text
-Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Authenticate with automaton login if needed, create or link automaton.json in the project root, ensure a runner exists for backend controllers, run automaton validate before deploy, and only publish after explicit user confirmation.
+Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root, refresh local guidance with automaton sync-ai only if needed, ensure a runner exists for backend controllers, run automaton validate before deploy, and only publish after explicit user confirmation.
 ```
 
 When the app is deployed but not yet published, the AI should direct the user to preview it in Automaton Studio and inspect logs there before recommending publish.

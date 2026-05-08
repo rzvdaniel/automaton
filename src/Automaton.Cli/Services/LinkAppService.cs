@@ -6,13 +6,16 @@ namespace Automaton.Cli.Services;
 public sealed class LinkAppService
 {
     private readonly ConfigService _config;
+    private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, string, CancellationToken, Task<JsonElement>> _getAppAsync;
 
     public LinkAppService(
         ConfigService config,
-        Func<string, string, string, CancellationToken, Task<JsonElement>>? getAppAsync = null)
+        Func<string, string, string, CancellationToken, Task<JsonElement>>? getAppAsync = null,
+        AiGuidancePackService? aiGuidancePackService = null)
     {
         _config = config;
+        _aiGuidancePackService = aiGuidancePackService ?? new AiGuidancePackService();
         _getAppAsync = getAppAsync ?? GetAppAsync;
     }
 
@@ -67,6 +70,9 @@ public sealed class LinkAppService
                 Server = server
             });
 
+            var guidance = _aiGuidancePackService.Sync(directory);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+
             nextSteps.Add("Run automaton pull if you want the app's current remote files");
 
             return new LinkAppResult
@@ -83,8 +89,13 @@ public sealed class LinkAppService
         }
         catch (Exception ex)
         {
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.LinkApp, false, ex.Message));
-            nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+            var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.LinkApp)
+                ? CommandDiagnosticCheckNames.AiGuidance
+                : CommandDiagnosticCheckNames.LinkApp;
+            checks.Add(new CommandDiagnosticCheck(checkName, false, ex.Message));
+            nextSteps.Add(checkName == CommandDiagnosticCheckNames.AiGuidance
+                ? "Fix local file permissions or rerun automaton link"
+                : "Run automaton whoami to confirm the current server and identity");
             return new LinkAppResult
             {
                 Success = false,

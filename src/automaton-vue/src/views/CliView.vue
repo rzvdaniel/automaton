@@ -64,14 +64,14 @@ const quickStartSteps = [
     code: 'dotnet tool install -g Automaton.Cli',
   },
   {
-    title: 'Login',
-    detail: 'Prefer CLI login and identity confirmation before creating or linking the app.',
-    code: 'automaton login\nautomaton whoami',
+    title: 'Setup',
+    detail: 'Prepare the current machine or workspace and let the CLI sync local guidance automatically.',
+    code: 'automaton setup',
   },
   {
-    title: 'Create app',
-    detail: 'Create a linked app in the current folder so automaton.json is written locally.',
-    code: 'automaton create --name "My App"',
+    title: 'Create or link app',
+    detail: 'Write automaton.json in the current folder with the current happy-path commands.',
+    code: 'automaton new "My App"\n# or\nautomaton link your-app-id',
   },
   {
     title: 'Validate',
@@ -89,12 +89,12 @@ const workflowSteps = [
   {
     title: 'Start with the AI-readable contract',
     description: 'Point your IDE or AI agent to llms.txt before asking it to generate files. It should create the app structure and automaton.json for you.',
-    code: `Read ${publicAppConfig.llmsUrl}, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.`,
+    code: `Read ${publicAppConfig.llmsUrl}, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root with automaton new or automaton link, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner <runner-id>, or tell the user to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation.`,
   },
   {
     title: 'Connect the local project',
     description: 'Create a new linked app in the current folder, or link to an existing one when the remote app already exists.',
-    code: 'automaton create --name "My App"\n# or\nautomaton link your-app-id',
+    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id',
   },
   {
     title: 'Deploy from your IDE',
@@ -215,7 +215,7 @@ async function copyCode(key: string, code: string) {
             <div class="cli-card-head">
               <span class="tag">Install</span>
               <h2>Install with NuGet</h2>
-              <p class="cli-card-subtitle">If your AI follows llms.txt, automaton.json should be created automatically. Use init or link only as a manual fallback.</p>
+              <p class="cli-card-subtitle">If your AI follows llms.txt, automaton.json should be created automatically. Use setup plus new or link as the manual fallback flow.</p>
             </div>
 
             <article v-for="mode in installModes" :key="mode.title" class="code-card">
@@ -348,8 +348,9 @@ async function copyCode(key: string, code: string) {
               </div>
               <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
 - Keep the project in your repo
+- Start with automaton setup
+- Use automaton new or automaton link to connect the app
 - Run automaton validate before deploy
-- Create or link the Automaton app
 - Deploy frontend files and backend controllers
 - Preview and inspect logs in Automaton Studio
 - Reuse the same flow every time you update the app</code></pre>

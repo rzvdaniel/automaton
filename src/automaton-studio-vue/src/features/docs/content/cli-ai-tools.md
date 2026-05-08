@@ -21,10 +21,10 @@ irm https://api.automaton.monster/downloads/install.ps1 | iex
 dotnet tool install -g Automaton.Cli
 ```
 
-### 2. Configure server and API key
+### 2. Prepare the current machine or workspace
 
 ```bash
-automaton config --server https://api.automaton.monster --key ak_execute_xxx
+automaton setup
 ```
 
 Get an API key from **Settings → API Keys → New Key** (scope: `execute`).
@@ -35,12 +35,13 @@ For the full CLI reference — all commands, options, `automaton.json` fields, a
 
 ## Recommended flow
 
-1. Create the app in Studio (**Apps → New App**) and note the app ID.
-2. In your project folder: `automaton init --app <id>` to create `automaton.json`.
+1. Run `automaton setup` in the project or workspace.
+2. Use `automaton new "My App"` for a new app, or `automaton link <app-id>` when the remote app already exists.
 3. Keep the project in Git.
 4. Point your AI tool to [llms.txt](https://automaton.monster/llms.txt) so it follows the required Automaton app structure.
 5. Use your AI tool to scaffold and edit the app.
-6. Deploy with `automaton deploy`.
+6. Run `automaton sync-ai` only if the generated local guidance files are missing or stale.
+7. Deploy with `automaton deploy`.
 
 ## AI-readable files
 
@@ -54,7 +55,7 @@ For the full CLI reference — all commands, options, `automaton.json` fields, a
 ## Starter prompt
 
 ```text
-Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI to deploy it.
+Read https://automaton.monster/llms.txt, then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root with automaton new or automaton link, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner <runner-id>, or tell the user to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation.
 ```
 
 ## MCP recommendation
