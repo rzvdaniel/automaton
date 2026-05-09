@@ -9,6 +9,7 @@ namespace Automaton.Studio.Server.Services;
 
 public class ApiKeyService
 {
+    private const int RawKeyLength = 40;
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<ApiKeyService> logger;
     private readonly ResourceAuthorizationService authorizationService;
@@ -26,13 +27,7 @@ public class ApiKeyService
     public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(Guid userId, string name, string? description = null, DateTime? expiresAt = null, ApiKeyScope scope = ApiKeyScope.Runner, Guid? projectId = null)
     {
         // Generate a cryptographically secure API key
-        var keyBytes = new byte[32];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(keyBytes);
-        }
-
-        var rawKey = Convert.ToBase64String(keyBytes).Replace("+", "").Replace("/", "").Replace("=", "")[..40];
+        var rawKey = GenerateRawKey();
         var prefix = scope switch
         {
             ApiKeyScope.ReadOnly => "ak_readonly_",
@@ -87,6 +82,15 @@ public class ApiKeyService
         logger.LogInformation("API key created for user {UserId} with scope {Scope}", userId, scope);
 
         return (fullApiKey, entity);
+    }
+
+    internal static string GenerateRawKey()
+    {
+        // 20 bytes = 40 hex chars, which gives us a stable fixed-length suffix
+        // without needing brittle substring logic on a variable-length encoded string.
+        var keyBytes = new byte[RawKeyLength / 2];
+        RandomNumberGenerator.Fill(keyBytes);
+        return Convert.ToHexString(keyBytes).ToLowerInvariant();
     }
 
     public async Task<ApiKey?> ValidateApiKeyAsync(string apiKey)
