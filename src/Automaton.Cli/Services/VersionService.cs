@@ -14,7 +14,7 @@ public class VersionService
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion;
         var buildVersion = informationalVersion ?? assembly.GetName().Version?.ToString() ?? "unknown";
-        var installedPackageVersion = TryGetInstalledPackageVersion(assembly.Location);
+        var installedPackageVersion = TryGetInstalledPackageVersion(AppContext.BaseDirectory);
 
         return new CliVersionInfo(
             installedPackageVersion ?? buildVersion,

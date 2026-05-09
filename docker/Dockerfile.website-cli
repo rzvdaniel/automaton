@@ -7,9 +7,11 @@ WORKDIR /src
 RUN apk add --no-cache zip tar
 
 COPY src/Automaton.Cli/Automaton.Cli.csproj src/Automaton.Cli/
+COPY shared/ai-guidance/ shared/ai-guidance/
 RUN dotnet restore src/Automaton.Cli/Automaton.Cli.csproj
 
 COPY src/Automaton.Cli/ src/Automaton.Cli/
+COPY shared/ai-guidance/ shared/ai-guidance/
 
 RUN set -eux; \
 		mkdir -p /cli-dist; \

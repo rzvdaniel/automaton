@@ -11,6 +11,8 @@ azure-pipelines*.yml
 *.md
 docs/
 screenshots/
+!shared/ai-guidance/**/*.md
+!shared/ai-guidance/llms.txt
 
 # Development files
 .vs/
