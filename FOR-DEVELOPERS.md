@@ -250,7 +250,49 @@ We weren't consistently checking before dereferencing. The compiler warned us, b
 
 **Lesson:** Nullable reference types aren't just compiler features. They're a way to make your assumptions explicit. "This could be null" vs. "this will never be null" is important information.
 
-### 3. Scope/Project Linkage and Authorization
+### 4. Cloudflare Timeouts with a Healthy Origin
+
+**The Pitfall:**
+A production site can show `ERR_CONNECTION_TIMED_OUT` in the browser even when the Docker stack, Traefik, TLS, and the app itself are all healthy. This is especially confusing because the first instinct is usually "certificate problem" or "container is down."
+
+In our case:
+- Cloudflare had active edge certificates for `automaton.monster` and `*.automaton.monster`
+- Traefik was listening on `80` and `443`
+- `curl` against the origin IP returned `200 OK` when we sent the correct `Host` header
+- the public browser request still timed out while the DNS record was proxied
+
+This tells you the failure is in the Cloudflare-to-origin path, not in the app.
+
+**The Fix:**
+Use a short isolation sequence before changing application code:
+
+```bash
+# On the server: confirm Traefik is listening
+sudo ss -tulpn | grep -E ':80|:443'
+
+# Confirm the site works locally with the real host header
+curl -I -H "Host: automaton.monster" http://127.0.0.1
+curl -k -I -H "Host: automaton.monster" https://127.0.0.1
+
+# Confirm the origin IP itself serves the site
+curl -I -H "Host: automaton.monster" http://178.105.66.33
+curl -k -I -H "Host: automaton.monster" https://178.105.66.33
+```
+
+If those return the expected redirect/`200 OK`, the origin is healthy.
+
+Then in Cloudflare:
+1. Temporarily switch the affected `A` record from **Proxied** to **DNS only**
+2. Wait a minute or two
+3. Test the site again
+
+If the site loads on `DNS only`, the app is fine and the failing hop is Cloudflare proxying. In our incident, switching to `DNS only` and then back to **Proxied** cleared the bad state.
+
+**Why it's subtle:** A timeout looks like "server down," but the server can be perfectly healthy. Cloudflare certificates can also be valid at the same time, which makes it easy to chase the wrong layer. The decisive test is whether the origin IP answers correctly with the expected `Host` header.
+
+**Lesson:** When a proxied Cloudflare hostname times out, don't start by changing code or rebuilding containers. First prove whether the origin is healthy with `curl` plus the real `Host` header, then use `DNS only` as the quickest proxy-path isolation test.
+
+### 5. Scope/Project Linkage and Authorization
 
 **The Pitfall:**
 When we added project scoping to runners (and apps, and flows), we initially treated scope as a simple property. But authorization isn't just "is this in a project?" It's "am I allowed to access this resource in this context?"
