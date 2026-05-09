@@ -292,7 +292,46 @@ If the site loads on `DNS only`, the app is fine and the failing hop is Cloudfla
 
 **Lesson:** When a proxied Cloudflare hostname times out, don't start by changing code or rebuilding containers. First prove whether the origin is healthy with `curl` plus the real `Host` header, then use `DNS only` as the quickest proxy-path isolation test.
 
-### 5. Scope/Project Linkage and Authorization
+### 5. Single-Container Deploys Can Poison the Proxy Path
+
+**The Pitfall:**
+Rebuilding a public-facing service with a single-instance Compose command like:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build website
+```
+
+can take the public hostname offline even if the new container itself is healthy. The subtle part is that the outage may outlive the container restart: Cloudflare can observe the brief origin failure and keep serving a timeout/error state until it re-establishes a clean path to the origin.
+
+In our production stack, this risk applies to:
+- `website` for `automaton.monster`
+- `studio` for `studio.automaton.monster`
+- `api` for `api.automaton.monster`
+
+**The Fix:**
+1. Remove fixed `container_name` values from stateless public services so Compose can run multiple replicas
+2. Add health checks to those services
+3. Deploy with scaling instead of replacing the only container
+
+Example:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build --scale website=2 website
+docker compose -f docker-compose.prod.yml up -d --build --scale studio=2 studio
+docker compose -f docker-compose.prod.yml up -d --build --scale api=2 api
+```
+
+or:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+```
+
+**Why it's subtle:** The application logs can look fine because the container is healthy by the time you check it. The actual failure window happened during replacement, and the proxy/CDN layer can keep the failure state longer than the restart itself.
+
+**Lesson:** For proxied public services, "container restarted successfully" is not the same as "safe deploy." A short no-backend window is enough to create user-visible downtime. Treat health checks and multi-replica cutovers as part of the deployment design, not optional polish.
+
+### 6. Scope/Project Linkage and Authorization
 
 **The Pitfall:**
 When we added project scoping to runners (and apps, and flows), we initially treated scope as a simple property. But authorization isn't just "is this in a project?" It's "am I allowed to access this resource in this context?"

@@ -522,6 +522,7 @@ app.UseAuthentication();
 app.UseRouting();
 app.UseAuthorization();
 
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 
 app.MapBlazorHub();

@@ -545,12 +545,49 @@ cd /opt/automaton
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 
+# Safer deploys for public services (keeps a second healthy replica available)
+docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+
 # Stop everything
 docker compose -f docker-compose.prod.yml down
 
 # Stop everything and delete volumes (WARNING: destroys database)
 docker compose -f docker-compose.prod.yml down -v
 ```
+
+### Safer deploys for API, Studio, and Website
+
+If you deploy a single service like this:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build website
+```
+
+Compose replaces the only running container for that service. During that gap, Traefik temporarily has no backend for the hostname, and Cloudflare can hold onto the failed origin state for longer than the actual container restart.
+
+That risk applies to `website`, `studio`, and `api`.
+
+Use replica-based deploys instead:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build --scale website=2 website
+docker compose -f docker-compose.prod.yml up -d --build --scale studio=2 studio
+docker compose -f docker-compose.prod.yml up -d --build --scale api=2 api
+```
+
+Or rebuild all three public services together:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+```
+
+Why this works better:
+
+- `api`, `studio`, and `website` no longer use fixed `container_name` values, so Compose can run more than one replica
+- all three services now have health checks
+- Traefik can keep routing to a healthy replica while another one is starting
+
+If Cloudflare still shows a stale timeout/error page after the origin is healthy again, temporarily switching the affected DNS record from **Proxied** to **DNS only** and then back to **Proxied** forces Cloudflare to re-establish the origin path.
 
 ---
 

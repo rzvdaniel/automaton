@@ -56,9 +56,10 @@ sudo ./setup-service.sh
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
 | `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
-| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API container |
-| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website |
-| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy the full production stack |
+| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with 2 replicas |
+| `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with 2 replicas |
+| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with 2 replicas |
+| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with 2 replicas |
 
 ---
 
@@ -69,6 +70,7 @@ These helpers wrap `docker compose -f docker-compose.prod.yml ...` for the most 
 ```bash
 cd /opt/automaton
 ./scripts/prod-redeploy-api.sh
+./scripts/prod-redeploy-studio.sh
 ./scripts/prod-redeploy-website.sh
 ./scripts/prod-redeploy-website.sh --with-cli-assets
 ./scripts/prod-redeploy-all.sh
@@ -76,6 +78,7 @@ cd /opt/automaton
 ```
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
+Set `AUTOMATON_DEPLOY_REPLICAS=3` (or another value) before running a script if you want a different replica count for a deploy.
 
 ---
 
