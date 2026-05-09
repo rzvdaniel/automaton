@@ -60,21 +60,21 @@ const directScripts = [
 const quickStartSteps = [
   {
     title: 'Install CLI',
-    detail: 'Start with the .NET global tool, or use the portable builds further down this page.',
+    detail: 'Start with the .NET global tool, or use the portable builds lower on this page if that fits your environment better.',
     code: 'dotnet tool install -g Automaton.Cli',
   },
   {
-    title: 'Setup',
+    title: 'Run setup',
     detail: 'Prepare the current machine or workspace and let the CLI sync local guidance automatically.',
     code: 'automaton setup',
   },
   {
-    title: 'Open your AI tool',
+    title: 'Paste the starter prompt',
     detail: 'After setup, ask the AI to build and deploy the app in the current folder.',
-    code: 'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Then build this app and deploy it to Automaton Studio.',
+    code: 'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.',
   },
   {
-    title: 'Deploy and preview in Studio',
+    title: 'Preview in Studio',
     detail: 'The AI should handle deploy; you use Studio preview and logs as the test loop.',
     code: 'Automaton Studio preview\nAutomaton Studio logs',
   },
@@ -82,19 +82,37 @@ const quickStartSteps = [
 
 const workflowSteps = [
   {
-    title: 'AI-first default',
-    description: 'After setup, let the AI handle the app workflow in the current folder. Local generated guidance should be enough for most tools.',
-    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the remaining workflow yourself: create or link automaton.json, refresh local guidance only if needed, run validation, guide runner assignment for backend apps, and deploy. Only ask me to step in for auth, runner creation outside the CLI, or publish approval.`,
-  },
-  {
     title: 'Manual fallback',
-    description: 'Only use this when you want to drive the CLI yourself instead of letting the AI run the flow.',
+    description: 'Use this only when you want to drive the CLI yourself instead of letting the AI handle the main flow.',
     code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id\nautomaton validate\nautomaton deploy',
   },
   {
     title: 'Use Studio as the test loop',
-    description: 'After the AI deploys, preview the app and inspect logs in Automaton Studio before publish.',
+    description: 'After deploy, preview the app and inspect logs in Automaton Studio before publish.',
     code: 'Automaton Studio preview\nAutomaton Studio logs',
+  },
+]
+
+const starterPromptVariants = [
+  {
+    title: 'Generic starter',
+    description: 'Best default when the user wants the AI to choose the simplest suitable stack.',
+    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`,
+  },
+  {
+    title: 'Existing app',
+    description: 'Use this when the remote Automaton app already exists and the folder should be linked first.',
+    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. I already have an Automaton app. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: link this folder to app id [app-id], scaffold or update the app locally, keep automaton.json correct in this folder, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`,
+  },
+  {
+    title: 'Frontend-only',
+    description: 'Use this when the app should stay frontend-only unless backend code is truly necessary.',
+    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript unless I explicitly ask for a framework. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`,
+  },
+  {
+    title: 'React or Vue',
+    description: 'Use this when the user explicitly wants a framework app.',
+    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, make sure build and deployDir are correct, run automaton validate, handle runner assignment only if backend controllers exist, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`,
   },
 ]
 
@@ -149,9 +167,8 @@ async function copyCode(key: string, code: string) {
             <span class="section-label"><i class="pi pi-terminal" /> Automaton CLI</span>
             <h1 class="section-title cli-title">Install fast. Deploy from your editor. Stay in control.</h1>
             <p class="cli-subtitle">
-              Use the NuGet package when you already have .NET. Use direct downloads when you want a
-              portable binary. Use llms.txt and the CLI together when you want AI-assisted app builds
-              without leaving your local workflow.
+              Install the CLI, run <code>automaton setup</code>, paste one starter prompt into your AI tool,
+              and let it build locally and deploy to Automaton without leaving your workflow.
             </p>
 
             <div class="cli-hero-actions">
@@ -256,9 +273,9 @@ async function copyCode(key: string, code: string) {
       <section class="cli-section cli-section-strong">
         <div class="container">
           <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Quick start</h2>
+            <h2 class="section-title cli-section-title">Recommended flow</h2>
             <p class="section-subtitle cli-section-subtitle">
-              The shortest path from install to Studio preview. For the full CLI + your tools flow, open the docs page.
+              This is the default path most users should follow: install the CLI once, run setup, paste the starter prompt, and let the AI handle the rest.
             </p>
           </div>
 
@@ -281,9 +298,9 @@ async function copyCode(key: string, code: string) {
       <section id="workflow" class="cli-section cli-section-strong">
         <div class="container">
           <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">CLI + AI workflow</h2>
+            <h2 class="section-title cli-section-title">If you want more control</h2>
             <p class="section-subtitle cli-section-subtitle">
-              The easiest reliable path is to combine the CLI with the AI-readable project contract and your local IDE, then use Studio for preview and logs.
+              Most users can stop at the recommended flow above. Use these fallback references only when you want to drive the CLI more directly.
             </p>
           </div>
 
@@ -305,9 +322,33 @@ async function copyCode(key: string, code: string) {
       <section class="cli-section cli-section-strong">
         <div class="container">
           <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Backend app checklist</h2>
+            <h2 class="section-title cli-section-title">Starter prompt variants</h2>
             <p class="section-subtitle cli-section-subtitle">
-              Only needed for apps that include Python backend controllers. Frontend-only apps can skip this section.
+              Start with the generic prompt below. Use the more specific variants only when the app already exists, should stay frontend-only, or must use a framework.
+            </p>
+          </div>
+
+          <div class="workflow-grid">
+            <article v-for="(prompt, index) in starterPromptVariants" :key="prompt.title" class="workflow-card">
+              <div class="workflow-index">{{ index + 1 }}</div>
+              <h3>{{ prompt.title }}</h3>
+              <p>{{ prompt.description }}</p>
+              <button class="copy-chip workflow-copy" @click="copyCode(`starter-${index}`, prompt.code)">
+                <i :class="copiedKey === `starter-${index}` ? 'pi pi-check' : 'pi pi-copy'" />
+                {{ copiedKey === `starter-${index}` ? 'Copied' : 'Copy' }}
+              </button>
+              <pre class="workflow-code"><code>{{ prompt.code }}</code></pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="cli-section cli-section-strong">
+        <div class="container">
+          <div class="cli-section-head">
+            <h2 class="section-title cli-section-title">Only for backend apps</h2>
+            <p class="section-subtitle cli-section-subtitle">
+              Skip this entire section for frontend-only apps. Use it only when your app includes Python backend controllers.
             </p>
           </div>
 
@@ -331,7 +372,7 @@ async function copyCode(key: string, code: string) {
             <div class="cli-card-head">
               <span class="tag">Why CLI</span>
               <h2>What the CLI is for</h2>
-              <p class="cli-card-subtitle">Use it when you want local development, Git control, and a clean path to validate, deploy, preview in Studio, and redeploy.</p>
+              <p class="cli-card-subtitle">Use it when you want local development, Git control, and a reliable path from AI prompt to deploy.</p>
             </div>
 
             <article class="code-card">
@@ -344,6 +385,7 @@ async function copyCode(key: string, code: string) {
               <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
 - Keep the project in your repo
 - Start with automaton setup
+- Paste the starter prompt into your AI tool
 - Let the AI handle create or link, validation, and deploy by default
 - Use manual CLI commands only when you want the fallback flow
 - Preview and inspect logs in Automaton Studio
@@ -355,7 +397,7 @@ async function copyCode(key: string, code: string) {
             <div class="cli-card-head">
               <span class="tag">Next step</span>
               <h2>Where to go deeper</h2>
-              <p class="cli-card-subtitle">Keep this page high-level. Use the public docs for the full developer workflow, and the AI instructions only when your coding tool needs them.</p>
+              <p class="cli-card-subtitle">Keep this page simple. Use the public docs for the full workflow, and the AI instructions only when your coding tool needs them.</p>
             </div>
 
             <article class="code-card">

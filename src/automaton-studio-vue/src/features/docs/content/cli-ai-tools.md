@@ -59,16 +59,39 @@ After `automaton setup`, the AI should be able to handle most of the remaining w
 These files remain the canonical source of truth and the fallback reference set when local generated guidance is unavailable:
 
 - [llms.txt](https://automaton.monster/llms.txt)
+- [llms/automaton-cli-install.md](https://automaton.monster/llms/automaton-cli-install.md)
 - [llms/automaton-cli-deploy.md](https://automaton.monster/llms/automaton-cli-deploy.md)
 - [llms/automaton-apps-overview.md](https://automaton.monster/llms/automaton-apps-overview.md)
 - [llms/automaton-frontend-structure.md](https://automaton.monster/llms/automaton-frontend-structure.md)
 - [llms/automaton-backend-controllers.md](https://automaton.monster/llms/automaton-backend-controllers.md)
 - [llms/automaton-starter-prompts.md](https://automaton.monster/llms/automaton-starter-prompts.md)
 
-## Starter prompt
+## Official starter prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the remaining workflow yourself: create or link automaton.json in the project root, refresh local guidance with automaton sync-ai only if the generated files are missing or stale, run automaton validate, and for backend controllers pick an existing connected runner with automaton current-runner, automaton runners, and automaton set-runner <runner-id>, or tell the user to create or deploy one in Automaton Studio, then deploy. Only publish after explicit user confirmation.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+```
+
+## Prompt variants
+
+Use the generic prompt above by default. Use these only when the situation is more specific.
+
+### Existing app
+
+```text
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. I already have an Automaton app. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: link this folder to app id [app-id], scaffold or update the app locally, keep automaton.json correct in this folder, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
+```
+
+### Frontend-only app
+
+```text
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript unless I explicitly ask for a framework. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+```
+
+### React or Vue app
+
+```text
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, make sure build and deployDir are correct, run automaton validate, handle runner assignment only if backend controllers exist, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
 ```
 
 ## MCP recommendation
