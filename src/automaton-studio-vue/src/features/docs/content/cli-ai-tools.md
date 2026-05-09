@@ -38,11 +38,11 @@ For the full CLI reference — all commands, options, `automaton.json` fields, a
 ### AI-first flow
 
 1. Install the CLI once.
-2. Run `automaton setup` in the project or workspace.
+2. Run `automaton setup` in the app folder you want to create or manage.
 3. Open your preferred AI tool in the app folder.
 4. Ask it to build and deploy the app to Automaton Studio.
 
-After `automaton setup`, the AI should be able to handle most of the remaining work in the local project: scaffold or edit files, create or link the app, keep `automaton.json` correct, run validation, guide runner assignment for backend apps, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+Each app should have its own `automaton.json` and local guidance scaffold. After `automaton setup`, the AI should be able to handle most of the remaining work in the local project: scaffold or edit files, create or link the app, keep `automaton.json` correct, run validation, guide runner assignment for backend apps, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
 ### Manual fallback
 
@@ -69,7 +69,7 @@ These files remain the canonical source of truth and the fallback reference set 
 ## Official starter prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Choose the simplest suitable frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep `index.html`, CSS, and JS at the project root by default instead of creating `frontend/` unless I explicitly ask for a split source structure. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 ## Prompt variants
@@ -85,7 +85,7 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 ### Frontend-only app
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript unless I explicitly ask for a framework. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level frontend files unless I explicitly ask for a framework or split source structure. Do not default to `frontend/` for plain apps. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 ### React or Vue app

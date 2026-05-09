@@ -167,13 +167,17 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div>
                 <div class="step-title">Paste the starter prompt in your AI tool</div>
                 <div class="prompt-example">
-                  "Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval."
+                  "Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Choose the simplest suitable frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS, and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a split source structure. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval."
                 </div>
                 <p class="step-body">
                   This is the practical default for Codex, Copilot, Cursor, Claude Code, and similar tools.
                   The prompt already tells the AI to prefer local generated guidance after setup, use
                   <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a> only as fallback,
                   install the CLI if needed, and start with <code>automaton setup</code>.
+                </p>
+                <p class="step-body">
+                  Run <code>automaton setup</code> inside the app folder you want to create or manage.
+                  Each app should have its own <code>automaton.json</code> and local guidance scaffold.
                 </p>
                 <p class="step-body">
                   If you need a prompt for an existing app, a frontend-only build, or a React/Vue-specific flow,

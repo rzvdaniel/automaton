@@ -68,6 +68,6 @@ Common problems and how to fix them.
 
 **Causes and fixes:**
 
-- **Entry point mismatch** — The default frontend entry point is `frontend/index.html` for plain apps and `dist/index.html` for framework apps. Confirm your files are in the right place.
+- **Entry point mismatch** — For plain HTML/CSS/JS apps, prefer `index.html` at the project root. For build-based framework apps, the deployable entry point is usually `dist/index.html`. Confirm your files are in the right place and that `deployDir` matches the folder you intend to upload.
 - **Framework build not run** — For React or Vue apps, run `npm run build` before deploying, or set `"build": "npm run build"` in `automaton.json` so the CLI does it automatically.
 - **JavaScript error on load** — Open the browser console in the preview and look for errors.

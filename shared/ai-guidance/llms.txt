@@ -38,7 +38,7 @@ try {
 }
 ```
 
-For plain HTML/CSS/JS apps, prefer keeping `index.html`, CSS, and JS at the project root unless the user explicitly wants a separate frontend source folder.
+For plain HTML/CSS/JS apps, prefer keeping `index.html`, CSS, and JS at the project root unless the user explicitly wants a separate frontend source folder. Do not default plain apps to `frontend/`.
 
 If the app has a build step or deploys from a build output folder, add the missing fields instead of assuming root deploy:
 ```json
@@ -103,6 +103,7 @@ Prefer MCP only as a secondary enhancement when the tool supports it. MCP should
 Choose the simplest frontend stack that fits the requested app.
 
 - Default to plain HTML/CSS/JS for small or medium apps, single-page tools, lightweight dashboards, forms, calculators, planning apps, or when the user did not ask for a framework.
+- For plain HTML/CSS/JS apps, keep `index.html`, CSS, and JS at the project root by default. Only use `frontend/` when the user explicitly asked for a split source structure or there is a clear organizational reason.
 - Use Vite + vanilla HTML/CSS/JS when the app is still framework-free but benefits from modules, a dev server, build tooling, or clearer source organization.
 - Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs a component-heavy SPA structure, richer routing, or more complex reusable UI.
 - If multiple stacks are equally reasonable and the user gave no preference, ask one short question before scaffolding.

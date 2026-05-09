@@ -10,6 +10,7 @@ Use these rules:
 - Python backend code lives in `backend/`.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For plain HTML/CSS/JS apps, prefer root-level frontend files unless the user explicitly wants a separate `frontend/` source folder.
+- Do not default plain apps to `frontend/` just because it is a valid deploy directory.
 - Deploy with `automaton deploy`.
 - If the app has Python backend controllers, inspect the assignment with `automaton current-runner`, list available runners with `automaton runners`, assign an existing connected runner with `automaton set-runner <runner-id>`, or tell the user to create or deploy one in Automaton Studio, then deploy.
 - `automaton setup`, `automaton new`, and `automaton link` automatically sync a local AI guidance pack; use `automaton sync-ai` only when those generated files need a manual refresh.
