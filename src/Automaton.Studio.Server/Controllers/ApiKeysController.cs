@@ -73,10 +73,10 @@ public class ApiKeysController : BaseController
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> RevokeApiKey(Guid id)
+    public async Task<IActionResult> DeleteApiKey(Guid id)
     {
         var userId = userContextService.GetUserId();
-        var success = await apiKeyService.RevokeApiKeyAsync(id, userId);
+        var success = await apiKeyService.DeleteApiKeyAsync(id, userId);
 
         if (!success)
             return NotFound();

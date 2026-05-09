@@ -47,7 +47,7 @@ API keys are the **primary and only** authentication method for console runners.
 #### Step 1: Create an API Key
 
 1. Login to Automaton Studio Web Interface
-2. Go to **Settings → API Keys**
+2. Go to **API Keys**
 3. Click **Create API Key**
 4. Fill in the details:
    - **Name**: Descriptive name (e.g., "Production Runner")

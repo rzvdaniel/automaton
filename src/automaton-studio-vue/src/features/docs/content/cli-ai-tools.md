@@ -29,7 +29,7 @@ If `.NET 9` is already available, prefer the global tool because AI tools can us
 automaton setup
 ```
 
-Get an API key from **Settings → API Keys → New Key** (scope: `execute`).
+Get an API key from **API Keys → Generate New Key** (scope: `execute`).
 
 For the full CLI reference — all commands, options, `automaton.json` fields, and CI/CD usage — see the [Automaton CLI](/docs/automaton-cli) page.
 

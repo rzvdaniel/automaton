@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -10,6 +9,7 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import Dropdown from 'primevue/dropdown'
 import Message from 'primevue/message'
+import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { apiKeysService } from '../services/apikeys.service'
 import {
@@ -23,6 +23,7 @@ import {
 } from '../types/apikeys.types'
 
 const toast = useToast()
+const confirm = useConfirm()
 
 // State
 const loading = ref(true)
@@ -108,18 +109,14 @@ async function createApiKey() {
   }
 }
 
-// Revoke API key
-async function revokeApiKey(id: string, name: string) {
-  if (!confirm(`Are you sure you want to revoke the API key "${name}"? This action cannot be undone.`)) {
-    return
-  }
-
+// Permanently delete API key
+async function deleteApiKey(id: string) {
   try {
-    await apiKeysService.revoke(id)
+    await apiKeysService.delete(id)
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: 'API key revoked successfully',
+      detail: 'API key deleted successfully',
       life: 3000,
     })
     await loadApiKeys()
@@ -132,6 +129,20 @@ async function revokeApiKey(id: string, name: string) {
       life: 5000,
     })
   }
+}
+
+function confirmDeleteApiKey(id: string, name: string) {
+  confirm.require({
+    message: `Delete the API key "${name}" permanently? This cannot be undone.`,
+    header: 'Delete API Key',
+    icon: 'pi pi-exclamation-triangle',
+    rejectLabel: 'Cancel',
+    acceptLabel: 'Delete',
+    acceptClass: 'p-button-danger',
+    accept: () => {
+      void deleteApiKey(id)
+    },
+  })
 }
 
 // Copy to clipboard
@@ -168,87 +179,101 @@ onMounted(() => {
 </script>
 
 <template>
-  <Card>
-    <template #title>
-      <div class="flex align-items-center justify-content-between">
-        <span>API Keys</span>
-        <Button
-          label="Generate New Key"
-          icon="pi pi-plus"
-          size="small"
-          @click="openCreateDialog"
-        />
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">API Keys</h2>
+      <p class="page-subtitle">Create keys for runners, workflow execution, web apps, and external integrations.</p>
+    </div>
+    <Button
+      label="Generate New Key"
+      icon="pi pi-plus"
+      @click="openCreateDialog"
+    />
+  </div>
+
+  <div v-if="!loading && apiKeys.length === 0" class="api-keys-empty mb-4">
+    <i class="pi pi-key api-keys-empty-icon"></i>
+    <h3 class="mt-0 mb-2">No API keys created yet</h3>
+    <p class="text-color-secondary mt-0 mb-3">
+      API keys let runners, scripts, and published apps authenticate with Automaton.
+      Create a scoped key for the job instead of reusing one broad credential everywhere.
+    </p>
+    <div class="api-keys-scopes mb-4">
+      <span class="scope-chip">Runner</span>
+      <span class="scope-chip">Execute</span>
+      <span class="scope-chip">Web App</span>
+      <span class="scope-chip">Full Access</span>
+    </div>
+    <Button label="Generate Your First Key" icon="pi pi-plus" @click="openCreateDialog" />
+  </div>
+
+  <DataTable
+    v-else
+    :value="apiKeys"
+    :loading="loading"
+    data-key="id"
+    class="keys-table"
+    :paginator="apiKeys.length > 10"
+    :rows="10"
+  >
+    <template #empty>
+      <div class="text-center py-5">
+        <i class="pi pi-key text-4xl text-color-secondary mb-3"></i>
+        <p class="text-color-secondary">No API keys found. Create one to get started.</p>
       </div>
     </template>
-    <template #subtitle> Manage API keys for runners, webhooks, and integrations </template>
-    <template #content>
-      <DataTable
-        :value="apiKeys"
-        :loading="loading"
-        class="p-datatable-sm"
-        :paginator="apiKeys.length > 10"
-        :rows="10"
-      >
-        <template #empty>
-          <div class="text-center py-5">
-            <i class="pi pi-key text-4xl text-color-secondary mb-3"></i>
-            <p class="text-color-secondary">No API keys found. Create one to get started.</p>
-          </div>
-        </template>
 
-        <Column field="name" header="Name" :sortable="true"></Column>
+    <Column field="name" header="Name" :sortable="true" />
 
-        <Column field="keyPrefix" header="Key">
-          <template #body="{ data }">
-            <code class="surface-ground p-1 border-round">{{ data.keyPrefix }}</code>
-          </template>
-        </Column>
+    <Column field="keyPrefix" header="Key">
+      <template #body="{ data }">
+        <code class="monospace text-sm text-color-secondary">{{ data.keyPrefix }}</code>
+      </template>
+    </Column>
 
-        <Column field="scope" header="Scope" :sortable="true">
-          <template #body="{ data }">
-            <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
-          </template>
-        </Column>
+    <Column field="scope" header="Scope" :sortable="true">
+      <template #body="{ data }">
+        <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
+      </template>
+    </Column>
 
-        <Column field="createdAt" header="Created" :sortable="true">
-          <template #body="{ data }">
-            {{ formatDate(data.createdAt) }}
-          </template>
-        </Column>
+    <Column field="createdAt" header="Created" :sortable="true">
+      <template #body="{ data }">
+        <span class="text-sm text-color-secondary">{{ formatDate(data.createdAt) }}</span>
+      </template>
+    </Column>
 
-        <Column field="lastUsedAt" header="Last Used" :sortable="true">
-          <template #body="{ data }">
-            {{ formatDate(data.lastUsedAt) }}
-          </template>
-        </Column>
+    <Column field="lastUsedAt" header="Last Used" :sortable="true">
+      <template #body="{ data }">
+        <span class="text-sm text-color-secondary">{{ formatDate(data.lastUsedAt) }}</span>
+      </template>
+    </Column>
 
-        <Column field="isActive" header="Status" :sortable="true">
-          <template #body="{ data }">
-            <Tag
-              :value="data.isActive ? 'Active' : 'Revoked'"
-              :severity="data.isActive ? 'success' : 'danger'"
-            />
-          </template>
-        </Column>
+    <Column field="isActive" header="Status" :sortable="true">
+      <template #body="{ data }">
+        <Tag
+          :value="data.isActive ? 'Active' : 'Revoked'"
+          :severity="data.isActive ? 'success' : 'danger'"
+        />
+      </template>
+    </Column>
 
-        <Column header="Actions">
-          <template #body="{ data }">
-            <div class="flex gap-1">
-              <Button
-                v-if="data.isActive"
-                icon="pi pi-trash"
-                text
-                rounded
-                size="small"
-                severity="danger"
-                @click="revokeApiKey(data.id, data.name)"
-              />
-            </div>
-          </template>
-        </Column>
-      </DataTable>
-    </template>
-  </Card>
+    <Column header="" style="width: 100px; text-align: right">
+      <template #body="{ data }">
+        <div class="row-actions">
+          <Button
+            icon="pi pi-trash"
+            size="small"
+            severity="danger"
+            text
+            rounded
+            v-tooltip.top="'Delete'"
+            @click="confirmDeleteApiKey(data.id, data.name)"
+          />
+        </div>
+      </template>
+    </Column>
+  </DataTable>
 
   <!-- Create API Key Dialog -->
   <Dialog
@@ -354,7 +379,75 @@ onMounted(() => {
 </template>
 
 <style scoped>
-code {
-  font-size: 0.875rem;
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.page-subtitle {
+  color: var(--p-text-muted-color);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.keys-table {
+  width: 100%;
+}
+
+.monospace {
+  font-family: monospace;
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.api-keys-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--p-surface-300);
+  border-radius: 8px;
+}
+
+:global(.app-dark) .api-keys-empty {
+  border-color: var(--p-surface-600);
+}
+
+.api-keys-empty-icon {
+  font-size: 3rem;
+  color: var(--p-text-muted-color);
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.api-keys-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.scope-chip {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+  border: 1px solid var(--p-surface-200);
+}
+
+:global(.app-dark) .scope-chip {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
 }
 </style>

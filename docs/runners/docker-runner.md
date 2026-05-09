@@ -34,7 +34,7 @@ Optional: You can still run with `docker run` for ad-hoc testing, but Compose is
 ### Get an API Key
 
 1. Log in to [https://automaton.monster](https://automaton.monster)
-2. Go to **Settings > API Keys**
+2. Go to **API Keys**
 3. Click **Create API Key**
 4. Select scope: **Runner**
 5. Copy the generated key (starts with `ak_`)
@@ -55,7 +55,7 @@ For **local development** (connecting to a local Studio Server):
 
 1. Start Automaton Studio Server locally
 2. Open the Studio UI in your browser
-3. Go to **Settings > API Keys**
+3. Go to **API Keys**
 4. Click **Create API Key**
 5. Select scope: **Runner** (or **All** for development)
 6. Copy the generated key (starts with `ak_`)

@@ -20,8 +20,6 @@ import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service
 import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
 import { AppExecutionPolicy, AppVerificationStrategy } from '../types/settings.types'
-import ApiKeysSection from '../components/ApiKeysSection.vue'
-
 const {
   theme: themePreference,
   fontSize,
@@ -423,15 +421,6 @@ const passwordLoading = computed(() => passwordSaving.value)
                 class="w-full justify-content-start"
                 @click="activeSection = 'account'"
               />
-              <Button
-                label="API Keys"
-                icon="pi pi-key"
-                text
-                :class="{ 'surface-hover': activeSection === 'apikeys' }"
-                class="w-full justify-content-start"
-                @click="activeSection = 'apikeys'"
-              />
-
               <div class="text-color-secondary text-sm font-semibold mb-2 mt-4 px-3">Preferences</div>
               <Button
                 label="Appearance"
@@ -563,9 +552,6 @@ const passwordLoading = computed(() => passwordSaving.value)
             </div>
           </template>
         </Card>
-        <!-- API Keys Section -->
-        <ApiKeysSection v-if="activeSection === 'apikeys'" />
-
         <!-- Appearance Section -->
         <Card v-if="activeSection === 'appearance'">
           <template #title>Appearance</template>

@@ -6,7 +6,7 @@ This guide explains how to install and run the Automaton Runner container locall
 
 1. **Docker Desktop** installed and running
 2. **Automaton API Key** — Create one in your Automaton Studio:
-   - Go to **Settings > API Keys**
+   - Go to **API Keys**
    - Click **Create API Key**
    - Select scope: **Runner**
    - Copy the key (starts with `ak_`)
@@ -416,7 +416,7 @@ If you see `Connection refused` in logs:
 
 **Solutions:**
 1. Verify the API key is correct (starts with `ak_`)
-2. Check the key hasn't expired (in Studio > Settings > API Keys)
+2. Check the key hasn't expired (in Studio > API Keys)
 3. Ensure the key has **Runner** scope
 4. Try creating a new API key
 

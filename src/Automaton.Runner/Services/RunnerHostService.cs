@@ -217,7 +217,7 @@ public class RunnerHostService
                 WriteLine("🔧 Authentication required...");
                 WriteLine();
                 WriteLine("You need an API key to authenticate with the Automaton server.");
-                WriteLine("Get your API key from: Automaton Studio → Settings → API Keys");
+                WriteLine("Get your API key from: Automaton Studio → API Keys");
                 WriteLine();
 
                 Write("Enter your API key (starts with 'ak_'): ");
@@ -1055,7 +1055,7 @@ public class RunnerHostService
     /// </summary>
     private async Task<string?> PromptForNewApiKeyAsync()
     {
-        WriteLine("Get your API key from: Automaton Studio → Settings → API Keys");
+        WriteLine("Get your API key from: Automaton Studio → API Keys");
         WriteLine();
         Write("Enter your API key (starts with 'ak_'): ");
         var newApiKey = ReadLine();

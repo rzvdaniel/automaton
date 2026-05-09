@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
 const bottomNavItems: NavItem[] = [
   { label: 'Downloads', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
+  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true },
   { label: 'AI Keys', icon: 'pi pi-key', to: '/ai-keys' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
   { label: 'Documentation', icon: 'pi pi-book', to: '/docs' },

@@ -33,6 +33,8 @@ const pageTitle = computed(() => {
     runners: 'Runners',
     'projects-list': 'Projects',
     'project-settings': 'Project Settings',
+    apikeys: 'API Keys',
+    'ai-keys': 'AI Keys',
     settings: 'Settings',
     'admin-providers': 'Admin',
     'admin-models': 'Admin',

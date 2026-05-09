@@ -7,7 +7,6 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import ConfirmDialog from 'primevue/confirmdialog'
 import { getUserAiApiKeys, deleteAiApiKey } from '@/shared/services/ai/ai-providers-service'
 import type { AiApiKey } from '@/shared/types/ai.types'
 
@@ -73,8 +72,6 @@ function formatDate(dateStr: string) {
 
 <template>
   <div class="ai-keys-view">
-    <ConfirmDialog />
-
     <!-- Header -->
     <div class="page-header">
       <div>

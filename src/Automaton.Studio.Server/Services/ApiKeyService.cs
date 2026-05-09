@@ -128,12 +128,12 @@ public class ApiKeyService
             .ToListAsync();
     }
 
-    public async Task<bool> RevokeApiKeyAsync(Guid apiKeyId, Guid userId)
+    public async Task<bool> DeleteApiKeyAsync(Guid apiKeyId, Guid userId)
     {
-        // Check if user can delete (revoke) this API key
+        // Check if user can delete this API key
         if (!await authorizationService.CanDeleteApiKeyAsync(apiKeyId, userId))
         {
-            logger.LogWarning("User {UserId} attempted to revoke API key {ApiKeyId} without permission", userId, apiKeyId);
+            logger.LogWarning("User {UserId} attempted to delete API key {ApiKeyId} without permission", userId, apiKeyId);
             return false;
         }
 
@@ -143,10 +143,10 @@ public class ApiKeyService
         if (apiKey == null)
             return false;
 
-        apiKey.IsActive = false;
+        dbContext.ApiKeys.Remove(apiKey);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("API key revoked: {KeyPrefix} for user {UserId}", apiKey.KeyPrefix, userId);
+        logger.LogInformation("API key deleted: {KeyPrefix} for user {UserId}", apiKey.KeyPrefix, userId);
         return true;
     }
 

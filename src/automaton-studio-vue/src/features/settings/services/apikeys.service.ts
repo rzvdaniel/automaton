@@ -30,10 +30,10 @@ class ApiKeysService {
   }
 
   /**
-   * Revoke (delete) an API key
+   * Permanently delete an API key
    * DELETE /api/apikeys/{id}
    */
-  async revoke(id: string): Promise<void> {
+  async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/apikeys/${id}`)
   }
 }

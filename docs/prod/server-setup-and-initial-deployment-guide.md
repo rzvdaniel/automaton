@@ -450,7 +450,7 @@ the same server as the stack or on a completely different machine.
 
 1. Open https://studio.automaton.monster in your browser
 2. Register the first admin account
-3. Go to **Settings → API Keys**
+3. Go to **API Keys**
 4. Create a new key with the **Runner** scope
 5. Copy the key (it starts with `ak_runner_...`)
 

@@ -362,7 +362,7 @@ automaton status</pre></div>
               <div>
                 <div class="step-title">Get an API key</div>
                 <p class="step-body">
-                  In the Studio: <strong>Settings → API Keys → New Key</strong>, scope: <code>execute</code>.
+                  In the Studio: <strong>API Keys → Generate New Key</strong>, scope: <code>execute</code>.
                   You'll get a key like <code>ak_execute_xxx</code>.
                 </p>
               </div>

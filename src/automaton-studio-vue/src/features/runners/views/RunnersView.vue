@@ -238,7 +238,7 @@ watch(
             </div>
             <p class="text-color-secondary text-sm mt-2 mb-0">
               Get a runner API key from
-              <router-link to="/apikeys" class="runner-link">Settings → API Keys</router-link>
+              <router-link to="/apikeys" class="runner-link">API Keys</router-link>
               (scope: <em>runner</em>). See
               <a
                 href="https://automaton.monster/docs"
@@ -423,7 +423,7 @@ watch(
             <div class="config-table">
               <div class="config-row">
                 <code class="config-key">AUTOMATON_API_KEY</code>
-                <span class="config-desc">Required. Get this from Settings &gt; API Keys</span>
+                <span class="config-desc">Required. Get this from API Keys</span>
               </div>
               <div class="config-row">
                 <code class="config-key">AUTOMATON_RUNNER_NAME</code>

@@ -27,7 +27,7 @@ This is the recommended production deployment method.
 ### 1. Prerequisites
 
 - Linux server with Docker Engine 24+ and Docker Compose v2 (`docker compose`)
-- An API key from your Automaton server: Settings → API Keys → Create (scope: `runner`)
+- An API key from your Automaton server: API Keys → Generate New Key (scope: `runner`)
 - The URL of your Automaton server (e.g., `https://api.automaton.monster`)
 
 ### 2. Create the working directory

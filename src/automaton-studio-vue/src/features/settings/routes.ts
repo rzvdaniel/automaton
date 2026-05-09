@@ -7,6 +7,11 @@ export const settingsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/SettingsView.vue'),
   },
   {
+    path: '/apikeys',
+    name: 'apikeys',
+    component: () => import('./views/ApiKeysView.vue'),
+  },
+  {
     path: '/ai-keys',
     name: 'ai-keys',
     component: () => import('./views/AiKeysView.vue'),

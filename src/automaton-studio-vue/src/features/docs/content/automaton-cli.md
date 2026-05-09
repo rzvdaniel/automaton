@@ -46,7 +46,7 @@ Prepare the current machine or workspace:
 automaton setup
 ```
 
-Get an API key from **Settings → API Keys → New Key** (scope: `execute`).
+Get an API key from **API Keys → Generate New Key** (scope: `execute`).
 
 Manual configuration is still available when you need it:
 ```bash
