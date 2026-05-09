@@ -431,21 +431,26 @@ automaton status</pre></div>
             The public docs stay high-level. If you want the exact app structure, backend contract,
             starter prompts, and framework-specific guidance, use the AI-readable instruction files.
           </p>
+
+          <div class="tip-box">
+            <i class="pi pi-info-circle" />
+            <span>
               <strong>Using Cursor or VS Code?</strong> The default flow is still simple: run <code>automaton setup</code>,
               then let the AI handle the project workflow. Local generated guidance should usually be enough after setup.
               Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               only as the canonical fallback when the tool does not honor local guidance files yet. If you want to drive the CLI manually,
-              use the command reference and manual workflow guidance instead. For the full list of CLI commands, JSON output examples, and backend-runner flow, see the
-                <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
-                <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
-              </ul>
-            </div>
+              use the command reference and manual workflow guidance instead.
+            </span>
           </div>
 
           <div class="tool-sections">
             <div class="tool-section">
               <ul class="link-list">
+                <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">AI instructions</a></li>
+                <li><a :href="publicAppConfig.cliInstallGuideUrl" target="_blank" rel="noopener" class="docs-link">CLI install and setup guide</a></li>
+                <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">CLI workflow guide for coding tools</a></li>
                 <li><a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a></li>
+                <li><a :href="publicAppConfig.cliInstallGuideUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-cli-install.md</a></li>
                 <li><a :href="publicAppConfig.cliWorkflowGuideUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-cli-deploy.md</a></li>
                 <li><a :href="publicAppConfig.appsOverviewUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-apps-overview.md</a></li>
                 <li><a :href="publicAppConfig.frontendStructureUrl" target="_blank" rel="noopener" class="docs-link">llms/automaton-frontend-structure.md</a></li>

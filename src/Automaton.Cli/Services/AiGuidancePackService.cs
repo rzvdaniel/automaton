@@ -14,6 +14,7 @@ public sealed class AiGuidancePackService
     private static readonly IReadOnlyDictionary<string, string> ResourceMap = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["llms.txt"] = "llms.txt",
+        ["llms.automaton-cli-install.md"] = "llms/automaton-cli-install.md",
         ["llms.automaton-apps-overview.md"] = "llms/automaton-apps-overview.md",
         ["llms.automaton-backend-controllers.md"] = "llms/automaton-backend-controllers.md",
         ["llms.automaton-cli-deploy.md"] = "llms/automaton-cli-deploy.md",
@@ -260,11 +261,12 @@ Mode: `{{mode}}`
 1. `.automaton/agents/instructions.md`
 2. `.automaton/agents/skills/automaton-app/SKILL.md`
 3. `.automaton/ai-guidance/llms.txt`
-4. `.automaton/ai-guidance/llms/automaton-cli-deploy.md`
-5. `.automaton/ai-guidance/llms/automaton-apps-overview.md`
-6. `.automaton/ai-guidance/llms/automaton-frontend-structure.md`
-7. `.automaton/ai-guidance/llms/automaton-backend-controllers.md`
-8. `.automaton/ai-guidance/llms/automaton-starter-prompts.md`
+4. `.automaton/ai-guidance/llms/automaton-cli-install.md`
+5. `.automaton/ai-guidance/llms/automaton-cli-deploy.md`
+6. `.automaton/ai-guidance/llms/automaton-apps-overview.md`
+7. `.automaton/ai-guidance/llms/automaton-frontend-structure.md`
+8. `.automaton/ai-guidance/llms/automaton-backend-controllers.md`
+9. `.automaton/ai-guidance/llms/automaton-starter-prompts.md`
 
 ## Operating Rules
 

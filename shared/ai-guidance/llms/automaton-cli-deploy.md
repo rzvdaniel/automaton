@@ -8,38 +8,11 @@ Keep the project local, commit it to Git, and deploy the app to Automaton with t
 
 For now, treat Automaton Studio as the official preview and debugging environment after each deploy.
 
-## Required setup
+## Prerequisites
 
-1. Install the Automaton CLI.
-2. Prepare the current machine or workspace.
-
-Preferred:
-
-```bash
-automaton setup
-```
-
-For testing, account switching, or a clean auth reset:
-
-```bash
-automaton logout
-automaton logout --global
-automaton logout --all
-```
-
-Then run:
-
-```bash
-automaton setup
-```
-
-Fallback when the user wants explicit API key configuration:
-
-```bash
-automaton config --key ak_execute_xxx
-```
-
-That command now saves project-local CLI settings in `./.automaton/config.json` by default. Use `automaton config --global ...` only when you intentionally want shared machine-wide settings.
+1. The Automaton CLI is installed.
+2. The current machine or workspace has already been prepared with `automaton setup`.
+3. If install or first-time setup is still needed, read `automaton-cli-install.md` first.
 
 3. The AI should create `automaton.json` in the project root automatically when it follows the local generated guidance after setup, or `llms.txt` as the fallback source of truth.
 

@@ -69,7 +69,7 @@ When the AI is asked to build an Automaton app from scratch in a local project, 
 
 Follow this order:
 
-1. Ensure the Automaton CLI is installed.
+1. Ensure the Automaton CLI is installed. If not, read `/llms/automaton-cli-install.md`.
 2. Run `automaton setup`.
 3. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all`, then run `automaton setup` again.
 4. Check whether `automaton.json` exists in the project root.
@@ -114,6 +114,7 @@ Choose the simplest frontend stack that fits the requested app.
 ## Linked files (read these for full structure and examples)
 
 Read these files in order for complete guidance:
+- /llms/automaton-cli-install.md
 - /llms/automaton-cli-deploy.md
 - /llms/automaton-apps-overview.md
 - /llms/automaton-frontend-structure.md
