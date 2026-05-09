@@ -151,6 +151,37 @@ public class DeployServiceTests
         AssertCheck(result, DeployCheckNames.BackendDeploy, true, "no backend controllers found");
     }
 
+    [Test]
+    public async Task DeployAsync_WhenUploadDisposesStream_StillReturnsSuccessShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com"
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteIndexHtml(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            async (_, _, _, zip, _, _) =>
+            {
+                await zip.DisposeAsync();
+                return new DeployUploadResult(2, 0, 0);
+            },
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.Uploaded?.Written, Is.EqualTo(2));
+        AssertCheck(result, DeployCheckNames.Upload, true, "uploaded 2 file(s)");
+    }
+
     private static void AssertCheck(DeployResult result, string name, bool expectedSuccess, string expectedMessageFragment)
     {
         var check = result.Checks.Single(c => c.Name == name);

@@ -281,6 +281,7 @@ public sealed class DeployService
         bool clean,
         CancellationToken cancellationToken)
     {
+        var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
         var uploadResult = await client.UploadZipAsync(appId, zip, clean, cancellationToken);
         var written = uploadResult.TryGetProperty("written", out var writtenProperty)
@@ -290,7 +291,7 @@ public sealed class DeployService
             ? skippedProperty.GetArrayLength()
             : 0;
 
-        return new DeployUploadResult(written, skipped, zip.Length / 1_048_576.0);
+        return new DeployUploadResult(written, skipped, sizeMb);
     }
 
     private static async Task<DeployBackendResult> DeployBackendAsync(
