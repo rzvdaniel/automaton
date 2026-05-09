@@ -28,7 +28,7 @@ const downloadCards = [
 const installModes = [
   {
     title: 'Recommended: .NET global tool',
-    description: 'Best fit when you already have .NET installed and want automatic updates through NuGet.',
+    description: 'Best fit when you already have .NET 9 installed and want the easiest install/update path for both humans and AI tools.',
     code: 'dotnet tool install -g Automaton.Cli',
   },
 ]

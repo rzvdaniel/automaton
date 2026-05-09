@@ -21,6 +21,8 @@ irm https://api.automaton.monster/downloads/install.ps1 | iex
 dotnet tool install -g Automaton.Cli
 ```
 
+If `.NET 9` is already available, prefer the global tool because AI tools can usually install, update, and verify it more easily. If `.NET 9` is not available, use the platform installer script or portable download instead.
+
 ### 2. Prepare the current machine or workspace
 
 ```bash

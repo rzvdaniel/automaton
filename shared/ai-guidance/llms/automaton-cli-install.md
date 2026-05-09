@@ -8,7 +8,7 @@ Make sure the `automaton` command is available, authenticated, and ready for loc
 
 ## Install
 
-Preferred managed install:
+Preferred managed install when .NET 9 is available:
 
 ```bash
 dotnet tool install -g Automaton.Cli
@@ -20,7 +20,17 @@ Verify the install:
 automaton --version
 ```
 
-If the user prefers platform-specific installers or portable binaries, use the official Automaton CLI docs or downloads page instead of inventing a custom install path.
+If `.NET 9` is already available, prefer the global tool because it is the easiest path for AI tools to install, update, and verify with `automaton --version`.
+
+If `.NET 9` is not available or the environment cannot use global tools, use the official portable downloads or install scripts instead of inventing a custom install path.
+
+Install decision rule:
+
+1. Check whether `automaton` is already available.
+2. If not, check whether `dotnet` is available.
+3. If `dotnet` is available, prefer `dotnet tool install -g Automaton.Cli`.
+4. If `dotnet` is not available, use the official platform download or installer script.
+5. Always verify with `automaton --version` before proceeding.
 
 ## First-time setup
 

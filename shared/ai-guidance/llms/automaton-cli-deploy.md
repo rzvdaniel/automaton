@@ -98,6 +98,8 @@ Use it to catch obvious problems early, such as:
 - backend controllers that require a runner when none is assigned
 - other structural issues that should fail before deploy starts
 
+If `automaton validate` passes but `automaton deploy` fails during upload with transport-style errors such as closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, do not assume the app structure is wrong. Treat that as a likely CLI or server upload-path problem first, unless the error message clearly points to an invalid deploy directory or archive shape.
+
 ## What the AI should do
 
 - Build the app in the current local project folder.
@@ -113,6 +115,7 @@ Use it to catch obvious problems early, such as:
 - Prefer `automaton status` and `automaton validate` as preflight checks before declaring success.
 - After deploy, use Automaton Studio preview and logs as the current test/debug loop before proposing publish.
 - Ask before public publish, then use `automaton publish --yes` after approval.
+- If upload fails after validation already passed, avoid repeatedly restructuring a plain app unless there is clear evidence that `deployDir`, the archive shape, or duplicate deploy roots are the actual problem.
 
 ## Deploy commands
 

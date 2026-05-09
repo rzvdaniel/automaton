@@ -24,7 +24,7 @@ curl -fsSL https://api.automaton.monster/downloads/install.sh | bash
 irm https://api.automaton.monster/downloads/install.ps1 | iex
 ```
 
-**Via .NET global tool (all platforms):**
+**Via .NET global tool (all platforms, preferred when .NET 9 is available):**
 ```bash
 dotnet tool install -g Automaton.Cli
 ```
@@ -33,6 +33,8 @@ Verify the install:
 ```bash
 automaton --version
 ```
+
+If `.NET 9` is not available or global tools are not practical in this environment, use the platform installer script or the portable downloads instead.
 
 ---
 
@@ -83,7 +85,7 @@ For framework apps (React, Vue, Angular) that need a build step:
 | `appId` | ✅ | App ID from Automaton Studio |
 | `name` | ✅ | Display name |
 | `build` | Optional | Shell command to run before upload (e.g. `npm run build`) |
-| `deployDir` | Optional | Directory to upload as frontend (default: tries `dist/`, `frontend/`, then root) |
+| `deployDir` | Optional | Directory to upload as frontend (default resolution checks `dist/`, then root, then `frontend/` as a compatibility fallback; for plain HTML/CSS/JS apps prefer root-level files unless you explicitly want split structure) |
 
 ---
 
@@ -192,9 +194,11 @@ automaton deploy --dir dist        # override the upload directory
 
 What happens:
 1. Runs the `build` command from `automaton.json` if set
-2. Zips the `deployDir` (or the default resolution order: `dist/` → `frontend/` → root)
+2. Zips the `deployDir` (or the default resolution order: `dist/` → root → `frontend/` compatibility fallback)
 3. Uploads the zip to the server (merge by default, full replace with `--clean`)
 4. Deploys backend Python controllers to the runner (unless `--skip-backend`)
+
+If `automaton validate` already passes but deploy fails during upload with transport-style errors like closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, treat that as a likely CLI or server upload-path issue first instead of immediately restructuring the app.
 
 ---
 

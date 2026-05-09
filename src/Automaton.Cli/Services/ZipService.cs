@@ -5,7 +5,7 @@ namespace Automaton.Cli.Services;
 
 /// <summary>
 /// Creates a zip stream from a local directory, respecting an optional deploy directory
-/// (dist/ → frontend/ → project root fallback).
+/// (dist/ → project root → frontend/ compatibility fallback).
 /// Files inside .git/, node_modules/, and obj/ are excluded.
 /// automaton.json is excluded from the upload (it's local-only).
 /// </summary>
@@ -16,18 +16,21 @@ public static class ZipService
     public static readonly string[] DefaultIgnorePatterns =
     {
         ".automaton/",
+        ".github/",
         ".git/",
         "node_modules/",
         "obj/",
         "bin/",
         ".vs/",
         ".idea/",
+        "AGENTS.md",
+        "CLAUDE.md",
         "automaton.json",
         ".automatonignore"
     };
 
     /// <summary>
-    /// Resolves which directory to zip: explicit deployDir → dist → frontend → projectRoot.
+    /// Resolves which directory to zip: explicit deployDir → dist → projectRoot → frontend compatibility fallback.
     /// </summary>
     public static string ResolveDeployDirectory(string projectRoot, string? deployDir)
     {
@@ -40,10 +43,14 @@ public static class ZipService
         }
 
         // Auto-detect
-        var dist     = Path.Combine(projectRoot, "dist");
+        var dist = Path.Combine(projectRoot, "dist");
         var frontend = Path.Combine(projectRoot, "frontend");
 
-        if (Directory.Exists(dist))     return dist;
+        if (Directory.Exists(dist)) return dist;
+
+        var rootIndex = Path.Combine(projectRoot, "index.html");
+        if (File.Exists(rootIndex)) return projectRoot;
+
         if (Directory.Exists(frontend)) return frontend;
         return projectRoot;
     }

@@ -19,7 +19,7 @@ public class AutomatonConfig
     public string? Build { get; set; }
 
     /// <summary>
-    /// Directory to upload as the frontend (default: tries dist/, then frontend/, then root).
+    /// Directory to upload as the frontend (default: tries dist/, then root, then frontend/ as a compatibility fallback).
     /// </summary>
     public string? DeployDir { get; set; }
 }

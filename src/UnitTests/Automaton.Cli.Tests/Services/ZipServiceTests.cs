@@ -77,9 +77,14 @@ public class ZipServiceTests
         // Arrange
         var projectRoot = CreateTempDirectory();
         File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(projectRoot, "AGENTS.md"), "agent guidance");
+        File.WriteAllText(Path.Combine(projectRoot, "CLAUDE.md"), "claude guidance");
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
         Directory.CreateDirectory(Path.Combine(projectRoot, ".automaton"));
         File.WriteAllText(Path.Combine(projectRoot, ".automaton", "config.json"), "{}");
+        Directory.CreateDirectory(Path.Combine(projectRoot, ".github", "skills", "automaton-app"));
+        File.WriteAllText(Path.Combine(projectRoot, ".github", "copilot-instructions.md"), "copilot");
+        File.WriteAllText(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md"), "skill");
 
         Directory.CreateDirectory(Path.Combine(projectRoot, "node_modules", "pkg"));
         File.WriteAllText(Path.Combine(projectRoot, "node_modules", "pkg", "index.js"), "console.log('ignored');");
@@ -92,6 +97,10 @@ public class ZipServiceTests
         // Assert
         Assert.That(entries, Does.Contain("index.html"));
         Assert.That(entries, Does.Not.Contain(".automaton/config.json"));
+        Assert.That(entries, Does.Not.Contain(".github/copilot-instructions.md"));
+        Assert.That(entries, Does.Not.Contain(".github/skills/automaton-app/SKILL.md"));
+        Assert.That(entries, Does.Not.Contain("AGENTS.md"));
+        Assert.That(entries, Does.Not.Contain("CLAUDE.md"));
         Assert.That(entries, Does.Not.Contain("automaton.json"));
         Assert.That(entries, Does.Not.Contain("node_modules/pkg/index.js"));
     }
@@ -134,6 +143,44 @@ public class ZipServiceTests
 
         // Assert
         Assert.That(ex!.Message, Does.Contain("does not support negation patterns yet"));
+    }
+
+    [Test]
+    public void ResolveDeployDirectory_WhenDistExists_PrefersDist()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "dist"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
+        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html>root</html>");
+
+        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+
+        Assert.That(resolved, Is.EqualTo(Path.Combine(projectRoot, "dist")));
+    }
+
+    [Test]
+    public void ResolveDeployDirectory_WhenRootAndFrontendExist_PrefersRoot()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
+        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html>root</html>");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "index.html"), "<html>frontend</html>");
+
+        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+
+        Assert.That(resolved, Is.EqualTo(projectRoot));
+    }
+
+    [Test]
+    public void ResolveDeployDirectory_WhenOnlyFrontendExists_UsesFrontendAsCompatibilityFallback()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "index.html"), "<html>frontend</html>");
+
+        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+
+        Assert.That(resolved, Is.EqualTo(Path.Combine(projectRoot, "frontend")));
     }
 
     private string CreateTempDirectory()
