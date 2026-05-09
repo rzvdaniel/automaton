@@ -1,6 +1,6 @@
 #!/bin/bash
 # Rebuild and redeploy the production application stack.
-# Pass --with-cli-assets when src/Automaton.Cli changed and the website should serve new CLI downloads.
+# Pass --with-cli-assets when src/Automaton.Cli or shared/ai-guidance changed and the website should serve new CLI downloads.
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
 Usage: ./scripts/prod-redeploy-all.sh [--with-cli-assets]
 
 Options:
-  --with-cli-assets   Rebuild the downloadable CLI bundles before rebuilding the website.
+  --with-cli-assets   Rebuild the downloadable CLI bundles before rebuilding the website. Use this when src/Automaton.Cli or shared/ai-guidance changed.
 EOF
             exit 0
             ;;

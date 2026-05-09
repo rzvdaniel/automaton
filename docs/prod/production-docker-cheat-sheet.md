@@ -83,7 +83,7 @@ docker compose -f docker-compose.prod.yml up -d traefik mysql socket-proxy
 
 ## Website CLI Downloads
 
-Rebuild the downloadable CLI bundles only when `src/Automaton.Cli` changed:
+Rebuild the downloadable CLI bundles when `src/Automaton.Cli` or `shared/ai-guidance` changed:
 
 ```bash
 cd /opt/automaton
@@ -96,6 +96,12 @@ Then rebuild the website so it bakes those files into `public/cli`:
 cd /opt/automaton
 docker compose -f docker-compose.prod.yml up -d --build website
 ```
+
+Rule of thumb:
+
+- CLI code changed: rebuild `website-cli-assets`
+- Shared AI guidance changed: rebuild `website-cli-assets`
+- Website UI or docs changed without CLI asset changes: rebuild `website` only
 
 ## Helper Scripts
 
