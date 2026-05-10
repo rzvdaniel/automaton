@@ -253,7 +253,8 @@ EOF
 **4. Restart the API to pick up the new keys:**
 
 ```bash
-docker compose -f docker-compose.prod.yml restart api
+docker compose -f docker-compose.prod.yml restart api-blue
+docker compose -f docker-compose.prod.yml restart api-green
 ```
 
 ---
@@ -402,14 +403,16 @@ ufw status
 ```bash
 cd /opt/automaton
 
-docker compose -f docker-compose.prod.yml up -d --build mysql api studio website traefik
+chmod +x ./scripts/prod-*.sh
+./scripts/prod-redeploy-all.sh
 ```
 
 This will:
-1. Build Docker images for the API, Studio, and Website from source
-2. Pull the Traefik and MySQL images
-3. Start all containers
-4. Traefik will automatically request TLS certificates from Let's Encrypt
+1. Generate the Traefik blue/green routing files under `docker/traefik/dynamic/`
+2. Start MySQL, socket-proxy, and Traefik
+3. Build and start the first live color for API, Studio, and Website
+4. Point Traefik at that live color
+5. Let Traefik automatically request TLS certificates from Let's Encrypt
 
 Watch the logs to confirm everything started correctly:
 
@@ -534,19 +537,23 @@ Now that the stack is verified working and Let's Encrypt certificates are issued
 docker compose -f docker-compose.prod.yml ps
 
 # View logs for a specific service
-docker compose -f docker-compose.prod.yml logs -f api
+docker compose -f docker-compose.prod.yml logs -f api-blue
+docker compose -f docker-compose.prod.yml logs -f api-green
 docker compose -f docker-compose.prod.yml logs -f runner
 
 # Restart a specific service
-docker compose -f docker-compose.prod.yml restart api
+docker compose -f docker-compose.prod.yml restart api-blue
 
-# Pull latest code and rebuild
+# Pull latest code and redeploy the public stack with blue/green cutovers
 cd /opt/automaton
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+./scripts/prod-redeploy-all.sh
 
-# Safer deploys for public services (keeps a second healthy replica available)
-docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+# Same, but also rebuild CLI download assets for the website
+./scripts/prod-redeploy-all.sh --with-cli-assets
+
+# See which color is currently live
+./scripts/prod-switch-blue-green.sh status
 
 # Stop everything
 docker compose -f docker-compose.prod.yml down
@@ -555,7 +562,7 @@ docker compose -f docker-compose.prod.yml down
 docker compose -f docker-compose.prod.yml down -v
 ```
 
-### Safer deploys for API, Studio, and Website
+### Blue/Green deploys for API, Studio, and Website
 
 If you deploy a single service like this:
 
@@ -567,27 +574,39 @@ Compose replaces the only running container for that service. During that gap, T
 
 That risk applies to `website`, `studio`, and `api`.
 
-Use replica-based deploys instead:
+This guide now uses blue/green services instead:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build --scale website=2 website
-docker compose -f docker-compose.prod.yml up -d --build --scale studio=2 studio
-docker compose -f docker-compose.prod.yml up -d --build --scale api=2 api
+./scripts/prod-redeploy-website.sh
+./scripts/prod-redeploy-studio.sh
+./scripts/prod-redeploy-api.sh
 ```
 
-Or rebuild all three public services together:
+Or redeploy all three together:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+./scripts/prod-redeploy-all.sh
 ```
 
 Why this works better:
 
-- `api`, `studio`, and `website` no longer use fixed `container_name` values, so Compose can run more than one replica
-- all three services now have health checks
-- Traefik can keep routing to a healthy replica while another one is starting
+- each public service now has two dedicated Compose services: `*-blue` and `*-green`
+- the deploy scripts build the inactive color, wait for health checks to pass, and only then switch Traefik to the new color
+- the live color is controlled by a generated Traefik file-provider config instead of by recreating the currently live service
 
-If Cloudflare still shows a stale timeout/error page after the origin is healthy again, temporarily switching the affected DNS record from **Proxied** to **DNS only** and then back to **Proxied** forces Cloudflare to re-establish the origin path.
+If you want the previous color to stay up for rollback, add `--keep-previous`:
+
+```bash
+./scripts/prod-redeploy-all.sh --keep-previous
+```
+
+You can also inspect or manually switch the live color:
+
+```bash
+./scripts/prod-switch-blue-green.sh status
+./scripts/prod-switch-blue-green.sh website green
+./scripts/prod-switch-blue-green.sh all blue
+```
 
 ---
 
@@ -602,7 +621,7 @@ If Cloudflare still shows a stale timeout/error page after the origin is healthy
 
 ### API container exits immediately
 
-- Check logs: `docker compose -f docker-compose.prod.yml logs api`
+- Check logs: `docker compose -f docker-compose.prod.yml logs api-blue` and `docker compose -f docker-compose.prod.yml logs api-green`
 - Most common cause: `appsettings.Production.json` is missing or has invalid JSON
 - Verify the file exists: `ls -la /opt/automaton/config/`
 - Validate JSON: `python3 -m json.tool /opt/automaton/config/appsettings.Production.json`

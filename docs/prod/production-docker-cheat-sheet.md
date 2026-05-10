@@ -2,29 +2,44 @@
 
 Use these commands from the production server after pulling the latest code into `/opt/automaton`.
 
+## Blue/Green Basics
+
+Traefik now serves `api`, `studio`, and `website` through a generated file-provider config:
+
+- state file: `docker/traefik/dynamic/blue-green-state.env`
+- routes file: `docker/traefik/dynamic/blue-green-routes.yml`
+
+Each public service has two Compose services:
+
+- `api-blue` / `api-green`
+- `studio-blue` / `studio-green`
+- `website-blue` / `website-green`
+
+The deploy scripts build the inactive color, wait for health checks to pass, switch Traefik to that color, and then stop the old color unless you pass `--keep-previous`.
+
 ## Full Stack
 
-Build and redeploy everything:
+Normal redeploy:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale studio=2 --scale website=2 api studio website
+git pull
+./scripts/prod-redeploy-all.sh
 ```
 
-`--scale api=2 --scale studio=2 --scale website=2` means Docker Compose keeps 2 containers running for each public service. That reduces downtime during redeploys because Traefik can keep sending traffic to one healthy container while the other is being replaced.
-
-Stop everything:
+Normal redeploy when website CLI downloads changed too:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml down
+git pull
+./scripts/prod-redeploy-all.sh --with-cli-assets
 ```
 
-Show running services:
+Keep the previous color running for rollback:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml ps
+./scripts/prod-redeploy-all.sh --keep-previous
 ```
 
 ## Single Service Redeploy
@@ -33,56 +48,93 @@ API:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d --build --scale api=2 api
+./scripts/prod-redeploy-api.sh
 ```
 
 Studio:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d --build --scale studio=2 studio
+./scripts/prod-redeploy-studio.sh
 ```
 
 Website:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d --build --scale website=2 website
+./scripts/prod-redeploy-website.sh
 ```
 
-The `--scale ...=2` part is intentional. It keeps two replicas of that service running so Cloudflare and Traefik are less likely to see a brief “no backend available” gap during deploy.
+Website with refreshed CLI downloads:
+
+```bash
+cd /opt/automaton
+./scripts/prod-redeploy-website.sh --with-cli-assets
+```
+
+Force a specific target color:
+
+```bash
+cd /opt/automaton
+./scripts/prod-redeploy-api.sh --color green
+./scripts/prod-redeploy-studio.sh --color blue
+./scripts/prod-redeploy-website.sh --color green
+```
+
+## Route Switching
+
+Show which color is live:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh status
+```
+
+Manually switch one hostname:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh api green
+./scripts/prod-switch-blue-green.sh studio blue
+./scripts/prod-switch-blue-green.sh website green
+```
+
+Switch all three hostnames to the same color:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh all blue
+```
+
+## First-Time Bootstrap
+
+On a fresh server:
+
+```bash
+cd /opt/automaton
+cp .env.prod.example .env
+# edit .env and /opt/automaton/config/appsettings.Production.json
+chmod +x ./scripts/prod-*.sh
+./scripts/prod-redeploy-all.sh
+```
+
+`prod-redeploy-all.sh` bootstraps the generated Traefik routes file, starts `mysql`, `socket-proxy`, and `traefik`, then deploys the first live color for API, Studio, and website.
 
 ## Infrastructure Services
 
-These services do not build from local source in this repo. Redeploy them with `up -d`.
-
-Traefik:
+These services do not rebuild from local source in this repo:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d traefik
+docker compose -f docker-compose.prod.yml up -d mysql socket-proxy traefik
 ```
 
-MySQL:
+Pull newer upstream images first if needed:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d mysql
-```
-
-Socket proxy:
-
-```bash
-cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d socket-proxy
-```
-
-If you want newer upstream image versions for those services, pull first and then recreate:
-
-```bash
-cd /opt/automaton
-docker compose -f docker-compose.prod.yml pull traefik mysql socket-proxy
-docker compose -f docker-compose.prod.yml up -d traefik mysql socket-proxy
+docker compose -f docker-compose.prod.yml pull mysql socket-proxy traefik
+docker compose -f docker-compose.prod.yml up -d mysql socket-proxy traefik
 ```
 
 ## Website CLI Downloads
@@ -94,47 +146,40 @@ cd /opt/automaton
 docker compose -f docker-compose.prod.yml --profile build-assets build website-cli-assets
 ```
 
-Then rebuild the website so it bakes those files into `public/cli`:
+Then redeploy the website:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d --build --scale website=2 website
+./scripts/prod-redeploy-website.sh --with-cli-assets
 ```
 
 Rule of thumb:
 
 - CLI code changed: rebuild `website-cli-assets`
 - Shared AI guidance changed: rebuild `website-cli-assets`
-- Website UI or docs changed without CLI asset changes: rebuild `website` only
-
-## Helper Scripts
-
-These wrappers are available in `scripts/`:
-
-```bash
-cd /opt/automaton
-./scripts/prod-redeploy-api.sh
-./scripts/prod-redeploy-studio.sh
-./scripts/prod-redeploy-website.sh
-./scripts/prod-redeploy-website.sh --with-cli-assets
-./scripts/prod-redeploy-all.sh
-./scripts/prod-redeploy-all.sh --with-cli-assets
-```
-
-Note: `website-cli-assets` is a build-only helper image. It is not a long-running container, so you build it when needed but you do not `up -d` it as part of the stack.
+- Website UI or docs changed without CLI asset changes: redeploy `website` only
 
 ## Logs
 
-Follow one service:
+Follow one color:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml logs -f api
-docker compose -f docker-compose.prod.yml logs -f studio
-docker compose -f docker-compose.prod.yml logs -f website
+docker compose -f docker-compose.prod.yml logs -f api-blue
+docker compose -f docker-compose.prod.yml logs -f api-green
+docker compose -f docker-compose.prod.yml logs -f studio-blue
+docker compose -f docker-compose.prod.yml logs -f studio-green
+docker compose -f docker-compose.prod.yml logs -f website-blue
+docker compose -f docker-compose.prod.yml logs -f website-green
 docker compose -f docker-compose.prod.yml logs -f traefik
-docker compose -f docker-compose.prod.yml logs -f mysql
-docker compose -f docker-compose.prod.yml logs -f socket-proxy
+```
+
+Show the overall stack:
+
+```bash
+cd /opt/automaton
+docker compose -f docker-compose.prod.yml ps
+./scripts/prod-switch-blue-green.sh status
 ```
 
 Check the resolved compose config:
@@ -144,3 +189,9 @@ cd /opt/automaton
 docker compose -f docker-compose.prod.yml config
 docker compose -f docker-compose.prod.yml --profile build-assets config
 ```
+
+## Notes
+
+- This is safer than `docker compose up -d --build website` because Traefik keeps serving the currently live color until the new color passes health checks.
+- Cloudflare should no longer need the DNS proxy off/on workaround in normal deploys, because the hostname never points at a half-restarted backend.
+- API blue/green assumes database changes are backward-compatible for the duration of the cutover. Avoid schema changes where the old API crashes immediately after the migration is applied.

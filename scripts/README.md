@@ -56,19 +56,22 @@ sudo ./setup-service.sh
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
 | `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
-| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with 2 replicas |
-| `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with 2 replicas |
-| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with 2 replicas |
-| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with 2 replicas |
+| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for blue/green production deploys |
+| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color Traefik serves for API, Studio, and website |
+| `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with a blue/green cutover |
+| `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with a blue/green cutover |
+| `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with a blue/green cutover |
+| `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
 
 ---
 
 ## 🚢 Production Docker Redeploy Helpers
 
-These helpers wrap `docker compose -f docker-compose.prod.yml ...` for the most common production redeploy flows.
+These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. Traefik now reads a generated file-provider config from `docker/traefik/dynamic/blue-green-routes.yml`, and the scripts update that file to point each hostname at the freshly deployed color.
 
 ```bash
 cd /opt/automaton
+./scripts/prod-switch-blue-green.sh status
 ./scripts/prod-redeploy-api.sh
 ./scripts/prod-redeploy-studio.sh
 ./scripts/prod-redeploy-website.sh
@@ -78,7 +81,25 @@ cd /opt/automaton
 ```
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
-Set `AUTOMATON_DEPLOY_REPLICAS=3` (or another value) before running a script if you want a different replica count for a deploy.
+Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window.
+
+Examples:
+
+```bash
+# First deployment on a fresh server, or a normal full-stack redeploy
+cd /opt/automaton
+./scripts/prod-redeploy-all.sh
+
+# Deploy website + Studio, but keep the previous color around for quick rollback
+./scripts/prod-redeploy-website.sh --keep-previous
+./scripts/prod-redeploy-studio.sh --keep-previous
+
+# Force just the API to the green color
+./scripts/prod-redeploy-api.sh --color green
+
+# See which color is currently live for each hostname
+./scripts/prod-switch-blue-green.sh status
+```
 
 ---
 

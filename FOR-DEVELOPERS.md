@@ -331,6 +331,18 @@ docker compose -f docker-compose.prod.yml up -d --build --scale api=2 --scale st
 
 **Lesson:** For proxied public services, "container restarted successfully" is not the same as "safe deploy." A short no-backend window is enough to create user-visible downtime. Treat health checks and multi-replica cutovers as part of the deployment design, not optional polish.
 
+**What we learned next:** replica scaling in plain Docker Compose helped, but it still wasn't a true rolling deployment strategy. Compose is a great "make the containers match this file" tool, not a traffic orchestrator. Even with `--scale ...=2`, it can recreate containers in an order that's good enough for Docker and still awkward for Cloudflare.
+
+The sturdier fix was blue/green routing:
+
+- `api-blue` / `api-green`
+- `studio-blue` / `studio-green`
+- `website-blue` / `website-green`
+
+Traefik now reads a generated file-provider config that decides which color is live for each hostname. The deploy scripts build the inactive color, wait for health checks, then flip Traefik to the new color. That means the live color is never rebuilt in place.
+
+**Bigger lesson:** if you care about smooth public deploys, separate "start the new version" from "switch traffic to the new version." Those are different responsibilities, and forcing one tool to do both is where the weird outages begin.
+
 ### 6. Scope/Project Linkage and Authorization
 
 **The Pitfall:**
