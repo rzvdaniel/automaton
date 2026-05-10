@@ -82,6 +82,7 @@ cd /opt/automaton
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
 Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window.
+These production shell scripts are committed with the executable bit set, so a normal `git pull` on Linux should not show them as locally modified just because you ran `chmod +x` once.
 
 Examples:
 
