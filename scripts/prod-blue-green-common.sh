@@ -244,7 +244,7 @@ wait_for_service_healthy() {
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
     echo "[INFO] Ensuring MySQL, socket proxy, and Traefik are up"
-    docker compose -f "$COMPOSE_FILE" up -d mysql socket-proxy traefik
+    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql socket-proxy traefik
 }
 
 deploy_color() {
@@ -254,7 +254,7 @@ deploy_color() {
     compose_service="$(compose_service_name "$service" "$color")"
 
     echo "[INFO] Deploying $compose_service"
-    docker compose -f "$COMPOSE_FILE" up -d --build "$compose_service"
+    docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans "$compose_service"
     wait_for_service_healthy "$compose_service"
 }
 
@@ -286,10 +286,10 @@ assert_service_exists() {
 
 status_table() {
     load_state
-    printf "Service   Live color\n"
-    printf "-------   ----------\n"
-    printf "api       %s\n" "$LIVE_API_COLOR"
-    printf "studio    %s\n" "$LIVE_STUDIO_COLOR"
-    printf "website   %s\n" "$LIVE_WEBSITE_COLOR"
-    printf "\nState file: %s\nRoutes file: %s\n" "$STATE_FILE" "$ROUTES_FILE"
+    printf -- "Service   Live color\n"
+    printf -- "-------   ----------\n"
+    printf -- "api       %s\n" "$LIVE_API_COLOR"
+    printf -- "studio    %s\n" "$LIVE_STUDIO_COLOR"
+    printf -- "website   %s\n" "$LIVE_WEBSITE_COLOR"
+    printf -- "\nState file: %s\nRoutes file: %s\n" "$STATE_FILE" "$ROUTES_FILE"
 }

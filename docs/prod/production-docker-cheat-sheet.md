@@ -195,3 +195,4 @@ docker compose -f docker-compose.prod.yml --profile build-assets config
 - This is safer than `docker compose up -d --build website` because Traefik keeps serving the currently live color until the new color passes health checks.
 - Cloudflare should no longer need the DNS proxy off/on workaround in normal deploys, because the hostname never points at a half-restarted backend.
 - API blue/green assumes database changes are backward-compatible for the duration of the cutover. Avoid schema changes where the old API crashes immediately after the migration is applied.
+- The blue/green scripts run `docker compose ... --remove-orphans`, so old pre-migration containers like `automaton-prod-website-1` / `-2` get cleaned up automatically on the next deploy.
