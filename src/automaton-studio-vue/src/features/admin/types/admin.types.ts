@@ -92,6 +92,7 @@ export interface AiModelAdmin {
   createdAt: string
   updatedAt?: string
 }
+/**
  * Matches AdminCreateAiModelRequest from backend
  */
 export interface CreateAiModelRequest {
@@ -242,44 +243,52 @@ export interface SubscriptionPlan {
   id: string
   name: string
   description?: string
-  monthlyCostLimitUsd: number
   priceUsd: number
   stripeProductId?: string
   stripePriceId?: string
   isDefault: boolean
   isActive: boolean
-  canCreateProjects: boolean
-  canCreateOrganizations: boolean
+  capabilities: PlanCapabilities
   sortOrder: number
   createdAt: string
   updatedAt?: string
 }
 
+export interface PlanCapabilities {
+  version: number
+  hostedRunner: HostedRunnerCapability
+}
+
+export interface HostedRunnerCapability {
+  enabled: boolean
+  cpuCores: number
+  memoryMb: number
+  diskMb: number
+  maxApps: number
+  visibility: 'disabled' | 'testUsersOnly' | 'public'
+}
+
 export interface CreateSubscriptionPlanRequest {
   name: string
   description?: string
-  monthlyCostLimitUsd: number
   priceUsd: number
   stripeProductId?: string
   stripePriceId?: string
   isDefault: boolean
   isActive: boolean
-  canCreateProjects: boolean
-  canCreateOrganizations: boolean
+  capabilities: PlanCapabilities
   sortOrder: number
 }
 
 export interface UpdateSubscriptionPlanRequest {
   name?: string
   description?: string
-  monthlyCostLimitUsd?: number
   priceUsd?: number
   stripeProductId?: string
   stripePriceId?: string
   isDefault?: boolean
   isActive?: boolean
-  canCreateProjects?: boolean
-  canCreateOrganizations?: boolean
+  capabilities?: PlanCapabilities
   sortOrder?: number
 }
 
@@ -289,9 +298,6 @@ export interface UserPlan {
   name: string
   subscriptionPlanId?: string
   planName?: string
-  monthlyCostLimitUsd: number
-  currentMonthCostUsd: number
-  overageAction: string
 }
 
 export interface AssignPlanRequest {

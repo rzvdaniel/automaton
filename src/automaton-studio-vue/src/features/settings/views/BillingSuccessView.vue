@@ -11,7 +11,7 @@ const router = useRouter()
     </div>
     <h1 class="text-2xl font-semibold mb-2">You're all set!</h1>
     <p class="text-surface-600 mb-6 max-w-sm">
-      Your subscription has been activated. Your new AI budget is now available.
+      Your subscription has been activated. Your hosted runner plan is now available.
     </p>
     <div class="flex gap-3">
       <Button label="Go to Dashboard" icon="pi pi-home" @click="router.push('/')" />

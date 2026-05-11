@@ -1,6 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,18 +17,15 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 public class AdminSubscriptionPlansController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    private readonly ITokenBudgetService _tokenBudgetService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<AdminSubscriptionPlansController> _logger;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
-        ITokenBudgetService tokenBudgetService,
         UserManager<ApplicationUser> userManager,
         ILogger<AdminSubscriptionPlansController> logger)
     {
         _db = db;
-        _tokenBudgetService = tokenBudgetService;
         _userManager = userManager;
         _logger = logger;
     }
@@ -73,14 +70,12 @@ public class AdminSubscriptionPlansController : ControllerBase
             Id                     = Guid.NewGuid(),
             Name                   = req.Name,
             Description            = req.Description,
-            MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd,
             PriceUsd               = req.PriceUsd,
             StripeProductId        = req.StripeProductId,
             StripePriceId          = req.StripePriceId,
             IsDefault              = isDefault,
             IsActive               = isActive,
-            CanCreateProjects      = req.CanCreateProjects,
-            CanCreateOrganizations = req.CanCreateOrganizations,
+            CapabilitiesJson       = PlanCapabilitiesSerializer.Serialize(req.Capabilities),
             SortOrder              = req.SortOrder,
             CreatedAt              = DateTime.UtcNow
         };
@@ -108,14 +103,12 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         if (req.Name        != null) plan.Name               = req.Name;
         if (req.Description != null) plan.Description        = req.Description;
-        if (req.MonthlyCostLimitUsd   .HasValue) plan.MonthlyCostLimitUsd    = req.MonthlyCostLimitUsd.Value;
         if (req.PriceUsd              .HasValue) plan.PriceUsd               = req.PriceUsd.Value;
         if (req.StripeProductId != null) plan.StripeProductId = req.StripeProductId == "" ? null : req.StripeProductId;
         if (req.StripePriceId   != null) plan.StripePriceId   = req.StripePriceId   == "" ? null : req.StripePriceId;
         if (req.IsActive              .HasValue) plan.IsActive               = req.IsActive.Value;
         plan.IsDefault = newIsDefault;
-        if (req.CanCreateProjects     .HasValue) plan.CanCreateProjects      = req.CanCreateProjects.Value;
-        if (req.CanCreateOrganizations.HasValue) plan.CanCreateOrganizations = req.CanCreateOrganizations.Value;
+        if (req.Capabilities != null) plan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(req.Capabilities);
         if (req.SortOrder             .HasValue) plan.SortOrder              = req.SortOrder.Value;
         plan.UpdatedAt = DateTime.UtcNow;
 
@@ -135,32 +128,19 @@ public class AdminSubscriptionPlansController : ControllerBase
     {
         var users = await _userManager.Users
             .AsNoTracking()
+            .Include(u => u.SubscriptionPlan)
             .OrderBy(u => u.Email)
             .ToListAsync();
 
-        var allowances = await _db.UserTokenAllowances
-            .AsNoTracking()
-            .Include(a => a.SubscriptionPlan)
-            .ToListAsync();
-
-        var allowanceMap = allowances.ToDictionary(a => a.UserId);
-        var now = DateTime.UtcNow;
-
         var result = users.Select(u =>
         {
-            allowanceMap.TryGetValue(u.Id, out var allowance);
-            var isCurrentMonth = allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year;
-
             return new UserPlanResponse
             {
                 UserId              = u.Id,
                 Email               = u.Email ?? string.Empty,
                 Name                = u.Name ?? u.Email ?? string.Empty,
-                SubscriptionPlanId  = allowance?.SubscriptionPlanId,
-                PlanName            = allowance?.SubscriptionPlan?.Name,
-                MonthlyCostLimitUsd = allowance?.MonthlyCostLimitUsd ?? 10m,
-                CurrentMonthCostUsd = isCurrentMonth ? (allowance?.CurrentMonthCostUsd ?? 0m) : 0m,
-                OverageAction       = allowance?.OverageAction ?? OverageActions.Downgrade
+                SubscriptionPlanId  = u.SubscriptionPlanId,
+                PlanName            = u.SubscriptionPlan?.Name
             };
         });
 
@@ -168,8 +148,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     /// <summary>
-    /// Assign a subscription plan to a user. Updates their MonthlyCostLimitUsd immediately.
-    /// Pass planId = null to remove the plan and reset to default ($10).
+    /// Assign a subscription plan to a user. Pass planId = null to remove the plan.
     /// </summary>
     [HttpPost("users/{userId:guid}/assign")]
     public async Task<IActionResult> AssignPlan(Guid userId, [FromBody] AssignPlanRequest req)
@@ -177,32 +156,18 @@ public class AdminSubscriptionPlansController : ControllerBase
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null) return NotFound("User not found.");
 
-        decimal limitUsd;
-
         if (req.PlanId.HasValue)
         {
             var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == req.PlanId.Value);
             if (plan == null) return NotFound("Subscription plan not found.");
-            limitUsd = plan.MonthlyCostLimitUsd;
-        }
-        else
-        {
-            limitUsd = 10.00m; // default free tier
         }
 
-        await _tokenBudgetService.SetAllowanceAsync(userId, limitUsd, OverageActions.Downgrade);
-
-        // Also record the plan FK directly
-        var allowance = await _db.UserTokenAllowances.FirstOrDefaultAsync(a => a.UserId == userId);
-        if (allowance != null)
-        {
-            allowance.SubscriptionPlanId = req.PlanId;
-            await _db.SaveChangesAsync();
-        }
+        user.SubscriptionPlanId = req.PlanId;
+        await _userManager.UpdateAsync(user);
 
         _logger.LogInformation(
-            "Plan {PlanId} assigned to user {UserId} (limit=${Limit:F2}/month)",
-            req.PlanId, userId, limitUsd);
+            "Plan {PlanId} assigned to user {UserId}",
+            req.PlanId, userId);
 
         return NoContent();
     }
@@ -214,14 +179,12 @@ public class AdminSubscriptionPlansController : ControllerBase
         Id                     = p.Id,
         Name                   = p.Name,
         Description            = p.Description,
-        MonthlyCostLimitUsd    = p.MonthlyCostLimitUsd,
         PriceUsd               = p.PriceUsd,
         StripeProductId        = p.StripeProductId,
         StripePriceId          = p.StripePriceId,
         IsDefault              = p.IsDefault,
         IsActive               = p.IsActive,
-        CanCreateProjects      = p.CanCreateProjects,
-        CanCreateOrganizations = p.CanCreateOrganizations,
+        Capabilities           = PlanCapabilitiesSerializer.Deserialize(p.CapabilitiesJson),
         SortOrder              = p.SortOrder,
         CreatedAt              = p.CreatedAt,
         UpdatedAt              = p.UpdatedAt
@@ -235,14 +198,12 @@ public record SubscriptionPlanResponse
     public Guid    Id                     { get; init; }
     public string  Name                   { get; init; } = string.Empty;
     public string? Description            { get; init; }
-    public decimal MonthlyCostLimitUsd    { get; init; }
     public decimal PriceUsd               { get; init; }
     public string? StripeProductId        { get; init; }
     public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; }
     public bool    IsActive               { get; init; }
-    public bool    CanCreateProjects      { get; init; }
-    public bool    CanCreateOrganizations { get; init; }
+    public PlanCapabilities Capabilities  { get; init; } = PlanCapabilities.Default;
     public int     SortOrder              { get; init; }
     public DateTime  CreatedAt            { get; init; }
     public DateTime? UpdatedAt            { get; init; }
@@ -252,14 +213,12 @@ public record CreateSubscriptionPlanRequest
 {
     public string  Name                   { get; init; } = string.Empty;
     public string? Description            { get; init; }
-    public decimal MonthlyCostLimitUsd    { get; init; } = 10m;
     public decimal PriceUsd               { get; init; } = 0m;
     public string? StripeProductId        { get; init; }
     public string? StripePriceId          { get; init; }
     public bool    IsDefault              { get; init; } = false;
     public bool    IsActive               { get; init; } = true;
-    public bool    CanCreateProjects      { get; init; } = false;
-    public bool    CanCreateOrganizations { get; init; } = false;
+    public PlanCapabilities Capabilities  { get; init; } = PlanCapabilities.Default;
     public int     SortOrder              { get; init; } = 0;
 }
 
@@ -267,14 +226,12 @@ public record UpdateSubscriptionPlanRequest
 {
     public string?  Name                   { get; init; }
     public string?  Description            { get; init; }
-    public decimal? MonthlyCostLimitUsd    { get; init; }
     public decimal? PriceUsd               { get; init; }
     public string?  StripeProductId        { get; init; }
     public string?  StripePriceId          { get; init; }
     public bool?    IsDefault              { get; init; }
     public bool?    IsActive               { get; init; }
-    public bool?    CanCreateProjects      { get; init; }
-    public bool?    CanCreateOrganizations { get; init; }
+    public PlanCapabilities? Capabilities  { get; init; }
     public int?     SortOrder              { get; init; }
 }
 
@@ -285,9 +242,6 @@ public record UserPlanResponse
     public string  Name                { get; init; } = string.Empty;
     public Guid?   SubscriptionPlanId  { get; init; }
     public string? PlanName            { get; init; }
-    public decimal MonthlyCostLimitUsd { get; init; }
-    public decimal CurrentMonthCostUsd { get; init; }
-    public string  OverageAction       { get; init; } = OverageActions.Downgrade;
 }
 
 public record AssignPlanRequest

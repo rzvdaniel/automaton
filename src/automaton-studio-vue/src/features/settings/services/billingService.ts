@@ -11,13 +11,22 @@ export interface PortalResponse {
 export interface BillingStatusResponse {
   planName: string
   priceUsd: number
-  monthlyCostLimitUsd: number
-  currentMonthCostUsd: number
-  percentUsed: number
   hasActiveSubscription: boolean
-  canCreateProjects: boolean
-  canCreateOrganizations: boolean
-  hasByokKeys: boolean
+  capabilities: PlanCapabilities
+}
+
+export interface PlanCapabilities {
+  version: number
+  hostedRunner: HostedRunnerCapability
+}
+
+export interface HostedRunnerCapability {
+  enabled: boolean
+  cpuCores: number
+  memoryMb: number
+  diskMb: number
+  maxApps: number
+  visibility: 'disabled' | 'testUsersOnly' | 'public'
 }
 
 const billingService = {

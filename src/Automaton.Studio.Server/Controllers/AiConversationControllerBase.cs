@@ -128,7 +128,7 @@ public abstract class AiConversationControllerBase : BaseController
                 return;
             }
 
-            // Downgrade model if user has exceeded their monthly token allowance
+            // Pass through the model selection policy hook.
             model = await _tokenBudgetService.GetEffectiveModelAsync(userId, provider, model);
 
             var aiConfig = await _settingsService.GetEffectiveConfigAsync();

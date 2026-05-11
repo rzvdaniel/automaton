@@ -700,6 +700,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("StripeSubscriptionId")
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("SubscriptionPlanId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("tinyint(1)");
 
@@ -715,6 +718,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("SubscriptionPlanId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -1645,15 +1650,9 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<bool>("CanCreateOrganizations")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("CanCreateProjects")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false);
+                    b.Property<string>("CapabilitiesJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -1671,9 +1670,6 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
-
-                    b.Property<decimal>("MonthlyCostLimitUsd")
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1772,62 +1768,6 @@ namespace Automaton.Studio.Server.Migrations
                         .IsUnique();
 
                     b.ToTable("UserSettings");
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserTokenAllowance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<int>("CurrentMonth")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("CurrentMonthCostUsd")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(10,6)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<int>("CurrentMonthInputTokens")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("CurrentMonthOutputTokens")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("CurrentYear")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("MonthlyCostLimitUsd")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(10,6)")
-                        .HasDefaultValue(10.00m);
-
-                    b.Property<string>("OverageAction")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<Guid?>("SubscriptionPlanId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubscriptionPlanId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("UserTokenAllowances");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
@@ -2184,6 +2124,16 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AppVersion");
 
                     b.Navigation("Step");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("SubscriptionPlan");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
@@ -2569,24 +2519,6 @@ namespace Automaton.Studio.Server.Migrations
                         .HasForeignKey("SensitiveVariableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserTokenAllowance", b =>
-                {
-                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
-                        .WithMany()
-                        .HasForeignKey("SubscriptionPlanId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SubscriptionPlan");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>

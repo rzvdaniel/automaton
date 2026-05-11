@@ -73,9 +73,6 @@ namespace Automaton.Studio.Server.Data
         // User Settings
         public virtual DbSet<UserSetting> UserSettings { get; set; }
 
-        // Token budget
-        public virtual DbSet<UserTokenAllowance> UserTokenAllowances { get; set; }
-
         // Subscription plans
         public virtual DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
 
@@ -101,6 +98,16 @@ namespace Automaton.Studio.Server.Data
                     .WithMany(r => r.UserRoles)
                     .HasForeignKey(ur => ur.UserId)
                     .IsRequired();
+            });
+
+            modelBuilder.Entity<ApplicationUser>(entity =>
+            {
+                entity.HasOne(e => e.SubscriptionPlan)
+                    .WithMany()
+                    .HasForeignKey(e => e.SubscriptionPlanId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(e => e.SubscriptionPlanId);
             });
 
             modelBuilder.Entity<Flow>(entity =>
@@ -402,14 +409,12 @@ namespace Automaton.Studio.Server.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Description).HasMaxLength(500);
-                entity.Property(e => e.MonthlyCostLimitUsd).IsRequired().HasColumnType("decimal(10,2)");
                 entity.Property(e => e.PriceUsd).IsRequired().HasColumnType("decimal(10,2)");
                 entity.Property(e => e.StripeProductId).HasMaxLength(100);
                 entity.Property(e => e.StripePriceId).HasMaxLength(100);
                 entity.Property(e => e.IsDefault).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-                entity.Property(e => e.CanCreateProjects).IsRequired().HasDefaultValue(false);
-                entity.Property(e => e.CanCreateOrganizations).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.CapabilitiesJson).IsRequired().HasColumnType("longtext");
                 entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
                 entity.Property(e => e.CreatedAt).IsRequired();
 
@@ -914,33 +919,6 @@ namespace Automaton.Studio.Server.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            // Token Budget
-            modelBuilder.Entity<UserTokenAllowance>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.MonthlyCostLimitUsd).IsRequired().HasColumnType("decimal(10,6)").HasDefaultValue(10.00m);
-                entity.Property(e => e.CurrentMonthInputTokens).IsRequired().HasDefaultValue(0);
-                entity.Property(e => e.CurrentMonthOutputTokens).IsRequired().HasDefaultValue(0);
-                entity.Property(e => e.CurrentMonthCostUsd).IsRequired().HasColumnType("decimal(10,6)").HasDefaultValue(0m);
-                entity.Property(e => e.CurrentMonth).IsRequired();
-                entity.Property(e => e.CurrentYear).IsRequired();
-                entity.Property(e => e.OverageAction).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.UpdatedAt).IsRequired();
-
-                // One row per user
-                entity.HasIndex(e => e.UserId).IsUnique();
-
-                entity.HasOne(e => e.User)
-                    .WithMany()
-                    .HasForeignKey(e => e.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(e => e.SubscriptionPlan)
-                    .WithMany()
-                    .HasForeignKey(e => e.SubscriptionPlanId)
-                    .OnDelete(DeleteBehavior.SetNull);
-            });
         }
 
         public void BeginTransaction()

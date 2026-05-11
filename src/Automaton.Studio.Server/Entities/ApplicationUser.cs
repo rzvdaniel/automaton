@@ -56,5 +56,10 @@ namespace Automaton.Studio.Server.Entities
 
         /// <summary>Active Stripe Subscription ID (sub_xxx). Null on Free plan.</summary>
         public string StripeSubscriptionId { get; set; }
+
+        /// <summary>Current Automaton subscription plan. Null means no paid plan is assigned.</summary>
+        public Guid? SubscriptionPlanId { get; set; }
+
+        public virtual SubscriptionPlan SubscriptionPlan { get; set; }
     }
 }

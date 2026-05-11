@@ -1,29 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
-import { usePlanLimit } from '@/shared/composables/usePlanLimit'
-import { usePlanFeatures } from '@/shared/composables/usePlanFeatures'
-import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
-import { useBudgetBanner } from '@/shared/composables/useBudgetBanner'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
-import BudgetBanner from '@/shared/components/layout/BudgetBanner.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
-import Dialog from 'primevue/dialog'
-import Button from 'primevue/button'
 
 // Initialize settings on app mount
 useUserSettings()
 const projectsStore = useProjectsStore()
 const route = useRoute()
-const router = useRouter()
-const { visible: planLimitVisible, featureName, requiredPlan, install: installPlanLimit, dismiss } = usePlanLimit()
-const { load: loadPlanFeatures } = usePlanFeatures()
-const { load: loadBudgetBanner } = useBudgetBanner()
-const subscriptionsEnabled = useSubscriptionsEnabled()
 
 // Check if current route uses auth layout (login, register, install, etc.)
 const isAuthLayout = computed(() => route.meta.layout === 'auth')
@@ -36,51 +24,18 @@ const shouldInitializeAuthenticatedShell = computed(() => {
 })
 
 onMounted(async () => {
-  installPlanLimit()
   // Public no-layout pages such as published apps must not trigger authenticated
   // shell bootstrap requests, or they can redirect anonymous visitors to login.
   if (shouldInitializeAuthenticatedShell.value) {
     await projectsStore.initialize()
-    await loadPlanFeatures()
-    await loadBudgetBanner()
   }
 })
-
-function goToPricing() {
-  dismiss()
-  router.push('/pricing')
-}
 </script>
 
 <template>
   <!-- Global PrimeVue components -->
   <Toast position="bottom-right" />
   <ConfirmDialog />
-
-  <!-- Plan limit upgrade dialog -->
-  <Dialog
-    v-model:visible="planLimitVisible"
-    header="Upgrade Required"
-    modal
-    style="width: 400px"
-    :closable="true"
-  >
-    <div class="flex flex-column gap-3">
-      <div class="flex align-items-center gap-3">
-        <i class="pi pi-lock text-4xl text-primary" />
-        <div>
-          <div class="font-semibold text-lg">{{ featureName }} requires a higher plan</div>
-          <div class="text-color-secondary text-sm mt-1">
-            This feature is available on the <strong>{{ requiredPlan }}</strong> plan and above.
-          </div>
-        </div>
-      </div>
-    </div>
-    <template #footer>
-      <Button label="Maybe later" text @click="dismiss" />
-      <Button v-if="subscriptionsEnabled" label="See plans" icon="pi pi-arrow-right" icon-pos="right" @click="goToPricing" />
-    </template>
-  </Dialog>
 
   <!-- No layout: full-screen for published apps -->
   <template v-if="isNoLayout">
@@ -101,9 +56,6 @@ function goToPricing() {
     <div class="app-content">
       <!-- Top Toolbar -->
       <AppToolbar />
-
-      <!-- Budget usage warning banner -->
-      <BudgetBanner />
 
       <!-- Page Content -->
       <main class="app-main">

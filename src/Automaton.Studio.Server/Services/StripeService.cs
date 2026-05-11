@@ -318,23 +318,20 @@ public class StripeService
         var plan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == planId && p.IsActive);
         if (plan == null) return;
 
-        var allowance = await _db.UserTokenAllowances.FirstOrDefaultAsync(a => a.UserId == userId);
-        if (allowance == null)
-        {
-            allowance = new UserTokenAllowance { Id = Guid.NewGuid(), UserId = userId };
-            _db.UserTokenAllowances.Add(allowance);
-        }
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return;
 
-        allowance.MonthlyCostLimitUsd = plan.MonthlyCostLimitUsd;
-        allowance.SubscriptionPlanId = plan.Id;
-        allowance.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        user.SubscriptionPlanId = plan.Id;
+        await _userManager.UpdateAsync(user);
     }
 
     private async Task DowngradeToFreeAsync(Guid userId)
     {
         var freePlan = await _db.SubscriptionPlans.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault && p.IsActive);
-        if (freePlan != null)
-            await AssignPlanAsync(userId, freePlan.Id);
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return;
+
+        user.SubscriptionPlanId = freePlan?.Id;
+        await _userManager.UpdateAsync(user);
     }
 }

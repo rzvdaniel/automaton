@@ -233,6 +233,19 @@ API keys authenticate runners, web apps, and integrations. Format: `ak_<scope>_<
 | ak_readonly_xxx| Read-only keys | Monitoring, reporting tools |
 | ak_xxxxxxxxx   | Flexible format | Any scope (configured on server) |
 
+### Subscription Plans
+
+Subscription plans are runner-focused and intentionally extensible. Store plan entitlements in `SubscriptionPlan.CapabilitiesJson`, serialized as `PlanCapabilities` from `src/Automaton.Studio.Server/Models/PlanCapabilities.cs`.
+
+Current capabilities:
+- `HostedRunner.Enabled` — whether the plan includes an Automaton-hosted runner.
+- `HostedRunner.CpuCores`, `MemoryMb`, `DiskMb`, `MaxApps` — resource limits for the hosted runner container.
+- `HostedRunner.Visibility` — admin-controlled visibility (`disabled`, `testUsersOnly`, `public`).
+
+Do not add subscription-specific columns for new entitlements unless there is a strong query/indexing reason. Extend `PlanCapabilities` instead, add serializer normalization/tests, and update the Admin Subscription Plans screen.
+
+AI budget is currently not part of subscriptions. Users bring/manage AI provider keys separately, and token usage is recorded only as telemetry.
+
 ## Apps (Web App Platform)
 
 Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.

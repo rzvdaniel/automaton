@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { watch } from 'vue'
 import Button from 'primevue/button'
-import ProgressBar from 'primevue/progressbar'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
@@ -73,13 +72,10 @@ onMounted(async () => {
 })
 
 const sidebarPlansLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans soon')
-
-const usagePercent = computed(() => billingStatus.value?.percentUsed ?? 0)
-const usageSeverity = computed(() => {
-  const pct = usagePercent.value
-  if (pct >= 90) return 'danger'
-  if (pct >= 70) return 'warn'
-  return null
+const runnerSummary = computed(() => {
+  const runner = billingStatus.value?.capabilities.hostedRunner
+  if (!runner?.enabled) return 'Self-hosted runner'
+  return `${runner.cpuCores} vCPU · ${runner.memoryMb} MB`
 })
 const isAdmin = computed(() => {
   const roles = authStore.user?.roles
@@ -155,29 +151,14 @@ const sidebarClass = computed(() => ({
       <!-- Spacer -->
       <div class="sidebar-spacer"></div>
 
-      <!-- Billing usage widget (expanded only) -->
+      <!-- Billing widget (expanded only) -->
       <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate('/billing')">
         <div class="billing-widget-header">
           <span class="billing-plan">{{ billingStatus.planName }}</span>
-          <span
-            class="billing-pct"
-            :class="{
-              'text-red-400': usageSeverity === 'danger',
-              'text-yellow-400': usageSeverity === 'warn',
-            }"
-          >{{ usagePercent }}%</span>
+          <span v-if="billingStatus.hasActiveSubscription" class="billing-status">Active</span>
         </div>
-        <ProgressBar
-          :value="usagePercent"
-          :show-value="false"
-          style="height: 4px"
-          :class="{
-            'progress-warn': usageSeverity === 'warn',
-            'progress-danger': usageSeverity === 'danger',
-          }"
-        />
         <div class="billing-widget-footer">
-          <span class="text-color-secondary">AI: ${{ billingStatus.currentMonthCostUsd.toFixed(2) }} / ${{ billingStatus.monthlyCostLimitUsd.toFixed(2) }}</span>
+          <span class="text-color-secondary">{{ runnerSummary }}</span>
           <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate('/pricing')">{{ sidebarPlansLabel }}</span>
         </div>
       </div>
@@ -314,9 +295,10 @@ const sidebarClass = computed(() => ({
   white-space: nowrap;
 }
 
-.billing-pct {
+.billing-status {
   font-size: 0.7rem;
   font-weight: 500;
+  color: var(--p-green-500);
 }
 
 .billing-widget-footer {
@@ -336,11 +318,4 @@ const sidebarClass = computed(() => ({
   text-decoration: underline;
 }
 
-:deep(.progress-warn .p-progressbar-value) {
-  background: var(--p-yellow-400);
-}
-
-:deep(.progress-danger .p-progressbar-value) {
-  background: var(--p-red-400);
-}
 </style>

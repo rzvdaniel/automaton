@@ -164,7 +164,7 @@ public class SystemAiService : ISystemAiService
 
             provider.ConversationUpdated -= tokenCapture;
 
-            // Record usage so system AI calls count toward the user's monthly budget
+            // Record usage as telemetry for future analytics and operations.
             if ((capturedInput > 0 || capturedOutput > 0) && resolvedUserId.HasValue)
             {
                 await _tokenBudgetService.RecordUsageAsync(

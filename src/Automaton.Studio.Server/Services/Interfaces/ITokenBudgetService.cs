@@ -15,10 +15,4 @@ public interface ITokenBudgetService
     /// for the provider that supports tools + streaming. Otherwise returns requestedModel.
     /// </summary>
     Task<string> GetEffectiveModelAsync(Guid userId, string provider, string requestedModel);
-
-    /// <summary>
-    /// Updates (or creates) the allowance settings for a user.
-    /// Call this when a subscription plan changes.
-    /// </summary>
-    Task SetAllowanceAsync(Guid userId, decimal monthlyCostLimitUsd, string overageAction);
 }

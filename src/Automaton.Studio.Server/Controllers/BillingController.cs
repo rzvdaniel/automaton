@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -79,38 +80,27 @@ public class BillingController : BaseController
     public async Task<IActionResult> GetStatus()
     {
         var userId = GetUserId();
-        var now = DateTime.UtcNow;
-
-        var allowance = await _db.UserTokenAllowances
-            .AsNoTracking()
-            .Include(a => a.SubscriptionPlan)
-            .FirstOrDefaultAsync(a => a.UserId == userId);
-
         var user = await _db.Users
             .AsNoTracking()
-            .Select(u => new { u.Id, u.StripeSubscriptionId })
+            .Include(u => u.SubscriptionPlan)
+            .Select(u => new
+            {
+                u.Id,
+                u.StripeSubscriptionId,
+                PlanName = u.SubscriptionPlan != null ? u.SubscriptionPlan.Name : null,
+                PlanPriceUsd = u.SubscriptionPlan != null ? u.SubscriptionPlan.PriceUsd : 0m,
+                CapabilitiesJson = u.SubscriptionPlan != null ? u.SubscriptionPlan.CapabilitiesJson : null
+            })
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        var hasByokKeys = await _db.AiApiKeys
-            .AsNoTracking()
-            .AnyAsync(k => k.CreatedByUserId == userId);
-
-        var isCurrentMonth = allowance?.CurrentMonth == now.Month && allowance?.CurrentYear == now.Year;
-        var currentCost = (isCurrentMonth ? allowance?.CurrentMonthCostUsd : 0m) ?? 0m;
-        var limit = allowance?.MonthlyCostLimitUsd ?? 0m;
-        var percent = limit > 0 ? (int)Math.Min(100, Math.Round(currentCost / limit * 100)) : 0;
+        var capabilities = PlanCapabilitiesSerializer.Deserialize(user?.CapabilitiesJson);
 
         return Ok(new
         {
-            planName            = allowance?.SubscriptionPlan?.Name ?? "Free",
-            priceUsd            = allowance?.SubscriptionPlan?.PriceUsd ?? 0m,
-            currentMonthCostUsd = currentCost,
-            monthlyCostLimitUsd = limit,
-            percentUsed         = percent,
+            planName            = user?.PlanName ?? "Free",
+            priceUsd            = user?.PlanPriceUsd ?? 0m,
             hasActiveSubscription = !string.IsNullOrEmpty(user?.StripeSubscriptionId),
-            canCreateProjects   = allowance?.SubscriptionPlan?.CanCreateProjects ?? false,
-            canCreateOrganizations = allowance?.SubscriptionPlan?.CanCreateOrganizations ?? false,
-            hasByokKeys,
+            capabilities,
         });
     }
 }

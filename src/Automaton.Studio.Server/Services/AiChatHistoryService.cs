@@ -577,7 +577,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            // Record usage against the user's monthly cost budget
+            // Record usage as telemetry for future analytics and operations.
             if (request.InputTokens.HasValue || request.OutputTokens.HasValue)
                 await tokenBudgetService.RecordUsageAsync(
                     userId,

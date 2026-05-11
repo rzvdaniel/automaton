@@ -12,10 +12,17 @@ interface SubscriptionPlan {
   id: string
   name: string
   description: string | null
-  monthlyCostLimitUsd: number
   priceUsd: number
-  canCreateProjects: boolean
-  canCreateOrganizations: boolean
+  capabilities: {
+    hostedRunner: {
+      enabled: boolean
+      cpuCores: number
+      memoryMb: number
+      diskMb: number
+      maxApps: number
+      visibility: string
+    }
+  }
   isDefault: boolean
   sortOrder: number
 }
@@ -44,18 +51,24 @@ onMounted(async () => {
 })
 
 const showPlanCatalog = computed(() => subscriptionsEnabled && hasPaidPlans.value)
-const pageTitle = computed(() => showPlanCatalog.value ? 'Choose your plan' : 'Free for now')
+const pageTitle = computed(() => showPlanCatalog.value ? 'Choose your runner plan' : 'Free for now')
 const pageSubtitle = computed(() => showPlanCatalog.value
-  ? 'Upgrade to unlock more AI budget and collaboration features.'
-  : 'Future paid plans will add more capability, like automated runners and higher limits.')
+  ? 'Upgrade when you want Automaton to host a ready-to-use runner for your apps.'
+  : 'Future paid plans will add hosted runners, so users can run app backends without configuring infrastructure.')
 
 function planFeatures(plan: SubscriptionPlan): string[] {
-  const features: string[] = [
-    `$${plan.monthlyCostLimitUsd.toFixed(0)} AI budget / month`,
+  const runner = plan.capabilities.hostedRunner
+  if (!runner.enabled) {
+    return ['Self-hosted runners', 'Create apps and projects', 'Use your own infrastructure']
+  }
+
+  return [
+    'Hosted runner included',
+    `${runner.cpuCores} vCPU`,
+    `${runner.memoryMb} MB memory`,
+    `${runner.diskMb} MB persistent disk`,
+    `Up to ${runner.maxApps} apps`,
   ]
-  if (plan.canCreateProjects) features.push('Projects')
-  if (plan.canCreateOrganizations) features.push('Organizations')
-  return features
 }
 
 // Highlight the middle plan (Pro / highest non-last paid plan)
@@ -129,7 +142,7 @@ const isDisabled = (plan: SubscriptionPlan) =>
       <h2>Paid subscriptions coming later</h2>
       <p class="text-color-secondary">
         Everyone is on the <strong>Free</strong> plan for now.
-        The free plan is here to stay. Future paid plans will add more capability, like automated runners, more included AI usage, and collaboration features.
+        The free plan is here to stay. Future paid plans will add hosted runners for users who want Automaton-managed backend execution.
       </p>
     </div>
 
@@ -295,4 +308,3 @@ const isDisabled = (plan: SubscriptionPlan) =>
   gap: 0.75rem;
 }
 </style>
-

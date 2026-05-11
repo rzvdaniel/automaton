@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import ProgressBar from 'primevue/progressbar'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
@@ -20,16 +19,7 @@ const loading = ref(true)
 const portalLoading = ref(false)
 const error = ref<string | null>(null)
 
-const usagePercent = computed(() => {
-  if (!status.value || status.value.monthlyCostLimitUsd === 0) return 0
-  return Math.min(100, Math.round((status.value.currentMonthCostUsd / status.value.monthlyCostLimitUsd) * 100))
-})
-
-const usageSeverity = computed(() => {
-  if (usagePercent.value >= 100) return 'danger'
-  if (usagePercent.value >= 80) return 'warn'
-  return 'success'
-})
+const hostedRunner = computed(() => status.value?.capabilities.hostedRunner)
 
 onMounted(async () => {
   try {
@@ -58,10 +48,6 @@ async function goToPortal() {
 }
 
 const plansActionLabel = computed(() => hasPaidPlans.value ? 'Change Plan' : 'Plans Soon')
-const aiUpgradeLabel = computed(() => hasPaidPlans.value ? 'Upgrade' : 'Plans Soon')
-const aiAccessHint = computed(() => hasPaidPlans.value
-  ? 'Add your own API key or upgrade for managed AI'
-  : 'Add your own API key for AI access. Paid subscriptions are coming later.')
 </script>
 
 <template>
@@ -93,61 +79,32 @@ const aiAccessHint = computed(() => hasPaidPlans.value
           </template>
         </Card>
 
-        <!-- AI Usage Card -->
+        <!-- Hosted Runner Card -->
         <Card class="billing-card">
           <template #content>
-            <div class="billing-card-label">AI Usage</div>
+            <div class="billing-card-label">Hosted Runner</div>
 
-            <!-- BYOK: user has own keys, no managed budget -->
-            <template v-if="status.hasByokKeys && status.monthlyCostLimitUsd === 0">
-              <div class="billing-card-value byok-value">
-                <i class="pi pi-key" style="color: var(--p-green-500)"></i>
-                External (BYOK)
-              </div>
-              <div class="billing-card-meta">Using your own API keys — no AI charges</div>
-              <Button
-                label="Manage AI Keys"
-                icon="pi pi-key"
-                size="small"
-                text
-                class="mt-2 pl-0"
-                @click="router.push('/ai-keys')"
-              />
-            </template>
-
-            <!-- Paid: managed AI budget -->
-            <template v-else-if="status.monthlyCostLimitUsd > 0">
+            <template v-if="hostedRunner?.enabled">
               <div class="billing-card-value">
-                ${{ status.currentMonthCostUsd.toFixed(2) }}
-                <span class="billing-card-of">/ ${{ status.monthlyCostLimitUsd.toFixed(2) }} included</span>
+                <i class="pi pi-server mr-2 text-primary"></i>
+                Included
               </div>
-              <ProgressBar
-                :value="usagePercent"
-                :show-value="false"
-                class="billing-progress mb-2"
-                :class="`progress-${usageSeverity}`"
-              />
-              <div class="billing-card-meta">
-                <span
-                  :class="{
-                    'text-orange-500 font-semibold': usagePercent >= 80,
-                    'text-red-500 font-semibold': usagePercent >= 100,
-                  }"
-                >{{ usagePercent }}% used</span>
-                <span class="billing-card-divider">·</span>
-                <span>${{ (status.monthlyCostLimitUsd - status.currentMonthCostUsd).toFixed(2) }} remaining</span>
+              <div class="runner-specs">
+                <span>{{ hostedRunner.cpuCores }} vCPU</span>
+                <span>{{ hostedRunner.memoryMb }} MB RAM</span>
+                <span>{{ hostedRunner.diskMb }} MB disk</span>
+                <span>{{ hostedRunner.maxApps }} apps</span>
               </div>
             </template>
 
-            <!-- Free, no keys, no budget -->
             <template v-else>
-              <div class="billing-card-value" style="font-size: 1rem; font-weight: 500; color: var(--p-text-muted-color)">
-                No AI access configured
+              <div class="billing-card-value" style="font-size: 1.1rem">
+                <i class="pi pi-server mr-2 text-color-secondary"></i>
+                Self-hosted
               </div>
-              <div class="billing-card-meta mb-3">{{ aiAccessHint }}</div>
+              <div class="billing-card-meta mb-3">Use your own runner infrastructure.</div>
               <div class="flex gap-2">
-                <Button label="Add AI Key" icon="pi pi-key" size="small" outlined @click="router.push('/ai-keys')" />
-                <Button :label="aiUpgradeLabel" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
+                <Button :label="plansActionLabel" icon="pi pi-tag" size="small" severity="secondary" outlined @click="router.push('/pricing')" />
               </div>
             </template>
           </template>
@@ -156,12 +113,13 @@ const aiAccessHint = computed(() => hasPaidPlans.value
         <!-- Infrastructure Card -->
         <Card class="billing-card">
           <template #content>
-            <div class="billing-card-label">Infrastructure</div>
+            <div class="billing-card-label">AI Keys</div>
             <div class="billing-card-value" style="font-size: 1.1rem">
-              <i class="pi pi-server mr-2 text-color-secondary"></i>
-              Self-hosted
+              <i class="pi pi-key mr-2 text-color-secondary"></i>
+              Bring your own
             </div>
-            <div class="billing-card-meta">Using your own runners — no infrastructure charges</div>
+            <div class="billing-card-meta mb-3">AI provider keys are managed separately from runner subscriptions.</div>
+            <Button label="Manage AI Keys" icon="pi pi-key" size="small" text class="mt-2 pl-0" @click="router.push('/ai-keys')" />
           </template>
         </Card>
 
@@ -211,10 +169,6 @@ const aiAccessHint = computed(() => hasPaidPlans.value
   }
 }
 
-.byok-value {
-  gap: 0.5rem;
-}
-
 .billing-card {
   height: 100%;
 }
@@ -236,13 +190,6 @@ const aiAccessHint = computed(() => hasPaidPlans.value
   align-items: center;
 }
 
-.billing-card-of {
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--p-text-muted-color);
-  margin-left: 0.25rem;
-}
-
 .billing-card-meta {
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
@@ -251,19 +198,17 @@ const aiAccessHint = computed(() => hasPaidPlans.value
   gap: 0.4rem;
 }
 
-.billing-card-divider {
-  opacity: 0.4;
+.runner-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
 }
 
-.billing-progress {
-  height: 6px !important;
+.runner-specs span {
+  border: 1px solid var(--p-surface-200);
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
 }
-
-:deep(.billing-progress.p-progressbar) {
-  height: 6px;
-}
-
-:deep(.progress-success .p-progressbar-value) { background: var(--p-green-500); }
-:deep(.progress-warn   .p-progressbar-value)  { background: var(--p-orange-500); }
-:deep(.progress-danger .p-progressbar-value)  { background: var(--p-red-500); }
 </style>

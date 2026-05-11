@@ -14,16 +14,13 @@ namespace Automaton.Studio.Server.Controllers;
 public class OrganizationsController : BaseController
 {
     private readonly IOrganizationService organizationService;
-    private readonly ISubscriptionGatewayService subscriptionGateway;
     private readonly ILogger<OrganizationsController> logger;
 
     public OrganizationsController(
         IOrganizationService organizationService,
-        ISubscriptionGatewayService subscriptionGateway,
         ILogger<OrganizationsController> logger)
     {
         this.organizationService  = organizationService;
-        this.subscriptionGateway  = subscriptionGateway;
         this.logger               = logger;
     }
 
@@ -92,8 +89,6 @@ public class OrganizationsController : BaseController
             {
                 return BadRequest(ModelState);
             }
-
-            await subscriptionGateway.EnsureCanCreateOrganizationAsync(GetUserId());
 
             var organization = await organizationService.CreateOrganizationAsync(request);
             
