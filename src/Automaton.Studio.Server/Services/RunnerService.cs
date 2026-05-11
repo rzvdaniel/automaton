@@ -112,11 +112,50 @@ public class RunnerService
 
         var result = dbContext.SaveChanges();
 
+        LinkHostedRunnerAfterRegistration(runner);
+        result += dbContext.SaveChanges();
+
         logger.Information("Runner created successfully: ID={RunnerId}, Name={Name}, UserId={UserId}, Changes={Changes}",
             runner.Id, runner.Name, UserId, result);
         logger.Information("=== END ADD RUNNER DEBUG ===");
 
         return result;
+    }
+
+    private void LinkHostedRunnerAfterRegistration(Runner runner)
+    {
+        var hostedRunner = dbContext.HostedRunners
+            .Include(x => x.Deployments)
+            .FirstOrDefault(x =>
+                x.UserId == UserId &&
+                x.Name == runner.Name &&
+                x.RunnerId == null &&
+                x.DeletedAt == null &&
+                (x.Status == HostedRunnerStatuses.Pending || x.Status == HostedRunnerStatuses.Provisioning));
+
+        if (hostedRunner == null)
+        {
+            return;
+        }
+
+        hostedRunner.RunnerId = runner.Id;
+        hostedRunner.Status = HostedRunnerStatuses.Running;
+        hostedRunner.ProvisionedAt ??= DateTime.UtcNow;
+        hostedRunner.UpdatedAt = DateTime.UtcNow;
+
+        var deployment = hostedRunner.Deployments
+            .Where(x => x.Action == HostedRunnerDeploymentActions.Provision && x.Status == HostedRunnerDeploymentStatuses.Running)
+            .OrderByDescending(x => x.StartedAt)
+            .FirstOrDefault();
+
+        if (deployment != null)
+        {
+            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
+            deployment.FinishedAt = DateTime.UtcNow;
+            deployment.Logs = "Runner registered successfully and is linked to this hosted runner.";
+        }
+
+        logger.Information("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
     }
 
     public async Task UpdateConnection(Guid runnerId, string connectionId, CancellationToken cancellationToken)

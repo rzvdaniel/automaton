@@ -303,3 +303,89 @@ export interface UserPlan {
 export interface AssignPlanRequest {
   planId?: string
 }
+
+// ── Hosted Runners ──────────────────────────────────────────────────────────
+
+export interface RunnerHost {
+  id: string
+  name: string
+  provider: string
+  region?: string
+  publicIp?: string
+  isLocal: boolean
+  status: 'active' | 'draining' | 'disabled'
+  totalCpuCores: number
+  usedCpuCores: number
+  totalMemoryMb: number
+  usedMemoryMb: number
+  totalDiskMb: number
+  usedDiskMb: number
+  hostedRunnerCount: number
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface CreateRunnerHostRequest {
+  name: string
+  provider: string
+  region?: string
+  publicIp?: string
+  isLocal: boolean
+  status: 'active' | 'draining' | 'disabled'
+  totalCpuCores: number
+  totalMemoryMb: number
+  totalDiskMb: number
+}
+
+export interface UpdateRunnerHostRequest {
+  name?: string
+  provider?: string
+  region?: string
+  publicIp?: string
+  isLocal?: boolean
+  status?: 'active' | 'draining' | 'disabled'
+  totalCpuCores?: number
+  totalMemoryMb?: number
+  totalDiskMb?: number
+}
+
+export interface HostedRunnerDeployment {
+  id: string
+  action: string
+  status: string
+  commandPreview?: string
+  logs?: string
+  error?: string
+  startedAt: string
+  finishedAt?: string
+}
+
+export interface HostedRunner {
+  id: string
+  userId: string
+  userEmail: string
+  subscriptionPlanId: string
+  subscriptionPlanName: string
+  runnerHostId?: string
+  runnerHostName?: string
+  runnerId?: string
+  runnerName?: string
+  apiKeyId?: string
+  name: string
+  status: 'pending' | 'provisioning' | 'running' | 'failed' | 'disabled' | 'deleting'
+  cpuCores: number
+  memoryMb: number
+  diskMb: number
+  maxApps: number
+  containerName: string
+  containerId?: string
+  lastError?: string
+  createdAt: string
+  updatedAt?: string
+  provisionedAt?: string
+  latestDeployment?: HostedRunnerDeployment
+}
+
+export interface ProvisionHostedRunnerRequest {
+  planId?: string
+}

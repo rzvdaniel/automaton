@@ -20,17 +20,20 @@ public class StripeService
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly StripeOptions _options;
+    private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
     private readonly ILogger<StripeService> _logger;
 
     public StripeService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IOptionsSnapshot<StripeOptions> options,
+        HostedRunnerProvisioningService hostedRunnerProvisioningService,
         ILogger<StripeService> logger)
     {
         _db = db;
         _userManager = userManager;
         _options = options.Value;
+        _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
         _logger = logger;
         StripeConfiguration.ApiKey = _options.SecretKey;
     }
@@ -323,6 +326,16 @@ public class StripeService
 
         user.SubscriptionPlanId = plan.Id;
         await _userManager.UpdateAsync(user);
+
+        try
+        {
+            await _hostedRunnerProvisioningService.EnsureHostedRunnerForUserPlanAsync(userId, plan.Id);
+        }
+        catch (Exception ex)
+        {
+            // Stripe webhooks must stay idempotent and retryable; provisioning failures are tracked separately.
+            _logger.LogError(ex, "Hosted runner provisioning failed after assigning plan {PlanId} to user {UserId}", plan.Id, userId);
+        }
     }
 
     private async Task DowngradeToFreeAsync(Guid userId)
@@ -333,5 +346,9 @@ public class StripeService
 
         user.SubscriptionPlanId = freePlan?.Id;
         await _userManager.UpdateAsync(user);
+
+        await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(
+            userId,
+            "Subscription was downgraded or cancelled.");
     }
 }

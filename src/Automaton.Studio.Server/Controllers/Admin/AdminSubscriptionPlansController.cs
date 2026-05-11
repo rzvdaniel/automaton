@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ public class AdminSubscriptionPlansController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
     private readonly ILogger<AdminSubscriptionPlansController> _logger;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
+        HostedRunnerProvisioningService hostedRunnerProvisioningService,
         ILogger<AdminSubscriptionPlansController> logger)
     {
         _db = db;
         _userManager = userManager;
+        _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
         _logger = logger;
     }
 
@@ -164,6 +168,15 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         user.SubscriptionPlanId = req.PlanId;
         await _userManager.UpdateAsync(user);
+
+        if (req.PlanId.HasValue)
+        {
+            await _hostedRunnerProvisioningService.EnsureHostedRunnerForUserPlanAsync(userId, req.PlanId.Value);
+        }
+        else
+        {
+            await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(userId, "Admin removed subscription plan.");
+        }
 
         _logger.LogInformation(
             "Plan {PlanId} assigned to user {UserId}",

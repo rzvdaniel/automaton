@@ -24,6 +24,9 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
         public virtual DbSet<Runner> Runners { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
+        public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
+        public virtual DbSet<HostedRunner> HostedRunners { get; set; }
+        public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
         public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
         public virtual DbSet<Schedule> Schedules { get; set; }
@@ -147,6 +150,88 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.RunnerId, "IX_RunnerUser_RunnerId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.RunnerId).IsRequired();
+            });
+
+            modelBuilder.Entity<RunnerHost>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.Provider).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.Region).HasMaxLength(80);
+                entity.Property(e => e.PublicIp).HasMaxLength(120);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.TotalCpuCores).IsRequired().HasColumnType("decimal(5,2)");
+                entity.Property(e => e.TotalMemoryMb).IsRequired();
+                entity.Property(e => e.TotalDiskMb).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.Provider);
+            });
+
+            modelBuilder.Entity<HostedRunner>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.CpuCores).IsRequired().HasColumnType("decimal(5,2)");
+                entity.Property(e => e.MemoryMb).IsRequired();
+                entity.Property(e => e.DiskMb).IsRequired();
+                entity.Property(e => e.MaxApps).IsRequired();
+                entity.Property(e => e.ContainerName).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.ContainerId).HasMaxLength(160);
+                entity.Property(e => e.LastError).HasMaxLength(2000);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.RunnerHostId);
+                entity.HasIndex(e => e.RunnerId);
+                entity.HasIndex(e => e.ApiKeyId);
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.SubscriptionPlan)
+                    .WithMany()
+                    .HasForeignKey(e => e.SubscriptionPlanId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.RunnerHost)
+                    .WithMany(e => e.HostedRunners)
+                    .HasForeignKey(e => e.RunnerHostId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(e => e.Runner)
+                    .WithMany()
+                    .HasForeignKey(e => e.RunnerId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(e => e.ApiKey)
+                    .WithMany()
+                    .HasForeignKey(e => e.ApiKeyId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<HostedRunnerDeployment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Action).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.CommandPreview).HasColumnType("longtext");
+                entity.Property(e => e.Logs).HasColumnType("longtext");
+                entity.Property(e => e.Error).HasColumnType("longtext");
+                entity.Property(e => e.StartedAt).IsRequired();
+
+                entity.HasIndex(e => e.HostedRunnerId);
+                entity.HasIndex(e => e.Status);
+
+                entity.HasOne(e => e.HostedRunner)
+                    .WithMany(e => e.Deployments)
+                    .HasForeignKey(e => e.HostedRunnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Schedule>(entity =>

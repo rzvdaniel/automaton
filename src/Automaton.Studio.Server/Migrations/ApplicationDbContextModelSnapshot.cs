@@ -908,6 +908,134 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("ApiKeyId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ContainerId")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<string>("ContainerName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<decimal>("CpuCores")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("DiskMb")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<int>("MaxApps")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MemoryMb")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<DateTime?>("ProvisionedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<Guid>("SubscriptionPlanId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiKeyId");
+
+                    b.HasIndex("RunnerHostId");
+
+                    b.HasIndex("RunnerId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("HostedRunners");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunnerDeployment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("CommandPreview")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("HostedRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Logs")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostedRunnerId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("HostedRunnerDeployments");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.InvitationToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1488,6 +1616,62 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Runners");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerHost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsLocal")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("PublicIp")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<decimal>("TotalCpuCores")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("TotalDiskMb")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalMemoryMb")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("RunnerHosts");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerUser", b =>
@@ -2193,6 +2377,57 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", "ApiKey")
+                        .WithMany()
+                        .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.RunnerHost", "RunnerHost")
+                        .WithMany("HostedRunners")
+                        .HasForeignKey("RunnerHostId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
+                        .WithMany()
+                        .HasForeignKey("RunnerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApiKey");
+
+                    b.Navigation("Runner");
+
+                    b.Navigation("RunnerHost");
+
+                    b.Navigation("SubscriptionPlan");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunnerDeployment", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.HostedRunner", "HostedRunner")
+                        .WithMany("Deployments")
+                        .HasForeignKey("HostedRunnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HostedRunner");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
@@ -2654,6 +2889,11 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("FlowExecutionUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+                {
+                    b.Navigation("Deployments");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
                 {
                     b.Navigation("AppAssignments");
@@ -2687,6 +2927,11 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("ProjectRunners");
 
                     b.Navigation("RunnerUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerHost", b =>
+                {
+                    b.Navigation("HostedRunners");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>

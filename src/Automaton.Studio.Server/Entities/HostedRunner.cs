@@ -1,0 +1,58 @@
+using Automaton.Studio.Server.Models;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Automaton.Studio.Server.Entities;
+
+/// <summary>
+/// A managed runner container allocated to one paid user.
+/// </summary>
+public class HostedRunner
+{
+    [Key]
+    public Guid Id { get; set; }
+
+    public Guid UserId { get; set; }
+    public virtual ApplicationUser User { get; set; } = null!;
+
+    public Guid SubscriptionPlanId { get; set; }
+    public virtual SubscriptionPlan SubscriptionPlan { get; set; } = null!;
+
+    public Guid? RunnerHostId { get; set; }
+    public virtual RunnerHost? RunnerHost { get; set; }
+
+    public Guid? RunnerId { get; set; }
+    public virtual Runner? Runner { get; set; }
+
+    public Guid? ApiKeyId { get; set; }
+    public virtual ApiKey? ApiKey { get; set; }
+
+    [Required, MaxLength(160)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required, MaxLength(40)]
+    public string Status { get; set; } = HostedRunnerStatuses.Pending;
+
+    [Column(TypeName = "decimal(5,2)")]
+    public decimal CpuCores { get; set; }
+
+    public int MemoryMb { get; set; }
+    public int DiskMb { get; set; }
+    public int MaxApps { get; set; }
+
+    [Required, MaxLength(160)]
+    public string ContainerName { get; set; } = string.Empty;
+
+    [MaxLength(160)]
+    public string? ContainerId { get; set; }
+
+    [MaxLength(2000)]
+    public string? LastError { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? ProvisionedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+
+    public virtual ICollection<HostedRunnerDeployment> Deployments { get; set; } = new List<HostedRunnerDeployment>();
+}

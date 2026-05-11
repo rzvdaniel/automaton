@@ -246,6 +246,18 @@ Do not add subscription-specific columns for new entitlements unless there is a 
 
 AI budget is currently not part of subscriptions. Users bring/manage AI provider keys separately, and token usage is recorded only as telemetry.
 
+### Hosted Runner Provisioning
+
+Hosted runners are one managed runner container per paid user. The first provisioning slice lives in:
+- Backend entities: `RunnerHost`, `HostedRunner`, `HostedRunnerDeployment`.
+- Provisioning service: `src/Automaton.Studio.Server/Services/HostedRunnerProvisioningService.cs`.
+- Admin API: `src/Automaton.Studio.Server/Controllers/Admin/AdminHostedRunnersController.cs`.
+- Admin UI: `src/automaton-studio-vue/src/features/admin/views/AdminHostedRunnersView.vue`.
+
+Plan assignment is the trigger. Stripe webhook assignment and Admin → Subscription Plans user assignment both call `EnsureHostedRunnerForUserPlanAsync`, so production testing with Stripe test mode uses the same path as real paid users. Runner registration links back automatically by `AUTOMATON_RUNNER_NAME`; do not pre-create duplicate `Runner` rows.
+
+Provisioning is intentionally config-gated by `HostedRunners:Enabled` and starts in `dryRun` mode. It creates the hosted-runner record, allocates host capacity, creates a runner-scoped API key, and stores a redacted Docker command preview. Never persist or display the raw generated API key.
+
 ## Apps (Web App Platform)
 
 Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.

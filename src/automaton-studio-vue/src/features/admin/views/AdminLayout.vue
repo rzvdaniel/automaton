@@ -45,6 +45,12 @@ const navItems: AdminNavItem[] = [
     to: '/admin/subscription-plans',
     routePrefix: '/admin/subscription-plans',
   },
+  {
+    label: 'Hosted Runners',
+    icon: 'pi pi-server',
+    to: '/admin/hosted-runners',
+    routePrefix: '/admin/hosted-runners',
+  },
 ]
 
 const isActive = (item: AdminNavItem) => {
