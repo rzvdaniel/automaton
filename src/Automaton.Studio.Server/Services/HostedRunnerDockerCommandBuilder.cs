@@ -7,30 +7,43 @@ namespace Automaton.Studio.Server.Services;
 public static class HostedRunnerDockerCommandBuilder
 {
     public static string BuildPreview(HostedRunner runner, HostedRunnerOptions options)
+        => BuildProvisionScript(runner, options, "*** generated runner key ***");
+
+    public static string BuildProvisionScript(HostedRunner runner, HostedRunnerOptions options, string apiKey)
     {
         var cpu = runner.CpuCores.ToString("0.##", CultureInfo.InvariantCulture);
         var dataRoot = TrimTrailingSlash(options.DataRoot);
+        var runnerRoot = $"{dataRoot}/{runner.Id}";
 
-        return string.Join(" \\\n  ", new[]
+        var dockerRun = string.Join(" \\\n  ", new[]
         {
             "docker run -d",
-            $"--name {Quote(runner.ContainerName)}",
+            $"--name {ShellQuote(runner.ContainerName)}",
             "--restart unless-stopped",
-            $"--cpus {Quote(cpu)}",
-            $"--memory {Quote($"{runner.MemoryMb}m")}",
-            $"--network {Quote(options.DockerNetwork)}",
-            $"-e AUTOMATON_SERVER_URL={Quote(options.ServerUrl)}",
-            $"-e AUTOMATON_API_KEY={Quote("*** generated runner key ***")}",
-            $"-e AUTOMATON_RUNNER_NAME={Quote(runner.Name)}",
-            $"-e AUTOMATON_HOSTED_RUNNER_ID={Quote(runner.Id.ToString())}",
-            $"-v {Quote($"{dataRoot}/{runner.Id}/config:/home/automaton/.config/AutomatonRunner")}",
-            $"-v {Quote($"{dataRoot}/{runner.Id}/data:/app/data")}",
-            $"-v {Quote($"{dataRoot}/{runner.Id}/logs:/app/logs")}",
-            Quote(options.DockerImage)
+            $"--cpus {ShellQuote(cpu)}",
+            $"--memory {ShellQuote($"{runner.MemoryMb}m")}",
+            $"--network {ShellQuote(options.DockerNetwork)}",
+            $"-e AUTOMATON_SERVER_URL={ShellQuote(options.ServerUrl)}",
+            $"-e AUTOMATON_API_KEY={ShellQuote(apiKey)}",
+            $"-e AUTOMATON_RUNNER_NAME={ShellQuote(runner.Name)}",
+            $"-e AUTOMATON_HOSTED_RUNNER_ID={ShellQuote(runner.Id.ToString())}",
+            $"-v {ShellQuote($"{runnerRoot}/config:/home/automaton/.config/AutomatonRunner")}",
+            $"-v {ShellQuote($"{runnerRoot}/data:/app/data")}",
+            $"-v {ShellQuote($"{runnerRoot}/logs:/app/logs")}",
+            ShellQuote(options.DockerImage)
+        });
+
+        return string.Join("\n", new[]
+        {
+            "set -eu",
+            $"mkdir -p {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/data")} {ShellQuote($"{runnerRoot}/logs")}",
+            $"docker network inspect {ShellQuote(options.DockerNetwork)} >/dev/null 2>&1 || docker network create {ShellQuote(options.DockerNetwork)} >/dev/null",
+            $"docker rm -f {ShellQuote(runner.ContainerName)} >/dev/null 2>&1 || true",
+            dockerRun
         });
     }
 
     private static string TrimTrailingSlash(string value) => value.TrimEnd('/', '\\');
 
-    private static string Quote(string value) => $"\"{value.Replace("\"", "\\\"")}\"";
+    internal static string ShellQuote(string value) => $"'{value.Replace("'", "'\"'\"'")}'";
 }

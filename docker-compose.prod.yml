@@ -35,6 +35,9 @@ x-api-common: &api-common
     # appsettings.Production.json lives on the server (outside the repo), never committed.
     # Create it at /opt/automaton/config/appsettings.Production.json — see .env.prod.example for structure.
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
+    # SSH private key used only by the API's hosted-runner provisioner.
+    # Create it on the server with chmod 600 and authorize its public key on runner hosts.
+    - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
   networks:
     - automaton-prod
   depends_on:

@@ -330,6 +330,7 @@ services.AddTransient<ScheduleService>();
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
+services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<HostedRunnerProvisioningService>();
 
 // System Prompt Builders for AI Chat

@@ -21,6 +21,7 @@ const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
 const loadingHosts = ref(false)
 const loadingRunners = ref(false)
+const provisioningUserId = ref<string | null>(null)
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -133,6 +134,19 @@ async function saveHost() {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save host', life: 3000 })
   } finally {
     savingHost.value = false
+  }
+}
+
+async function retryProvisioning(runner: HostedRunner) {
+  provisioningUserId.value = runner.userId
+  try {
+    await adminHostedRunnersService.provisionForUser(runner.userId, { planId: runner.subscriptionPlanId })
+    toast.add({ severity: 'success', summary: 'Provisioning requested', detail: 'Hosted runner deployment was queued again.', life: 3000 })
+    await refreshAll()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to request hosted runner provisioning', life: 3000 })
+  } finally {
+    provisioningUserId.value = null
   }
 }
 
@@ -254,7 +268,18 @@ onMounted(refreshAll)
           </Column>
           <Column header="Actions">
             <template #body="{ data }">
-              <Button label="Details" text size="small" @click="selectedRunner = data" />
+              <div class="flex gap-2">
+                <Button label="Details" text size="small" @click="selectedRunner = data" />
+                <Button
+                  v-if="data.status !== 'running'"
+                  label="Retry"
+                  icon="pi pi-play"
+                  size="small"
+                  outlined
+                  :loading="provisioningUserId === data.userId"
+                  @click="retryProvisioning(data)"
+                />
+              </div>
             </template>
           </Column>
         </DataTable>

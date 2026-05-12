@@ -30,12 +30,37 @@ public class HostedRunnerDockerCommandBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(command, Does.Contain("--cpus \"0.5\""));
-            Assert.That(command, Does.Contain("--memory \"768m\""));
-            Assert.That(command, Does.Contain("AUTOMATON_SERVER_URL=\"https://api.automaton.monster\""));
-            Assert.That(command, Does.Contain("AUTOMATON_API_KEY=\"*** generated runner key ***\""));
+            Assert.That(command, Does.Contain("mkdir -p '/opt/automaton/hosted-runners/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/config'"));
+            Assert.That(command, Does.Contain("--cpus '0.5'"));
+            Assert.That(command, Does.Contain("--memory '768m'"));
+            Assert.That(command, Does.Contain("AUTOMATON_SERVER_URL='https://api.automaton.monster'"));
+            Assert.That(command, Does.Contain("AUTOMATON_API_KEY='*** generated runner key ***'"));
             Assert.That(command, Does.Contain("/opt/automaton/hosted-runners/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/data:/app/data"));
             Assert.That(command, Does.Not.Contain("ak_runner_"));
+        });
+    }
+
+    [Test]
+    public void BuildProvisionScript_IncludesRawApiKeyOnlyForExecution()
+    {
+        var runner = new HostedRunner
+        {
+            Id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+            Name = "Hosted Runner abc123",
+            ContainerName = "automaton-hosted-runner-abc123",
+            CpuCores = 1m,
+            MemoryMb = 1024
+        };
+
+        var command = HostedRunnerDockerCommandBuilder.BuildProvisionScript(
+            runner,
+            new HostedRunnerOptions(),
+            "ak_runner_secret_for_remote_execution");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(command, Does.Contain("docker rm -f 'automaton-hosted-runner-abc123'"));
+            Assert.That(command, Does.Contain("AUTOMATON_API_KEY='ak_runner_secret_for_remote_execution'"));
         });
     }
 }

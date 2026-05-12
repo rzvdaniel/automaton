@@ -41,5 +41,5 @@ public static class HostedRunnerDeploymentStatuses
 public static class HostedRunnerDeploymentModes
 {
     public const string DryRun = "dryRun";
-    public const string LocalDocker = "localDocker";
+    public const string SshDocker = "sshDocker";
 }

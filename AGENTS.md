@@ -258,6 +258,10 @@ Plan assignment is the trigger. Stripe webhook assignment and Admin → Subscrip
 
 Provisioning is intentionally config-gated by `HostedRunners:Enabled` and starts in `dryRun` mode. It creates the hosted-runner record, allocates host capacity, creates a runner-scoped API key, and stores a redacted Docker command preview. Never persist or display the raw generated API key.
 
+Real remote provisioning uses `HostedRunners:DeploymentMode = sshDocker`. The API mounts a private SSH key at `/run/secrets/hosted_runner_ssh_key`, connects to the selected host's `PublicIp`, prepares the hosted-runner data folders/network, and runs the runner Docker container. A successful SSH command means the container was launched; the hosted runner only becomes `running` after the runner registers back with Automaton.
+
+Provisioning intentionally lives in the API control plane rather than a separate app. It works for both same-server testing and separate Hetzner runner hosts because the API provisions whichever `RunnerHost` record has available capacity. Keep the execution boundary behind `IHostedRunnerRemoteCommandExecutor` so we can extract it into a queue/worker service later if scale or isolation demands it. See `docs/prod/hosted-runner-ssh-provisioning.md`.
+
 ## Apps (Web App Platform)
 
 Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.
