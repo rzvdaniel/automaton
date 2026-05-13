@@ -24,7 +24,14 @@ public class ApiKeyService
         this.authorizationService = authorizationService;
     }
 
-    public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(Guid userId, string name, string? description = null, DateTime? expiresAt = null, ApiKeyScope scope = ApiKeyScope.Runner, Guid? projectId = null)
+    public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(
+        Guid userId,
+        string name,
+        string? description = null,
+        DateTime? expiresAt = null,
+        ApiKeyScope scope = ApiKeyScope.Runner,
+        Guid? projectId = null,
+        bool saveChanges = true)
     {
         // Generate a cryptographically secure API key
         var rawKey = GenerateRawKey();
@@ -77,7 +84,10 @@ public class ApiKeyService
             dbContext.ProjectApiKeys.Add(projectApiKey);
         }
         
-        await dbContext.SaveChangesAsync();
+        if (saveChanges)
+        {
+            await dbContext.SaveChangesAsync();
+        }
 
         logger.LogInformation("API key created for user {UserId} with scope {Scope}", userId, scope);
 
