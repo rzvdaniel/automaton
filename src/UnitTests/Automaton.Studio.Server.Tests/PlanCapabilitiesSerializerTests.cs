@@ -80,4 +80,30 @@ public class PlanCapabilitiesSerializerTests
 
         Assert.That(capabilities.HostedRunner.Visibility, Is.EqualTo(HostedRunnerVisibility.Disabled));
     }
+
+    [TestCase(HostedRunnerVisibility.Public, false, true)]
+    [TestCase(HostedRunnerVisibility.Public, true, true)]
+    [TestCase(HostedRunnerVisibility.TestUsersOnly, false, false)]
+    [TestCase(HostedRunnerVisibility.TestUsersOnly, true, true)]
+    [TestCase(HostedRunnerVisibility.Disabled, false, false)]
+    public void HostedRunnerPlanVisibility_RespectsCatalogVisibility(
+        string visibility,
+        bool canAccessHostedRunnerTestPlans,
+        bool expected)
+    {
+        var capabilities = new PlanCapabilities
+        {
+            HostedRunner = new HostedRunnerCapability
+            {
+                Enabled = true,
+                Visibility = visibility
+            }
+        };
+
+        var visible = HostedRunnerPlanVisibility.IsVisibleInCatalog(
+            capabilities,
+            canAccessHostedRunnerTestPlans);
+
+        Assert.That(visible, Is.EqualTo(expected));
+    }
 }

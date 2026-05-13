@@ -44,23 +44,6 @@ This works for both layouts:
 
 Each host is represented by a `RunnerHost` row with public IP and capacity. The scheduler picks a host with enough remaining CPU, memory, and disk budget, so adding more Hetzner servers later does not change the business flow.
 
-## Why No Separate Provisioning App?
-
-Provisioning currently lives in the API because it is:
-
-- a low-volume admin/subscription control-plane task
-- tightly coupled to plan assignment, API key creation, and hosted-runner state
-- simpler to deploy and observe while the product is still young
-
-The code is still extraction-friendly. The API talks to an `IHostedRunnerRemoteCommandExecutor`, so if provisioning volume or isolation needs grow later, the SSH adapter can move behind a queue or into a dedicated worker service without changing the subscription model.
-
-A separate provisioning service becomes worth it only if we need things like:
-
-- large provisioning concurrency
-- strong network isolation between the public API and infrastructure credentials
-- long-running multi-step orchestration
-- retries/queues that should survive API restarts independently
-
 ## Server Configuration
 
 In `/opt/automaton/config/appsettings.Production.json`, configure:
@@ -98,28 +81,15 @@ into the API container at:
 
 ## Hetzner Runner Host Setup
 
-On each Hetzner server that will host user runners:
+Each Hetzner runner host needs:
 
-```bash
-sudo useradd --create-home --shell /bin/bash automaton-runner-provisioner
-sudo usermod -aG docker automaton-runner-provisioner
-sudo mkdir -p /opt/automaton/hosted-runners
-sudo chown -R automaton-runner-provisioner:automaton-runner-provisioner /opt/automaton/hosted-runners
-```
+- a dedicated provisioning user with Docker access
+- a writable hosted-runner data root
+- the Automaton provisioning public key in that user's `authorized_keys`
 
-Generate the provisioning key on the Automaton production server, store the private key at:
+The Automaton production server also needs the matching private key file available before the API container is redeployed.
 
-```text
-/opt/automaton/secrets/hosted_runner_ssh_key
-```
-
-Add the public key to:
-
-```text
-/home/automaton-runner-provisioner/.ssh/authorized_keys
-```
-
-on each runner host.
+Use the full checklist in [Administrator Step-by-Step](#administrator-step-by-step) for the exact commands, ordering, and validation steps.
 
 ## Automaton Admin Flow
 
@@ -158,21 +128,77 @@ You can do this:
 
 **In plain words:** Automaton needs a safe way to log in to the runner host without a password prompt. The private key stays with the Automaton API server; the public key is copied to every runner host that Automaton is allowed to manage.
 
-Generate an SSH key pair for Automaton provisioning.
+Generate the SSH key pair on the Automaton production server:
 
-Store the private key on the Automaton production server at:
+```bash
+sudo mkdir -p /opt/automaton/secrets
+sudo ssh-keygen -t ed25519 -f /opt/automaton/secrets/hosted_runner_ssh_key -N ""
+sudo chmod 600 /opt/automaton/secrets/hosted_runner_ssh_key
+sudo chmod 644 /opt/automaton/secrets/hosted_runner_ssh_key.pub
+```
+
+This stores the private key at:
 
 ```text
 /opt/automaton/secrets/hosted_runner_ssh_key
 ```
 
-Add the public key to:
+and the public key at:
+
+```text
+/opt/automaton/secrets/hosted_runner_ssh_key.pub
+```
+
+Add the public key contents to:
 
 ```text
 /home/automaton-runner-provisioner/.ssh/authorized_keys
 ```
 
 on every runner host server.
+
+Create the runner host SSH directory if needed:
+
+```bash
+sudo mkdir -p /home/automaton-runner-provisioner/.ssh
+sudo chmod 700 /home/automaton-runner-provisioner/.ssh
+sudo touch /home/automaton-runner-provisioner/.ssh/authorized_keys
+sudo chmod 600 /home/automaton-runner-provisioner/.ssh/authorized_keys
+sudo chown -R automaton-runner-provisioner:automaton-runner-provisioner /home/automaton-runner-provisioner/.ssh
+```
+
+Then append the public key contents to `authorized_keys`.
+
+If the Automaton API server and the runner host are the same machine, use:
+
+```bash
+sudo sh -c 'cat /opt/automaton/secrets/hosted_runner_ssh_key.pub >> /home/automaton-runner-provisioner/.ssh/authorized_keys'
+sudo chown automaton-runner-provisioner:automaton-runner-provisioner /home/automaton-runner-provisioner/.ssh/authorized_keys
+```
+
+If the runner host is a different Hetzner server:
+
+1. On the Automaton production server, print the public key:
+
+```bash
+sudo cat /opt/automaton/secrets/hosted_runner_ssh_key.pub
+```
+
+2. Copy the full single line that is printed.
+3. On the runner host, open:
+
+```bash
+sudo nano /home/automaton-runner-provisioner/.ssh/authorized_keys
+```
+
+4. Paste the public key on its own line, save, and exit.
+5. Reapply ownership if needed:
+
+```bash
+sudo chown automaton-runner-provisioner:automaton-runner-provisioner /home/automaton-runner-provisioner/.ssh/authorized_keys
+```
+
+Do this **before** redeploying the API container. The Compose bind mount expects `/opt/automaton/secrets/hosted_runner_ssh_key` to be a real file. If the path is missing during redeploy, Docker can create a directory with that name instead, which looks mounted but cannot be used as an SSH private key.
 
 ### 3. Configure Automaton production settings
 
@@ -223,6 +249,36 @@ into the API container at:
 /run/secrets/hosted_runner_ssh_key
 ```
 
+After redeploying, verify that the active API container can see the mounted private key file.
+
+First check which color is live:
+
+```bash
+./scripts/prod-switch-blue-green.sh status
+```
+
+Then run the check against the active API container, for example:
+
+```bash
+docker exec automaton-prod-api-blue-1 sh -lc 'ls -l /run/secrets/hosted_runner_ssh_key'
+```
+
+or:
+
+```bash
+docker exec automaton-prod-api-green-1 sh -lc 'ls -l /run/secrets/hosted_runner_ssh_key'
+```
+
+You should see a normal file entry, for example one starting with `-rw`, not output like `total 0`.
+
+You can also verify the path is readable:
+
+```bash
+docker exec automaton-prod-api-blue-1 sh -lc 'test -r /run/secrets/hosted_runner_ssh_key && echo readable || echo missing-or-unreadable'
+```
+
+Use `green-1` instead of `blue-1` when green is live.
+
 ### 5. Add the runner host in Automaton Studio
 
 **In plain words:** now we introduce that Hetzner machine to Automaton. This creates a schedulable host record, so the system knows where it is allowed to place paid users' runner containers and how much capacity that machine has.
@@ -255,6 +311,16 @@ In Studio:
    - max apps
    - visibility
 5. Save the plan.
+
+For internal production testing, set visibility to `testUsersOnly`.
+
+Then go to:
+
+```text
+Admin -> Subscription Plans -> User Plans
+```
+
+and enable `Test runner plans` for the specific test users who should be allowed to see that plan in Pricing and complete Stripe test checkout. Users without that flag will not see the plan and cannot start checkout for it.
 
 ### 7. Test the real purchase flow
 

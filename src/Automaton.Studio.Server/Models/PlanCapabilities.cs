@@ -30,6 +30,16 @@ public static class HostedRunnerVisibility
     public static bool IsValid(string? value) => value is Disabled or TestUsersOnly or Public;
 }
 
+public static class HostedRunnerPlanVisibility
+{
+    public static bool IsVisibleInCatalog(PlanCapabilities capabilities, bool canAccessHostedRunnerTestPlans)
+    {
+        var visibility = capabilities.HostedRunner.Visibility;
+        return visibility == HostedRunnerVisibility.Public
+            || (visibility == HostedRunnerVisibility.TestUsersOnly && canAccessHostedRunnerTestPlans);
+    }
+}
+
 public static class PlanCapabilitiesSerializer
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

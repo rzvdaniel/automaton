@@ -246,6 +246,12 @@ public class AccountController : BaseController
     [Authorize]
     public async Task<IActionResult> GetSubscriptionPlans([FromServices] Data.ApplicationDbContext db)
     {
+        var canAccessHostedRunnerTestPlans = await db.Users
+            .AsNoTracking()
+            .Where(x => x.Id == GetUserId())
+            .Select(x => x.CanAccessHostedRunnerTestPlans)
+            .FirstOrDefaultAsync();
+
         var plans = await db.SubscriptionPlans
             .AsNoTracking()
             .Where(p => p.IsActive)
@@ -264,6 +270,7 @@ public class AccountController : BaseController
             })
             .ToListAsync();
 
-        return Ok(plans);
+        return Ok(plans.Where(plan =>
+            HostedRunnerPlanVisibility.IsVisibleInCatalog(plan.Capabilities, canAccessHostedRunnerTestPlans)));
     }
 }

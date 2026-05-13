@@ -60,6 +60,11 @@ namespace Automaton.Studio.Server.Entities
         /// <summary>Current Automaton subscription plan. Null means no paid plan is assigned.</summary>
         public Guid? SubscriptionPlanId { get; set; }
 
+        /// <summary>
+        /// Grants access to internal hosted-runner plans whose catalog visibility is test-users-only.
+        /// </summary>
+        public bool CanAccessHostedRunnerTestPlans { get; set; }
+
         public virtual SubscriptionPlan SubscriptionPlan { get; set; }
     }
 }

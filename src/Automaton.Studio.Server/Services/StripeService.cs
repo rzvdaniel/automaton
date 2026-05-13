@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -54,6 +55,10 @@ public class StripeService
 
         if (!plan.IsActive)
             throw new InvalidOperationException($"Plan '{plan.Name}' is not active.");
+
+        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson);
+        if (!HostedRunnerPlanVisibility.IsVisibleInCatalog(capabilities, user.CanAccessHostedRunnerTestPlans))
+            throw new InvalidOperationException($"Plan '{plan.Name}' is not available for this user.");
 
         if (string.IsNullOrEmpty(plan.StripePriceId))
             throw new InvalidOperationException($"Plan '{plan.Name}' has no Stripe Price ID configured.");

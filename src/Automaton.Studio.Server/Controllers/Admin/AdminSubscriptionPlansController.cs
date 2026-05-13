@@ -144,7 +144,8 @@ public class AdminSubscriptionPlansController : ControllerBase
                 Email               = u.Email ?? string.Empty,
                 Name                = u.Name ?? u.Email ?? string.Empty,
                 SubscriptionPlanId  = u.SubscriptionPlanId,
-                PlanName            = u.SubscriptionPlan?.Name
+                PlanName            = u.SubscriptionPlan?.Name,
+                CanAccessHostedRunnerTestPlans = u.CanAccessHostedRunnerTestPlans
             };
         });
 
@@ -181,6 +182,23 @@ public class AdminSubscriptionPlansController : ControllerBase
         _logger.LogInformation(
             "Plan {PlanId} assigned to user {UserId}",
             req.PlanId, userId);
+
+        return NoContent();
+    }
+
+    [HttpPost("users/{userId:guid}/hosted-runner-test-access")]
+    public async Task<IActionResult> SetHostedRunnerTestAccess(Guid userId, [FromBody] SetHostedRunnerTestAccessRequest req)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null) return NotFound("User not found.");
+
+        user.CanAccessHostedRunnerTestPlans = req.Enabled;
+        await _userManager.UpdateAsync(user);
+
+        _logger.LogInformation(
+            "Hosted runner test-plan access for user {UserId} set to {Enabled}",
+            userId,
+            req.Enabled);
 
         return NoContent();
     }
@@ -255,9 +273,15 @@ public record UserPlanResponse
     public string  Name                { get; init; } = string.Empty;
     public Guid?   SubscriptionPlanId  { get; init; }
     public string? PlanName            { get; init; }
+    public bool    CanAccessHostedRunnerTestPlans { get; init; }
 }
 
 public record AssignPlanRequest
 {
     public Guid? PlanId { get; init; }
+}
+
+public record SetHostedRunnerTestAccessRequest
+{
+    public bool Enabled { get; init; }
 }

@@ -39,6 +39,10 @@ class AdminSubscriptionPlansService {
   async assignPlan(userId: string, req: AssignPlanRequest): Promise<void> {
     await apiClient.post(`/api/admin/subscription-plans/users/${userId}/assign`, req)
   }
+
+  async setHostedRunnerTestAccess(userId: string, enabled: boolean): Promise<void> {
+    await apiClient.post(`/api/admin/subscription-plans/users/${userId}/hosted-runner-test-access`, { enabled })
+  }
 }
 
 export const adminSubscriptionPlansService = new AdminSubscriptionPlansService()

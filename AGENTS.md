@@ -244,6 +244,8 @@ Current capabilities:
 
 Do not add subscription-specific columns for new entitlements unless there is a strong query/indexing reason. Extend `PlanCapabilities` instead, add serializer normalization/tests, and update the Admin Subscription Plans screen.
 
+`testUsersOnly` runner plans are visible in the public pricing catalog and checkout flow only when `ApplicationUser.CanAccessHostedRunnerTestPlans` is enabled. Admins toggle that flag from `Admin -> Subscription Plans -> User Plans`; Admin plan assignment and hosted-runner provisioning can still use the plan directly for controlled smoke tests.
+
 AI budget is currently not part of subscriptions. Users bring/manage AI provider keys separately, and token usage is recorded only as telemetry.
 
 ### Hosted Runner Provisioning

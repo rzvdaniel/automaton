@@ -298,6 +298,7 @@ export interface UserPlan {
   name: string
   subscriptionPlanId?: string
   planName?: string
+  canAccessHostedRunnerTestPlans: boolean
 }
 
 export interface AssignPlanRequest {

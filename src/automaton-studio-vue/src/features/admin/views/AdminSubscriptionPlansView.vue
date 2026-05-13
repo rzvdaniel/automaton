@@ -34,6 +34,7 @@ const assignDialogVisible = ref(false)
 const assigningUser = ref<UserPlan | null>(null)
 const selectedPlanId = ref<string | null>(null)
 const assigning = ref(false)
+const togglingHostedRunnerTestAccessUserId = ref<string | null>(null)
 
 const visibilityOptions = [
   { label: 'Disabled', value: 'disabled' },
@@ -191,6 +192,27 @@ async function confirmAssign() {
   }
 }
 
+async function toggleHostedRunnerTestAccess(user: UserPlan) {
+  togglingHostedRunnerTestAccessUserId.value = user.userId
+  try {
+    await adminSubscriptionPlansService.setHostedRunnerTestAccess(
+      user.userId,
+      !user.canAccessHostedRunnerTestPlans,
+    )
+    toast.add({
+      severity: 'success',
+      summary: 'Test access updated',
+      detail: `${user.email} ${user.canAccessHostedRunnerTestPlans ? 'lost' : 'gained'} access to test-only runner plans.`,
+      life: 2500,
+    })
+    await loadUsers()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update test plan access', life: 3000 })
+  } finally {
+    togglingHostedRunnerTestAccessUserId.value = null
+  }
+}
+
 function runnerSummary(plan: SubscriptionPlan) {
   const runner = plan.capabilities.hostedRunner
   if (!runner.enabled) return 'No hosted runner'
@@ -268,6 +290,18 @@ function runnerSummary(plan: SubscriptionPlan) {
           <template #body="{ data }">
             <span v-if="data.planName">{{ data.planName }}</span>
             <span v-else class="text-color-secondary text-sm">None</span>
+          </template>
+        </Column>
+        <Column header="Test runner plans" style="width: 170px">
+          <template #body="{ data }">
+            <Button
+              :label="data.canAccessHostedRunnerTestPlans ? 'Allowed' : 'Blocked'"
+              :severity="data.canAccessHostedRunnerTestPlans ? 'success' : 'secondary'"
+              :outlined="!data.canAccessHostedRunnerTestPlans"
+              size="small"
+              :loading="togglingHostedRunnerTestAccessUserId === data.userId"
+              @click="toggleHostedRunnerTestAccess(data)"
+            />
           </template>
         </Column>
         <Column header="" style="width: 100px">

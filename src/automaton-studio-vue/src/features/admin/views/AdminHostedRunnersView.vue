@@ -13,7 +13,14 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
-import type { CreateRunnerHostRequest, HostedRunner, RunnerHost } from '../types/admin.types'
+import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
+import type {
+  CreateRunnerHostRequest,
+  HostedRunner,
+  RunnerHost,
+  SubscriptionPlan,
+  UserPlan,
+} from '../types/admin.types'
 
 const toast = useToast()
 
@@ -21,11 +28,18 @@ const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
 const loadingHosts = ref(false)
 const loadingRunners = ref(false)
+const loadingProvisioningOptions = ref(false)
 const provisioningUserId = ref<string | null>(null)
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
 const selectedRunner = ref<HostedRunner | null>(null)
+const provisionDialogVisible = ref(false)
+const provisioningNewRunner = ref(false)
+const users = ref<UserPlan[]>([])
+const plans = ref<SubscriptionPlan[]>([])
+const selectedProvisionUserId = ref<string | null>(null)
+const selectedProvisionPlanId = ref<string | null>(null)
 const runnerDetailsVisible = computed({
   get: () => selectedRunner.value !== null,
   set: (visible: boolean) => {
@@ -38,6 +52,24 @@ const statusOptions = [
   { label: 'Draining', value: 'draining' },
   { label: 'Disabled', value: 'disabled' },
 ] as const
+
+const provisionablePlans = computed(() =>
+  plans.value.filter((plan) => plan.isActive && plan.capabilities.hostedRunner.enabled),
+)
+
+const userOptions = computed(() =>
+  users.value.map((user) => ({
+    label: user.name ? `${user.name} (${user.email})` : user.email,
+    value: user.userId,
+  })),
+)
+
+const planOptions = computed(() =>
+  provisionablePlans.value.map((plan) => ({
+    label: `${plan.name} - ${plan.capabilities.hostedRunner.cpuCores} CPU, ${formatMb(plan.capabilities.hostedRunner.memoryMb)}`,
+    value: plan.id,
+  })),
+)
 
 function defaultHostForm(): CreateRunnerHostRequest {
   return {
@@ -89,6 +121,22 @@ async function loadHostedRunners() {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load hosted runners', life: 3000 })
   } finally {
     loadingRunners.value = false
+  }
+}
+
+async function loadProvisioningOptions() {
+  loadingProvisioningOptions.value = true
+  try {
+    const [loadedUsers, loadedPlans] = await Promise.all([
+      adminSubscriptionPlansService.getUsers(),
+      adminSubscriptionPlansService.getPlans(),
+    ])
+    users.value = loadedUsers
+    plans.value = loadedPlans
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load users or plans', life: 3000 })
+  } finally {
+    loadingProvisioningOptions.value = false
   }
 }
 
@@ -147,6 +195,36 @@ async function retryProvisioning(runner: HostedRunner) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to request hosted runner provisioning', life: 3000 })
   } finally {
     provisioningUserId.value = null
+  }
+}
+
+async function openProvisionDialog() {
+  selectedProvisionUserId.value = null
+  selectedProvisionPlanId.value = null
+  provisionDialogVisible.value = true
+  await loadProvisioningOptions()
+}
+
+async function provisionHostedRunner() {
+  if (!selectedProvisionUserId.value || !selectedProvisionPlanId.value) return
+
+  provisioningNewRunner.value = true
+  try {
+    await adminHostedRunnersService.provisionForUser(selectedProvisionUserId.value, {
+      planId: selectedProvisionPlanId.value,
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Provisioning requested',
+      detail: 'Hosted runner provisioning has started for the selected user.',
+      life: 3000,
+    })
+    provisionDialogVisible.value = false
+    await refreshAll()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to provision hosted runner', life: 3000 })
+  } finally {
+    provisioningNewRunner.value = false
   }
 }
 
@@ -241,7 +319,12 @@ onMounted(refreshAll)
     </Card>
 
     <Card>
-      <template #title>Hosted Runner Containers</template>
+      <template #title>
+        <div class="flex justify-content-between align-items-center gap-3">
+          <span>Hosted Runner Containers</span>
+          <Button label="Provision Runner" icon="pi pi-play" size="small" @click="openProvisionDialog" />
+        </div>
+      </template>
       <template #content>
         <DataTable :value="hostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll">
           <Column field="userEmail" header="User" />
@@ -285,6 +368,48 @@ onMounted(refreshAll)
         </DataTable>
       </template>
     </Card>
+
+    <Dialog v-model:visible="provisionDialogVisible" header="Provision Hosted Runner" modal :style="{ width: '36rem' }">
+      <div class="flex flex-column gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-2">User</label>
+          <Select
+            v-model="selectedProvisionUserId"
+            :options="userOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+            placeholder="Select a user"
+            :loading="loadingProvisioningOptions"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Hosted runner plan</label>
+          <Select
+            v-model="selectedProvisionPlanId"
+            :options="planOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+            placeholder="Select a plan"
+            :loading="loadingProvisioningOptions"
+          />
+        </div>
+        <div class="text-color-secondary text-sm">
+          This uses the same provisioning endpoint as plan assignment and Stripe-driven subscriptions, but lets admins run the first smoke test directly.
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancel" text @click="provisionDialogVisible = false" />
+        <Button
+          label="Provision"
+          icon="pi pi-play"
+          :disabled="!selectedProvisionUserId || !selectedProvisionPlanId"
+          :loading="provisioningNewRunner"
+          @click="provisionHostedRunner"
+        />
+      </template>
+    </Dialog>
 
     <Dialog v-model:visible="hostDialogVisible" :header="editingHost ? 'Edit Runner Host' : 'Add Runner Host'" modal :style="{ width: '36rem' }">
       <div class="flex flex-column gap-3">
