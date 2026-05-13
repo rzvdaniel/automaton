@@ -158,7 +158,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost("users/{userId:guid}/assign")]
     public async Task<IActionResult> AssignPlan(Guid userId, [FromBody] AssignPlanRequest req)
     {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
+        var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
         if (user == null) return NotFound("User not found.");
 
         if (req.PlanId.HasValue)
@@ -168,7 +168,7 @@ public class AdminSubscriptionPlansController : ControllerBase
         }
 
         user.SubscriptionPlanId = req.PlanId;
-        await _userManager.UpdateAsync(user);
+        await _db.SaveChangesAsync();
 
         if (req.PlanId.HasValue)
         {
@@ -189,11 +189,11 @@ public class AdminSubscriptionPlansController : ControllerBase
     [HttpPost("users/{userId:guid}/hosted-runner-test-access")]
     public async Task<IActionResult> SetHostedRunnerTestAccess(Guid userId, [FromBody] SetHostedRunnerTestAccessRequest req)
     {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
+        var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
         if (user == null) return NotFound("User not found.");
 
         user.CanAccessHostedRunnerTestPlans = req.Enabled;
-        await _userManager.UpdateAsync(user);
+        await _db.SaveChangesAsync();
 
         _logger.LogInformation(
             "Hosted runner test-plan access for user {UserId} set to {Enabled}",
