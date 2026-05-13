@@ -112,7 +112,7 @@ public class HostedRunnerProvisioningService
                 ? $"Provisioning mode '{options.DeploymentMode}' selected."
                 : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.");
 
-        await db.SaveChangesAsync(cancellationToken);
+        await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
 
         if (!options.Enabled)
         {
@@ -267,4 +267,31 @@ public class HostedRunnerProvisioningService
     private static string BuildRunnerName(Guid userId) => $"Hosted Runner {userId.ToString("N")[..8]}";
 
     private static string BuildContainerName(Guid userId) => $"automaton-hosted-runner-{userId.ToString("N")[..12]}";
+
+    private async Task SaveProvisioningCheckpointAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            var entries = ex.Entries.Select(entry =>
+            {
+                var keyValues = entry.Metadata.FindPrimaryKey()?.Properties
+                    .Select(property => $"{property.Name}={entry.Property(property.Name).CurrentValue}")
+                    ?? [];
+
+                return $"{entry.Metadata.ClrType.Name} [{entry.State}] ({string.Join(", ", keyValues)})";
+            });
+
+            logger.LogError(
+                ex,
+                "Hosted runner provisioning checkpoint failed for runner {HostedRunnerId}. Concurrency entries: {Entries}",
+                hostedRunner.Id,
+                string.Join("; ", entries));
+
+            throw;
+        }
+    }
 }
