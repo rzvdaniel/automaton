@@ -53,7 +53,6 @@ public class HostedRunnerProvisioningService
         }
 
         var hostedRunner = await db.HostedRunners
-            .Include(x => x.Deployments)
             .FirstOrDefaultAsync(x => x.UserId == userId && x.DeletedAt == null && x.Status != HostedRunnerStatuses.Disabled, cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -219,7 +218,7 @@ public class HostedRunnerProvisioningService
         return rawApiKey;
     }
 
-    private static HostedRunnerDeployment AddDeployment(
+    private HostedRunnerDeployment AddDeployment(
         HostedRunner runner,
         string status,
         string? commandPreview,
@@ -238,7 +237,7 @@ public class HostedRunnerProvisioningService
             StartedAt = DateTime.UtcNow,
             FinishedAt = status is HostedRunnerDeploymentStatuses.Running ? null : DateTime.UtcNow
         };
-        runner.Deployments.Add(deployment);
+        db.HostedRunnerDeployments.Add(deployment);
         return deployment;
     }
 
