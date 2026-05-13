@@ -309,10 +309,10 @@ This mirrors the current design, but in nginx form instead of Traefik form.
 ### First-time bootstrap
 
 1. Start `mysql`.
-2. Start `api-blue`, `studio-blue`, `website-blue`.
-3. Create selector files pointing all live traffic to blue.
-4. Start `nginx`.
-5. Run `certbot` to obtain certificates.
+2. Start `nginx` with temporary bootstrap upstreams that do not depend on app containers existing yet.
+3. Run `certbot` to obtain certificates.
+4. Start `api-blue`, `studio-blue`, and `website-blue`.
+5. Run `prod-reset-blue-green.sh` to create selector files pointing live traffic to blue.
 6. Reload `nginx`.
 7. Keep Cloudflare proxied and set SSL mode to `Full (strict)`.
 

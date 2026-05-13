@@ -169,13 +169,17 @@ chmod +x ./scripts/prod-*.sh
 ```bash
 cd /opt/automaton
 ./scripts/prod-issue-certs.sh
-./scripts/prod-redeploy-all.sh
+docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue
+./scripts/prod-reset-blue-green.sh
+./scripts/prod-redeploy-all.sh --keep-previous
 ```
 
-That does two things:
+That does four things:
 
 - `prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx
-- `prod-redeploy-all.sh` deploys the first live blue/green color for API, Studio, and Website
+- `docker compose ... up -d --build api-blue studio-blue website-blue` creates a known all-blue baseline
+- `prod-reset-blue-green.sh` points nginx state at that all-blue baseline
+- `prod-redeploy-all.sh --keep-previous` exercises the normal green deployment flow while keeping blue available for rollback
 
 ### 11. Verify locally on the server
 
@@ -301,6 +305,13 @@ cd /opt/automaton
 ./scripts/prod-switch-blue-green.sh all blue
 ```
 
+Reset routing state to a known all-blue baseline after the blue containers are already running:
+
+```bash
+cd /opt/automaton
+./scripts/prod-reset-blue-green.sh
+```
+
 ## First-Time Bootstrap
 
 If the server is already prepared and you just need the minimal first deploy sequence:
@@ -311,11 +322,13 @@ cp .env.prod.example .env
 # edit .env and /opt/automaton/config/appsettings.Production.json
 chmod +x ./scripts/prod-*.sh
 ./scripts/prod-issue-certs.sh
-./scripts/prod-redeploy-all.sh
+docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue
+./scripts/prod-reset-blue-green.sh
+./scripts/prod-redeploy-all.sh --keep-previous
 ```
 
 `prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx.
-`prod-redeploy-all.sh` then deploys the first live color for API, Studio, and website.
+The explicit blue startup plus `prod-reset-blue-green.sh` creates a predictable routing baseline before the first regular blue/green redeploy.
 
 ## Infrastructure Services
 

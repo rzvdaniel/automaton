@@ -64,6 +64,7 @@ sudo ./setup-service.sh
 | `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
 | `prod-issue-certs.sh` | Linux/macOS | Request or refresh the nginx TLS certificate bundle used by the public stack |
 | `prod-renew-certs.sh` | Linux/macOS | Run certbot renew and reload nginx |
+| `prod-reset-blue-green.sh` | Linux/macOS | Reset live routing state to all-blue after blue containers are confirmed running |
 
 ---
 
@@ -75,6 +76,7 @@ These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/gree
 cd /opt/automaton
 ./scripts/prod-switch-blue-green.sh status
 ./scripts/prod-issue-certs.sh
+./scripts/prod-reset-blue-green.sh
 ./scripts/prod-redeploy-api.sh
 ./scripts/prod-redeploy-studio.sh
 ./scripts/prod-redeploy-website.sh

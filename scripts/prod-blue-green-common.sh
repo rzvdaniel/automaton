@@ -20,6 +20,7 @@ LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 LIVE_API_COLOR_DEFAULT="blue"
 LIVE_STUDIO_COLOR_DEFAULT="blue"
 LIVE_WEBSITE_COLOR_DEFAULT="blue"
+BOOTSTRAP_UPSTREAM_HOST="127.0.0.1"
 
 ensure_runtime_dirs() {
     mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR"
@@ -108,12 +109,32 @@ upstream_destination() {
     esac
 }
 
+bootstrap_upstream_destination() {
+    local service="$1"
+
+    case "$service" in
+        api) echo "server $BOOTSTRAP_UPSTREAM_HOST:8080;" ;;
+        studio) echo "server $BOOTSTRAP_UPSTREAM_HOST:8081;" ;;
+        website) echo "server $BOOTSTRAP_UPSTREAM_HOST:8082;" ;;
+        *)
+            echo "[ERROR] Unknown service: $service" >&2
+            exit 1
+            ;;
+    esac
+}
+
 render_service_upstream() {
     local service="$1"
     local color="$2"
     local destination="$NGINX_UPSTREAMS_DIR/${service}-live.conf"
 
     printf '%s\n' "$(upstream_destination "$service" "$color")" > "$destination"
+}
+
+render_bootstrap_upstreams() {
+    printf '%s\n' "$(bootstrap_upstream_destination api)" > "$NGINX_UPSTREAMS_DIR/api-live.conf"
+    printf '%s\n' "$(bootstrap_upstream_destination studio)" > "$NGINX_UPSTREAMS_DIR/studio-live.conf"
+    printf '%s\n' "$(bootstrap_upstream_destination website)" > "$NGINX_UPSTREAMS_DIR/website-live.conf"
 }
 
 render_all_upstreams() {
@@ -131,7 +152,12 @@ render_nginx_runtime() {
     render_template "$NGINX_TEMPLATE_DIR/conf.d/api.conf.template" "$NGINX_CONF_DIR/api.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/studio.conf.template" "$NGINX_CONF_DIR/studio.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/website.conf.template" "$NGINX_CONF_DIR/website.conf"
-    render_all_upstreams
+
+    if [[ -f "$STATE_FILE" ]]; then
+        render_all_upstreams
+    else
+        render_bootstrap_upstreams
+    fi
 }
 
 ensure_placeholder_certificate() {
@@ -163,10 +189,6 @@ ensure_blue_green_bootstrap() {
     load_prod_env
     ensure_runtime_dirs
     ensure_acme_webroot
-
-    if [[ ! -f "$STATE_FILE" ]]; then
-        write_default_state
-    fi
 
     render_nginx_runtime
     ensure_placeholder_certificate
@@ -353,6 +375,14 @@ ensure_infrastructure() {
     echo "[INFO] Ensuring MySQL and nginx are up"
     docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql nginx
     wait_for_service_healthy nginx 120
+}
+
+reset_blue_green_to_blue() {
+    LIVE_API_COLOR="$LIVE_API_COLOR_DEFAULT"
+    LIVE_STUDIO_COLOR="$LIVE_STUDIO_COLOR_DEFAULT"
+    LIVE_WEBSITE_COLOR="$LIVE_WEBSITE_COLOR_DEFAULT"
+    save_state
+    render_all_upstreams
 }
 
 deploy_color() {

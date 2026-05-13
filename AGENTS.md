@@ -167,6 +167,7 @@ The live color is tracked in `.prod-runtime/nginx/state/blue-green-state.env`, a
 
 - `./scripts/prod-issue-certs.sh`
 - `./scripts/prod-renew-certs.sh`
+- `./scripts/prod-reset-blue-green.sh`
 - `./scripts/prod-redeploy-api.sh`
 - `./scripts/prod-redeploy-studio.sh`
 - `./scripts/prod-redeploy-website.sh`
