@@ -60,7 +60,13 @@ else
 fi
 
 echo "[INFO] Requesting certificate bundle '$CERT_NAME' for $WEBSITE_DOMAIN, www.$WEBSITE_DOMAIN, $API_DOMAIN, and $STUDIO_DOMAIN"
-docker compose -f "$COMPOSE_FILE" "${CERTBOT_ARGS[@]}"
+remove_bootstrap_placeholder_certificate
+
+if ! docker compose -f "$COMPOSE_FILE" "${CERTBOT_ARGS[@]}"; then
+    echo "[ERROR] Certbot issuance failed. Restoring the temporary bootstrap certificate files." >&2
+    ensure_placeholder_certificate
+    exit 1
+fi
 
 echo "[INFO] Reloading nginx to pick up the latest certificates"
 nginx_reload

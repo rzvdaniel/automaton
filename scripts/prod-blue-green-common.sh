@@ -164,6 +164,7 @@ ensure_placeholder_certificate() {
     local cert_dir="$LETSENCRYPT_DIR/live/$CERT_NAME"
     local fullchain="$cert_dir/fullchain.pem"
     local privkey="$cert_dir/privkey.pem"
+    local marker="$cert_dir/.automaton-bootstrap-placeholder"
 
     if [[ -f "$fullchain" && -f "$privkey" ]]; then
         return
@@ -178,6 +179,21 @@ ensure_placeholder_certificate() {
         -subj "/CN=$WEBSITE_DOMAIN" \
         -addext "subjectAltName=DNS:$WEBSITE_DOMAIN,DNS:www.$WEBSITE_DOMAIN,DNS:$API_DOMAIN,DNS:$STUDIO_DOMAIN" \
         > /dev/null 2>&1
+
+    printf 'bootstrap\n' > "$marker"
+}
+
+bootstrap_placeholder_exists() {
+    [[ -f "$LETSENCRYPT_DIR/live/$CERT_NAME/.automaton-bootstrap-placeholder" ]]
+}
+
+remove_bootstrap_placeholder_certificate() {
+    local cert_dir="$LETSENCRYPT_DIR/live/$CERT_NAME"
+
+    if bootstrap_placeholder_exists; then
+        echo "[INFO] Removing temporary bootstrap certificate files before Certbot issuance"
+        rm -rf "$cert_dir"
+    fi
 }
 
 ensure_acme_webroot() {

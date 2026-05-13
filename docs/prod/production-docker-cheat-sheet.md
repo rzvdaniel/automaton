@@ -330,6 +330,8 @@ docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue web
 `prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx.
 The explicit blue startup plus `prod-reset-blue-green.sh` creates a predictable routing baseline before the first regular blue/green redeploy.
 
+The certificate helper removes only its own temporary bootstrap certificate directory before calling Certbot. If issuance fails, it restores that placeholder so nginx can still restart cleanly while you resolve ACME validation.
+
 ## Infrastructure Services
 
 These services do not rebuild from local source in this repo:
