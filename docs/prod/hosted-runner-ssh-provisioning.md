@@ -102,6 +102,14 @@ Use the full checklist in [Administrator Step-by-Step](#administrator-step-by-st
 
 Failed or pending hosted runners can be retried from `Admin -> Hosted Runners`.
 
+If Docker starts the hosted runner container but the hosted runner stays in `provisioning`, inspect that container's logs on the selected runner host. The most common first-launch failure is a permissions error on the bind-mounted data folders, for example:
+
+```text
+mkdir: cannot create directory '/app/data/apps': Permission denied
+```
+
+Hosted runner provisioning now fixes ownership automatically before launching the container, but older pending runners created before that fix may need the one-time recovery command shown in [Retry failed provisioning](#10-retry-failed-provisioning).
+
 ## Administrator Step-by-Step
 
 Use this checklist when setting up hosted runner subscriptions for the first time.
@@ -375,6 +383,30 @@ If a hosted runner stays pending or fails:
 3. Click `Retry`.
 
 Automaton will rotate the temporary runner registration key and attempt provisioning again.
+
+If the deployment attempt says Docker succeeded but the hosted runner remains `provisioning`, inspect the actual container on the selected runner host:
+
+```bash
+docker ps --filter "name=automaton-hosted-runner-..."
+docker logs --tail 200 automaton-hosted-runner-...
+```
+
+If the container is restarting with:
+
+```text
+mkdir: cannot create directory '/app/data/apps': Permission denied
+```
+
+then the host bind mounts were created without ownership for the non-root `automaton` user inside the Runner image. For an already-created hosted runner, repair ownership once on the runner host:
+
+```bash
+sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/config
+sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/data
+sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/logs
+docker restart automaton-hosted-runner-...
+```
+
+After the container starts cleanly, it should register back with Automaton and move from `provisioning` to `running`.
 
 ### 11. Add more Hetzner servers later
 

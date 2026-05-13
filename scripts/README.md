@@ -56,28 +56,32 @@ sudo ./setup-service.sh
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
 | `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
-| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for blue/green production deploys |
-| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color Traefik serves for API, Studio, and website |
+| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for nginx-based blue/green production deploys |
+| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color nginx serves for API, Studio, and website |
 | `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with a blue/green cutover |
 | `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with a blue/green cutover |
 | `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with a blue/green cutover |
 | `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
+| `prod-issue-certs.sh` | Linux/macOS | Request or refresh the nginx TLS certificate bundle used by the public stack |
+| `prod-renew-certs.sh` | Linux/macOS | Run certbot renew and reload nginx |
 
 ---
 
 ## 🚢 Production Docker Redeploy Helpers
 
-These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. Traefik now reads a generated file-provider config from `docker/traefik/dynamic/blue-green-routes.yml`, and the scripts update that file to point each hostname at the freshly deployed color.
+These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. nginx reads generated upstream selector files from `.prod-runtime/nginx/upstreams/`, and the scripts update those files before reloading nginx to point each hostname at the freshly deployed color.
 
 ```bash
 cd /opt/automaton
 ./scripts/prod-switch-blue-green.sh status
+./scripts/prod-issue-certs.sh
 ./scripts/prod-redeploy-api.sh
 ./scripts/prod-redeploy-studio.sh
 ./scripts/prod-redeploy-website.sh
 ./scripts/prod-redeploy-website.sh --with-cli-assets
 ./scripts/prod-redeploy-all.sh
 ./scripts/prod-redeploy-all.sh --with-cli-assets
+./scripts/prod-renew-certs.sh
 ```
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.

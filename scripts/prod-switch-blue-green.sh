@@ -1,5 +1,5 @@
 #!/bin/bash
-# Manage the Traefik blue/green route mapping for api, studio, and website.
+# Manage the nginx blue/green upstream mapping for api, studio, and website.
 
 set -euo pipefail
 
@@ -40,9 +40,10 @@ case "$1" in
             print_usage
             exit 1
         fi
+        ensure_infrastructure
         assert_service_exists "$1" "$2"
-        set_live_color "$1" "$2"
-        echo "[INFO] Routed $1 traffic to $1-$2"
+        switch_live_color "$1" "$2"
+        echo "[INFO] Routed $1 traffic to $1-$2 via nginx reload"
         status_table
         ;;
     all)
@@ -54,13 +55,14 @@ case "$1" in
             print_usage
             exit 1
         fi
+        ensure_infrastructure
         assert_service_exists api "$2"
         assert_service_exists studio "$2"
         assert_service_exists website "$2"
-        set_live_color api "$2"
-        set_live_color studio "$2"
-        set_live_color website "$2"
-        echo "[INFO] Routed api, studio, and website traffic to the $2 color"
+        switch_live_color api "$2"
+        switch_live_color studio "$2"
+        switch_live_color website "$2"
+        echo "[INFO] Routed api, studio, and website traffic to the $2 color via nginx reloads"
         status_table
         ;;
     *)

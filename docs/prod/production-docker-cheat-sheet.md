@@ -1,13 +1,208 @@
 # Production Docker Cheat Sheet
 
-Use these commands from the production server after pulling the latest code into `/opt/automaton`.
+This is the source of truth for the current nginx-based production stack.
+
+Use it for both:
+
+- first-time server bootstrap
+- normal day-to-day deploys and operations
+
+## Prerequisites
+
+Before touching the server, make sure you have:
+
+- a Hetzner VPS or equivalent Ubuntu host
+- a Cloudflare-managed domain
+- DNS records for `@`, `www`, `api`, and `studio`
+- SSH access to the server
+- a local SSH key pair
+
+Recommended DNS shape in Cloudflare:
+
+- `A @ -> server IP`
+- `A www -> server IP`
+- `A api -> server IP`
+- `A studio -> server IP`
+
+Recommended Cloudflare settings:
+
+- keep all four records `Proxied`
+- set SSL/TLS mode to `Full (strict)`
+
+## Fresh Server Bootstrap
+
+### 1. Install Docker
+
+Run on the server:
+
+```bash
+apt update && apt upgrade -y
+curl -fsSL https://get.docker.com | sh
+docker --version
+docker compose version
+```
+
+### 2. Clone the repo
+
+Recommended location:
+
+```bash
+mkdir -p /opt/automaton
+git clone https://github.com/rzvdaniel/automaton.git /opt/automaton
+cd /opt/automaton
+```
+
+If the repo is private, clone with a GitHub token or use your normal authenticated git flow.
+
+### 3. Create config and secret directories
+
+```bash
+mkdir -p /opt/automaton/config
+mkdir -p /opt/automaton/secrets
+```
+
+### 4. Create production app settings
+
+```bash
+cp /opt/automaton/appsettings.Production.example.json /opt/automaton/config/appsettings.Production.json
+```
+
+Then edit:
+
+```bash
+nano /opt/automaton/config/appsettings.Production.json
+```
+
+Fill in the production values for:
+
+- CORS origins
+- JWT issuer
+- HMAC secret
+- RSA keys
+- AI encryption key
+- email
+- Stripe
+- any hosted-runner options you use
+
+### 5. Generate RSA keys
+
+Install the helper dependency:
+
+```bash
+apt install -y python3-cryptography
+```
+
+Generate keys:
+
+```bash
+cd /opt/automaton
+python3 chatgpt/GenerateRsaKeysASXml.py
+```
+
+This writes `publickey.xml` and `privatekey.xml` into `/opt/automaton/`. Copy those values into `appsettings.Production.json`.
+
+### 6. Create the production `.env`
+
+```bash
+cd /opt/automaton
+cp .env.prod.example .env
+nano .env
+```
+
+Set at least:
+
+```env
+API_DOMAIN=api.automaton.monster
+STUDIO_DOMAIN=studio.automaton.monster
+WEBSITE_DOMAIN=automaton.monster
+ACME_EMAIL=you@example.com
+MYSQL_ROOT_PASSWORD=strong-root-password
+MYSQL_DATABASE=automaton
+MYSQL_USER=automaton_user
+MYSQL_PASSWORD=strong-user-password
+```
+
+Optional:
+
+```env
+CERT_NAME=automaton.monster
+```
+
+Use `CERT_NAME` only if you want the certificate stored under a different folder name than `WEBSITE_DOMAIN`.
+
+### 7. Add hosted-runner SSH key if needed
+
+If you use hosted-runner provisioning from the API, create:
+
+```bash
+chmod 700 /opt/automaton/secrets
+touch /opt/automaton/secrets/hosted_runner_ssh_key
+chmod 600 /opt/automaton/secrets/hosted_runner_ssh_key
+```
+
+Then put the private key contents into that file.
+
+If you do not use hosted-runner provisioning yet, you can still create an empty placeholder file so the API bind mount resolves cleanly.
+
+### 8. Open the firewall
+
+If you use UFW:
+
+```bash
+apt install -y ufw
+ufw allow ssh
+ufw allow 80
+ufw allow 443
+ufw enable
+ufw status
+```
+
+### 9. Make the production scripts executable
+
+```bash
+cd /opt/automaton
+chmod +x ./scripts/prod-*.sh
+```
+
+### 10. Bootstrap certificates and first deploy
+
+```bash
+cd /opt/automaton
+./scripts/prod-issue-certs.sh
+./scripts/prod-redeploy-all.sh
+```
+
+That does two things:
+
+- `prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx
+- `prod-redeploy-all.sh` deploys the first live blue/green color for API, Studio, and Website
+
+### 11. Verify locally on the server
+
+```bash
+curl -k --resolve api.automaton.monster:443:127.0.0.1 https://api.automaton.monster/healthz
+curl -k --resolve studio.automaton.monster:443:127.0.0.1 https://studio.automaton.monster -I
+curl -k --resolve automaton.monster:443:127.0.0.1 https://automaton.monster -I
+curl -k --resolve www.automaton.monster:443:127.0.0.1 https://www.automaton.monster -I
+```
+
+### 12. Verify publicly through Cloudflare
+
+```bash
+curl -I https://api.automaton.monster/healthz
+curl -I https://studio.automaton.monster
+curl -I https://automaton.monster
+curl -I https://www.automaton.monster
+```
+
+If these succeed, the stack is live.
 
 ## Blue/Green Basics
 
-Traefik now serves `api`, `studio`, and `website` through a generated file-provider config:
+nginx now serves `api`, `studio`, and `website` through generated upstream selector files:
 
-- state file: `docker/traefik/dynamic/blue-green-state.env`
-- routes file: `docker/traefik/dynamic/blue-green-routes.yml`
+- state file: `.prod-runtime/nginx/state/blue-green-state.env`
+- upstream selector dir: `.prod-runtime/nginx/upstreams/`
 
 Each public service has two Compose services:
 
@@ -15,7 +210,7 @@ Each public service has two Compose services:
 - `studio-blue` / `studio-green`
 - `website-blue` / `website-green`
 
-The deploy scripts build the inactive color, wait for health checks to pass, switch Traefik to that color, and then stop the old color unless you pass `--keep-previous`.
+The deploy scripts build the inactive color, wait for health checks to pass, rewrite the nginx selector for that hostname, reload nginx, and then stop the old color unless you pass `--keep-previous`.
 
 ## Full Stack
 
@@ -108,17 +303,19 @@ cd /opt/automaton
 
 ## First-Time Bootstrap
 
-On a fresh server:
+If the server is already prepared and you just need the minimal first deploy sequence:
 
 ```bash
 cd /opt/automaton
 cp .env.prod.example .env
 # edit .env and /opt/automaton/config/appsettings.Production.json
 chmod +x ./scripts/prod-*.sh
+./scripts/prod-issue-certs.sh
 ./scripts/prod-redeploy-all.sh
 ```
 
-`prod-redeploy-all.sh` bootstraps the generated Traefik routes file, starts `mysql`, `socket-proxy`, and `traefik`, then deploys the first live color for API, Studio, and website.
+`prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx.
+`prod-redeploy-all.sh` then deploys the first live color for API, Studio, and website.
 
 ## Infrastructure Services
 
@@ -126,15 +323,38 @@ These services do not rebuild from local source in this repo:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d mysql socket-proxy traefik
+docker compose -f docker-compose.prod.yml up -d mysql nginx
 ```
 
 Pull newer upstream images first if needed:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml pull mysql socket-proxy traefik
-docker compose -f docker-compose.prod.yml up -d mysql socket-proxy traefik
+docker compose -f docker-compose.prod.yml pull mysql nginx
+docker compose -f docker-compose.prod.yml up -d mysql nginx
+```
+
+## TLS Certificates
+
+Issue or refresh the live certificate bundle:
+
+```bash
+cd /opt/automaton
+./scripts/prod-issue-certs.sh
+```
+
+Force a fresh cert request:
+
+```bash
+cd /opt/automaton
+./scripts/prod-issue-certs.sh --force-renewal
+```
+
+Run a normal renewal check:
+
+```bash
+cd /opt/automaton
+./scripts/prod-renew-certs.sh
 ```
 
 ## Website CLI Downloads
@@ -171,7 +391,7 @@ docker compose -f docker-compose.prod.yml logs -f studio-blue
 docker compose -f docker-compose.prod.yml logs -f studio-green
 docker compose -f docker-compose.prod.yml logs -f website-blue
 docker compose -f docker-compose.prod.yml logs -f website-green
-docker compose -f docker-compose.prod.yml logs -f traefik
+docker compose -f docker-compose.prod.yml logs -f nginx
 ```
 
 Show the overall stack:
@@ -192,7 +412,7 @@ docker compose -f docker-compose.prod.yml --profile build-assets config
 
 ## Notes
 
-- This is safer than `docker compose up -d --build website` because Traefik keeps serving the currently live color until the new color passes health checks.
+- This is safer than `docker compose up -d --build website` because nginx keeps serving the currently live color until the new color passes health checks and the selector file is switched.
 - Cloudflare should no longer need the DNS proxy off/on workaround in normal deploys, because the hostname never points at a half-restarted backend.
 - API blue/green assumes database changes are backward-compatible for the duration of the cutover. Avoid schema changes where the old API crashes immediately after the migration is applied.
 - The blue/green scripts run `docker compose ... --remove-orphans`, so old pre-migration containers like `automaton-prod-website-1` / `-2` get cleaned up automatically on the next deploy.

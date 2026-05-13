@@ -155,6 +155,25 @@ AUTOMATON_API_KEY=ak_runner_xxx automaton-runner
 
 See `docs/runners/docker-runner.md` for advanced options.
 
+### Production Deployment
+
+The production public stack uses `docker-compose.prod.yml` with:
+
+- `nginx` as the only public reverse proxy on ports `80/443`
+- static blue/green upstream switching for `api`, `studio`, and `website`
+- Docker Compose services `api-blue/api-green`, `studio-blue/studio-green`, `website-blue/website-green`
+
+The live color is tracked in `.prod-runtime/nginx/state/blue-green-state.env`, and deploy scripts rewrite selector files under `.prod-runtime/nginx/upstreams/` before reloading nginx. Production deploy entrypoints are:
+
+- `./scripts/prod-issue-certs.sh`
+- `./scripts/prod-renew-certs.sh`
+- `./scripts/prod-redeploy-api.sh`
+- `./scripts/prod-redeploy-studio.sh`
+- `./scripts/prod-redeploy-website.sh`
+- `./scripts/prod-redeploy-all.sh`
+
+Use `docs/prod/production-docker-cheat-sheet.md` and `docs/prod/nginx-static-blue-green-layout.md` as the source of truth for the current production model.
+
 ## Backend API
 
 **Swagger / OpenAPI:**

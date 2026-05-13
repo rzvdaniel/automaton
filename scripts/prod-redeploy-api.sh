@@ -54,8 +54,8 @@ TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color api)}"
 
 echo "[INFO] Redeploying production API to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
 deploy_color api "$TARGET_COLOR"
-set_live_color api "$TARGET_COLOR"
-echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR"
+switch_live_color api "$TARGET_COLOR"
+echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via nginx reload"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
     stop_color api "$CURRENT_COLOR"

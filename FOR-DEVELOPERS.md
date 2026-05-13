@@ -175,6 +175,12 @@ But the value is massive: users can prototype entire applications (forms, dashbo
 
 ## Common Pitfalls & How We Fixed Them
 
+### Bind Mounts Replace Carefully Prepared Container Directories
+
+The Runner image pre-creates `/app/data/apps` and `/app/logs` with the right ownership for its non-root `automaton` user. That ownership disappears the moment Docker bind-mounts fresh host directories over `/app/data` or `/app/logs`. If the provisioning script creates those host folders as root or another host user and does not hand them to the container UID, the runner crash-loops before it can register, usually with `mkdir: cannot create directory '/app/data/apps': Permission denied`.
+
+Hosted-runner provisioning now fixes this by chowning each runner's `config`, `data`, and `logs` folders to UID/GID `1000:1000` before `docker run`. The lesson is broader than this one bug: whenever a non-root container receives a writable bind mount, ownership belongs in the deployment contract, not in a hopeful comment inside the Dockerfile.
+
 ### 1. Theme-Aware Styling (Dark/Light Mode)
 
 **The Pitfall:**

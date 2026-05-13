@@ -66,8 +66,8 @@ TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color website)}"
 
 echo "[INFO] Redeploying production website to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
 deploy_color website "$TARGET_COLOR"
-set_live_color website "$TARGET_COLOR"
-echo "[INFO] Switched $WEBSITE_DOMAIN and www.$WEBSITE_DOMAIN traffic to website-$TARGET_COLOR"
+switch_live_color website "$TARGET_COLOR"
+echo "[INFO] Switched $WEBSITE_DOMAIN and www.$WEBSITE_DOMAIN traffic to website-$TARGET_COLOR via nginx reload"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
     stop_color website "$CURRENT_COLOR"

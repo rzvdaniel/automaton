@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared helpers for production blue/green deploy scripts.
+# Shared helpers for nginx-based production blue/green deploy scripts.
 
 set -euo pipefail
 
@@ -7,16 +7,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
 ENV_FILE="$REPO_ROOT/.env"
-DYNAMIC_DIR="$REPO_ROOT/docker/traefik/dynamic"
-STATE_FILE="$DYNAMIC_DIR/blue-green-state.env"
-ROUTES_FILE="$DYNAMIC_DIR/blue-green-routes.yml"
+NGINX_TEMPLATE_DIR="$REPO_ROOT/docker/nginx/prod"
+RUNTIME_ROOT="$REPO_ROOT/.prod-runtime"
+NGINX_RUNTIME_DIR="$RUNTIME_ROOT/nginx"
+NGINX_CONF_DIR="$NGINX_RUNTIME_DIR/conf.d"
+NGINX_UPSTREAMS_DIR="$NGINX_RUNTIME_DIR/upstreams"
+STATE_DIR="$NGINX_RUNTIME_DIR/state"
+STATE_FILE="$STATE_DIR/blue-green-state.env"
+CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
+LETSENCRYPT_DIR="$RUNTIME_ROOT/letsencrypt"
 
 LIVE_API_COLOR_DEFAULT="blue"
 LIVE_STUDIO_COLOR_DEFAULT="blue"
 LIVE_WEBSITE_COLOR_DEFAULT="blue"
 
-ensure_dynamic_dir() {
-    mkdir -p "$DYNAMIC_DIR"
+ensure_runtime_dirs() {
+    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR"
 }
 
 ensure_env_file() {
@@ -37,10 +43,13 @@ load_prod_env() {
     : "${API_DOMAIN:?API_DOMAIN is required in .env}"
     : "${STUDIO_DOMAIN:?STUDIO_DOMAIN is required in .env}"
     : "${WEBSITE_DOMAIN:?WEBSITE_DOMAIN is required in .env}"
+    : "${ACME_EMAIL:?ACME_EMAIL is required in .env}"
+
+    CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
 }
 
 write_default_state() {
-    ensure_dynamic_dir
+    ensure_runtime_dirs
     cat > "$STATE_FILE" <<EOF
 LIVE_API_COLOR=$LIVE_API_COLOR_DEFAULT
 LIVE_STUDIO_COLOR=$LIVE_STUDIO_COLOR_DEFAULT
@@ -49,7 +58,7 @@ EOF
 }
 
 load_state() {
-    ensure_dynamic_dir
+    ensure_runtime_dirs
 
     if [[ ! -f "$STATE_FILE" ]]; then
         write_default_state
@@ -64,7 +73,7 @@ load_state() {
 }
 
 save_state() {
-    ensure_dynamic_dir
+    ensure_runtime_dirs
     cat > "$STATE_FILE" <<EOF
 LIVE_API_COLOR=$LIVE_API_COLOR
 LIVE_STUDIO_COLOR=$LIVE_STUDIO_COLOR
@@ -72,46 +81,95 @@ LIVE_WEBSITE_COLOR=$LIVE_WEBSITE_COLOR
 EOF
 }
 
-render_routes_file() {
-    load_prod_env
+render_template() {
+    local template_file="$1"
+    local destination_file="$2"
+
+    sed \
+        -e "s|__API_DOMAIN__|$API_DOMAIN|g" \
+        -e "s|__STUDIO_DOMAIN__|$STUDIO_DOMAIN|g" \
+        -e "s|__WEBSITE_DOMAIN__|$WEBSITE_DOMAIN|g" \
+        -e "s|__CERT_NAME__|$CERT_NAME|g" \
+        "$template_file" > "$destination_file"
+}
+
+upstream_destination() {
+    local service="$1"
+    local color="$2"
+
+    case "$service" in
+        api) echo "server api-$color:8080;" ;;
+        studio) echo "server studio-$color:80;" ;;
+        website) echo "server website-$color:80;" ;;
+        *)
+            echo "[ERROR] Unknown service: $service" >&2
+            exit 1
+            ;;
+    esac
+}
+
+render_service_upstream() {
+    local service="$1"
+    local color="$2"
+    local destination="$NGINX_UPSTREAMS_DIR/${service}-live.conf"
+
+    printf '%s\n' "$(upstream_destination "$service" "$color")" > "$destination"
+}
+
+render_all_upstreams() {
     load_state
+    render_service_upstream api "$LIVE_API_COLOR"
+    render_service_upstream studio "$LIVE_STUDIO_COLOR"
+    render_service_upstream website "$LIVE_WEBSITE_COLOR"
+}
 
-    cat > "$ROUTES_FILE" <<EOF
-http:
-  routers:
-    api:
-      rule: "Host(\`${API_DOMAIN}\`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      service: api-${LIVE_API_COLOR}@docker
+render_nginx_runtime() {
+    load_prod_env
+    ensure_runtime_dirs
 
-    studio:
-      rule: "Host(\`${STUDIO_DOMAIN}\`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      service: studio-${LIVE_STUDIO_COLOR}@docker
+    cp "$NGINX_TEMPLATE_DIR/nginx.conf" "$NGINX_RUNTIME_DIR/nginx.conf"
+    render_template "$NGINX_TEMPLATE_DIR/conf.d/api.conf.template" "$NGINX_CONF_DIR/api.conf"
+    render_template "$NGINX_TEMPLATE_DIR/conf.d/studio.conf.template" "$NGINX_CONF_DIR/studio.conf"
+    render_template "$NGINX_TEMPLATE_DIR/conf.d/website.conf.template" "$NGINX_CONF_DIR/website.conf"
+    render_all_upstreams
+}
 
-    website:
-      rule: "Host(\`${WEBSITE_DOMAIN}\`) || Host(\`www.${WEBSITE_DOMAIN}\`)"
-      entryPoints:
-        - websecure
-      tls:
-        certResolver: letsencrypt
-      service: website-${LIVE_WEBSITE_COLOR}@docker
-EOF
+ensure_placeholder_certificate() {
+    local cert_dir="$LETSENCRYPT_DIR/live/$CERT_NAME"
+    local fullchain="$cert_dir/fullchain.pem"
+    local privkey="$cert_dir/privkey.pem"
+
+    if [[ -f "$fullchain" && -f "$privkey" ]]; then
+        return
+    fi
+
+    echo "[INFO] Creating temporary self-signed certificate for nginx bootstrap"
+    mkdir -p "$cert_dir"
+
+    openssl req -x509 -nodes -newkey rsa:2048 -days 7 \
+        -keyout "$privkey" \
+        -out "$fullchain" \
+        -subj "/CN=$WEBSITE_DOMAIN" \
+        -addext "subjectAltName=DNS:$WEBSITE_DOMAIN,DNS:www.$WEBSITE_DOMAIN,DNS:$API_DOMAIN,DNS:$STUDIO_DOMAIN" \
+        > /dev/null 2>&1
+}
+
+ensure_acme_webroot() {
+    mkdir -p "$CERTBOT_WWW_DIR/.well-known/acme-challenge"
+    printf 'ok\n' > "$CERTBOT_WWW_DIR/.well-known/acme-challenge/healthz"
 }
 
 ensure_blue_green_bootstrap() {
-    ensure_dynamic_dir
+    load_prod_env
+    ensure_runtime_dirs
+    ensure_acme_webroot
+
     if [[ ! -f "$STATE_FILE" ]]; then
         write_default_state
     fi
 
-    render_routes_file
+    render_nginx_runtime
+    ensure_placeholder_certificate
 }
 
 other_color() {
@@ -138,7 +196,7 @@ get_live_color() {
     esac
 }
 
-set_live_color() {
+set_live_color_record() {
     local service="$1"
     local color="$2"
 
@@ -155,7 +213,6 @@ set_live_color() {
     esac
 
     save_state
-    render_routes_file
 }
 
 compose_service_name() {
@@ -241,10 +298,61 @@ wait_for_service_healthy() {
     done
 }
 
+nginx_test() {
+    docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -t
+}
+
+nginx_reload() {
+    nginx_test
+    docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -s reload
+}
+
+verify_live_origin() {
+    local service="$1"
+
+    case "$service" in
+        api)
+            curl -kfsS --resolve "$API_DOMAIN:443:127.0.0.1" "https://$API_DOMAIN/healthz" > /dev/null
+            ;;
+        studio)
+            curl -kIfsS --resolve "$STUDIO_DOMAIN:443:127.0.0.1" "https://$STUDIO_DOMAIN/" > /dev/null
+            ;;
+        website)
+            curl -kIfsS --resolve "$WEBSITE_DOMAIN:443:127.0.0.1" "https://$WEBSITE_DOMAIN/" > /dev/null
+            curl -kIfsS --resolve "www.$WEBSITE_DOMAIN:443:127.0.0.1" "https://www.$WEBSITE_DOMAIN/" > /dev/null
+            ;;
+        *)
+            echo "[ERROR] Unknown service: $service" >&2
+            exit 1
+            ;;
+    esac
+}
+
+switch_live_color() {
+    local service="$1"
+    local color="$2"
+    local previous_color
+
+    previous_color="$(get_live_color "$service")"
+
+    render_service_upstream "$service" "$color"
+
+    if ! nginx_reload; then
+        echo "[ERROR] nginx reload failed while switching $service to $color. Reverting selector." >&2
+        render_service_upstream "$service" "$previous_color"
+        nginx_reload || true
+        exit 1
+    fi
+
+    verify_live_origin "$service"
+    set_live_color_record "$service" "$color"
+}
+
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
-    echo "[INFO] Ensuring MySQL, socket proxy, and Traefik are up"
-    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql socket-proxy traefik
+    echo "[INFO] Ensuring MySQL and nginx are up"
+    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql nginx
+    wait_for_service_healthy nginx 120
 }
 
 deploy_color() {
@@ -291,5 +399,5 @@ status_table() {
     printf -- "api       %s\n" "$LIVE_API_COLOR"
     printf -- "studio    %s\n" "$LIVE_STUDIO_COLOR"
     printf -- "website   %s\n" "$LIVE_WEBSITE_COLOR"
-    printf -- "\nState file: %s\nRoutes file: %s\n" "$STATE_FILE" "$ROUTES_FILE"
+    printf -- "\nState file: %s\nUpstreams dir: %s\n" "$STATE_FILE" "$NGINX_UPSTREAMS_DIR"
 }

@@ -37,6 +37,7 @@ public static class HostedRunnerDockerCommandBuilder
         {
             "set -eu",
             $"mkdir -p {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/data")} {ShellQuote($"{runnerRoot}/logs")}",
+            $"chown -R 1000:1000 {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/data")} {ShellQuote($"{runnerRoot}/logs")}",
             $"docker network inspect {ShellQuote(options.DockerNetwork)} >/dev/null 2>&1 || docker network create {ShellQuote(options.DockerNetwork)} >/dev/null",
             $"docker rm -f {ShellQuote(runner.ContainerName)} >/dev/null 2>&1 || true",
             dockerRun
