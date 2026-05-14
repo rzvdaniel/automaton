@@ -28,6 +28,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-settings',
   },
   {
+    label: 'Marketplace Apps',
+    icon: 'pi pi-shop',
+    to: '/admin/marketplace-apps',
+    routePrefix: '/admin/marketplace-apps',
+  },
+  {
     label: 'App Activity',
     icon: 'pi pi-chart-line',
     to: '/admin/app-activity',

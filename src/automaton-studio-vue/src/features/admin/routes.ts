@@ -14,6 +14,7 @@ import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
+import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -82,6 +83,15 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminHostedRunnersView,
         meta: {
           title: 'Hosted Runners',
+        },
+      },
+
+      {
+        path: 'marketplace-apps',
+        name: 'admin-marketplace-apps',
+        component: AdminMarketplaceAppsView,
+        meta: {
+          title: 'Marketplace Apps',
         },
       },
       {
