@@ -289,6 +289,7 @@ services.AddHangfireServer();
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
 services.AddScoped<PublicAppsService>();
+services.AddScoped<WebAppStarService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
 services.AddSingleton<TunnelRequestRegistry>();

@@ -65,11 +65,16 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 
 ## EF Core / Database
 
-- All schema changes require a migration — **always use the CLI, never write migration files by hand**:
+- All schema changes require a migration — **always generate migrations with `dotnet ef`, never write migration files by hand**:
   ```bash
-  dotnet ef migrations add <Name> --project src/Automaton.Studio.Server
+  dotnet ef migrations add <Name> --project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --startup-project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --output-dir Migrations
   ```
   Hand-crafted migrations silently skip the required `.Designer.cs` companion file; EF then ignores the migration and `Database.Migrate()` fails at runtime with confusing column errors.
+- Treat the generated migration trio as one unit:
+  - `<timestamp>_<Name>.cs`
+  - `<timestamp>_<Name>.Designer.cs`
+  - `ApplicationDbContextModelSnapshot.cs`
+- If a manual migration file was created during exploration, delete or replace it before committing and regenerate the migration with `dotnet ef` so the designer file and snapshot stay in sync.
 - **Never run `dotnet ef database update`** — migrations are applied automatically at startup via `ApplyMigrations()` in `Program.cs`. Running it manually is redundant and may cause issues in CI/CD.
 - Never write raw SQL unless EF cannot express it
 - Use `AsNoTracking()` for read-only queries
@@ -197,5 +202,4 @@ private static string GetContentType(string fileName) => Path.GetExtension(fileN
 ### General Rule
 
 Before writing any utility method that maps, converts, or resolves a well-known system concept (paths, MIME types, encodings, cultures, time zones, HTTP status codes), check whether the framework already provides it. It almost always does.
-
 

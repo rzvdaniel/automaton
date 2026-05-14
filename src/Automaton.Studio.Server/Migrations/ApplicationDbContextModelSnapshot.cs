@@ -1160,13 +1160,13 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsActive", "SortOrder");
-
                     b.HasIndex("Name")
                         .IsUnique();
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("IsActive", "SortOrder");
 
                     b.ToTable("MarketplaceCategories");
                 });
@@ -2016,7 +2016,7 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("Category")
-                        .HasColumnType("longtext");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<DateTime>("Created")
                         .HasColumnType("datetime(6)");
@@ -2051,15 +2051,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime?>("LastViewedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("MarketplaceModerationReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
-
                     b.Property<DateTime?>("MarketplaceModeratedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<Guid?>("MarketplaceModeratedByUserId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("MarketplaceModerationReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
 
                     b.Property<string>("MarketplaceStatus")
                         .IsRequired()
@@ -2086,6 +2086,11 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
+
+                    b.Property<int>("StarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Summary")
                         .IsRequired()
@@ -2119,11 +2124,31 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("PublicUrl")
                         .IsUnique();
 
-                    b.HasIndex("IsPublished", "MarketplaceStatus", "Category");
-
                     b.HasIndex("IsSample", "IsPublished");
 
+                    b.HasIndex("IsPublished", "MarketplaceStatus", "Category");
+
                     b.ToTable("WebApps");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStar", b =>
+                {
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("WebAppId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("WebAppId");
+
+                    b.ToTable("WebAppStars");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>

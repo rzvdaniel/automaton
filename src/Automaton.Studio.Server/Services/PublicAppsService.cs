@@ -54,7 +54,7 @@ public class PublicAppsService
     /// <summary>
     /// Get all public (published) apps for a user by public username
     /// </summary>
-    public async Task<List<PublicAppCard>> GetPublicAppsAsync(string publicUsername)
+    public async Task<List<PublicAppCard>> GetPublicAppsAsync(string publicUsername, Guid? currentUserId = null)
     {
         var user = await dataContext.Users
             .FirstOrDefaultAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
@@ -69,6 +69,7 @@ public class PublicAppsService
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
             .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .OrderByDescending(w => w.IsFeatured)
+            .ThenByDescending(w => w.StarCount)
             .ThenByDescending(w => w.PublishedAt)
             .Select(w => new PublicAppCard
             {
@@ -82,7 +83,10 @@ public class PublicAppsService
                 AppUrl = $"/web/{w.PublicUrl}",
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
-                IsFeatured = w.IsFeatured
+                IsFeatured = w.IsFeatured,
+                StarCount = w.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
             })
             .ToListAsync();
 
@@ -92,7 +96,7 @@ public class PublicAppsService
     /// <summary>
     /// Get details of a specific public app
     /// </summary>
-    public async Task<PublicAppDetails?> GetPublicAppDetailsAsync(string publicUsername, Guid appId)
+    public async Task<PublicAppDetails?> GetPublicAppDetailsAsync(string publicUsername, Guid appId, Guid? currentUserId = null)
     {
         var user = await dataContext.Users
             .FirstOrDefaultAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower());
@@ -119,7 +123,10 @@ public class PublicAppsService
                 AppUrl = $"/web/{w.PublicUrl}",
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
-                IsFeatured = w.IsFeatured
+                IsFeatured = w.IsFeatured,
+                StarCount = w.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
             })
             .FirstOrDefaultAsync();
 
@@ -159,7 +166,9 @@ public class PublicAppCard
     public string AppUrl { get; set; } = string.Empty;
     public string? PublicUrl { get; set; }
     public int ViewCount { get; set; }
+    public int StarCount { get; set; }
     public bool IsFeatured { get; set; }
+    public bool IsStarredByCurrentUser { get; set; }
 }
 
 public class PublicAppDetails : PublicAppCard

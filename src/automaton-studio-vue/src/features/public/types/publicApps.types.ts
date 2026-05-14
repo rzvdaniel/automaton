@@ -28,7 +28,9 @@ export interface PublicAppCard {
   appUrl: string
   publicUrl?: string
   viewCount: number
+  starCount: number
   isFeatured: boolean
+  isStarredByCurrentUser: boolean
 }
 
 /**

@@ -508,6 +508,7 @@ public class AppsService
             Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
             // Analytics
             ViewCount = entity.ViewCount,
+            StarCount = entity.StarCount,
             LastViewedAt = entity.LastViewedAt,
             // Sample/Featured
             IsSample = entity.IsSample,

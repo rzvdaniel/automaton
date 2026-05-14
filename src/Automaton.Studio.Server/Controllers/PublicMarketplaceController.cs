@@ -24,6 +24,7 @@ public class PublicMarketplaceController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] int take = 20)
     {
+        var currentUserId = TryGetCurrentUserId();
         var query = _dbContext.WebApps
             .AsNoTracking()
             .Where(a =>
@@ -46,6 +47,7 @@ public class PublicMarketplaceController : ControllerBase
 
         var apps = await query
             .OrderByDescending(a => a.IsFeatured)
+            .ThenByDescending(a => a.StarCount)
             .ThenByDescending(a => a.ViewCount)
             .ThenByDescending(a => a.PublishedAt)
             .Take(Math.Clamp(take, 1, 100))
@@ -59,6 +61,9 @@ public class PublicMarketplaceController : ControllerBase
                 a.Category,
                 a.Tags,
                 a.ViewCount,
+                a.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 a.PublicUrl
             })
             .ToListAsync();
@@ -78,5 +83,11 @@ public class PublicMarketplaceController : ControllerBase
             .ToListAsync();
 
         return Ok(categories);
+    }
+
+    private Guid? TryGetCurrentUserId()
+    {
+        var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdString, out var userId) ? userId : null;
     }
 }

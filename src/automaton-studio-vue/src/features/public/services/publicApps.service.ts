@@ -3,6 +3,7 @@
  * No authentication required - these are public endpoints
  */
 import axios from 'axios'
+import apiClient from '@/shared/services/api/axios-instance'
 import type {
   PublicAppsResponse,
   PublicUserProfile,
@@ -49,6 +50,14 @@ class PublicAppsService {
       `/api/public/${encodeURIComponent(username)}/apps/${appId}`,
     )
     return data
+  }
+
+  async starApp(appId: string): Promise<void> {
+    await apiClient.post(`/api/marketplace/apps/${appId}/star`)
+  }
+
+  async unstarApp(appId: string): Promise<void> {
+    await apiClient.delete(`/api/marketplace/apps/${appId}/star`)
   }
 }
 

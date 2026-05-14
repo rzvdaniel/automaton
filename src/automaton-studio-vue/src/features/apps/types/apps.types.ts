@@ -54,6 +54,7 @@ export interface App {
   definition: AppDefinition
   // Analytics
   viewCount: number
+  starCount: number
   lastViewedAt?: string // ISO date string
   // Sample/Featured flags
   isSample: boolean

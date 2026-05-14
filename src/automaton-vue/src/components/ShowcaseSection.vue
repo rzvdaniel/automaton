@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 const props = defineProps<{ fullPage?: boolean }>()
 
-type MarketplaceApp = { id: string; name: string; summary?: string; thumbnailUrl?: string; category?: string; tags?: string; viewCount: number; publicUrl?: string }
+type MarketplaceApp = { id: string; name: string; summary?: string; thumbnailUrl?: string; category?: string; tags?: string; viewCount: number; starCount: number; isStarredByCurrentUser?: boolean; publicUrl?: string }
 
 const categories = ref<string[]>([])
 const apps = ref<MarketplaceApp[]>([])
@@ -45,7 +45,7 @@ onMounted(async () => {
           <img v-if="app.thumbnailUrl" :src="app.thumbnailUrl" class="app-thumbnail" :alt="app.name" />
           <h3>{{ app.name }}</h3>
           <p>{{ app.summary }}</p>
-          <p>⭐ Popularity: {{ app.viewCount }}</p>
+          <p>⭐ Stars: {{ app.starCount }} · 👁 Views: {{ app.viewCount }}</p>
           <a v-if="app.publicUrl" :href="`/web/${app.publicUrl}`" target="_blank">Open app</a>
         </article>
       </div>

@@ -49,7 +49,8 @@ public class PublicAppsController : ControllerBase
                 return NotFound(new { message = "User not found" });
             }
 
-            var apps = await publicAppsService.GetPublicAppsAsync(publicUsername);
+            var currentUserId = TryGetCurrentUserId();
+            var apps = await publicAppsService.GetPublicAppsAsync(publicUsername, currentUserId);
 
             var response = new PublicAppsResponse
             {
@@ -115,7 +116,8 @@ public class PublicAppsController : ControllerBase
                 return BadRequest(new { message = "Invalid username format" });
             }
 
-            var app = await publicAppsService.GetPublicAppDetailsAsync(publicUsername, appId);
+            var currentUserId = TryGetCurrentUserId();
+            var app = await publicAppsService.GetPublicAppDetailsAsync(publicUsername, appId, currentUserId);
 
             if (app == null)
             {
@@ -140,5 +142,11 @@ public class PublicAppsController : ControllerBase
     {
         // Allow alphanumeric, underscore, and hyphen (no @ symbol needed)
         return System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_\-]+$");
+    }
+
+    private Guid? TryGetCurrentUserId()
+    {
+        var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdString, out var userId) ? userId : null;
     }
 }

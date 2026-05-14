@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import type { PublicAppCard as AppCardType } from '../types/publicApps.types'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
@@ -11,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'details', app: AppCardType): void
+  (e: 'toggle-star', app: AppCardType): void
 }>()
 
 const isHovering = ref(false)
@@ -33,6 +33,11 @@ const fullThumbnailUrl = computed(() => {
 
 function showDetails() {
   emit('details', props.app)
+}
+
+function toggleStar(event: Event) {
+  event.stopPropagation()
+  emit('toggle-star', props.app)
 }
 
 function toggleSummary(e: Event) {
@@ -61,6 +66,11 @@ function toggleSummary(e: Event) {
         <i class="pi pi-eye"></i>
         <span>{{ app.viewCount }}</span>
       </div>
+
+      <button class="stars-pill" @click="toggleStar">
+        <i :class="app.isStarredByCurrentUser ? 'pi pi-star-fill' : 'pi pi-star'"></i>
+        <span>{{ app.starCount }}</span>
+      </button>
 
       <!-- Hover Overlay — visual affordance only, no buttons -->
       <transition name="fade">
@@ -213,6 +223,28 @@ function toggleSummary(e: Event) {
 }
 
 .views-pill i {
+  font-size: 0.75rem;
+}
+
+.stars-pill {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  line-height: 1;
+  z-index: 30;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+
+.stars-pill i {
   font-size: 0.75rem;
 }
 

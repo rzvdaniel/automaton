@@ -40,6 +40,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<AiModel> AiModels { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
+        public virtual DbSet<WebAppStar> WebAppStars { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
         public virtual DbSet<AppVersion> AppVersions { get; set; }
@@ -268,6 +269,7 @@ namespace Automaton.Studio.Server.Data
 
                 // Analytics fields
                 entity.Property(e => e.ViewCount).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.StarCount).IsRequired().HasDefaultValue(0);
                 entity.Property(e => e.LastViewedAt).IsRequired(false);
 
                 // Sample/Featured flags
@@ -307,6 +309,14 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.WebAppId, "IX_WebAppUser_WebAppId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.WebAppId).IsRequired();
+            });
+
+            modelBuilder.Entity<Entities.WebAppStar>(entity =>
+            {
+                entity.HasKey(e => new { e.WebAppId, e.UserId });
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.WebAppId);
             });
 
             modelBuilder.Entity<Entities.WebAppStep>(entity =>

@@ -20,6 +20,7 @@ interface MarketplaceApp {
   publicUrl?: string | null
   thumbnailUrl?: string | null
   viewCount: number
+  starCount: number
   isFeatured: boolean
   category?: string | null
   tags?: string | null
@@ -404,6 +405,14 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
       <Column field="viewCount" header="Views" sortable style="width: 110px">
         <template #body="{ data }: { data: MarketplaceApp }">
           <span class="num-cell">{{ data.viewCount.toLocaleString() }}</span>
+        </template>
+      </Column>
+
+      <Column field="starCount" header="Stars" sortable style="width: 110px">
+        <template #body="{ data }: { data: MarketplaceApp }">
+          <span class="num-cell">
+            <i class="pi pi-star-fill mr-1 text-yellow-500"></i>{{ data.starCount.toLocaleString() }}
+          </span>
         </template>
       </Column>
 

@@ -35,6 +35,7 @@ public class WebApp
 
     // Analytics
     public int ViewCount { get; set; } = 0;
+    public int StarCount { get; set; } = 0;
     public DateTime? LastViewedAt { get; set; }
 
     // Sample/Featured flags (admin-managed)

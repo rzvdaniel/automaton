@@ -37,6 +37,7 @@ public class AdminMarketplaceAppsController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 ThumbnailUrl = a.ThumbnailUrl,
                 ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
                 IsFeatured = a.IsFeatured,
                 Category = a.Category,
                 Tags = a.Tags,
@@ -185,6 +186,7 @@ public class AdminMarketplaceAppDto
     public string? PublicUrl { get; set; }
     public string? ThumbnailUrl { get; set; }
     public int ViewCount { get; set; }
+    public int StarCount { get; set; }
     public bool IsFeatured { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }

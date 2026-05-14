@@ -12,9 +12,11 @@ import { publicAppsService } from '../services/publicApps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { PublicUserProfile, PublicAppCard as AppCardType } from '../types/publicApps.types'
 import { formatPublishedDate, parseTags } from '../types/publicApps.types'
+import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const toast = useToast()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -61,6 +63,54 @@ function openApp(app: AppCardType) {
 function showDetails(app: AppCardType) {
   selectedApp.value = app
   showDrawer.value = true
+}
+
+async function toggleStar(app: AppCardType) {
+  if (!authStore.isAuthenticated) {
+    toast.add({
+      severity: 'info',
+      summary: 'Sign in required',
+      detail: 'Sign in to star apps you like.',
+      life: 3000,
+    })
+    return
+  }
+
+  const nextStarred = !app.isStarredByCurrentUser
+  const nextCount = Math.max(0, app.starCount + (nextStarred ? 1 : -1))
+
+  app.isStarredByCurrentUser = nextStarred
+  app.starCount = nextCount
+
+  if (selectedApp.value?.id === app.id) {
+    selectedApp.value = { ...selectedApp.value, isStarredByCurrentUser: nextStarred, starCount: nextCount }
+  }
+
+  try {
+    if (nextStarred) {
+      await publicAppsService.starApp(app.id)
+    } else {
+      await publicAppsService.unstarApp(app.id)
+    }
+  } catch {
+    app.isStarredByCurrentUser = !nextStarred
+    app.starCount = Math.max(0, app.starCount + (nextStarred ? -1 : 1))
+
+    if (selectedApp.value?.id === app.id) {
+      selectedApp.value = {
+        ...selectedApp.value,
+        isStarredByCurrentUser: !nextStarred,
+        starCount: Math.max(0, (selectedApp.value.starCount ?? 0) + (nextStarred ? -1 : 1)),
+      }
+    }
+
+    toast.add({
+      severity: 'error',
+      summary: 'Star failed',
+      detail: 'Could not update your star right now.',
+      life: 3000,
+    })
+  }
 }
 
 onMounted(() => {
@@ -131,6 +181,7 @@ onMounted(() => {
               :key="app.id"
               :app="app"
               @details="showDetails"
+              @toggle-star="toggleStar"
             />
           </div>
         </div>
@@ -175,6 +226,9 @@ onMounted(() => {
             <span v-if="selectedApp.viewCount > 0" class="meta-stat">
               <i class="pi pi-eye"></i> {{ selectedApp.viewCount }}
             </span>
+            <span class="meta-stat">
+              <i :class="selectedApp.isStarredByCurrentUser ? 'pi pi-star-fill' : 'pi pi-star'"></i> {{ selectedApp.starCount }}
+            </span>
             <span v-if="selectedApp.publishedAt" class="meta-stat">
               <i class="pi pi-calendar"></i> {{ formatPublishedDate(selectedApp.publishedAt) }}
             </span>
@@ -192,6 +246,16 @@ onMounted(() => {
               severity="secondary"
             />
           </div>
+
+          <Button
+            v-if="authStore.isAuthenticated"
+            :label="selectedApp.isStarredByCurrentUser ? 'Unstar' : 'Star'"
+            :icon="selectedApp.isStarredByCurrentUser ? 'pi pi-star-fill' : 'pi pi-star'"
+            severity="secondary"
+            outlined
+            class="w-full mb-2"
+            @click="toggleStar(selectedApp)"
+          />
 
           <Button
             label="Open App"

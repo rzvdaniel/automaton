@@ -22,6 +22,7 @@ public class AppModel
 
     // Analytics
     public int ViewCount { get; set; }
+    public int StarCount { get; set; }
     public DateTime? LastViewedAt { get; set; }
 
     // Sample/Featured flags
