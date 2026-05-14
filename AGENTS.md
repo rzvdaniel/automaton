@@ -294,6 +294,7 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Runner selection for executions triggered from the app
 - PWA settings (manifest, theme colors, icons)
 - AI-assisted frontend editing
+- Backend Server tab in the app editor proxies to the selected connected runner and shows the runner's deployed `{RUNNER_SCRIPTS_DIR}/{appId}/backend` files. It supports read-only text preview and deletion of runner-side files without touching Studio source files.
 
 **Publishing & Access:**
 - Draft vs. Published states

@@ -145,7 +145,7 @@ const handleExport = async () => {
   isExporting.value = true
 
   try {
-    const { blob, fileName } = await appsService.exportApp(props.app.id)
+    const { blob, fileName } = await appsService.exportApp(props.app.id, props.app.name)
     const downloadUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl

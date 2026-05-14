@@ -12,6 +12,9 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 
 const props = defineProps<{
   filePath: string
+  content?: string
+  language?: string
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +31,9 @@ const file = computed(() => {
   return editorStore.openFiles.find((f) => f.path === props.filePath)
 })
 
+const editorContent = computed(() => props.content ?? file.value?.content ?? '')
+const editorLanguage = computed(() => props.language ?? file.value?.language ?? 'plaintext')
+
 // Detect if dark mode is enabled
 const isDarkMode = computed(() => {
   return document.documentElement.classList.contains('app-dark')
@@ -35,13 +41,14 @@ const isDarkMode = computed(() => {
 
 // Initialize Monaco Editor
 onMounted(() => {
-  if (!editorContainer.value || !file.value) return
+  if (!editorContainer.value) return
 
   // Create editor instance
   editorInstance = monaco.editor.create(editorContainer.value, {
-    value: file.value.content,
-    language: file.value.language,
+    value: editorContent.value,
+    language: editorLanguage.value,
     theme: isDarkMode.value ? 'vs-dark' : 'vs',
+    readOnly: props.readOnly,
     automaticLayout: true,
     minimap: { enabled: true },
     fontSize: 14,
@@ -70,6 +77,7 @@ onMounted(() => {
   // Listen for content changes
   editorInstance.onDidChangeModelContent(() => {
     if (!editorInstance) return
+    if (props.readOnly) return
     const content = editorInstance.getValue()
     editorStore.updateFileContent(props.filePath, content)
     emit('change', content)
@@ -77,6 +85,7 @@ onMounted(() => {
 
   // Add keyboard shortcuts
   editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    if (props.readOnly) return
     emit('save')
   })
 })
@@ -89,12 +98,12 @@ onUnmounted(() => {
 
 // Watch for external content changes (e.g., from AI updates)
 watch(
-  () => file.value?.content,
+  () => editorContent.value,
   (newContent, oldContent) => {
-    if (!editorInstance || !newContent) {
+    if (!editorInstance) {
       console.log('[CodeEditor] Watch triggered but editor or content missing', {
         hasEditor: !!editorInstance,
-        newContent: newContent?.substring(0, 50),
+        newContent: newContent.substring(0, 50),
       })
       return
     }
@@ -137,7 +146,7 @@ watch(isDarkMode, (dark) => {
 
 // Watch for language changes
 watch(
-  () => file.value?.language,
+  () => editorLanguage.value,
   (newLanguage) => {
     if (editorInstance && newLanguage) {
       const model = editorInstance.getModel()
@@ -145,6 +154,13 @@ watch(
         monaco.editor.setModelLanguage(model, newLanguage)
       }
     }
+  },
+)
+
+watch(
+  () => props.readOnly,
+  (readOnly) => {
+    editorInstance?.updateOptions({ readOnly })
   },
 )
 

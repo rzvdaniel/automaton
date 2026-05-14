@@ -27,6 +27,9 @@ public class HubService
     private const string FileUploadFailedMethod = "FileUploadFailed";
     private const string FetchFileChunkMethod = "FetchFileChunk";
     private const string FileChunkReadyMethod = "FileChunkReady";
+    private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
+    private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
+    private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -312,6 +315,21 @@ public class HubService
                 await HandleFetchFileChunkAsync(request);
             });
 
+            connection.On<string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId) =>
+            {
+                return ListAppBackendFiles(appId);
+            });
+
+            connection.On<string, string, AppBackendFileContentResponse>(ReadAppBackendFileMethod, (appId, path) =>
+            {
+                return ReadAppBackendFile(appId, path);
+            });
+
+            connection.On<string, string, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, (appId, path) =>
+            {
+                return DeleteAppBackendFile(appId, path);
+            });
+
             // Handle connection events
             connection.Closed += async (error) =>
             {
@@ -504,6 +522,168 @@ public class HubService
             WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
             return new AppControllerUploadResult { Success = false, Logs = [$"❌ {ex.Message}"] };
         }
+    }
+
+    private static AppBackendFilesResponse ListAppBackendFiles(string appId)
+    {
+        try
+        {
+            var backendDir = GetAppBackendDirectory(ParseAppId(appId));
+            if (!Directory.Exists(backendDir))
+            {
+                return new AppBackendFilesResponse { Success = true };
+            }
+
+            var files = Directory
+                .EnumerateFiles(backendDir, "*", SearchOption.AllDirectories)
+                .Select(path =>
+                {
+                    var info = new FileInfo(path);
+                    var relativePath = Path.GetRelativePath(backendDir, path).Replace(Path.DirectorySeparatorChar, '/');
+                    return new AppBackendFileEntry
+                    {
+                        Path = relativePath,
+                        Name = info.Name,
+                        Size = info.Length,
+                        LastModifiedUtc = info.LastWriteTimeUtc,
+                        IsText = IsTextFile(relativePath)
+                    };
+                })
+                .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return new AppBackendFilesResponse
+            {
+                Success = true,
+                Files = files
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AppBackendFilesResponse { Success = false, Error = ex.Message };
+        }
+    }
+
+    private static AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath)
+    {
+        try
+        {
+            var path = ResolveAppBackendFilePath(ParseAppId(appId), relativePath);
+            if (!File.Exists(path))
+            {
+                return new AppBackendFileContentResponse { Success = false, Error = "File not found." };
+            }
+
+            var info = new FileInfo(path);
+            var normalizedRelativePath = NormalizeRunnerRelativePath(relativePath);
+            var isText = IsTextFile(normalizedRelativePath);
+            if (!isText)
+            {
+                return new AppBackendFileContentResponse
+                {
+                    Success = true,
+                    Path = normalizedRelativePath,
+                    Size = info.Length,
+                    IsText = false,
+                    Error = "Binary preview is not supported."
+                };
+            }
+
+            const long maxPreviewBytes = 1024 * 1024;
+            if (info.Length > maxPreviewBytes)
+            {
+                return new AppBackendFileContentResponse
+                {
+                    Success = false,
+                    Path = normalizedRelativePath,
+                    Size = info.Length,
+                    IsText = true,
+                    Error = "File is larger than the 1 MB preview limit."
+                };
+            }
+
+            return new AppBackendFileContentResponse
+            {
+                Success = true,
+                Path = normalizedRelativePath,
+                Content = File.ReadAllText(path),
+                Size = info.Length,
+                IsText = true
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AppBackendFileContentResponse { Success = false, Error = ex.Message };
+        }
+    }
+
+    private static AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath)
+    {
+        try
+        {
+            var path = ResolveAppBackendFilePath(ParseAppId(appId), relativePath);
+            if (!File.Exists(path))
+            {
+                return new AppBackendFileDeleteResponse { Success = false, Error = "File not found." };
+            }
+
+            File.Delete(path);
+            return new AppBackendFileDeleteResponse { Success = true };
+        }
+        catch (Exception ex)
+        {
+            return new AppBackendFileDeleteResponse { Success = false, Error = ex.Message };
+        }
+    }
+
+    private static string GetAppBackendDirectory(Guid appId)
+    {
+        return Path.GetFullPath(Path.Combine(AppsRootDir, appId.ToString(), "backend"));
+    }
+
+    private static Guid ParseAppId(string appId)
+    {
+        if (!Guid.TryParse(appId, out var parsed))
+        {
+            throw new ArgumentException("Invalid app ID.");
+        }
+
+        return parsed;
+    }
+
+    private static string ResolveAppBackendFilePath(Guid appId, string relativePath)
+    {
+        var backendDir = GetAppBackendDirectory(appId);
+        var normalizedPath = NormalizeRunnerRelativePath(relativePath);
+        var fullPath = Path.GetFullPath(Path.Combine(backendDir, normalizedPath));
+
+        if (!fullPath.StartsWith(backendDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fullPath, backendDir, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Path must stay inside the app backend directory.");
+        }
+
+        return fullPath;
+    }
+
+    private static string NormalizeRunnerRelativePath(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        if (string.IsNullOrWhiteSpace(normalized)
+            || normalized.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new ArgumentException("Invalid backend file path.");
+        }
+
+        return normalized;
+    }
+
+    private static bool IsTextFile(string relativePath)
+    {
+        var fileName = Path.GetFileName(relativePath).ToLowerInvariant();
+        var extension = Path.GetExtension(relativePath).ToLowerInvariant();
+        return fileName is ".env"
+            || extension is ".py" or ".txt" or ".json" or ".md" or ".csv" or ".log" or ".yml" or ".yaml" or ".ini" or ".toml";
     }
 
     /// <summary>

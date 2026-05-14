@@ -7,30 +7,46 @@
 import { ref, computed } from 'vue'
 import Tree from 'primevue/tree'
 import Button from 'primevue/button'
-import ContextMenu from 'primevue/contextmenu'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { FileNode } from '../types/apps.types'
+
+const props = withDefaults(defineProps<{
+  title?: string
+  nodes?: FileNode[]
+  activePath?: string | null
+  dirtyPaths?: string[]
+  showCreate?: boolean
+  allowDelete?: boolean
+  emptyMessage?: string
+}>(), {
+  title: 'Files',
+  nodes: undefined,
+  activePath: undefined,
+  dirtyPaths: undefined,
+  showCreate: true,
+  allowDelete: true,
+  emptyMessage: 'No files yet',
+})
 
 const emit = defineEmits<{
   createFile: []
   createFolder: []
+  openFile: [path: string]
   deleteFile: [path: string]
   renameFile: [path: string]
 }>()
 
 const editorStore = useAppEditorStore()
 
-// Context menu reference
-const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
-const selectedContextNode = ref<FileNode | null>(null)
-
 // Tree selection
 const selectedKey = ref<Record<string, boolean>>({})
 
 // Convert FileNode[] to PrimeVue Tree format
 const treeNodes = computed(() => {
-  return convertToTreeNodes(editorStore.fileTree)
+  return convertToTreeNodes(fileTree.value)
 })
+
+const fileTree = computed(() => props.nodes ?? editorStore.fileTree)
 
 function convertToTreeNodes(nodes: FileNode[]): any[] {
   return nodes.map((node) => ({
@@ -71,57 +87,31 @@ function onNodeSelect(node: any) {
   const data = node.data
   const fileNode = data as FileNode
   if (fileNode.type === 'file') {
-    editorStore.openFile(fileNode.path)
+    emit('openFile', fileNode.path)
+    if (!props.nodes) {
+      editorStore.openFile(fileNode.path)
+    }
   }
 }
-
-// Handle context menu
-function onNodeContextMenu(event: any) {
-  const node = event.node
-  if (!node) return
-  selectedContextNode.value = node.data as FileNode
-  contextMenu.value?.show(event.originalEvent)
-}
-
-// Context menu items
-const contextMenuItems = computed(() => {
-  const node = selectedContextNode.value
-  if (!node) return []
-
-  const items: any[] = []
-
-  if (node.type === 'file') {
-    items.push({
-      label: 'Open',
-      icon: 'pi pi-folder-open',
-      command: () => editorStore.openFile(node.path),
-    })
-    items.push({ separator: true })
-    items.push({
-      label: 'Delete',
-      icon: 'pi pi-trash',
-      class: 'text-red-500',
-      command: () => emit('deleteFile', node.path),
-    })
-  } else {
-    items.push({
-      label: 'New File',
-      icon: 'pi pi-file-plus',
-      command: () => emit('createFile'),
-    })
-  }
-
-  return items
-})
 
 // Check if a file is active
 function isActive(path: string): boolean {
-  return editorStore.activeFilePath === path
+  return (props.activePath ?? editorStore.activeFilePath) === path
 }
 
 // Check if a file has unsaved changes
 function isDirty(path: string): boolean {
+  if (props.dirtyPaths) {
+    return props.dirtyPaths.includes(path)
+  }
+
   return editorStore.openFiles.some((f) => f.path === path && f.isDirty)
+}
+
+function canDeleteFile(path: string | undefined): boolean {
+  if (!props.allowDelete) return false
+  if (!path) return false
+  return path !== 'index.html' && path !== '_metadata.json'
 }
 </script>
 
@@ -129,16 +119,20 @@ function isDirty(path: string): boolean {
   <div class="file-tree">
     <!-- Header -->
     <div class="file-tree-header">
-      <span class="font-semibold">Files</span>
-      <Button
-        v-tooltip.bottom="'New File'"
-        icon="pi pi-plus"
-        text
-        rounded
-        size="small"
-        severity="secondary"
-        @click="emit('createFile')"
-      />
+      <span class="font-semibold">{{ title }}</span>
+      <div class="file-tree-header-actions">
+        <slot name="header-actions" />
+        <Button
+          v-if="showCreate"
+          v-tooltip.bottom="'New File'"
+          icon="pi pi-plus"
+          text
+          rounded
+          size="small"
+          severity="secondary"
+          @click="emit('createFile')"
+        />
+      </div>
     </div>
 
     <!-- Tree -->
@@ -149,7 +143,6 @@ function isDirty(path: string): boolean {
         selection-mode="single"
         class="w-full border-none p-0 file-tree-component"
         @node-select="onNodeSelect"
-        @node-context-menu="onNodeContextMenu"
       >
         <template #default="{ node }">
           <div
@@ -159,17 +152,31 @@ function isDirty(path: string): boolean {
               'tree-node-dirty': isDirty(node.data?.path),
             }"
           >
-            <span>{{ node.label }}</span>
-            <span v-if="isDirty(node.data?.path)" class="dirty-indicator">*</span>
+            <span class="tree-node-label">{{ node.label }}</span>
+            <div class="tree-node-actions">
+              <span v-if="isDirty(node.data?.path)" class="dirty-indicator">*</span>
+              <Button
+                v-if="node.data?.type === 'file' && canDeleteFile(node.data?.path)"
+                v-tooltip.left="'Delete file'"
+                icon="pi pi-trash"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                class="delete-file-button"
+                @click.stop="emit('deleteFile', node.data.path)"
+              />
+            </div>
           </div>
         </template>
       </Tree>
 
       <!-- Empty state for files -->
-      <div v-if="editorStore.fileTree.length === 0" class="empty-state">
+      <div v-if="fileTree.length === 0" class="empty-state">
         <i class="pi pi-folder-open text-4xl text-color-secondary mb-2"></i>
-        <p class="text-color-secondary text-sm">No files yet</p>
+        <p class="text-color-secondary text-sm">{{ emptyMessage }}</p>
         <Button
+          v-if="showCreate"
           label="Create File"
           icon="pi pi-plus"
           size="small"
@@ -178,9 +185,6 @@ function isDirty(path: string): boolean {
         />
       </div>
     </div>
-
-    <!-- Context Menu -->
-    <ContextMenu ref="contextMenu" :model="contextMenuItems" />
   </div>
 </template>
 
@@ -231,6 +235,11 @@ function isDirty(path: string): boolean {
   border-radius: var(--p-border-radius);
 }
 
+.file-tree-component :deep(.p-tree-node-label) {
+  flex: 1;
+  min-width: 0;
+}
+
 .file-tree-component :deep(.p-tree-node-content:hover) {
   background-color: var(--p-surface-100);
 }
@@ -238,7 +247,53 @@ function isDirty(path: string): boolean {
 .tree-node-content {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.25rem 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.tree-node-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.delete-file-button {
+  width: 1.65rem;
+  height: 1.65rem;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--p-text-muted-color);
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.delete-file-button:hover,
+.delete-file-button:focus-visible {
+  color: var(--p-red-500);
+}
+
+.file-tree-component :deep(.p-tree-node-content:hover) .delete-file-button,
+.file-tree-component :deep(.p-tree-node-content:focus-within) .delete-file-button,
+.tree-node-active .delete-file-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.file-tree-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .tree-node-active {
@@ -254,6 +309,13 @@ function isDirty(path: string): boolean {
   color: var(--p-orange-500);
   margin-left: 0.25rem;
   font-weight: bold;
+}
+
+@media (hover: none) {
+  .delete-file-button {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .empty-state {

@@ -86,3 +86,6 @@ __pycache__/
 .prod-runtime/
 
 apps/
+!src/automaton-studio-vue/src/features/apps/
+!src/automaton-studio-vue/src/features/apps/components/
+!src/automaton-studio-vue/src/features/apps/components/BackendServerFiles.vue

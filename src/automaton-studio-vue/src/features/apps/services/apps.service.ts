@@ -12,11 +12,49 @@ import type {
   AppFile,
   FileNode,
   CreateAppStepRequest,
+  RunnerBackendFileContent,
+  RunnerBackendFilesResponse,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 import { buildPreviewApiScript } from '../utils/preview-api-script'
 
 class AppsService {
+  private sanitizeArchiveFileName(name: string | undefined, extension: string): string {
+    const fallbackBaseName = 'app-export'
+    const baseName = (name || '')
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+      .trim()
+
+    const finalBaseName = baseName || fallbackBaseName
+    return finalBaseName.toLowerCase().endsWith(extension.toLowerCase())
+      ? finalBaseName
+      : `${finalBaseName}${extension}`
+  }
+
+  private getDownloadFileName(
+    contentDisposition: string | undefined,
+    fallbackName: string | undefined,
+    extension: string,
+  ): string {
+    if (contentDisposition) {
+      const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i)
+      if (utf8Match?.[1]) {
+        return decodeURIComponent(utf8Match[1].trim().replace(/^"(.*)"$/, '$1'))
+      }
+
+      const asciiMatch = contentDisposition.match(/filename\s*=\s*("?)([^";]+)\1/i)
+      if (asciiMatch?.[2]) {
+        return asciiMatch[2].trim()
+      }
+    }
+
+    return this.sanitizeArchiveFileName(fallbackName, extension)
+  }
+
+  private encodePath(path: string): string {
+    return path.split('/').map(encodeURIComponent).join('/')
+  }
+
   /**
    * Get all apps for the current user
    * GET /api/apps
@@ -49,14 +87,13 @@ class AppsService {
    * Export an app as a portable zip archive.
    * GET /api/apps/{id}/export
    */
-  async exportApp(id: string): Promise<ExportAppResponse> {
+  async exportApp(id: string, fallbackAppName?: string): Promise<ExportAppResponse> {
     const response = await apiClient.get<Blob>(`/api/apps/${id}/export`, {
       responseType: 'blob',
     })
 
     const contentDisposition = response.headers['content-disposition'] as string | undefined
-    const fileNameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)
-    const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1].replace(/"/g, '')) : `app-${id}.zip`
+    const fileName = this.getDownloadFileName(contentDisposition, fallbackAppName, '.zip')
 
     return {
       blob: response.data,
@@ -127,6 +164,24 @@ class AppsService {
   async deployBackend(id: string): Promise<{ success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }> {
     const { data } = await apiClient.post(`/api/apps/${id}/backend/deploy`, {})
     return data
+  }
+
+  async listRunnerBackendFiles(id: string): Promise<RunnerBackendFilesResponse> {
+    const { data } = await apiClient.get<RunnerBackendFilesResponse>(
+      `/api/apps/${id}/runner-backend/files`,
+    )
+    return data
+  }
+
+  async readRunnerBackendFile(id: string, path: string): Promise<RunnerBackendFileContent> {
+    const { data } = await apiClient.get<RunnerBackendFileContent>(
+      `/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`,
+    )
+    return data
+  }
+
+  async deleteRunnerBackendFile(id: string, path: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`)
   }
 
   /**

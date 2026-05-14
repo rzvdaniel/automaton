@@ -130,6 +130,29 @@ export interface AppFile {
   lastModified: string
 }
 
+export interface RunnerBackendFile {
+  path: string
+  name: string
+  size: number
+  lastModifiedUtc: string
+  isText: boolean
+}
+
+export interface RunnerBackendFilesResponse {
+  success: boolean
+  error?: string
+  files: RunnerBackendFile[]
+}
+
+export interface RunnerBackendFileContent {
+  success: boolean
+  error?: string
+  path: string
+  content?: string
+  size: number
+  isText: boolean
+}
+
 /**
  * App statistics for display
  */

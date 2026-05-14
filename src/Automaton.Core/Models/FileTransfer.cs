@@ -43,3 +43,35 @@ public class FileChunkReadyMessage
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = "application/octet-stream";
 }
+
+public class AppBackendFileEntry
+{
+    public string Path { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public long Size { get; set; }
+    public DateTime LastModifiedUtc { get; set; }
+    public bool IsText { get; set; }
+}
+
+public class AppBackendFilesResponse
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public List<AppBackendFileEntry> Files { get; set; } = [];
+}
+
+public class AppBackendFileContentResponse
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public string Path { get; set; } = string.Empty;
+    public string? Content { get; set; }
+    public long Size { get; set; }
+    public bool IsText { get; set; }
+}
+
+public class AppBackendFileDeleteResponse
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+}

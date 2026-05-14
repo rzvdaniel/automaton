@@ -22,7 +22,21 @@ async def shutdown():
 # Per-app pip packages live at:           {RUNNER_SCRIPTS_DIR}/{app_id}/packages/
 # This must match the path where .NET writes scripts:
 #   AppContext.BaseDirectory/data/apps/{appId}/backend/{controllerName}.py
-SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR", "/app/data/apps")
+def _default_scripts_dir() -> str:
+    if (
+        os.environ.get("DOTNET_RUNNING_IN_CONTAINER", "").lower() == "true"
+        or os.path.exists("/.dockerenv")
+    ):
+        return "/app/data/apps"
+
+    # Standalone/local runner layout: fastapi_server/main.py sits beside data/apps
+    # in the build output folder. This keeps manual FastAPI starts from falling back
+    # to the Docker-only /app/data/apps path on Windows/macOS/Linux dev machines.
+    runner_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(runner_root, "data", "apps")
+
+
+SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
 
 @app.get("/debug-scripts-dir")
 async def debug_scripts_dir():

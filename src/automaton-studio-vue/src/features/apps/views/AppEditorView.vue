@@ -30,6 +30,7 @@ import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
+import BackendServerFiles from '../components/BackendServerFiles.vue'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -79,7 +80,7 @@ const selectedRunnerId = ref<string | null>(null)
 const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
-const activeTab = ref<'build' | 'code' | 'monitor' | 'settings'>('build')
+const activeTab = ref<'build' | 'code' | 'backend-server' | 'monitor' | 'settings'>('build')
 
 // Active sub-tab in monitor view
 const activeMonitorTab = ref<'build-logs' | 'execution-history' | 'usage'>('build-logs')
@@ -966,6 +967,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               </button>
               <button
                 class="view-tab"
+                :class="{ active: activeTab === 'backend-server' }"
+                @click="activeTab = 'backend-server'"
+              >
+                <i class="pi pi-server"></i>
+                Backend Server
+              </button>
+              <button
+                class="view-tab"
                 :class="{ active: activeTab === 'monitor' }"
                 @click="activeTab = 'monitor'"
               >
@@ -986,7 +995,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
         <div class="header-right">
           <!-- Build and Code tabs: show action buttons -->
-          <template v-if="activeTab === 'build' || activeTab === 'code'">
+          <template v-if="activeTab === 'build' || activeTab === 'code' || activeTab === 'backend-server'">
             <!-- Runner selector (hidden when confirmed no runners; shown while loading or when runners exist) -->
             <div v-if="hasRunners !== false" class="flex align-items-center gap-2">
               <span
@@ -1031,6 +1040,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             />
 
             <Button
+              v-if="activeTab !== 'backend-server'"
               v-tooltip.bottom="'Open full-screen preview'"
               icon="pi pi-eye"
               label="Preview"
@@ -1139,6 +1149,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       <!-- Settings View -->
       <div v-show="activeTab === 'settings'" class="settings-view">
         <AppSettings />
+      </div>
+
+      <div v-show="activeTab === 'backend-server'" class="backend-server-view">
+        <BackendServerFiles :app-id="resolvedAppId" />
       </div>
 
       <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
@@ -1463,6 +1477,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 /* Settings view container */
 .settings-view {
   flex: 1;
+  overflow: hidden;
+}
+
+.backend-server-view {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
