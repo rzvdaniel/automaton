@@ -23,6 +23,10 @@ interface MarketplaceApp {
   isFeatured: boolean
   category?: string | null
   tags?: string | null
+  marketplaceStatus: string
+  marketplaceModerationReason?: string | null
+  ownerDisplayName?: string | null
+  ownerPublicUsername?: string | null
 }
 
 interface SelectOption {
@@ -39,10 +43,11 @@ const apps = ref<MarketplaceApp[]>([])
 const categoriesText = ref('')
 const savingAppIds = ref<string[]>([])
 
-const uncategorizedOption: SelectOption = {
-  label: 'Uncategorized',
-  value: null,
-}
+const statusOptions = [
+  { label: 'Approved', value: 'approved' },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Banned', value: 'banned' },
+]
 
 onMounted(loadData)
 
@@ -83,35 +88,29 @@ function parseCategories(value: string): string[] {
 const categoryList = computed(() => parseCategories(categoriesText.value))
 
 const categoryOptions = computed<SelectOption[]>(() => [
-  uncategorizedOption,
-  ...categoryList.value.map(category => ({
-    label: category,
-    value: category,
-  })),
+  { label: 'Uncategorized', value: null },
+  ...categoryList.value.map(category => ({ label: category, value: category })),
 ])
 
 const featuredCount = computed(() => apps.value.filter(app => app.isFeatured).length)
-
+const moderatedCount = computed(() => apps.value.filter(app => app.marketplaceStatus !== 'approved').length)
 const categorizedCount = computed(() => apps.value.filter(app => !!app.category?.trim()).length)
 
 const filteredApps = computed(() => {
   const query = search.value.trim().toLowerCase()
+  if (!query) return apps.value
 
-  if (!query) {
-    return apps.value
-  }
-
-  return apps.value.filter(app => {
-    const fields = [
+  return apps.value.filter(app =>
+    [
       app.name,
       app.summary ?? '',
       app.category ?? '',
       app.tags ?? '',
+      app.ownerDisplayName ?? '',
+      app.ownerPublicUsername ?? '',
       app.publicUrl ?? '',
-    ]
-
-    return fields.some(field => field.toLowerCase().includes(query))
-  })
+    ].some(field => field.toLowerCase().includes(query)),
+  )
 })
 
 function isSavingApp(appId: string): boolean {
@@ -119,11 +118,7 @@ function isSavingApp(appId: string): boolean {
 }
 
 function appHref(app: MarketplaceApp): string | null {
-  if (!app.publicUrl?.trim()) {
-    return null
-  }
-
-  return `/web/${app.publicUrl}`
+  return app.publicUrl?.trim() ? `/web/${app.publicUrl}` : null
 }
 
 function appInitials(name: string): string {
@@ -136,7 +131,6 @@ function appInitials(name: string): string {
 
 async function saveCategories() {
   isSavingCategories.value = true
-
   try {
     const cleanedCategories = parseCategories(categoriesText.value)
     await apiClient.put('/api/admin/marketplace-apps/categories', cleanedCategories)
@@ -162,14 +156,13 @@ async function saveCategories() {
 
 async function saveApp(app: MarketplaceApp) {
   savingAppIds.value = [...savingAppIds.value, app.id]
-
   try {
-    await apiClient.post(`/api/admin/marketplace-apps/${app.id}/promote`, {
+    await apiClient.put(`/api/admin/marketplace-apps/${app.id}`, {
       isFeatured: app.isFeatured,
       category: app.category?.trim() || null,
-      tags: app.tags?.trim() || null,
+      marketplaceStatus: app.marketplaceStatus,
+      marketplaceModerationReason: app.marketplaceModerationReason?.trim() || null,
     })
-
     toast.add({
       severity: 'success',
       summary: 'App updated',
@@ -188,6 +181,13 @@ async function saveApp(app: MarketplaceApp) {
     savingAppIds.value = savingAppIds.value.filter(id => id !== app.id)
   }
 }
+
+function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'secondary' {
+  if (status === 'approved') return 'success'
+  if (status === 'hidden') return 'warn'
+  if (status === 'banned') return 'danger'
+  return 'secondary'
+}
 </script>
 
 <template>
@@ -199,13 +199,13 @@ async function saveApp(app: MarketplaceApp) {
           Marketplace Apps
         </h2>
         <p class="page-subtitle text-color-secondary">
-          Curate the apps shown on automaton.monster, feature the strongest ones, and keep category navigation tidy.
+          Moderate visibility, feature standout apps, and keep storefront categories organized.
         </p>
       </div>
       <div class="header-actions">
         <InputText
           v-model="search"
-          placeholder="Search apps..."
+          placeholder="Search apps, owners, tags..."
           class="search-input"
         />
         <Button
@@ -227,7 +227,6 @@ async function saveApp(app: MarketplaceApp) {
           </div>
         </template>
       </Card>
-
       <Card>
         <template #content>
           <div class="stat-card">
@@ -236,7 +235,14 @@ async function saveApp(app: MarketplaceApp) {
           </div>
         </template>
       </Card>
-
+      <Card>
+        <template #content>
+          <div class="stat-card">
+            <span class="stat-label">Hidden or banned</span>
+            <span class="stat-value">{{ moderatedCount }}</span>
+          </div>
+        </template>
+      </Card>
       <Card>
         <template #content>
           <div class="stat-card">
@@ -253,7 +259,7 @@ async function saveApp(app: MarketplaceApp) {
           <div>
             <div class="section-title">Marketplace Categories</div>
             <div class="text-color-secondary text-sm">
-              One category per line. These become the tabs users can assign their apps to.
+              One category per line. These drive the storefront tabs developers can publish into.
             </div>
           </div>
           <Button
@@ -273,7 +279,7 @@ async function saveApp(app: MarketplaceApp) {
           placeholder="Productivity&#10;AI Tools&#10;Education"
         />
 
-        <div class="category-pill-row" v-if="categoryList.length > 0">
+        <div v-if="categoryList.length > 0" class="category-pill-row">
           <Tag
             v-for="category in categoryList"
             :key="category"
@@ -304,7 +310,7 @@ async function saveApp(app: MarketplaceApp) {
         </div>
       </template>
 
-      <Column field="name" header="App" sortable style="min-width: 300px">
+      <Column field="name" header="App" sortable style="min-width: 330px">
         <template #body="{ data }: { data: MarketplaceApp }">
           <div class="app-cell">
             <div v-if="data.thumbnailUrl" class="thumb-frame">
@@ -317,10 +323,19 @@ async function saveApp(app: MarketplaceApp) {
             <div class="app-meta">
               <div class="app-meta-topline">
                 <span class="app-name">{{ data.name }}</span>
+                <Tag :value="data.marketplaceStatus" :severity="statusSeverity(data.marketplaceStatus)" />
                 <Tag v-if="data.isFeatured" value="Featured" severity="warn" />
+              </div>
+              <div class="text-sm text-color-secondary">
+                By {{ data.ownerDisplayName || 'Unknown developer' }}
+                <span v-if="data.ownerPublicUsername"> · {{ data.ownerPublicUsername }}</span>
               </div>
               <div class="app-summary text-color-secondary">
                 {{ data.summary?.trim() || 'No summary yet.' }}
+              </div>
+              <div class="text-xs text-color-secondary">
+                Developer tags:
+                {{ data.tags?.trim() || 'None' }}
               </div>
               <a
                 v-if="appHref(data)"
@@ -364,12 +379,26 @@ async function saveApp(app: MarketplaceApp) {
         </template>
       </Column>
 
-      <Column header="Tags" style="min-width: 220px">
+      <Column header="Status" style="min-width: 170px">
         <template #body="{ data }: { data: MarketplaceApp }">
-          <InputText
-            v-model="data.tags"
+          <Select
+            v-model="data.marketplaceStatus"
+            :options="statusOptions"
+            option-label="label"
+            option-value="value"
             class="w-full"
-            placeholder="automation, analytics"
+          />
+        </template>
+      </Column>
+
+      <Column header="Moderation Note" style="min-width: 260px">
+        <template #body="{ data }: { data: MarketplaceApp }">
+          <Textarea
+            v-model="data.marketplaceModerationReason"
+            rows="3"
+            auto-resize
+            class="w-full"
+            placeholder="Optional internal moderation reason"
           />
         </template>
       </Column>
@@ -426,12 +455,12 @@ async function saveApp(app: MarketplaceApp) {
 }
 
 .search-input {
-  width: 220px;
+  width: 240px;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -569,13 +598,17 @@ async function saveApp(app: MarketplaceApp) {
   gap: 0.5rem;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .search-input {
     width: 100%;
   }

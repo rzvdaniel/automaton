@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Services;
@@ -37,7 +38,7 @@ public class PublicAppsService
         var publicAppCount = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished)
+            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .CountAsync();
 
         return new PublicUserProfile
@@ -66,7 +67,7 @@ public class PublicAppsService
         var apps = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished)
+            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .OrderByDescending(w => w.IsFeatured)
             .ThenByDescending(w => w.PublishedAt)
             .Select(w => new PublicAppCard
@@ -104,7 +105,7 @@ public class PublicAppsService
         var app = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id && wu.WebAppId == appId)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished)
+            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .Select(w => new PublicAppDetails
             {
                 Id = w.Id,

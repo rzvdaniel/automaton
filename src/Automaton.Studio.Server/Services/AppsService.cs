@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Studio.Server.Enums;
 using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -124,7 +125,8 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
-                x.IsPublished,
+                x.IsPublished &&
+                x.MarketplaceStatus == MarketplaceAppStatuses.Approved,
                 cancellationToken);
 
         if (appEntity == null)
@@ -325,7 +327,13 @@ public class AppsService
         logger.Information("Deleted app {AppId} from file system and database for user {UserId}", id, ownerId);
     }
 
-    public async Task Publish(Guid id, string publicUrl, bool requiresAuthentication = true, Guid? executionRunnerId = null)
+    public async Task Publish(
+        Guid id,
+        string publicUrl,
+        bool requiresAuthentication = true,
+        Guid? executionRunnerId = null,
+        string? category = null,
+        string? tags = null)
     {
         // Check if user can update this app (needed for publishing)
         if (!await authorizationService.CanUpdateAppAsync(id))
@@ -368,6 +376,8 @@ public class AppsService
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
         entity.RequiresAuthentication = requiresAuthentication;
+        entity.Category = category?.Trim();
+        entity.Tags = tags?.Trim();
         if (executionRunnerId.HasValue)
             entity.ExecutionRunnerId = executionRunnerId.Value;
         entity.Version++;
@@ -505,7 +515,11 @@ public class AppsService
             // Public profile display
             ThumbnailUrl = entity.ThumbnailUrl,
             Category = entity.Category,
-            Tags = entity.Tags
+            Tags = entity.Tags,
+            MarketplaceStatus = entity.MarketplaceStatus,
+            MarketplaceModerationReason = entity.MarketplaceModerationReason,
+            MarketplaceModeratedAt = entity.MarketplaceModeratedAt,
+            MarketplaceModeratedByUserId = entity.MarketplaceModeratedByUserId
         };
     }
 

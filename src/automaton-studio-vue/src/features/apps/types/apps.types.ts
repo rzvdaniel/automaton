@@ -62,6 +62,10 @@ export interface App {
   thumbnailUrl?: string | null
   category?: string | null
   tags?: string | null
+  marketplaceStatus: string
+  marketplaceModerationReason?: string | null
+  marketplaceModeratedAt?: string
+  marketplaceModeratedByUserId?: string
 }
 
 /**
@@ -80,6 +84,8 @@ export interface PublishAppRequest {
   publicUrl: string
   requiresAuthentication: boolean
   executionRunnerId?: string
+  category?: string | null
+  tags?: string | null
 }
 
 export interface ExportAppResponse {

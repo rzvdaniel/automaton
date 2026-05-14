@@ -1318,6 +1318,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
     <PublishDialog
       v-model:visible="showPublishDialog"
       :current-slug="editorStore.currentApp?.publicUrl"
+      :current-category="editorStore.currentApp?.category"
+      :current-tags="editorStore.currentApp?.tags"
       :requires-auth="editorStore.currentApp?.requiresAuthentication"
       :app-name="editorStore.currentApp?.name"
       @publish="handlePublish"

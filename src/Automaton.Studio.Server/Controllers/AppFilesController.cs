@@ -1,6 +1,7 @@
 using Automaton.Core.Models;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -88,7 +89,7 @@ public class AppFilesController : ControllerBase
     {
         var app = await dataContext.WebApps
             .Include(a => a.WebAppUsers)
-            .Where(a => a.PublicUrl == slug)
+            .Where(a => a.PublicUrl == slug && a.IsPublished && a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
             .FirstOrDefaultAsync(ct);
 
@@ -129,7 +130,7 @@ public class AppFilesController : ControllerBase
     {
         var app = await dataContext.WebApps
             .Include(a => a.WebAppUsers)
-            .Where(a => a.PublicUrl == slug)
+            .Where(a => a.PublicUrl == slug && a.IsPublished && a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
             .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
             .FirstOrDefaultAsync(ct);
 

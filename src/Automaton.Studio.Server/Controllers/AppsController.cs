@@ -337,7 +337,13 @@ public class AppsController : BaseController
     [HttpPost("{id}/publish")]
     public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request)
     {
-        await appsService.Publish(id, request.PublicUrl, request.RequiresAuthentication, request.ExecutionRunnerId);
+        await appsService.Publish(
+            id,
+            request.PublicUrl,
+            request.RequiresAuthentication,
+            request.ExecutionRunnerId,
+            request.Category,
+            request.Tags);
 
         return NoContent();
     }
@@ -1184,6 +1190,8 @@ public class PublishAppRequest
     public required string PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; } = false;
     public Guid? ExecutionRunnerId { get; set; }
+    public string? Category { get; set; }
+    public string? Tags { get; set; }
 }
 
 public class LinkMultipleStepsRequest

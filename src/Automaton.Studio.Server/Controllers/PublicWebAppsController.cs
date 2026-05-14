@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,7 +56,7 @@ public class PublicWebAppsController : ControllerBase
             // Query published app by slug with owner info
             var app = await _context.WebApps
                 .Include(w => w.WebAppUsers)
-                .Where(w => w.IsPublished && w.PublicUrl == slug)
+                .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved && w.PublicUrl == slug)
                 .Select(w => new
                 {
                     w.Id,
@@ -157,7 +158,7 @@ public class PublicWebAppsController : ControllerBase
             // Query published app by slug with owner info
             var app = await _context.WebApps
                 .Include(w => w.WebAppUsers)
-                .Where(w => w.IsPublished && w.PublicUrl == slug)
+                .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved && w.PublicUrl == slug)
                 .Select(w => new
                 {
                     w.Id,

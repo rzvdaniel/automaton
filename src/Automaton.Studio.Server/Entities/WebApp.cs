@@ -58,6 +58,19 @@ public class WebApp
     public string? Tags { get; set; }
 
     /// <summary>
+    /// Marketplace moderation status controlling whether the app is publicly discoverable.
+    /// </summary>
+    public string MarketplaceStatus { get; set; } = Enums.MarketplaceAppStatuses.Approved;
+
+    /// <summary>
+    /// Optional admin moderation reason shown in the admin review experience.
+    /// </summary>
+    public string? MarketplaceModerationReason { get; set; }
+
+    public DateTime? MarketplaceModeratedAt { get; set; }
+    public Guid? MarketplaceModeratedByUserId { get; set; }
+
+    /// <summary>
     /// Total tokens used in AI chat sessions for this app
     /// </summary>
     public int TotalChatTokensUsed { get; set; } = 0;

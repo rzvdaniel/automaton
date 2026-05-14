@@ -145,6 +145,8 @@ export const useAppsStore = defineStore('apps', () => {
           publicUrl: request.publicUrl,
           requiresAuthentication: request.requiresAuthentication,
           publishedAt: new Date().toISOString(),
+          category: request.category ?? apps.value[index]!.category,
+          tags: request.tags ?? apps.value[index]!.tags,
         }
       }
       if (selectedApp.value?.id === id) {
@@ -154,6 +156,8 @@ export const useAppsStore = defineStore('apps', () => {
           publicUrl: request.publicUrl,
           requiresAuthentication: request.requiresAuthentication,
           publishedAt: new Date().toISOString(),
+          category: request.category ?? selectedApp.value.category,
+          tags: request.tags ?? selectedApp.value.tags,
         }
       }
     } catch (err: unknown) {

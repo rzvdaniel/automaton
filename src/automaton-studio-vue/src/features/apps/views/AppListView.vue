@@ -16,6 +16,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import TabMenu from 'primevue/tabmenu'
 import AppCard from '../components/AppCard.vue'
+import PublishDialog from '../components/PublishDialog.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
@@ -23,7 +24,7 @@ import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
-import type { App } from '../types/apps.types'
+import type { App, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 
 const router = useRouter()
@@ -174,10 +175,6 @@ const isImporting = ref(false)
 // Publish dialog state
 const showPublishDialog = ref(false)
 const publishingApp = ref<App | null>(null)
-const publicUrl = ref('')
-const requiresAuth = ref(true)
-const isPublishing = ref(false)
-const urlError = ref('')
 
 // Computed
 const showEmptySearch = computed(() => {
@@ -350,46 +347,18 @@ const viewPublicApps = () => {
 
 const openPublishDialog = (app: App) => {
   publishingApp.value = app
-  publicUrl.value = app.publicUrl || generateSlug(app.name)
-  requiresAuth.value = true
-  urlError.value = ''
   showPublishDialog.value = true
 }
 
-const generateSlug = (name: string): string => {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-const validateUrl = () => {
-  if (!publicUrl.value.trim()) {
-    urlError.value = 'URL slug is required'
-    return false
-  }
-  if (!/^[a-z0-9-]+$/.test(publicUrl.value)) {
-    urlError.value = 'URL can only contain lowercase letters, numbers, and hyphens'
-    return false
-  }
-  urlError.value = ''
-  return true
-}
-
-const handlePublishApp = async () => {
+const handlePublishApp = async (request: PublishAppRequest) => {
   if (!publishingApp.value) return
-  if (!validateUrl()) return
 
-  isPublishing.value = true
   try {
-    await appsStore.publishApp(publishingApp.value.id, {
-      publicUrl: publicUrl.value,
-      requiresAuthentication: requiresAuth.value,
-    })
+    await appsStore.publishApp(publishingApp.value.id, request)
     toast.add({
       severity: 'success',
       summary: 'Published',
-      detail: `App is now available at /web/${publicUrl.value}`,
+      detail: `App is now available at /web/${request.publicUrl}`,
       life: 5000,
     })
     showPublishDialog.value = false
@@ -402,8 +371,6 @@ const handlePublishApp = async () => {
       detail: message,
       life: 5000,
     })
-  } finally {
-    isPublishing.value = false
   }
 }
 
@@ -883,70 +850,15 @@ const handleRetry = async () => {
       </template>
     </Dialog>
 
-    <!-- Publish App Dialog -->
-    <Dialog
+    <PublishDialog
       v-model:visible="showPublishDialog"
-      modal
-      header="Publish App"
-      :style="{ width: '500px' }"
-      :closable="!isPublishing"
-      :close-on-escape="!isPublishing"
-    >
-      <div class="flex flex-column gap-4">
-        <p class="text-color-secondary m-0">
-          Publishing will make "{{ publishingApp?.name }}" accessible to users via a public URL.
-        </p>
-
-        <div class="flex flex-column gap-2">
-          <label for="public-url" class="font-semibold">Public URL</label>
-          <div class="p-inputgroup">
-            <span class="p-inputgroup-addon">/web/</span>
-            <InputText
-              id="public-url"
-              v-model="publicUrl"
-              placeholder="my-app"
-              :class="{ 'p-invalid': urlError }"
-              :disabled="isPublishing"
-              @input="validateUrl"
-            />
-          </div>
-          <small v-if="urlError" class="p-error">{{ urlError }}</small>
-          <small v-else class="text-color-secondary">
-            Your app will be accessible at /web/{{ publicUrl || 'your-slug' }}
-          </small>
-        </div>
-
-        <div class="flex align-items-center gap-2">
-          <input
-            id="requires-auth"
-            v-model="requiresAuth"
-            type="checkbox"
-            :disabled="isPublishing"
-            class="p-checkbox"
-          />
-          <label for="requires-auth" class="cursor-pointer">
-            Require authentication to access
-          </label>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-content-end gap-2">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            outlined
-            :disabled="isPublishing"
-            @click="showPublishDialog = false"
-          />
-          <Button
-            label="Publish"
-            icon="pi pi-upload"
-            :loading="isPublishing"
-            @click="handlePublishApp"
-          />
-        </div>
-      </template>
-    </Dialog>
+      :current-slug="publishingApp?.publicUrl"
+      :current-category="publishingApp?.category"
+      :current-tags="publishingApp?.tags"
+      :requires-auth="publishingApp?.requiresAuthentication"
+      :app-name="publishingApp?.name"
+      @publish="handlePublishApp"
+    />
   </div>
 </template>
 

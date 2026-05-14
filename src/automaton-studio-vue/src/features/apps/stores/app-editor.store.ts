@@ -490,6 +490,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         publicUrl: request.publicUrl,
         requiresAuthentication: request.requiresAuthentication,
         publishedAt: new Date().toISOString(),
+        category: request.category ?? currentApp.value.category,
+        tags: request.tags ?? currentApp.value.tags,
       }
 
       // Refresh preview with published API

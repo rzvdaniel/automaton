@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +76,7 @@ public class UserAppsController : ControllerBase
                 .Include(a => a.WebAppUsers)
                 .FirstOrDefaultAsync(a =>
                     a.IsPublished &&
+                    a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
                     a.PublicUrl != null &&
                     a.PublicUrl.ToLower() == slug.ToLower());
 

@@ -39,6 +39,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<AiProvider> AiProviders { get; set; }
         public virtual DbSet<AiModel> AiModels { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
+        public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
         public virtual DbSet<AppVersion> AppVersions { get; set; }
@@ -272,9 +273,32 @@ namespace Automaton.Studio.Server.Data
                 // Sample/Featured flags
                 entity.Property(e => e.IsSample).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsFeatured).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.MarketplaceStatus)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(Automaton.Studio.Server.Enums.MarketplaceAppStatuses.Approved);
+                entity.Property(e => e.MarketplaceModerationReason)
+                    .HasMaxLength(2000);
 
                 // Index for sample apps queries
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
+                entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
+            });
+
+            modelBuilder.Entity<MarketplaceCategory>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.Slug).IsRequired().HasMaxLength(140);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                entity.HasIndex(e => e.Name).IsUnique();
+                entity.HasIndex(e => e.Slug).IsUnique();
+                entity.HasIndex(e => new { e.IsActive, e.SortOrder });
             });
 
             modelBuilder.Entity<Entities.WebAppUser>(entity =>

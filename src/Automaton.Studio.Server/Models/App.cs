@@ -32,6 +32,10 @@ public class AppModel
     public string? ThumbnailUrl { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }
+    public string MarketplaceStatus { get; set; } = Enums.MarketplaceAppStatuses.Approved;
+    public string? MarketplaceModerationReason { get; set; }
+    public DateTime? MarketplaceModeratedAt { get; set; }
+    public Guid? MarketplaceModeratedByUserId { get; set; }
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
 }
