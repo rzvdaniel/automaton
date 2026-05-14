@@ -241,6 +241,10 @@ cd /opt/automaton
 ./scripts/prod-redeploy-all.sh --keep-previous
 ```
 
+Use `--keep-previous` for normal production deploys while the deployment is still fresh. It leaves the old live color running after nginx switches to the new color, so rollback is only a route switch.
+
+Run without `--keep-previous` only when you are comfortable removing the old color after the switch. That keeps the server cleaner and uses fewer resources, but rollback then requires rebuilding or redeploying the previous version.
+
 ## Single Service Redeploy
 
 API:
@@ -311,6 +315,54 @@ Reset routing state to a known all-blue baseline after the blue containers are a
 cd /opt/automaton
 ./scripts/prod-reset-blue-green.sh
 ```
+
+## Rollback Flow
+
+Rollback is fastest when the last deploy used `--keep-previous`, because the previous color is still running.
+
+First, check the current live color:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh status
+docker compose -f docker-compose.prod.yml ps
+```
+
+If all traffic currently points to `green` and the previous healthy color is `blue`, roll all public services back to blue:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh all blue
+```
+
+If all traffic currently points to `blue` and the previous healthy color is `green`, roll all public services back to green:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh all green
+```
+
+Rollback can also be done one service at a time:
+
+```bash
+cd /opt/automaton
+./scripts/prod-switch-blue-green.sh api blue
+./scripts/prod-switch-blue-green.sh studio blue
+./scripts/prod-switch-blue-green.sh website blue
+```
+
+After rollback, verify both origin and Cloudflare paths:
+
+```bash
+curl -k --resolve api.automaton.monster:443:127.0.0.1 https://api.automaton.monster/healthz
+curl -k --resolve studio.automaton.monster:443:127.0.0.1 https://studio.automaton.monster -I
+curl -k --resolve automaton.monster:443:127.0.0.1 https://automaton.monster -I
+curl -I https://api.automaton.monster/healthz
+curl -I https://studio.automaton.monster
+curl -I https://automaton.monster
+```
+
+If the previous color was already stopped because the deploy ran without `--keep-previous`, do not use route switching as rollback. Redeploy a known-good commit or image to the inactive color, wait for health checks, then switch traffic normally.
 
 ## First-Time Bootstrap
 
