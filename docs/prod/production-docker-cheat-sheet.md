@@ -424,6 +424,22 @@ cd /opt/automaton
 ./scripts/prod-renew-certs.sh
 ```
 
+Recommended production cron job:
+
+```bash
+sudo crontab -e
+```
+
+Add:
+
+```cron
+17 3 * * * cd /opt/automaton && ./scripts/prod-renew-certs.sh >> /var/log/automaton-cert-renew.log 2>&1
+```
+
+This checks renewal daily at `03:17` server time. Certbot only renews when the certificate is close to expiry, so running the check daily is normal.
+
+`prod-renew-certs.sh` runs `nginx -t` and then reloads nginx after the renew command. Reloading nginx is graceful: nginx keeps listening on `80/443`, starts workers with the current config, and lets old workers finish existing requests.
+
 ## Website CLI Downloads
 
 Rebuild the downloadable CLI bundles when `src/Automaton.Cli` or `shared/ai-guidance` changed:
