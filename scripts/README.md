@@ -65,6 +65,7 @@ sudo ./setup-service.sh
 | `prod-issue-certs.sh` | Linux/macOS | Request or refresh the nginx TLS certificate bundle used by the public stack |
 | `prod-renew-certs.sh` | Linux/macOS | Run certbot renew and reload nginx |
 | `prod-reset-blue-green.sh` | Linux/macOS | Reset live routing state to all-blue after blue containers are confirmed running |
+| `prod-verify.sh` | Linux/macOS | Verify nginx config, live colors, origin URLs, and public Cloudflare URLs |
 
 ---
 
@@ -84,6 +85,7 @@ cd /opt/automaton
 ./scripts/prod-redeploy-all.sh
 ./scripts/prod-redeploy-all.sh --with-cli-assets
 ./scripts/prod-renew-certs.sh
+./scripts/prod-verify.sh
 ```
 
 Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.

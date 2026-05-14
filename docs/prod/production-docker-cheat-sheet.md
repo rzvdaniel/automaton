@@ -201,6 +201,13 @@ curl -I https://www.automaton.monster
 
 If these succeed, the stack is live.
 
+For the scripted verification path, use:
+
+```bash
+cd /opt/automaton
+./scripts/prod-verify.sh
+```
+
 ## Blue/Green Basics
 
 nginx now serves `api`, `studio`, and `website` through generated upstream selector files:
@@ -244,6 +251,53 @@ cd /opt/automaton
 Use `--keep-previous` for normal production deploys while the deployment is still fresh. It leaves the old live color running after nginx switches to the new color, so rollback is only a route switch.
 
 Run without `--keep-previous` only when you are comfortable removing the old color after the switch. That keeps the server cleaner and uses fewer resources, but rollback then requires rebuilding or redeploying the previous version.
+
+## CI/CD Deploy Flow
+
+A production deploy job should SSH into the server and run a small, boring sequence:
+
+```bash
+cd /opt/automaton
+git pull
+chmod +x ./scripts/prod-*.sh
+./scripts/prod-redeploy-all.sh --keep-previous
+./scripts/prod-verify.sh
+```
+
+Use `--keep-previous` by default in CI/CD. It leaves the previous color running, so rollback remains a route switch while you watch the new deployment.
+
+For a website-only deploy:
+
+```bash
+cd /opt/automaton
+git pull
+chmod +x ./scripts/prod-*.sh
+./scripts/prod-redeploy-website.sh --keep-previous
+./scripts/prod-verify.sh
+```
+
+For API-only or Studio-only deploys, use `prod-redeploy-api.sh --keep-previous` or `prod-redeploy-studio.sh --keep-previous` with the same verify step.
+
+## Cold Reinstall Checklist
+
+Use this when reinstalling Automaton websites on a new server.
+
+1. Point Cloudflare DNS records `@`, `www`, `api`, and `studio` at the new server IP.
+2. Install Docker and Docker Compose.
+3. Clone the repository to `/opt/automaton`.
+4. Create `/opt/automaton/config/appsettings.Production.json`.
+5. Create `/opt/automaton/.env` from `.env.prod.example`.
+6. Create `/opt/automaton/secrets/hosted_runner_ssh_key`, even as an empty placeholder if hosted runners are not in use.
+7. Open firewall ports `22`, `80`, and `443`.
+8. Run `chmod +x ./scripts/prod-*.sh`.
+9. Run `./scripts/prod-issue-certs.sh`.
+10. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
+11. Run `./scripts/prod-reset-blue-green.sh`.
+12. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
+13. Run `./scripts/prod-verify.sh`.
+14. Add the certificate renewal cron job from the TLS section.
+
+Fresh installs normally use `CERT_NAME=automaton.monster` or omit `CERT_NAME` entirely so it defaults to `WEBSITE_DOMAIN`. Only keep a suffix such as `CERT_NAME=automaton.monster-0001` on a migrated host where Certbot already created that certificate name.
 
 ## Single Service Redeploy
 
@@ -491,6 +545,13 @@ Check the resolved compose config:
 cd /opt/automaton
 docker compose -f docker-compose.prod.yml config
 docker compose -f docker-compose.prod.yml --profile build-assets config
+```
+
+Run the full production smoke check:
+
+```bash
+cd /opt/automaton
+./scripts/prod-verify.sh
 ```
 
 ## Notes
