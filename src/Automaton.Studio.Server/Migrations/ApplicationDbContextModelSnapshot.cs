@@ -1122,6 +1122,55 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Logs");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.MarketplaceCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(140)
+                        .HasColumnType("varchar(140)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive", "SortOrder");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("MarketplaceCategories");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2002,6 +2051,23 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime?>("LastViewedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("MarketplaceModerationReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("MarketplaceModeratedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("MarketplaceModeratedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("MarketplaceStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("approved");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -2052,6 +2118,8 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("PublicUrl")
                         .IsUnique();
+
+                    b.HasIndex("IsPublished", "MarketplaceStatus", "Category");
 
                     b.HasIndex("IsSample", "IsPublished");
 

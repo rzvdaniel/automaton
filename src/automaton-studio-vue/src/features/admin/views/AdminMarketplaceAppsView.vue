@@ -39,6 +39,9 @@ const toast = useToast()
 const isLoading = ref(false)
 const isSavingCategories = ref(false)
 const search = ref('')
+const selectedStatusFilter = ref<'all' | 'approved' | 'hidden' | 'banned'>('all')
+const selectedCategoryFilter = ref<string | null>('all')
+const featuredOnly = ref(false)
 const apps = ref<MarketplaceApp[]>([])
 const categoriesText = ref('')
 const savingAppIds = ref<string[]>([])
@@ -92,16 +95,45 @@ const categoryOptions = computed<SelectOption[]>(() => [
   ...categoryList.value.map(category => ({ label: category, value: category })),
 ])
 
+const categoryFilterOptions = computed(() => [
+  { label: 'All categories', value: 'all' },
+  { label: 'Uncategorized', value: '__uncategorized__' },
+  ...categoryList.value.map(category => ({ label: category, value: category })),
+])
+
 const featuredCount = computed(() => apps.value.filter(app => app.isFeatured).length)
 const moderatedCount = computed(() => apps.value.filter(app => app.marketplaceStatus !== 'approved').length)
 const categorizedCount = computed(() => apps.value.filter(app => !!app.category?.trim()).length)
 
 const filteredApps = computed(() => {
   const query = search.value.trim().toLowerCase()
-  if (!query) return apps.value
+  return apps.value.filter(app => {
+    if (selectedStatusFilter.value !== 'all' && app.marketplaceStatus !== selectedStatusFilter.value) {
+      return false
+    }
 
-  return apps.value.filter(app =>
-    [
+    if (selectedCategoryFilter.value === '__uncategorized__' && app.category?.trim()) {
+      return false
+    }
+
+    if (
+      selectedCategoryFilter.value &&
+      selectedCategoryFilter.value !== 'all' &&
+      selectedCategoryFilter.value !== '__uncategorized__' &&
+      app.category !== selectedCategoryFilter.value
+    ) {
+      return false
+    }
+
+    if (featuredOnly.value && !app.isFeatured) {
+      return false
+    }
+
+    if (!query) {
+      return true
+    }
+
+    return [
       app.name,
       app.summary ?? '',
       app.category ?? '',
@@ -109,8 +141,8 @@ const filteredApps = computed(() => {
       app.ownerDisplayName ?? '',
       app.ownerPublicUsername ?? '',
       app.publicUrl ?? '',
-    ].some(field => field.toLowerCase().includes(query)),
-  )
+    ].some(field => field.toLowerCase().includes(query))
+  })
 })
 
 function isSavingApp(appId: string): boolean {
@@ -208,6 +240,24 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
           placeholder="Search apps, owners, tags..."
           class="search-input"
         />
+        <Select
+          v-model="selectedStatusFilter"
+          :options="[{ label: 'All statuses', value: 'all' }, ...statusOptions]"
+          option-label="label"
+          option-value="value"
+          class="filter-select"
+        />
+        <Select
+          v-model="selectedCategoryFilter"
+          :options="categoryFilterOptions"
+          option-label="label"
+          option-value="value"
+          class="filter-select"
+        />
+        <div class="feature-toggle feature-toggle--header">
+          <Checkbox v-model="featuredOnly" :binary="true" input-id="featured-only" />
+          <label for="featured-only" class="text-sm text-color-secondary">Featured only</label>
+        </div>
         <Button
           icon="pi pi-refresh"
           outlined
@@ -458,6 +508,10 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
   width: 240px;
 }
 
+.filter-select {
+  min-width: 180px;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -598,6 +652,10 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
   gap: 0.5rem;
 }
 
+.feature-toggle--header {
+  min-height: 2.5rem;
+}
+
 @media (max-width: 1200px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -614,6 +672,10 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
   }
 
   .header-actions {
+    width: 100%;
+  }
+
+  .filter-select {
     width: 100%;
   }
 
