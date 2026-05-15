@@ -55,6 +55,7 @@ $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
 $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Studio.Server"
 $RunnerProject = Join-Path $WorktreeRoot "src\Automaton.Runner"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
+$WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
 
 # Auto-detect main repo from git worktree list if not supplied
 if (-not $MainRepo) {
@@ -143,29 +144,50 @@ if ($pythonOk -and $fastapiOk -and $uvicornOk) {
 # ---------- Node / Vite checks for frontend --------------------------------
 $nodeOk = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
 $npmOk  = $null -ne (Get-Command npm -ErrorAction SilentlyContinue)
-$viteBin = Join-Path $VueProject "node_modules\.bin\vite"
+$studioViteBin = Join-Path $VueProject "node_modules\.bin\vite"
+$websiteViteBin = Join-Path $WebsiteProject "node_modules\.bin\vite"
 if (-not $nodeOk -or -not $npmOk) {
-    Write-Warn "Node.js and/or npm not found. Vue frontend will not start."
+    Write-Warn "Node.js and/or npm not found. Vue frontends will not start."
     Write-Warn "Install Node.js (includes npm) from https://nodejs.org/"
 } else {
-    if (-not (Test-Path $viteBin)) {
+    if (-not (Test-Path $studioViteBin)) {
         if ($AutoInstall) {
-            Write-Step "Installing frontend dependencies (npm install)..."
+            Write-Step "Installing studio frontend dependencies (npm install)..."
             $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
             try {
                 Push-Location $VueProject
                 npm install
                 Pop-Location
-                Write-Ok "npm install completed"
+                Write-Ok "Studio frontend npm install completed"
             } catch {
-                Write-Warn "npm install failed: $_"
+                Write-Warn "Studio frontend npm install failed: $_"
                 Pop-Location -ErrorAction SilentlyContinue
             } finally { $ErrorActionPreference = $prev }
         } else {
             Write-Warn "Frontend dependencies missing. Run 'npm install' in $VueProject or re-run with -AutoInstall"
         }
     } else {
-        Write-Ok "Frontend dependencies appear installed"
+        Write-Ok "Studio frontend dependencies appear installed"
+    }
+
+    if (-not (Test-Path $websiteViteBin)) {
+        if ($AutoInstall) {
+            Write-Step "Installing website frontend dependencies (npm install)..."
+            $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            try {
+                Push-Location $WebsiteProject
+                npm install
+                Pop-Location
+                Write-Ok "Website frontend npm install completed"
+            } catch {
+                Write-Warn "Website frontend npm install failed: $_"
+                Pop-Location -ErrorAction SilentlyContinue
+            } finally { $ErrorActionPreference = $prev }
+        } else {
+            Write-Warn "Website frontend dependencies missing. Run 'npm install' in $WebsiteProject or re-run with -AutoInstall"
+        }
+    } else {
+        Write-Ok "Website frontend dependencies appear installed"
     }
 }
 
@@ -181,6 +203,10 @@ Write-Step "Starting Vue.js frontend..."
 Start-DevWindow "Automaton Vue" $VueProject "npm run dev"
 Write-Ok "Vue window launched"
 
+Write-Step "Starting front-facing Automaton website..."
+Start-DevWindow "Automaton Website" $WebsiteProject "npm run dev"
+Write-Ok "Website window launched"
+
 # ---------- Summary ---------------------------------------------------------
 
 Write-Host ""
@@ -190,5 +216,6 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Server   : https://localhost:7091        " -ForegroundColor White
 Write-Host "  Swagger  : https://localhost:7091/swagger" -ForegroundColor White
 Write-Host "  Frontend : http://localhost:5173         " -ForegroundColor White
+Write-Host "  Website  : http://localhost:5174         " -ForegroundColor White
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
