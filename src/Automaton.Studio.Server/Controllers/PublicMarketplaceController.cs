@@ -19,7 +19,7 @@ public class PublicMarketplaceController : ControllerBase
     }
 
     [HttpGet("apps")]
-    public async Task<ActionResult<object>> GetApps(
+    public async Task<ActionResult<List<MarketplaceAppCardDto>>> GetApps(
         [FromQuery] string? category = null,
         [FromQuery] string? search = null,
         [FromQuery] int take = 20)
@@ -51,12 +51,12 @@ public class PublicMarketplaceController : ControllerBase
             .ThenByDescending(a => a.ViewCount)
             .ThenByDescending(a => a.PublishedAt)
             .Take(Math.Clamp(take, 1, 100))
-            .Select(a => new
+            .Select(a => new MarketplaceAppCardDto
             {
-                a.Id,
-                a.Name,
-                a.Summary,
-                a.Description,
+                Id = a.Id,
+                Name = a.Name,
+                Summary = a.Summary,
+                Description = a.Description,
                 ThumbnailUrl = a.ThumbnailUrl ??
                     _dbContext.WebAppScreenshots
                         .Where(s => s.WebAppId == a.Id)
@@ -64,17 +64,115 @@ public class PublicMarketplaceController : ControllerBase
                         .ThenBy(s => s.CreatedAt)
                         .Select(s => s.ImageUrl)
                         .FirstOrDefault(),
-                a.Category,
-                a.Tags,
-                a.ViewCount,
-                a.StarCount,
+                Category = a.Category,
+                Tags = a.Tags,
+                ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                a.PublicUrl
+                PublicUrl = a.PublicUrl,
+                PublishedAt = a.PublishedAt,
+                IsFeatured = a.IsFeatured
             })
             .ToListAsync();
 
         return Ok(apps);
+    }
+
+    [HttpGet("apps/{appId:guid}")]
+    public async Task<ActionResult<MarketplaceAppDetailsDto>> GetAppDetails(Guid appId)
+    {
+        var currentUserId = TryGetCurrentUserId();
+
+        var app = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a =>
+                a.Id == appId &&
+                a.IsPublished &&
+                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Select(a => new MarketplaceAppDetailsDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Summary = a.Summary,
+                Description = a.Description,
+                ThumbnailUrl = a.ThumbnailUrl ??
+                    _dbContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == a.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
+                Category = a.Category,
+                Tags = a.Tags,
+                ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
+                PublicUrl = a.PublicUrl,
+                PublishedAt = a.PublishedAt,
+                IsFeatured = a.IsFeatured
+            })
+            .FirstOrDefaultAsync();
+
+        if (app == null)
+        {
+            return NotFound(new { message = "App not found or not published" });
+        }
+
+        app.Screenshots = await _dbContext.WebAppScreenshots
+            .AsNoTracking()
+            .Where(s => s.WebAppId == app.Id)
+            .OrderBy(s => s.SortOrder)
+            .ThenBy(s => s.CreatedAt)
+            .Select(s => new MarketplaceAppScreenshotDto
+            {
+                Id = s.Id,
+                ImageUrl = s.ImageUrl,
+                Caption = s.Caption,
+                SortOrder = s.SortOrder
+            })
+            .ToListAsync();
+
+        app.RelatedApps = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a =>
+                a.Id != app.Id &&
+                a.IsPublished &&
+                a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
+                a.Category != null &&
+                a.Category == app.Category)
+            .OrderByDescending(a => a.IsFeatured)
+            .ThenByDescending(a => a.StarCount)
+            .ThenByDescending(a => a.ViewCount)
+            .ThenByDescending(a => a.PublishedAt)
+            .Take(4)
+            .Select(a => new MarketplaceAppCardDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Summary = a.Summary,
+                Description = a.Description,
+                ThumbnailUrl = a.ThumbnailUrl ??
+                    _dbContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == a.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
+                Category = a.Category,
+                Tags = a.Tags,
+                ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
+                PublicUrl = a.PublicUrl,
+                PublishedAt = a.PublishedAt,
+                IsFeatured = a.IsFeatured
+            })
+            .ToListAsync();
+
+        return Ok(app);
     }
 
     [HttpGet("categories")]
@@ -96,4 +194,35 @@ public class PublicMarketplaceController : ControllerBase
         var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         return Guid.TryParse(userIdString, out var userId) ? userId : null;
     }
+}
+
+public class MarketplaceAppCardDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Summary { get; set; }
+    public string? Description { get; set; }
+    public string? ThumbnailUrl { get; set; }
+    public string? Category { get; set; }
+    public string? Tags { get; set; }
+    public int ViewCount { get; set; }
+    public int StarCount { get; set; }
+    public bool IsStarredByCurrentUser { get; set; }
+    public string? PublicUrl { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public bool IsFeatured { get; set; }
+}
+
+public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
+{
+    public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
+    public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
+}
+
+public class MarketplaceAppScreenshotDto
+{
+    public Guid Id { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
+    public string? Caption { get; set; }
+    public int SortOrder { get; set; }
 }

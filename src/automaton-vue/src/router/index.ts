@@ -15,6 +15,11 @@ const router = createRouter({
       component: () => import('@/views/AppsView.vue'),
     },
     {
+      path: '/apps/:appId',
+      name: 'app-marketplace-detail',
+      component: () => import('@/views/AppMarketplaceDetailView.vue'),
+    },
+    {
       path: '/docs',
       name: 'docs',
       component: () => import('@/views/DocsView.vue'),
