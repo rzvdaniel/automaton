@@ -8,8 +8,16 @@ const props = defineProps<{ fullPage?: boolean }>()
 const router = useRouter()
 const marketplaceApiBaseUrl = `${publicAppConfig.apiBaseUrl}api/public/marketplace`
 
-function getLaunchUrl(publicUrl?: string) {
-  return publicUrl ? `${publicAppConfig.studioUrl}web/${publicUrl}` : null
+function resolveAssetUrl(url?: string | null) {
+  if (!url) {
+    return ''
+  }
+
+  if (url.startsWith('http')) {
+    return url
+  }
+
+  return `${publicAppConfig.apiBaseUrl}${url.replace(/^\/+/, '')}`
 }
 
 const categories = ref<string[]>([])
@@ -136,16 +144,17 @@ onMounted(async () => {
           @keydown.space.prevent="openDetails(app.id)"
         >
           <div class="app-media">
-            <img v-if="app.thumbnailUrl" :src="app.thumbnailUrl" class="app-thumbnail" :alt="app.name" />
+            <img
+              v-if="app.thumbnailUrl"
+              :src="resolveAssetUrl(app.thumbnailUrl)"
+              class="app-thumbnail"
+              :alt="app.name"
+            />
             <div v-else class="app-thumbnail app-thumbnail-fallback">
               <span>{{ app.name.charAt(0) }}</span>
             </div>
             <div class="app-overlay">
               <span v-if="app.isFeatured" class="overlay-badge">Featured</span>
-              <span class="overlay-link">
-                View details
-                <i class="pi pi-arrow-up-right" />
-              </span>
             </div>
           </div>
 
@@ -160,23 +169,6 @@ onMounted(async () => {
               <h3 class="app-title">{{ app.name }}</h3>
               <p class="app-summary">{{ app.summary || app.description || 'Open the detail page to explore the app.' }}</p>
             </div>
-
-            <div class="app-footer">
-              <span class="app-open">
-                View details
-                <i class="pi pi-arrow-right" />
-              </span>
-              <a
-                v-if="getLaunchUrl(app.publicUrl)"
-                class="app-launch"
-                :href="getLaunchUrl(app.publicUrl) || undefined"
-                target="_blank"
-                rel="noopener"
-                @click.stop
-              >
-                Launch
-              </a>
-            </div>
           </div>
         </article>
       </div>
@@ -186,7 +178,7 @@ onMounted(async () => {
 
 <style scoped>
 .showcase-section {
-  padding: 88px 0 108px;
+  padding: 0px;
 }
 
 .showcase-header {
@@ -284,6 +276,7 @@ onMounted(async () => {
 
 .app-card {
   display: grid;
+  cursor: pointer;
   overflow: hidden;
   min-height: 100%;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -351,13 +344,6 @@ onMounted(async () => {
   backdrop-filter: blur(10px);
 }
 
-.overlay-link {
-  align-self: flex-end;
-  background: rgba(10, 10, 15, 0.66);
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
 .app-body {
   display: grid;
   gap: 18px;
@@ -390,40 +376,6 @@ onMounted(async () => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.app-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.app-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-text);
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.app-launch {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(124, 106, 245, 0.28);
-  color: var(--color-accent-hover);
-  font-size: 0.82rem;
-  font-weight: 700;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.app-launch:hover {
-  background: rgba(124, 106, 245, 0.12);
-  border-color: rgba(124, 106, 245, 0.48);
 }
 
 .showcase-empty {

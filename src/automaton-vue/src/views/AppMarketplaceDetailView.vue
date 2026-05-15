@@ -14,6 +14,18 @@ const loading = ref(true)
 const selectedImageUrl = ref('')
 const errorMessage = ref('')
 
+function resolveAssetUrl(url?: string | null): string {
+  if (!url) {
+    return ''
+  }
+
+  if (url.startsWith('http')) {
+    return url
+  }
+
+  return `${publicAppConfig.apiBaseUrl}${url.replace(/^\/+/, '')}`
+}
+
 const galleryImages = computed(() => {
   if (!app.value) {
     return []
@@ -156,7 +168,7 @@ onMounted(loadApp)
               <div class="gallery-stage">
                 <img
                   v-if="selectedImageUrl"
-                  :src="selectedImageUrl"
+                  :src="resolveAssetUrl(selectedImageUrl)"
                   :alt="app.name"
                   class="stage-image"
                 />
@@ -174,7 +186,7 @@ onMounted(loadApp)
                   :class="{ 'gallery-thumb-active': selectedImageUrl === image.imageUrl }"
                   @click="selectedImageUrl = image.imageUrl"
                 >
-                  <img :src="image.imageUrl" :alt="image.caption" />
+                  <img :src="resolveAssetUrl(image.imageUrl)" :alt="image.caption" />
                 </button>
               </div>
             </div>
@@ -193,7 +205,7 @@ onMounted(loadApp)
                 <div class="related-media">
                   <img
                     v-if="relatedApp.thumbnailUrl"
-                    :src="relatedApp.thumbnailUrl"
+                    :src="resolveAssetUrl(relatedApp.thumbnailUrl)"
                     :alt="relatedApp.name"
                     class="related-image"
                   />
