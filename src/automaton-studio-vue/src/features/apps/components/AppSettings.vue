@@ -19,7 +19,7 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
-import { AccessScope } from '../types/apps.types'
+import { AccessScope, type AppScreenshot } from '../types/apps.types'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -82,16 +82,23 @@ const publicUrl = ref('')
 const requiresAuthentication = ref(false)
 const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
+const maxScreenshots = 8
 
 // Loading states
 const isSaving = ref(false)
 const isUploadingImage = ref(false)
 const isRemovingImage = ref(false)
+const isUploadingScreenshot = ref(false)
 const isDraggingOver = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const screenshotInputRef = ref<HTMLInputElement | null>(null)
 
 function triggerFilePicker() {
   fileInputRef.value?.click()
+}
+
+function triggerScreenshotPicker() {
+  screenshotInputRef.value?.click()
 }
 
 function onFileInputChange(e: Event) {
@@ -106,6 +113,16 @@ function onDrop(e: DragEvent) {
   const file = e.dataTransfer?.files?.[0]
   if (file) handleImageUpload({ files: [file] })
 }
+
+function onScreenshotInputChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) {
+    void handleScreenshotUpload(file)
+  }
+  if (screenshotInputRef.value) {
+    screenshotInputRef.value.value = ''
+  }
+}
 const isDeleting = ref(false)
 
 // Template (admin) state
@@ -117,16 +134,21 @@ const isSavingTemplate = ref(false)
 const app = computed(() => editorStore.currentApp)
 const isPublished = computed(() => app.value?.isPublished ?? false)
 const isLinkedToProject = computed(() => app.value?.scope === AccessScope.Project)
+const screenshots = computed(() => app.value?.screenshots ?? [])
+const canAddMoreScreenshots = computed(() => screenshots.value.length < maxScreenshots)
+
+function resolveAssetUrl(url?: string | null): string {
+  if (!url) return ''
+  if (url.startsWith('http')) {
+    return url
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  return `${baseUrl}${url}`
+}
 
 // Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
-  if (!thumbnailUrl.value) return ''
-  // If already a full URL, use as-is; otherwise prepend API base URL
-  if (thumbnailUrl.value.startsWith('http')) {
-    return thumbnailUrl.value
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  return `${baseUrl}${thumbnailUrl.value}`
+  return resolveAssetUrl(thumbnailUrl.value)
 })
 
 const hasChanges = computed(() => {
@@ -309,6 +331,85 @@ async function handleImageUpload(event: { files: File[] }) {
     })
   } finally {
     isUploadingImage.value = false
+  }
+}
+
+function screenshotUrl(screenshot: AppScreenshot): string {
+  return resolveAssetUrl(screenshot.imageUrl)
+}
+
+async function handleScreenshotUpload(file: File) {
+  if (!app.value) return
+
+  if (!file.type.startsWith('image/')) {
+    toast.add({
+      severity: 'error',
+      summary: 'Invalid File',
+      detail: 'Please select an image file',
+      life: 3000,
+    })
+    return
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    toast.add({
+      severity: 'error',
+      summary: 'File Too Large',
+      detail: 'Image must be less than 2MB',
+      life: 3000,
+    })
+    return
+  }
+
+  isUploadingScreenshot.value = true
+  try {
+    const screenshot = await appsService.uploadScreenshot(app.value.id, file)
+    if (editorStore.currentApp) {
+      editorStore.currentApp.screenshots = [...(editorStore.currentApp.screenshots ?? []), screenshot]
+    }
+
+    toast.add({
+      severity: 'success',
+      summary: 'Uploaded',
+      detail: 'Screenshot added to your app gallery',
+      life: 2500,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Upload Failed',
+      detail: err instanceof Error ? err.message : 'Failed to upload screenshot',
+      life: 5000,
+    })
+  } finally {
+    isUploadingScreenshot.value = false
+  }
+}
+
+async function removeScreenshot(screenshotId: string) {
+  if (!app.value) return
+
+  try {
+    await appsService.deleteScreenshot(app.value.id, screenshotId)
+    if (editorStore.currentApp) {
+      editorStore.currentApp.screenshots = (editorStore.currentApp.screenshots ?? []).filter(
+        screenshot => screenshot.id !== screenshotId,
+      )
+    }
+
+    toast.add({
+      severity: 'success',
+      summary: 'Removed',
+      detail: 'Screenshot deleted',
+      life: 2500,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err instanceof Error ? err.message : 'Failed to delete screenshot',
+      life: 5000,
+    })
   }
 }
 
@@ -730,6 +831,64 @@ async function handleSaveTemplateStatus() {
                 <small class="text-color-secondary">Recommended 16:9 · max 2 MB</small>
               </div>
 
+              <div class="flex flex-column gap-3">
+                <div class="flex align-items-center justify-content-between gap-3 flex-wrap">
+                  <div>
+                    <label class="font-medium">Screenshots</label>
+                    <div class="text-color-secondary text-sm mt-1">
+                      Add up to {{ maxScreenshots }} screenshots for your app gallery and marketplace previews.
+                    </div>
+                  </div>
+                  <Button
+                    label="Add Screenshot"
+                    icon="pi pi-images"
+                    severity="secondary"
+                    outlined
+                    :disabled="!canAddMoreScreenshots || isUploadingScreenshot"
+                    :loading="isUploadingScreenshot"
+                    @click="triggerScreenshotPicker"
+                  />
+                </div>
+
+                <input
+                  ref="screenshotInputRef"
+                  type="file"
+                  accept="image/*"
+                  style="display:none"
+                  @change="onScreenshotInputChange"
+                />
+
+                <div v-if="screenshots.length > 0" class="screenshots-grid">
+                  <article
+                    v-for="screenshot in screenshots"
+                    :key="screenshot.id"
+                    class="screenshot-card"
+                  >
+                    <img
+                      :src="screenshotUrl(screenshot)"
+                      :alt="`${app?.name || 'App'} screenshot`"
+                      class="screenshot-img"
+                    />
+                    <button
+                      class="screenshot-delete"
+                      title="Remove screenshot"
+                      @click="removeScreenshot(screenshot.id)"
+                    >
+                      <i class="pi pi-trash"></i>
+                    </button>
+                  </article>
+                </div>
+                <div v-else class="screenshots-empty">
+                  <i class="pi pi-images"></i>
+                  <span>No screenshots yet</span>
+                  <small>Upload a few product shots so users can see what your app feels like before opening it.</small>
+                </div>
+
+                <small class="text-color-secondary">
+                  Best results: landscape images, under 2 MB each.
+                </small>
+              </div>
+
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
                 <Button
                   label="Save Changes"
@@ -1080,6 +1239,74 @@ async function handleSaveTemplateStatus() {
 .cover-empty-hint small {
   font-size: 0.75rem;
   opacity: 0.6;
+}
+
+.screenshots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.screenshot-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--p-surface-300);
+  background: var(--p-surface-50);
+  aspect-ratio: 16 / 9;
+}
+
+:global(.app-dark) .screenshot-card {
+  border-color: var(--p-surface-700);
+  background: var(--p-surface-900);
+}
+
+.screenshot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.screenshot-delete {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.56);
+  color: white;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.screenshot-delete:hover {
+  background: rgba(185, 28, 28, 0.9);
+}
+
+.screenshots-empty {
+  border: 1px dashed var(--p-surface-300);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--p-text-muted-color);
+  align-items: flex-start;
+}
+
+:global(.app-dark) .screenshots-empty {
+  border-color: var(--p-surface-700);
+}
+
+.screenshots-empty i {
+  font-size: 1.4rem;
+  opacity: 0.75;
 }
 
 .analytics-section {

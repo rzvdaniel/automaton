@@ -30,6 +30,13 @@ export interface AppDefinition {
   gitHub?: GitHubSettings
 }
 
+export interface AppScreenshot {
+  id: string
+  imageUrl: string
+  caption?: string | null
+  sortOrder: number
+}
+
 /**
  * App model from API
  * Matches src/Automaton.Studio.Server/Models/App.cs
@@ -61,6 +68,7 @@ export interface App {
   isFeatured: boolean
   // Public profile display
   thumbnailUrl?: string | null
+  screenshots: AppScreenshot[]
   category?: string | null
   tags?: string | null
   marketplaceStatus: string

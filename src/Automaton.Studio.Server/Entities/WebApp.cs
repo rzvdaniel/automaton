@@ -91,5 +91,6 @@ public class WebApp
 
     // Navigation properties
     public virtual ICollection<WebAppUser> WebAppUsers { get; set; }
+    public virtual ICollection<WebAppScreenshot> WebAppScreenshots { get; set; } = new List<WebAppScreenshot>();
     public virtual ICollection<ProjectApp> ProjectApps { get; set; }
 }

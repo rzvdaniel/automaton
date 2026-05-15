@@ -294,6 +294,8 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Runner selection for executions triggered from the app
 - PWA settings (manifest, theme colors, icons)
 - AI-assisted frontend editing
+- Marketplace media metadata: thumbnail plus developer-managed screenshot gallery
+- Uploaded marketplace media must live under `AppData/media/...` so Docker volume mounts preserve thumbnails and screenshots across API redeploys; do not write runtime uploads into `wwwroot`
 - Backend Server tab in the app editor proxies to the selected connected runner and shows the runner's deployed `{RUNNER_SCRIPTS_DIR}/{appId}/backend` files. It supports read-only text preview and deletion of runner-side files without touching Studio source files.
 
 **Publishing & Access:**
@@ -301,6 +303,7 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Published apps get a `PublicUrl` (`/web/{publicUrl}`)
 - Public (no login) or Protected (requires Automaton login)
 - Publish/Unpublish flows with clear status badges
+- Public profile app details can render screenshot galleries sourced from `WebAppScreenshots`, and marketplace cards can fall back to the first screenshot when no thumbnail is set
 
 **For complete API reference, request/response formats, and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
 

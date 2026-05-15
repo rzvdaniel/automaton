@@ -494,6 +494,12 @@ if (Directory.Exists(appFilesPath))
     });
 }
 
+// Serve uploaded marketplace media from the persistent AppData volume.
+// Public URLs stay the same even though storage lives outside wwwroot.
+var appMediaRootPath = Path.Combine(app.Environment.ContentRootPath, "AppData", "media");
+ConfigureStaticMediaPath(app, Path.Combine(appMediaRootPath, "app-thumbnails"), "/app-thumbnails");
+ConfigureStaticMediaPath(app, Path.Combine(appMediaRootPath, "app-screenshots"), "/app-screenshots");
+
 // Enable CORS before authentication (only if configured)
 if (corsOrigins != null && corsOrigins.Length > 0)
 {
@@ -512,3 +518,22 @@ app.MapHub<AutomatonHub>("/api/workflow/hub");
 app.MapFallbackToPage("/_Host");
 
 app.Run();
+
+static void ConfigureStaticMediaPath(WebApplication app, string physicalPath, string requestPath)
+{
+    if (!Directory.Exists(physicalPath))
+    {
+        Directory.CreateDirectory(physicalPath);
+    }
+
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(physicalPath),
+        RequestPath = requestPath,
+        OnPrepareResponse = ctx =>
+        {
+            ctx.Context.Response.Headers.CacheControl = "public,max-age=86400";
+            ctx.Context.Response.Headers.XContentTypeOptions = "nosniff";
+        }
+    });
+}

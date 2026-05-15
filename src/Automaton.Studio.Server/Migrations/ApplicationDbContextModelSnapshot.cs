@@ -2131,6 +2131,41 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("WebApps");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppScreenshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(240)
+                        .HasColumnType("varchar(240)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebAppId");
+
+                    b.HasIndex("WebAppId", "SortOrder");
+
+                    b.ToTable("WebAppScreenshots");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStar", b =>
                 {
                     b.Property<Guid>("WebAppId")
@@ -2852,6 +2887,17 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppScreenshot", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                        .WithMany("WebAppScreenshots")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WebApp");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
                 {
                     b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "CustomStep")
@@ -3043,6 +3089,8 @@ namespace Automaton.Studio.Server.Migrations
             modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
                 {
                     b.Navigation("ProjectApps");
+
+                    b.Navigation("WebAppScreenshots");
 
                     b.Navigation("WebAppUsers");
                 });

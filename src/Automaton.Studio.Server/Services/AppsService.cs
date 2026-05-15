@@ -40,7 +40,8 @@ public class AppsService
     {
         // Use authorization service to get apps filtered by project context
         var entities = authorizationService.GetAppsQueryByContext(projectId)
-            .Include(x => x.WebAppUsers);
+            .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots);
         var apps = entities.Select(e => MapToModel(e, null));
 
         return apps;
@@ -51,6 +52,7 @@ public class AppsService
         // Use authorization service query to check access (personal + project-based)
         var appEntity = authorizationService.GetAccessibleAppsQuery()
             .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
             .SingleOrDefault(x => x.Id == id);
 
         if (appEntity == null)
@@ -85,6 +87,7 @@ public class AppsService
     {
         var appEntity = dataContext.WebApps
             .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
             .FirstOrDefault(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
@@ -248,6 +251,7 @@ public class AppsService
 
         var entity = dataContext.WebApps
             .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
             .SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
@@ -515,6 +519,17 @@ public class AppsService
             IsFeatured = entity.IsFeatured,
             // Public profile display
             ThumbnailUrl = entity.ThumbnailUrl,
+            Screenshots = entity.WebAppScreenshots?
+                .OrderBy(s => s.SortOrder)
+                .ThenBy(s => s.CreatedAt)
+                .Select(s => new Models.AppScreenshotModel
+                {
+                    Id = s.Id,
+                    ImageUrl = s.ImageUrl,
+                    Caption = s.Caption,
+                    SortOrder = s.SortOrder
+                })
+                .ToList() ?? new List<Models.AppScreenshotModel>(),
             Category = entity.Category,
             Tags = entity.Tags,
             MarketplaceStatus = entity.MarketplaceStatus,
@@ -589,6 +604,7 @@ public class AppsService
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
         return MapToModel(newEntity, null);
@@ -647,6 +663,7 @@ public class AppsService
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
         return MapToModel(newEntity, null);
@@ -702,5 +719,68 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
         logger.Information("Updated thumbnail URL for app {AppId}: {ThumbnailUrl}", appId, thumbnailUrl);
+    }
+
+    public async Task<Models.AppScreenshotModel> AddScreenshotAsync(Guid appId, string imageUrl, string? caption = null)
+    {
+        var nextSortOrder = await dataContext.WebAppScreenshots
+            .Where(s => s.WebAppId == appId)
+            .Select(s => (int?)s.SortOrder)
+            .MaxAsync() ?? -1;
+
+        var screenshot = new Entities.WebAppScreenshot
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = appId,
+            ImageUrl = imageUrl,
+            Caption = caption?.Trim(),
+            SortOrder = nextSortOrder + 1,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        dataContext.WebAppScreenshots.Add(screenshot);
+
+        var entity = await dataContext.WebApps.FindAsync(appId);
+        if (entity != null)
+        {
+            entity.Updated = DateTime.UtcNow;
+        }
+
+        await dataContext.SaveChangesAsync();
+
+        logger.Information("Added screenshot {ScreenshotId} for app {AppId}", screenshot.Id, appId);
+
+        return new Models.AppScreenshotModel
+        {
+            Id = screenshot.Id,
+            ImageUrl = screenshot.ImageUrl,
+            Caption = screenshot.Caption,
+            SortOrder = screenshot.SortOrder
+        };
+    }
+
+    public async Task<string?> DeleteScreenshotAsync(Guid appId, Guid screenshotId)
+    {
+        var screenshot = await dataContext.WebAppScreenshots
+            .FirstOrDefaultAsync(s => s.WebAppId == appId && s.Id == screenshotId);
+
+        if (screenshot == null)
+        {
+            throw new InvalidOperationException($"Screenshot {screenshotId} not found for app {appId}");
+        }
+
+        var imageUrl = screenshot.ImageUrl;
+        dataContext.WebAppScreenshots.Remove(screenshot);
+
+        var entity = await dataContext.WebApps.FindAsync(appId);
+        if (entity != null)
+        {
+            entity.Updated = DateTime.UtcNow;
+        }
+
+        await dataContext.SaveChangesAsync();
+
+        logger.Information("Deleted screenshot {ScreenshotId} for app {AppId}", screenshotId, appId);
+        return imageUrl;
     }
 }

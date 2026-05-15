@@ -419,7 +419,7 @@ public class AppsController : BaseController
             }
 
             // Delete all old images for this app (keep only the new one)
-            var appThumbnailsDir = Path.Combine(webHostEnvironment.WebRootPath, "app-thumbnails", id.ToString());
+            var appThumbnailsDir = GetAppMediaDirectory("app-thumbnails", id);
             await DeleteAllAppImagesAsync(appThumbnailsDir);
 
             // Create directory if it doesn't exist
@@ -471,6 +471,131 @@ public class AppsController : BaseController
         {
             logger.LogError(ex, "[AppsController] Error uploading background image for app {AppId}", id);
             return StatusCode(500, new { message = "Failed to upload image" });
+        }
+    }
+
+    [HttpPost("{id}/screenshots")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadScreenshot(Guid id, IFormFile file)
+    {
+        try
+        {
+            var app = appsService.Get(id);
+            if (app == null)
+            {
+                logger.LogWarning("[AppsController] Screenshot upload attempt by user {User} to app not owned: {AppId}",
+                    User.Identity?.Name ?? "Unknown", id);
+                return NotFound(new { message = "App not found" });
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "No file provided" });
+            }
+
+            if ((app.Screenshots?.Count ?? 0) >= 8)
+            {
+                return BadRequest(new { message = "You can upload up to 8 screenshots per app" });
+            }
+
+            const long maxFileSize = 2 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                logger.LogWarning("[AppsController] Screenshot file size exceeds limit for app {AppId}: {Size} bytes", id, file.Length);
+                return BadRequest(new { message = "File size exceeds 2MB limit" });
+            }
+
+            var allowedMimeTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
+            if (!allowedMimeTypes.Contains(file.ContentType))
+            {
+                logger.LogWarning("[AppsController] Invalid screenshot MIME type for app {AppId}: {MimeType}", id, file.ContentType);
+                return BadRequest(new { message = "Invalid file type. Only image files are allowed." });
+            }
+
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                logger.LogWarning("[AppsController] Invalid screenshot extension for app {AppId}: {Extension}", id, fileExtension);
+                return BadRequest(new { message = "Invalid file extension. Only .jpg, .png, .gif, and .webp are allowed." });
+            }
+
+            if (Path.GetFileName(file.FileName) != file.FileName || file.FileName.Contains(".."))
+            {
+                logger.LogWarning("[AppsController] Suspicious screenshot filename detected for app {AppId}: {FileName}", id, file.FileName);
+                return BadRequest(new { message = "Invalid filename" });
+            }
+
+            var screenshotsDir = GetAppMediaDirectory("app-screenshots", id);
+            Directory.CreateDirectory(screenshotsDir);
+
+            var fileName = $"{Guid.NewGuid()}{fileExtension}";
+            var filePath = Path.Combine(screenshotsDir, fileName);
+            var fullPath = Path.GetFullPath(filePath);
+            var fullDirPath = Path.GetFullPath(screenshotsDir);
+
+            if (!fullPath.StartsWith(fullDirPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                logger.LogError("[AppsController] Screenshot path traversal attempt detected for app {AppId}", id);
+                return BadRequest(new { message = "Invalid file path" });
+            }
+
+            using (var stream = file.OpenReadStream())
+            {
+                if (!IsValidImageFile(stream, fileExtension))
+                {
+                    logger.LogWarning("[AppsController] Screenshot content doesn't match image format for app {AppId}", id);
+                    return BadRequest(new { message = "File content is not a valid image" });
+                }
+
+                stream.Seek(0, SeekOrigin.Begin);
+
+                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await stream.CopyToAsync(fileStream);
+            }
+
+            var imageUrl = $"/app-screenshots/{id}/{fileName}";
+            var screenshot = await appsService.AddScreenshotAsync(id, imageUrl);
+
+            logger.LogInformation("[AppsController] Screenshot uploaded for app {AppId}: {FileName} by user {User}",
+                id, fileName, User.Identity?.Name);
+
+            return Ok(screenshot);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error uploading screenshot for app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to upload screenshot" });
+        }
+    }
+
+    [HttpDelete("{id}/screenshots/{screenshotId:guid}")]
+    public async Task<IActionResult> DeleteScreenshot(Guid id, Guid screenshotId)
+    {
+        try
+        {
+            var app = appsService.Get(id);
+            if (app == null)
+            {
+                logger.LogWarning("[AppsController] Screenshot delete attempt by user {User} to app not owned: {AppId}",
+                    User.Identity?.Name ?? "Unknown", id);
+                return NotFound(new { message = "App not found" });
+            }
+
+            var imageUrl = await appsService.DeleteScreenshotAsync(id, screenshotId);
+            DeleteImageFromUrl(imageUrl, GetAppMediaDirectory("app-screenshots", id));
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error deleting screenshot {ScreenshotId} for app {AppId}", screenshotId, id);
+            return StatusCode(500, new { message = "Failed to delete screenshot" });
         }
     }
 
@@ -532,6 +657,52 @@ public class AppsController : BaseController
             logger.LogError(ex, "[AppsController] Error cleaning up old images in {Directory}", appThumbnailsDir);
             // Don't throw - cleanup failure shouldn't prevent upload
         }
+    }
+
+    private void DeleteImageFromUrl(string? imageUrl, string parentDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            var fileName = Path.GetFileName(imageUrl);
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return;
+            }
+
+            var filePath = Path.Combine(parentDirectory, fileName);
+            var fullPath = Path.GetFullPath(filePath);
+            var fullDirectoryPath = Path.GetFullPath(parentDirectory);
+
+            if (!fullPath.StartsWith(fullDirectoryPath + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                logger.LogWarning("[AppsController] Skipped deleting image outside allowed directory: {ImageUrl}", imageUrl);
+                return;
+            }
+
+            if (System.IO.File.Exists(fullPath))
+            {
+                System.IO.File.Delete(fullPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "[AppsController] Failed to delete image for URL {ImageUrl}", imageUrl);
+        }
+    }
+
+    private string GetAppMediaDirectory(string mediaFolder, Guid appId)
+    {
+        return Path.Combine(
+            webHostEnvironment.ContentRootPath,
+            "AppData",
+            "media",
+            mediaFolder,
+            appId.ToString());
     }
 
     /// <summary>

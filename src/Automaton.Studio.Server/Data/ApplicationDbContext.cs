@@ -41,6 +41,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<WebApp> WebApps { get; set; }
         public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
         public virtual DbSet<WebAppStar> WebAppStars { get; set; }
+        public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
         public virtual DbSet<WebAppUser> WebAppUsers { get; set; }
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
         public virtual DbSet<AppVersion> AppVersions { get; set; }
@@ -285,6 +286,11 @@ namespace Automaton.Studio.Server.Data
                 // Index for sample apps queries
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
                 entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
+
+                entity.HasMany(e => e.WebAppScreenshots)
+                    .WithOne(e => e.WebApp)
+                    .HasForeignKey(e => e.WebAppId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<MarketplaceCategory>(entity =>
@@ -317,6 +323,18 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.WebAppId);
+            });
+
+            modelBuilder.Entity<Entities.WebAppScreenshot>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ImageUrl).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.Caption).HasMaxLength(240);
+                entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(0);
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.WebAppId);
+                entity.HasIndex(e => new { e.WebAppId, e.SortOrder });
             });
 
             modelBuilder.Entity<Entities.WebAppStep>(entity =>

@@ -77,7 +77,13 @@ public class PublicAppsService
                 Name = w.Name,
                 Summary = w.Summary,
                 Description = w.Description,
-                ThumbnailUrl = w.ThumbnailUrl,
+                ThumbnailUrl = w.ThumbnailUrl ??
+                    dataContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == w.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
                 Category = w.Category,
                 PublishedAt = w.PublishedAt,
                 AppUrl = $"/web/{w.PublicUrl}",
@@ -116,7 +122,13 @@ public class PublicAppsService
                 Name = w.Name,
                 Summary = w.Summary,
                 Description = w.Description,
-                ThumbnailUrl = w.ThumbnailUrl,
+                ThumbnailUrl = w.ThumbnailUrl ??
+                    dataContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == w.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
                 Category = w.Category,
                 Tags = w.Tags,
                 PublishedAt = w.PublishedAt,
@@ -129,6 +141,22 @@ public class PublicAppsService
                     dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
             })
             .FirstOrDefaultAsync();
+
+        if (app != null)
+        {
+            app.Screenshots = await dataContext.WebAppScreenshots
+                .Where(s => s.WebAppId == app.Id)
+                .OrderBy(s => s.SortOrder)
+                .ThenBy(s => s.CreatedAt)
+                .Select(s => new PublicAppScreenshot
+                {
+                    Id = s.Id,
+                    ImageUrl = s.ImageUrl,
+                    Caption = s.Caption,
+                    SortOrder = s.SortOrder
+                })
+                .ToListAsync();
+        }
 
         return app;
     }
@@ -174,6 +202,15 @@ public class PublicAppCard
 public class PublicAppDetails : PublicAppCard
 {
     public string? Tags { get; set; }
+    public List<PublicAppScreenshot> Screenshots { get; set; } = new();
+}
+
+public class PublicAppScreenshot
+{
+    public Guid Id { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
+    public string? Caption { get; set; }
+    public int SortOrder { get; set; }
 }
 
 public class PublicAppsResponse

@@ -31,6 +31,7 @@ public class AppModel
 
     // Public profile display
     public string? ThumbnailUrl { get; set; }
+    public List<AppScreenshotModel> Screenshots { get; set; } = new();
     public string? Category { get; set; }
     public string? Tags { get; set; }
     public string MarketplaceStatus { get; set; } = Enums.MarketplaceAppStatuses.Approved;
@@ -39,4 +40,12 @@ public class AppModel
     public Guid? MarketplaceModeratedByUserId { get; set; }
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
+}
+
+public class AppScreenshotModel
+{
+    public Guid Id { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
+    public string? Caption { get; set; }
+    public int SortOrder { get; set; }
 }

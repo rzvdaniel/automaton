@@ -33,11 +33,19 @@ export interface PublicAppCard {
   isStarredByCurrentUser: boolean
 }
 
+export interface PublicAppScreenshot {
+  id: string
+  imageUrl: string
+  caption?: string | null
+  sortOrder: number
+}
+
 /**
  * Public app details (extended card with more info)
  */
 export interface PublicAppDetails extends PublicAppCard {
   tags?: string // Comma-separated
+  screenshots: PublicAppScreenshot[]
 }
 
 /**

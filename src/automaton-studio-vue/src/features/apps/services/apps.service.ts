@@ -5,6 +5,7 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   App,
+  AppScreenshot,
   CreateAppRequest,
   PublishAppRequest,
   ExportAppResponse,
@@ -224,6 +225,7 @@ class AppsService {
       executionRunnerId: settings.executionRunnerId ?? app.executionRunnerId,
       definition: app.definition,
       thumbnailUrl: app.thumbnailUrl,
+      screenshots: app.screenshots,
       category: app.category,
       tags: app.tags,
     }
@@ -271,10 +273,32 @@ class AppsService {
       executionRunnerId: app.executionRunnerId,
       definition: app.definition,
       thumbnailUrl: null,
+      screenshots: app.screenshots,
       category: app.category,
       tags: app.tags,
     }
     await this.update(id, updatePayload)
+  }
+
+  async uploadScreenshot(id: string, file: File): Promise<AppScreenshot> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await apiClient.post<AppScreenshot>(
+      `/api/apps/${id}/screenshots`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    )
+
+    return data
+  }
+
+  async deleteScreenshot(id: string, screenshotId: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${id}/screenshots/${screenshotId}`)
   }
 
   /**

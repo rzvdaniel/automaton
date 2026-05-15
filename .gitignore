@@ -45,6 +45,11 @@ wwwroot/app-thumbnails/**
 !**/wwwroot/app-thumbnails/
 !**/wwwroot/app-thumbnails/README.md
 
+# Ignore any nested project `wwwroot/app-screenshots` folders as well
+**/wwwroot/app-screenshots/**
+!**/wwwroot/app-screenshots/
+!**/wwwroot/app-screenshots/README.md
+
 #npm
 node_modules/
 src/automaton-vue/dist/
@@ -85,7 +90,4 @@ __pycache__/
 .tmp/
 .prod-runtime/
 
-apps/
-!src/automaton-studio-vue/src/features/apps/
-!src/automaton-studio-vue/src/features/apps/components/
-!src/automaton-studio-vue/src/features/apps/components/BackendServerFiles.vue
+.artifacts/

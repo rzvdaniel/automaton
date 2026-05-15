@@ -57,7 +57,13 @@ public class PublicMarketplaceController : ControllerBase
                 a.Name,
                 a.Summary,
                 a.Description,
-                a.ThumbnailUrl,
+                ThumbnailUrl = a.ThumbnailUrl ??
+                    _dbContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == a.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
                 a.Category,
                 a.Tags,
                 a.ViewCount,

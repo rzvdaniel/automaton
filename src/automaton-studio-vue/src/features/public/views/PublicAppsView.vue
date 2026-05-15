@@ -10,7 +10,11 @@ import PublicAppCard from '../components/PublicAppCard.vue'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
 import { publicAppsService } from '../services/publicApps.service'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
-import type { PublicUserProfile, PublicAppCard as AppCardType } from '../types/publicApps.types'
+import type {
+  PublicUserProfile,
+  PublicAppCard as AppCardType,
+  PublicAppDetails,
+} from '../types/publicApps.types'
 import { formatPublishedDate, parseTags } from '../types/publicApps.types'
 import { useToast } from 'primevue/usetoast'
 
@@ -22,19 +26,34 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const profile = ref<PublicUserProfile | null>(null)
 const apps = ref<AppCardType[]>([])
+const publicUsername = computed(() => (route.params.publicUsername as string) || '')
 
 const showDrawer = ref(false)
-const selectedApp = ref<AppCardType | null>(null)
+const selectedApp = ref<PublicAppDetails | null>(null)
+const loadingDetails = ref(false)
+const activeScreenshotUrl = ref('')
+
+function resolveAssetUrl(url?: string | null): string {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `${import.meta.env.VITE_API_BASE_URL || ''}${url}`
+}
 
 const fullThumbnailUrl = computed(() => {
-  if (!selectedApp.value?.thumbnailUrl) return ''
-  if (selectedApp.value.thumbnailUrl.startsWith('http')) return selectedApp.value.thumbnailUrl
-  return `${import.meta.env.VITE_API_BASE_URL || ''}${selectedApp.value.thumbnailUrl}`
+  return resolveAssetUrl(selectedApp.value?.thumbnailUrl)
+})
+
+const screenshotGallery = computed(() => selectedApp.value?.screenshots ?? [])
+
+const activeGalleryImageUrl = computed(() => {
+  if (activeScreenshotUrl.value) return resolveAssetUrl(activeScreenshotUrl.value)
+  if (selectedApp.value?.thumbnailUrl) return fullThumbnailUrl.value
+  const firstScreenshot = screenshotGallery.value[0]
+  return firstScreenshot ? resolveAssetUrl(firstScreenshot.imageUrl) : ''
 })
 
 async function loadUserApps() {
-  const publicUsername = route.params.publicUsername as string
-  if (!publicUsername) {
+  if (!publicUsername.value) {
     error.value = 'Invalid public username'
     loading.value = false
     return
@@ -42,7 +61,7 @@ async function loadUserApps() {
   loading.value = true
   error.value = null
   try {
-    const response = await publicAppsService.getUserApps(publicUsername)
+    const response = await publicAppsService.getUserApps(publicUsername.value)
     profile.value = response.profile
     apps.value = response.apps
   } catch (err: unknown) {
@@ -61,8 +80,28 @@ function openApp(app: AppCardType) {
 }
 
 function showDetails(app: AppCardType) {
-  selectedApp.value = app
   showDrawer.value = true
+  loadingDetails.value = true
+  selectedApp.value = null
+  activeScreenshotUrl.value = ''
+
+  void publicAppsService.getAppDetails(publicUsername.value, app.id)
+    .then((details) => {
+      selectedApp.value = details
+      activeScreenshotUrl.value = details.thumbnailUrl || details.screenshots[0]?.imageUrl || ''
+    })
+    .catch(() => {
+      toast.add({
+        severity: 'error',
+        summary: 'Details unavailable',
+        detail: 'Could not load this app right now.',
+        life: 3000,
+      })
+      showDrawer.value = false
+    })
+    .finally(() => {
+      loadingDetails.value = false
+    })
 }
 
 async function toggleStar(app: AppCardType) {
@@ -206,9 +245,17 @@ onMounted(() => {
       :pt="{ header: { style: 'display: none' } }"
     >
       <div v-if="selectedApp" class="drawer-body">
+      <div v-if="loadingDetails" class="drawer-loading">
+        <ProgressSpinner />
+      </div>
+      <div v-else-if="selectedApp" class="drawer-body">
         <!-- Cover image -->
         <div class="drawer-cover">
-          <img v-if="selectedApp.thumbnailUrl" :src="fullThumbnailUrl" :alt="selectedApp.name" />
+          <img
+            v-if="activeGalleryImageUrl"
+            :src="activeGalleryImageUrl"
+            :alt="selectedApp.name"
+          />
           <AppCoverPlaceholder v-else :app-id="selectedApp.id" :name="selectedApp.name" />
           <button class="drawer-close" @click="showDrawer = false">
             <i class="pi pi-times"></i>
@@ -238,9 +285,24 @@ onMounted(() => {
             {{ selectedApp.description || selectedApp.summary }}
           </p>
 
-          <div v-if="(selectedApp as any).tags" class="drawer-tags">
+          <div v-if="screenshotGallery.length > 0" class="drawer-gallery">
+            <button
+              v-for="screenshot in screenshotGallery"
+              :key="screenshot.id"
+              class="gallery-thumb"
+              :class="{ 'gallery-thumb-active': activeScreenshotUrl === screenshot.imageUrl }"
+              @click="activeScreenshotUrl = screenshot.imageUrl"
+            >
+              <img
+                :src="resolveAssetUrl(screenshot.imageUrl)"
+                :alt="`${selectedApp.name} screenshot`"
+              />
+            </button>
+          </div>
+
+          <div v-if="selectedApp.tags" class="drawer-tags">
             <Tag
-              v-for="tag in parseTags((selectedApp as any).tags)"
+              v-for="tag in parseTags(selectedApp.tags)"
               :key="tag"
               :value="tag"
               severity="secondary"
@@ -464,6 +526,13 @@ onMounted(() => {
   overflow-y: auto;
 }
 
+.drawer-loading {
+  min-height: 18rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Cover — 16:9 within drawer width */
 .drawer-cover {
   position: relative;
@@ -563,6 +632,33 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.drawer-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 0.55rem;
+}
+
+.gallery-thumb {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--p-surface-100);
+  cursor: pointer;
+  aspect-ratio: 16 / 9;
+}
+
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-thumb-active {
+  border-color: var(--p-primary-500);
 }
 
 .drawer-cta {
