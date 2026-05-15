@@ -5,7 +5,7 @@ namespace Automaton.Cli.Services;
 
 public sealed class SetupService
 {
-    public const string DefaultHostedServer = "https://automaton.monster";
+    public const string DefaultHostedServer = "https://api.automaton.monster";
 
     private readonly ConfigService _config;
     private readonly AiGuidancePackService _aiGuidancePackService;

@@ -48,16 +48,14 @@ public class AutomatonApiClient : IDisposable
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}", ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     public async Task<JsonElement> GetUserProfileAsync(CancellationToken ct = default)
     {
         using var resp = await _http.GetAsync("api/User/GetUserProfile", ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
@@ -72,8 +70,7 @@ public class AutomatonApiClient : IDisposable
         var payload = JsonSerializer.Serialize(new { name, description, scope }, JsonOptions);
         using var resp = await PostJsonAsync("api/ApiKeys", payload, ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     // ── File upload ───────────────────────────────────────────────────────────
@@ -91,8 +88,7 @@ public class AutomatonApiClient : IDisposable
         var url = $"api/apps/{appId}/upload{(clean ? "?clean=true" : "")}";
         using var resp = await _http.PostAsync(url, content, ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     // ── Backend deploy ────────────────────────────────────────────────────────
@@ -101,8 +97,7 @@ public class AutomatonApiClient : IDisposable
     {
         using var resp = await PostJsonAsync($"api/apps/{appId}/backend/deploy", "{}", ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     // ── Publish (version snapshot) ────────────────────────────────────────────
@@ -112,8 +107,7 @@ public class AutomatonApiClient : IDisposable
         var payload = JsonSerializer.Serialize(new { summary, trigger = "ManualSave" }, JsonOptions);
         using var resp = await PostJsonAsync($"api/apps/{appId}/versions/snapshot", payload, ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     // ── Runners ───────────────────────────────────────────────────────────────
@@ -122,8 +116,7 @@ public class AutomatonApiClient : IDisposable
     {
         using var resp = await _http.GetAsync("api/runners", ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     // ── App files ─────────────────────────────────────────────────────────────
@@ -132,8 +125,7 @@ public class AutomatonApiClient : IDisposable
     {
         using var resp = await _http.GetAsync($"api/apps/{appId}/files", ct);
         await EnsureSuccessAsync(resp);
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        return JsonDocument.Parse(json).RootElement.Clone();
+        return await ReadJsonAsync(resp, ct);
     }
 
     public async Task<string> ReadFileAsync(string appId, string path, CancellationToken ct = default)
@@ -190,6 +182,29 @@ public class AutomatonApiClient : IDisposable
     {
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         return await _http.PutAsync(url, content, ct);
+    }
+
+    private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        var body = await resp.Content.ReadAsStringAsync(ct);
+
+        try
+        {
+            return JsonDocument.Parse(body).RootElement.Clone();
+        }
+        catch (JsonException ex)
+        {
+            var mediaType = resp.Content.Headers.ContentType?.MediaType;
+            var preview = body.Length > 160 ? body[..160] + "..." : body;
+            var looksLikeHtml = preview.TrimStart().StartsWith("<", StringComparison.Ordinal);
+            var formatHint = looksLikeHtml || string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase)
+                ? "The server returned HTML instead of the Automaton API JSON response. Verify you are using the API base URL, for example https://api.automaton.monster."
+                : "The server returned a non-JSON response.";
+
+            throw new InvalidOperationException(
+                $"Unexpected response from {resp.RequestMessage?.RequestUri}. {formatHint} Content-Type: {mediaType ?? "unknown"}. Response preview: {preview}",
+                ex);
+        }
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage resp)

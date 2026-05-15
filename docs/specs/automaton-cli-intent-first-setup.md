@@ -43,7 +43,7 @@ The change is in the default UX:
 
 ## Assumptions
 
-1. The default hosted server is `https://automaton.monster`.
+1. The default hosted server is `https://api.automaton.monster`.
 2. Most users should not need to type or configure the server explicitly.
 3. Shared app-development guidance lives in `llms.txt` and linked `llms/` files.
 4. The CLI should sync local AI guidance automatically during `setup`, `new`, and `link`, while keeping manual refresh optional.
@@ -69,7 +69,7 @@ Prepare this machine or workspace for Automaton app development.
 
 Responsibilities:
 
-- default to `https://automaton.monster` automatically
+- default to `https://api.automaton.monster` automatically
 - detect whether the user is already authenticated
 - if not authenticated, run the login flow inside setup
 - persist local CLI config needed for normal usage
@@ -214,7 +214,7 @@ It should not ask questions unrelated to the current deploy attempt.
 For the standard hosted product, default to:
 
 ```text
-https://automaton.monster
+https://api.automaton.monster
 ```
 
 Users should only see server configuration when they intentionally choose advanced or self-hosted usage.
@@ -300,7 +300,7 @@ Example:
 
 ```text
 Setup complete
-- server: https://automaton.monster
+- server: https://api.automaton.monster
 - auth: signed in as razvan@example.com
 - workspace: ready
 
