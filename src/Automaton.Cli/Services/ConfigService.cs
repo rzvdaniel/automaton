@@ -6,8 +6,8 @@ namespace Automaton.Cli.Services;
 
 /// <summary>
 /// Reads and writes automaton.json (project-level) and ~/.automaton/config.json (global).
-/// Resolution order for server: env vars > project config > global config file > prompt.
-/// Resolution order for api-key: env vars > global config file > prompt.
+/// Resolution order for server: project config > project-local config > global config file > env vars > prompt.
+/// Resolution order for api-key: project-local config > global config file > env vars > prompt.
 /// </summary>
 public class ConfigService
 {
@@ -131,11 +131,10 @@ public class ConfigService
             catch { /* ignore malformed global config */ }
         }
 
-        // Env vars always win
         return new GlobalConfig
         {
-            Server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")  ?? file.Server,
-            ApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY") ?? file.ApiKey
+            Server = file.Server,
+            ApiKey = file.ApiKey
         };
     }
 
@@ -153,19 +152,36 @@ public class ConfigService
         return true;
     }
 
+    public GlobalConfig ResolveExistingConfig(bool global, string? directory = null)
+    {
+        if (global)
+        {
+            return LoadGlobalConfig();
+        }
+
+        var (server, apiKey) = ResolveCredentials(directory: directory);
+        return new GlobalConfig
+        {
+            Server = server,
+            ApiKey = apiKey
+        };
+    }
+
     public (string? server, string? apiKey) ResolveCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
     {
         var cwd = directory ?? Directory.GetCurrentDirectory();
         var local = LoadProjectLocalConfig(cwd);
         var global = LoadGlobalConfig();
+        var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
+        var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
 
-        var server = Environment.GetEnvironmentVariable("AUTOMATON_SERVER")
-            ?? projectConfig?.Server
+        var server = projectConfig?.Server
             ?? local.Server
-            ?? global.Server;
-        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY")
-            ?? local.ApiKey
-            ?? global.ApiKey;
+            ?? global.Server
+            ?? envServer;
+        var apiKey = local.ApiKey
+            ?? global.ApiKey
+            ?? envApiKey;
 
         return (server?.TrimEnd('/'), apiKey);
     }

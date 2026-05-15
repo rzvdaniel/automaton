@@ -30,7 +30,7 @@ public static class LoginCommand
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var existing = global ? config.LoadGlobalConfig() : config.LoadProjectLocalConfig(cwd);
+                var existing = config.ResolveExistingConfig(global, cwd);
 
                 server ??= PromptForValue("Automaton server URL", existing.Server, secret: false);
                 key ??= PromptForValue("API key", existing.ApiKey, secret: true);

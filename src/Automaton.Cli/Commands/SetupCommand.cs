@@ -25,7 +25,7 @@ public static class SetupCommand
         cmd.SetHandler(async (string? server, string? key, bool global, bool asJson) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var existing = global ? config.LoadGlobalConfig() : config.LoadProjectLocalConfig(cwd);
+            var existing = config.ResolveExistingConfig(global, cwd);
 
             var resolvedServer = string.IsNullOrWhiteSpace(server)
                 ? existing.Server ?? SetupService.DefaultHostedServer

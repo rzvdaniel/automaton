@@ -110,6 +110,41 @@ public class ConfigServiceTests
         Assert.That(apiKey, Is.EqualTo("ak_local"));
     }
 
+    [Test]
+    public void ResolveExistingConfig_WhenLocalScopeRequested_PrefersProjectLocalConfigOverEnvironmentVariables()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://local.example.com",
+            ApiKey = "ak_local"
+        });
+
+        Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com");
+
+        var resolved = configService.ResolveExistingConfig(global: false, directory: projectRoot);
+
+        Assert.That(resolved.Server, Is.EqualTo("https://local.example.com"));
+        Assert.That(resolved.ApiKey, Is.EqualTo("ak_local"));
+    }
+
+    [Test]
+    public void RequireCredentials_WhenStoredConfigIsMissing_FallsBackToEnvironmentVariables()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+
+        Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com");
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
+
+        var (server, apiKey) = configService.RequireCredentials(directory: projectRoot);
+
+        Assert.That(server, Is.EqualTo("https://env.example.com"));
+        Assert.That(apiKey, Is.EqualTo("ak_env"));
+    }
+
     private string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "automaton-cli-tests", Guid.NewGuid().ToString("N"));

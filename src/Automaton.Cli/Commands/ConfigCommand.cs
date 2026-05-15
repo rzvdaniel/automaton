@@ -12,7 +12,7 @@ namespace Automaton.Cli.Commands;
 ///
 /// Manages project-local CLI configuration in ./.automaton/config.json by default.
 /// Use --global for shared settings in ~/.automaton/config.json.
-/// Environment variables AUTOMATON_SERVER and AUTOMATON_API_KEY always take precedence.
+/// Environment variables AUTOMATON_SERVER and AUTOMATON_API_KEY act as fallback values when stored config is missing.
 /// </summary>
 public static class ConfigCommand
 {
@@ -90,7 +90,9 @@ public static class ConfigCommand
     private static void AddRow(Table table, string name, string? value, string envVar, string fileSource)
     {
         var envValue = Environment.GetEnvironmentVariable(envVar);
-        var (display, source) = envValue != null
+        var (display, source) = !string.IsNullOrWhiteSpace(value)
+            ? (value, fileSource)
+            : envValue != null
             ? (MaskKey(envValue), $"[cyan]{envVar}[/] (env)")
             : (value ?? "[grey]not set[/]", fileSource);
 
