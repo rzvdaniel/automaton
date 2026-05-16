@@ -31,6 +31,7 @@ export interface PublicAppCard {
   starCount: number
   isFeatured: boolean
   isStarredByCurrentUser: boolean
+  screenshots: PublicAppScreenshot[]
 }
 
 export interface PublicAppScreenshot {
@@ -45,7 +46,6 @@ export interface PublicAppScreenshot {
  */
 export interface PublicAppDetails extends PublicAppCard {
   tags?: string // Comma-separated
-  screenshots: PublicAppScreenshot[]
 }
 
 /**

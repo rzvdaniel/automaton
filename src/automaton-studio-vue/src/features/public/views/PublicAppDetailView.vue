@@ -160,8 +160,13 @@ onMounted(() => {
     <header v-if="!authStore.isAuthenticated" class="public-header">
       <div class="header-inner">
         <router-link to="/" class="logo">
-          <span class="logo-text">Automaton</span>
+          <span class="logo-mark">A</span>
+          <span class="logo-text">Automaton Store</span>
         </router-link>
+        <nav class="store-nav" aria-label="Store navigation">
+          <button @click="goBackToProfile">Creator Store</button>
+          <a v-if="app?.appUrl" :href="app.appUrl" target="_blank" rel="noopener">Open App</a>
+        </nav>
         <div class="header-actions">
           <router-link to="/login">
             <Button label="Sign In" text size="small" />
@@ -195,7 +200,12 @@ onMounted(() => {
           />
         </div>
 
-        <section class="hero-card">
+        <section class="product-shell">
+          <div class="product-heading">
+            <h1>{{ app.name }}</h1>
+            <Tag v-if="app.isFeatured" value="Featured" severity="warning" />
+          </div>
+
           <div class="hero-media">
             <img
               v-if="heroImageUrl"
@@ -206,7 +216,7 @@ onMounted(() => {
             <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
           </div>
 
-          <div class="hero-copy">
+          <aside class="hero-copy">
             <div class="creator-row">
               <Avatar
                 v-if="profile.avatarUrl"
@@ -225,11 +235,6 @@ onMounted(() => {
                   {{ profile.displayName || profile.username }}
                 </button>
               </div>
-            </div>
-
-            <div class="title-row">
-              <h1>{{ app.name }}</h1>
-              <Tag v-if="app.isFeatured" value="Featured" severity="warning" />
             </div>
 
             <div class="meta-row">
@@ -273,7 +278,7 @@ onMounted(() => {
                 @click="openApp"
               />
             </div>
-          </div>
+          </aside>
         </section>
 
         <section v-if="galleryImages.length > 0" class="gallery-section">
@@ -304,13 +309,14 @@ onMounted(() => {
 .public-app-detail-view {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--p-primary-400) 18%, transparent), transparent 32%),
-    linear-gradient(180deg, var(--p-surface-ground) 0%, color-mix(in srgb, var(--p-surface-ground) 90%, black) 100%);
+    radial-gradient(circle at top left, rgba(102, 192, 244, 0.2), transparent 30rem),
+    linear-gradient(180deg, #1b2838 0%, #0f1922 32rem, #0b1118 100%);
+  color: #c7d5e0;
 }
 
 .public-header {
-  border-bottom: 1px solid var(--p-surface-200);
-  background: color-mix(in srgb, var(--p-surface-card) 88%, transparent);
+  border-bottom: 1px solid rgba(103, 193, 245, 0.12);
+  background: rgba(23, 29, 37, 0.96);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -323,7 +329,7 @@ onMounted(() => {
 
 .header-inner,
 .detail-shell {
-  max-width: 1240px;
+  max-width: 1280px;
   margin: 0 auto;
   padding-left: 1.5rem;
   padding-right: 1.5rem;
@@ -335,16 +341,51 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   text-decoration: none;
 }
 
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  background: linear-gradient(135deg, #66c0f4, #1a9fff);
+  color: #0b1118;
+  font-weight: 800;
+}
+
 .logo-text {
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 700;
-  color: var(--p-primary-500);
+  color: #ffffff;
+}
+
+.store-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.store-nav a,
+.store-nav button {
+  border: 0;
+  background: none;
+  color: #dcdedf;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.store-nav a:hover,
+.store-nav button:hover {
+  color: #66c0f4;
 }
 
 .header-actions {
@@ -376,23 +417,37 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
-.hero-card {
+.product-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-  gap: 1.5rem;
-  padding: 1.5rem;
-  border-radius: 28px;
-  background: color-mix(in srgb, var(--p-surface-card) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--p-surface-300) 80%, transparent);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr);
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(22, 34, 49, 0.9);
+  border: 1px solid rgba(103, 193, 245, 0.14);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+
+.product-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.product-heading h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.05;
 }
 
 .hero-media {
   position: relative;
   min-height: 320px;
-  border-radius: 22px;
   overflow: hidden;
-  background: var(--p-surface-200);
+  background: #0e141b;
 }
 
 .hero-image {
@@ -406,6 +461,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .creator-row {
@@ -424,7 +481,7 @@ onMounted(() => {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--p-text-muted-color);
+  color: #8f98a0;
 }
 
 .creator-link {
@@ -433,25 +490,12 @@ onMounted(() => {
   padding: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--p-text-color);
+  color: #ffffff;
   cursor: pointer;
 }
 
 .creator-link:hover {
-  color: var(--p-primary-500);
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.title-row h1 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  line-height: 1.05;
+  color: #66c0f4;
 }
 
 .meta-row {
@@ -471,21 +515,21 @@ onMounted(() => {
 }
 
 .meta-pill {
-  background: var(--p-primary-500);
-  color: white;
+  background: #66c0f4;
+  color: #0b1118;
   font-weight: 600;
 }
 
 .meta-stat {
-  background: color-mix(in srgb, var(--p-surface-200) 78%, transparent);
-  color: var(--p-text-muted-color);
+  background: rgba(103, 193, 245, 0.11);
+  color: #c7d5e0;
 }
 
 .app-description {
   margin: 0;
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--p-text-color);
+  color: #dbe8f4;
 }
 
 .tag-row {
@@ -509,11 +553,13 @@ onMounted(() => {
 .section-heading h2 {
   margin: 0 0 0.35rem;
   font-size: 1.4rem;
+  color: #ffffff;
+  text-transform: uppercase;
 }
 
 .section-heading p {
   margin: 0 0 1rem;
-  color: var(--p-text-muted-color);
+  color: #8f98a0;
 }
 
 .gallery-grid {
@@ -523,9 +569,8 @@ onMounted(() => {
 }
 
 .gallery-card {
-  border: 1px solid color-mix(in srgb, var(--p-surface-300) 85%, transparent);
-  background: var(--p-surface-card);
-  border-radius: 18px;
+  border: 1px solid rgba(103, 193, 245, 0.12);
+  background: rgba(32, 50, 70, 0.72);
   overflow: hidden;
   padding: 0;
   text-align: left;
@@ -535,13 +580,13 @@ onMounted(() => {
 
 .gallery-card:hover {
   transform: translateY(-2px);
-  border-color: var(--p-primary-400);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  border-color: #66c0f4;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .gallery-card.active {
-  border-color: var(--p-primary-500);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-500) 18%, transparent);
+  border-color: #66c0f4;
+  box-shadow: 0 0 0 2px rgba(102, 192, 244, 0.2);
 }
 
 .gallery-card img {
@@ -555,11 +600,11 @@ onMounted(() => {
   display: block;
   padding: 0.8rem 0.9rem 0.95rem;
   font-size: 0.9rem;
-  color: var(--p-text-color);
+  color: #ffffff;
 }
 
 @media (max-width: 960px) {
-  .hero-card {
+  .product-shell {
     grid-template-columns: 1fr;
   }
 
@@ -574,9 +619,8 @@ onMounted(() => {
     padding-right: 1rem;
   }
 
-  .hero-card {
+  .product-shell {
     padding: 1rem;
-    border-radius: 22px;
   }
 
   .gallery-grid {

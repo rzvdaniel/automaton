@@ -92,7 +92,19 @@ public class PublicAppsService
                 IsFeatured = w.IsFeatured,
                 StarCount = w.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
-                    dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
+                    dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value),
+                Screenshots = dataContext.WebAppScreenshots
+                    .Where(s => s.WebAppId == w.Id)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.CreatedAt)
+                    .Select(s => new PublicAppScreenshot
+                    {
+                        Id = s.Id,
+                        ImageUrl = s.ImageUrl,
+                        Caption = s.Caption,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList()
             })
             .ToListAsync();
 
@@ -197,12 +209,12 @@ public class PublicAppCard
     public int StarCount { get; set; }
     public bool IsFeatured { get; set; }
     public bool IsStarredByCurrentUser { get; set; }
+    public List<PublicAppScreenshot> Screenshots { get; set; } = new();
 }
 
 public class PublicAppDetails : PublicAppCard
 {
     public string? Tags { get; set; }
-    public List<PublicAppScreenshot> Screenshots { get; set; } = new();
 }
 
 public class PublicAppScreenshot

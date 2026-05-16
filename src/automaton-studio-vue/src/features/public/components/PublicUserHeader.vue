@@ -84,9 +84,9 @@ const goToSettings = () => {
 
 <style scoped>
 .public-user-header {
-  padding: 2rem;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid var(--p-surface-200);
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(103, 193, 245, 0.1);
+  background: rgba(14, 20, 27, 0.34);
 }
 
 :global(.app-dark) .public-user-header {
@@ -94,27 +94,27 @@ const goToSettings = () => {
 }
 
 .header-content {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
+  align-items: center;
+  gap: 1rem;
 }
 
 .user-avatar {
   flex-shrink: 0;
-  width: 100px !important;
-  height: 100px !important;
-  font-size: 2rem;
+  width: 72px !important;
+  height: 72px !important;
+  font-size: 1.5rem;
 }
 
 .avatar-fallback {
-  background: linear-gradient(135deg, var(--p-primary-400) 0%, var(--p-primary-600) 100%);
-  color: white;
+  background: linear-gradient(135deg, #66c0f4 0%, #1a9fff 100%);
+  color: #0b1118;
 }
 
 .avatar-initials {
-  font-size: 2rem;
+  font-size: 1.35rem;
   font-weight: 600;
 }
 
@@ -138,22 +138,22 @@ const goToSettings = () => {
 
 .user-name {
   margin: 0 0 0.25rem 0;
-  font-size: 2rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  color: var(--p-text-color);
+  color: #ffffff;
 }
 
 .user-username {
   margin: 0 0 0.5rem 0;
-  color: var(--p-text-muted-color);
+  color: #66c0f4;
   font-size: 1rem;
 }
 
 .user-bio {
-  margin: 0 0 1rem 0;
-  color: var(--p-text-color);
+  margin: 0 0 0.75rem 0;
+  color: #acb9c7;
   line-height: 1.5;
-  max-width: 600px;
+  max-width: 720px;
 }
 
 .user-stats {
@@ -165,16 +165,16 @@ const goToSettings = () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--p-text-muted-color);
+  color: #8f98a0;
   font-size: 0.95rem;
 }
 
 .stat i {
-  color: var(--p-primary-500);
+  color: #66c0f4;
 }
 
 .stat strong {
-  color: var(--p-text-color);
+  color: #ffffff;
 }
 
 @media (max-width: 600px) {
