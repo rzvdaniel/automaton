@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import ProjectSwitcher from '@/features/projects/components/ProjectSwitcher.vue'
+import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
@@ -63,7 +64,7 @@ const userMenuItems = computed<MenuItem[]>(() => {
       icon: 'pi pi-external-link',
       command: () => {
         if (authStore.publicUsername) {
-          router.push(`/${authStore.publicUsername}`)
+          window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
         } else {
           router.push('/settings')
         }

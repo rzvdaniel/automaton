@@ -22,6 +22,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
+import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App, PublishAppRequest } from '../types/apps.types'
@@ -332,7 +333,7 @@ const handleImportSelected = async (event: Event) => {
 
 const viewPublicApps = () => {
   if (authStore.publicUsername) {
-    window.open(`/${authStore.publicUsername}`, '_blank')
+    window.open(getPublicStoreUrl(authStore.publicUsername), '_blank', 'noopener')
   } else {
     toast.add({
       severity: 'warn',

@@ -14,7 +14,6 @@ import { organizationsRoutes } from '@/features/organizations/routes'
 import { settingsRoutes } from '@/features/settings/routes'
 import { downloadsRoutes } from '@/features/downloads/routes'
 import { installRoutes } from '@/features/install/routes'
-import { publicRoutes } from '@/features/public/routes'
 import { adminRoutes } from '@/features/admin/routes'
 
 const router = createRouter({
@@ -40,9 +39,6 @@ const router = createRouter({
     ...settingsRoutes,
     ...downloadsRoutes,
     ...adminRoutes,
-
-    // Public pages (no auth required, self-contained layout)
-    ...publicRoutes,
 
     // Catch-all redirect to dashboard
     {

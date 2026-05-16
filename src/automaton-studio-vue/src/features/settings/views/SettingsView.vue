@@ -16,6 +16,7 @@ import { useToast } from 'primevue/usetoast'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { authService } from '@/features/auth/services/auth.service'
+import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
 import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
@@ -239,7 +240,7 @@ async function saveAccountSettings() {
 // Navigate to public profile
 function goToPublicProfile() {
   if (publicUsername.value) {
-    router.push(`/${publicUsername.value}`)
+    window.open(getPublicStoreUrl(publicUsername.value), '_blank', 'noopener')
   }
 }
 
