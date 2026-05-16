@@ -74,16 +74,6 @@ const filteredApps = computed(() => {
     .sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || b.starCount - a.starCount)
 })
 
-const newAndTrendingApps = computed(() =>
-  [...apps.value]
-    .sort((a, b) => {
-      const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
-      const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
-      return bDate - aDate || b.viewCount - a.viewCount
-    })
-    .slice(0, 6),
-)
-
 const displayName = computed(() => profile.value?.displayName || profile.value?.username || 'Automaton')
 
 function resolveAppAssetUrl(url?: string | null): string {
@@ -194,7 +184,6 @@ onMounted(() => {
         <nav class="store-nav" aria-label="Store navigation">
           <a href="#featured">Featured</a>
           <a href="#browse">Browse</a>
-          <a href="#trending">Trending</a>
         </nav>
         <div class="header-actions">
           <router-link to="/login">
@@ -265,10 +254,7 @@ onMounted(() => {
             class="featured-section"
           >
             <div class="section-header">
-              <div>
-                <span class="section-kicker">Featured and recommended</span>
-                <h2>Spotlight apps</h2>
-              </div>
+              <span class="section-kicker">Featured and recommended</span>
             </div>
 
             <div class="featured-carousel">
@@ -305,7 +291,13 @@ onMounted(() => {
                       <span><i class="pi pi-star-fill"></i>{{ activeFeaturedApp.starCount }}</span>
                       <span><i class="pi pi-eye"></i>{{ activeFeaturedApp.viewCount }}</span>
                     </div>
-                    <p>{{ activeFeaturedApp.summary || 'Published Automaton app' }}</p>
+                    <p>
+                      {{
+                        activeFeaturedApp.description ||
+                        activeFeaturedApp.summary ||
+                        'Published Automaton app'
+                      }}
+                    </p>
                   </div>
                 </div>
 
@@ -348,10 +340,7 @@ onMounted(() => {
 
           <section id="browse" class="browse-section">
             <div class="section-header">
-              <div>
-                <span class="section-kicker">Browse catalog</span>
-                <h2>Published apps</h2>
-              </div>
+              <span class="section-kicker">Browse catalog</span>
               <span class="result-count">
                 {{ filteredApps.length }} result{{ filteredApps.length === 1 ? '' : 's' }}
               </span>
@@ -378,27 +367,6 @@ onMounted(() => {
               @toggle-star="toggleStar"
             />
           </div>
-          </section>
-
-          <section v-if="newAndTrendingApps.length > 0" id="trending" class="trending-section">
-            <div class="section-header">
-              <div>
-                <span class="section-kicker">New and trending</span>
-                <h2>Recently updated</h2>
-              </div>
-            </div>
-
-            <div class="trending-list">
-              <button
-                v-for="app in newAndTrendingApps"
-                :key="app.id"
-                class="trending-item"
-                @click="openDetails(app)"
-              >
-                <span>{{ app.name }}</span>
-                <small>{{ app.category || 'App' }} - {{ app.viewCount }} views</small>
-              </button>
-            </div>
           </section>
         </div>
       </template>
@@ -520,8 +488,8 @@ onMounted(() => {
 .hero-copy h1 {
   margin: 0.35rem 0 0.75rem;
   color: #ffffff;
-  font-size: clamp(2.2rem, 5vw, 4.4rem);
-  line-height: 1;
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+  line-height: 1.06;
 }
 
 .hero-copy p {
@@ -664,8 +632,7 @@ onMounted(() => {
 }
 
 .featured-section,
-.browse-section,
-.trending-section {
+.browse-section {
   margin-bottom: 2rem;
 }
 
@@ -742,10 +709,7 @@ onMounted(() => {
   color: #dbe8f4;
   font-size: 0.92rem;
   line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .featured-info {
@@ -762,18 +726,21 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 0.45rem;
+  gap: 0.6rem;
   min-height: 0;
   flex: 1;
+  align-content: center;
 }
 
 .featured-preview {
   min-height: 0;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: rgba(103, 193, 245, 0.1);
-  border: 1px solid transparent;
+  background:
+    radial-gradient(circle at center, rgba(103, 193, 245, 0.12), rgba(10, 17, 24, 0.96));
+  border: 1px solid rgba(103, 193, 245, 0.12);
   color: #66c0f4;
   font-weight: 800;
 }
@@ -783,9 +750,10 @@ onMounted(() => {
 }
 
 .featured-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: calc(100% - 0.75rem);
+  height: calc(100% - 0.75rem);
+  object-fit: contain;
+  background: rgba(10, 17, 24, 0.96);
 }
 
 .featured-stats {
@@ -874,35 +842,6 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(390px, 1fr));
   gap: 0.75rem;
   padding-bottom: 1rem;
-}
-
-.trending-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.65rem;
-}
-
-.trending-item {
-  border: 1px solid rgba(103, 193, 245, 0.1);
-  background: rgba(32, 50, 70, 0.72);
-  color: #ffffff;
-  padding: 0.85rem 1rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.trending-item:hover {
-  background: linear-gradient(90deg, rgba(103, 193, 245, 0.24), rgba(32, 50, 70, 0.9));
-}
-
-.trending-item span,
-.trending-item small {
-  display: block;
-}
-
-.trending-item small {
-  margin-top: 0.25rem;
-  color: #acb9c7;
 }
 
 .public-footer {

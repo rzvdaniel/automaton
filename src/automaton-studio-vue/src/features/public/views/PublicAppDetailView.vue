@@ -422,6 +422,7 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr);
   gap: 1rem;
   padding: 1rem;
+  align-items: stretch;
   background: rgba(22, 34, 49, 0.9);
   border: 1px solid rgba(103, 193, 245, 0.14);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
@@ -439,13 +440,15 @@ onMounted(() => {
 .product-heading h1 {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(1.8rem, 4vw, 3rem);
-  line-height: 1.05;
+  font-size: clamp(1.5rem, 2.8vw, 2.35rem);
+  line-height: 1.08;
 }
 
 .hero-media {
   position: relative;
   min-height: 320px;
+  max-height: min(60vh, 560px);
+  height: min(60vh, 560px);
   overflow: hidden;
   background: #0e141b;
 }
@@ -462,7 +465,9 @@ onMounted(() => {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
+  max-height: min(60vh, 560px);
   background: rgba(0, 0, 0, 0.18);
+  overflow: auto;
 }
 
 .creator-row {
@@ -610,6 +615,13 @@ onMounted(() => {
 
   .hero-media {
     min-height: 240px;
+    height: min(46vh, 420px);
+    max-height: min(46vh, 420px);
+  }
+
+  .hero-copy {
+    max-height: none;
+    overflow: visible;
   }
 }
 
