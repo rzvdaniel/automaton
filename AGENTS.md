@@ -52,7 +52,10 @@ The Vue.js frontend implements feature-based routes (see `src/automaton-studio-v
 
 ## Project Structure
 
-**Frontend (`src/automaton-studio-vue/`):**
+**Automaton Presentation Frontend (`src/automaton-vue/`):**
+ – Static marketing site
+
+**Automaton Studio Frontend (`src/automaton-studio-vue/`):**
 - `src/features/` – Feature modules (auth, dashboard, flows, apps, steps, runners, projects, settings)
 - `src/shared/` – Shared components, services (Axios, SignalR), composables, utils, types
 - `src/router/` – Vue Router aggregation across features
@@ -73,7 +76,6 @@ The Vue.js frontend implements feature-based routes (see `src/automaton-studio-v
 - `src/Automaton.Steps/` – Built-in steps
 - `src/Automaton.Core.Scripting/` – Python interop (pythonnet)
 - `src/Automaton.Mcp/` – AI integration and MCP tools
-- `src/Automaton.Web/` – Static marketing site
 
 **Tests (`src/UnitTests/`):**
 - `Automaton.Core.Tests/`, `Automaton.Studio.Server.Tests/`, `Automaton.Runner.Tests/`
