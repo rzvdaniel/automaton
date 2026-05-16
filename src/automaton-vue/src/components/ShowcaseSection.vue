@@ -71,6 +71,10 @@ function openDetails(appId: string) {
   void router.push(`/apps/${appId}`)
 }
 
+function openCreator(publicUsername: string) {
+  void router.push(`/${publicUsername}`)
+}
+
 onMounted(async () => {
   const categoriesResponse = await fetch(`${marketplaceApiBaseUrl}/categories`)
   categories.value = await categoriesResponse.json()
@@ -79,29 +83,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section id="apps" class="showcase-section">
-    <div class="container">
-      <div class="showcase-header">
-        <div>
-          <span class="section-label">Marketplace</span>
-          <h2 class="section-title">{{ heading }}</h2>
-          <p class="section-subtitle showcase-subtitle">{{ subtitle }}</p>
-        </div>
-        <RouterLink v-if="!props.fullPage" to="/apps" class="btn btn-secondary showcase-link">
-          Browse all apps
-          <i class="pi pi-arrow-right" />
-        </RouterLink>
-      </div>
-
-      <MarketplaceCarousel
-        v-if="carouselApps.length > 0"
-        class="showcase-carousel"
-        :apps="carouselApps"
-        :compact="!props.fullPage"
-        @select="openDetails"
-      />
-
-      <div v-if="props.fullPage" class="showcase-toolbar">
+  <section id="apps" class="showcase-section" :class="{ 'showcase-section-full': props.fullPage }">
+    <div v-if="props.fullPage" class="showcase-toolbar">
+      <div class="container toolbar-inner">
         <div class="category-tabs" role="tablist" aria-label="Marketplace categories">
           <button
             class="category-tab"
@@ -123,20 +107,42 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div v-if="props.fullPage" class="search-bar">
+        <label class="search-bar">
           <i class="pi pi-search search-icon" />
           <input
             v-model="search"
             class="search-input"
-            type="text"
-            placeholder="Search by app name, summary, or tag"
+            type="search"
+            placeholder="Search apps"
             @keyup.enter="loadApps"
           />
-          <button type="button" class="btn btn-primary search-button" @click="loadApps">
-            Search
+          <button type="button" class="search-button" aria-label="Search apps" @click="loadApps">
+            <i class="pi pi-arrow-right" />
           </button>
-        </div>
+        </label>
       </div>
+    </div>
+
+    <div class="container showcase-content">
+      <div class="showcase-header">
+        <div>
+          <span class="section-label">Marketplace</span>
+          <h2 class="section-title">{{ heading }}</h2>
+          <p class="section-subtitle showcase-subtitle">{{ subtitle }}</p>
+        </div>
+        <RouterLink v-if="!props.fullPage" to="/apps" class="btn btn-secondary showcase-link">
+          Browse all apps
+          <i class="pi pi-arrow-right" />
+        </RouterLink>
+      </div>
+
+      <MarketplaceCarousel
+        v-if="carouselApps.length > 0"
+        class="showcase-carousel"
+        :apps="carouselApps"
+        :compact="!props.fullPage"
+        @select="openDetails"
+      />
 
       <div v-if="loading" class="showcase-empty">
         <div class="empty-orb" />
@@ -183,6 +189,16 @@ onMounted(async () => {
 
             <div>
               <h3 class="app-title">{{ app.name }}</h3>
+              <button
+                v-if="app.creatorPublicUsername"
+                type="button"
+                class="creator-link"
+                @click.stop="openCreator(app.creatorPublicUsername)"
+                @keydown.enter.stop
+                @keydown.space.stop
+              >
+                by {{ app.creatorDisplayName || app.creatorPublicUsername }}
+              </button>
               <p class="app-summary">{{ app.summary || app.description || 'Open the detail page to explore the app.' }}</p>
             </div>
           </div>
@@ -195,6 +211,10 @@ onMounted(async () => {
 <style scoped>
 .showcase-section {
   padding: 0px;
+}
+
+.showcase-section-full .showcase-content {
+  padding-top: 28px;
 }
 
 .showcase-header {
@@ -214,9 +234,29 @@ onMounted(async () => {
 }
 
 .showcase-toolbar {
-  display: grid;
-  gap: 20px;
-  margin-bottom: 28px;
+  position: sticky;
+  top: 64px;
+  z-index: 40;
+  padding: 4px 0 0;
+  border-bottom: 1px solid rgba(124, 106, 245, 0.14);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(77, 166, 255, 0.14), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(124, 106, 245, 0.18), transparent 36%),
+    rgba(10, 10, 15, 0.88);
+  backdrop-filter: blur(14px);
+}
+
+.toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 8px;
+  border: 1px solid rgba(124, 106, 245, 0.18);
+  background:
+    linear-gradient(135deg, rgba(35, 28, 70, 0.78), rgba(14, 28, 43, 0.78)),
+    rgba(17, 17, 24, 0.86);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
 }
 
 .showcase-carousel {
@@ -225,58 +265,57 @@ onMounted(async () => {
 
 .category-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .category-tab {
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--color-text-muted);
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  color: #c7d5e0;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .category-tab:hover {
-  color: var(--color-text);
-  border-color: rgba(124, 106, 245, 0.35);
-  background: rgba(124, 106, 245, 0.08);
+  color: #ffffff;
+  background: rgba(124, 106, 245, 0.16);
 }
 
 .category-tab-active {
-  color: var(--color-text);
-  border-color: rgba(124, 106, 245, 0.45);
-  background: linear-gradient(135deg, rgba(124, 106, 245, 0.22), rgba(77, 166, 255, 0.12));
-  box-shadow: inset 0 0 0 1px rgba(124, 106, 245, 0.2);
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(124, 106, 245, 0.34), rgba(77, 166, 255, 0.2));
 }
 
 .search-bar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border);
-  background:
-    linear-gradient(135deg, rgba(124, 106, 245, 0.08), rgba(77, 166, 255, 0.04)),
-    var(--color-surface);
+  gap: 8px;
+  width: min(380px, 40vw);
+  min-width: 0;
+  padding: 3px 8px;
+  border: 1px solid rgba(124, 106, 245, 0.18);
+  background: rgba(10, 10, 15, 0.66);
+  color: var(--color-blue);
 }
 
 .search-icon {
-  color: var(--color-text-muted);
+  color: var(--color-blue);
 }
 
 .search-input {
+  width: 100%;
   min-width: 0;
   background: transparent;
   border: none;
   color: var(--color-text);
-  font-size: 0.96rem;
+  font-size: 0.92rem;
+  line-height: 1.2;
   outline: none;
 }
 
@@ -285,7 +324,18 @@ onMounted(async () => {
 }
 
 .search-button {
-  white-space: nowrap;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-blue));
+  color: #ffffff;
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .apps-grid {
@@ -317,15 +367,21 @@ onMounted(async () => {
 
 .app-media {
   position: relative;
-  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(124, 106, 245, 0.24), rgba(77, 166, 255, 0.18));
+  padding: 10px;
+  background: #05070d;
 }
 
 .app-thumbnail {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  display: block;
 }
 
 .app-thumbnail-fallback {
@@ -389,6 +445,21 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 
+.creator-link {
+  margin: -2px 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-blue);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.creator-link:hover {
+  color: #7cc3ff;
+}
+
 .app-summary {
   color: var(--color-text-muted);
   font-size: 0.92rem;
@@ -431,21 +502,25 @@ onMounted(async () => {
 }
 
 @media (max-width: 720px) {
-  .showcase-section {
-    padding: 72px 0 88px;
+  .showcase-section-full .showcase-content {
+    padding-top: 22px;
+  }
+
+  .toolbar-inner {
+    display: grid;
+    gap: 8px;
   }
 
   .search-bar {
-    grid-template-columns: 1fr;
+    width: 100%;
   }
 
-  .search-icon {
-    display: none;
+  .category-tabs {
+    padding-bottom: 2px;
   }
 
   .search-button {
-    width: 100%;
-    justify-content: center;
+    width: 30px;
   }
 
   .apps-grid {

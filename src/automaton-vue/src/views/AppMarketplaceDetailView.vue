@@ -76,6 +76,34 @@ const publishedLabel = computed(() => {
   })
 })
 
+const selectedImageIndex = computed(() =>
+  galleryImages.value.findIndex((image) => image.imageUrl === selectedImageUrl.value),
+)
+
+function selectImage(imageUrl: string) {
+  selectedImageUrl.value = imageUrl
+}
+
+function previousImage() {
+  if (galleryImages.value.length === 0) return
+
+  const index = selectedImageIndex.value >= 0 ? selectedImageIndex.value : 0
+  const previousIndex = (index - 1 + galleryImages.value.length) % galleryImages.value.length
+  const image = galleryImages.value[previousIndex]
+  if (!image) return
+  selectedImageUrl.value = image.imageUrl
+}
+
+function nextImage() {
+  if (galleryImages.value.length === 0) return
+
+  const index = selectedImageIndex.value >= 0 ? selectedImageIndex.value : 0
+  const nextIndex = (index + 1) % galleryImages.value.length
+  const image = galleryImages.value[nextIndex]
+  if (!image) return
+  selectedImageUrl.value = image.imageUrl
+}
+
 async function loadApp() {
   loading.value = true
   errorMessage.value = ''
@@ -133,7 +161,7 @@ onMounted(loadApp)
         </section>
 
         <template v-else-if="app">
-          <section class="detail-hero">
+          <section class="detail-panel detail-summary-card">
             <div class="hero-copy">
               <div class="hero-badges">
                 <span v-if="app.category" class="tag">{{ app.category }}</span>
@@ -141,7 +169,12 @@ onMounted(loadApp)
               </div>
 
               <h1 class="hero-title">{{ app.name }}</h1>
-              <p class="hero-summary">{{ app.summary || 'A public app built with Automaton.' }}</p>
+              <div v-if="app.creatorPublicUsername" class="developer-row">
+                <span>Developer:</span>
+                <RouterLink :to="`/${app.creatorPublicUsername}`" class="developer-link">
+                  {{ app.creatorDisplayName || app.creatorPublicUsername }}
+                </RouterLink>
+              </div>
 
               <div class="hero-stats">
                 <span class="hero-stat">⭐ {{ app.starCount }} stars</span>
@@ -163,9 +196,21 @@ onMounted(loadApp)
                 <RouterLink to="/apps" class="btn btn-secondary">Explore more apps</RouterLink>
               </div>
             </div>
+          </section>
 
+          <section class="detail-panel media-panel">
             <div class="hero-gallery">
               <div class="gallery-stage">
+                <button
+                  v-if="galleryImages.length > 1"
+                  type="button"
+                  class="gallery-arrow gallery-arrow-left"
+                  aria-label="Previous screenshot"
+                  @click="previousImage"
+                >
+                  <i class="pi pi-chevron-left" />
+                </button>
+
                 <img
                   v-if="selectedImageUrl"
                   :src="resolveAssetUrl(selectedImageUrl)"
@@ -175,6 +220,16 @@ onMounted(loadApp)
                 <div v-else class="stage-image stage-fallback">
                   <span>{{ app.name.charAt(0) }}</span>
                 </div>
+
+                <button
+                  v-if="galleryImages.length > 1"
+                  type="button"
+                  class="gallery-arrow gallery-arrow-right"
+                  aria-label="Next screenshot"
+                  @click="nextImage"
+                >
+                  <i class="pi pi-chevron-right" />
+                </button>
               </div>
 
               <div v-if="galleryImages.length > 1" class="gallery-strip">
@@ -184,7 +239,7 @@ onMounted(loadApp)
                   type="button"
                   class="gallery-thumb"
                   :class="{ 'gallery-thumb-active': selectedImageUrl === image.imageUrl }"
-                  @click="selectedImageUrl = image.imageUrl"
+                  @click="selectImage(image.imageUrl)"
                 >
                   <img :src="resolveAssetUrl(image.imageUrl)" :alt="image.caption" />
                 </button>
@@ -219,6 +274,9 @@ onMounted(loadApp)
                     <span class="related-metric">⭐ {{ relatedApp.starCount }}</span>
                   </div>
                   <h3 class="related-name">{{ relatedApp.name }}</h3>
+                  <div v-if="relatedApp.creatorPublicUsername" class="related-creator">
+                    by {{ relatedApp.creatorDisplayName || relatedApp.creatorPublicUsername }}
+                  </div>
                   <p class="related-summary">
                     {{ relatedApp.summary || relatedApp.description || 'Open the detail page to see what this app does.' }}
                   </p>
@@ -281,13 +339,7 @@ onMounted(loadApp)
     linear-gradient(135deg, rgba(255, 120, 120, 0.42), rgba(124, 106, 245, 0.18));
 }
 
-.detail-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: 28px;
-  align-items: start;
-}
-
+.detail-panel,
 .hero-copy,
 .hero-gallery,
 .related-card {
@@ -299,11 +351,27 @@ onMounted(loadApp)
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
 }
 
+.detail-panel {
+  border-radius: 30px;
+}
+
+.detail-summary-card {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(77, 166, 255, 0.18), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(124, 106, 245, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    var(--color-surface);
+}
+
 .hero-copy {
   display: grid;
-  gap: 22px;
-  padding: 30px;
-  border-radius: 30px;
+  gap: 14px;
+  padding: 24px 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .hero-badges,
@@ -312,19 +380,23 @@ onMounted(loadApp)
 .hero-actions,
 .related-meta {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.hero-actions {
+  align-items: stretch;
 }
 
 .hero-chip,
 .hero-stat {
   display: inline-flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--color-text-muted);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -334,42 +406,66 @@ onMounted(loadApp)
 }
 
 .hero-title {
-  font-size: clamp(2.4rem, 5vw, 4.2rem);
-  line-height: 0.98;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.75rem, 3.4vw, 2.55rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
-.hero-summary {
-  font-size: 1.15rem;
-  color: rgba(255, 255, 255, 0.88);
-  max-width: 40rem;
+.developer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.developer-link {
+  color: var(--color-blue);
+}
+
+.developer-link:hover {
+  color: #7cc3ff;
 }
 
 .hero-description {
   color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
   white-space: pre-line;
+  max-width: 56rem;
+}
+
+.media-panel {
+  margin-top: 22px;
+  padding: 18px;
 }
 
 .hero-gallery {
   display: grid;
   gap: 16px;
-  padding: 18px;
-  border-radius: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .gallery-stage {
   position: relative;
   overflow: hidden;
-  min-height: 420px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, rgba(124, 106, 245, 0.28), rgba(77, 166, 255, 0.18));
+  height: min(62vw, 560px);
+  min-height: 360px;
+  border-radius: 18px;
+  background: #05070d;
 }
 
 .stage-image {
   width: 100%;
   height: 100%;
-  min-height: 420px;
-  object-fit: cover;
+  min-height: 360px;
+  object-fit: contain;
+  display: block;
 }
 
 .stage-fallback,
@@ -383,16 +479,19 @@ onMounted(loadApp)
 }
 
 .gallery-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
 }
 
 .gallery-thumb {
+  flex: 0 0 148px;
   overflow: hidden;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--color-surface-2);
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease;
@@ -410,9 +509,37 @@ onMounted(loadApp)
 
 .gallery-thumb img {
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
   display: block;
+  background: #060910;
+}
+
+.gallery-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 54px;
+  height: 112px;
+  transform: translateY(-50%);
+  border: 0;
+  background: linear-gradient(90deg, rgba(103, 193, 245, 0.28), rgba(103, 193, 245, 0));
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1.8rem;
+}
+
+.gallery-arrow-left {
+  left: 0;
+}
+
+.gallery-arrow-right {
+  right: 0;
+  background: linear-gradient(270deg, rgba(103, 193, 245, 0.28), rgba(103, 193, 245, 0));
+}
+
+.gallery-arrow:hover {
+  color: #66c0f4;
 }
 
 .related-section {
@@ -476,16 +603,16 @@ onMounted(loadApp)
   overflow: hidden;
 }
 
+.related-creator {
+  color: var(--color-blue);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .related-metric {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   font-weight: 700;
-}
-
-@media (max-width: 960px) {
-  .detail-hero {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {
@@ -493,15 +620,26 @@ onMounted(loadApp)
     padding: 28px 0 84px;
   }
 
-  .hero-copy,
-  .hero-gallery {
-    padding: 20px;
+  .hero-copy {
+    padding: 18px;
     border-radius: 24px;
+  }
+
+  .media-panel {
+    padding: 12px;
   }
 
   .gallery-stage,
   .stage-image {
     min-height: 280px;
+  }
+
+  .gallery-stage {
+    height: 320px;
+  }
+
+  .gallery-thumb {
+    flex-basis: 112px;
   }
 }
 </style>

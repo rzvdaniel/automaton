@@ -7,7 +7,7 @@ import ShowcaseSection from '@/components/ShowcaseSection.vue'
 <template>
   <div>
     <AppNav />
-    <main style="padding-top: 40px">
+    <main>
       <ShowcaseSection full-page />
     </main>
     <AppFooter />

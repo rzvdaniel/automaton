@@ -218,10 +218,13 @@ onMounted(loadCreatorApps)
   position: sticky;
   top: 64px;
   z-index: 40;
-  padding: 8px 0 0;
-  background: rgba(16, 30, 43, 0.72);
-  border-bottom: 1px solid rgba(103, 193, 245, 0.08);
-  backdrop-filter: blur(10px);
+  padding: 4px 0 0;
+  border-bottom: 1px solid rgba(124, 106, 245, 0.14);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(77, 166, 255, 0.14), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(124, 106, 245, 0.18), transparent 36%),
+    rgba(10, 10, 15, 0.88);
+  backdrop-filter: blur(14px);
 }
 
 .toolbar-inner {
@@ -229,15 +232,18 @@ onMounted(loadCreatorApps)
   gap: 16px;
   align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  background: rgba(35, 55, 75, 0.78);
-  border: 1px solid rgba(103, 193, 245, 0.12);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  padding: 6px 8px;
+  border: 1px solid rgba(124, 106, 245, 0.18);
+  background:
+    linear-gradient(135deg, rgba(35, 28, 70, 0.78), rgba(14, 28, 43, 0.78)),
+    rgba(17, 17, 24, 0.86);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
 }
 
 .category-tabs {
   display: flex;
   gap: 6px;
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -245,15 +251,20 @@ onMounted(loadCreatorApps)
   border: 0;
   background: transparent;
   color: #c7d5e0;
-  padding: 9px 12px;
+  padding: 7px 12px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.category-tab:hover,
+.category-tab:hover {
+  background: rgba(124, 106, 245, 0.16);
+  color: #ffffff;
+}
+
 .category-tab-active {
-  background: rgba(103, 193, 245, 0.14);
+  background: linear-gradient(135deg, rgba(124, 106, 245, 0.34), rgba(77, 166, 255, 0.2));
   color: #ffffff;
 }
 
@@ -261,12 +272,12 @@ onMounted(loadCreatorApps)
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(360px, 40vw);
+  width: min(380px, 40vw);
   min-width: 0;
-  padding: 9px 12px;
-  border: 1px solid rgba(103, 193, 245, 0.14);
-  background: rgba(14, 20, 27, 0.72);
-  color: #66c0f4;
+  padding: 5px 8px;
+  border: 1px solid rgba(124, 106, 245, 0.18);
+  background: rgba(10, 10, 15, 0.66);
+  color: var(--color-blue);
 }
 
 .search-bar input {
@@ -276,6 +287,8 @@ onMounted(loadCreatorApps)
   outline: 0;
   background: transparent;
   color: #ffffff;
+  font-size: 0.92rem;
+  line-height: 1.2;
 }
 
 .catalog-header {
@@ -313,10 +326,10 @@ onMounted(loadCreatorApps)
 .card-media {
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
-  padding: 8px;
-  background: #0e141b;
+  padding: 10px;
+  background: #05070d;
   color: #66c0f4;
   font-size: 2.5rem;
   font-weight: 800;
@@ -325,6 +338,8 @@ onMounted(loadCreatorApps)
 .card-media img {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: contain;
   display: block;
 }

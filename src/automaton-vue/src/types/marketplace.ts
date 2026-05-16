@@ -1,6 +1,8 @@
 export type MarketplaceAppCard = {
   id: string
   name: string
+  creatorPublicUsername?: string
+  creatorDisplayName?: string
   summary?: string
   description?: string
   thumbnailUrl?: string

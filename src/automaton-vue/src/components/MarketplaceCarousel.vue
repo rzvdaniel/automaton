@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (e: 'select', appId: string): void
 }>()
 
+const router = useRouter()
 const activeIndex = ref(0)
 const hoveredPreviewUrl = ref<string | null>(null)
 
@@ -96,11 +98,15 @@ function openActiveApp() {
   if (!activeApp.value) return
   emit('select', activeApp.value.id)
 }
+
+function openCreator(publicUsername: string) {
+  void router.push(`/${publicUsername}`)
+}
 </script>
 
 <template>
   <div v-if="activeApp" class="market-carousel" :class="{ 'market-carousel-compact': compact }">
-    <h2 class="carousel-heading">{{ title }}</h2>
+    <span class="section-label carousel-heading">{{ title }}</span>
 
     <button
       v-if="apps.length > 1"
@@ -134,6 +140,14 @@ function openActiveApp() {
 
       <aside class="carousel-screenshots">
         <h3>{{ activeApp.name }}</h3>
+        <button
+          v-if="activeApp.creatorPublicUsername"
+          type="button"
+          class="carousel-creator-link"
+          @click.stop="openCreator(activeApp.creatorPublicUsername)"
+        >
+          by {{ activeApp.creatorDisplayName || activeApp.creatorPublicUsername }}
+        </button>
         <div v-if="activeScreenshots.length > 0" class="screenshot-grid">
           <button
             v-for="screenshot in activeScreenshots"
@@ -191,11 +205,7 @@ function openActiveApp() {
 }
 
 .carousel-heading {
-  margin: 0 0 10px;
-  color: #ffffff;
-  font-size: 0.92rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  margin-bottom: 10px;
 }
 
 .carousel-slide {
@@ -312,6 +322,22 @@ function openActiveApp() {
   font-size: 1.55rem;
   font-weight: 500;
   line-height: 1.2;
+}
+
+.carousel-creator-link {
+  width: fit-content;
+  margin-top: -8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #66c0f4;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.carousel-creator-link:hover {
+  color: #8fd6ff;
 }
 
 .screenshot-grid {

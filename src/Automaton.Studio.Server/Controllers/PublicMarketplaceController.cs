@@ -55,6 +55,16 @@ public class PublicMarketplaceController : ControllerBase
             {
                 Id = a.Id,
                 Name = a.Name,
+                CreatorPublicUsername = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => u.PublicUsername)
+                    .FirstOrDefault(),
+                CreatorDisplayName = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
+                    .FirstOrDefault(),
                 Summary = a.Summary,
                 Description = a.Description,
                 ThumbnailUrl = a.ThumbnailUrl ??
@@ -106,6 +116,16 @@ public class PublicMarketplaceController : ControllerBase
             {
                 Id = a.Id,
                 Name = a.Name,
+                CreatorPublicUsername = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => u.PublicUsername)
+                    .FirstOrDefault(),
+                CreatorDisplayName = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
+                    .FirstOrDefault(),
                 Summary = a.Summary,
                 Description = a.Description,
                 ThumbnailUrl = a.ThumbnailUrl ??
@@ -163,6 +183,16 @@ public class PublicMarketplaceController : ControllerBase
             {
                 Id = a.Id,
                 Name = a.Name,
+                CreatorPublicUsername = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => u.PublicUsername)
+                    .FirstOrDefault(),
+                CreatorDisplayName = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
+                    .FirstOrDefault(),
                 Summary = a.Summary,
                 Description = a.Description,
                 ThumbnailUrl = a.ThumbnailUrl ??
@@ -224,6 +254,8 @@ public class MarketplaceAppCardDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? CreatorPublicUsername { get; set; }
+    public string? CreatorDisplayName { get; set; }
     public string? Summary { get; set; }
     public string? Description { get; set; }
     public string? ThumbnailUrl { get; set; }
