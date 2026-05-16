@@ -4,20 +4,9 @@ import AppFooter from '@/components/AppFooter.vue'
 import { ref } from 'vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
-const activePath = ref<'editor' | 'agent' | 'cli' | 'mcp'>('agent')
+const activePath = ref<'editor' | 'agent' | 'cli'>('agent')
 const aiCliSetupPrompt = `"Read ${publicAppConfig.llmsUrl} first. Then install Automaton CLI in this environment if needed, or verify that it is already available."`
-const copilotMcpConfig = `{
-  "servers": {
-    "automaton": {
-      "type": "http",
-      "url": "${publicAppConfig.mcpUrl}",
-      "headers": {
-        "X-API-Key": "your-api-key"
-      }
-    }
-  }
-}`
-const claudeMcpCommand = `claude mcp add automaton --transport http "${publicAppConfig.mcpUrl}" --header "X-API-Key: your-api-key"`
+const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
 </script>
 
 <template>
@@ -65,16 +54,6 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
             <div>
               <div class="tab-name">CLI + Your Tools</div>
               <div class="tab-desc">Editors, coding tools</div>
-            </div>
-          </button>
-          <button
-            :class="['path-tab', activePath === 'mcp' && 'active']"
-            @click="activePath = 'mcp'"
-          >
-            <i class="pi pi-sparkles" />
-            <div>
-              <div class="tab-name">MCP Server</div>
-              <div class="tab-desc">Copilot Agent · Claude Code</div>
             </div>
           </button>
         </div>
@@ -167,10 +146,10 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
               <div>
                 <div class="step-title">Paste the starter prompt in your AI tool</div>
                 <div class="prompt-example">
-                  "Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Choose the simplest suitable frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS, and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a split source structure. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval."
+                  "{{ genericStarterPrompt }}"
                 </div>
                 <p class="step-body">
-                  This is the practical default for Codex, Copilot, Cursor, Claude Code, and similar tools.
+              This is the practical default for Codex, Copilot, Cursor, and similar tools.
                   The prompt already tells the AI to prefer local generated guidance after setup, use
                   <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a> only as fallback,
                   install the CLI if needed, and start with <code>automaton setup</code>.
@@ -217,8 +196,7 @@ const claudeMcpCommand = `claude mcp add automaton --transport http "${publicApp
           <div class="tip-box">
             <i class="pi pi-info-circle" />
             <span>
-              This is the practical default for Copilot, Cursor, Claude Code, and similar tools when
-              MCP is not connected. The AI builds locally, the CLI gives it a reliable deploy path,
+              This is the practical default for Cursor, VS Code, and similar tools. The AI builds locally, the CLI gives it a reliable deploy path,
               and the local generated guidance should usually be enough after setup. Use <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
               only as the canonical fallback.
             </span>
@@ -344,84 +322,6 @@ automaton status</pre></div>
           </div>
         </div>
 
-        <!-- ── PATH 4: MCP ────────────────────────────────────── -->
-        <div v-if="activePath === 'mcp'" class="path-content">
-          <div class="path-intro">
-            <span class="path-badge path-badge-purple">AI-native</span>
-            <p>
-              Connect Automaton as an MCP server so your AI coding assistant (GitHub Copilot Agent,
-              Claude Code) can understand the required Automaton structure while you keep working in
-              your local project. This is the most accurate path when your tool supports MCP. Use the
-              Automaton CLI to upload and deploy the app.
-            </p>
-          </div>
-
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div>
-                <div class="step-title">Get an API key</div>
-                <p class="step-body">
-                  In the Studio: <strong>API Keys → Generate New Key</strong>, scope: <code>execute</code>.
-                  You'll get a key like <code>ak_execute_xxx</code>.
-                </p>
-              </div>
-            </div>
-
-            <div class="step">
-              <div class="step-num">2</div>
-              <div>
-                <div class="step-title">Connect your tool</div>
-
-                <div class="tool-tabs">
-                  <div class="tool-section">
-                    <div class="tool-label"><i class="pi pi-github" /> GitHub Copilot (VS Code)</div>
-                    <p class="step-body">Create <code>.vscode/mcp.json</code> in your workspace:</p>
-                    <div class="code-block code-block-multi">
-<pre>{{ copilotMcpConfig }}</pre>
-                    </div>
-                    <p class="step-body">Then open Copilot Chat → switch to <strong>Agent mode</strong>.</p>
-                  </div>
-
-                  <div class="tool-section">
-                    <div class="tool-label"><i class="pi pi-sparkles" /> Claude Code</div>
-                    <div class="code-block">
-                      <span class="code-prompt">$</span>
-                      <span class="code-text">{{ claudeMcpCommand }}</span>
-                    </div>
-                    <p class="step-body">Then <code>cd</code> to your project and run <code>claude</code>.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="step">
-              <div class="step-num">3</div>
-              <div>
-                <div class="step-title">Ask the AI to scaffold the project</div>
-                <div class="prompt-example">
-                  "Build this [idea] as an Automaton app."
-                </div>
-                <p class="step-body">
-                  The AI can create or link the app, understand the required structure, and generate
-                  the project in your local workspace. Keep the project in your own Git repo if you want version control.
-                  The AI should usually handle the remaining deploy flow itself and only stop when it needs your help,
-                  such as interactive auth, runner creation outside the CLI, or publish approval.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="tip-box">
-            <i class="pi pi-info-circle" />
-            <span>
-              The AI learns the correct file structure from the MCP server's instructions.
-              You still keep the project locally and use the CLI for deploy, but you usually do not
-              need to re-explain the Automaton structure on every session.
-            </span>
-          </div>
-        </div>
-
         <!-- ── Developer + AI guidance ────────────────────────── -->
         <div v-if="activePath === 'agent' || activePath === 'cli'" class="ref-section">
           <h2 class="ref-title">For developers and AI tools</h2>
@@ -458,15 +358,6 @@ automaton status</pre></div>
             </div>
           </div>
 
-          <div class="tip-box">
-            <i class="pi pi-info-circle" />
-            <span>
-              MCP is still the most accurate option when supported, but the
-              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="docs-link">llms.txt</a>
-              files give external AI tools a reliable fallback without overwhelming non-technical users
-              on the public website.
-            </span>
-          </div>
         </div>
 
       </div>

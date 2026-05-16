@@ -14,7 +14,6 @@ Use these rules:
 - Deploy with `automaton deploy`.
 - If the app has Python backend controllers, inspect the assignment with `automaton current-runner`, list available runners with `automaton runners`, assign an existing connected runner with `automaton set-runner <runner-id>`, or tell the user to create or deploy one in Automaton Studio, then deploy.
 - `automaton setup`, `automaton new`, and `automaton link` automatically sync a local AI guidance pack; use `automaton sync-ai` only when those generated files need a manual refresh.
-- The CLI should be the primary autonomous path. MCP is a secondary enhancement when supported, not a requirement.
 
 Recommended workflow for most developers:
 1. Run `automaton setup`.

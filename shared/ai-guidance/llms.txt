@@ -98,7 +98,6 @@ Completion criteria:
 4. `automaton deploy` succeeded.
 5. If the user asked for a live published app, `automaton publish --yes` succeeded.
 
-Prefer MCP only as a secondary enhancement when the tool supports it. MCP should mirror the same flow, not replace the CLI requirement.
 
 ## Frontend stack selection
 
@@ -130,4 +129,3 @@ Read these files in order for complete guidance:
 
 - **App Editor inside Automaton Studio** — fastest browser-first path, no local setup
 - **Local IDE + CLI deploy** — default developer workflow, keep project in Git
-- **MCP** — secondary structured interface when supported; the CLI should still be enough to complete the job

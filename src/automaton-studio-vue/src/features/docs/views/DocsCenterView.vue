@@ -10,7 +10,6 @@ import homeRaw from '../content/home.md?raw'
 import stackSelectionRaw from '../content/stack-selection.md?raw'
 import appEditorRaw from '../content/app-editor.md?raw'
 import cliAiToolsRaw from '../content/cli-ai-tools.md?raw'
-import mcpRaw from '../content/mcp.md?raw'
 import templatesRaw from '../content/templates.md?raw'
 import troubleshootingRaw from '../content/troubleshooting.md?raw'
 import automatonCliRaw from '../content/automaton-cli.md?raw'
@@ -32,7 +31,6 @@ const docs: DocItem[] = [
   { slug: 'stack-selection', label: 'Choose a stack', summary: 'HTML, React, or Vue', group: 'Quick Starts', content: stackSelectionRaw },
   { slug: 'app-editor', label: 'App Editor', summary: 'Browser-first workflow', group: 'Workflows', content: appEditorRaw },
   { slug: 'cli-ai-tools', label: 'CLI + AI tools', summary: 'Cursor, Claude, Copilot', group: 'Workflows', content: cliAiToolsRaw },
-  { slug: 'mcp', label: 'MCP Server', summary: 'Recommended when supported', group: 'Workflows', content: mcpRaw },
   { slug: 'templates', label: 'Templates', summary: 'Start from examples', group: 'Workflows', content: templatesRaw },
   { slug: 'troubleshooting', label: 'Troubleshooting', summary: 'Common errors and fixes', group: 'Reference', content: troubleshootingRaw },
   { slug: 'automaton-cli', label: 'Automaton CLI', summary: 'All commands and options', group: 'Reference', content: automatonCliRaw },

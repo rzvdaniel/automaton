@@ -4,7 +4,7 @@ You are connected to Automaton via MCP. You can **discover** apps, **read** file
 
 > **Important:** Writing files and deploying are handled by the **automaton CLI**, not via MCP.
 > After generating code to the local filesystem, the developer runs `automaton deploy` to push it to the server.
-> MCP is for discovery and app creation only.
+> MCP is mostly for guidance and discovery. Prefer the CLI for creating or linking the local project that will be deployed.
 
 ## Source of truth
 
@@ -25,10 +25,17 @@ Read these shared files for app-building guidance:
 
 MCP-specific role:
 
-- use MCP to discover apps, create apps, and inspect remote files when needed
+- use MCP to discover apps and inspect remote files when needed
+- create apps through MCP only when the user explicitly asked for MCP app creation or cannot use the CLI creation/link flow
 - write frontend and backend files locally with normal file tools
 - rely on the shared `llms.txt` guidance for UI conventions, backend contracts, mocks, and deploy shape instead of redefining them here
-- use the Automaton CLI flow for validate, deploy, preview iteration, and publish
+- use the Automaton CLI flow for setup, app linking or creation, validate, deploy, preview iteration, and publish
+
+Why this matters:
+
+- An MCP API key and the CLI's stored API key can belong to different users or servers.
+- If MCP creates an app but the CLI later deploys with another account, the CLI may return 404 because that account cannot see the MCP-created app.
+- `automaton new` and `automaton link` avoid this mismatch by writing `automaton.json` using the same CLI credentials that will deploy.
 
 ## First: Check for automaton.json
 
@@ -38,27 +45,30 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 
 **If it does not exist**, choose the right path based on user intent:
 
-- **User provided an app ID** (e.g. "work on app `abc123`", "the app id is ...") — write `automaton.json` immediately with that ID, then follow the **Resuming Work on an Existing App** section to pull files down before editing. Do **not** call `create_app`.
+- **The user asked for a CLI-first or normal local app workflow** — run or instruct the developer to run `automaton setup`, then `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing app. Do **not** call `create_app` by default.
 
-- **User said they want to resume / continue work on an existing app but gave no ID** — ask: *"What is the app ID? You can find it in `automaton.json` on another machine or in the Automaton dashboard."* Once they provide it, write `automaton.json` and proceed as above.
+- **User provided an app ID** (e.g. "work on app `abc123`", "the app id is ...") — prefer `automaton link <app-id>` so the CLI writes `automaton.json` with the resolved server. Do **not** call `create_app`.
 
-- **User wants to build a new app** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately **overwrite** `automaton.json` in the project root with **only** this content (replace any existing content entirely — never append):
+- **User said they want to resume / continue work on an existing app but gave no ID** — ask: *"What is the app ID? You can find it in `automaton.json` on another machine or in the Automaton dashboard."* Once they provide it, prefer `automaton link <app-id>` and proceed as above.
+
+- **User explicitly wants MCP to create the app** — call `create_app` with a short descriptive name. The tool returns the appId. Immediately **overwrite** `automaton.json` in the project root with **only** this content (replace any existing content entirely — never append):
 
 ```json
 {
   "appId": "<returned-appId>",
-  "name": "<app-name>"
+  "name": "<app-name>",
+  "server": "<Automaton server URL>"
 }
 ```
 
-The file must contain exactly one JSON object.
+The file must contain exactly one JSON object. Before deploying, verify that `automaton whoami` is using the same server/account as the MCP key. If the CLI cannot resolve the MCP-created app, relink with `automaton new` or `automaton link` under the CLI account instead of repeatedly restructuring the app files.
 
 `automaton.json` is the project's link to its Automaton app. Commit it to Git so collaborators don't need to reconfigure anything.
 
 ## Workflow
 
 1. Check for `automaton.json`.
-2. Create or link the app via MCP only when that project link is missing.
+2. Create or link the app with the CLI (`automaton new` or `automaton link`) unless the user explicitly requested MCP creation.
 3. Build app files locally using the shared app rules from `llms.txt`.
 4. Use MCP to inspect existing remote files only when needed.
 5. Tell the developer to run the Automaton CLI flow (`automaton validate`, `automaton deploy`, and publish later if desired).
@@ -87,4 +97,4 @@ For the CLI workflow and commands, use `llms.txt` and `/llms/automaton-cli-deplo
 | `list_files` | List all files in the app |
 | `list_runners` | List available runners (for reference only) |
 
-All write, deploy, and publish operations are handled by the **automaton CLI** (`automaton deploy`, `automaton publish`, etc.).
+All write, deploy, and publish operations are handled by the **automaton CLI** (`automaton setup`, `automaton new`, `automaton link`, `automaton validate`, `automaton deploy`, `automaton publish`, etc.). Use `create_app` sparingly because it may not share credentials with the CLI.

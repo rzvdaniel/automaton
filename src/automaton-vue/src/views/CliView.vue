@@ -57,6 +57,14 @@ const directScripts = [
   },
 ]
 
+const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+
+const existingAppStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. I already have an Automaton app. Use the Automaton CLI as the only execution path: start with automaton setup, link this folder to app id [app-id] with automaton link, scaffold or update the app locally, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
+
+const frontendOnlyStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level files unless I explicitly ask for a framework or split source structure. Do not default to frontend/ for plain apps. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+
+const frameworkStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, scaffold the app, make sure build and deployDir are correct, run automaton validate, handle runner assignment only if backend controllers exist, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
+
 const quickStartSteps = [
   {
     title: 'Install CLI',
@@ -71,7 +79,7 @@ const quickStartSteps = [
   {
     title: 'Paste the starter prompt',
     detail: 'After setup, ask the AI to build and deploy the app in the current folder.',
-    code: 'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for: [describe the app]. Choose the simplest suitable frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS, and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a split source structure. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.',
+    code: genericStarterPrompt,
   },
   {
     title: 'Preview in Studio',
@@ -97,22 +105,22 @@ const starterPromptVariants = [
   {
     title: 'Generic starter',
     description: 'Best default when the user wants the AI to choose the simplest suitable stack.',
-    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app for: [describe the app]. Choose the simplest suitable frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS, and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a split source structure. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`,
+    code: genericStarterPrompt,
   },
   {
     title: 'Existing app',
     description: 'Use this when the remote Automaton app already exists and the folder should be linked first.',
-    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. I already have an Automaton app. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: link this folder to app id [app-id], scaffold or update the app locally, keep automaton.json correct in this folder, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`,
+    code: existingAppStarterPrompt,
   },
   {
     title: 'Frontend-only',
     description: 'Use this when the app should stay frontend-only unless backend code is truly necessary.',
-    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level frontend files unless I explicitly ask for a framework or split source structure. Do not default to frontend/ for plain apps. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`,
+    code: frontendOnlyStarterPrompt,
   },
   {
     title: 'React or Vue',
     description: 'Use this when the user explicitly wants a framework app.',
-    code: `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create or link automaton.json in this folder, scaffold the app, make sure build and deployDir are correct, run automaton validate, handle runner assignment only if backend controllers exist, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`,
+    code: frameworkStarterPrompt,
   },
 ]
 

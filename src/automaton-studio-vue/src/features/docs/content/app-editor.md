@@ -27,7 +27,7 @@ Build a Poker Planning app where users vote on story complexity.
 The frontend should show a list of stories and a set of voting cards.
 ```
 
-The AI knows the Automaton app structure automatically (via MCP or built-in guidance). You do not need to explain `handle()`, `callController()`, or the file layout.
+The AI knows the Automaton app structure automatically through the built-in guidance. You do not need to explain `handle()`, `callController()`, or the file layout.
 
 ### 4. Review and iterate
 

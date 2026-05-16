@@ -1,20 +1,16 @@
 # Building Automaton Apps with AI
 
-Automaton apps are frontend-agnostic static web apps with Python backends. There are three ways
+Automaton apps are frontend-agnostic static web apps with Python backends. There are two main ways
 to build them, depending on how much local tooling you want to use.
 
 ---
 
-## Three Ways to Build
+## Two Ways to Build
 
 | Path | Where you work | Best for |
 |---|---|---|
 | **1. Studio App Editor** | Browser — Automaton Studio | Fastest start, quick prototypes |
 | **2. Local IDE + CLI** | Your editor (Cursor, VS Code, etc.) | Full Git workflow, larger apps |
-| **3. MCP** | VS Code Agent / Claude Code | Most accurate AI guidance when supported |
-
-Paths 2 and 3 overlap — MCP is an optional enhancement to the local IDE workflow. You can use
-Path 2 without MCP by pointing your AI tool to the `llms.txt` file instead.
 
 ---
 
@@ -84,7 +80,7 @@ The file links to detailed instructions covering frontend structure, backend con
 Fallback prompt when the tool does not consume local guidance files:
 
 ```text
-Read https://automaton.monster/llms.txt, then build an Automaton app for Poker Planning.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for Poker Planning. Use the Automaton CLI as the only execution path: start with automaton setup, use automaton new or automaton link so automaton.json is written by the CLI account that will deploy, run automaton validate before automaton deploy, and ask before publish.
 ```
 
 If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
@@ -92,15 +88,14 @@ If you use the CLI happy path, `automaton setup`, `automaton new`, and `automato
 Or paste the generic starter prompt directly if your tool does not fetch URLs:
 
 ```text
-Build this as an Automaton app. Use any static frontend stack that fits the task. Put Python
-backend controllers in backend/. Each controller file must export handle(action_name, inputs)
-and return { success, data, error }. Frontend code must call
-window.automatonApi.callController(controller, action, inputs) and use try/catch because the
-function returns data directly and throws on errors. Use backend/shared/ for shared helpers,
-backend/requirements.txt for extra Python packages,
-backend/mocks/{controller}.{action}.json for local mock responses, keep automaton.json in the
-project root. If the app has Python backend controllers, run automaton runners, assign a runner
-with automaton set-runner <runner-id>, or create/deploy one in Automaton Studio if none is connected, and then deploy with automaton deploy.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read
+https://automaton.monster/llms.txt. Build this as an Automaton app. Choose the simplest suitable
+frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS,
+and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a
+split source structure. Use the Automaton CLI as the only execution path: start with automaton
+setup, then use automaton new or automaton link so automaton.json is created by the same CLI account
+that will deploy. Put Python backend controllers in backend/ only when needed. Run automaton
+validate before automaton deploy, and ask before public publish.
 ```
 
 Starter prompts for specific stacks (plain HTML, React, Vue) are available at
@@ -179,137 +174,15 @@ If the app has no backend scripts, a successful deploy may finish with `No backe
 
 ---
 
-## Path 3: MCP
-
-MCP gives the AI the most accurate Automaton-specific guidance by connecting it directly to
-your Automaton server. Use it in tools that support MCP alongside the local IDE workflow.
-
-If your tool does not support MCP — or you are in a session without MCP configured — use
-`https://automaton.monster/llms.txt` instead (Path 2 above).
-
-### VS Code — GitHub Copilot (Agent Mode)
-
-**Requires:** VS Code 1.99+ and the GitHub Copilot extension.
-
-#### Setup
-
-Create `.vscode/mcp.json` in your workspace (or add to user settings):
-
-```json
-{
-  "servers": {
-    "automaton": {
-      "type": "http",
-      "url": "https://localhost:7091/api/mcp",
-      "headers": {
-        "X-API-Key": "ak_execute_xxx"
-      }
-    }
-  }
-}
-```
-
-> VS Code accepts both `http://` and `https://` URLs directly — no extra settings needed.
-> If your server uses a self-signed certificate, trust the dev certificate in your browser
-> first (`https://localhost:7091` → accept the warning) so VS Code can connect.
-
-#### Using Copilot
-
-1. Open Copilot Chat (`Ctrl+Alt+I`)
-2. Switch to **Agent** mode using the dropdown next to the input box
-3. Automaton tools appear automatically — Copilot discovers them on connection
-4. Start with a prompt describing what to build:
-
-```
-Build this as an Automaton app. Use a Python backend in backend/ to store and retrieve todos.
-Each backend controller must export handle(action_name, inputs), and frontend code should call
-window.automatonApi.callController(...).
-```
-
-Copilot can:
-- Create or link the app if `automaton.json` doesn't exist yet
-- Add missing `build` and `deployDir` fields to `automaton.json` when the app builds to `dist/` or another output folder
-- Generate the project in your local workspace
-- Follow the Automaton backend/controller contract automatically through MCP guidance
-
-When the project is ready, pick an existing connected runner with `automaton set-runner <runner-id>` for backend apps, or create/deploy one in Automaton Studio if none exists, then run `automaton deploy` to upload the frontend and deploy the backend.
-
-#### Iterating
-
-Open `automaton.json` to see the appId, then in Copilot Chat:
-
-```
-Add a "clear completed" button that calls backend/todos.py → clear_completed()
-```
-
-Copilot reads existing files via `read_file` and `list_files`, updates only what changed.
-
----
-
-### Claude Code
-
-**Requires:** Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
-
-#### Setup (one-time per server)
-
-```bash
-claude mcp add automaton \
-  --transport http \
-  "https://localhost:7091/api/mcp" \
-  --header "X-API-Key: ak_execute_xxx"
-```
-
-Verify the server is registered:
-
-```bash
-claude mcp list
-```
-
-#### Using Claude Code
-
-In your project folder:
-
-```bash
-cd /path/to/my-app
-claude
-```
-
-Then describe what to build:
-
-```
-Build this as an Automaton app. Store scores in a Python backend in backend/.
-Each controller must export handle(action_name, inputs), and frontend code should call
-window.automatonApi.callController(...). Keep the project local and prepare it for automaton deploy.
-```
-
-Claude Code can:
-- Check for `automaton.json` and link or create the app
-- Add missing `build` and `deployDir` fields to `automaton.json` when the deployable frontend is built output
-- Generate the local project with the correct Automaton structure
-- Reuse the same project folder across sessions
-
-When the project is ready, pick an existing connected runner with `automaton set-runner <runner-id>` for backend apps, or create/deploy one in Automaton Studio if none exists, then run `automaton deploy`.
-
-#### Switching Projects
-
-Each project folder has its own `automaton.json`. Claude Code reads from the current working
-directory — `cd` to a different project and it automatically targets a different app.
-
-```bash
-cd /path/to/app-1   # works on app-1
-cd /path/to/app-2   # works on app-2 — no reconfiguration needed
-```
-
----
-
 ## App Structure Reference
 
 ```
 my-app/
 ├── automaton.json          ← app link + optional build/deploy config (commit this)
-├── frontend/               ← plain static apps can live here
-│   ├── index.html          ← entry point for plain static apps
-│   └── *.css / *.js / assets/
+├── index.html              ← preferred entry point for plain static apps
+├── *.css / *.js            ← root-level plain app assets
+├── assets/                 ← images, icons, local media
+├── frontend/               ← optional split static source, only when intentional
 ├── src/                    ← framework source code can stay in the repo
 ├── dist/                   ← common build output for framework apps
 └── backend/
@@ -321,7 +194,7 @@ my-app/
 ```
 
 Notes:
-- Plain static apps can live directly in `frontend/`
+- Plain static apps should usually use root-level files; use `frontend/` only when you intentionally want a split source structure
 - Framework apps such as React, Vue, or Angular can keep source code in the repo and deploy the built output, typically from `dist/`
 - Use `build` and `deployDir` in `automaton.json` when the deployable frontend lives somewhere other than the default path
 
@@ -383,12 +256,11 @@ No API key, no runner, no Automaton server needed for frontend development.
 
 ## Comparison
 
-| | Studio App Editor | Local IDE + CLI (llms.txt) | VS Code Copilot (MCP) | Claude Code (MCP) |
-|---|---|---|---|---|
-| Local setup required | ❌ | ✅ | ✅ | ✅ |
-| Git workflow | ❌ | ✅ | ✅ | ✅ |
-| MCP integration | N/A | ❌ (llms.txt instead) | ✅ Native | ✅ Native |
-| AI knows Automaton structure | ✅ Built-in | ✅ Via llms.txt | ✅ Via MCP | ✅ Via MCP |
-| Auto-creates `automaton.json` | ✅ | ✅ | ✅ | ✅ |
-| Multi-app support | ✅ Per app | ✅ Per folder | ✅ Per folder | ✅ Per folder |
-| Best for | Quick prototypes | Any IDE, any AI tool | Daily dev in VS Code | Terminal-first workflow |
+| | Studio App Editor | Local IDE + CLI |
+|---|---|---|
+| Local setup required | ❌ | ✅ |
+| Git workflow | ❌ | ✅ |
+| AI knows Automaton structure | ✅ Built-in | ✅ Via local guidance and `llms.txt` |
+| Auto-creates `automaton.json` | ✅ | ✅ |
+| Multi-app support | ✅ Per app | ✅ Per folder |
+| Best for | Quick prototypes | Any IDE, any AI tool |

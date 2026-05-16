@@ -171,7 +171,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ## Default instruction to the AI
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Then build this as an Automaton app for: [describe the app]. Use the Automaton CLI as the primary execution path. Start with automaton setup, create or link automaton.json in the project root, refresh local guidance with automaton sync-ai only if needed, ensure a runner exists for backend controllers, run automaton validate before deploy, and only publish after explicit user confirmation.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 When the app is deployed but not yet published, the AI should direct the user to preview it in Automaton Studio and inspect logs there before recommending publish.

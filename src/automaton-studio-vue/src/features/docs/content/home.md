@@ -17,7 +17,7 @@ Manual fallback:
 3. If `backend/*.py` exists, assign a connected runner.
 4. Run `automaton deploy`.
 
-If your AI tool supports MCP, connect Automaton as an MCP server. That gives the AI the most accurate Automaton-specific context. If it does not, use the CLI + AI workflow, the stack guide, and the starter prompt.
+Use the CLI + AI workflow, the stack guide, and the starter prompt as the default path for external coding tools.
 
 ## What every Automaton app has
 
@@ -31,7 +31,6 @@ If your AI tool supports MCP, connect Automaton as an MCP server. That gives the
 - A quick stack guide for plain HTML/CSS/JS, React, and Vue.
 - The in-browser App Editor workflow.
 - External AI workflows with CLI and starter prompts.
-- MCP setup.
 - Templates.
 
 ## Core contract

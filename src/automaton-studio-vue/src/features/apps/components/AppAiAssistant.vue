@@ -32,12 +32,12 @@ const config = computed<AiChatConfig>(() => ({
 // Handlers for app editor AI interactions
 const handlers: AiChatHandlers = {
   onSendMessage: async (message: string, context) => {
-    // TODO: Integrate with actual MCP server for app generation
+    // TODO: Integrate with the real app-generation service
     // For now, simulate API call
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(
-          `AI assistant is not yet implemented. This will connect to the MCP server for app generation.\n\nYour request: "${message}"\n\nContext:\n- App: ${context?.appName || 'Unknown'}\n- File: ${context?.activeFile || 'None selected'}`,
+          `AI assistant is not yet implemented. This will connect to the app-generation service.\n\nYour request: "${message}"\n\nContext:\n- App: ${context?.appName || 'Unknown'}\n- File: ${context?.activeFile || 'None selected'}`,
         )
       }, 1000)
     })

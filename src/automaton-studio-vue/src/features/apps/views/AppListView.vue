@@ -33,7 +33,6 @@ const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
 const { defaultAiModel } = useUserSettings()
-const apiBase = import.meta.env.VITE_API_BASE_URL || ''
 
 // AI generation state
 const aiDescription = ref('')
@@ -162,7 +161,7 @@ const statusOptions = ref([
 ])
 
 // Quick-start how-to tab
-const quickStartPath = ref<'editor' | 'cli' | 'mcp'>('editor')
+const quickStartPath = ref<'editor' | 'cli'>('editor')
 
 // Create dialog state
 const showCreateDialog = ref(false)
@@ -634,13 +633,6 @@ const handleRetry = async () => {
               <i class="pi pi-terminal" />
               <span>CLI + Your IDE</span>
             </button>
-            <button
-              :class="['qs-tab', quickStartPath === 'mcp' && 'qs-tab--active']"
-              @click="quickStartPath = 'mcp'"
-            >
-              <i class="pi pi-sparkles" />
-              <span>MCP Server</span>
-            </button>
           </div>
 
           <!-- Editor path -->
@@ -661,15 +653,17 @@ const handleRetry = async () => {
           <div v-else-if="quickStartPath === 'cli'" class="qs-content">
             <p class="text-color-secondary text-sm mt-0 mb-3">
               Build locally with any editor (Cursor, VS Code…), keep the project in Git,
-              and deploy with one command. MCP is recommended when supported, but not required.
+              and deploy with the CLI. Let the CLI create or link the project that it will deploy.
             </p>
             <div class="qs-code mb-2">dotnet tool install -g Automaton.Cli</div>
-            <div class="qs-code mb-2">automaton config</div>
+            <div class="qs-code mb-2">automaton setup</div>
+            <div class="qs-code mb-2">automaton new "My App"</div>
+            <div class="qs-code mb-2">automaton validate</div>
             <div class="qs-code mb-3">automaton deploy</div>
             <p class="text-color-secondary text-sm mb-2">
               Automaton apps need to follow a specific project structure, backend controller pattern,
-              and frontend integration contract. If you are using an external AI tool without MCP,
-              point it to <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
+              and frontend integration contract. Point your AI tool to
+              <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
               before it starts generating files.
             </p>
             <div class="qs-links mb-3">
@@ -698,38 +692,6 @@ const handleRetry = async () => {
             </p>
           </div>
 
-          <!-- MCP path -->
-          <div v-else class="qs-content">
-            <p class="text-color-secondary text-sm mt-0 mb-3">
-              Connect Automaton as an MCP server to GitHub Copilot Agent or Claude Code.
-              The AI can understand the required Automaton structure while you keep working in your
-              local project. This is the most accurate path when your tool supports MCP.
-            </p>
-            <p class="text-sm font-semibold mb-1">VS Code / GitHub Copilot — add to <code class="qs-inline-code">.vscode/mcp.json</code>:</p>
-            <div class="qs-code qs-code--block mb-3">
-              <div>&#123;</div>
-              <div class="pl-3">"servers": &#123; "automaton": &#123;</div>
-              <div class="pl-5">"type": "http",</div>
-              <div class="pl-5">"url": "{{ apiBase }}/api/mcp",</div>
-              <div class="pl-5">"headers": &#123; "X-API-Key": "<em>your-api-key</em>" &#125;</div>
-              <div class="pl-3">&#125; &#125;</div>
-              <div>&#125;</div>
-            </div>
-            <p class="text-sm font-semibold mb-1">Claude Code:</p>
-            <div class="qs-code mb-3">claude mcp add automaton --transport http "{{ apiBase }}/api/mcp" --header "X-API-Key: your-api-key"</div>
-            <p class="text-color-secondary text-sm mb-3">
-              Replace <code class="qs-inline-code">your-api-key</code> with a key from
-              <strong
-                class="cursor-pointer"
-                style="color: var(--p-primary-500)"
-                @click="router.push('/apikeys')"
-              >Settings → API Keys</strong> (scope: <em>execute</em>).
-              Then tell the AI that backend controllers live in <code class="qs-inline-code">backend/</code>,
-              export <code class="qs-inline-code">handle(action_name, inputs)</code>, and frontend code should use
-              <code class="qs-inline-code">window.automatonApi.callController(...)</code> with <code class="qs-inline-code">try/catch</code>.
-              When the project is ready, run <code class="qs-inline-code">automaton deploy</code>.
-            </p>
-          </div>
         </template>
       </Card>
     </template><!-- /v-if="activeTabIndex === 2" -->
