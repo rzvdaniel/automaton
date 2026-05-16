@@ -29,6 +29,16 @@ const router = createRouter({
       name: 'cli',
       component: () => import('@/views/CliView.vue'),
     },
+    {
+      path: '/:publicUsername/apps/:appId',
+      name: 'creator-app-detail',
+      component: () => import('@/views/CreatorAppDetailView.vue'),
+    },
+    {
+      path: '/:publicUsername',
+      name: 'creator-store',
+      component: () => import('@/views/CreatorStoreView.vue'),
+    },
   ],
   scrollBehavior(to) {
     if (to.hash) {

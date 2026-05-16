@@ -72,7 +72,19 @@ public class PublicMarketplaceController : ControllerBase
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
-                IsFeatured = a.IsFeatured
+                IsFeatured = a.IsFeatured,
+                Screenshots = _dbContext.WebAppScreenshots
+                    .Where(s => s.WebAppId == a.Id)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.CreatedAt)
+                    .Select(s => new MarketplaceAppScreenshotDto
+                    {
+                        Id = s.Id,
+                        ImageUrl = s.ImageUrl,
+                        Caption = s.Caption,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList()
             })
             .ToListAsync();
 
@@ -168,7 +180,19 @@ public class PublicMarketplaceController : ControllerBase
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
-                IsFeatured = a.IsFeatured
+                IsFeatured = a.IsFeatured,
+                Screenshots = _dbContext.WebAppScreenshots
+                    .Where(s => s.WebAppId == a.Id)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.CreatedAt)
+                    .Select(s => new MarketplaceAppScreenshotDto
+                    {
+                        Id = s.Id,
+                        ImageUrl = s.ImageUrl,
+                        Caption = s.Caption,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList()
             })
             .ToListAsync();
 
@@ -211,11 +235,11 @@ public class MarketplaceAppCardDto
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public bool IsFeatured { get; set; }
+    public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }
 
 public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
 {
-    public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
     public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
 }
 

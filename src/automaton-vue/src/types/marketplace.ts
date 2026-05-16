@@ -12,6 +12,7 @@ export type MarketplaceAppCard = {
   publicUrl?: string
   publishedAt?: string
   isFeatured?: boolean
+  screenshots: MarketplaceAppScreenshot[]
 }
 
 export type MarketplaceAppScreenshot = {
@@ -22,6 +23,18 @@ export type MarketplaceAppScreenshot = {
 }
 
 export type MarketplaceAppDetails = MarketplaceAppCard & {
-  screenshots: MarketplaceAppScreenshot[]
   relatedApps: MarketplaceAppCard[]
+}
+
+export type PublicUserProfile = {
+  username: string
+  displayName?: string
+  avatarUrl?: string
+  bio?: string
+  publicAppCount: number
+}
+
+export type PublicAppsResponse = {
+  profile: PublicUserProfile
+  apps: MarketplaceAppCard[]
 }

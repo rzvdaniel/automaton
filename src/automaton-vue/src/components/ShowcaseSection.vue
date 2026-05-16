@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -26,6 +27,13 @@ const activeCategory = ref('')
 const search = ref('')
 const loading = ref(false)
 
+const featuredApps = computed(() => apps.value.filter((app) => app.isFeatured).slice(0, 12))
+const carouselApps = computed(() => {
+  const featured = featuredApps.value
+  if (featured.length > 0) return featured.slice(0, props.fullPage ? 12 : 10)
+  return props.fullPage ? [] : apps.value.slice(0, 10)
+})
+
 const heading = computed(() =>
   props.fullPage ? 'Discover what people are shipping with Automaton' : 'Explore apps built with Automaton',
 )
@@ -50,7 +58,7 @@ async function loadApps() {
       query.set('search', search.value.trim())
     }
 
-    query.set('take', props.fullPage ? '100' : '8')
+    query.set('take', props.fullPage ? '100' : '10')
 
     const response = await fetch(`${marketplaceApiBaseUrl}/apps?${query.toString()}`)
     apps.value = await response.json()
@@ -85,7 +93,15 @@ onMounted(async () => {
         </RouterLink>
       </div>
 
-      <div class="showcase-toolbar">
+      <MarketplaceCarousel
+        v-if="carouselApps.length > 0"
+        class="showcase-carousel"
+        :apps="carouselApps"
+        :compact="!props.fullPage"
+        @select="openDetails"
+      />
+
+      <div v-if="props.fullPage" class="showcase-toolbar">
         <div class="category-tabs" role="tablist" aria-label="Marketplace categories">
           <button
             class="category-tab"
@@ -132,7 +148,7 @@ onMounted(async () => {
         <p>No apps matched this category yet. Try another tab or search term.</p>
       </div>
 
-      <div v-else class="apps-grid">
+      <div v-else-if="props.fullPage" class="apps-grid">
         <article
           v-for="app in apps"
           :key="app.id"
@@ -201,6 +217,10 @@ onMounted(async () => {
   display: grid;
   gap: 20px;
   margin-bottom: 28px;
+}
+
+.showcase-carousel {
+  margin-bottom: 32px;
 }
 
 .category-tabs {

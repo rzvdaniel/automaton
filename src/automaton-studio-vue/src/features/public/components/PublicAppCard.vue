@@ -83,20 +83,20 @@ function toggleStar(event: Event) {
   flex: 0 0 42%;
   min-height: 148px;
   overflow: hidden;
+  padding: 0.5rem;
   background: #0e141b;
 }
 
 .cover-image {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.22s ease, filter 0.22s ease;
+  inset: 0.5rem;
+  width: calc(100% - 1rem);
+  height: calc(100% - 1rem);
+  object-fit: contain;
+  transition: filter 0.22s ease;
 }
 
 .store-card:hover .cover-image {
-  transform: scale(1.04);
   filter: saturate(1.08);
 }
 
