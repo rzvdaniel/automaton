@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import Tag from 'primevue/tag'
 import type { PublicAppCard as AppCardType } from '../types/publicApps.types'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
@@ -13,15 +13,6 @@ const emit = defineEmits<{
   (e: 'toggle-star', app: AppCardType): void
 }>()
 
-const isHovering = ref(false)
-const summaryExpanded = ref(false)
-
-// Check if summary is long enough to need expansion
-const isSummaryLong = computed(() => {
-  return (props.app.summary?.length ?? 0) > 80
-})
-
-// Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
   if (!props.app.thumbnailUrl) return ''
   if (props.app.thumbnailUrl.startsWith('http')) {
@@ -39,208 +30,149 @@ function toggleStar(event: Event) {
   event.stopPropagation()
   emit('toggle-star', props.app)
 }
-
-function toggleSummary(e: Event) {
-  e.stopPropagation()
-  summaryExpanded.value = !summaryExpanded.value
-}
 </script>
 
 <template>
-  <div class="netflix-card" @mouseenter="isHovering = true" @mouseleave="isHovering = false" @click="showDetails">
-    <!-- Thumbnail Container -->
-    <div class="thumbnail-container">
-      <img
-        v-if="app.thumbnailUrl"
-        :src="fullThumbnailUrl"
-        :alt="app.name"
-        class="thumbnail-image"
-      />
+  <article class="store-card" @click="showDetails">
+    <div class="cover-frame">
+      <img v-if="app.thumbnailUrl" :src="fullThumbnailUrl" :alt="app.name" class="cover-image" />
       <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
-
-      <!-- Featured Badge -->
-      <Tag v-if="app.isFeatured" value="Featured" severity="warning" class="featured-badge" />
-
-      <!-- Views Pill (always visible, including on hover) -->
-      <div v-if="app.viewCount > 0" class="views-pill">
-        <i class="pi pi-eye"></i>
-        <span>{{ app.viewCount }}</span>
-      </div>
 
       <button class="stars-pill" @click="toggleStar">
         <i :class="app.isStarredByCurrentUser ? 'pi pi-star-fill' : 'pi pi-star'"></i>
         <span>{{ app.starCount }}</span>
       </button>
-
-      <!-- Hover Overlay — visual affordance only, no buttons -->
-      <transition name="fade">
-        <div v-if="isHovering" class="hover-overlay" />
-      </transition>
     </div>
 
-    <!-- Combined Title + Summary as one paragraph -->
-    <div class="card-text">
-      <p :class="['text-line', { 'expanded': summaryExpanded }]">
-        <span class="text-title">{{ app.name }}</span>
-        <span v-if="app.summary" class="text-summary">{{ app.summary }}</span>
-      </p>
-      <button 
-        v-if="isSummaryLong"
-        class="summary-toggle"
-        @click="toggleSummary"
-      >
-        {{ summaryExpanded ? 'Show less' : 'Show more' }}
-        <i :class="summaryExpanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"></i>
-      </button>
+    <div class="card-body">
+      <div class="title-row">
+        <h3>{{ app.name }}</h3>
+        <Tag v-if="app.isFeatured" value="Featured" severity="warning" class="featured-badge" />
+      </div>
+
+      <p v-if="app.summary" class="summary">{{ app.summary }}</p>
+
+      <div class="meta-row">
+        <span v-if="app.category" class="category-pill">{{ app.category }}</span>
+        <span class="meta-stat"><i class="pi pi-eye"></i>{{ app.viewCount }}</span>
+      </div>
     </div>
-  </div>
+  </article>
 </template>
 
 <style scoped>
-.netflix-card {
+.store-card {
   cursor: pointer;
   display: flex;
-  flex-direction: column;
+  min-height: 100%;
+  background: rgba(22, 34, 49, 0.88);
+  border: 1px solid rgba(103, 193, 245, 0.14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  color: #dbe8f4;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-/* Thumbnail Container */
-.thumbnail-container {
+.store-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(103, 193, 245, 0.42);
+  background: rgba(32, 50, 70, 0.96);
+}
+
+.cover-frame {
   position: relative;
-  width: 100%;
-  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  flex: 0 0 42%;
+  min-height: 148px;
   overflow: hidden;
-  border-radius: var(--p-border-radius);
-  background: var(--p-surface-200);
+  background: #0e141b;
 }
 
-:global(.app-dark) .thumbnail-container {
-  background: var(--p-surface-700);
-}
-
-.thumbnail-image {
+.cover-image {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.22s ease, filter 0.22s ease;
 }
 
-.netflix-card:hover .thumbnail-image {
-  transform: scale(1.05);
+.store-card:hover .cover-image {
+  transform: scale(1.04);
+  filter: saturate(1.08);
 }
 
-/* Featured Badge */
-.featured-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
+.card-body {
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
-/* Hover Overlay — subtle tint only */
-.hover-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  z-index: 20;
-  pointer-events: none;
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-/* Combined Title + Summary block */
-.card-text {
-  padding: 0.5rem 0 0.5rem 0;
-}
-
-.text-line {
+.title-row h3 {
   margin: 0;
-  color: var(--p-text-color);
-  line-height: 1.45;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.featured-badge {
+  flex-shrink: 0;
+}
+
+.summary {
+  margin: 0;
+  color: #acb9c7;
+  font-size: 0.88rem;
+  line-height: 1.4;
   display: -webkit-box;
-  -webkit-line-clamp: 3; /* allow wrapping across lines */
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  transition: all 0.3s ease;
 }
 
-.text-line.expanded {
-  -webkit-line-clamp: unset;
-  display: block;
-}
-
-.text-title {
-  font-weight: 700;
-  font-size: 1rem;
-  margin-right: 0.25rem;
-}
-
-.text-summary {
-  color: var(--p-text-muted-color);
-  font-size: 0.92rem;
-}
-
-.summary-toggle {
-  margin-top: 0.25rem;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--p-primary-500);
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
+.meta-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  transition: color 0.2s ease;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: auto;
 }
 
-.summary-toggle:hover {
-  color: var(--p-primary-600);
-  text-decoration: underline;
-}
-
-.summary-toggle i {
-  font-size: 0.7rem;
-}
-
-/* Views pill */
-.views-pill {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
+.category-pill,
+.meta-stat,
+.stars-pill {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  font-size: 0.78rem;
   line-height: 1;
-  z-index: 30; /* above hover overlay */
-  pointer-events: none;
 }
 
-.views-pill i {
-  font-size: 0.75rem;
+.category-pill,
+.meta-stat {
+  color: #c7d5e0;
+  background: rgba(103, 193, 245, 0.11);
+  padding: 0.35rem 0.55rem;
 }
 
 .stars-pill {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  line-height: 1;
-  z-index: 30;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  left: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 2;
+  padding: 0.38rem 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.68);
+  color: #ffffff;
   cursor: pointer;
 }
 
@@ -248,14 +180,15 @@ function toggleSummary(e: Event) {
   font-size: 0.75rem;
 }
 
-/* Fade transition */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
+@media (max-width: 620px) {
+  .store-card {
+    flex-direction: column;
+  }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+  .cover-frame {
+    flex-basis: auto;
+    aspect-ratio: 16 / 9;
+    min-height: auto;
+  }
 }
 </style>
