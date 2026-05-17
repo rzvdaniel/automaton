@@ -7,29 +7,29 @@ Prefer the local generated Automaton guidance in the current folder after `autom
 ## Official generic starter prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 ## Existing app link prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. I already have an Automaton app. Use the Automaton CLI as the only execution path: start with automaton setup, link this folder to app id [app-id] with automaton link, scaffold or update the app locally, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
+Update my existing Automaton Monster app using the Automaton CLI. Start by running automaton setup, link this folder to app id [app-id] with automaton link, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
 ```
 
 ## Frontend-only prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level files unless the user explicitly asks for a framework or split source structure. Do not default to `frontend/` for plain apps. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Build [describe the app] as a frontend-only Automaton Monster app using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 ## React prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app using React. Keep the React source in the repo. If the app is frontend-only, build to dist/ and set automaton.json so automaton deploy uploads dist. If the app also has Python backend controllers in backend/, do not assume deployDir: dist is enough unless backend/ is copied into dist/backend/. Instead, prepare one deploy-ready folder that contains both the built frontend files and backend/, then set deployDir to that folder. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, scaffold the app, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
+Build [describe the app] as a React app for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
 ```
 
 ## Vue prompt
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app using Vue. Keep the Vue source in the repo. If the app is frontend-only, build to dist/ and set automaton.json so automaton deploy uploads dist. If the app also has Python backend controllers in backend/, do not assume deployDir: dist is enough unless backend/ is copied into dist/backend/. Instead, prepare one deploy-ready folder that contains both the built frontend files and backend/, then set deployDir to that folder. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, scaffold the app, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
+Build [describe the app] as a Vue app for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.
 ```

@@ -38,9 +38,10 @@ public class SetupServiceTests
         Assert.That(result.UserName, Is.EqualTo("Razvan"));
         Assert.That(result.Checks.Any(check => check.Name == "aiGuidance" && check.Success), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
 
         var config = new ConfigService().LoadProjectLocalConfig(projectRoot);
         Assert.That(config.Server, Is.EqualTo(SetupService.DefaultHostedServer));

@@ -93,11 +93,9 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 After `automaton setup`:
 
 - `AGENTS.md`
-- `CLAUDE.md`
 - `.automaton/agents/`
-- `.automaton/ai-guidance/`
-- `.github/copilot-instructions.md`
-- `.github/skills/automaton-app/SKILL.md`
+- `.automaton/agents/skills/automaton-app/SKILL.md`
+- `.automaton/agents/references/llms.txt`
 
 After `automaton new`:
 

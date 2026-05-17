@@ -135,10 +135,23 @@ Refresh or repair the generated local AI guidance files in the current folder.
 
 ```bash
 automaton sync-ai
+automaton sync-ai --adapter claude
+automaton sync-ai --adapter copilot
+automaton sync-ai --adapter all
 automaton sync-ai --json
 ```
 
-Use this only when the generated `.automaton/agents/`, `.automaton/ai-guidance/`, `AGENTS.md`, `CLAUDE.md`, or `.github/` files are missing or stale. It is not required on the normal happy path because `setup`, `new`, and `link` already do this automatically.
+Use this only when the generated `.automaton/agents/`, `.automaton/agents/references/`, or `AGENTS.md` files are missing or stale, or when you want an optional adapter for another AI tool. It is not required on the normal happy path because `setup`, `new`, and `link` already sync the default guidance automatically.
+
+By default, `sync-ai` writes only `.automaton/` plus `AGENTS.md`. Optional adapters are tiny wrappers that point back to `.automaton/agents/`:
+
+| Adapter | Generated file(s) |
+|---|---|
+| `none` | Removes Automaton-generated optional adapters |
+| `claude` | `CLAUDE.md` |
+| `copilot` | `.github/copilot-instructions.md` |
+| `github-skills` | `.github/skills/automaton-app/SKILL.md` |
+| `all` | All optional adapters |
 
 ---
 

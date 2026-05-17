@@ -6,7 +6,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 
 const activePath = ref<'editor' | 'agent' | 'cli'>('agent')
 const aiCliSetupPrompt = `"Read ${publicAppConfig.llmsUrl} first. Then install Automaton CLI in this environment if needed, or verify that it is already available."`
-const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+const genericStarterPrompt = `Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read ${publicAppConfig.llmsUrl}. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.`
 </script>
 
 <template>

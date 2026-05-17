@@ -79,22 +79,18 @@ The file links to detailed instructions covering frontend structure, backend con
 Fallback prompt when the tool does not consume local guidance files:
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for Poker Planning. Use the Automaton CLI as the only execution path: start with automaton setup, use automaton new or automaton link so automaton.json is written by the CLI account that will deploy, deploy with automaton deploy, and ask before publish.
+Build a Poker Planning app for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish.
 ```
 
-If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
+If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write canonical local guidance into `.automaton/agents/` plus a small root `AGENTS.md` adapter. Detailed references live under `.automaton/agents/references/`. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
 
 Or paste the generic starter prompt directly if your tool does not fetch URLs:
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read
-https://automaton.monster/llms.txt. Build this as an Automaton app. Choose the simplest suitable
-frontend stack unless I explicitly ask for one. For plain HTML/CSS/JS apps, keep index.html, CSS,
-and JS at the project root by default instead of creating frontend/ unless I explicitly ask for a
-split source structure. Use the Automaton CLI as the only execution path: start with automaton
-setup, then use automaton new or automaton link so automaton.json is created by the same CLI account
-that will deploy. Put Python backend controllers in backend/ only when needed. Run automaton
-deploy with automaton deploy, and ask before public publish.
+Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton
+setup, then follow the generated .automaton guidance in this folder. If local guidance is
+unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before
+publish. Only ask me to step in for authentication or publish approval.
 ```
 
 Starter prompts for specific stacks (plain HTML, React, Vue) are available at

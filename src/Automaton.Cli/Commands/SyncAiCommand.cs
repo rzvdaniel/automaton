@@ -9,17 +9,22 @@ public static class SyncAiCommand
 {
     public static Command Build(ConfigService _)
     {
+        var adapterOption = new Option<string>(
+            "--adapter",
+            () => AiGuidanceAdapters.None,
+            "Optional AI tool adapter to generate: none, claude, copilot, github-skills, or all");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
         var cmd = new Command("sync-ai", "Refresh the generated local AI guidance files in this folder")
         {
+            adapterOption,
             jsonOption
         };
 
-        cmd.SetHandler((bool asJson) =>
+        cmd.SetHandler((string adapter, bool asJson) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var result = Sync(cwd);
+            var result = Sync(cwd, adapter);
 
             if (asJson)
             {
@@ -53,16 +58,16 @@ public static class SyncAiCommand
             }
 
             Environment.ExitCode = result.Success ? 0 : 1;
-        }, jsonOption);
+        }, adapterOption, jsonOption);
 
         return cmd;
     }
 
-    private static SyncAiResult Sync(string directory)
+    private static SyncAiResult Sync(string directory, string adapter)
     {
         try
         {
-            var syncResult = new AiGuidancePackService().Sync(directory);
+            var syncResult = new AiGuidancePackService().Sync(directory, adapter);
             return new SyncAiResult
             {
                 Success = true,
@@ -88,7 +93,7 @@ public static class SyncAiCommand
                 ],
                 NextSteps =
                 [
-                    "Fix local file permissions or rerun automaton sync-ai"
+                    "Fix local file permissions, use a valid --adapter value, or rerun automaton sync-ai"
                 ]
             };
         }

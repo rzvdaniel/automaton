@@ -22,19 +22,24 @@ public sealed class AiGuidancePackService
         ["llms.automaton-starter-prompts.md"] = "llms/automaton-starter-prompts.md"
     };
 
-    public AiGuidanceSyncResult Sync(string directory)
+    public AiGuidanceSyncResult Sync(string directory, string adapter = AiGuidanceAdapters.None)
     {
+        if (!AiGuidanceAdapters.IsKnown(adapter))
+        {
+            throw new ArgumentException($"Unknown adapter '{adapter}'. Use one of: none, claude, copilot, github-skills, all.", nameof(adapter));
+        }
+
         var mode = DetectMode(directory);
         var generatedFiles = new List<string>();
-        var guidanceRoot = Path.Combine(directory, ".automaton", "ai-guidance");
         var agentsRoot = Path.Combine(directory, ".automaton", "agents");
-        Directory.CreateDirectory(guidanceRoot);
+        var referencesRoot = Path.Combine(agentsRoot, "references");
         Directory.CreateDirectory(agentsRoot);
+        Directory.CreateDirectory(referencesRoot);
 
         var sources = LoadSources();
         foreach (var source in sources)
         {
-            var targetPath = Path.Combine(guidanceRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            var targetPath = Path.Combine(referencesRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
             var targetDirectory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrWhiteSpace(targetDirectory))
             {
@@ -56,45 +61,19 @@ public sealed class AiGuidancePackService
         File.WriteAllText(canonicalSkillPath, BuildCanonicalSkillContent(mode), Encoding.UTF8);
         generatedFiles.Add(canonicalSkillPath);
 
-        var canonicalManifestPath = Path.Combine(agentsRoot, "manifest.json");
-        File.WriteAllText(canonicalManifestPath, BuildCanonicalManifest(mode), Encoding.UTF8);
-        generatedFiles.Add(canonicalManifestPath);
-
         var agentsPath = Path.Combine(directory, "AGENTS.md");
         File.WriteAllText(agentsPath, BuildAgentsContent(mode), Encoding.UTF8);
         generatedFiles.Add(agentsPath);
 
-        var claudePath = Path.Combine(directory, "CLAUDE.md");
-        File.WriteAllText(claudePath, BuildClaudeContent(mode), Encoding.UTF8);
-        generatedFiles.Add(claudePath);
+        SyncOptionalAdapters(directory, mode, adapter, generatedFiles);
+        DeleteLegacyAiGuidance(directory);
 
-        var copilotPath = Path.Combine(directory, ".github", "copilot-instructions.md");
-        Directory.CreateDirectory(Path.GetDirectoryName(copilotPath)!);
-        File.WriteAllText(copilotPath, BuildCopilotInstructions(mode), Encoding.UTF8);
-        generatedFiles.Add(copilotPath);
-
-        var skillPath = Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md");
-        Directory.CreateDirectory(Path.GetDirectoryName(skillPath)!);
-        File.WriteAllText(skillPath, BuildSkillContent(mode), Encoding.UTF8);
-        generatedFiles.Add(skillPath);
-
-        var manifestPath = Path.Combine(guidanceRoot, "manifest.json");
-        var manifest = new
-        {
-            generatedAtUtc = DateTime.UtcNow.ToString("O"),
-            mode,
-            sourceHash = ComputeHash(sources.Select(source => source.RelativePath + "\n" + source.Content)),
-            sources = sources.Select(source => source.RelativePath).ToList(),
-            generatedFiles = generatedFiles.Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToList(),
-            generator = new
-            {
-                name = "Automaton.Cli",
-                version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
-            }
-        };
-
-        File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions), Encoding.UTF8);
+        var manifestPath = Path.Combine(agentsRoot, "manifest.json");
         generatedFiles.Add(manifestPath);
+        File.WriteAllText(manifestPath, BuildCanonicalManifest(
+            mode,
+            sources,
+            generatedFiles.Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToList()), Encoding.UTF8);
 
         return new AiGuidanceSyncResult
         {
@@ -148,6 +127,139 @@ public sealed class AiGuidancePackService
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    private static void DeleteLegacyGeneratedAdapters(string directory)
+    {
+        DeleteIfGenerated(Path.Combine(directory, "CLAUDE.md"));
+        DeleteIfGenerated(Path.Combine(directory, ".github", "copilot-instructions.md"));
+        DeleteIfGenerated(Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md"));
+
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills", "automaton-app"));
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills"));
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github"));
+    }
+
+    private static void SyncOptionalAdapters(
+        string directory,
+        string mode,
+        string adapter,
+        ICollection<string> generatedFiles)
+    {
+        if (string.Equals(adapter, AiGuidanceAdapters.None, StringComparison.OrdinalIgnoreCase))
+        {
+            DeleteLegacyGeneratedAdapters(directory);
+            return;
+        }
+
+        if (string.Equals(adapter, AiGuidanceAdapters.Claude, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
+        {
+            var claudePath = Path.Combine(directory, "CLAUDE.md");
+            File.WriteAllText(claudePath, BuildClaudeAdapter(mode), Encoding.UTF8);
+            generatedFiles.Add(claudePath);
+        }
+        else
+        {
+            DeleteIfGenerated(Path.Combine(directory, "CLAUDE.md"));
+        }
+
+        if (string.Equals(adapter, AiGuidanceAdapters.Copilot, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
+        {
+            var copilotPath = Path.Combine(directory, ".github", "copilot-instructions.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(copilotPath)!);
+            File.WriteAllText(copilotPath, BuildCopilotAdapter(mode), Encoding.UTF8);
+            generatedFiles.Add(copilotPath);
+        }
+        else
+        {
+            DeleteIfGenerated(Path.Combine(directory, ".github", "copilot-instructions.md"));
+        }
+
+        if (string.Equals(adapter, AiGuidanceAdapters.GitHubSkills, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
+        {
+            var skillPath = Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(skillPath)!);
+            File.WriteAllText(skillPath, BuildGitHubSkillAdapter(mode), Encoding.UTF8);
+            generatedFiles.Add(skillPath);
+        }
+        else
+        {
+            DeleteIfGenerated(Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md"));
+        }
+
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills", "automaton-app"));
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills"));
+        TryDeleteEmptyDirectory(Path.Combine(directory, ".github"));
+    }
+
+    private static void DeleteLegacyAiGuidance(string directory)
+    {
+        var legacyRoot = Path.Combine(directory, ".automaton", "ai-guidance");
+        if (!Directory.Exists(legacyRoot))
+        {
+            return;
+        }
+
+        foreach (var source in ResourceMap.Values)
+        {
+            var path = Path.Combine(legacyRoot, source.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+
+        DeleteLegacyManifest(Path.Combine(legacyRoot, "manifest.json"));
+        TryDeleteEmptyDirectory(Path.Combine(legacyRoot, "llms"));
+        TryDeleteEmptyDirectory(legacyRoot);
+    }
+
+    private static void DeleteLegacyManifest(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (document.RootElement.TryGetProperty("generator", out var generator)
+                && generator.TryGetProperty("name", out var name)
+                && string.Equals(name.GetString(), "Automaton.Cli", StringComparison.Ordinal))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (JsonException)
+        {
+            // Leave unrecognized user files in place.
+        }
+    }
+
+    private static void DeleteIfGenerated(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var content = File.ReadAllText(path);
+        if (content.Contains("This file is generated by `automaton`", StringComparison.Ordinal))
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static void TryDeleteEmptyDirectory(string path)
+    {
+        if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any())
+        {
+            Directory.Delete(path);
+        }
+    }
+
     private static string BuildAgentsContent(string mode)
     {
         var scopeLine = mode switch
@@ -168,13 +280,13 @@ Canonical local guidance:
 
 - `.automaton/agents/instructions.md`
 - `.automaton/agents/skills/automaton-app/SKILL.md`
-- `.automaton/ai-guidance/llms.txt`
+- `.automaton/agents/references/llms.txt`
 
 Working rules:
 
 - Read `.automaton/agents/instructions.md` first.
 - Then read `.automaton/agents/skills/automaton-app/SKILL.md`.
-- Use `.automaton/ai-guidance/llms.txt` and the linked files for the detailed Automaton contract.
+- Use `.automaton/agents/references/llms.txt` and the linked files for the detailed Automaton contract.
 - If any local prompt or stale note conflicts with these generated files, prefer the generated files.
 - Run `automaton sync-ai` to refresh this local guidance pack after a CLI upgrade or if the generated files were removed.
 - Keep `automaton.json` in each app root.
@@ -183,7 +295,17 @@ Working rules:
 """;
     }
 
-    private static string BuildClaudeContent(string mode)
+    private static string BuildClaudeAdapter(string mode)
+    {
+        return BuildAdapterMarkdown("CLAUDE.md", mode);
+    }
+
+    private static string BuildCopilotAdapter(string mode)
+    {
+        return BuildAdapterMarkdown("GitHub Copilot", mode);
+    }
+
+    private static string BuildAdapterMarkdown(string title, string mode)
     {
         var scopeLine = mode switch
         {
@@ -193,56 +315,23 @@ Working rules:
         };
 
         return $$"""
-# CLAUDE.md
+# Automaton Local Guidance for {{title}}
 
 This file is generated by `automaton`. Do not edit it manually.
 
 {{scopeLine}}
 
-Read in this order:
+Read first:
 
 1. `.automaton/agents/instructions.md`
 2. `.automaton/agents/skills/automaton-app/SKILL.md`
-3. `.automaton/ai-guidance/llms.txt`
-4. The linked files under `.automaton/ai-guidance/llms/`
+3. `.automaton/agents/references/llms.txt`
 
-Rules:
-
-- Prefer the generated local Automaton guidance over stale local notes.
-- Run `automaton sync-ai` if these files are missing or outdated.
-- Keep `automaton.json` at the app root.
-- Use the CLI as the primary workflow: `automaton setup`, `automaton new` or `automaton link`, then `automaton deploy`.
-- For backend apps, let `automaton deploy` choose or prompt for a connected runner; if none exists, tell the user to create or deploy one in Automaton Studio.
+If these files are missing or stale, run `automaton sync-ai`.
 """;
     }
 
-    private static string BuildCopilotInstructions(string mode)
-    {
-        var modeRule = mode switch
-        {
-            AiGuidanceModes.Workspace => "Treat this folder as a workspace that may contain multiple Automaton apps in subfolders.",
-            AiGuidanceModes.App => "Treat this folder as the Automaton app root.",
-            _ => "Treat this folder as the current Automaton project root."
-        };
-
-        return $$"""
-# Generated Automaton Instructions
-
-This file is generated by `automaton`. Do not edit it manually.
-
-{{modeRule}}
-
-- Start with `.automaton/agents/instructions.md`.
-- Then read `.automaton/agents/skills/automaton-app/SKILL.md`.
-- Use `.automaton/ai-guidance/llms.txt` and the linked local files before making structure or deploy decisions.
-- If the generated local guidance pack looks stale or is missing, run `automaton sync-ai`.
-- Keep `automaton.json` at the app root.
-- For backend apps, let `automaton deploy` choose or prompt for a connected runner; if none exists, tell the user to create or deploy one in Automaton Studio.
-- Use `automaton deploy` as the shipping command; run `automaton validate` only as an optional diagnostic preflight.
-""";
-    }
-
-    private static string BuildSkillContent(string mode)
+    private static string BuildGitHubSkillAdapter(string mode)
     {
         return $$"""
 ---
@@ -256,27 +345,13 @@ This file is generated by `automaton`. Do not edit it manually.
 
 Mode: `{{mode}}`
 
-## Read First
+Read first:
 
 1. `.automaton/agents/instructions.md`
 2. `.automaton/agents/skills/automaton-app/SKILL.md`
-3. `.automaton/ai-guidance/llms.txt`
-4. `.automaton/ai-guidance/llms/automaton-cli-install.md`
-5. `.automaton/ai-guidance/llms/automaton-cli-deploy.md`
-6. `.automaton/ai-guidance/llms/automaton-apps-overview.md`
-7. `.automaton/ai-guidance/llms/automaton-frontend-structure.md`
-8. `.automaton/ai-guidance/llms/automaton-backend-controllers.md`
-9. `.automaton/ai-guidance/llms/automaton-starter-prompts.md`
+3. `.automaton/agents/references/llms.txt`
 
-## Operating Rules
-
-- Follow the generated local `llms` copies as the source of truth for Automaton app structure.
-- Treat this file as a compatibility shim for tools that scan `.github/skills/`.
-- Run `automaton sync-ai` to refresh these local guidance files when needed.
-- Keep `automaton.json` in the app root and commit it.
-- Keep frontend-only apps simple; add `backend/` only when the app truly needs Python controllers.
-- For backend apps, let `automaton deploy` choose or prompt for a connected runner; tell the user to create/deploy one in Automaton Studio only if none exists.
-- Prefer the intent-first CLI flow: `automaton setup`, `automaton new` or `automaton link`, then `automaton deploy`.
+If these files are missing or stale, run `automaton sync-ai`.
 """;
     }
 
@@ -300,9 +375,10 @@ Help an AI tool work correctly in this folder as {{modeDescription}}.
 
 ## Read Order
 
-1. Read `.automaton/ai-guidance/llms.txt`.
-2. Read the linked files under `.automaton/ai-guidance/llms/` before making structure, backend, or deploy decisions.
-3. Use tool-specific wrapper files like `AGENTS.md`, `CLAUDE.md`, or `.github/copilot-instructions.md` only as discovery entrypoints, not as the canonical source.
+1. Read `.automaton/agents/skills/automaton-app/SKILL.md`.
+2. Read `.automaton/agents/references/llms.txt`.
+3. Read the linked files under `.automaton/agents/references/llms/` before making structure, backend, or deploy decisions.
+4. Use `AGENTS.md` only as the root discovery entrypoint, not as the canonical source.
 
 ## Core Rules
 
@@ -318,8 +394,8 @@ Help an AI tool work correctly in this folder as {{modeDescription}}.
 ## Compatibility
 
 - `.automaton/agents/` is the canonical local agent guidance tree.
-- Root files like `AGENTS.md` and `CLAUDE.md` are lightweight wrappers for AI tools that auto-discover those names.
-- `.github/skills/` is a compatibility export for tools that look for GitHub-style skill folders.
+- `AGENTS.md` is the only default root adapter and points back to `.automaton/agents/`.
+- Tool-specific adapters such as `CLAUDE.md` or `.github/copilot-instructions.md` are intentionally not generated by default.
 """;
     }
 
@@ -346,12 +422,12 @@ This file is generated by `automaton` as canonical reusable guidance for local A
 ## Inputs Expected
 
 - The current workspace contents.
-- `.automaton/ai-guidance/llms.txt`
-- The linked files under `.automaton/ai-guidance/llms/`
+- `.automaton/agents/references/llms.txt`
+- The linked files under `.automaton/agents/references/llms/`
 
 ## Workflow
 
-1. Read `.automaton/ai-guidance/llms.txt` first.
+1. Read `.automaton/agents/references/llms.txt` first.
 2. Use the linked local guidance files before making decisions about structure, backend controllers, or deploy packaging.
 3. Keep `automaton.json` in the app root.
 4. Prefer frontend-only structure unless the app truly needs Python backend controllers in `backend/`.
@@ -366,25 +442,34 @@ This file is generated by `automaton` as canonical reusable guidance for local A
 """;
     }
 
-    private static string BuildCanonicalManifest(string mode)
+    private static string BuildCanonicalManifest(
+        string mode,
+        IReadOnlyList<(string RelativePath, string Content)> sources,
+        IReadOnlyList<string> generatedFiles)
     {
         var manifest = new
         {
             version = 1,
+            generatedAtUtc = DateTime.UtcNow.ToString("O"),
             mode,
             canonicalRoot = ".automaton/agents",
+            sourceHash = ComputeHash(sources.Select(source => source.RelativePath + "\n" + source.Content)),
+            sources = sources.Select(source => source.RelativePath).ToList(),
+            generatedFiles,
             entrypoints = new
             {
                 instructions = ".automaton/agents/instructions.md",
                 skill = ".automaton/agents/skills/automaton-app/SKILL.md",
-                llms = ".automaton/ai-guidance/llms.txt"
+                references = ".automaton/agents/references/llms.txt"
             },
             adapters = new[]
             {
-                new { tool = "codex", path = "AGENTS.md" },
-                new { tool = "claude", path = "CLAUDE.md" },
-                new { tool = "copilot", path = ".github/copilot-instructions.md" },
-                new { tool = "github-skills", path = ".github/skills/automaton-app/SKILL.md" }
+                new { tool = "generic", path = "AGENTS.md" }
+            },
+            generator = new
+            {
+                name = "Automaton.Cli",
+                version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown"
             }
         };
 

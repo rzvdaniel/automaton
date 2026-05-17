@@ -20,10 +20,18 @@ When the user asks to use the Automaton CLI, the AI should prefer `automaton new
 
 The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
 
-`automaton setup`, `automaton new`, and `automaton link` also sync a local AI guidance pack into `.automaton/ai-guidance/`, generate canonical tool-neutral files under `.automaton/agents/`, and write compatibility wrappers like `AGENTS.md`, `CLAUDE.md`, and `.github/` guidance files. If those generated files are missing or stale, run:
+`automaton setup`, `automaton new`, and `automaton link` also sync canonical local AI guidance under `.automaton/agents/`, including references under `.automaton/agents/references/`, and write a small root `AGENTS.md` adapter. If those generated files are missing or stale, run:
 
 ```bash
 automaton sync-ai
+```
+
+Optional tool adapters can be generated later without changing the default setup flow:
+
+```bash
+automaton sync-ai --adapter claude
+automaton sync-ai --adapter copilot
+automaton sync-ai --adapter all
 ```
 
 4. If the app already exists in Automaton Studio, link the local project to it:
@@ -99,7 +107,7 @@ If `automaton validate` passes but `automaton deploy` fails during upload with t
 - Build the app in the current local project folder.
 - Keep `automaton.json` in the project root.
 - Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
-- Follow the local generated guidance pack after setup. Start with `.automaton/agents/` when present, then use `llms.txt` and the linked files as the detailed canonical source and fallback when the tool does not honor local guidance files.
+- Follow the local generated guidance pack after setup. Start with `.automaton/agents/` when present, then use `.automaton/agents/references/llms.txt` and the linked files as the detailed canonical source. Use the public `llms.txt` only as a fallback when local guidance is unavailable.
 - Treat `automaton sync-ai` as the manual refresh path for the generated local guidance pack, not as a required onboarding step.
 - If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
 - If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.
@@ -162,7 +170,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ## Default instruction to the AI
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 When the app is deployed but not yet published, the AI should direct the user to preview it in Automaton Studio and inspect logs there before recommending publish.

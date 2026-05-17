@@ -39,8 +39,9 @@ public class NewAppServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
 
         var config = new ConfigService().LoadProjectConfig(projectRoot);
         Assert.That(config.AppId, Is.EqualTo("app-123"));

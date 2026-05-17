@@ -167,6 +167,19 @@ public class CommandJsonShapeTests
         Assert.That(checks.Any(check => string.Equals(check.GetProperty("name").GetString(), CommandDiagnosticCheckNames.AiGuidance, StringComparison.Ordinal)), Is.True);
     }
 
+    [Test]
+    public async Task SyncAiCommand_WhenAdapterIsRequested_GeneratesAdapter()
+    {
+        var projectRoot = CreateProjectRoot();
+        var command = SyncAiCommand.Build(new ConfigService());
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--adapter", "claude", "--json"]);
+
+        using var doc = JsonDocument.Parse(output);
+        Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
+    }
+
     private static void AssertDiagnosticFailure(string output, string expectedSummary, string expectedCheckName, params string[] requiredTopLevelProperties)
     {
         using var doc = JsonDocument.Parse(output);

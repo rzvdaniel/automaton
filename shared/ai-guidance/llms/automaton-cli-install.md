@@ -66,13 +66,22 @@ automaton setup
 `automaton setup`, `automaton new`, and `automaton link` sync local guidance into:
 
 - `.automaton/agents/`
-- `.automaton/ai-guidance/`
-- compatibility wrappers like `AGENTS.md`, `CLAUDE.md`, and `.github/`
+- `.automaton/agents/references/`
+- `AGENTS.md` as the only default root adapter
 
 If those generated files are missing or stale, run:
 
 ```bash
 automaton sync-ai
+```
+
+If you use an AI tool that needs its own discovery file, generate a tiny optional adapter:
+
+```bash
+automaton sync-ai --adapter claude
+automaton sync-ai --adapter copilot
+automaton sync-ai --adapter github-skills
+automaton sync-ai --adapter all
 ```
 
 ## Handoff to deploy workflow
