@@ -3,25 +3,28 @@
 
 name: 1.0.$(Date:yyyyMMdd)$(Rev:.r)
 
-trigger:
-  branches:
-    include:
-      - main
-      - develop
-  paths:
-    include:
-      - azure-pipelines-cli.yml
-      - src/Automaton.Cli/**
+# trigger:
+#   branches:
+#     include:
+#       - main
+#       - develop
+#   paths:
+#     include:
+#       - azure-pipelines-cli.yml
+#       - src/Automaton.Cli/**
 
-pr:
-  branches:
-    include:
-      - main
-      - develop
-  paths:
-    include:
-      - azure-pipelines-cli.yml
-      - src/Automaton.Cli/**
+# pr:
+#   branches:
+#     include:
+#       - main
+#       - develop
+#   paths:
+#     include:
+#       - azure-pipelines-cli.yml
+#       - src/Automaton.Cli/**
+
+trigger: none
+pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
