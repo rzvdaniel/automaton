@@ -14,6 +14,7 @@ type FallbackApp = {
   name: string
   creatorDisplayName: string
   category: string
+  summary?: string
   description: string
   thumbnailUrl: string
   screenshots: { id: string; imageUrl: string; caption: string; sortOrder: number }[]
@@ -24,6 +25,7 @@ type FallbackApp = {
 const router = useRouter()
 const { apps, featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
+const activePreviewUrl = ref<string | null>(null)
 
 const fallbackApps: FallbackApp[] = [
   {
@@ -31,6 +33,7 @@ const fallbackApps: FallbackApp[] = [
     name: 'Pac-Man Editor and Game',
     creatorDisplayName: 'Razvan Predescu',
     category: 'Games',
+    summary: 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.',
     description: 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.',
     thumbnailUrl: pacManImage,
     screenshots: [
@@ -49,6 +52,13 @@ const heroApps = computed<(MarketplaceAppCard | FallbackApp)[]>(() => {
 })
 
 const activeApp = computed(() => heroApps.value[activeIndex.value] ?? heroApps.value[0])
+const activeMainImageUrl = computed(() => activePreviewUrl.value || activeApp.value?.thumbnailUrl || '')
+const activeAppCopy = computed(() => {
+  const app = activeApp.value
+  if (!app) return ''
+
+  return app.summary || app.description || 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.'
+})
 const activeScreenshots = computed(() => {
   const app = activeApp.value
   if (!app) return []
@@ -71,14 +81,25 @@ function appImageUrl(url?: string | null) {
 
 function previousApp() {
   activeIndex.value = (activeIndex.value - 1 + heroApps.value.length) % heroApps.value.length
+  activePreviewUrl.value = null
 }
 
 function nextApp() {
   activeIndex.value = (activeIndex.value + 1) % heroApps.value.length
+  activePreviewUrl.value = null
 }
 
 function selectApp(index: number) {
   activeIndex.value = index
+  activePreviewUrl.value = null
+}
+
+function previewScreenshot(url: string) {
+  activePreviewUrl.value = url
+}
+
+function resetPreview() {
+  activePreviewUrl.value = null
 }
 
 function openActiveApp() {
@@ -138,28 +159,34 @@ onMounted(() => {
           </div>
 
           <div class="hero-showcase">
-            <div class="carousel-frame">
+            <div class="carousel-frame" @mouseleave="resetPreview">
               <div class="carousel-label">
                 <span>Featured & recommended</span>
-                <span>{{ String(activeIndex + 1).padStart(2, '0') }} / {{ String(heroApps.length).padStart(2, '0') }}</span>
+                <span class="carousel-header-controls">
+                  <button v-if="heroApps.length > 1" type="button" aria-label="Previous app" @click="previousApp">
+                    <i class="pi pi-chevron-left" />
+                  </button>
+                  <span>{{ String(activeIndex + 1).padStart(2, '0') }} / {{ String(heroApps.length).padStart(2, '0') }}</span>
+                  <button v-if="heroApps.length > 1" type="button" aria-label="Next app" @click="nextApp">
+                    <i class="pi pi-chevron-right" />
+                  </button>
+                </span>
               </div>
-
-              <button v-if="heroApps.length > 1" class="carousel-arrow left" type="button" aria-label="Previous app" @click="previousApp">
-                <i class="pi pi-chevron-left" />
-              </button>
-              <button v-if="heroApps.length > 1" class="carousel-arrow right" type="button" aria-label="Next app" @click="nextApp">
-                <i class="pi pi-chevron-right" />
-              </button>
 
               <article v-if="activeApp" class="featured-app" role="button" tabindex="0" @click="openActiveApp" @keydown.enter.prevent="openActiveApp">
                 <div class="featured-image">
-                  <img :src="appImageUrl(activeApp.thumbnailUrl)" :alt="`${activeApp.name} screenshot`" />
+                  <img
+                    :src="appImageUrl(activeMainImageUrl)"
+                    :alt="`${activeApp.name} screenshot`"
+                    @focus="resetPreview"
+                    @mouseenter="resetPreview"
+                  />
                 </div>
                 <div class="featured-detail">
                   <div>
                     <h2>{{ activeApp.name }}</h2>
                     <p v-if="activeApp.creatorDisplayName" class="creator-line">by {{ activeApp.creatorDisplayName }}</p>
-                    <p class="featured-description">{{ activeApp.description || 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.' }}</p>
+                    <p class="featured-description">{{ activeAppCopy }}</p>
                   </div>
                   <div class="featured-thumbs">
                     <button
@@ -168,21 +195,25 @@ onMounted(() => {
                       class="thumb-button"
                       type="button"
                       :aria-label="screenshot.caption || activeApp.name"
+                      @focus="previewScreenshot(screenshot.imageUrl)"
+                      @mouseenter="previewScreenshot(screenshot.imageUrl)"
                     >
                       <img :src="appImageUrl(screenshot.imageUrl)" :alt="screenshot.caption || activeApp.name" />
                     </button>
                   </div>
                   <div class="carousel-controls">
-                    <span class="carousel-dots">
-                      <button
-                        v-for="(_app, index) in heroApps"
-                        :key="`${_app.id}-${index}`"
-                        class="dot"
-                        :class="{ active: index === activeIndex }"
-                        type="button"
-                        :aria-label="`Show app ${index + 1}`"
-                        @click.stop="selectApp(index)"
-                      />
+                    <span class="carousel-bottom-controls">
+                      <span class="carousel-dots">
+                        <button
+                          v-for="(_app, index) in heroApps"
+                          :key="`${_app.id}-${index}`"
+                          class="dot"
+                          :class="{ active: index === activeIndex }"
+                          type="button"
+                          :aria-label="`Show app ${index + 1}`"
+                          @click.stop="selectApp(index)"
+                        />
+                      </span>
                     </span>
                     <RouterLink to="/apps">View all apps</RouterLink>
                   </div>
@@ -378,6 +409,7 @@ onMounted(() => {
     radial-gradient(circle at 86% 10%, rgba(69, 230, 138, 0.1), transparent 28rem),
     linear-gradient(180deg, #090b10 0%, #07080b 44%, #050608 100%);
   color: #f5f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
   --v2-bg: #07080b;
   --v2-panel-3: #20242f;
@@ -519,7 +551,7 @@ h1 {
   width: max-content;
   max-width: none;
   margin: 18px 0;
-  font-size: clamp(3.0rem, 6vw, 6.0rem);
+  font-size: clamp(3rem, 6.1vw, 6rem);
   line-height: 0.92;
   letter-spacing: -0.06em;
 }
@@ -603,6 +635,7 @@ h1 span:last-child {
 
 .carousel-label {
   justify-content: space-between;
+  gap: 16px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--v2-line);
   color: var(--v2-muted);
@@ -610,6 +643,37 @@ h1 span:last-child {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.carousel-header-controls,
+.carousel-bottom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.carousel-header-controls button {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--v2-soft);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.carousel-header-controls button:hover {
+  border-color: rgba(80, 215, 255, 0.42);
+  background: rgba(80, 215, 255, 0.1);
+  color: #ffffff;
+}
+
+.carousel-header-controls button i {
+  font-size: 0.72rem;
 }
 
 .featured-app {
@@ -632,7 +696,7 @@ h1 span:last-child {
   width: min(100%, 360px);
   max-height: 320px;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: 6px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
 }
 
@@ -645,6 +709,10 @@ h1 span:last-child {
   overflow: hidden;
   padding: 24px;
   background: #172231;
+}
+
+.featured-detail > div:first-child {
+  min-height: 0;
 }
 
 .featured-detail h2 {
@@ -665,9 +733,11 @@ h1 span:last-child {
 
 .featured-description {
   display: -webkit-box;
+  font-size: 0.94rem;
+  line-height: 1.45;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 4;
 }
 
 .creator-line {
@@ -680,7 +750,7 @@ h1 span:last-child {
 .featured-thumbs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
@@ -692,16 +762,17 @@ h1 span:last-child {
 
 .featured-thumbs img {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
   background: #0b0f15;
 }
 
 .carousel-controls {
   justify-content: space-between;
   gap: 14px;
+  min-height: 24px;
   color: var(--v2-muted);
   font-weight: 800;
 }
@@ -724,29 +795,6 @@ h1 span:last-child {
 
 .dot.active {
   background: var(--v2-cyan);
-}
-
-.carousel-arrow {
-  position: absolute;
-  top: 50%;
-  z-index: 2;
-  display: grid;
-  width: 42px;
-  height: 88px;
-  place-items: center;
-  transform: translateY(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(22, 36, 50, 0.78);
-  color: #fff;
-  cursor: pointer;
-}
-
-.carousel-arrow.left {
-  left: 0;
-}
-
-.carousel-arrow.right {
-  right: 0;
 }
 
 .quick-setup {
@@ -811,7 +859,7 @@ section {
 }
 
 .section-head h2 {
-  max-width: 680px;
+  max-width: 760px;
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.5rem);
   line-height: 1;
@@ -1187,6 +1235,17 @@ footer {
 
   .featured-app {
     height: auto;
+    max-height: 720px;
+    overflow: hidden;
+  }
+
+  .featured-image {
+    min-height: 0;
+    max-height: 300px;
+  }
+
+  .featured-image img {
+    max-height: 260px;
   }
 
   h1 {
@@ -1202,6 +1261,7 @@ footer {
   .nav-links {
     display: none;
   }
+
 }
 
 @media (max-width: 640px) {
@@ -1233,6 +1293,32 @@ footer {
 
   .prompt-label {
     place-items: start;
+  }
+
+  .carousel-label {
+    align-items: flex-start;
+  }
+
+  .carousel-header-controls {
+    flex-shrink: 0;
+  }
+
+  .featured-app {
+    max-height: 650px;
+  }
+
+  .featured-image {
+    max-height: 240px;
+    padding: 14px;
+  }
+
+  .featured-image img {
+    max-height: 210px;
+  }
+
+  .featured-detail {
+    gap: 12px;
+    padding: 18px;
   }
 
   .steps,
