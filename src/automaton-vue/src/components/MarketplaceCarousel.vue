@@ -9,10 +9,12 @@ const props = withDefaults(
     apps: MarketplaceAppCard[]
     compact?: boolean
     title?: string
+    variant?: 'showcase' | 'hero'
   }>(),
   {
     compact: false,
     title: 'Featured & Recommended',
+    variant: 'showcase',
   },
 )
 
@@ -105,7 +107,16 @@ function openCreator(publicUsername: string) {
 </script>
 
 <template>
-  <div v-if="activeApp" class="market-carousel" :class="{ 'market-carousel-compact': compact }">
+  <div
+    v-if="activeApp"
+    class="market-carousel"
+    :class="[
+      `market-carousel-${variant}`,
+      {
+        'market-carousel-compact': compact,
+      },
+    ]"
+  >
     <span class="section-label carousel-heading">{{ title }}</span>
 
     <button
@@ -425,9 +436,76 @@ function openCreator(publicUsername: string) {
   background: #66c0f4;
 }
 
+.market-carousel-hero {
+  padding: 0;
+}
+
+.market-carousel-hero .carousel-heading {
+  display: inline-flex;
+  margin-bottom: 10px;
+  color: #50d7ff;
+}
+
+.market-carousel-hero .carousel-slide {
+  height: 360px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(15, 18, 24, 0.94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.market-carousel-hero .carousel-main {
+  background: #080b10;
+}
+
+.market-carousel-hero .carousel-main-media {
+  padding: 14px;
+  background: #080b10;
+}
+
+.market-carousel-hero .carousel-screenshots {
+  padding: 18px;
+  gap: 12px;
+  background:
+    linear-gradient(135deg, rgba(36, 48, 64, 0.98), rgba(18, 32, 45, 0.98)),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 8px);
+}
+
+.market-carousel-hero .carousel-screenshots h3 {
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.market-carousel-hero .carousel-copy p {
+  -webkit-line-clamp: 4;
+}
+
+.market-carousel-hero .carousel-tag {
+  color: #45e68a;
+  background: rgba(69, 230, 138, 0.14);
+}
+
+.market-carousel-hero .carousel-arrow {
+  width: 42px;
+  height: 88px;
+  background: rgba(22, 36, 50, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.market-carousel-hero .carousel-arrow-left {
+  left: -12px;
+}
+
+.market-carousel-hero .carousel-arrow-right {
+  right: -12px;
+}
+
 @media (max-width: 900px) {
   .carousel-slide,
-  .market-carousel-compact .carousel-slide {
+  .market-carousel-compact .carousel-slide,
+  .market-carousel-hero .carousel-slide {
     height: auto;
     grid-template-columns: 1fr;
   }

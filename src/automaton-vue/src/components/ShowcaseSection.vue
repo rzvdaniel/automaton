@@ -1,35 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
-import type { MarketplaceAppCard } from '@/types/marketplace'
+import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
 
 const props = defineProps<{ fullPage?: boolean }>()
 const router = useRouter()
-const marketplaceApiBaseUrl = `${publicAppConfig.apiBaseUrl}api/public/marketplace`
+const { activeCategory, apps, categories, featuredApps, loading, loadApps, loadCategories, search } =
+  useMarketplaceApps(props.fullPage ? 100 : 10)
 
-function resolveAssetUrl(url?: string | null) {
-  if (!url) {
-    return ''
-  }
-
-  if (url.startsWith('http')) {
-    return url
-  }
-
-  return `${publicAppConfig.apiBaseUrl}${url.replace(/^\/+/, '')}`
-}
-
-const categories = ref<string[]>([])
-const apps = ref<MarketplaceAppCard[]>([])
-const activeCategory = ref('')
-const search = ref('')
-const loading = ref(false)
-
-const featuredApps = computed(() => apps.value.filter((app) => app.isFeatured).slice(0, 12))
 const carouselApps = computed(() => {
-  const featured = featuredApps.value
+  const featured = featuredApps.value.slice(0, 12)
   if (featured.length > 0) return featured.slice(0, props.fullPage ? 12 : 10)
   return props.fullPage ? [] : apps.value.slice(0, 10)
 })
@@ -44,31 +25,12 @@ const subtitle = computed(() =>
     : 'A rotating shelf of polished public apps, featured by category and ranked by community momentum.',
 )
 
-async function loadApps() {
-  loading.value = true
-
-  try {
-    const query = new URLSearchParams()
-
-    if (activeCategory.value) {
-      query.set('category', activeCategory.value)
-    }
-
-    if (search.value.trim()) {
-      query.set('search', search.value.trim())
-    }
-
-    query.set('take', props.fullPage ? '100' : '10')
-
-    const response = await fetch(`${marketplaceApiBaseUrl}/apps?${query.toString()}`)
-    apps.value = await response.json()
-  } finally {
-    loading.value = false
-  }
-}
-
 function openDetails(appId: string) {
   void router.push(`/apps/${appId}`)
+}
+
+function refreshApps() {
+  void loadApps()
 }
 
 function openCreator(publicUsername: string) {
@@ -76,8 +38,7 @@ function openCreator(publicUsername: string) {
 }
 
 onMounted(async () => {
-  const categoriesResponse = await fetch(`${marketplaceApiBaseUrl}/categories`)
-  categories.value = await categoriesResponse.json()
+  await loadCategories()
   await loadApps()
 })
 </script>
@@ -114,9 +75,9 @@ onMounted(async () => {
             class="search-input"
             type="search"
             placeholder="Search apps"
-            @keyup.enter="loadApps"
+            @keyup.enter="refreshApps"
           />
-          <button type="button" class="search-button" aria-label="Search apps" @click="loadApps">
+          <button type="button" class="search-button" aria-label="Search apps" @click="refreshApps">
             <i class="pi pi-arrow-right" />
           </button>
         </label>
@@ -168,7 +129,7 @@ onMounted(async () => {
           <div class="app-media">
             <img
               v-if="app.thumbnailUrl"
-              :src="resolveAssetUrl(app.thumbnailUrl)"
+              :src="resolveMarketplaceAssetUrl(app.thumbnailUrl)"
               class="app-thumbnail"
               :alt="app.name"
             />
