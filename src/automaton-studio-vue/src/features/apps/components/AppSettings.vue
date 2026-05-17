@@ -55,7 +55,7 @@ const cliLoginCommand = computed(() =>
 )
 
 const starterPrompt = computed(() =>
-  'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.'
+  'Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.'
 )
 
 // Local form state
@@ -961,12 +961,11 @@ async function handleSaveTemplateStatus() {
                 </div>
                 <div class="connect-snippet mt-2">
                   <pre>automaton link {{ app?.id }}
-automaton validate
 automaton deploy</pre>
                   <Button
                     :icon="copiedItem === 'deploy' ? 'pi pi-check' : 'pi pi-copy'"
                     text rounded size="small" class="connect-copy-btn"
-                    @click="copyText(`automaton link ${app?.id ?? '<app-id>'}\nautomaton validate\nautomaton deploy`, 'deploy')"
+                    @click="copyText(`automaton link ${app?.id ?? '<app-id>'}\nautomaton deploy`, 'deploy')"
                   />
                 </div>
               </div>
@@ -975,7 +974,7 @@ automaton deploy</pre>
                 <div class="font-semibold mb-1">3. Starter prompt</div>
                 <p class="text-color-secondary text-sm mb-2">
                   Paste this prompt into your AI tool. It intentionally keeps the CLI as the source
-                  of truth for app creation, linking, validation, and deploy.
+                  of truth for app creation, linking, deploy preflight, and deploy.
                 </p>
                 <div class="connect-snippet">
                   <pre>{{ starterPrompt }}</pre>

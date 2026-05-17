@@ -78,7 +78,7 @@ public static class WhoAmICommand
             catch (Exception ex)
             {
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, false, ex.Message));
-                nextSteps.Add("Run automaton login to refresh or set credentials");
+                nextSteps.Add("Run automaton setup to refresh or set credentials");
                 var failure = new CommandDiagnosticResult { Success = false, Summary = "Whoami failed", Checks = checks, NextSteps = nextSteps.ToList() };
                 if (asJson)
                 {

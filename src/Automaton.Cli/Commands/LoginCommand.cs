@@ -14,7 +14,7 @@ public static class LoginCommand
         var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        var cmd = new Command("login", "Store CLI credentials and validate them against the server")
+        var cmd = new Command("login", "Advanced: store CLI credentials and validate them against the server")
         {
             serverOption,
             keyOption,
@@ -98,7 +98,7 @@ public static class LoginCommand
             catch (Exception ex)
             {
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
-                nextSteps.Add("Verify the server URL and API key, then rerun automaton login");
+                nextSteps.Add("Run automaton setup with a valid API key");
                 var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
                 if (asJson)
                 {

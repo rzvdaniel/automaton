@@ -42,10 +42,10 @@ automaton setup
 
 That should authenticate the current project or workspace and sync the local generated AI guidance pack.
 
-Fallback when the user wants explicit API key configuration:
+Advanced fallback when the user explicitly wants to manage low-level CLI settings:
 
 ```bash
-automaton config --key ak_execute_xxx
+automaton setup --key ak_execute_xxx
 ```
 
 That command saves project-local CLI settings in `./.automaton/config.json` by default. Use `automaton config --global ...` only when the user explicitly wants shared machine-wide settings.
@@ -82,4 +82,4 @@ After install and setup:
 1. Keep working in the current folder.
 2. Use `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing one.
 3. Follow the local generated guidance first.
-4. Use the CLI deploy workflow guide for validate, runner, deploy, and publish behavior.
+4. Use the CLI deploy workflow guide for deploy and publish behavior.

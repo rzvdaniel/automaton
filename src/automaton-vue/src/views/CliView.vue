@@ -57,13 +57,13 @@ const directScripts = [
   },
 ]
 
-const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
 
-const existingAppStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. I already have an Automaton app. Use the Automaton CLI as the only execution path: start with automaton setup, link this folder to app id [app-id] with automaton link, scaffold or update the app locally, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
+const existingAppStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. I already have an Automaton app. Use the Automaton CLI as the only execution path: start with automaton setup, link this folder to app id [app-id] with automaton link, scaffold or update the app locally, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
 
-const frontendOnlyStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level files unless I explicitly ask for a framework or split source structure. Do not default to frontend/ for plain apps. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+const frontendOnlyStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML, CSS, and JavaScript with root-level files unless I explicitly ask for a framework or split source structure. Do not default to frontend/ for plain apps. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
 
-const frameworkStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, scaffold the app, make sure build and deployDir are correct, run automaton validate, handle runner assignment only if backend controllers exist, deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
+const frameworkStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as an Automaton app using [React or Vue]. Keep the source code in the repo. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, scaffold the app, make sure build and deployDir are correct, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
 
 const quickStartSteps = [
   {
@@ -92,7 +92,7 @@ const workflowSteps = [
   {
     title: 'Manual fallback',
     description: 'Use this only when you want to drive the CLI yourself instead of letting the AI handle the main flow.',
-    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id\nautomaton validate\nautomaton deploy',
+    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id\nautomaton deploy',
   },
   {
     title: 'Use Studio as the test loop',
@@ -132,17 +132,17 @@ const backendChecklist = [
   },
   {
     title: 'Backend app',
-    detail: 'List your connected runners before the first backend deploy.',
-    code: 'automaton runners',
+    detail: 'Deploy will select or prompt for a connected runner when Python controllers need one.',
+    code: 'automaton deploy',
   },
   {
-    title: 'Assign once',
-    detail: 'Pick one runner for the app so Python controllers have a target.',
-    code: 'automaton set-runner your-runner-id',
+    title: 'Choose explicitly',
+    detail: 'Pass a runner only when you already know which connected runner should handle backend deploy.',
+    code: 'automaton deploy --runner your-runner-id',
   },
   {
     title: 'Deploy normally',
-    detail: 'After assignment, reuse the same deploy command for every update.',
+    detail: 'Reuse the same deploy command for every update.',
     code: 'automaton deploy',
   },
 ]

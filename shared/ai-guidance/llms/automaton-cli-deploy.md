@@ -42,20 +42,15 @@ Real happy path:
 2. run `automaton setup`
 3. let the AI handle most of the remaining local work
 4. run `automaton new "My App"` or `automaton link <app-id>`
-5. run `automaton validate`
-6. if `backend/*.py` exists, assign a connected runner
-7. run `automaton deploy`
-8. preview and debug in Automaton Studio
+5. run `automaton deploy`
+6. if `backend/*.py` exists, let deploy auto-select or prompt for a connected runner
+7. preview and debug in Automaton Studio
 
 Use this canonical order:
 
 ```bash
 automaton setup
 automaton new "My App"
-automaton validate
-automaton current-runner
-automaton runners
-automaton set-runner <runner-id>
 automaton deploy
 automaton publish --yes
 automaton status
@@ -64,12 +59,12 @@ automaton status
 Interpretation rules:
 
 1. Run `automaton setup` first so the AI can authenticate and sync local guidance in one step.
-2. After `automaton setup`, the AI should be able to handle most of the remaining workflow: create or link the app, scaffold files, keep `automaton.json` correct, run validation, guide runner assignment, and deploy.
+2. After `automaton setup`, the AI should be able to handle most of the remaining workflow: create or link the app, scaffold files, keep `automaton.json` correct, and deploy.
 3. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton setup`.
 4. Use `automaton new` for new apps; reserve `automaton link` for existing remote apps.
 5. Run `automaton sync-ai` only when the generated local guidance files need a manual refresh.
-6. Run `automaton validate` before deploy.
-7. If backend controllers exist and no connected runner is assigned, pick one with `automaton set-runner <runner-id>` or tell the user to create or deploy one in Automaton Studio.
+6. Run `automaton deploy`; it performs deploy preflight and handles runner selection only when backend controllers require it.
+7. If backend controllers exist and no connected runner is available, tell the user to create or deploy one in Automaton Studio.
 8. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
 9. Ask the user before public publish, then use `automaton publish --yes` only after approval.
 
@@ -78,17 +73,16 @@ Interpretation rules:
 Until a dedicated local app runtime exists, this is the intended workflow:
 
 1. build locally in your IDE
-2. run `automaton validate`
-3. run `automaton deploy`
-4. open the app in Automaton Studio
-5. preview it there
-6. inspect app/backend logs there
-7. fix locally and redeploy
-8. publish only after the Studio preview looks correct
+2. run `automaton deploy`
+3. open the app in Automaton Studio
+4. preview it there
+5. inspect app/backend logs there
+6. fix locally and redeploy
+7. publish only after the Studio preview looks correct
 
 ## What `automaton validate` is for
 
-`automaton validate` is the cheap preflight check before upload.
+`automaton validate` is an optional diagnostic preflight. `automaton deploy` runs the deploy checks needed for the happy path.
 
 Use it to catch obvious problems early, such as:
 
@@ -111,8 +105,8 @@ If `automaton validate` passes but `automaton deploy` fails during upload with t
 - If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.
 - For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then set `deployDir` to that folder.
 - Use Python backend controllers in `backend/`.
-- If the app includes Python backend controllers, do not consider backend deploy complete until a runner assignment exists or you have clearly reported why it could not be made.
-- Prefer `automaton status` and `automaton validate` as preflight checks before declaring success.
+- If the app includes Python backend controllers, do not consider backend deploy complete until `automaton deploy` assigned or used a runner, or you have clearly reported why it could not be made.
+- Prefer `automaton status` after deploy before declaring success.
 - After deploy, use Automaton Studio preview and logs as the current test/debug loop before proposing publish.
 - Ask before public publish, then use `automaton publish --yes` after approval.
 - If upload fails after validation already passed, avoid repeatedly restructuring a plain app unless there is clear evidence that `deployDir`, the archive shape, or duplicate deploy roots are the actual problem.
@@ -126,14 +120,11 @@ automaton deploy --clean
 automaton deploy --skip-backend
 ```
 
-For backend apps, assign a runner before the first backend deploy:
+For backend apps, let deploy choose or prompt for a connected runner:
 
 ```bash
-automaton current-runner
-automaton runners
-automaton set-runner <runner-id>
-automaton validate
 automaton deploy
+automaton deploy --runner <runner-id-or-name>
 ```
 
 `automaton deploy` uploads the frontend archive and then deploys backend scripts using the same API key authentication path. If the app has no backend scripts, a successful deploy may end with `No backend scripts found`.
@@ -171,7 +162,7 @@ If `automaton.json` already exists, the AI should add missing `build` and `deplo
 ## Default instruction to the AI
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.
 ```
 
 When the app is deployed but not yet published, the AI should direct the user to preview it in Automaton Studio and inspect logs there before recommending publish.

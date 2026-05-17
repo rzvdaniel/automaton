@@ -58,7 +58,7 @@ public static class CurrentRunnerCommand
                 if (string.IsNullOrWhiteSpace(runnerId))
                 {
                     checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, "no runner is currently assigned to this app"));
-                    var noAssignment = new CommandDiagnosticResult { Success = true, Summary = "No runner assigned", Checks = checks, NextSteps = ["Run automaton runners", "Run automaton set-runner <runner-id>"] };
+                    var noAssignment = new CommandDiagnosticResult { Success = true, Summary = "No runner assigned", Checks = checks, NextSteps = ["Run automaton deploy and choose a connected runner when prompted", "If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy"] };
                     if (asJson)
                     {
                         CliJson.Write(new { success = true, summary = noAssignment.Summary, checks = noAssignment.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = noAssignment.NextSteps, appId = appConfig.AppId, runnerAssigned = false });

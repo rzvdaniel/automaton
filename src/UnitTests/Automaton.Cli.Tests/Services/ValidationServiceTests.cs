@@ -52,7 +52,7 @@ public class ValidationServiceTests
         Assert.That(result.Success, Is.False);
         AssertCheck(result, ValidationCheckNames.AppLink, false, "automaton.json not found");
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, false, "skipped because app linkage failed");
-        Assert.That(result.NextSteps, Has.Some.Contains("automaton create"));
+        Assert.That(result.NextSteps, Has.Some.Contains("automaton new"));
     }
 
     [Test]
@@ -105,7 +105,7 @@ public class ValidationServiceTests
         Assert.That(result.Success, Is.False);
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, true, "remote app found");
         AssertCheck(result, ValidationCheckNames.BackendRunner, false, "no runner is assigned");
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton runners"));
+        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton deploy and choose a connected runner when prompted"));
     }
 
     [Test]

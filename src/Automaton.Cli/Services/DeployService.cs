@@ -112,8 +112,8 @@ public sealed class DeployService
 
         if (!backendResult.Success || backendResult.RunnerCount <= 0)
         {
-            nextSteps.Add("Run automaton runners");
-            nextSteps.Add("Run automaton set-runner <runner-id>");
+            nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
+            nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.BackendDeploy,
                 false,
@@ -133,7 +133,7 @@ public sealed class DeployService
     {
         if (!configFileExists)
         {
-            nextSteps.Add("Run automaton create --name \"My App\" or automaton link <app-id>");
+            nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");
             return new DeployCheckResult(DeployCheckNames.AppLink, false, "automaton.json not found in the project root");
         }
 
@@ -156,13 +156,13 @@ public sealed class DeployService
     {
         if (string.IsNullOrWhiteSpace(server))
         {
-            nextSteps.Add("Configure the server with automaton config --server <url> or add server to automaton.json");
+            nextSteps.Add("Run automaton setup to configure the hosted server and credentials");
             return new DeployCheckResult(DeployCheckNames.Credentials, false, "server could not be resolved from environment, automaton.json, or CLI config");
         }
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            nextSteps.Add("Run automaton login or automaton config --key <api-key>");
+            nextSteps.Add("Run automaton setup");
             return new DeployCheckResult(DeployCheckNames.Credentials, false, "API key could not be resolved from environment or CLI config");
         }
 

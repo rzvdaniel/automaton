@@ -11,7 +11,7 @@ public static class CliCommandChecks
     {
         if (!configFileExists)
         {
-            nextSteps.Add("Run automaton create --name \"My App\" or automaton link <app-id>");
+            nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");
             return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "automaton.json not found in the project root");
         }
 
@@ -34,13 +34,13 @@ public static class CliCommandChecks
     {
         if (string.IsNullOrWhiteSpace(server))
         {
-            nextSteps.Add("Configure the server with automaton config --server <url> or add server to automaton.json");
+            nextSteps.Add("Run automaton setup to configure the hosted server and credentials");
             return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Credentials, false, "server could not be resolved from environment, automaton.json, or CLI config");
         }
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            nextSteps.Add("Run automaton login or automaton config --key <api-key>");
+            nextSteps.Add("Run automaton setup");
             return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Credentials, false, "API key could not be resolved from environment or CLI config");
         }
 

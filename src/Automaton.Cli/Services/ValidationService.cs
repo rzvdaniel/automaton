@@ -98,7 +98,7 @@ public sealed class ValidationService
     {
         if (!configFileExists)
         {
-            nextSteps.Add("Run automaton create --name \"My App\" or automaton link <app-id>");
+            nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");
             return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json not found in the project root");
         }
 
@@ -116,7 +116,7 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(resolvedServer))
         {
-            nextSteps.Add("Configure the server with automaton config --server <url> or add server to automaton.json");
+            nextSteps.Add("Run automaton setup to configure the hosted server and credentials");
             return new ValidationCheckResult(
                 ValidationCheckNames.AppLink,
                 false,
@@ -203,8 +203,8 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(remoteAppCheck.RemoteApp?.ExecutionRunnerId))
         {
-            nextSteps.Add("Run automaton runners");
-            nextSteps.Add("Run automaton set-runner <runner-id>");
+            nextSteps.Add("Run automaton deploy and choose a connected runner when prompted");
+            nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
             return new ValidationCheckResult(
                 ValidationCheckNames.BackendRunner,
                 false,
@@ -241,7 +241,7 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(resolvedApiKey))
         {
-            nextSteps.Add("Run automaton login or automaton config --key <api-key>");
+            nextSteps.Add("Run automaton setup");
             return new RemoteAppCheckResult(
                 new ValidationCheckResult(
                     ValidationCheckNames.RemoteAppAccess,

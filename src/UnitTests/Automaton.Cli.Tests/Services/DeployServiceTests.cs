@@ -120,8 +120,8 @@ public class DeployServiceTests
         Assert.That(result.Success, Is.False);
         AssertCheck(result, DeployCheckNames.Upload, true, "uploaded 3 file(s)");
         AssertCheck(result, DeployCheckNames.BackendDeploy, false, "No runner assigned");
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton runners"));
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton set-runner <runner-id>"));
+        Assert.That(result.NextSteps, Has.Some.EqualTo("Rerun automaton deploy with --runner <runner-id-or-name>"));
+        Assert.That(result.NextSteps, Has.Some.EqualTo("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy"));
     }
 
     [Test]

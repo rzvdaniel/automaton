@@ -45,7 +45,7 @@ Keep this as simple as possible for the user:
 3. Open your preferred AI tool in the app folder.
 4. Ask it to build and deploy the app to Automaton Studio.
 
-After `automaton setup`, the AI should usually handle the rest: local file generation, app creation or linking, validation, runner checks for backend apps, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+After `automaton setup`, the AI should usually handle the rest: local file generation, app creation or linking, deploy preflight, runner selection for backend apps, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
 ### Fallback flow: manual CLI
 
@@ -55,9 +55,8 @@ Use this only when you want to drive the CLI yourself:
 2. Run `automaton setup`.
 3. Run `automaton new "My App"` or `automaton link <app-id>`.
 4. Build locally.
-5. Run `automaton validate`.
-6. If `backend/*.py` exists, assign a connected runner.
-7. Run `automaton deploy`.
+5. Run `automaton deploy`.
+6. Run `automaton validate` only when you need a separate diagnostic check.
 
 ### Prerequisites
 
@@ -80,7 +79,7 @@ The file links to detailed instructions covering frontend structure, backend con
 Fallback prompt when the tool does not consume local guidance files:
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for Poker Planning. Use the Automaton CLI as the only execution path: start with automaton setup, use automaton new or automaton link so automaton.json is written by the CLI account that will deploy, run automaton validate before automaton deploy, and ask before publish.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build this as an Automaton app for Poker Planning. Use the Automaton CLI as the only execution path: start with automaton setup, use automaton new or automaton link so automaton.json is written by the CLI account that will deploy, deploy with automaton deploy, and ask before publish.
 ```
 
 If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write a local guidance pack into `.automaton/ai-guidance/` plus generated `AGENTS.md` and `.github/` instructions. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
@@ -95,7 +94,7 @@ and JS at the project root by default instead of creating frontend/ unless I exp
 split source structure. Use the Automaton CLI as the only execution path: start with automaton
 setup, then use automaton new or automaton link so automaton.json is created by the same CLI account
 that will deploy. Put Python backend controllers in backend/ only when needed. Run automaton
-validate before automaton deploy, and ask before public publish.
+deploy with automaton deploy, and ask before public publish.
 ```
 
 Starter prompts for specific stacks (plain HTML, React, Vue) are available at
@@ -155,17 +154,13 @@ automaton setup
 automaton link <app-id>
 ```
 
-After `automaton setup`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, run validation, and prepare the app for deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+After `automaton setup`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, and deploy. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
-For backend apps, pick an existing connected runner once before the first backend deploy, or create/deploy one in Automaton Studio if none exists:
-
-```bash
-automaton runners
-automaton set-runner <runner-id>
-```
+For backend apps, `automaton deploy` selects or prompts for a connected runner when one is needed. If no connected runner exists, create/deploy one in Automaton Studio and rerun deploy:
 
 ```bash
 automaton deploy
+automaton deploy --runner <runner-id-or-name>
 ```
 
 This uploads frontend files and triggers backend deployment. Re-run after any change.

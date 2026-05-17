@@ -6,7 +6,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 
 const activePath = ref<'editor' | 'agent' | 'cli'>('agent')
 const aiCliSetupPrompt = `"Read ${publicAppConfig.llmsUrl} first. Then install Automaton CLI in this environment if needed, or verify that it is already available."`
-const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, run automaton validate, deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
+const genericStarterPrompt = `Use the local generated Automaton guidance in this folder if it exists; otherwise read ${publicAppConfig.llmsUrl}. Build this as a frontend-only Automaton app for: [describe the app]. Prefer plain HTML/CSS/JS with root-level files unless I ask for a framework. Use the Automaton CLI as the only execution path: start with automaton setup, create or link automaton.json with automaton new or automaton link, deploy with automaton deploy, and ask before publish. Only ask me to step in for authentication or publish approval.`
 </script>
 
 <template>
@@ -185,7 +185,7 @@ const genericStarterPrompt = `Use the local generated Automaton guidance in this
               <div>
                 <div class="step-title">Use Studio as the test loop</div>
                 <p class="step-body">
-                  The AI should run validation and deploy commands itself, then use Automaton Studio as the current test loop:
+                  The AI should run deploy itself, then use Automaton Studio as the current test loop:
                   open the app there, preview it there, inspect logs there, and iterate locally until the preview looks right.
                   It should only pause when the workflow needs you, such as interactive login or final publish approval.
                 </p>
@@ -268,27 +268,26 @@ automaton link your-app-id</pre></div>
             <div class="step">
               <div class="step-num">5</div>
               <div>
-                <div class="step-title">Validate before deploy</div>
+                <div class="step-title">Optional diagnostics</div>
                 <div class="code-block code-block-multi"><pre>automaton sync-ai   # only if generated guidance files are missing or stale
 automaton validate
 automaton status</pre></div>
                 <p class="step-body">
-                  Refresh generated guidance only when needed, then run the preflight check so missing config, missing remote app links, or missing
-                  backend runner assignments fail before upload.
+                  Refresh generated guidance only when needed. Run validate when you want a separate diagnostic check;
+                  deploy performs the preflight needed for the normal happy path.
                 </p>
               </div>
             </div>
             <div class="step">
               <div class="step-num">6</div>
               <div>
-                <div class="step-title">Handle backend runners when needed</div>
-                <div class="code-block code-block-multi"><pre>automaton current-runner
-automaton runners
-automaton set-runner your-runner-id</pre></div>
+                <div class="step-title">Deploy handles backend runners when needed</div>
+                <div class="code-block code-block-multi"><pre>automaton deploy
+automaton deploy --runner your-runner-id</pre></div>
                 <p class="step-body">
-                  Skip this if the app is frontend-only. If the app has Python backend controllers,
-                  inspect the current assignment first, then pick an existing connected runner before the
-                  first backend deploy. If no connected runner exists yet, create or deploy one in Automaton Studio.
+                  If the app is frontend-only, deploy skips runner setup. If Python backend controllers exist,
+                  deploy auto-selects one connected runner or prompts you to choose. If no connected runner
+                  exists yet, create or deploy one in Automaton Studio and rerun deploy.
                 </p>
               </div>
             </div>

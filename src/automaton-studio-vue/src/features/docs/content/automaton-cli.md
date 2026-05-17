@@ -48,9 +48,9 @@ automaton setup
 
 Get an API key from **API Keys → Generate New Key** (scope: `execute`).
 
-Manual configuration is still available when you need it:
+Explicit key setup is still available when you need it:
 ```bash
-automaton config --key ak_execute_xxx
+automaton setup --key ak_execute_xxx
 automaton config --show
 ```
 
@@ -144,7 +144,7 @@ Use this only when the generated `.automaton/agents/`, `.automaton/ai-guidance/`
 
 ### `automaton login`
 
-Store and validate CLI credentials directly. Most users should prefer `automaton setup` instead.
+Advanced fallback to store and validate CLI credentials directly. Most users should prefer `automaton setup` instead.
 
 ```bash
 automaton login
@@ -177,7 +177,7 @@ automaton whoami
 automaton whoami --json
 ```
 
-Useful after `automaton login` or `automaton logout` to confirm which credentials are currently active.
+Useful after `automaton setup` or `automaton logout` to confirm which credentials are currently active.
 
 ---
 
@@ -194,9 +194,10 @@ automaton deploy --dir dist        # override the upload directory
 
 What happens:
 1. Runs the `build` command from `automaton.json` if set
-2. Zips the `deployDir` (or the default resolution order: `dist/` → root → `frontend/` compatibility fallback)
-3. Uploads the zip to the server (merge by default, full replace with `--clean`)
-4. Deploys backend Python controllers to the runner (unless `--skip-backend`)
+2. Performs the deploy preflight, including runner selection only when backend controllers require it
+3. Zips the `deployDir` (or the default resolution order: `dist/` → root → `frontend/` compatibility fallback)
+4. Uploads the zip to the server (merge by default, full replace with `--clean`)
+5. Deploys backend Python controllers to the runner (unless `--skip-backend`)
 
 If `automaton validate` already passes but deploy fails during upload with transport-style errors like closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, treat that as a likely CLI or server upload-path issue first instead of immediately restructuring the app.
 

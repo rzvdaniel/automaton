@@ -52,7 +52,6 @@ automaton setup
 automaton new "My App"
 # or
 automaton link <app-id>
-automaton validate
 automaton deploy
 ```
 

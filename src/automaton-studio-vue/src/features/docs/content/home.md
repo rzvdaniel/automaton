@@ -13,9 +13,8 @@ For most developers, the least-friction workflow is:
 Manual fallback:
 
 1. Run `automaton new` or `automaton link`.
-2. Run `automaton validate`.
-3. If `backend/*.py` exists, assign a connected runner.
-4. Run `automaton deploy`.
+2. Run `automaton deploy`.
+3. Run `automaton validate` only when you need a separate diagnostic check.
 
 Use the CLI + AI workflow, the stack guide, and the starter prompt as the default path for external coding tools.
 
