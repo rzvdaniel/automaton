@@ -64,6 +64,7 @@ const summary = ref('')
 const description = ref('')
 const publicUrl = ref('')
 const requiresAuthentication = ref(false)
+const isProfileFeatured = ref(false)
 const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
 const maxScreenshots = 8
@@ -143,6 +144,7 @@ const hasChanges = computed(() => {
     description.value !== (app.value.description || '') ||
     publicUrl.value !== (app.value.publicUrl || '') ||
     requiresAuthentication.value !== app.value.requiresAuthentication ||
+    isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined)
   )
@@ -164,6 +166,7 @@ watch(
       description.value = newApp.description || ''
       publicUrl.value = newApp.publicUrl || ''
       requiresAuthentication.value = newApp.requiresAuthentication || false
+      isProfileFeatured.value = newApp.isProfileFeatured ?? false
       executionRunnerId.value = newApp.executionRunnerId || null
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
@@ -239,6 +242,7 @@ async function saveSettings() {
       description: description.value || undefined,
       publicUrl: publicUrl.value || undefined,
       requiresAuthentication: requiresAuthentication.value,
+      isProfileFeatured: isProfileFeatured.value,
       executionRunnerId: executionRunnerId.value || undefined,
     })
 
@@ -249,6 +253,7 @@ async function saveSettings() {
       editorStore.currentApp.description = description.value
       editorStore.currentApp.publicUrl = publicUrl.value
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
+      editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
       editorStore.currentApp.executionRunnerId = executionRunnerId.value || undefined
     }
 
@@ -703,6 +708,20 @@ async function handleSaveTemplateStatus() {
                   {{ requiresAuthentication
                     ? 'Users must be logged in to access this app'
                     : 'Anyone with the link can access this app' }}
+                </small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="profile-featured" class="font-medium">Creator Store Spotlight</label>
+                <div class="flex align-items-center gap-3">
+                  <InputSwitch
+                    id="profile-featured"
+                    v-model="isProfileFeatured"
+                  />
+                  <span>{{ isProfileFeatured ? 'Featured on my creator profile' : 'Use normal profile ranking' }}</span>
+                </div>
+                <small class="text-color-secondary">
+                  Featured apps appear in the carousel on your public creator store. If none are selected, Automaton uses your top published apps.
                 </small>
               </div>
 

@@ -66,6 +66,7 @@ export interface App {
   // Sample/Featured flags
   isSample: boolean
   isFeatured: boolean
+  isProfileFeatured: boolean
   // Public profile display
   thumbnailUrl?: string | null
   screenshots: AppScreenshot[]

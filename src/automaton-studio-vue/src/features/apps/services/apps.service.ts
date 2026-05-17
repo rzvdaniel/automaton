@@ -206,6 +206,7 @@ class AppsService {
       publicUrl?: string
       requiresAuthentication?: boolean
       executionRunnerId?: string
+      isProfileFeatured?: boolean
     },
   ): Promise<void> {
     // Get current app and build update payload with only backend-expected fields
@@ -223,6 +224,7 @@ class AppsService {
       created: app.created,
       updated: app.updated,
       executionRunnerId: settings.executionRunnerId ?? app.executionRunnerId,
+      isProfileFeatured: settings.isProfileFeatured ?? app.isProfileFeatured,
       definition: app.definition,
       thumbnailUrl: app.thumbnailUrl,
       screenshots: app.screenshots,
@@ -271,6 +273,7 @@ class AppsService {
       created: app.created,
       updated: app.updated,
       executionRunnerId: app.executionRunnerId,
+      isProfileFeatured: app.isProfileFeatured,
       definition: app.definition,
       thumbnailUrl: null,
       screenshots: app.screenshots,

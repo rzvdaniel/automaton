@@ -276,6 +276,7 @@ namespace Automaton.Studio.Server.Data
                 // Sample/Featured flags
                 entity.Property(e => e.IsSample).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsFeatured).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.IsProfileFeatured).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.MarketplaceStatus)
                     .IsRequired()
                     .HasMaxLength(40)
@@ -285,6 +286,7 @@ namespace Automaton.Studio.Server.Data
 
                 // Index for sample apps queries
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
+                entity.HasIndex(e => new { e.IsProfileFeatured, e.IsPublished });
                 entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
 
                 entity.HasMany(e => e.WebAppScreenshots)

@@ -269,6 +269,7 @@ public class AppsService
         entity.PublicUrl = app.PublicUrl;
         entity.RequiresAuthentication = app.RequiresAuthentication;
         entity.ExecutionRunnerId = app.ExecutionRunnerId;
+        entity.IsProfileFeatured = app.IsProfileFeatured;
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
         entity.Definition = "{}";
@@ -517,6 +518,7 @@ public class AppsService
             // Sample/Featured
             IsSample = entity.IsSample,
             IsFeatured = entity.IsFeatured,
+            IsProfileFeatured = entity.IsProfileFeatured,
             // Public profile display
             ThumbnailUrl = entity.ThumbnailUrl,
             Screenshots = entity.WebAppScreenshots?
@@ -586,6 +588,7 @@ public class AppsService
             ProjectId = null,
             IsSample = false,
             IsFeatured = false,
+            IsProfileFeatured = false,
             ThumbnailUrl = source.ThumbnailUrl,
             Category = source.Category,
             Tags = source.Tags,
@@ -645,6 +648,7 @@ public class AppsService
             ProjectId = null,
             IsSample = false,
             IsFeatured = false,
+            IsProfileFeatured = false,
             ThumbnailUrl = source.ThumbnailUrl,
             Category = source.Category,
             Tags = source.Tags,

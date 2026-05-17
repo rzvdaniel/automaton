@@ -68,8 +68,9 @@ public class PublicAppsService
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
             .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
-            .OrderByDescending(w => w.IsFeatured)
+            .OrderByDescending(w => w.IsProfileFeatured)
             .ThenByDescending(w => w.StarCount)
+            .ThenByDescending(w => w.ViewCount)
             .ThenByDescending(w => w.PublishedAt)
             .Select(w => new PublicAppCard
             {
@@ -90,6 +91,7 @@ public class PublicAppsService
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
                 IsFeatured = w.IsFeatured,
+                IsProfileFeatured = w.IsProfileFeatured,
                 StarCount = w.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value),
@@ -148,6 +150,7 @@ public class PublicAppsService
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
                 IsFeatured = w.IsFeatured,
+                IsProfileFeatured = w.IsProfileFeatured,
                 StarCount = w.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
@@ -208,6 +211,7 @@ public class PublicAppCard
     public int ViewCount { get; set; }
     public int StarCount { get; set; }
     public bool IsFeatured { get; set; }
+    public bool IsProfileFeatured { get; set; }
     public bool IsStarredByCurrentUser { get; set; }
     public List<PublicAppScreenshot> Screenshots { get; set; } = new();
 }

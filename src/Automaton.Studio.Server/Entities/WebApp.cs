@@ -42,6 +42,9 @@ public class WebApp
     public bool IsSample { get; set; } = false;
     public bool IsFeatured { get; set; } = false;
 
+    // Creator-managed profile display
+    public bool IsProfileFeatured { get; set; } = false;
+
     // Public profile display
     /// <summary>
     /// URL to app thumbnail image for card display

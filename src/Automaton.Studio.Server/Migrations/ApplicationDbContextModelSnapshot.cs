@@ -2037,6 +2037,11 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsProfileFeatured")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("tinyint(1)");
 
@@ -2123,6 +2128,8 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.HasIndex("PublicUrl")
                         .IsUnique();
+
+                    b.HasIndex("IsProfileFeatured", "IsPublished");
 
                     b.HasIndex("IsSample", "IsPublished");
 

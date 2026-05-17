@@ -14,6 +14,7 @@ export type MarketplaceAppCard = {
   publicUrl?: string
   publishedAt?: string
   isFeatured?: boolean
+  isProfileFeatured?: boolean
   screenshots: MarketplaceAppScreenshot[]
 }
 

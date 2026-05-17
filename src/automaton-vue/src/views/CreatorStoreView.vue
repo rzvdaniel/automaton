@@ -19,8 +19,8 @@ const activeCategory = ref('')
 
 const publicUsername = computed(() => String(route.params.publicUsername || ''))
 const displayName = computed(() => profile.value?.displayName || profile.value?.username || publicUsername.value)
-const featuredApps = computed(() => apps.value.filter((app) => app.isFeatured))
-const carouselApps = computed(() => (featuredApps.value.length > 0 ? featuredApps.value : apps.value.slice(0, 10)))
+const profileFeaturedApps = computed(() => apps.value.filter((app) => app.isProfileFeatured))
+const carouselApps = computed(() => (profileFeaturedApps.value.length > 0 ? profileFeaturedApps.value : apps.value.slice(0, 10)))
 const categories = computed(() => {
   const values = apps.value.map((app) => app.category).filter(Boolean) as string[]
   return ['All', ...Array.from(new Set(values))]

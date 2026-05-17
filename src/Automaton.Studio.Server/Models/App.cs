@@ -28,6 +28,7 @@ public class AppModel
     // Sample/Featured flags
     public bool IsSample { get; set; }
     public bool IsFeatured { get; set; }
+    public bool IsProfileFeatured { get; set; }
 
     // Public profile display
     public string? ThumbnailUrl { get; set; }
