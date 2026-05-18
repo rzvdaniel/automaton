@@ -32,6 +32,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     isFeatured: true,
     screenshots: [
       { id: 'pac-snake', imageUrl: snakeImage, caption: 'Snake remix', sortOrder: 1 },
@@ -52,6 +53,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -67,6 +69,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -82,6 +85,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -97,6 +101,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -112,6 +117,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -127,6 +133,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
   {
@@ -142,6 +149,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     starCount: 0,
     forkCount: 0,
     isForkable: true,
+    hasBackendExecution: false,
     screenshots: [],
   },
 ]

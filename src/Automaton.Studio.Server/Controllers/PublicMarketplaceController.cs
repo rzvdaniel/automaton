@@ -85,6 +85,7 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
+                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -149,6 +150,7 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
+                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured
             })
             .FirstOrDefaultAsync();
@@ -219,6 +221,66 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
+                HasBackendExecution = a.ExecutionRunnerId.HasValue,
+                IsFeatured = a.IsFeatured,
+                Screenshots = _dbContext.WebAppScreenshots
+                    .Where(s => s.WebAppId == a.Id)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.CreatedAt)
+                    .Select(s => new MarketplaceAppScreenshotDto
+                    {
+                        Id = s.Id,
+                        ImageUrl = s.ImageUrl,
+                        Caption = s.Caption,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+
+        app.ForksAndRemixes = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a =>
+                a.ForkedFromAppId == app.Id &&
+                a.IsPublished &&
+                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .OrderByDescending(a => a.PublishedAt)
+            .Take(6)
+            .Select(a => new MarketplaceAppCardDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                CreatorPublicUsername = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => u.PublicUsername)
+                    .FirstOrDefault(),
+                CreatorDisplayName = _dbContext.WebAppUsers
+                    .Where(wu => wu.WebAppId == a.Id)
+                    .Join(_dbContext.Users, wu => wu.UserId, u => u.Id, (wu, u) => u)
+                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
+                    .FirstOrDefault(),
+                Summary = a.Summary,
+                Description = a.Description,
+                ThumbnailUrl = a.ThumbnailUrl ??
+                    _dbContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == a.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
+                Category = a.Category,
+                Tags = a.Tags,
+                ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
+                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
+                IsForkable = a.IsForkable,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
+                PublicUrl = a.PublicUrl,
+                PublishedAt = a.PublishedAt,
+                UpdatedAt = a.Updated,
+                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -300,6 +362,7 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
+                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -359,6 +422,7 @@ public class MarketplaceAppCardDto
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public bool HasBackendExecution { get; set; }
     public bool IsFeatured { get; set; }
     public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }
@@ -366,6 +430,7 @@ public class MarketplaceAppCardDto
 public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
 {
     public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
+    public List<MarketplaceAppCardDto> ForksAndRemixes { get; set; } = new();
 }
 
 public class MarketplaceAppScreenshotDto

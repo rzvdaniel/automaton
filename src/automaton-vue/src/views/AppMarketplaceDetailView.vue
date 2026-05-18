@@ -15,6 +15,7 @@ const creatorApps = ref<MarketplaceAppCard[]>([])
 const loading = ref(true)
 const selectedImageUrl = ref('')
 const errorMessage = ref('')
+const shareMessage = ref('')
 
 function resolveAssetUrl(url?: string | null): string {
   if (!url) {
@@ -76,6 +77,27 @@ const forkUrl = computed(() =>
   app.value ? `${publicAppConfig.studioUrl}apps/fork/${app.value.id}` : publicAppConfig.studioUrl,
 )
 
+const creatorName = computed(() =>
+  app.value?.creatorDisplayName || app.value?.creatorPublicUsername || 'Automaton creator',
+)
+
+const creatorInitials = computed(() =>
+  creatorName.value
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase(),
+)
+
+const heroSummary = computed(() =>
+  app.value?.summary || app.value?.description || 'Open the app to see what this public Automaton build does.',
+)
+
+const aboutDescription = computed(() =>
+  app.value?.description || app.value?.summary || 'Open the app to see what this public Automaton build does.',
+)
+
 const publishedLabel = computed(() => {
   if (!app.value?.publishedAt) {
     return null
@@ -116,6 +138,33 @@ const relatedHeading = computed(() => {
 function formatCount(value: number) {
   if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
   return String(value)
+}
+
+function pluralize(value: number, singular: string, plural = `${singular}s`) {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`
+}
+
+function relatedImageUrl(relatedApp: MarketplaceAppCard) {
+  return relatedApp.thumbnailUrl || relatedApp.screenshots?.[0]?.imageUrl || ''
+}
+
+async function shareApp() {
+  shareMessage.value = ''
+
+  const title = app.value?.name || 'Automaton app'
+  const url = window.location.href
+
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, url })
+      return
+    }
+
+    await navigator.clipboard.writeText(url)
+    shareMessage.value = 'Link ready on your clipboard.'
+  } catch {
+    shareMessage.value = 'Could not share this app.'
+  }
 }
 
 const selectedImageIndex = computed(() =>
@@ -224,23 +273,38 @@ onMounted(loadApp)
 
         <template v-else-if="app">
           <section class="detail-hero">
-            <div class="summary-panel">
-              <div>
-                <span class="detail-eyebrow">{{ app.category || 'Live app' }}</span>
+            <aside class="summary-panel">
+              <div class="badge-row">
+                <span class="badge">Live app</span>
+                <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
+                <span v-if="app.isForkable" class="badge badge-forkable">Forkable</span>
+                <span class="badge badge-static">{{ app.hasBackendExecution ? 'Backend' : 'Static' }}</span>
+              </div>
+
+              <div class="summary-main">
                 <h1 class="hero-title">{{ app.name }}</h1>
                 <div v-if="app.creatorPublicUsername" class="developer-row">
-                  by
                   <RouterLink :to="`/${app.creatorPublicUsername}`" class="developer-link">
-                    {{ app.creatorDisplayName || app.creatorPublicUsername }}
+                    <span class="creator-avatar">{{ creatorInitials }}</span>
+                    <span>by {{ creatorName }}</span>
                   </RouterLink>
                 </div>
+                <div v-else class="developer-row developer-row-static">
+                  <span class="creator-avatar">{{ creatorInitials }}</span>
+                  <span>by {{ creatorName }}</span>
+                </div>
 
-                <p v-if="app.description" class="hero-description">{{ app.description }}</p>
-                <p v-else-if="app.summary" class="hero-description">{{ app.summary }}</p>
+                <p class="hero-description">{{ heroSummary }}</p>
 
                 <div class="hero-stats" aria-label="App activity">
-                  <span>{{ formatCount(app.viewCount) }} plays</span>
-                  <span v-if="app.isForkable">{{ formatCount(app.forkCount) }} forks</span>
+                  <span><i class="pi pi-play" /> {{ pluralize(app.viewCount, 'play') }}</span>
+                  <span v-if="app.isForkable">
+                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                      <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
+                    </svg>
+                    {{ pluralize(app.forkCount, 'fork') }}
+                  </span>
+                  <span><i class="pi pi-star" /> {{ pluralize(app.starCount, 'save') }}</span>
                   <span>{{ updatedLabel }}</span>
                 </div>
 
@@ -253,18 +317,24 @@ onMounted(loadApp)
                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                       <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
                     </svg>
-                    Fork
+                    Fork app
                   </a>
+                  <button class="detail-button" type="button" @click="shareApp">
+                    Share
+                    <i class="pi pi-share-alt" />
+                  </button>
                 </div>
+                <p v-if="shareMessage" class="share-message">{{ shareMessage }}</p>
 
                 <div class="hero-pills" aria-label="App metadata">
-                  <span class="hero-pill">Live app</span>
                   <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
-                  <span v-if="app.isForkable" class="hero-pill hero-pill-forkable">Forkable</span>
+                  <span class="hero-pill">{{ app.hasBackendExecution ? 'Backend app' : 'Static app' }}</span>
+                  <span class="hero-pill">{{ app.hasBackendExecution ? 'Runner required' : 'Runner not required' }}</span>
+                  <span v-if="app.isForkable" class="hero-pill hero-pill-forkable">Free to fork</span>
                   <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
                 </div>
               </div>
-            </div>
+            </aside>
 
             <article class="detail-gallery">
               <div class="gallery-stage">
@@ -314,17 +384,87 @@ onMounted(loadApp)
             </article>
           </section>
 
-          <section class="detail-body-grid">
-            <article class="detail-card">
+          <nav class="detail-tabs" aria-label="App detail sections">
+            <a href="#overview" class="detail-tab detail-tab-active">Overview</a>
+            <a href="#forks" class="detail-tab">Forks & Remixes</a>
+            <a href="#runtime" class="detail-tab">Runtime</a>
+            <a href="#creator" class="detail-tab">Creator</a>
+          </nav>
+
+          <section id="overview" class="detail-body-grid">
+            <article class="detail-card detail-card-main">
               <h2>About this app</h2>
-              <p>{{ app.summary || app.description || 'Open the app to see what this public Automaton build does.' }}</p>
+              <p>{{ aboutDescription }}</p>
               <div v-if="tagList.length" class="tag-row">
                 <span v-for="tag in tagList" :key="tag" class="tag">{{ tag }}</span>
               </div>
+
+              <section id="forks" class="remix-section">
+                <div class="section-heading-row">
+                  <div>
+                    <h3>Forks & Remixes</h3>
+                    <p>Forks preserve attribution and show how apps evolve over time.</p>
+                  </div>
+                  <span v-if="app.isForkable" class="remix-count">{{ pluralize(app.forkCount, 'fork') }}</span>
+                </div>
+
+                <div v-if="app.forksAndRemixes?.length" class="remix-grid">
+                  <RouterLink
+                    v-for="remix in app.forksAndRemixes"
+                    :key="remix.id"
+                    :to="`/apps/${remix.id}`"
+                    class="remix-card"
+                  >
+                    <img
+                      v-if="relatedImageUrl(remix)"
+                      :src="resolveAssetUrl(relatedImageUrl(remix))"
+                      :alt="remix.name"
+                    />
+                    <div v-else class="remix-image-fallback">{{ remix.name.charAt(0) }}</div>
+                    <div>
+                      <strong>{{ remix.name }}</strong>
+                      <span>by {{ remix.creatorDisplayName || remix.creatorPublicUsername || 'Automaton creator' }}</span>
+                    </div>
+                  </RouterLink>
+                </div>
+
+                <p v-else-if="app.isForkable" class="empty-copy">
+                  No public remixes yet. Fork this app to create a private editable copy, modify it, then publish your version when ready.
+                </p>
+                <p v-else class="empty-copy">This app is published for use. Remixing is not enabled by the creator.</p>
+              </section>
             </article>
+
+            <aside id="runtime" class="side-stack">
+              <section v-if="app.isForkable" class="detail-card fork-panel">
+                <h3>Fork this app</h3>
+                <p>Create your own private editable copy, modify it with your AI coding tools, then publish your version when ready.</p>
+                <a :href="forkUrl" class="detail-button fork-action side-action" target="_blank" rel="noopener">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
+                  </svg>
+                  Fork app
+                </a>
+              </section>
+
+              <section class="detail-card">
+                <h3>Runtime</h3>
+                <div class="runtime-list">
+                  <div class="runtime-item"><span>Frontend</span><span>Static hosting</span></div>
+                  <div class="runtime-item">
+                    <span>Backend</span>
+                    <span>{{ app.hasBackendExecution ? 'Requires Runner' : 'Not required' }}</span>
+                  </div>
+                  <div class="runtime-item">
+                    <span>Fork & publish</span>
+                    <span>{{ app.hasBackendExecution ? 'Runner needed' : 'Free' }}</span>
+                  </div>
+                </div>
+              </section>
+            </aside>
           </section>
 
-          <section v-if="creatorApps.length" class="related-section">
+          <section v-if="creatorApps.length" id="creator" class="related-section">
             <div class="related-header">
               <h2 class="related-title">{{ relatedHeading }}</h2>
             </div>
@@ -425,54 +565,102 @@ onMounted(loadApp)
 
 .detail-hero {
   display: grid;
-  grid-template-columns: minmax(360px, 0.86fr) minmax(620px, 1.14fr);
+  grid-template-columns: minmax(320px, 0.74fr) minmax(0, 1.26fr);
   gap: 28px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .summary-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 460px;
-  padding: 18px 0;
+  position: sticky;
+  top: 144px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding-top: 6px;
 }
 
-.detail-eyebrow {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6px 10px;
-  border: 1px solid rgba(80, 215, 255, 0.22);
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge {
+  padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(80, 215, 255, 0.08);
-  color: #c4f2ff;
-  font-size: 0.82rem;
-  font-weight: 800;
+  background: rgba(80, 215, 255, 0.12);
+  color: #bdefff;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-static {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d6dbe7;
+}
+
+.badge-forkable {
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+}
+
+.badge-hot {
+  background: rgba(255, 203, 87, 0.13);
+  color: #ffcb57;
 }
 
 .hero-title {
-  margin: 16px 0 14px;
+  margin: 0;
   color: #f5f7fb;
-  font-size: clamp(2.5rem, 4.7vw, 4.75rem);
-  line-height: 0.96;
-  letter-spacing: -0.052em;
+  font-size: clamp(3rem, 5.8vw, 5.8rem);
+  line-height: 0.94;
+  letter-spacing: -0.06em;
+}
+
+.summary-main {
+  display: grid;
+  gap: 16px;
 }
 
 .developer-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
+  width: fit-content;
+  gap: 9px;
   color: #50d7ff;
-  font-weight: 800;
+  font-weight: 850;
 }
 
 .developer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   color: #50d7ff;
+  cursor: pointer;
 }
 
 .developer-link:hover {
   color: #9ee8ff;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.developer-row-static {
+  color: #9ba3b4;
+}
+
+.creator-avatar {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #45e68a, #50d7ff);
+  color: #031008;
+  font-size: 0.72rem;
+  font-weight: 950;
 }
 
 .hero-description {
@@ -487,32 +675,30 @@ onMounted(loadApp)
 .hero-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 12px;
   color: #9fb0c2;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   font-weight: 850;
 }
 
 .hero-stats span {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
 }
 
-.hero-stats span + span::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(159, 176, 194, 0.68);
+.hero-stats i,
+.hero-stats svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .hero-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, auto));
+  justify-content: start;
   gap: 10px;
-  margin-top: 24px;
 }
 
 .detail-button {
@@ -527,18 +713,43 @@ onMounted(loadApp)
   background: rgba(255, 255, 255, 0.04);
   color: #f5f7fb;
   font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
 }
 
 .detail-button.primary {
-  border-color: rgba(69, 230, 138, 0.42);
-  background: rgba(69, 230, 138, 0.14);
-  color: #dcffe9;
+  border-color: rgba(69, 230, 138, 0.55);
+  background: #45e68a;
+  color: #041008;
+  box-shadow: 0 16px 44px rgba(69, 230, 138, 0.16);
 }
 
 .detail-button:hover {
-  border-color: rgba(69, 230, 138, 0.44);
-  background: rgba(69, 230, 138, 0.1);
-  color: #f3fff7;
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.detail-button.primary:hover {
+  border-color: rgba(69, 230, 138, 0.72);
+  background: #6cf0a3;
+  color: #041008;
+}
+
+.fork-action {
+  border-color: rgba(69, 230, 138, 0.38);
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+}
+
+.fork-action:hover {
+  border-color: rgba(69, 230, 138, 0.5);
+  background: rgba(69, 230, 138, 0.18);
+  color: #8affb7;
 }
 
 .fork-action svg {
@@ -546,11 +757,17 @@ onMounted(loadApp)
   height: 16px;
 }
 
+.share-message {
+  margin: -4px 0 0;
+  color: #9ba3b4;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
 .hero-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 22px;
 }
 
 .hero-pill {
@@ -584,7 +801,7 @@ onMounted(loadApp)
   position: relative;
   overflow: hidden;
   display: grid;
-  min-height: 460px;
+  min-height: 520px;
   place-items: center;
   padding: 18px;
   background:
@@ -594,7 +811,7 @@ onMounted(loadApp)
 
 .stage-image {
   width: min(100%, 780px);
-  max-height: 420px;
+  max-height: 486px;
   object-fit: contain;
   display: block;
   border-radius: 8px;
@@ -678,9 +895,9 @@ onMounted(loadApp)
 
 .detail-body-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 
 .detail-card,
@@ -705,6 +922,171 @@ onMounted(loadApp)
 .detail-card p {
   margin: 0;
   color: #9ba3b4;
+}
+
+.detail-card p + p {
+  margin-top: 12px;
+}
+
+.detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.detail-tab {
+  padding: 9px 13px;
+  border-radius: 7px;
+  color: #9ba3b4;
+  font-size: 0.86rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.detail-tab:hover {
+  color: #f5f7fb;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.detail-tab-active {
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+}
+
+.remix-section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.section-heading-row p {
+  margin-top: 0;
+}
+
+.remix-count {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(69, 230, 138, 0.24);
+  border-radius: 999px;
+  background: rgba(69, 230, 138, 0.1);
+  color: #bdfbd2;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.remix-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.remix-card {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.remix-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(69, 230, 138, 0.32);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.remix-card img,
+.remix-image-fallback {
+  width: 100%;
+  height: 118px;
+  object-fit: cover;
+  background: #080b10;
+}
+
+.remix-image-fallback {
+  display: grid;
+  place-items: center;
+  color: #f5f7fb;
+  font-size: 2.6rem;
+  font-weight: 900;
+}
+
+.remix-card div {
+  padding: 12px;
+}
+
+.remix-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #f5f7fb;
+  font-size: 0.95rem;
+}
+
+.remix-card span {
+  color: #9ba3b4;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.empty-copy {
+  margin-top: 14px !important;
+}
+
+.side-stack {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.fork-panel {
+  border-color: rgba(69, 230, 138, 0.24);
+  background:
+    linear-gradient(135deg, rgba(69, 230, 138, 0.07), rgba(80, 215, 255, 0.035)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.side-action {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.runtime-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.runtime-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  color: #c8ceda;
+  font-weight: 850;
+}
+
+.runtime-item span:last-child {
+  color: #9ba3b4;
+  font-size: 0.84rem;
 }
 
 .tag-row {
@@ -749,12 +1131,13 @@ onMounted(loadApp)
 
 .related-card {
   overflow: hidden;
+  cursor: pointer;
   transition: transform 0.22s ease, border-color 0.22s ease;
 }
 
 .related-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(80, 215, 255, 0.28);
+  transform: translateY(-2px);
+  border-color: rgba(69, 230, 138, 0.32);
 }
 
 .related-media {
@@ -805,8 +1188,8 @@ onMounted(loadApp)
   }
 
   .summary-panel {
-    min-height: auto;
-    padding: 0;
+    position: static;
+    padding-top: 0;
   }
 
   .gallery-stage {
@@ -824,10 +1207,15 @@ onMounted(loadApp)
   }
 
   .hero-title {
-    font-size: clamp(2.35rem, 12vw, 3.7rem);
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
   }
 
-  .gallery-strip {
+  .hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .gallery-strip,
+  .remix-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 

@@ -16,6 +16,7 @@ export type MarketplaceAppCard = {
   publicUrl?: string
   publishedAt?: string
   updatedAt?: string
+  hasBackendExecution: boolean
   isFeatured?: boolean
   isProfileFeatured?: boolean
   screenshots: MarketplaceAppScreenshot[]
@@ -30,6 +31,7 @@ export type MarketplaceAppScreenshot = {
 
 export type MarketplaceAppDetails = MarketplaceAppCard & {
   relatedApps: MarketplaceAppCard[]
+  forksAndRemixes: MarketplaceAppCard[]
 }
 
 export type PublicUserProfile = {

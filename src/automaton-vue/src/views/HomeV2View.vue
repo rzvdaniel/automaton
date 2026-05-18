@@ -211,7 +211,6 @@ onMounted(() => {
                         />
                       </span>
                     </span>
-                    <RouterLink to="/apps">View all apps</RouterLink>
                   </div>
                 </div>
               </article>
