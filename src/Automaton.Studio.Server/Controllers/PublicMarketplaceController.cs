@@ -229,6 +229,84 @@ public class PublicMarketplaceController : ControllerBase
         return Ok(app);
     }
 
+    [HttpGet("apps/{appId:guid}/creator-apps")]
+    public async Task<ActionResult<List<MarketplaceAppCardDto>>> GetCreatorApps(Guid appId, [FromQuery] int take = 6)
+    {
+        var currentUserId = TryGetCurrentUserId();
+
+        var creatorUserId = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a =>
+                a.Id == appId &&
+                a.IsPublished &&
+                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Join(_dbContext.WebAppUsers, a => a.Id, wu => wu.WebAppId, (_, wu) => wu.UserId)
+            .FirstOrDefaultAsync();
+
+        if (creatorUserId == Guid.Empty)
+        {
+            return NotFound(new { message = "Creator not found for app" });
+        }
+
+        var apps = await _dbContext.WebApps
+            .AsNoTracking()
+            .Where(a =>
+                a.Id != appId &&
+                a.IsPublished &&
+                a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
+                _dbContext.WebAppUsers.Any(wu => wu.WebAppId == a.Id && wu.UserId == creatorUserId))
+            .OrderByDescending(a => a.IsProfileFeatured)
+            .ThenByDescending(a => a.IsFeatured)
+            .ThenByDescending(a => a.PublishedAt)
+            .Take(Math.Clamp(take, 1, 12))
+            .Select(a => new MarketplaceAppCardDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                CreatorPublicUsername = _dbContext.Users
+                    .Where(u => u.Id == creatorUserId)
+                    .Select(u => u.PublicUsername)
+                    .FirstOrDefault(),
+                CreatorDisplayName = _dbContext.Users
+                    .Where(u => u.Id == creatorUserId)
+                    .Select(u => !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name)
+                    .FirstOrDefault(),
+                Summary = a.Summary,
+                Description = a.Description,
+                ThumbnailUrl = a.ThumbnailUrl ??
+                    _dbContext.WebAppScreenshots
+                        .Where(s => s.WebAppId == a.Id)
+                        .OrderBy(s => s.SortOrder)
+                        .ThenBy(s => s.CreatedAt)
+                        .Select(s => s.ImageUrl)
+                        .FirstOrDefault(),
+                Category = a.Category,
+                Tags = a.Tags,
+                ViewCount = a.ViewCount,
+                StarCount = a.StarCount,
+                IsStarredByCurrentUser = currentUserId.HasValue &&
+                    _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
+                PublicUrl = a.PublicUrl,
+                PublishedAt = a.PublishedAt,
+                IsFeatured = a.IsFeatured,
+                Screenshots = _dbContext.WebAppScreenshots
+                    .Where(s => s.WebAppId == a.Id)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.CreatedAt)
+                    .Select(s => new MarketplaceAppScreenshotDto
+                    {
+                        Id = s.Id,
+                        ImageUrl = s.ImageUrl,
+                        Caption = s.Caption,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+
+        return Ok(apps);
+    }
+
     [HttpGet("categories")]
     public async Task<ActionResult<List<string>>> GetCategories()
     {

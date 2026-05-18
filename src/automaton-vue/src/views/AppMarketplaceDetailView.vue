@@ -4,12 +4,13 @@ import { RouterLink, useRoute } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
 import AppNav from '@/components/AppNav.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
-import type { MarketplaceAppDetails } from '@/types/marketplace'
+import type { MarketplaceAppCard, MarketplaceAppDetails } from '@/types/marketplace'
 
 const route = useRoute()
 const marketplaceApiBaseUrl = `${publicAppConfig.apiBaseUrl}api/public/marketplace`
 
 const app = ref<MarketplaceAppDetails | null>(null)
+const creatorApps = ref<MarketplaceAppCard[]>([])
 const loading = ref(true)
 const selectedImageUrl = ref('')
 const errorMessage = ref('')
@@ -19,7 +20,13 @@ function resolveAssetUrl(url?: string | null): string {
     return ''
   }
 
-  if (url.startsWith('http')) {
+  if (
+    url.startsWith('http') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('/assets/') ||
+    url.startsWith('/src/')
+  ) {
     return url
   }
 
@@ -76,6 +83,11 @@ const publishedLabel = computed(() => {
   })
 })
 
+const relatedHeading = computed(() => {
+  const name = app.value?.creatorDisplayName || app.value?.creatorPublicUsername
+  return name ? `More apps from ${name}` : 'More apps from this author'
+})
+
 const selectedImageIndex = computed(() =>
   galleryImages.value.findIndex((image) => image.imageUrl === selectedImageUrl.value),
 )
@@ -104,9 +116,26 @@ function nextImage() {
   selectedImageUrl.value = image.imageUrl
 }
 
+async function loadCreatorApps(appId: string) {
+  creatorApps.value = []
+
+  try {
+    const response = await fetch(`${marketplaceApiBaseUrl}/apps/${appId}/creator-apps`)
+
+    if (!response.ok) {
+      return
+    }
+
+    creatorApps.value = await response.json()
+  } catch {
+    creatorApps.value = []
+  }
+}
+
 async function loadApp() {
   loading.value = true
   errorMessage.value = ''
+  creatorApps.value = []
 
   try {
     const response = await fetch(`${marketplaceApiBaseUrl}/apps/${route.params.appId}`)
@@ -120,10 +149,12 @@ async function loadApp() {
 
     app.value = await response.json()
     selectedImageUrl.value = galleryImages.value[0]?.imageUrl || ''
+    await loadCreatorApps(String(route.params.appId))
   } catch {
     errorMessage.value = 'Unable to load this app right now.'
     app.value = null
     selectedImageUrl.value = ''
+    creatorApps.value = []
   } finally {
     loading.value = false
   }
@@ -140,13 +171,13 @@ onMounted(loadApp)
 </script>
 
 <template>
-  <div>
+  <div class="app-detail-v2">
     <AppNav />
     <main class="detail-page">
-      <div class="container">
+      <div class="detail-shell">
         <RouterLink to="/apps" class="back-link">
           <i class="pi pi-arrow-left" />
-          Back to marketplace
+          Back to apps
         </RouterLink>
 
         <section v-if="loading" class="detail-state">
@@ -161,45 +192,38 @@ onMounted(loadApp)
         </section>
 
         <template v-else-if="app">
-          <section class="detail-panel detail-summary-card">
-            <div class="hero-copy">
-              <div class="hero-badges">
-                <span v-if="app.category" class="tag">{{ app.category }}</span>
-                <span v-if="app.isFeatured" class="hero-chip">Featured</span>
+          <section class="detail-hero">
+            <div class="summary-panel">
+              <div>
+                <span class="detail-eyebrow">{{ app.category || 'Live app' }}</span>
+                <h1 class="hero-title">{{ app.name }}</h1>
+                <div v-if="app.creatorPublicUsername" class="developer-row">
+                  by
+                  <RouterLink :to="`/${app.creatorPublicUsername}`" class="developer-link">
+                    {{ app.creatorDisplayName || app.creatorPublicUsername }}
+                  </RouterLink>
+                </div>
+
+                <p v-if="app.description" class="hero-description">{{ app.description }}</p>
+                <p v-else-if="app.summary" class="hero-description">{{ app.summary }}</p>
+
+                <div class="hero-actions">
+                  <a v-if="launchUrl" :href="launchUrl" target="_blank" rel="noopener" class="detail-button primary">
+                    Open app
+                    <i class="pi pi-external-link" />
+                  </a>
+                  <RouterLink to="/apps" class="detail-button">Browse apps</RouterLink>
+                </div>
               </div>
 
-              <h1 class="hero-title">{{ app.name }}</h1>
-              <div v-if="app.creatorPublicUsername" class="developer-row">
-                <span>Developer:</span>
-                <RouterLink :to="`/${app.creatorPublicUsername}`" class="developer-link">
-                  {{ app.creatorDisplayName || app.creatorPublicUsername }}
-                </RouterLink>
-              </div>
-
-              <div class="hero-stats">
-                <span class="hero-stat">⭐ {{ app.starCount }} stars</span>
-                <span class="hero-stat">👁 {{ app.viewCount }} views</span>
-                <span v-if="publishedLabel" class="hero-stat">Published {{ publishedLabel }}</span>
-              </div>
-
-              <p v-if="app.description" class="hero-description">{{ app.description }}</p>
-
-              <div v-if="tagList.length" class="tag-row">
-                <span v-for="tag in tagList" :key="tag" class="tag">{{ tag }}</span>
-              </div>
-
-              <div class="hero-actions">
-                <a v-if="launchUrl" :href="launchUrl" target="_blank" rel="noopener" class="btn btn-primary">
-                  Open app
-                  <i class="pi pi-external-link" />
-                </a>
-                <RouterLink to="/apps" class="btn btn-secondary">Explore more apps</RouterLink>
+              <div class="meta-strip">
+                <div v-if="app.category" class="meta-card"><strong>{{ app.category }}</strong><span>category</span></div>
+                <div v-if="publishedLabel" class="meta-card"><strong>{{ publishedLabel }}</strong><span>published</span></div>
+                <div class="meta-card"><strong>{{ galleryImages.length }}</strong><span>screenshot{{ galleryImages.length === 1 ? '' : 's' }}</span></div>
               </div>
             </div>
-          </section>
 
-          <section class="detail-panel media-panel">
-            <div class="hero-gallery">
+            <article class="detail-gallery">
               <div class="gallery-stage">
                 <button
                   v-if="galleryImages.length > 1"
@@ -244,19 +268,37 @@ onMounted(loadApp)
                   <img :src="resolveAssetUrl(image.imageUrl)" :alt="image.caption" />
                 </button>
               </div>
-            </div>
+            </article>
           </section>
 
-          <section v-if="app.relatedApps.length" class="related-section">
-            <div class="related-header">
-              <div>
-                <span class="section-label">More like this</span>
-                <h2 class="section-title related-title">Keep exploring this category</h2>
+          <section class="detail-body-grid">
+            <article class="detail-card">
+              <h2>About this app</h2>
+              <p>{{ app.summary || app.description || 'Open the app to see what this public Automaton build does.' }}</p>
+              <div v-if="tagList.length" class="tag-row">
+                <span v-for="tag in tagList" :key="tag" class="tag">{{ tag }}</span>
               </div>
+            </article>
+
+            <aside class="detail-card fork-card">
+              <h3>Fork this idea</h3>
+              <p>Use this app as a starting point for a new Automaton build.</p>
+              <RouterLink to="/cli" class="fork-button">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
+                </svg>
+                Fork app
+              </RouterLink>
+            </aside>
+          </section>
+
+          <section v-if="creatorApps.length" class="related-section">
+            <div class="related-header">
+              <h2 class="related-title">{{ relatedHeading }}</h2>
             </div>
 
             <div class="related-grid">
-              <RouterLink v-for="relatedApp in app.relatedApps" :key="relatedApp.id" :to="`/apps/${relatedApp.id}`" class="related-card">
+              <RouterLink v-for="relatedApp in creatorApps" :key="relatedApp.id" :to="`/apps/${relatedApp.id}`" class="related-card">
                 <div class="related-media">
                   <img
                     v-if="relatedApp.thumbnailUrl"
@@ -269,10 +311,6 @@ onMounted(loadApp)
                   </div>
                 </div>
                 <div class="related-body">
-                  <div class="related-meta">
-                    <span v-if="relatedApp.category" class="tag">{{ relatedApp.category }}</span>
-                    <span class="related-metric">⭐ {{ relatedApp.starCount }}</span>
-                  </div>
                   <h3 class="related-name">{{ relatedApp.name }}</h3>
                   <div v-if="relatedApp.creatorPublicUsername" class="related-creator">
                     by {{ relatedApp.creatorDisplayName || relatedApp.creatorPublicUsername }}
@@ -292,8 +330,23 @@ onMounted(loadApp)
 </template>
 
 <style scoped>
+.app-detail-v2 {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(80, 215, 255, 0.12), transparent 28rem),
+    radial-gradient(circle at 84% 10%, rgba(69, 230, 138, 0.1), transparent 30rem),
+    linear-gradient(180deg, #090b10 0%, #07080b 48%, #050608 100%);
+  color: #f5f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 .detail-page {
-  padding: 40px 0 100px;
+  padding: 42px 0 80px;
+}
+
+.detail-shell {
+  width: min(1260px, calc(100% - 40px));
+  margin: 0 auto;
 }
 
 .back-link {
@@ -301,12 +354,13 @@ onMounted(loadApp)
   align-items: center;
   gap: 8px;
   margin-bottom: 24px;
-  color: var(--color-text-muted);
-  font-weight: 600;
+  color: #9ba3b4;
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .back-link:hover {
-  color: var(--color-text);
+  color: #f5f7fb;
 }
 
 .detail-state {
@@ -315,13 +369,11 @@ onMounted(loadApp)
   gap: 14px;
   min-height: 360px;
   padding: 32px;
-  border-radius: 28px;
-  border: 1px solid var(--color-border);
-  background:
-    radial-gradient(circle at top, rgba(124, 106, 245, 0.14), transparent 40%),
-    var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
   text-align: center;
-  color: var(--color-text-muted);
+  color: #9ba3b4;
 }
 
 .state-orb {
@@ -330,142 +382,156 @@ onMounted(loadApp)
   border-radius: 999px;
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 36%),
-    linear-gradient(135deg, rgba(124, 106, 245, 0.42), rgba(77, 166, 255, 0.22));
+    linear-gradient(135deg, rgba(69, 230, 138, 0.32), rgba(80, 215, 255, 0.22));
 }
 
 .state-orb-error {
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.24), transparent 36%),
-    linear-gradient(135deg, rgba(255, 120, 120, 0.42), rgba(124, 106, 245, 0.18));
+    linear-gradient(135deg, rgba(255, 120, 120, 0.42), rgba(80, 215, 255, 0.18));
 }
 
-.detail-panel,
-.hero-copy,
-.hero-gallery,
-.related-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    radial-gradient(circle at top right, rgba(77, 166, 255, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
-    var(--color-surface);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-}
-
-.detail-panel {
-  border-radius: 30px;
-}
-
-.detail-summary-card {
-  overflow: hidden;
-  background:
-    radial-gradient(circle at top right, rgba(77, 166, 255, 0.18), transparent 34%),
-    radial-gradient(circle at bottom left, rgba(124, 106, 245, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    var(--color-surface);
-}
-
-.hero-copy {
+.detail-hero {
   display: grid;
-  gap: 14px;
-  padding: 24px 28px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.hero-badges,
-.hero-stats,
-.tag-row,
-.hero-actions,
-.related-meta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.hero-actions {
+  grid-template-columns: minmax(0, 0.74fr) minmax(680px, 1.26fr);
+  gap: 34px;
   align-items: stretch;
 }
 
-.hero-chip,
-.hero-stat {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
+.summary-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 520px;
+  padding: 28px 0;
 }
 
-.hero-chip {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(124, 106, 245, 0.34), rgba(77, 166, 255, 0.18));
+.detail-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border: 1px solid rgba(80, 215, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(80, 215, 255, 0.08);
+  color: #c4f2ff;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .hero-title {
-  font-size: clamp(1.75rem, 3.4vw, 2.55rem);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  margin: 18px 0 16px;
+  color: #f5f7fb;
+  font-size: clamp(3.1rem, 6.2vw, 6.1rem);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
 }
 
 .developer-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
+  margin-bottom: 18px;
+  color: #50d7ff;
+  font-weight: 800;
 }
 
 .developer-link {
-  color: var(--color-blue);
+  color: #50d7ff;
 }
 
 .developer-link:hover {
-  color: #7cc3ff;
+  color: #9ee8ff;
 }
 
 .hero-description {
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
-  line-height: 1.45;
+  max-width: 560px;
+  margin: 0;
+  color: #c8ceda;
+  font-size: 1.12rem;
+  line-height: 1.5;
   white-space: pre-line;
-  max-width: 56rem;
 }
 
-.media-panel {
-  margin-top: 22px;
-  padding: 18px;
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
 }
 
-.hero-gallery {
+.detail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f7fb;
+  font-weight: 800;
+}
+
+.detail-button.primary {
+  border-color: rgba(69, 230, 138, 0.55);
+  background: #45e68a;
+  color: #041008;
+}
+
+.meta-strip {
   display: grid;
-  gap: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 34px;
+}
+
+.meta-card {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.meta-card strong {
+  display: block;
+  color: #f5f7fb;
+  font-size: 1.08rem;
+  line-height: 1.1;
+}
+
+.meta-card span {
+  color: #aeb8c8;
+  font-size: 0.86rem;
+}
+
+.detail-gallery {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(15, 18, 24, 0.94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
 .gallery-stage {
   position: relative;
   overflow: hidden;
-  height: min(62vw, 560px);
-  min-height: 360px;
-  border-radius: 18px;
-  background: #05070d;
+  display: grid;
+  min-height: 520px;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(80, 215, 255, 0.08), transparent 28rem),
+    #080b10;
 }
 
 .stage-image {
-  width: 100%;
-  height: 100%;
-  min-height: 360px;
+  width: min(100%, 780px);
+  max-height: 480px;
   object-fit: contain;
   display: block;
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
 }
 
 .stage-fallback,
@@ -479,54 +545,56 @@ onMounted(loadApp)
 }
 
 .gallery-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
+  padding: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #172231;
 }
 
 .gallery-thumb {
-  flex: 0 0 148px;
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
-  background: var(--color-surface-2);
+  background: #0b0f15;
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .gallery-thumb:hover {
   transform: translateY(-2px);
-  border-color: rgba(124, 106, 245, 0.34);
+  border-color: rgba(80, 215, 255, 0.36);
 }
 
 .gallery-thumb-active {
-  border-color: rgba(124, 106, 245, 0.52);
-  box-shadow: inset 0 0 0 1px rgba(124, 106, 245, 0.25);
+  border-color: rgba(80, 215, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(80, 215, 255, 0.25);
 }
 
 .gallery-thumb img {
   width: 100%;
   aspect-ratio: 16 / 9;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
-  background: #060910;
+  background: #0b0f15;
 }
 
 .gallery-arrow {
   position: absolute;
   top: 50%;
   z-index: 2;
-  width: 54px;
-  height: 112px;
+  display: grid;
+  width: 42px;
+  height: 88px;
+  place-items: center;
   transform: translateY(-50%);
-  border: 0;
-  background: linear-gradient(90deg, rgba(103, 193, 245, 0.28), rgba(103, 193, 245, 0));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(22, 36, 50, 0.78);
   color: #ffffff;
   cursor: pointer;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
 }
 
 .gallery-arrow-left {
@@ -535,46 +603,120 @@ onMounted(loadApp)
 
 .gallery-arrow-right {
   right: 0;
-  background: linear-gradient(270deg, rgba(103, 193, 245, 0.28), rgba(103, 193, 245, 0));
 }
 
 .gallery-arrow:hover {
-  color: #66c0f4;
+  color: #50d7ff;
+}
+
+.detail-body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.detail-card,
+.related-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.detail-card {
+  padding: 22px;
+}
+
+.detail-card h2,
+.detail-card h3 {
+  margin: 0 0 10px;
+  color: #f5f7fb;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.detail-card p {
+  margin: 0;
+  color: #9ba3b4;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.tag {
+  display: inline-flex;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #9ba3b4;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.fork-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.fork-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid rgba(69, 230, 138, 0.45);
+  border-radius: 8px;
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+  font-weight: 900;
+}
+
+.fork-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .related-section {
-  margin-top: 42px;
+  margin-top: 36px;
 }
 
 .related-header {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .related-title {
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  margin: 0;
+  color: #f5f7fb;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
 .related-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
 }
 
 .related-card {
-  display: grid;
   overflow: hidden;
-  border-radius: 24px;
   transition: transform 0.22s ease, border-color 0.22s ease;
 }
 
 .related-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(124, 106, 245, 0.3);
+  border-color: rgba(80, 215, 255, 0.28);
 }
 
 .related-media {
   aspect-ratio: 16 / 10;
-  background: linear-gradient(135deg, rgba(124, 106, 245, 0.22), rgba(77, 166, 255, 0.14));
+  background: #080b10;
 }
 
 .related-image {
@@ -585,17 +727,19 @@ onMounted(loadApp)
 
 .related-body {
   display: grid;
-  gap: 12px;
   padding: 16px;
 }
 
 .related-name {
+  margin: 0 0 6px;
+  color: #f5f7fb;
   font-size: 1.02rem;
   line-height: 1.2;
 }
 
 .related-summary {
-  color: var(--color-text-muted);
+  margin: 0;
+  color: #9ba3b4;
   font-size: 0.9rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -604,42 +748,58 @@ onMounted(loadApp)
 }
 
 .related-creator {
-  color: var(--color-blue);
+  margin-bottom: 8px;
+  color: #50d7ff;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.related-metric {
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 700;
+@media (max-width: 1060px) {
+  .detail-hero,
+  .detail-body-grid,
+  .related-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-panel {
+    min-height: auto;
+    padding: 0;
+  }
+
+  .gallery-stage {
+    min-height: 360px;
+  }
 }
 
 @media (max-width: 720px) {
   .detail-page {
-    padding: 28px 0 84px;
+    padding: 26px 0 84px;
   }
 
-  .hero-copy {
-    padding: 18px;
-    border-radius: 24px;
+  .detail-shell {
+    width: min(100% - 28px, 1260px);
   }
 
-  .media-panel {
-    padding: 12px;
+  .hero-title {
+    font-size: clamp(2.9rem, 15vw, 4.4rem);
   }
 
-  .gallery-stage,
-  .stage-image {
-    min-height: 280px;
+  .meta-strip,
+  .gallery-strip {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .gallery-stage {
-    height: 320px;
+    min-height: 280px;
   }
 
-  .gallery-thumb {
-    flex-basis: 112px;
+  .stage-image {
+    max-height: 260px;
+  }
+
+  .gallery-arrow {
+    width: 38px;
+    height: 72px;
   }
 }
 </style>

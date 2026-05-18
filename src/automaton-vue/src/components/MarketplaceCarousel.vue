@@ -10,11 +10,13 @@ const props = withDefaults(
     compact?: boolean
     title?: string
     variant?: 'showcase' | 'hero'
+    showStats?: boolean
   }>(),
   {
     compact: false,
     title: 'Featured & Recommended',
     variant: 'showcase',
+    showStats: true,
   },
 )
 
@@ -67,7 +69,15 @@ watch(
 
 function resolveAssetUrl(url?: string | null) {
   if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (
+    url.startsWith('http') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('/assets/') ||
+    url.startsWith('/src/')
+  ) {
+    return url
+  }
   return `${publicAppConfig.apiBaseUrl}${url.replace(/^\/+/, '')}`
 }
 
@@ -117,7 +127,7 @@ function openCreator(publicUsername: string) {
       },
     ]"
   >
-    <span class="section-label carousel-heading">{{ title }}</span>
+    <span v-if="title" class="section-label carousel-heading">{{ title }}</span>
 
     <button
       v-if="apps.length > 1"
@@ -176,7 +186,7 @@ function openCreator(publicUsername: string) {
 
         <div class="carousel-copy">
           <p>{{ activeApp.description || activeApp.summary || 'Published Automaton app' }}</p>
-          <div class="carousel-stats">
+          <div v-if="showStats && variant !== 'hero'" class="carousel-stats">
             <span v-if="activeApp.category" class="carousel-tag">{{ activeApp.category }}</span>
             <span><i class="pi pi-star-fill"></i>{{ activeApp.starCount }}</span>
             <span><i class="pi pi-eye"></i>{{ activeApp.viewCount }}</span>
@@ -447,8 +457,8 @@ function openCreator(publicUsername: string) {
 }
 
 .market-carousel-hero .carousel-slide {
-  height: 360px;
-  grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
+  height: 392px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(15, 18, 24, 0.94);
@@ -460,8 +470,14 @@ function openCreator(publicUsername: string) {
 }
 
 .market-carousel-hero .carousel-main-media {
-  padding: 14px;
+  padding: 12px 14px;
   background: #080b10;
+}
+
+.market-carousel-hero .carousel-main-media img,
+.market-carousel-hero .carousel-placeholder {
+  width: 100%;
+  height: 100%;
 }
 
 .market-carousel-hero .carousel-screenshots {
@@ -479,7 +495,7 @@ function openCreator(publicUsername: string) {
 }
 
 .market-carousel-hero .carousel-copy p {
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
 }
 
 .market-carousel-hero .carousel-tag {

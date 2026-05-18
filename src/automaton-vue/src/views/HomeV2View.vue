@@ -166,7 +166,7 @@ onMounted(() => {
                   <button v-if="heroApps.length > 1" type="button" aria-label="Previous app" @click="previousApp">
                     <i class="pi pi-chevron-left" />
                   </button>
-                  <span>{{ String(activeIndex + 1).padStart(2, '0') }} / {{ String(heroApps.length).padStart(2, '0') }}</span>
+                  <span class="carousel-slide-count">{{ String(activeIndex + 1).padStart(2, '0') }} / {{ String(heroApps.length).padStart(2, '0') }}</span>
                   <button v-if="heroApps.length > 1" type="button" aria-label="Next app" @click="nextApp">
                     <i class="pi pi-chevron-right" />
                   </button>
@@ -436,7 +436,7 @@ onMounted(() => {
 }
 
 .shell {
-  width: min(1180px, calc(100% - 40px));
+  width: min(1260px, calc(100% - 40px));
   margin: 0 auto;
 }
 
@@ -529,7 +529,7 @@ onMounted(() => {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  grid-template-columns: minmax(0, 0.86fr) minmax(560px, 1.14fr);
   gap: 44px;
   align-items: center;
 }
@@ -652,6 +652,13 @@ h1 span:last-child {
   gap: 8px;
 }
 
+.carousel-slide-count {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 6ch;
+  text-align: center;
+}
+
 .carousel-header-controls button {
   display: inline-grid;
   width: 26px;
@@ -678,7 +685,7 @@ h1 span:last-child {
 
 .featured-app {
   display: grid;
-  grid-template-columns: 1.12fr 0.88fr;
+  grid-template-columns: 1.28fr 0.72fr;
   height: 410px;
   color: inherit;
   text-align: left;
@@ -688,13 +695,13 @@ h1 span:last-child {
 .featured-image {
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 16px 18px;
   background: #080b10;
 }
 
 .featured-image img {
-  width: min(100%, 360px);
-  max-height: 320px;
+  width: min(100%, 520px);
+  max-height: 340px;
   object-fit: contain;
   border-radius: 6px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);

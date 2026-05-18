@@ -9,7 +9,13 @@ export function resolveMarketplaceAssetUrl(url?: string | null) {
     return ''
   }
 
-  if (url.startsWith('http')) {
+  if (
+    url.startsWith('http') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('/assets/') ||
+    url.startsWith('/src/')
+  ) {
     return url
   }
 
