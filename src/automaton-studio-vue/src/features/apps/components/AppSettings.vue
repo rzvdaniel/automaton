@@ -5,7 +5,7 @@
  * Includes: Basic info, Publishing, Runner, Appearance
  */
 import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
@@ -23,6 +23,7 @@ import { AccessScope, type AppScreenshot } from '../types/apps.types'
 
 const toast = useToast()
 const confirm = useConfirm()
+const route = useRoute()
 const router = useRouter()
 const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
@@ -36,6 +37,16 @@ const isAdmin = computed(() => {
 
 // Active settings section
 const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+
+watch(
+  () => route.query.settings,
+  (section) => {
+    if (section === 'publishing') {
+      activeSection.value = 'publishing'
+    }
+  },
+  { immediate: true },
+)
 
 // Connect section state
 const copiedItem = ref<string | null>(null)
@@ -64,6 +75,7 @@ const summary = ref('')
 const description = ref('')
 const publicUrl = ref('')
 const requiresAuthentication = ref(false)
+const isForkable = ref(false)
 const isProfileFeatured = ref(false)
 const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
@@ -144,6 +156,7 @@ const hasChanges = computed(() => {
     description.value !== (app.value.description || '') ||
     publicUrl.value !== (app.value.publicUrl || '') ||
     requiresAuthentication.value !== app.value.requiresAuthentication ||
+    isForkable.value !== (app.value.isForkable ?? false) ||
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined)
@@ -166,6 +179,7 @@ watch(
       description.value = newApp.description || ''
       publicUrl.value = newApp.publicUrl || ''
       requiresAuthentication.value = newApp.requiresAuthentication || false
+      isForkable.value = newApp.isForkable ?? false
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
       executionRunnerId.value = newApp.executionRunnerId || null
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
@@ -242,6 +256,7 @@ async function saveSettings() {
       description: description.value || undefined,
       publicUrl: publicUrl.value || undefined,
       requiresAuthentication: requiresAuthentication.value,
+      isForkable: isForkable.value,
       isProfileFeatured: isProfileFeatured.value,
       executionRunnerId: executionRunnerId.value || undefined,
     })
@@ -253,6 +268,7 @@ async function saveSettings() {
       editorStore.currentApp.description = description.value
       editorStore.currentApp.publicUrl = publicUrl.value
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
+      editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
       editorStore.currentApp.executionRunnerId = executionRunnerId.value || undefined
     }
@@ -708,6 +724,22 @@ async function handleSaveTemplateStatus() {
                   {{ requiresAuthentication
                     ? 'Users must be logged in to access this app'
                     : 'Anyone with the link can access this app' }}
+                </small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="forkable" class="font-medium">Forking</label>
+                <div class="flex align-items-center gap-3">
+                  <InputSwitch
+                    id="forkable"
+                    v-model="isForkable"
+                  />
+                  <span>{{ isForkable ? 'Others can fork this app' : 'Source stays private' }}</span>
+                </div>
+                <small class="text-color-secondary">
+                  {{ isForkable
+                    ? 'Published users can create editable remixes with attribution.'
+                    : 'People can use the published app, but cannot access editable source.' }}
                 </small>
               </div>
 

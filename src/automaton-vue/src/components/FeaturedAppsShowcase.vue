@@ -141,7 +141,7 @@ onBeforeUnmount(stopRotation)
           <span class="badge badge-live">Live app</span>
           <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
           <span v-if="activeApp.category" class="badge badge-static">{{ activeApp.category }}</span>
-          <span class="badge">Fork ready</span>
+          <span v-if="activeApp.isForkable" class="badge">Forkable</span>
         </div>
 
         <h3>{{ activeApp.name }}</h3>
@@ -151,7 +151,7 @@ onBeforeUnmount(stopRotation)
           <span class="avatar">{{ activeCreatorInitials }}</span>
           <span>by {{ activeCreatorName }}</span>
           <span>{{ formatCount(activeApp.viewCount) }} views</span>
-          <span>{{ formatCount(activeApp.forkCount) }} forks</span>
+          <span v-if="activeApp.isForkable">{{ formatCount(activeApp.forkCount) }} forks</span>
           <span>{{ formatCount(activeApp.starCount) }} stars</span>
         </div>
 
@@ -160,7 +160,7 @@ onBeforeUnmount(stopRotation)
             <i class="pi pi-play"></i>
             Play
           </button>
-          <button class="showcase-button" type="button" @click.stop="forkApp(activeApp)">
+          <button v-if="activeApp.isForkable" class="showcase-button" type="button" @click.stop="forkApp(activeApp)">
             <i class="pi pi-copy"></i>
             Fork
           </button>

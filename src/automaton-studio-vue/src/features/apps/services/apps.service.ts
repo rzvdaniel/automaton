@@ -209,6 +209,7 @@ class AppsService {
       requiresAuthentication?: boolean
       executionRunnerId?: string
       isProfileFeatured?: boolean
+      isForkable?: boolean
     },
   ): Promise<void> {
     // Get current app and build update payload with only backend-expected fields
@@ -219,6 +220,7 @@ class AppsService {
       summary: settings.summary ?? app.summary ?? '',
       description: settings.description ?? app.description,
       isPublished: app.isPublished,
+      isForkable: settings.isForkable ?? app.isForkable,
       publicUrl: settings.publicUrl ?? app.publicUrl,
       publishedAt: app.publishedAt,
       version: app.version,
@@ -268,6 +270,7 @@ class AppsService {
       summary: app.summary ?? '',
       description: app.description,
       isPublished: app.isPublished,
+      isForkable: app.isForkable,
       publicUrl: app.publicUrl,
       publishedAt: app.publishedAt,
       version: app.version,

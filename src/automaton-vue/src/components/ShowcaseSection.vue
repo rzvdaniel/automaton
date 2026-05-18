@@ -31,6 +31,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 55,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     isFeatured: true,
     screenshots: [
       { id: 'pac-snake', imageUrl: snakeImage, caption: 'Snake remix', sortOrder: 1 },
@@ -50,6 +51,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 41,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -64,6 +66,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 38,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -78,6 +81,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 32,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -92,6 +96,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 27,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -106,6 +111,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 27,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -120,6 +126,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 24,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
   {
@@ -134,6 +141,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     viewCount: 19,
     starCount: 0,
     forkCount: 0,
+    isForkable: true,
     screenshots: [],
   },
 ]
@@ -181,8 +189,28 @@ function formatCount(value: number) {
   return String(value)
 }
 
-function appRuntimeLabel(app: MarketplaceAppCard) {
-  return app.publicUrl ? 'Live demo' : 'Preview'
+function pluralize(value: number, singular: string, plural = `${singular}s`) {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`
+}
+
+function updatedLabel(app: MarketplaceAppCard) {
+  const source = app.updatedAt || app.publishedAt
+  if (!source) return 'updated recently'
+
+  const updated = new Date(source)
+  if (Number.isNaN(updated.getTime())) return 'updated recently'
+
+  const diffMs = Date.now() - updated.getTime()
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000))
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMinutes < 60) return 'updated today'
+  if (diffHours < 24) return 'updated today'
+  if (diffDays === 1) return 'updated yesterday'
+  if (diffDays < 7) return `updated ${diffDays}d ago`
+  if (diffDays < 30) return `updated ${Math.floor(diffDays / 7)}w ago`
+  return `updated ${Math.floor(diffDays / 30)}mo ago`
 }
 
 function creatorLabel(app: MarketplaceAppCard) {
@@ -216,6 +244,7 @@ function openLiveApp(app: MarketplaceAppCard) {
 }
 
 function forkApp(app: MarketplaceAppCard) {
+  if (!app.isForkable) return
   window.open(`${publicAppConfig.studioUrl}apps/fork/${app.id}`, '_blank', 'noopener')
 }
 
@@ -341,9 +370,7 @@ watch(
                 <div class="badge-row">
                   <span class="badge badge-live">Live app</span>
                   <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
-                  <span v-if="app.category?.toLowerCase().includes('template')" class="badge badge-template">Template</span>
-                  <span v-else-if="appRuntimeLabel(app) === 'Live demo'" class="badge badge-static">Live demo</span>
-                  <span v-else class="badge badge-static">Preview</span>
+                  <span v-if="app.isForkable" class="badge">Forkable</span>
                 </div>
                 <h3 class="app-title">{{ app.name }}</h3>
                 <p class="app-summary">{{ app.summary || app.description || 'Open the detail page to explore the app.' }}</p>
@@ -351,7 +378,6 @@ watch(
 
               <div class="card-meta">
                 <div class="creator-row">
-                  <span class="creator-avatar">{{ creatorInitials(app) }}</span>
                   <button
                     v-if="app.creatorPublicUsername"
                     type="button"
@@ -360,22 +386,36 @@ watch(
                     @keydown.enter.stop
                     @keydown.space.stop
                   >
-                    {{ creatorLabel(app) }}
+                    <span class="creator-avatar">{{ creatorInitials(app) }}</span>
+                    <span>by {{ creatorLabel(app) }}</span>
                   </button>
-                  <span v-else class="creator-link creator-link-static">{{ creatorLabel(app) }}</span>
+                  <span v-else class="creator-link creator-link-static">
+                    <span class="creator-avatar">{{ creatorInitials(app) }}</span>
+                    <span>by {{ creatorLabel(app) }}</span>
+                  </span>
                 </div>
 
                 <div class="app-meta-row" aria-label="App metadata">
-                  <span>{{ formatCount(app.viewCount) }} views</span>
-                  <span>{{ formatCount(app.forkCount) }} forks</span>
-                  <span>{{ formatCount(app.starCount) }} stars</span>
+                  <span><i class="pi pi-play" /> {{ pluralize(app.viewCount, 'play') }}</span>
+                  <span v-if="app.isForkable"><i class="pi pi-copy" /> {{ pluralize(app.forkCount, 'fork') }}</span>
+                  <span>{{ updatedLabel(app) }}</span>
                 </div>
 
-                <div class="app-actions">
-                  <button class="button ghost" type="button" @click.stop="openLiveApp(app)">
+                <div class="app-actions" :class="{ 'app-actions-single': !app.isForkable }">
+                  <button class="button" type="button" @click.stop="openLiveApp(app)">
+                    <i class="pi pi-play" />
                     {{ app.publicUrl ? 'Play' : 'Open' }}
                   </button>
-                  <button class="button ghost" type="button" @click.stop="forkApp(app)">
+                  <button
+                    v-if="app.isForkable"
+                    class="button ghost"
+                    type="button"
+                    title="Fork this app in Automaton Studio"
+                    @click.stop="forkApp(app)"
+                  >
+                    <svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                      <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
+                    </svg>
                     Fork
                   </button>
                 </div>
@@ -636,7 +676,7 @@ watch(
     transform 0.18s ease;
 }
 
-.creator-link:hover {
+.creator-link:not(.creator-link-static):hover {
   color: #9ee8ff;
   background: rgba(80, 215, 255, 0.08);
   transform: translateY(-1px);
@@ -644,7 +684,7 @@ watch(
   text-underline-offset: 0.16em;
 }
 
-.creator-link:hover .creator-avatar {
+.creator-link:not(.creator-link-static):hover .creator-avatar {
   box-shadow: 0 0 0 1px rgba(80, 215, 255, 0.22);
 }
 
@@ -671,61 +711,94 @@ watch(
 .app-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 7px;
+}
+
+.app-actions-single {
+  grid-template-columns: 1fr;
 }
 
 .app-meta-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   color: #9fb0c2;
   font-size: 0.78rem;
   font-weight: 850;
 }
 
 .app-meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #778196;
+}
+
+.app-meta-row i {
+  font-size: 0.72rem;
 }
 
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #f5f7fb;
-  font-size: 0.92rem;
+  background: rgba(3, 7, 14, 0.48);
+  color: #dfe6f2;
+  font-size: 0.82rem;
   font-weight: 850;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .button.primary {
-  border-color: rgba(69, 230, 138, 0.55);
-  background: #45e68a;
-  color: #041008;
-  box-shadow: 0 16px 44px rgba(69, 230, 138, 0.18);
+  border-color: rgba(255, 255, 255, 0.11);
+  background: rgba(3, 7, 14, 0.48);
+  color: #dfe6f2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .button.ghost {
-  min-height: 34px;
-  padding: 0 11px;
-  background: rgba(0, 0, 0, 0.18);
-  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: #b9c5d6;
 }
 
 .button:hover {
-  border-color: rgba(80, 215, 255, 0.28);
-  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-1px);
+  border-color: rgba(69, 230, 138, 0.38);
+  background: rgba(69, 230, 138, 0.1);
+  color: #eafff1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px rgba(69, 230, 138, 0.1);
 }
 
 .button.ghost:hover {
-  border-color: rgba(69, 230, 138, 0.34);
-  background: rgba(69, 230, 138, 0.12);
+  border-color: rgba(80, 215, 255, 0.32);
+  background: rgba(80, 215, 255, 0.08);
+  color: #ecfbff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px rgba(80, 215, 255, 0.08);
+}
+
+.button i,
+.button-icon {
+  width: 0.82rem;
+  height: 0.82rem;
+  font-size: 0.76rem;
+  flex: 0 0 auto;
 }
 
 .market-footer-grid {

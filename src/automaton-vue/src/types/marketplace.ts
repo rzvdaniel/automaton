@@ -11,9 +11,11 @@ export type MarketplaceAppCard = {
   viewCount: number
   starCount: number
   forkCount: number
+  isForkable: boolean
   isStarredByCurrentUser?: boolean
   publicUrl?: string
   publishedAt?: string
+  updatedAt?: string
   isFeatured?: boolean
   isProfileFeatured?: boolean
   screenshots: MarketplaceAppScreenshot[]

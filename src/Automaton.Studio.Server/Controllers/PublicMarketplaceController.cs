@@ -79,10 +79,12 @@ public class PublicMarketplaceController : ControllerBase
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
                 ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
+                IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
+                UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -141,10 +143,12 @@ public class PublicMarketplaceController : ControllerBase
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
                 ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
+                IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
+                UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured
             })
             .FirstOrDefaultAsync();
@@ -209,10 +213,12 @@ public class PublicMarketplaceController : ControllerBase
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
                 ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
+                IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
+                UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -288,10 +294,12 @@ public class PublicMarketplaceController : ControllerBase
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
                 ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
+                IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
+                UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -346,9 +354,11 @@ public class MarketplaceAppCardDto
     public int ViewCount { get; set; }
     public int StarCount { get; set; }
     public int ForkCount { get; set; }
+    public bool IsForkable { get; set; }
     public bool IsStarredByCurrentUser { get; set; }
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
     public bool IsFeatured { get; set; }
     public List<MarketplaceAppScreenshotDto> Screenshots { get; set; } = new();
 }

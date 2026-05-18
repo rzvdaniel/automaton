@@ -82,6 +82,16 @@ const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 // Active view tab
 const activeTab = ref<'build' | 'code' | 'backend-server' | 'monitor' | 'settings'>('build')
 
+watch(
+  () => route.query.settings,
+  (section) => {
+    if (section === 'publishing') {
+      activeTab.value = 'settings'
+    }
+  },
+  { immediate: true },
+)
+
 // Active sub-tab in monitor view
 const activeMonitorTab = ref<'build-logs' | 'execution-history' | 'usage'>('build-logs')
 
@@ -617,6 +627,11 @@ async function handlePublish(request: PublishAppRequest) {
   }
 }
 
+function openPublishingSettings() {
+  activeTab.value = 'settings'
+  void router.replace({ query: { ...route.query, settings: 'publishing' } })
+}
+
 // Handle unpublish
 async function handleUnpublish() {
   confirm.require({
@@ -1066,6 +1081,13 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 />
               </a>
               <Button
+                label="Publishing settings"
+                icon="pi pi-cog"
+                outlined
+                severity="secondary"
+                @click="openPublishingSettings"
+              />
+              <Button
                 label="Unpublish"
                 icon="pi pi-cloud-download"
                 outlined
@@ -1321,6 +1343,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       :current-category="editorStore.currentApp?.category"
       :current-tags="editorStore.currentApp?.tags"
       :requires-auth="editorStore.currentApp?.requiresAuthentication"
+      :is-forkable="editorStore.currentApp?.isForkable"
       :app-name="editorStore.currentApp?.name"
       @publish="handlePublish"
     />

@@ -266,6 +266,7 @@ public class AppsService
         entity.Summary = app.Summary;
         entity.Description = app.Description;
         entity.IsPublished = app.IsPublished;
+        entity.IsForkable = app.IsForkable;
         entity.PublicUrl = app.PublicUrl;
         entity.RequiresAuthentication = app.RequiresAuthentication;
         entity.ExecutionRunnerId = app.ExecutionRunnerId;
@@ -338,7 +339,8 @@ public class AppsService
         bool requiresAuthentication = true,
         Guid? executionRunnerId = null,
         string? category = null,
-        string? tags = null)
+        string? tags = null,
+        bool isForkable = false)
     {
         // Check if user can update this app (needed for publishing)
         if (!await authorizationService.CanUpdateAppAsync(id))
@@ -380,6 +382,7 @@ public class AppsService
         entity.IsPublished = true;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
+        entity.IsForkable = isForkable;
         entity.RequiresAuthentication = requiresAuthentication;
         entity.Category = category?.Trim();
         entity.Tags = tags?.Trim();
@@ -390,8 +393,8 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth}, Runner: {Runner})",
-            id, publicUrl, entity.Version, requiresAuthentication, executionRunnerId);
+        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth}, Runner: {Runner}, Forkable: {Forkable})",
+            id, publicUrl, entity.Version, requiresAuthentication, executionRunnerId, isForkable);
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
@@ -504,6 +507,7 @@ public class AppsService
             Summary = entity.Summary,
             Description = entity.Description,
             IsPublished = entity.IsPublished,
+            IsForkable = entity.IsForkable,
             PublicUrl = entity.PublicUrl,
             PublishedAt = entity.PublishedAt,
             Version = entity.Version,
@@ -636,6 +640,9 @@ public class AppsService
         if (source == null)
             throw new InvalidOperationException("Fork source app not found.");
 
+        if (!source.IsForkable)
+            throw new InvalidOperationException("Forking is disabled for this app.");
+
         var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
             ?? throw new InvalidOperationException("Fork source app has no owner.");
 
@@ -683,6 +690,9 @@ public class AppsService
         if (source == null)
             throw new InvalidOperationException("Fork source app not found.");
 
+        if (!source.IsForkable)
+            throw new InvalidOperationException("Forking is disabled for this app.");
+
         var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
             ?? throw new InvalidOperationException("Fork source app has no owner.");
 
@@ -708,6 +718,7 @@ public class AppsService
             Description = source.Description,
             Definition = "{}",
             IsPublished = request.PublishImmediately,
+            IsForkable = false,
             PublicUrl = publicUrl,
             PublishedAt = request.PublishImmediately ? now : null,
             Version = 1,

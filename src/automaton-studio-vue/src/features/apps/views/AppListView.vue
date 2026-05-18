@@ -822,6 +822,7 @@ const handleRetry = async () => {
       :current-category="publishingApp?.category"
       :current-tags="publishingApp?.tags"
       :requires-auth="publishingApp?.requiresAuthentication"
+      :is-forkable="publishingApp?.isForkable"
       :app-name="publishingApp?.name"
       @publish="handlePublishApp"
     />

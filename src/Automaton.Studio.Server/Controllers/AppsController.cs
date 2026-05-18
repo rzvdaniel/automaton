@@ -365,7 +365,8 @@ public class AppsController : BaseController
             request.RequiresAuthentication,
             request.ExecutionRunnerId,
             request.Category,
-            request.Tags);
+            request.Tags,
+            request.IsForkable);
 
         return NoContent();
     }
@@ -1385,6 +1386,7 @@ public class PublishAppRequest
     public Guid? ExecutionRunnerId { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }
+    public bool IsForkable { get; set; } = false;
 }
 
 public class LinkMultipleStepsRequest

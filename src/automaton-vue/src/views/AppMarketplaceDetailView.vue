@@ -88,6 +88,26 @@ const publishedLabel = computed(() => {
   })
 })
 
+const updatedLabel = computed(() => {
+  const source = app.value?.updatedAt || app.value?.publishedAt
+  if (!source) return 'updated recently'
+
+  const updated = new Date(source)
+  if (Number.isNaN(updated.getTime())) return 'updated recently'
+
+  const diffMs = Date.now() - updated.getTime()
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000))
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMinutes < 60) return 'updated today'
+  if (diffHours < 24) return 'updated today'
+  if (diffDays === 1) return 'updated yesterday'
+  if (diffDays < 7) return `updated ${diffDays}d ago`
+  if (diffDays < 30) return `updated ${Math.floor(diffDays / 7)}w ago`
+  return `updated ${Math.floor(diffDays / 30)}mo ago`
+})
+
 const relatedHeading = computed(() => {
   const name = app.value?.creatorDisplayName || app.value?.creatorPublicUsername
   return name ? `More apps from ${name}` : 'More apps from this author'
@@ -220,9 +240,8 @@ onMounted(loadApp)
 
                 <div class="hero-stats" aria-label="App activity">
                   <span>{{ formatCount(app.viewCount) }} plays</span>
-                  <span>{{ formatCount(app.forkCount) }} forks</span>
-                  <span>{{ formatCount(app.starCount) }} saves</span>
-                  <span v-if="publishedLabel">published {{ publishedLabel }}</span>
+                  <span v-if="app.isForkable">{{ formatCount(app.forkCount) }} forks</span>
+                  <span>{{ updatedLabel }}</span>
                 </div>
 
                 <div class="hero-actions">
@@ -230,14 +249,20 @@ onMounted(loadApp)
                     Open app
                     <i class="pi pi-external-link" />
                   </a>
-                  <RouterLink to="/apps" class="detail-button">Browse apps</RouterLink>
+                  <a v-if="app.isForkable" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                      <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
+                    </svg>
+                    Fork
+                  </a>
                 </div>
-              </div>
 
-              <div class="meta-strip">
-                <div v-if="app.category" class="meta-card"><strong>{{ app.category }}</strong><span>category</span></div>
-                <div v-if="publishedLabel" class="meta-card"><strong>{{ publishedLabel }}</strong><span>published</span></div>
-                <div class="meta-card"><strong>{{ galleryImages.length }}</strong><span>screenshot{{ galleryImages.length === 1 ? '' : 's' }}</span></div>
+                <div class="hero-pills" aria-label="App metadata">
+                  <span class="hero-pill">Live app</span>
+                  <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
+                  <span v-if="app.isForkable" class="hero-pill hero-pill-forkable">Forkable</span>
+                  <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
+                </div>
               </div>
             </div>
 
@@ -297,17 +322,6 @@ onMounted(loadApp)
                 <span v-for="tag in tagList" :key="tag" class="tag">{{ tag }}</span>
               </div>
             </article>
-
-            <aside class="detail-card fork-card">
-              <h3>Fork this idea</h3>
-              <p>Use this app as a starting point for a new Automaton build.</p>
-              <a :href="forkUrl" class="fork-button" target="_blank" rel="noopener">
-                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                  <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
-                </svg>
-                Fork app
-              </a>
-            </aside>
           </section>
 
           <section v-if="creatorApps.length" class="related-section">
@@ -411,17 +425,17 @@ onMounted(loadApp)
 
 .detail-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.74fr) minmax(680px, 1.26fr);
-  gap: 34px;
+  grid-template-columns: minmax(360px, 0.86fr) minmax(620px, 1.14fr);
+  gap: 28px;
   align-items: stretch;
 }
 
 .summary-panel {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 520px;
-  padding: 28px 0;
+  justify-content: center;
+  min-height: 460px;
+  padding: 18px 0;
 }
 
 .detail-eyebrow {
@@ -437,11 +451,11 @@ onMounted(loadApp)
 }
 
 .hero-title {
-  margin: 18px 0 16px;
+  margin: 16px 0 14px;
   color: #f5f7fb;
-  font-size: clamp(3.1rem, 6.2vw, 6.1rem);
-  line-height: 0.92;
-  letter-spacing: -0.06em;
+  font-size: clamp(2.5rem, 4.7vw, 4.75rem);
+  line-height: 0.96;
+  letter-spacing: -0.052em;
 }
 
 .developer-row {
@@ -465,7 +479,7 @@ onMounted(loadApp)
   max-width: 560px;
   margin: 0;
   color: #c8ceda;
-  font-size: 1.12rem;
+  font-size: 1.02rem;
   line-height: 1.5;
   white-space: pre-line;
 }
@@ -497,8 +511,8 @@ onMounted(loadApp)
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .detail-button {
@@ -516,35 +530,46 @@ onMounted(loadApp)
 }
 
 .detail-button.primary {
-  border-color: rgba(69, 230, 138, 0.55);
-  background: #45e68a;
-  color: #041008;
+  border-color: rgba(69, 230, 138, 0.42);
+  background: rgba(69, 230, 138, 0.14);
+  color: #dcffe9;
 }
 
-.meta-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 34px;
+.detail-button:hover {
+  border-color: rgba(69, 230, 138, 0.44);
+  background: rgba(69, 230, 138, 0.1);
+  color: #f3fff7;
 }
 
-.meta-card {
-  padding: 14px;
+.fork-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.hero-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
-}
-
-.meta-card strong {
-  display: block;
-  color: #f5f7fb;
-  font-size: 1.08rem;
-  line-height: 1.1;
-}
-
-.meta-card span {
   color: #aeb8c8;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.hero-pill-forkable {
+  border-color: rgba(69, 230, 138, 0.24);
+  background: rgba(69, 230, 138, 0.1);
+  color: #bdfbd2;
 }
 
 .detail-gallery {
@@ -559,7 +584,7 @@ onMounted(loadApp)
   position: relative;
   overflow: hidden;
   display: grid;
-  min-height: 520px;
+  min-height: 460px;
   place-items: center;
   padding: 18px;
   background:
@@ -569,7 +594,7 @@ onMounted(loadApp)
 
 .stage-image {
   width: min(100%, 780px);
-  max-height: 480px;
+  max-height: 420px;
   object-fit: contain;
   display: block;
   border-radius: 8px;
@@ -653,7 +678,7 @@ onMounted(loadApp)
 
 .detail-body-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   margin-top: 28px;
 }
@@ -698,30 +723,6 @@ onMounted(loadApp)
   color: #9ba3b4;
   font-size: 0.82rem;
   font-weight: 800;
-}
-
-.fork-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-}
-
-.fork-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  border: 1px solid rgba(69, 230, 138, 0.45);
-  border-radius: 8px;
-  background: rgba(69, 230, 138, 0.14);
-  color: #45e68a;
-  font-weight: 900;
-}
-
-.fork-button svg {
-  width: 16px;
-  height: 16px;
 }
 
 .related-section {
@@ -823,10 +824,9 @@ onMounted(loadApp)
   }
 
   .hero-title {
-    font-size: clamp(2.9rem, 15vw, 4.4rem);
+    font-size: clamp(2.35rem, 12vw, 3.7rem);
   }
 
-  .meta-strip,
   .gallery-strip {
     grid-template-columns: repeat(2, 1fr);
   }

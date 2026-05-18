@@ -277,6 +277,7 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.IsSample).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsFeatured).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsProfileFeatured).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.IsForkable).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.MarketplaceStatus)
                     .IsRequired()
                     .HasMaxLength(40)
@@ -293,6 +294,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.IsProfileFeatured, e.IsPublished });
                 entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
                 entity.HasIndex(e => e.ForkedFromAppId);
+                entity.HasIndex(e => new { e.IsPublished, e.IsForkable });
 
                 entity.HasMany(e => e.WebAppScreenshots)
                     .WithOne(e => e.WebApp)

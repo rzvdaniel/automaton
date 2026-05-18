@@ -2051,6 +2051,11 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsForkable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsProfileFeatured")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
@@ -2146,6 +2151,8 @@ namespace Automaton.Studio.Server.Migrations
                         .IsUnique();
 
                     b.HasIndex("IsProfileFeatured", "IsPublished");
+
+                    b.HasIndex("IsPublished", "IsForkable");
 
                     b.HasIndex("IsSample", "IsPublished");
 

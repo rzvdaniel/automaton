@@ -12,6 +12,7 @@ public class WebApp
     
     // Publishing fields
     public bool IsPublished { get; set; }
+    public bool IsForkable { get; set; } = false;
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; } = 1;

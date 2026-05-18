@@ -16,6 +16,7 @@ const props = defineProps<{
   currentCategory?: string | null
   currentTags?: string | null
   requiresAuth?: boolean
+  isForkable?: boolean
   appName?: string
 }>()
 
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 
 const slug = ref('')
 const requiresAuthentication = ref(false)
+const allowForking = ref(false)
 const selectedCategory = ref<string | null>(null)
 const tags = ref('')
 const validationError = ref<string | null>(null)
@@ -73,6 +75,7 @@ watch(isVisible, async (visible) => {
   }
 
   requiresAuthentication.value = props.requiresAuth ?? false
+  allowForking.value = props.isForkable ?? false
   selectedCategory.value = props.currentCategory ?? null
   tags.value = props.currentTags ?? ''
   validationError.value = null
@@ -100,6 +103,7 @@ function handlePublish() {
     requiresAuthentication: requiresAuthentication.value,
     category: selectedCategory.value,
     tags: tags.value.trim() || null,
+    isForkable: allowForking.value,
   })
 }
 
@@ -173,6 +177,22 @@ function close() {
         />
         <small class="text-color-secondary block mt-1">
           Add a few search-friendly tags separated by commas.
+        </small>
+      </div>
+
+      <div class="field mb-4">
+        <div class="flex align-items-center gap-2">
+          <Checkbox
+            id="allowForking"
+            v-model="allowForking"
+            :binary="true"
+          />
+          <label for="allowForking">Allow others to fork this app</label>
+        </div>
+        <small class="text-color-secondary block mt-1 ml-6">
+          {{ allowForking
+            ? 'Others can create editable remixes with attribution.'
+            : 'People can use the app, but the editable source stays private.' }}
         </small>
       </div>
 

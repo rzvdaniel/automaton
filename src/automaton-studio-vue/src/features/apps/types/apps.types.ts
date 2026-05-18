@@ -48,6 +48,7 @@ export interface App {
   summary: string
   description: string
   isPublished: boolean
+  isForkable: boolean
   publicUrl?: string
   publishedAt?: string // ISO date string
   version: number
@@ -100,6 +101,7 @@ export interface PublishAppRequest {
   executionRunnerId?: string
   category?: string | null
   tags?: string | null
+  isForkable?: boolean
 }
 
 export interface ForkAppRequest {

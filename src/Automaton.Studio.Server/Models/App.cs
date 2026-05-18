@@ -8,6 +8,7 @@ public class AppModel
     public string Summary { get; set; }
     public string Description { get; set; }
     public bool IsPublished { get; set; }
+    public bool IsForkable { get; set; }
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; }
