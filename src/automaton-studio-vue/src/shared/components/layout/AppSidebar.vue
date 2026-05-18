@@ -8,6 +8,8 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
 import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 
+const publicDocsUrl = 'https://automaton.monster/docs'
+
 const router = useRouter()
 const route = useRoute()
 const isExpanded = ref(false)
@@ -26,6 +28,7 @@ interface NavItem {
   label: string
   icon: string
   to: string
+  external?: boolean
   divider?: boolean
   hideForAppUser?: boolean
 }
@@ -48,7 +51,7 @@ const bottomNavItems: NavItem[] = [
   { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true },
   { label: 'AI Keys', icon: 'pi pi-key', to: '/ai-keys' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
-  { label: 'Documentation', icon: 'pi pi-book', to: '/docs' },
+  { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },
 ]
 
 // Billing usage widget
@@ -103,14 +106,22 @@ const visibleBottomNavItems = computed(() => {
 })
 
 const isActive = (to: string) => {
+  if (to.startsWith('http')) {
+    return false
+  }
   if (to === '/') {
     return route.path === '/'
   }
   return route.path.startsWith(to)
 }
 
-const navigate = (to: string) => {
-  router.push(to)
+const navigate = (item: NavItem) => {
+  if (item.external) {
+    window.open(item.to, '_blank', 'noopener')
+    return
+  }
+
+  router.push(item.to)
 }
 
 const sidebarClass = computed(() => ({
@@ -140,7 +151,7 @@ const sidebarClass = computed(() => ({
             :severity="isActive(item.to) ? 'primary' : 'secondary'"
             :text="!isActive(item.to)"
             rounded
-            @click="navigate(item.to)"
+            @click="navigate(item)"
           >
             <i :class="item.icon"></i>
             <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
@@ -152,14 +163,14 @@ const sidebarClass = computed(() => ({
       <div class="sidebar-spacer"></div>
 
       <!-- Billing widget (expanded only) -->
-      <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate('/billing')">
+        <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate({ label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' })">
         <div class="billing-widget-header">
           <span class="billing-plan">{{ billingStatus.planName }}</span>
           <span v-if="billingStatus.hasActiveSubscription" class="billing-status">Active</span>
         </div>
         <div class="billing-widget-footer">
           <span class="text-color-secondary">{{ runnerSummary }}</span>
-          <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate('/pricing')">{{ sidebarPlansLabel }}</span>
+              <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate({ label: 'Pricing', icon: 'pi pi-credit-card', to: '/pricing' })">{{ sidebarPlansLabel }}</span>
         </div>
       </div>
 
@@ -173,7 +184,7 @@ const sidebarClass = computed(() => ({
             :severity="isActive(item.to) ? 'primary' : 'secondary'"
             :text="!isActive(item.to)"
             rounded
-            @click="navigate(item.to)"
+            @click="navigate(item)"
           >
             <i :class="item.icon"></i>
             <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>

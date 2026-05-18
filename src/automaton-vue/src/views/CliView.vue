@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import AppNav from '@/components/AppNav.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
 const downloadCards = [
@@ -166,7 +166,7 @@ async function copyCode(key: string, code: string) {
 
 <template>
   <div class="cli-page">
-    <AppNav />
+    <PublicSiteHeader />
 
     <main>
       <section class="cli-hero">
@@ -302,7 +302,7 @@ async function copyCode(key: string, code: string) {
             </article>
           </div>
 
-          <a href="/docs" class="cli-panel-link cli-quickstart-link">See detailed CLI + your tools docs <i class="pi pi-arrow-right" /></a>
+          <a href="/docs/cli-ai-tools" class="cli-panel-link cli-quickstart-link">See detailed CLI + your tools docs <i class="pi pi-arrow-right" /></a>
         </div>
       </section>
 

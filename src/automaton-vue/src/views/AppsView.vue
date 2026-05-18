@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import AppNav from '@/components/AppNav.vue'
+import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import ShowcaseSection from '@/components/ShowcaseSection.vue'
 </script>
 
 <template>
   <div>
-    <AppNav />
+    <PublicSiteHeader />
+    <AppsDiscoveryStrip />
     <main>
       <ShowcaseSection full-page />
     </main>

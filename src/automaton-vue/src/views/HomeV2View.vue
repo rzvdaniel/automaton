@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
@@ -26,6 +27,7 @@ const router = useRouter()
 const { apps, featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
 const activePreviewUrl = ref<string | null>(null)
+const showCopyNotice = ref(false)
 
 const fallbackApps: FallbackApp[] = [
   {
@@ -108,6 +110,18 @@ function openActiveApp() {
   void router.push(`/apps/${app.id}`)
 }
 
+async function copySetupFlow() {
+  try {
+    await navigator.clipboard.writeText('dotnet tool install -g Automaton.Cli\nautomaton setup')
+    showCopyNotice.value = true
+    window.setTimeout(() => {
+      showCopyNotice.value = false
+    }, 1500)
+  } catch {
+    showCopyNotice.value = false
+  }
+}
+
 onMounted(() => {
   void loadApps()
 })
@@ -115,25 +129,7 @@ onMounted(() => {
 
 <template>
   <div class="home-v2">
-    <nav class="v2-nav">
-      <div class="shell nav-inner">
-        <RouterLink class="brand" to="/">
-          <span class="mark">am</span>
-          <span>Automaton Monster</span>
-        </RouterLink>
-        <div class="nav-links" aria-label="Primary navigation">
-          <a href="#build">Build</a>
-          <RouterLink to="/apps">Apps</RouterLink>
-          <a href="#templates">Templates</a>
-          <a href="#creators">Creators</a>
-          <a href="#install">Install</a>
-        </div>
-        <div class="nav-actions">
-          <RouterLink class="button" to="/apps">Explore apps</RouterLink>
-          <RouterLink class="button primary" to="/cli">Start building</RouterLink>
-        </div>
-      </div>
-    </nav>
+    <PublicSiteHeader />
 
     <main>
       <header class="hero">
@@ -262,97 +258,10 @@ onMounted(() => {
         </div>
       </section>
 
-      <section id="apps" class="store">
-        <div class="shell">
-          <div class="section-head">
-            <h2>Explore live apps, templates, and remixes.</h2>
-            <p>Every published app can teach the next build. Browse what works, fork the idea, and deploy your own version.</p>
-          </div>
-          <div class="store-toolbar">
-            <div class="pills" aria-label="App categories">
-              <span class="pill active">Featured</span>
-              <span class="pill">Operations</span>
-              <span class="pill">AI Tools</span>
-              <span class="pill">Finance</span>
-              <span class="pill">Games</span>
-              <span class="pill">Internal Tools</span>
-            </div>
-            <RouterLink class="search" to="/apps">Search apps, creators, categories...</RouterLink>
-          </div>
-          <div class="app-grid">
-            <article class="app-card">
-              <div class="app-shot"><div class="mini-ui"><div class="mini-row short" /><div class="mini-row" /><div class="mini-cards"><span /><span /><span /></div></div></div>
-              <div class="app-info">
-                <div class="badge-row"><span class="badge">Live app</span><span class="badge template">Template</span></div>
-                <h3>Sprint Poker</h3>
-                <p>Planning poker with rooms, votes, reveal states, and exportable estimates.</p>
-                <div class="meta"><span>Fork template</span><span>1.8k runs</span></div>
-              </div>
-            </article>
-            <article class="app-card">
-              <div class="app-shot"><div class="mini-ui"><div class="mini-row short" /><div class="mini-row" /><div class="mini-cards"><span /><span /><span /></div></div></div>
-              <div class="app-info">
-                <div class="badge-row"><span class="badge">Live app</span><span class="badge">Backend</span></div>
-                <h3>Invoice Triage</h3>
-                <p>Upload invoices, classify vendors, flag anomalies, and route approvals.</p>
-                <div class="meta"><span>Remix app</span><span>942 runs</span></div>
-              </div>
-            </article>
-            <article class="app-card">
-              <div class="app-shot"><div class="mini-ui"><div class="mini-row short" /><div class="mini-row" /><div class="mini-cards"><span /><span /><span /></div></div></div>
-              <div class="app-info">
-                <div class="badge-row"><span class="badge">Verified</span><span class="badge">Trending</span></div>
-                <h3>Lead Qualifier</h3>
-                <p>Score inbound leads, enrich profiles, and draft next-step emails.</p>
-                <div class="meta"><span>Build similar</span><span>721 runs</span></div>
-              </div>
-            </article>
-            <article class="app-card">
-              <div class="app-shot"><div class="mini-ui"><div class="mini-row short" /><div class="mini-row" /><div class="mini-cards"><span /><span /><span /></div></div></div>
-              <div class="app-info">
-                <div class="badge-row"><span class="badge">Live app</span><span class="badge template">Starter</span></div>
-                <h3>Bug Intake Desk</h3>
-                <p>Collect reports, dedupe issues, and create clean engineering tickets.</p>
-                <div class="meta"><span>Fork template</span><span>603 runs</span></div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="templates">
-        <div class="shell">
-          <div class="section-head">
-            <h2>Start from a template, then make it yours.</h2>
-            <p>Templates reduce the blank page. They also create the remix loop that makes the ecosystem feel alive.</p>
-          </div>
-          <div class="templates-grid">
-            <article class="template-card">
-              <div class="badge-row"><span class="badge template">Template</span><span class="badge">Static</span></div>
-              <h3>AI Chat App</h3>
-              <p>A clean chat shell with settings, history, streaming states, and deploy-ready layout.</p>
-              <div class="template-actions"><RouterLink class="mini-button primary" to="/apps">Fork template</RouterLink><RouterLink class="mini-button" to="/cli">Build similar</RouterLink></div>
-            </article>
-            <article class="template-card">
-              <div class="badge-row"><span class="badge template">Template</span><span class="badge">Backend</span></div>
-              <h3>Admin Dashboard</h3>
-              <p>Tables, filters, charts, detail drawers, and flow-backed operations for internal tools.</p>
-              <div class="template-actions"><RouterLink class="mini-button primary" to="/apps">Fork template</RouterLink><RouterLink class="mini-button" to="/cli">Deploy version</RouterLink></div>
-            </article>
-            <article class="template-card">
-              <div class="badge-row"><span class="badge template">Template</span><span class="badge">Game</span></div>
-              <h3>Retro Game Kit</h3>
-              <p>Canvas game shell with score state, mobile controls, pause screen, and shareable replay hooks.</p>
-              <div class="template-actions"><RouterLink class="mini-button primary" to="/apps">Fork template</RouterLink><RouterLink class="mini-button" to="/cli">Remix game</RouterLink></div>
-            </article>
-          </div>
-        </div>
-      </section>
-
       <section id="creators">
         <div class="shell feature-band">
           <div class="big-card">
-            <h2>Creators make the platform feel alive.</h2>
+            <h2>A living ecosystem of apps and remixes.</h2>
             <p>
               Every app has a builder behind it. Profiles, app collections, updates, remixes, and verified templates turn Automaton Monster from a deploy tool into a creation ecosystem.
             </p>
@@ -365,7 +274,7 @@ onMounted(() => {
           <div class="creator-panel">
             <div class="creator-top">
               <div>
-                <h3>Creator launch feed</h3>
+                <h3>Live ecosystem feed</h3>
                 <p>Turn new builds into fresh marketplace activity.</p>
               </div>
               <span class="status">Live</span>
@@ -382,11 +291,24 @@ onMounted(() => {
 
       <section class="cta">
         <div class="shell cta-box">
-          <div>
-            <h2>Build one app today. Remix the next one tomorrow.</h2>
-            <p>Run setup, tell your AI what to build, deploy with Automaton, then publish when you are ready.</p>
+          <div class="cta-copy">
+            <h2>Build and publish your first app in minutes.</h2>
+            <p>Install the setup flow, tell your AI what to build, then deploy directly to Automaton Monster.</p>
+            <div class="cta-command-row">
+              <div class="cta-command-preview">
+                <div>$ dotnet tool install -g Automaton.Cli</div>
+                <div>$ automaton setup</div>
+              </div>
+              <div class="cta-actions">
+                <button class="button primary" type="button" @click="copySetupFlow">
+                  Copy setup flow
+                </button>
+                <div v-if="showCopyNotice" class="copy-notice" role="status" aria-live="polite">
+                  Setup commands copied to clipboard
+                </div>
+              </div>
+            </div>
           </div>
-          <RouterLink class="button primary" to="/cli">Copy the setup flow</RouterLink>
         </div>
       </section>
     </main>
@@ -919,112 +841,6 @@ section {
   color: var(--v2-muted);
 }
 
-.store {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0));
-}
-
-.store-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.pills {
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pill {
-  padding: 8px 12px;
-  border: 1px solid var(--v2-line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--v2-muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.pill.active {
-  border-color: rgba(69, 230, 138, 0.42);
-  background: var(--v2-green-soft);
-  color: var(--v2-green);
-}
-
-.search {
-  min-width: min(100%, 320px);
-  padding: 11px 14px;
-  border: 1px solid var(--v2-line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--v2-muted);
-}
-
-.app-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-
-.app-card {
-  overflow: hidden;
-  transition: transform 0.18s ease, border-color 0.18s ease;
-}
-
-.app-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(69, 230, 138, 0.34);
-}
-
-.app-shot {
-  min-height: 138px;
-  padding: 12px;
-  background:
-    linear-gradient(135deg, rgba(80, 215, 255, 0.12), rgba(69, 230, 138, 0.08)),
-    #0c0f15;
-}
-
-.mini-ui {
-  height: 114px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: #121620;
-}
-
-.mini-row {
-  height: 10px;
-  margin-bottom: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.mini-row.short {
-  width: 48%;
-  background: rgba(69, 230, 138, 0.4);
-}
-
-.mini-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 15px;
-}
-
-.mini-cards span {
-  height: 42px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.app-info {
-  padding: 15px;
-}
-
 .badge-row,
 .template-actions {
   display: flex;
@@ -1067,39 +883,6 @@ section {
   color: #778196;
   font-size: 0.8rem;
   font-weight: 700;
-}
-
-.template-card {
-  display: grid;
-  gap: 16px;
-  padding: 18px;
-}
-
-.template-card h3 {
-  font-size: 1.25rem;
-}
-
-.template-actions {
-  margin-bottom: 0;
-}
-
-.mini-button {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 11px;
-  border: 1px solid var(--v2-line);
-  border-radius: 8px;
-  color: var(--v2-text);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.mini-button.primary {
-  border-color: rgba(69, 230, 138, 0.45);
-  background: var(--v2-green-soft);
-  color: var(--v2-green);
 }
 
 .feature-band {
@@ -1209,6 +992,55 @@ section {
   box-shadow: var(--v2-shadow);
 }
 
+.cta-copy {
+  min-width: 0;
+}
+
+.cta-command-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.cta-actions {
+  position: relative;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.copy-notice {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(69, 230, 138, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 8, 11, 0.96);
+  color: #d9ffe8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+}
+
+.cta-command-preview {
+  width: min(100%, 520px);
+  flex: 1 1 auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(69, 230, 138, 0.18);
+  border-radius: 8px;
+  background: rgba(7, 8, 11, 0.72);
+  color: #d9ffe8;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.88rem;
+}
+
+.cta-command-preview div + div {
+  margin-top: 6px;
+}
+
 .cta h2 {
   margin: 0 0 8px;
   font-size: clamp(1.8rem, 3vw, 3rem);
@@ -1261,10 +1093,6 @@ footer {
   }
 
   .steps,
-  .app-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .nav-links {
     display: none;
   }
@@ -1291,6 +1119,23 @@ footer {
   .big-card,
   .cta-box {
     padding: 18px;
+  }
+
+  .cta-actions {
+    justify-items: stretch;
+  }
+
+  .copy-notice {
+    position: static;
+    white-space: normal;
+  }
+
+  .cta-command-row {
+    display: grid;
+  }
+
+  .cta-command-preview {
+    width: 100%;
   }
 
   .prompt-strip,
@@ -1329,7 +1174,6 @@ footer {
   }
 
   .steps,
-  .app-grid,
   .templates-grid,
   .live-strip,
   .stat-row {

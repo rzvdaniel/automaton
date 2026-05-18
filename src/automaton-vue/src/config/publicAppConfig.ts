@@ -30,6 +30,7 @@ const cliDownloadsBaseUrl = ensureTrailingSlash(import.meta.env.VITE_CLI_DOWNLOA
 export const publicAppConfig = {
   publicSiteUrl,
   studioUrl,
+  docsUrl: joinUrl(publicSiteUrl, 'docs'),
   apiBaseUrl,
   cliDownloadsBaseUrl,
   llmsUrl: joinUrl(publicSiteUrl, 'llms.txt'),

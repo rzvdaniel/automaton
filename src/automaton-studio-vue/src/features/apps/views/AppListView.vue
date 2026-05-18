@@ -28,6 +28,9 @@ import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 
+const publicDocsUrl = 'https://automaton.monster/docs'
+const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
+
 const router = useRouter()
 const toast = useToast()
 const appsStore = useAppsStore()
@@ -674,7 +677,7 @@ const handleRetry = async () => {
                 size="small"
                 severity="secondary"
                 outlined
-                @click="router.push('/docs/automaton-cli')"
+                @click="window.open(publicCliDocsUrl, '_blank', 'noopener')"
               />
               <Button
                 label="Open Studio documentation"
@@ -682,13 +685,13 @@ const handleRetry = async () => {
                 size="small"
                 severity="secondary"
                 outlined
-                @click="router.push('/docs')"
+                @click="window.open(publicDocsUrl, '_blank', 'noopener')"
               />
             </div>
             <p class="text-color-secondary text-sm mb-2">
               Use <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
               when you want the exact structure and AI instructions. Use
-              <button type="button" class="qs-inline-link" @click="router.push('/docs')">Studio documentation</button>
+              <button type="button" class="qs-inline-link" @click="window.open(publicDocsUrl, '_blank', 'noopener')">Studio documentation</button>
               when you want a more guided walkthrough with quick starts and examples.
             </p>
           </div>

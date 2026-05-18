@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FeaturedAppsShowcase from '@/components/FeaturedAppsShowcase.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
@@ -13,6 +13,7 @@ import installRocketImage from '@/assets/images/install-rocket.png'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
 const props = defineProps<{ fullPage?: boolean }>()
+const route = useRoute()
 const router = useRouter()
 const { activeCategory, apps, categories, featuredApps, loading, loadApps, loadCategories, search } =
   useMarketplaceApps(props.fullPage ? 100 : 10)
@@ -210,59 +211,45 @@ function refreshApps() {
   void loadApps()
 }
 
+function normalizeCategory(category: string) {
+  if (category === 'Featured' || category === 'Live Apps' || category === 'Forkable Apps') {
+    return ''
+  }
+
+  return category
+}
+
+function applyRouteFilters() {
+  if (!props.fullPage) return
+
+  activeCategory.value =
+    typeof route.query.category === 'string' ? normalizeCategory(route.query.category) : ''
+}
+
 function openCreator(publicUsername: string) {
   void router.push(`/${publicUsername}`)
 }
 
 onMounted(async () => {
+  applyRouteFilters()
   await loadCategories()
   await loadApps()
 })
+
+watch(
+  () => route.query.category,
+  async () => {
+    if (!props.fullPage) return
+    applyRouteFilters()
+    await loadApps()
+  },
+)
 </script>
 
 <template>
   <section id="apps" class="showcase-section" :class="{ 'showcase-section-full': props.fullPage }">
     <div class="container showcase-content">
       <template v-if="props.fullPage">
-        <header class="apps-hero">
-          <span class="apps-eyebrow">Community apps</span>
-          <h1>{{ heading }}</h1>
-          <p>{{ subtitle }}</p>
-        </header>
-
-        <section class="discovery-panel" aria-label="App discovery controls">
-          <div class="search-row">
-            <label class="search-bar">
-              <i class="pi pi-search search-icon" />
-              <input
-                v-model="search"
-                class="search-input"
-                type="search"
-                placeholder="Search apps, games, tools, creators..."
-                @keyup.enter="refreshApps"
-              />
-              <button type="button" class="search-button" aria-label="Search apps" @click="refreshApps">
-                <i class="pi pi-arrow-right" />
-              </button>
-            </label>
-            <div class="filter-select">Trending</div>
-            <div class="filter-select">All Runtimes</div>
-          </div>
-
-          <div class="category-tabs" role="tablist" aria-label="App categories">
-            <button
-              v-for="category in categoryPills"
-              :key="category"
-              class="category-tab"
-              :class="{ 'category-tab-active': activeCategory === '' && category === 'Featured' || activeCategory === category }"
-              type="button"
-              @click="activeCategory = category === 'Featured' || category === 'Live Apps' || category === 'Forkable Apps' ? '' : category; loadApps()"
-            >
-              {{ category }}
-            </button>
-          </div>
-        </section>
-
         <section v-if="heroApps.length > 0" class="featured-section" aria-label="Featured apps">
           <div class="section-head">
             <h2>Featured apps</h2>
@@ -438,62 +425,6 @@ onMounted(async () => {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.apps-hero {
-  padding: 0 0 12px;
-}
-
-.apps-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 6px 10px;
-  border: 1px solid rgba(80, 215, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(80, 215, 255, 0.08);
-  color: #c4f2ff;
-  font-size: 0.78rem;
-  font-weight: 850;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.apps-hero h1 {
-  margin: 10px 0 6px;
-  color: #f5f7fb;
-  font-size: clamp(2.2rem, 5vw, 4.6rem);
-  line-height: 0.92;
-  letter-spacing: -0.06em;
-}
-
-.apps-hero p {
-  max-width: 620px;
-  margin: 0;
-  color: #c8ceda;
-  font-size: clamp(1rem, 1.6vw, 1.13rem);
-}
-
-.discovery-panel {
-  display: grid;
-  gap: 12px;
-  margin: 6px 0 18px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(80, 215, 255, 0.055), rgba(69, 230, 138, 0.035)),
-    rgba(255, 255, 255, 0.035);
-  box-shadow: 0 16px 54px rgba(0, 0, 0, 0.22);
-}
-
-.search-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
-  align-items: center;
-}
-
 .showcase-header {
   display: flex;
   align-items: flex-end;
@@ -512,100 +443,6 @@ onMounted(async () => {
 
 .showcase-carousel {
   margin-bottom: 18px;
-}
-
-.category-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-
-.category-tab {
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  color: #9ba3b4;
-  font-size: 0.88rem;
-  font-weight: 850;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.category-tab:hover {
-  border-color: rgba(80, 215, 255, 0.28);
-  color: #f5f7fb;
-  background: rgba(80, 215, 255, 0.08);
-}
-
-.category-tab-active {
-  border-color: rgba(69, 230, 138, 0.42);
-  color: #45e68a;
-  background: rgba(69, 230, 138, 0.14);
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
-  color: #50d7ff;
-}
-
-.search-icon {
-  color: #50d7ff;
-}
-
-.search-input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  color: #f5f7fb;
-  font-size: 0.92rem;
-  line-height: 1.2;
-  outline: none;
-}
-
-.search-input::placeholder {
-  color: #9ba3b4;
-}
-
-.search-button {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 24px;
-  flex: 0 0 auto;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: #45e68a;
-  color: #041008;
-  font-size: 0.82rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.filter-select {
-  display: inline-flex;
-  align-items: center;
-  min-height: 42px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
-  color: #c8ceda;
-  font-size: 0.88rem;
-  font-weight: 850;
-  white-space: nowrap;
 }
 
 .featured-section,
@@ -631,9 +468,9 @@ onMounted(async () => {
 .section-head h2 {
   margin: 0;
   color: #f5f7fb;
-  font-size: clamp(1.6rem, 3vw, 2.65rem);
-  line-height: 1;
-  letter-spacing: -0.045em;
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .section-head p {
@@ -911,9 +748,9 @@ onMounted(async () => {
 .runner-panel h2 {
   margin: 0 0 7px;
   color: #f5f7fb;
-  font-size: clamp(1.4rem, 2.4vw, 2.2rem);
-  line-height: 1;
-  letter-spacing: -0.04em;
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .runner-panel p {
@@ -985,7 +822,6 @@ onMounted(async () => {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .search-row,
   .section-head {
     display: grid;
     justify-content: stretch;

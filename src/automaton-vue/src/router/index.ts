@@ -25,6 +25,11 @@ const router = createRouter({
       component: () => import('@/views/DocsView.vue'),
     },
     {
+      path: '/docs/:slug',
+      name: 'docs-section',
+      component: () => import('@/views/DocsView.vue'),
+    },
+    {
       path: '/cli',
       name: 'cli',
       component: () => import('@/views/CliView.vue'),

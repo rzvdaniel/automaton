@@ -2,7 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
-import AppNav from '@/components/AppNav.vue'
+import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard, MarketplaceAppDetails } from '@/types/marketplace'
 
@@ -172,7 +173,8 @@ onMounted(loadApp)
 
 <template>
   <div class="app-detail-v2">
-    <AppNav />
+    <PublicSiteHeader />
+    <AppsDiscoveryStrip />
     <main class="detail-page">
       <div class="detail-shell">
         <RouterLink to="/apps" class="back-link">

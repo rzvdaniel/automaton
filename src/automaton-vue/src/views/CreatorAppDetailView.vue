@@ -2,7 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
-import AppNav from '@/components/AppNav.vue'
+import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppDetails, PublicUserProfile } from '@/types/marketplace'
 
@@ -109,7 +110,8 @@ onMounted(loadPage)
 
 <template>
   <div>
-    <AppNav />
+    <PublicSiteHeader />
+    <AppsDiscoveryStrip />
     <main class="creator-detail-page">
       <div class="container">
         <RouterLink :to="`/${publicUsername}`" class="back-link">

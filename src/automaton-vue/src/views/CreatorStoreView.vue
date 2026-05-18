@@ -2,8 +2,9 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
-import AppNav from '@/components/AppNav.vue'
+import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
+import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppCard, PublicAppsResponse, PublicUserProfile } from '@/types/marketplace'
 
@@ -88,7 +89,8 @@ onMounted(loadCreatorApps)
 
 <template>
   <div>
-    <AppNav />
+    <PublicSiteHeader />
+    <AppsDiscoveryStrip />
     <main class="creator-page">
       <div class="store-toolbar">
         <div class="container toolbar-inner">
