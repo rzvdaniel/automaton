@@ -35,6 +35,11 @@ const router = createRouter({
       component: () => import('@/views/CliView.vue'),
     },
     {
+      path: '/pricing',
+      name: 'pricing',
+      component: () => import('@/views/PricingView.vue'),
+    },
+    {
       path: '/:publicUsername/apps/:appId',
       name: 'creator-app-detail',
       component: () => import('@/views/CreatorAppDetailView.vue'),
