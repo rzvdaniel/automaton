@@ -82,6 +82,11 @@ function playApp(app?: MarketplaceAppCard) {
   emit('select', app.id)
 }
 
+function forkApp(app?: MarketplaceAppCard) {
+  if (!app) return
+  window.open(`${publicAppConfig.studioUrl}apps/fork/${app.id}`, '_blank', 'noopener')
+}
+
 function startRotation() {
   stopRotation()
   rotationId = window.setInterval(() => {
@@ -154,7 +159,7 @@ onBeforeUnmount(stopRotation)
             <i class="pi pi-play"></i>
             Play
           </button>
-          <button class="showcase-button" type="button" @click.stop="selectApp(activeApp)">
+          <button class="showcase-button" type="button" @click.stop="forkApp(activeApp)">
             <i class="pi pi-copy"></i>
             Fork
           </button>

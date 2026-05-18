@@ -283,11 +283,16 @@ namespace Automaton.Studio.Server.Data
                     .HasDefaultValue(Automaton.Studio.Server.Enums.MarketplaceAppStatuses.Approved);
                 entity.Property(e => e.MarketplaceModerationReason)
                     .HasMaxLength(2000);
+                entity.Property(e => e.ForkedFromAppName)
+                    .HasMaxLength(200);
+                entity.Property(e => e.ForkedFromAuthorName)
+                    .HasMaxLength(200);
 
                 // Index for sample apps queries
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
                 entity.HasIndex(e => new { e.IsProfileFeatured, e.IsPublished });
                 entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
+                entity.HasIndex(e => e.ForkedFromAppId);
 
                 entity.HasMany(e => e.WebAppScreenshots)
                     .WithOne(e => e.WebApp)

@@ -76,6 +76,10 @@ export interface App {
   marketplaceModerationReason?: string | null
   marketplaceModeratedAt?: string
   marketplaceModeratedByUserId?: string
+  forkedFromAppId?: string | null
+  forkedFromAuthorUserId?: string | null
+  forkedFromAppName?: string | null
+  forkedFromAuthorName?: string | null
 }
 
 /**
@@ -96,6 +100,23 @@ export interface PublishAppRequest {
   executionRunnerId?: string
   category?: string | null
   tags?: string | null
+}
+
+export interface ForkAppRequest {
+  name?: string
+  publishImmediately?: boolean
+}
+
+export interface ForkAppSource {
+  id: string
+  name: string
+  summary?: string | null
+  description?: string | null
+  thumbnailUrl?: string | null
+  creatorPublicUsername?: string | null
+  creatorDisplayName: string
+  hasBackendExecution: boolean
+  runtimeLabel: string
 }
 
 export interface ExportAppResponse {

@@ -15,6 +15,8 @@ import type {
   CreateAppStepRequest,
   RunnerBackendFileContent,
   RunnerBackendFilesResponse,
+  ForkAppRequest,
+  ForkAppSource,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 import { buildPreviewApiScript } from '../utils/preview-api-script'
@@ -724,11 +726,20 @@ class AppsService {
   }
 
   /**
-   * Fork a published template app into the current user's account
+   * Get published source metadata for the guided fork flow.
+   * GET /api/apps/{id}/fork-source
+   */
+  async getForkSource(id: string): Promise<ForkAppSource> {
+    const { data } = await apiClient.get<ForkAppSource>(`/api/apps/${id}/fork-source`)
+    return data
+  }
+
+  /**
+   * Fork a published marketplace app into the current user's account.
    * POST /api/apps/{id}/fork
    */
-  async fork(id: string): Promise<App> {
-    const { data } = await apiClient.post<App>(`/api/apps/${id}/fork`)
+  async fork(id: string, request: ForkAppRequest = {}): Promise<App> {
+    const { data } = await apiClient.post<App>(`/api/apps/${id}/fork`, request)
     return data
   }
 

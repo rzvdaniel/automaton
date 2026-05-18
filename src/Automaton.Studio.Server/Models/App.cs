@@ -39,8 +39,33 @@ public class AppModel
     public string? MarketplaceModerationReason { get; set; }
     public DateTime? MarketplaceModeratedAt { get; set; }
     public Guid? MarketplaceModeratedByUserId { get; set; }
+    public Guid? ForkedFromAppId { get; set; }
+    public Guid? ForkedFromAuthorUserId { get; set; }
+    public string? ForkedFromAppName { get; set; }
+    public string? ForkedFromAuthorName { get; set; }
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
+}
+
+public class ForkAppRequest
+{
+    public string? Name { get; set; }
+    public bool PublishImmediately { get; set; } = false;
+}
+
+public class ForkAppSourceModel
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Summary { get; set; }
+    public string? Description { get; set; }
+    public string? ThumbnailUrl { get; set; }
+    public string? CreatorPublicUsername { get; set; }
+    public string CreatorDisplayName { get; set; } = "Automaton creator";
+    public bool HasBackendExecution { get; set; }
+    public string RuntimeLabel => HasBackendExecution
+        ? "Backend app — runner required"
+        : "Static app — no runner required";
 }
 
 public class AppScreenshotModel

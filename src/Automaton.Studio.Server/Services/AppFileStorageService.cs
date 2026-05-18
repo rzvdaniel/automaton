@@ -84,6 +84,9 @@ public class AppFileStorageService
                 continue; // Skip version snapshots
 
             var relativePath = Path.GetRelativePath(srcPath, sourceFile);
+            if (IsSensitiveAppFile(relativePath))
+                continue;
+
             var targetFilePath = Path.Combine(dstPath, relativePath);
             var targetDirectory = Path.GetDirectoryName(targetFilePath);
 
@@ -97,6 +100,17 @@ public class AppFileStorageService
             srcAppId, srcUserId, dstAppId, dstUserId);
 
         return Task.CompletedTask;
+    }
+
+    private static bool IsSensitiveAppFile(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/');
+        var fileName = Path.GetFileName(normalized);
+
+        return fileName.Equals(".env", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".local", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".secret", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("/secrets/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

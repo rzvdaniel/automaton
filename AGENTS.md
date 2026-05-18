@@ -307,6 +307,11 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Publish/Unpublish flows with clear status badges
 - Public profile app details can render screenshot galleries sourced from `WebAppScreenshots`, and marketplace cards can fall back to the first screenshot when no thumbnail is set
 
+**Forking / Remixing:**
+- Marketplace fork is a guided Studio flow at `/apps/fork/:sourceAppId`, not a silent clone.
+- Forks default to private draft, copy editable app files, clear runner assignment, skip sensitive local files, inherit screenshot references, and preserve lineage via `ForkedFromAppId`, original app name, and original author attribution.
+- Backend app forks must warn users that execution requires their own Runner or a future managed Runner. After creation, redirect to the Studio editor; publishing is a separate intentional action.
+
 **For complete API reference, request/response formats, and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
 
 ## Projects

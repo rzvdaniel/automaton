@@ -2032,6 +2032,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("ExecutionRunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ForkedFromAppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ForkedFromAppName")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("ForkedFromAuthorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<Guid?>("ForkedFromAuthorUserId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("IsFeatured")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
@@ -2125,6 +2139,8 @@ namespace Automaton.Studio.Server.Migrations
                         .HasDefaultValue(0);
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ForkedFromAppId");
 
                     b.HasIndex("PublicUrl")
                         .IsUnique();

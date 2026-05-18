@@ -469,6 +469,10 @@ public class AppsService
 
         // Trim hyphens from start and end
         slug = slug.Trim('-');
+        if (string.IsNullOrEmpty(slug))
+        {
+            slug = "app";
+        }
 
         // Ensure uniqueness
         var originalSlug = slug;
@@ -537,7 +541,11 @@ public class AppsService
             MarketplaceStatus = entity.MarketplaceStatus,
             MarketplaceModerationReason = entity.MarketplaceModerationReason,
             MarketplaceModeratedAt = entity.MarketplaceModeratedAt,
-            MarketplaceModeratedByUserId = entity.MarketplaceModeratedByUserId
+            MarketplaceModeratedByUserId = entity.MarketplaceModeratedByUserId,
+            ForkedFromAppId = entity.ForkedFromAppId,
+            ForkedFromAuthorUserId = entity.ForkedFromAuthorUserId,
+            ForkedFromAppName = entity.ForkedFromAppName,
+            ForkedFromAuthorName = entity.ForkedFromAuthorName
         };
     }
 
@@ -614,33 +622,94 @@ public class AppsService
     }
 
     /// <summary>
-    /// Fork a template app (must be IsSample=true and IsPublished=true) into the current user's account.
+    /// Get metadata for the guided fork screen.
     /// </summary>
-    public async Task<Models.AppModel> ForkAsync(Guid templateAppId)
+    public async Task<Models.ForkAppSourceModel> GetForkSourceAsync(Guid sourceAppId)
     {
         var source = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
-            .FirstOrDefaultAsync(x => x.Id == templateAppId && x.IsSample && x.IsPublished);
+            .FirstOrDefaultAsync(x =>
+                x.Id == sourceAppId &&
+                x.IsPublished &&
+                x.MarketplaceStatus == MarketplaceAppStatuses.Approved);
 
         if (source == null)
-            throw new InvalidOperationException("Template app not found.");
+            throw new InvalidOperationException("Fork source app not found.");
 
         var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
-            ?? throw new InvalidOperationException("Template app has no owner.");
+            ?? throw new InvalidOperationException("Fork source app has no owner.");
+
+        var creator = await dataContext.Users
+            .Where(u => u.Id == sourceOwner)
+            .Select(u => new
+            {
+                u.PublicUsername,
+                DisplayName = !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name
+            })
+            .FirstOrDefaultAsync();
+
+        var sourceFiles = await fileStorageService.GetAppFilesAsync(sourceOwner, sourceAppId);
+        var hasBackendExecution = source.ExecutionRunnerId.HasValue ||
+            sourceFiles.Any(file => file.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
+
+        return new Models.ForkAppSourceModel
+        {
+            Id = source.Id,
+            Name = source.Name,
+            Summary = source.Summary,
+            Description = source.Description,
+            ThumbnailUrl = source.ThumbnailUrl,
+            CreatorPublicUsername = creator?.PublicUsername,
+            CreatorDisplayName = creator?.DisplayName ?? "Automaton creator",
+            HasBackendExecution = hasBackendExecution
+        };
+    }
+
+    /// <summary>
+    /// Fork a published marketplace app into the current user's account.
+    /// </summary>
+    public async Task<Models.AppModel> ForkAsync(Guid sourceAppId, Models.ForkAppRequest? request = null)
+    {
+        request ??= new Models.ForkAppRequest();
+
+        var source = await dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
+            .FirstOrDefaultAsync(x =>
+                x.Id == sourceAppId &&
+                x.IsPublished &&
+                x.MarketplaceStatus == MarketplaceAppStatuses.Approved);
+
+        if (source == null)
+            throw new InvalidOperationException("Fork source app not found.");
+
+        var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
+            ?? throw new InvalidOperationException("Fork source app has no owner.");
+
+        var creator = await dataContext.Users
+            .Where(u => u.Id == sourceOwner)
+            .Select(u => new
+            {
+                u.Id,
+                DisplayName = !string.IsNullOrEmpty(u.DisplayName) ? u.DisplayName : u.Name
+            })
+            .FirstOrDefaultAsync();
 
         var newId = Guid.NewGuid();
         var now = DateTime.UtcNow;
+        var appName = NormalizeForkName(request.Name, source.Name);
+        var publicUrl = request.PublishImmediately ? GenerateUniqueSlug(appName) : null;
 
         var entity = new Entities.WebApp
         {
             Id = newId,
-            Name = source.Name,
+            Name = appName,
             Summary = source.Summary,
             Description = source.Description,
             Definition = "{}",
-            IsPublished = false,
-            PublicUrl = null,
-            PublishedAt = null,
+            IsPublished = request.PublishImmediately,
+            PublicUrl = publicUrl,
+            PublishedAt = request.PublishImmediately ? now : null,
             Version = 1,
             ExecutionRunnerId = null,
             RequiresAuthentication = false,
@@ -652,18 +721,36 @@ public class AppsService
             ThumbnailUrl = source.ThumbnailUrl,
             Category = source.Category,
             Tags = source.Tags,
+            ForkedFromAppId = source.Id,
+            ForkedFromAuthorUserId = sourceOwner,
+            ForkedFromAppName = source.Name,
+            ForkedFromAuthorName = creator?.DisplayName ?? "Automaton creator",
             Created = now,
             Updated = now,
         };
 
         dataContext.WebApps.Add(entity);
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
+
+        foreach (var screenshot in source.WebAppScreenshots.OrderBy(s => s.SortOrder))
+        {
+            dataContext.WebAppScreenshots.Add(new Entities.WebAppScreenshot
+            {
+                Id = Guid.NewGuid(),
+                WebAppId = newId,
+                ImageUrl = screenshot.ImageUrl,
+                Caption = screenshot.Caption,
+                SortOrder = screenshot.SortOrder,
+                CreatedAt = now
+            });
+        }
+
         await dataContext.SaveChangesAsync();
 
-        await fileStorageService.CopyAppFilesAsync(sourceOwner, templateAppId, UserId, newId);
+        await fileStorageService.CopyAppFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        logger.Information("Forked template {TemplateAppId} → {NewAppId} for user {UserId}", templateAppId, newId, UserId);
+        logger.Information("Forked app {SourceAppId} → {NewAppId} for user {UserId}", sourceAppId, newId, UserId);
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -671,6 +758,17 @@ public class AppsService
             .FirstAsync(x => x.Id == newId);
 
         return MapToModel(newEntity, null);
+    }
+
+    private static string NormalizeForkName(string? requestedName, string sourceName)
+    {
+        var name = requestedName?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = $"{sourceName} Remix";
+        }
+
+        return name.Length > 200 ? name[..200] : name;
     }
 
     /// <summary>

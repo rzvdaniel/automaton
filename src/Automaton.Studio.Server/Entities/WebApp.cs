@@ -75,6 +75,15 @@ public class WebApp
     public Guid? MarketplaceModeratedByUserId { get; set; }
 
     /// <summary>
+    /// Original published app this app was forked from, if it was created through the remix flow.
+    /// </summary>
+    public Guid? ForkedFromAppId { get; set; }
+
+    public Guid? ForkedFromAuthorUserId { get; set; }
+    public string? ForkedFromAppName { get; set; }
+    public string? ForkedFromAuthorName { get; set; }
+
+    /// <summary>
     /// Total tokens used in AI chat sessions for this app
     /// </summary>
     public int TotalChatTokensUsed { get; set; } = 0;

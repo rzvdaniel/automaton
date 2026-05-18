@@ -72,6 +72,10 @@ const launchUrl = computed(() =>
   app.value?.publicUrl ? `${publicAppConfig.studioUrl}web/${app.value.publicUrl}` : null,
 )
 
+const forkUrl = computed(() =>
+  app.value ? `${publicAppConfig.studioUrl}apps/fork/${app.value.id}` : publicAppConfig.studioUrl,
+)
+
 const publishedLabel = computed(() => {
   if (!app.value?.publishedAt) {
     return null
@@ -285,12 +289,12 @@ onMounted(loadApp)
             <aside class="detail-card fork-card">
               <h3>Fork this idea</h3>
               <p>Use this app as a starting point for a new Automaton build.</p>
-              <RouterLink to="/cli" class="fork-button">
+              <a :href="forkUrl" class="fork-button" target="_blank" rel="noopener">
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
                 </svg>
                 Fork app
-              </RouterLink>
+              </a>
             </aside>
           </section>
 

@@ -147,14 +147,36 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Fork a published template app into the current user's account.
+    /// Get the published app metadata needed to confirm a fork.
     /// </summary>
-    [HttpPost("{id}/fork")]
-    public async Task<ActionResult<Models.AppModel>> Fork(Guid id)
+    [HttpGet("{id}/fork-source")]
+    public async Task<ActionResult<Models.ForkAppSourceModel>> GetForkSource(Guid id)
     {
         try
         {
-            var newApp = await appsService.ForkAsync(id);
+            var source = await appsService.GetForkSourceAsync(id);
+            return Ok(source);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AppsController] Error loading fork source app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to load fork source" });
+        }
+    }
+
+    /// <summary>
+    /// Fork a published marketplace app into the current user's account.
+    /// </summary>
+    [HttpPost("{id}/fork")]
+    public async Task<ActionResult<Models.AppModel>> Fork(Guid id, [FromBody] Models.ForkAppRequest? request = null)
+    {
+        try
+        {
+            var newApp = await appsService.ForkAsync(id, request);
             return CreatedAtAction(nameof(Get), new { id = newApp.Id }, newApp);
         }
         catch (InvalidOperationException ex)
@@ -163,8 +185,8 @@ public class AppsController : BaseController
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[AppsController] Error forking template app {AppId}", id);
-            return StatusCode(500, new { message = "Failed to fork template" });
+            logger.LogError(ex, "[AppsController] Error forking app {AppId}", id);
+            return StatusCode(500, new { message = "Failed to fork app" });
         }
     }
 

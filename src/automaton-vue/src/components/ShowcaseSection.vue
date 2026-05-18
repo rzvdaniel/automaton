@@ -207,6 +207,10 @@ function openLiveApp(app: MarketplaceAppCard) {
   window.open(`${publicAppConfig.studioUrl}web/${app.publicUrl}`, '_blank', 'noopener')
 }
 
+function forkApp(app: MarketplaceAppCard) {
+  window.open(`${publicAppConfig.studioUrl}apps/fork/${app.id}`, '_blank', 'noopener')
+}
+
 function refreshApps() {
   void loadApps()
 }
@@ -363,7 +367,7 @@ watch(
                   <button class="button ghost" type="button" @click.stop="openLiveApp(app)">
                     {{ app.publicUrl ? 'Play' : 'Open' }}
                   </button>
-                  <button class="button ghost" type="button" @click.stop="openDetails(app.id)">
+                  <button class="button ghost" type="button" @click.stop="forkApp(app)">
                     Fork
                   </button>
                 </div>
@@ -586,7 +590,6 @@ watch(
 .creator-row {
   display: flex;
   align-items: center;
-  gap: 7px;
   min-width: 0;
 }
 
@@ -604,9 +607,13 @@ watch(
 }
 
 .creator-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
-  padding: 0;
+  padding: 4px 6px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: #50d7ff;
   font-size: 0.82rem;
@@ -615,10 +622,22 @@ watch(
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .creator-link:hover {
   color: #9ee8ff;
+  background: rgba(80, 215, 255, 0.08);
+  transform: translateY(-1px);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.creator-link:hover .creator-avatar {
+  box-shadow: 0 0 0 1px rgba(80, 215, 255, 0.22);
 }
 
 .creator-link-static {
@@ -689,6 +708,16 @@ watch(
   padding: 0 11px;
   background: rgba(0, 0, 0, 0.18);
   font-size: 0.82rem;
+}
+
+.button:hover {
+  border-color: rgba(80, 215, 255, 0.28);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.button.ghost:hover {
+  border-color: rgba(69, 230, 138, 0.34);
+  background: rgba(69, 230, 138, 0.12);
 }
 
 .market-footer-grid {
