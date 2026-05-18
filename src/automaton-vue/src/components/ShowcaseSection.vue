@@ -30,6 +30,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Games',
     viewCount: 55,
     starCount: 0,
+    forkCount: 0,
     isFeatured: true,
     screenshots: [
       { id: 'pac-snake', imageUrl: snakeImage, caption: 'Snake remix', sortOrder: 1 },
@@ -48,6 +49,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Games',
     viewCount: 41,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -61,6 +63,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Templates',
     viewCount: 38,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -74,6 +77,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Games',
     viewCount: 32,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -87,6 +91,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Tools',
     viewCount: 27,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -100,6 +105,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Tools',
     viewCount: 27,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -113,6 +119,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Productivity',
     viewCount: 24,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
   {
@@ -126,6 +133,7 @@ const fallbackApps: MarketplaceAppCard[] = [
     category: 'Tools',
     viewCount: 19,
     starCount: 0,
+    forkCount: 0,
     screenshots: [],
   },
 ]
@@ -359,8 +367,8 @@ watch(
 
                 <div class="app-meta-row" aria-label="App metadata">
                   <span>{{ formatCount(app.viewCount) }} views</span>
+                  <span>{{ formatCount(app.forkCount) }} forks</span>
                   <span>{{ formatCount(app.starCount) }} stars</span>
-                  <span>Forkable</span>
                 </div>
 
                 <div class="app-actions">

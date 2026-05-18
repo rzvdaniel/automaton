@@ -93,6 +93,11 @@ const relatedHeading = computed(() => {
   return name ? `More apps from ${name}` : 'More apps from this author'
 })
 
+function formatCount(value: number) {
+  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
+  return String(value)
+}
+
 const selectedImageIndex = computed(() =>
   galleryImages.value.findIndex((image) => image.imageUrl === selectedImageUrl.value),
 )
@@ -212,6 +217,13 @@ onMounted(loadApp)
 
                 <p v-if="app.description" class="hero-description">{{ app.description }}</p>
                 <p v-else-if="app.summary" class="hero-description">{{ app.summary }}</p>
+
+                <div class="hero-stats" aria-label="App activity">
+                  <span>{{ formatCount(app.viewCount) }} plays</span>
+                  <span>{{ formatCount(app.forkCount) }} forks</span>
+                  <span>{{ formatCount(app.starCount) }} saves</span>
+                  <span v-if="publishedLabel">published {{ publishedLabel }}</span>
+                </div>
 
                 <div class="hero-actions">
                   <a v-if="launchUrl" :href="launchUrl" target="_blank" rel="noopener" class="detail-button primary">
@@ -456,6 +468,30 @@ onMounted(loadApp)
   font-size: 1.12rem;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  color: #9fb0c2;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.hero-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-stats span + span::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(159, 176, 194, 0.68);
 }
 
 .hero-actions {

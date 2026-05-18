@@ -78,6 +78,7 @@ public class PublicMarketplaceController : ControllerBase
                 Tags = a.Tags,
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
+                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
@@ -139,6 +140,7 @@ public class PublicMarketplaceController : ControllerBase
                 Tags = a.Tags,
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
+                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
@@ -206,6 +208,7 @@ public class PublicMarketplaceController : ControllerBase
                 Tags = a.Tags,
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
+                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
@@ -284,6 +287,7 @@ public class PublicMarketplaceController : ControllerBase
                 Tags = a.Tags,
                 ViewCount = a.ViewCount,
                 StarCount = a.StarCount,
+                ForkCount = _dbContext.WebApps.Count(f => f.ForkedFromAppId == a.Id),
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
                 PublicUrl = a.PublicUrl,
@@ -341,6 +345,7 @@ public class MarketplaceAppCardDto
     public string? Tags { get; set; }
     public int ViewCount { get; set; }
     public int StarCount { get; set; }
+    public int ForkCount { get; set; }
     public bool IsStarredByCurrentUser { get; set; }
     public string? PublicUrl { get; set; }
     public DateTime? PublishedAt { get; set; }

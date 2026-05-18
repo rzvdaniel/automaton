@@ -151,6 +151,7 @@ onBeforeUnmount(stopRotation)
           <span class="avatar">{{ activeCreatorInitials }}</span>
           <span>by {{ activeCreatorName }}</span>
           <span>{{ formatCount(activeApp.viewCount) }} views</span>
+          <span>{{ formatCount(activeApp.forkCount) }} forks</span>
           <span>{{ formatCount(activeApp.starCount) }} stars</span>
         </div>
 

@@ -10,6 +10,7 @@ export type MarketplaceAppCard = {
   tags?: string
   viewCount: number
   starCount: number
+  forkCount: number
   isStarredByCurrentUser?: boolean
   publicUrl?: string
   publishedAt?: string
