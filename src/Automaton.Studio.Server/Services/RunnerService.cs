@@ -187,6 +187,33 @@ public class RunnerService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> RequestConnectedRunnersReconnectWhenIdleAsync(string reason, CancellationToken cancellationToken)
+    {
+        var connectedRunners = await dbContext.Runners
+            .AsNoTracking()
+            .Where(x => x.ConnectionId != null)
+            .Select(x => new { x.Id, x.Name, x.ConnectionId })
+            .ToListAsync(cancellationToken);
+
+        var signaled = 0;
+        foreach (var runner in connectedRunners)
+        {
+            try
+            {
+                await automatonHub.Clients.Client(runner.ConnectionId!)
+                    .SendAsync("ReconnectWhenIdle", reason, cancellationToken);
+                signaled++;
+            }
+            catch (Exception ex)
+            {
+                logger.Warning(ex, "Failed to request reconnect-when-idle for runner {RunnerId} ({RunnerName})", runner.Id, runner.Name);
+            }
+        }
+
+        logger.Information("Requested reconnect-when-idle for {RunnerCount} connected runners", signaled);
+        return signaled;
+    }
+
     public async Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
     {
         // Check if user can update this runner (personal owner OR project member with Developer/Admin role)

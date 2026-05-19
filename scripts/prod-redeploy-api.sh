@@ -48,6 +48,7 @@ if [[ -n "$TARGET_COLOR" && "$TARGET_COLOR" != "blue" && "$TARGET_COLOR" != "gre
 fi
 
 ensure_infrastructure
+DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
 
 CURRENT_COLOR="$(get_live_color api)"
 TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color api)}"
@@ -57,7 +58,13 @@ deploy_color api "$TARGET_COLOR"
 switch_live_color api "$TARGET_COLOR"
 echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via nginx reload"
 
+if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    signal_api_color_runners_reconnect_when_idle "$CURRENT_COLOR"
+fi
+
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    echo "[INFO] Waiting ${DRAIN_WAIT_SECONDS}s for runners on api-$CURRENT_COLOR to reconnect"
+    sleep "$DRAIN_WAIT_SECONDS"
     stop_color api "$CURRENT_COLOR"
 fi
 

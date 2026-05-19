@@ -47,6 +47,7 @@ load_prod_env() {
     : "${ACME_EMAIL:?ACME_EMAIL is required in .env}"
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
+    RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-20}"
 }
 
 write_default_state() {
@@ -423,6 +424,42 @@ stop_color() {
         docker compose -f "$COMPOSE_FILE" stop "$compose_service"
         docker compose -f "$COMPOSE_FILE" rm -f "$compose_service"
     fi
+}
+
+signal_api_color_runners_reconnect_when_idle() {
+    local color="$1"
+    local reason="${2:-API deploy cutover complete. Reconnect to the new live API instance when idle.}"
+    local compose_service
+    compose_service="$(compose_service_name api "$color")"
+
+    if ! service_exists "$compose_service"; then
+        echo "[INFO] Skip runner reconnect signal for $compose_service because it is not running"
+        return 0
+    fi
+
+    mapfile -t container_ids < <(service_container_ids "$compose_service")
+    if [[ ${#container_ids[@]} -eq 0 ]]; then
+        echo "[INFO] No containers found for $compose_service"
+        return 0
+    fi
+
+    for container_id in "${container_ids[@]}"; do
+        local container_ip
+        container_ip="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id")"
+
+        if [[ -z "$container_ip" ]]; then
+            echo "[WARN] Could not resolve IP for API container $container_id" >&2
+            continue
+        fi
+
+        echo "[INFO] Requesting reconnect-when-idle from API container $container_id ($container_ip)"
+        curl -fsS \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            --data "{\"reason\":\"${reason//\"/\\\"}\"}" \
+            "http://$container_ip:8080/internal/runners/reconnect-when-idle" \
+            > /dev/null
+    done
 }
 
 assert_service_exists() {

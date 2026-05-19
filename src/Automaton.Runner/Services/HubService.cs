@@ -30,6 +30,7 @@ public class HubService
     private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
+    private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -42,6 +43,9 @@ public class HubService
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
+    private int activeOperationCount = 0;
+    private int reconnectRequested = 0;
+    private int reconnectInProgress = 0;
 
     public HubService(
         ConfigurationService configService,
@@ -275,6 +279,7 @@ public class HubService
             // Register tunnel forwarding handler
             connection.On<TunnelRequest>(TunnelRequestMethod, async (request) =>
             {
+                BeginRunnerActivity();
                 logger.Debug("Tunnel request received: {Method} {Path} RequestId={RequestId}",
                     request.Method, request.Path, request.RequestId);
                 try
@@ -295,12 +300,21 @@ public class HubService
                     logger.Error(ex, "Tunnel forwarding failed: {Method} {Path} RequestId={RequestId}",
                         request.Method, request.Path, request.RequestId);
                 }
+                finally
+                {
+                    EndRunnerActivity();
+                }
             });
 
             connection.On(PingMethod, () =>
             {
                 logger.Debug("Received ping from server");
                 return "Pong";
+            });
+
+            connection.On<string>(ReconnectWhenIdleMethod, (reason) =>
+            {
+                HandleReconnectWhenIdle(reason);
             });
 
             // Handle incoming file upload chunks — write to runner's local volume
@@ -395,6 +409,7 @@ public class HubService
     /// </summary>
     private WorkflowExecution ExecuteWorkflowHandler(Guid workflowId)
     {
+        BeginRunnerActivity();
         try
         {
             WriteLine($"▶️ Executing workflow: {workflowId}");
@@ -418,6 +433,10 @@ public class HubService
             failed.AddLog("Error", ex.Message);
             return failed;
         }
+        finally
+        {
+            EndRunnerActivity();
+        }
     }
 
     /// <summary>
@@ -426,6 +445,7 @@ public class HubService
     /// </summary>
     private CustomStepExecutionResponse ExecuteCustomStepHandler(CustomStepPayload customStep)
     {
+        BeginRunnerActivity();
         try
         {
             // Execute on a background thread - crucial for long-running operations
@@ -457,6 +477,10 @@ public class HubService
                 Finished = DateTime.UtcNow,
                 OutputVariables = []
             };
+        }
+        finally
+        {
+            EndRunnerActivity();
         }
     }
 
@@ -989,6 +1013,106 @@ public class HubService
     public bool IsConnected()
     {
         return connection?.State == HubConnectionState.Connected;
+    }
+
+    private void BeginRunnerActivity()
+    {
+        Interlocked.Increment(ref activeOperationCount);
+    }
+
+    private void EndRunnerActivity()
+    {
+        var remaining = Interlocked.Decrement(ref activeOperationCount);
+        if (remaining < 0)
+        {
+            Interlocked.Exchange(ref activeOperationCount, 0);
+            remaining = 0;
+        }
+
+        if (remaining == 0 && Volatile.Read(ref reconnectRequested) == 1)
+        {
+            QueueReconnectNow("Current work finished.");
+        }
+    }
+
+    private void HandleReconnectWhenIdle(string? reason)
+    {
+        var activeOperations = Math.Max(0, Volatile.Read(ref activeOperationCount));
+        var message = string.IsNullOrWhiteSpace(reason)
+            ? "Server requested reconnect to the new API instance."
+            : reason.Trim();
+
+        logger.Information(
+            "Received reconnect-when-idle request from server. ActiveOperations={ActiveOperations} Reason={Reason}",
+            activeOperations,
+            message);
+
+        if (activeOperations == 0)
+        {
+            QueueReconnectNow(message);
+            return;
+        }
+
+        Interlocked.Exchange(ref reconnectRequested, 1);
+        WriteLine($"⏳ Reconnect requested by server. Waiting for {activeOperations} active task(s) to finish.");
+    }
+
+    private void QueueReconnectNow(string reason)
+    {
+        if (Interlocked.CompareExchange(ref reconnectInProgress, 1, 0) != 0)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref reconnectRequested, 0);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                WriteLine($"🔄 Reconnect requested by server: {reason}");
+                await ForceReconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.Warning(ex, "Forced reconnect request failed");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref reconnectInProgress, 0);
+            }
+        });
+    }
+
+    private async Task ForceReconnectAsync()
+    {
+        var currentConnection = connection;
+        if (currentConnection == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await currentConnection.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Debug(ex, "Stopping current SignalR connection during forced reconnect failed");
+        }
+
+        try
+        {
+            await currentConnection.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Debug(ex, "Disposing current SignalR connection during forced reconnect failed");
+        }
+
+        if (ReferenceEquals(connection, currentConnection))
+        {
+            connection = null;
+        }
     }
 
     private async Task HandleReceiveFileChunkAsync(FileUploadChunk chunk)

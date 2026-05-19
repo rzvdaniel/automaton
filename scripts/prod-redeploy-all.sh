@@ -75,6 +75,7 @@ validate_color "$STUDIO_COLOR" "--studio-color"
 validate_color "$WEBSITE_COLOR" "--website-color"
 
 ensure_infrastructure
+DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
 
 if [[ "$WITH_CLI_ASSETS" == "true" ]]; then
     echo "[INFO] Rebuilding website CLI assets image"
@@ -104,8 +105,14 @@ switch_live_color website "$TARGET_WEBSITE_COLOR"
 
 echo "[INFO] nginx is now routing api, studio, and website to the freshly deployed colors"
 
+if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
+    signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"
+fi
+
 if [[ "$KEEP_PREVIOUS" != "true" ]]; then
     if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
+        echo "[INFO] Waiting ${DRAIN_WAIT_SECONDS}s for runners on api-$CURRENT_API_COLOR to reconnect"
+        sleep "$DRAIN_WAIT_SECONDS"
         stop_color api "$CURRENT_API_COLOR"
     fi
     if [[ "$CURRENT_STUDIO_COLOR" != "$TARGET_STUDIO_COLOR" ]]; then

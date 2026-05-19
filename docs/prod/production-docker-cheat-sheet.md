@@ -126,9 +126,12 @@ Optional:
 
 ```env
 CERT_NAME=automaton.monster
+RUNNER_RECONNECT_GRACE_SECONDS=20
 ```
 
 Use `CERT_NAME` only if you want the certificate stored under a different folder name than `WEBSITE_DOMAIN`.
+
+Use `RUNNER_RECONNECT_GRACE_SECONDS` to control how long API deploy scripts wait before stopping the previous API color after cutover. During that window, the old API color asks connected runners to reconnect to the new live color once they become idle.
 
 ### 7. Add hosted-runner SSH key if needed
 
@@ -223,6 +226,15 @@ Each public service has two Compose services:
 
 The deploy scripts build the inactive color, wait for health checks to pass, rewrite the nginx selector for that hostname, reload nginx, and then stop the old color unless you pass `--keep-previous`.
 
+For API deploys, there is an extra runner-drain step:
+
+- after nginx switches `api.automaton.monster` to the new API color
+- the previous API color tells its connected runners to reconnect when idle
+- the deploy script waits `RUNNER_RECONNECT_GRACE_SECONDS`
+- then it stops the previous API color unless `--keep-previous` was used
+
+This avoids the earlier problem where hosted runners stayed connected to the old API color and appeared offline from the new live color.
+
 ## Full Stack
 
 Normal redeploy:
@@ -249,6 +261,12 @@ cd /opt/automaton
 ```
 
 Use `--keep-previous` for normal production deploys while the deployment is still fresh. It leaves the old live color running after nginx switches to the new color, so rollback is only a route switch.
+
+Important for runners:
+
+- if you use `--keep-previous`, old API-color runners can continue finishing work on that old API color
+- they will not be forced off immediately, so rollback stays fast
+- when you do not use `--keep-previous`, the script waits `RUNNER_RECONNECT_GRACE_SECONDS` and then stops the previous API color, which forces any remaining runners on that color to reconnect through `api.automaton.monster`
 
 Run without `--keep-previous` only when you are comfortable removing the old color after the switch. That keeps the server cleaner and uses fewer resources, but rollback then requires rebuilding or redeploying the previous version.
 
@@ -307,6 +325,8 @@ API:
 cd /opt/automaton
 ./scripts/prod-redeploy-api.sh
 ```
+
+This uses the same runner reconnect flow as `prod-redeploy-all.sh`: after cutover, the previous API color signals connected runners to reconnect when idle, waits `RUNNER_RECONNECT_GRACE_SECONDS`, then stops the old API color unless `--keep-previous` is used.
 
 Studio:
 
