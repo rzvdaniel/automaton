@@ -4,122 +4,27 @@ import AppFooter from '@/components/AppFooter.vue'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
-const installModes = [
-  {
-    title: 'Recommended: .NET global tool',
-    description: 'Best fit when you already have .NET 9 installed and want the easiest install/update path for both humans and AI tools.',
-    code: 'dotnet tool install -g Automaton.Cli',
-  },
-]
-
-const directScripts = [
-  {
-    title: 'PowerShell install script',
-    description: 'Use the hosted installer script. It installs or updates the global tool via dotnet.',
-    code: [
-      `irm ${publicAppConfig.apiBaseUrl}downloads/install.ps1 | iex`,
-      'automaton --help',
-    ].join('\n'),
-  },
-  {
-    title: 'Bash install script',
-    description: 'Use the hosted installer script. It installs or updates the global tool via dotnet.',
-    code: [
-      `curl -fsSL ${publicAppConfig.apiBaseUrl}downloads/install.sh | bash`,
-      'automaton --help',
-    ].join('\n'),
-  },
-]
-
-const genericStarterPrompt = `Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read ${publicAppConfig.llmsUrl}. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.`
-
-const existingAppStarterPrompt = `Update my existing Automaton Monster app using the Automaton CLI. Start by running automaton setup, link this folder to app id [app-id] with automaton link, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read ${publicAppConfig.llmsUrl}. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
-
-const frontendOnlyStarterPrompt = `Build [describe the app] as a frontend-only Automaton Monster app using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read ${publicAppConfig.llmsUrl}. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.`
-
-const frameworkStarterPrompt = `Build [describe the app] as a [React or Vue] app for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read ${publicAppConfig.llmsUrl}. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication, runner creation outside the CLI, or publish approval.`
-
-const quickStartSteps = [
-  {
-    title: 'Install CLI',
-    detail: 'Install the global tool once. That is now the only supported CLI installation path.',
-    code: 'dotnet tool install -g Automaton.Cli',
-  },
-  {
-    title: 'Run setup',
-    detail: 'Prepare the current machine or workspace and let the CLI sync local guidance automatically.',
-    code: 'automaton setup',
-  },
-  {
-    title: 'Paste the starter prompt',
-    detail: 'After setup, ask the AI to build and deploy the app in the current folder.',
-    code: genericStarterPrompt,
-  },
-  {
-    title: 'Preview in Studio',
-    detail: 'The AI should handle deploy; you use Studio preview and logs as the test loop.',
-    code: 'Automaton Studio preview\nAutomaton Studio logs',
-  },
-]
-
-const workflowSteps = [
-  {
-    title: 'Manual fallback',
-    description: 'Use this only when you want to drive the CLI yourself instead of letting the AI handle the main flow.',
-    code: 'automaton setup\nautomaton new "My App"\n# or\nautomaton link your-app-id\nautomaton deploy',
-  },
-  {
-    title: 'Use Studio as the test loop',
-    description: 'After deploy, preview the app and inspect logs in Automaton Studio before publish.',
-    code: 'Automaton Studio preview\nAutomaton Studio logs',
-  },
-]
-
-const starterPromptVariants = [
-  {
-    title: 'Generic starter',
-    description: 'Best default when the user wants the AI to choose the simplest suitable stack.',
-    code: genericStarterPrompt,
-  },
-  {
-    title: 'Existing app',
-    description: 'Use this when the remote Automaton app already exists and the folder should be linked first.',
-    code: existingAppStarterPrompt,
-  },
-  {
-    title: 'Frontend-only',
-    description: 'Use this when the app should stay frontend-only unless backend code is truly necessary.',
-    code: frontendOnlyStarterPrompt,
-  },
-  {
-    title: 'React or Vue',
-    description: 'Use this when the user explicitly wants a framework app.',
-    code: frameworkStarterPrompt,
-  },
-]
-
-const backendChecklist = [
-  {
-    title: 'Frontend-only app',
-    detail: 'You can skip runner setup and deploy immediately.',
-    code: 'automaton deploy',
-  },
-  {
-    title: 'Backend app',
-    detail: 'Deploy will select or prompt for a connected runner when Python controllers need one.',
-    code: 'automaton deploy',
-  },
-  {
-    title: 'Choose explicitly',
-    detail: 'Pass a runner only when you already know which connected runner should handle backend deploy.',
-    code: 'automaton deploy --runner your-runner-id',
-  },
-  {
-    title: 'Deploy normally',
-    detail: 'Reuse the same deploy command for every update.',
-    code: 'automaton deploy',
-  },
-]
+const installCommand = 'dotnet tool install -g Automaton.Cli'
+const loginCommand = 'automaton login'
+const setupCommand = 'automaton setup'
+const deployCommand = 'automaton deploy'
+const publishCommand = 'automaton publish'
+const setupFlow = [
+  installCommand,
+  loginCommand,
+  '',
+  'mkdir iss-tracker',
+  'cd iss-tracker',
+  '',
+  setupCommand,
+  '',
+  '# Then ask your AI:',
+  '# "Build a live ISS tracker with realtime orbital data."',
+  '',
+  deployCommand,
+  '',
+  publishCommand,
+].join('\n')
 
 const copiedKey = ref<string | null>(null)
 
@@ -131,7 +36,7 @@ async function copyCode(key: string, code: string) {
       if (copiedKey.value === key) {
         copiedKey.value = null
       }
-    }, 1500)
+    }, 1600)
   } catch {
     copiedKey.value = null
   }
@@ -139,233 +44,208 @@ async function copyCode(key: string, code: string) {
 </script>
 
 <template>
-  <div class="cli-page">
+  <div class="cli-concept-page">
     <PublicSiteHeader />
 
     <main>
-      <section class="cli-hero">
-        <div class="container cli-hero-inner">
-          <div class="cli-copy">
-            <span class="section-label"><i class="pi pi-terminal" /> Automaton CLI</span>
-            <h1 class="section-title cli-title">Install fast. Deploy from your editor. Stay in control.</h1>
-            <p class="cli-subtitle">
-              Install the CLI, run <code>automaton setup</code>, paste one starter prompt into your AI tool,
-              and let it build locally and deploy to Automaton without leaving your workflow.
+      <header class="hero">
+        <div class="container hero-grid">
+          <div>
+            <span class="eyebrow">AI-native deployment workflow</span>
+            <h1>Your AI already writes code. Automaton ships it.</h1>
+            <p class="hero-copy">
+              Install the Automaton CLI, connect your AI coding workflow, and deploy real frontend and backend apps
+              without manually wiring infrastructure.
             </p>
 
-            <div class="cli-hero-actions">
-              <a href="#install" class="btn btn-primary">
-                <i class="pi pi-download" />
-                Install CLI
-              </a>
-              <a href="#workflow" class="btn btn-secondary">
-                <i class="pi pi-compass" />
-                View workflow
-              </a>
-              <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="btn btn-secondary">
-                <i class="pi pi-sparkles" />
-                Open llms.txt
-              </a>
+            <div class="hero-actions">
+              <button class="button primary" type="button" @click="copyCode('install-command', installCommand)">
+                {{ copiedKey === 'install-command' ? 'Copied install command' : 'Copy install command' }}
+              </button>
+              <a class="button" href="/docs/cli-ai-tools">Open documentation</a>
             </div>
+
+            <p class="secondary-note">Use your own AI tools. Host your own runners. Keep your own code.</p>
           </div>
-        </div>
-      </section>
 
-      <section id="install" class="cli-section">
-        <div class="container cli-stack">
-          <div class="cli-card">
-            <div class="cli-card-head">
-              <span class="tag">Install</span>
-              <h2>Install with NuGet</h2>
-              <p class="cli-card-subtitle">Automaton CLI ships as a .NET global tool. After setup, the AI should usually handle app creation, validation, and deploy. Use the CLI commands directly only as the manual fallback flow.</p>
+          <article class="terminal">
+            <div class="terminal-bar">
+              <div class="dots"><span /><span /><span /></div>
+              <span class="copy-pill">Canonical workflow</span>
             </div>
 
-            <article v-for="mode in installModes" :key="mode.title" class="code-card">
-              <div class="code-card-header">
-                <div>
-                  <h3>{{ mode.title }}</h3>
-                  <p>{{ mode.description }}</p>
-                </div>
-                <button class="copy-chip" @click="copyCode(mode.title, mode.code)">
-                  <i :class="copiedKey === mode.title ? 'pi pi-check' : 'pi pi-copy'" />
-                  {{ copiedKey === mode.title ? 'Copied' : 'Copy' }}
-                </button>
+            <div class="terminal-body">
+              <div class="cmd">$ {{ installCommand }}</div>
+              <div class="cmd">$ {{ loginCommand }}</div>
+              <div class="cmd">$ {{ setupCommand }}</div>
+
+              <div class="setup-card">
+                <div class="check"><span class="tick">✓</span><span><strong>Authenticated</strong> with Automaton Studio</span></div>
+                <div class="check"><span class="tick">✓</span><span><strong>Generated AI guidance</strong> for coding agents</span></div>
+                <div class="check"><span class="tick">✓</span><span><strong>Prepared deployment workflow</strong> for publish and runners</span></div>
               </div>
-              <pre class="code-card-body"><code>{{ mode.code }}</code></pre>
-            </article>
+
+              <div class="cmd"><span class="muted"># Then ask your AI:</span>
+Build a live ISS tracker with Earth visualization and realtime orbital data.</div>
+
+              <div class="cmd">$ {{ deployCommand }}</div>
+            </div>
+          </article>
+        </div>
+      </header>
+
+      <section>
+        <div class="container">
+          <div class="section-head">
+            <h2>Install once. Then just describe the app.</h2>
+            <p>
+              Setup teaches your AI how Automaton apps work. After that, you describe the product — the agent handles structure, deployment, and publishing.
+            </p>
           </div>
 
-          <div id="scripts" class="cli-card">
-            <div class="cli-card-head">
-              <span class="tag">Scripts</span>
-              <h2>Install scripts</h2>
+          <div class="steps">
+            <article class="step">
+              <div class="step-number">1</div>
+              <h3>Install the CLI</h3>
+              <p>Use the .NET global tool to add Automaton commands to your local workflow.</p>
+              <div class="step-snippet">dotnet tool install -g Automaton.Cli</div>
+            </article>
+            <article class="step">
+              <div class="step-number">2</div>
+              <h3>Run setup once</h3>
+              <p>Connect your workspace and give your AI agent local guidance for building Automaton apps.</p>
+              <div class="step-snippet">{{ setupCommand }}</div>
+            </article>
+            <article class="step">
+              <div class="step-number">3</div>
+              <h3>Ask for the app</h3>
+              <p>Now the prompt becomes the product idea — not deployment instructions.</p>
+              <div class="prompt-bubble">"Build a live ISS tracker with Earth visualization and realtime orbital data."</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="flow-band">
+        <div class="container">
+          <div class="section-head">
+            <h2>The workflow layer between AI-generated code and deployed software.</h2>
+            <p>Automaton CLI connects local AI tools, Automaton Studio, publishing, and optional backend execution.</p>
+          </div>
+
+          <div class="flow">
+            <div class="flow-item"><strong>AI Agent</strong><span>Generates and edits the app locally.</span></div>
+            <div class="flow-item"><strong>Automaton CLI</strong><span>Applies structure, metadata, and deployment commands.</span></div>
+            <div class="flow-item"><strong>Automaton Studio</strong><span>Manages apps, publishing, visibility, and remixes.</span></div>
+            <div class="flow-item"><strong>Published App</strong><span>Goes live as public, private, or forkable.</span></div>
+            <div class="flow-item"><strong>Runner</strong><span>Executes backend logic locally or in Docker.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="container split">
+          <div>
+            <div class="section-head">
+              <h2>Quickstart workflow.</h2>
+              <p>From local AI workflow to published app.</p>
             </div>
 
-            <div class="script-grid">
-              <article v-for="script in directScripts" :key="script.title" class="code-card script-card">
-                <div class="code-card-header script-card-header">
-                  <div>
-                    <h3>{{ script.title }}</h3>
-                    <p>{{ script.description }}</p>
-                  </div>
-                  <button class="copy-chip" @click="copyCode(script.title, script.code)">
-                    <i :class="copiedKey === script.title ? 'pi pi-check' : 'pi pi-copy'" />
-                    {{ copiedKey === script.title ? 'Copied' : 'Copy' }}
-                  </button>
-                </div>
-                <pre class="code-card-body script-code"><code>{{ script.code }}</code></pre>
-              </article>
+            <div class="code-panel">
+              <pre>{{ setupFlow }}</pre>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section class="cli-section cli-section-strong">
-        <div class="container">
-          <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Recommended flow</h2>
-            <p class="section-subtitle cli-section-subtitle">
-              This is the default path most users should follow: install the CLI once, run setup, paste the starter prompt, and let the AI handle the rest.
-            </p>
-            <p class="section-subtitle cli-section-subtitle">
-              Run <code>automaton setup</code> inside the app folder you want to create or manage. Each app should have its own <code>automaton.json</code> and local guidance scaffold.
-            </p>
-          </div>
-
-          <div class="backend-checklist-grid">
-            <article v-for="item in quickStartSteps" :key="item.title" class="backend-checklist-card">
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.detail }}</p>
-              <button class="copy-chip workflow-copy" @click="copyCode(`quickstart-${item.title}`, item.code)">
-                <i :class="copiedKey === `quickstart-${item.title}` ? 'pi pi-check' : 'pi pi-copy'" />
-                {{ copiedKey === `quickstart-${item.title}` ? 'Copied' : 'Copy' }}
-              </button>
-              <pre class="workflow-code"><code>{{ item.code }}</code></pre>
-            </article>
-          </div>
-
-          <a href="/docs/cli-ai-tools" class="cli-panel-link cli-quickstart-link">See detailed CLI + your tools docs <i class="pi pi-arrow-right" /></a>
-        </div>
-      </section>
-
-      <section id="workflow" class="cli-section cli-section-strong">
-        <div class="container">
-          <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">If you want more control</h2>
-            <p class="section-subtitle cli-section-subtitle">
-              Most users can stop at the recommended flow above. Use these fallback references only when you want to drive the CLI more directly.
-            </p>
-          </div>
-
-          <div class="workflow-grid">
-            <article v-for="(step, index) in workflowSteps" :key="step.title" class="workflow-card">
-              <div class="workflow-index">{{ index + 1 }}</div>
-              <h3>{{ step.title }}</h3>
-              <p>{{ step.description }}</p>
-              <button class="copy-chip workflow-copy" @click="copyCode(`workflow-${index}`, step.code)">
-                <i :class="copiedKey === `workflow-${index}` ? 'pi pi-check' : 'pi pi-copy'" />
-                {{ copiedKey === `workflow-${index}` ? 'Copied' : 'Copy' }}
-              </button>
-              <pre class="workflow-code"><code>{{ step.code }}</code></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="cli-section cli-section-strong">
-        <div class="container">
-          <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Starter prompt variants</h2>
-            <p class="section-subtitle cli-section-subtitle">
-              Start with the generic prompt below. Use the more specific variants only when the app already exists, should stay frontend-only, or must use a framework.
-            </p>
-          </div>
-
-          <div class="workflow-grid">
-            <article v-for="(prompt, index) in starterPromptVariants" :key="prompt.title" class="workflow-card">
-              <div class="workflow-index">{{ index + 1 }}</div>
-              <h3>{{ prompt.title }}</h3>
-              <p>{{ prompt.description }}</p>
-              <button class="copy-chip workflow-copy" @click="copyCode(`starter-${index}`, prompt.code)">
-                <i :class="copiedKey === `starter-${index}` ? 'pi pi-check' : 'pi pi-copy'" />
-                {{ copiedKey === `starter-${index}` ? 'Copied' : 'Copy' }}
-              </button>
-              <pre class="workflow-code"><code>{{ prompt.code }}</code></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="cli-section cli-section-strong">
-        <div class="container">
-          <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Only for backend apps</h2>
-            <p class="section-subtitle cli-section-subtitle">
-              Skip this entire section for frontend-only apps. Use it only when your app includes Python backend controllers.
-            </p>
-          </div>
-
-          <div class="backend-checklist-grid">
-            <article v-for="item in backendChecklist" :key="item.title" class="backend-checklist-card">
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.detail }}</p>
-              <button class="copy-chip workflow-copy" @click="copyCode(`backend-${item.title}`, item.code)">
-                <i :class="copiedKey === `backend-${item.title}` ? 'pi pi-check' : 'pi pi-copy'" />
-                {{ copiedKey === `backend-${item.title}` ? 'Copied' : 'Copy' }}
-              </button>
-              <pre class="workflow-code"><code>{{ item.code }}</code></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="cli-section cli-section-strong">
-        <div class="container cli-grid-two">
-          <div class="cli-card">
-            <div class="cli-card-head">
-              <span class="tag">Why CLI</span>
-              <h2>What the CLI is for</h2>
-              <p class="cli-card-subtitle">Use it when you want local development, Git control, and a reliable path from AI prompt to deploy.</p>
+          <div>
+            <div class="section-head">
+              <h2>Project structure</h2>
+              <p>Automaton apps stay simple. Frontend files live at the root, while backend execution remains optional.</p>
             </div>
 
-            <article class="code-card">
-              <div class="code-card-header">
-                <div>
-                  <h3>Best fit</h3>
-                  <p>The CLI is the bridge between your local project and Automaton hosting.</p>
-                </div>
-              </div>
-              <pre class="code-card-body"><code>- Build locally with your own editor or AI tool
-- Keep the project in your repo
-- Start with automaton setup
-- Paste the starter prompt into your AI tool
-- Let the AI handle create or link, validation, and deploy by default
-- Use manual CLI commands only when you want the fallback flow
-- Preview and inspect logs in Automaton Studio
-- Reuse the same flow every time you update the app</code></pre>
-            </article>
-          </div>
-
-          <div class="cli-card">
-            <div class="cli-card-head">
-              <span class="tag">Next step</span>
-              <h2>Where to go deeper</h2>
-              <p class="cli-card-subtitle">Keep this page simple. Use the public docs for the full workflow, and the AI instructions only when your coding tool needs them.</p>
+            <div class="code-panel">
+              <pre>iss-tracker/
+├─ AGENTS.md
+├─ .automaton/
+│  └─ app.json
+├─ index.html
+├─ styles.css
+├─ app.js
+└─ backend/
+   └─ main.py</pre>
             </div>
 
-            <article class="code-card">
-              <div class="code-card-header code-card-header-stack">
-                <div>
-                  <h3>Detailed references</h3>
-                  <p>Use the public docs for the end-to-end developer flow. If you are working with Copilot, Claude Code, or another coding agent, open the AI instructions as a secondary reference.</p>
-                </div>
-                <div class="resource-links">
-                  <a href="/docs" class="btn btn-primary resource-button resource-button-primary">Open Building apps with Automaton</a>
-                  <a :href="publicAppConfig.llmsUrl" target="_blank" rel="noopener" class="btn btn-secondary resource-button resource-button-secondary">Open AI instructions</a>
-                </div>
-              </div>
+            <p class="secondary-note">
+              AGENTS.md gives coding agents local guidance. The backend folder is optional and only needed for apps requiring backend execution.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="container">
+          <div class="section-head">
+            <h2>Built for modern AI coding workflows.</h2>
+            <p>Automaton works with your preferred coding tools instead of replacing them.</p>
+          </div>
+
+          <div class="features">
+            <article class="feature">
+              <div class="feature-icon">CC</div>
+              <h3>Claude Code</h3>
+              <p>Prompt-driven local coding workflow with Automaton deployment support.</p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">CX</div>
+              <h3>Codex CLI</h3>
+              <p>Generate and iterate locally while Automaton handles structure and publishing.</p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">CU</div>
+              <h3>Cursor</h3>
+              <p>Use your preferred editor and AI coding environment without vendor lock-in.</p>
+            </article>
+            <article class="feature">
+              <div class="feature-icon">GM</div>
+              <h3>Gemini CLI</h3>
+              <p>Connect prompt-driven coding workflows to deployable Automaton apps.</p>
             </article>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="container split">
+          <article class="runner-card">
+            <h2>Backend apps need a Runner.</h2>
+            <p>
+              Static frontend apps can deploy instantly. Apps with backend logic execute through Automaton Runners.
+            </p>
+            <p class="secondary-note">Run them locally, on your own server, in Docker, or later using managed runners.</p>
+
+            <div class="hero-actions">
+              <a class="button" href="/docs/troubleshooting">Learn about runners</a>
+            </div>
+          </article>
+
+          <div class="requirements">
+            <div class="requirement"><span>Static frontend apps</span><span>No runner required</span></div>
+            <div class="requirement"><span>Backend apps</span><span>Requires Runner</span></div>
+            <div class="requirement"><span>Self-hosted Runner</span><span>Available today</span></div>
+            <div class="requirement"><span>Managed Runner</span><span>Coming later</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="container cta-box">
+          <div>
+            <h2>Build and publish your first app in minutes.</h2>
+            <p>Install the setup flow, tell your AI what to build, then deploy directly to Automaton Monster.</p>
+          </div>
+
+          <button class="button primary" type="button" @click="copyCode('setup-flow-bottom', setupFlow)">
+            {{ copiedKey === 'setup-flow-bottom' ? 'Copied setup flow' : 'Copy setup flow' }}
+          </button>
         </div>
       </section>
     </main>
@@ -375,384 +255,435 @@ async function copyCode(key: string, code: string) {
 </template>
 
 <style scoped>
-.cli-hero {
-  padding: 42px 0 24px;
+.cli-concept-page {
   background:
-    radial-gradient(circle at 0% 0%, rgba(124, 106, 245, 0.18), transparent 32%),
-    radial-gradient(circle at 100% 20%, rgba(77, 166, 255, 0.12), transparent 26%);
+    radial-gradient(circle at 14% 0%, rgba(80, 215, 255, 0.13), transparent 31rem),
+    radial-gradient(circle at 88% 8%, rgba(69, 230, 138, 0.11), transparent 30rem),
+    linear-gradient(180deg, #090b10 0%, #07080b 46%, #050608 100%);
 }
 
-.cli-hero-inner {
-  display: block;
+.hero {
+  padding: 86px 0 54px;
 }
 
-.cli-title {
-  max-width: 1080px;
-}
-
-.cli-subtitle {
-  max-width: 920px;
-  margin-top: 14px;
-  color: rgba(233, 236, 245, 0.78);
-  font-size: 1.04rem;
-}
-
-.cli-hero-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 26px;
-  flex-wrap: wrap;
-}
-
-.cli-panel-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  color: #d7d2ff;
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.cli-quickstart-link {
-  margin-top: 18px;
-}
-
-.cli-section {
-  padding: 22px 0 26px;
-}
-
-.cli-section-strong {
-  padding-bottom: 44px;
-}
-
-.cli-section-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 20px;
-}
-
-.cli-section-title {
-  font-size: 1.75rem;
-}
-
-.cli-section-subtitle {
-  max-width: 760px;
-}
-
-.downloads-grid {
+.hero-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.download-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(18, 20, 31, 0.98), rgba(12, 14, 23, 0.98));
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.download-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(124, 106, 245, 0.34);
-}
-
-.download-card-secondary {
-  background: linear-gradient(180deg, rgba(15, 18, 27, 0.96), rgba(12, 15, 22, 0.96));
-}
-
-.download-card-head {
-  display: flex;
+  grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.85fr);
+  gap: 40px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
-.download-card-head h3 {
-  font-size: 1rem;
-}
-
-.download-card p {
-  color: rgba(233, 236, 245, 0.7);
-  font-size: 0.88rem;
-}
-
-.download-badge {
-  padding: 4px 10px;
+.eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border: 1px solid rgba(80, 215, 255, 0.22);
   border-radius: 999px;
-  background: rgba(124, 106, 245, 0.14);
-  color: #d6ceff;
-  font-size: 0.72rem;
-  font-weight: 700;
+  background: rgba(80, 215, 255, 0.08);
+  color: #c4f2ff;
+  font-size: 0.82rem;
+  font-weight: 850;
 }
 
-.download-link {
-  margin-top: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: #ffffff;
+h1 {
+  margin: 18px 0;
+  max-width: 980px;
+  font-size: clamp(3.2rem, 7vw, 6.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  text-wrap: balance;
 }
 
-.cli-grid-two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+.hero-copy {
+  max-width: 760px;
+  margin: 0 0 26px;
+  color: #c8ceda;
+  font-size: clamp(1.08rem, 1.8vw, 1.24rem);
 }
 
-.cli-stack {
+.hero-actions {
   display: flex;
-  flex-direction: column;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
 }
 
-.cli-card {
-  padding: 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(16, 18, 28, 0.98), rgba(11, 13, 20, 0.98));
-}
-
-.cli-card-head {
-  margin-bottom: 16px;
-}
-
-.cli-card-head h2 {
-  margin-top: 10px;
-  font-size: 1.3rem;
-}
-
-.cli-card-subtitle {
-  margin-top: 6px;
-  color: rgba(233, 236, 245, 0.68);
-  font-size: 0.84rem;
-}
-
-.code-card {
-  padding: 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-
-.script-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.script-card {
-  height: 100%;
-}
-
-.script-card-header {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.script-code {
-  font-size: 0.74rem;
-  line-height: 1.5;
-}
-
-.code-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 10px;
-}
-
-.code-card-header-stack {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.resource-links {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 10px;
+.secondary-note {
   margin-top: 14px;
+  color: #9ba3b4;
+  font-size: 0.9rem;
 }
 
-.resource-button {
+.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
-  padding: 10px 14px;
-  font-size: 0.82rem;
-  line-height: 1.2;
-}
-
-.resource-button-primary {
-  flex: 1 1 auto;
-}
-
-.resource-button-secondary {
-  flex: 0 0 auto;
-  padding-inline: 12px;
-}
-
-.code-card-header h3 {
-  font-size: 0.96rem;
-}
-
-.code-card-header p {
-  margin-top: 4px;
-  color: rgba(233, 236, 245, 0.68);
-  font-size: 0.84rem;
-}
-
-.copy-chip {
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f7fb;
+  font-weight: 850;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.button:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.button.primary {
+  border-color: rgba(69, 230, 138, 0.55);
+  background: #45e68a;
+  color: #041008;
+  box-shadow: 0 16px 44px rgba(69, 230, 138, 0.18);
+}
+
+.button.primary:hover {
+  transform: translateY(-1px);
+}
+
+.terminal {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(13, 15, 21, 0.94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9ba3b4;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1d2531;
+}
+
+.copy-pill {
+  padding: 5px 9px;
+  border: 1px solid rgba(69, 230, 138, 0.35);
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--color-text);
-  font-size: 0.78rem;
-  font-weight: 600;
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
-.code-card-body,
-.workflow-code {
-  margin: 0;
-  padding: 14px;
-  border-radius: 12px;
-  background: #0d1019;
-  border: 1px solid rgba(124, 106, 245, 0.12);
-  color: #91f5b3;
+.terminal-body {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  line-height: 1.6;
-  overflow-x: auto;
+  font-size: 0.97rem;
+}
+
+.cmd {
+  color: #d9ffe8;
   white-space: pre-wrap;
-  word-break: break-word;
 }
 
-.workflow-grid {
+.cmd .muted {
+  color: #758096;
+}
+
+.setup-card {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
-.backend-checklist-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.backend-checklist-card {
-  padding: 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(125, 211, 252, 0.16);
-  background: linear-gradient(180deg, rgba(16, 21, 33, 0.98), rgba(10, 13, 21, 0.98));
-}
-
-.backend-checklist-card h3 {
-  font-size: 1rem;
-}
-
-.backend-checklist-card p {
-  margin: 8px 0 12px;
-  color: rgba(233, 236, 245, 0.7);
-  font-size: 0.86rem;
-}
-
-.workflow-card {
-  position: relative;
-  padding: 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(18, 20, 32, 0.98), rgba(12, 15, 24, 0.98));
-}
-
-.workflow-index {
-  width: 34px;
-  height: 34px;
+.check {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #4f36b3;
-  color: #fff;
+  gap: 10px;
+  color: #c8ceda;
+  font-size: 0.92rem;
+}
+
+.tick {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+  font-weight: 900;
+}
+
+section {
+  padding: 62px 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+
+.section-head h2 {
+  margin: 0;
+  max-width: 720px;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.section-head p {
+  max-width: 440px;
+  margin: 0;
+  color: #9ba3b4;
+}
+
+.steps,
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.features {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.step,
+.feature {
+  min-height: 210px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+}
+
+.step-number,
+.feature-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  margin-bottom: 22px;
+  border-radius: 8px;
+  background: rgba(80, 215, 255, 0.12);
+  color: #50d7ff;
+  font-weight: 950;
+}
+
+.feature-icon {
+  background: rgba(69, 230, 138, 0.14);
+  color: #45e68a;
+}
+
+.step h3,
+.feature h3 {
+  margin: 0 0 9px;
+  font-size: 1.16rem;
+}
+
+.step p,
+.feature p {
+  margin: 0;
+  color: #9ba3b4;
+}
+
+.step-snippet,
+.prompt-bubble {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #aeb7c7;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.prompt-bubble {
+  color: #d9ffe8;
+}
+
+.flow-band {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0));
+}
+
+.flow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.flow-item {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.flow-item strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.flow-item span {
+  color: #9ba3b4;
+  font-size: 0.9rem;
+}
+
+.code-panel {
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(13, 15, 21, 0.94);
+  color: #d9ffe8;
+  font-family: var(--font-mono);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+}
+
+.code-panel pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.runner-card {
+  padding: 26px;
+  border: 1px solid rgba(69, 230, 138, 0.25);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(69, 230, 138, 0.08), rgba(80, 215, 255, 0.04)), rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+}
+
+.runner-card h2 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.runner-card p {
+  margin: 0;
+  color: #9ba3b4;
+}
+
+.requirements {
+  display: grid;
+  gap: 10px;
+}
+
+.requirement {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c8ceda;
+  font-weight: 850;
+}
+
+.requirement span:last-child {
+  color: #9ba3b4;
   font-size: 0.86rem;
-  font-weight: 700;
-  margin-bottom: 12px;
 }
 
-.workflow-card h3 {
-  font-size: 1rem;
+.cta {
+  padding: 72px 0 92px;
 }
 
-.workflow-card p {
-  margin: 8px 0 12px;
-  color: rgba(233, 236, 245, 0.68);
-  font-size: 0.86rem;
+.cta-box {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 28px;
+  align-items: center;
+  padding: 30px;
+  border: 1px solid rgba(69, 230, 138, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(69, 230, 138, 0.1), rgba(80, 215, 255, 0.05)), rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
-.workflow-copy {
-  margin-bottom: 12px;
+.cta h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+  letter-spacing: -0.04em;
 }
 
-@media (max-width: 1100px) {
-  .downloads-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.cta p {
+  margin: 0;
+  color: #9ba3b4;
+}
 
-  .backend-checklist-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .workflow-grid {
+@media (max-width: 980px) {
+  .hero-grid,
+  .split,
+  .cta-box {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 900px) {
-  .cli-grid-two {
-    grid-template-columns: 1fr;
-  }
-
-  .script-grid {
-    grid-template-columns: 1fr;
+  .steps,
+  .features,
+  .flow {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 640px) {
-  .downloads-grid {
+  .hero {
+    padding-top: 54px;
+  }
+
+  .terminal-body,
+  .code-panel,
+  .runner-card,
+  .cta-box {
+    padding: 18px;
+  }
+
+  .steps,
+  .features,
+  .flow {
     grid-template-columns: 1fr;
   }
 
-  .backend-checklist-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .code-card-header {
-    flex-direction: column;
-  }
-
-  .resource-links {
-    flex-wrap: wrap;
-  }
-
-  .resource-button-primary,
-  .resource-button-secondary {
-    flex: 1 1 100%;
+  .section-head {
+    display: grid;
   }
 }
 </style>

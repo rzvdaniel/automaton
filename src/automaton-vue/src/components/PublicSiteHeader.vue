@@ -6,7 +6,14 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 const route = useRoute()
 const mobileMenuOpen = ref(false)
 
-const navLinks = [
+type NavLink = {
+  label: string
+  href: string
+  hash?: boolean
+  external?: boolean
+}
+
+const navLinks: NavLink[] = [
   { label: 'Apps', href: '/apps' },
   { label: 'Docs', href: '/docs' },
   { label: 'Pricing', href: '/pricing' },

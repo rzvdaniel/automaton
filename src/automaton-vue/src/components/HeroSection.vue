@@ -95,7 +95,7 @@ onMounted(() => {
         <div class="hero-setup-strip">
           <div><span>$</span> dotnet tool install -g Automaton.Cli</div>
           <div><span>$</span> automaton setup</div>
-          <div class="hero-setup-prompt">Then ask: Build a poker planning app for Automaton Monster.</div>
+          <div class="hero-setup-prompt">Then ask: Build a live ISS tracker with Earth view and astronaut telemetry.</div>
         </div>
 
         <div class="hero-proof-grid" aria-label="Automaton capabilities">

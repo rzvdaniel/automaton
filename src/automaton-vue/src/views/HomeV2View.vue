@@ -146,7 +146,7 @@ onMounted(() => {
             </p>
             <div class="prompt-strip" aria-label="Example AI prompt">
               <div class="prompt-label">PROMPT</div>
-              <div class="prompt-text">Build a poker planning app for Automaton Monster.</div>
+              <div class="prompt-text">Build a live ISS tracker with Earth view and astronaut telemetry.</div>
             </div>
             <div class="hero-actions">
               <RouterLink class="button primary" to="/cli">Install the CLI</RouterLink>
@@ -219,7 +219,7 @@ onMounted(() => {
             <div id="install" class="quick-setup">
               <div>$ dotnet tool install -g Automaton.Cli</div>
               <div>$ automaton setup</div>
-              <div><span class="muted"># Then ask:</span> Build a poker planning app for Automaton Monster.</div>
+              <div><span class="muted"># Then ask:</span> Build a live ISS tracker with Earth view and astronaut telemetry.</div>
             </div>
           </div>
         </div>
@@ -228,24 +228,27 @@ onMounted(() => {
       <section id="build">
         <div class="shell">
           <div class="section-head">
-            <h2>Install once. Build by asking.</h2>
-            <p>The setup step gives your AI agent the Automaton guidance it needs. After that, you describe the app, not the deployment process.</p>
+            <h2>Install once. Then just describe the app.</h2>
+            <p>Setup teaches your AI how Automaton apps work. After that, you describe the product — the agent handles structure, deployment, and publishing.</p>
           </div>
           <div class="steps">
             <article class="step">
               <div class="step-number">1</div>
               <h3>Install the CLI</h3>
-              <p>One global tool gives the AI a stable execution path instead of asking it to guess how Automaton works.</p>
+              <p>Install the Automaton CLI once so your AI tools can build and deploy apps consistently.</p>
+              <div class="step-snippet">dotnet tool install -g Automaton.Cli</div>
             </article>
             <article class="step">
               <div class="step-number">2</div>
               <h3>Run setup once</h3>
-              <p>Setup handles auth, creates AGENTS.md, writes .automaton instructions, and gives the current folder enough context.</p>
+              <p>Connect your workspace and give your AI agent local guidance for building Automaton apps.</p>
+              <div class="step-snippet">automaton setup</div>
             </article>
             <article class="step">
               <div class="step-number">3</div>
               <h3>Ask for the app</h3>
-              <p>The human prompt becomes simple: describe the product. The agent reads the local instructions and uses the CLI.</p>
+              <p>Now the prompt becomes the product idea — not deployment instructions.</p>
+              <div class="prompt-bubble">“Build a live ISS tracker with Earth visualization and realtime orbital data.”</div>
             </article>
           </div>
         </div>
@@ -832,6 +835,23 @@ section {
 .creator-top p {
   margin: 0;
   color: var(--v2-muted);
+}
+
+.step-snippet,
+.prompt-bubble {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #aeb7c7;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.prompt-bubble {
+  color: #d9ffe8;
 }
 
 .badge-row,
