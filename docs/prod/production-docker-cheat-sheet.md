@@ -235,6 +235,11 @@ For API deploys, there is an extra runner-drain step:
 
 This avoids the earlier problem where hosted runners stayed connected to the old API color and appeared offline from the new live color.
 
+Backward-compatibility note:
+
+- if the previous API color is still running an older version that does not support the internal reconnect endpoint yet, the deploy scripts log a warning and continue
+- in that case, hosted runners may remain attached to the old API color until that color is stopped or the runner container is restarted
+
 ## Full Stack
 
 Normal redeploy:

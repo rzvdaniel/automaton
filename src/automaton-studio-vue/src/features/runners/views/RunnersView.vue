@@ -32,6 +32,8 @@ const runners = ref<Runner[]>([])
 const showDeployDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const restartingRunnerId = ref<string | null>(null)
+const hostedRestartPollMaxAttempts = 8
+const hostedRestartPollDelayMs = 1500
 
 // View toggle options
 const viewOptions = [
@@ -67,6 +69,25 @@ async function loadRunners(projectId?: string | null) {
   }
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function pollRunnerUntilOnline(runnerId: string, projectId?: string | null) {
+  for (let attempt = 0; attempt < hostedRestartPollMaxAttempts; attempt += 1) {
+    await delay(hostedRestartPollDelayMs)
+
+    const latestRunners = await runnersService.list(projectId ?? undefined)
+    runners.value = latestRunners
+
+    if (latestRunners.some((candidate) => candidate.id === runnerId && candidate.status === RunnerStatus.Online)) {
+      return true
+    }
+  }
+
+  return false
+}
+
 // Delete runner
 async function deleteRunner(runner: Runner) {
   try {
@@ -94,12 +115,29 @@ async function restartHostedRunner(runner: Runner) {
   try {
     await runnersService.restartHostedRunner(runner.id)
     toast.add({
-      severity: 'success',
+      severity: 'info',
       summary: 'Restart requested',
-      detail: `Restart requested for ${runner.name}.`,
-      life: 3000,
+      detail: `Restart requested for ${runner.name}. Waiting for it to reconnect...`,
+      life: 3500,
     })
-    await loadRunners(projectsStore.activeProjectId)
+
+    const isOnline = await pollRunnerUntilOnline(runner.id, projectsStore.activeProjectId)
+
+    if (isOnline) {
+      toast.add({
+        severity: 'success',
+        summary: 'Runner online',
+        detail: `${runner.name} is back online.`,
+        life: 3000,
+      })
+    } else {
+      toast.add({
+        severity: 'warn',
+        summary: 'Still reconnecting',
+        detail: `${runner.name} did not come back online yet. It may still be restarting.`,
+        life: 5000,
+      })
+    }
   } catch (err: unknown) {
     console.error('Failed to restart hosted runner:', err)
     toast.add({

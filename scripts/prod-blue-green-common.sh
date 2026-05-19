@@ -453,12 +453,14 @@ signal_api_color_runners_reconnect_when_idle() {
         fi
 
         echo "[INFO] Requesting reconnect-when-idle from API container $container_id ($container_ip)"
-        curl -fsS \
+        if ! curl -fsS \
             -X POST \
             -H 'Content-Type: application/json' \
             --data "{\"reason\":\"${reason//\"/\\\"}\"}" \
             "http://$container_ip:8080/internal/runners/reconnect-when-idle" \
-            > /dev/null
+            > /dev/null; then
+            echo "[WARN] Reconnect-when-idle signal was not accepted by API container $container_id. This is expected when the previous color is still on an older API version." >&2
+        fi
     done
 }
 

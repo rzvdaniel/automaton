@@ -32,6 +32,8 @@ const loadingProvisioningOptions = ref(false)
 const provisioningUserId = ref<string | null>(null)
 const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
+const hostedRestartPollMaxAttempts = 8
+const hostedRestartPollDelayMs = 1500
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -126,6 +128,25 @@ async function loadHostedRunners() {
   }
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function pollHostedRunnerUntilRunning(hostedRunnerId: string) {
+  for (let attempt = 0; attempt < hostedRestartPollMaxAttempts; attempt += 1) {
+    await delay(hostedRestartPollDelayMs)
+
+    const latestHostedRunners = await adminHostedRunnersService.getHostedRunners()
+    hostedRunners.value = latestHostedRunners
+
+    if (latestHostedRunners.some((candidate) => candidate.id === hostedRunnerId && candidate.status === 'running')) {
+      return true
+    }
+  }
+
+  return false
+}
+
 async function loadProvisioningOptions() {
   loadingProvisioningOptions.value = true
   try {
@@ -205,12 +226,30 @@ async function restartHostedRunner(runner: HostedRunner) {
   try {
     await adminHostedRunnersService.restartHostedRunner(runner.id)
     toast.add({
-      severity: 'success',
+      severity: 'info',
       summary: 'Restart requested',
-      detail: `Restarted ${runner.name}.`,
-      life: 3000,
+      detail: `Restart requested for ${runner.name}. Waiting for it to reconnect...`,
+      life: 3500,
     })
-    await refreshAll()
+
+    const isRunning = await pollHostedRunnerUntilRunning(runner.id)
+    await loadHosts()
+
+    if (isRunning) {
+      toast.add({
+        severity: 'success',
+        summary: 'Runner online',
+        detail: `${runner.name} is running again.`,
+        life: 3000,
+      })
+    } else {
+      toast.add({
+        severity: 'warn',
+        summary: 'Still reconnecting',
+        detail: `${runner.name} did not report running yet. It may still be restarting.`,
+        life: 5000,
+      })
+    }
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to restart hosted runner', life: 3000 })
   } finally {
