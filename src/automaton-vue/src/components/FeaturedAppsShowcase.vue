@@ -30,6 +30,14 @@ const activeCreatorName = computed(() => creatorName(activeApp.value))
 
 const activeCreatorInitials = computed(() => creatorInitials(activeApp.value))
 
+const activeMeta = computed(() => {
+  const app = activeApp.value
+  if (!app) return ''
+
+  const parts = [`by ${activeCreatorName.value}`, `${formatCount(app.viewCount)} views`, `${formatCount(app.starCount)} stars`]
+  return parts.join(' · ')
+})
+
 function creatorName(app?: MarketplaceAppCard) {
   return app?.creatorDisplayName || app?.creatorPublicUsername || 'Automaton creator'
 }
@@ -140,20 +148,10 @@ onBeforeUnmount(stopRotation)
         <div class="badge-row">
           <span class="badge badge-live">Live app</span>
           <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
-          <span v-if="activeApp.category" class="badge badge-static">{{ activeApp.category }}</span>
-          <span v-if="activeApp.isForkable" class="badge">Forkable</span>
         </div>
 
         <h3>{{ activeApp.name }}</h3>
-        <p>{{ activeApp.summary || activeApp.description || 'Published Automaton app' }}</p>
-
-        <div class="creator-line">
-          <span class="avatar">{{ activeCreatorInitials }}</span>
-          <span>by {{ activeCreatorName }}</span>
-          <span>{{ formatCount(activeApp.viewCount) }} views</span>
-          <span v-if="activeApp.isForkable">{{ formatCount(activeApp.forkCount) }} forks</span>
-          <span>{{ formatCount(activeApp.starCount) }} stars</span>
-        </div>
+        <div class="creator-line">{{ activeMeta }}</div>
 
         <div class="feature-actions">
           <button class="showcase-button primary" type="button" @click.stop="playApp(activeApp)">
@@ -186,10 +184,6 @@ onBeforeUnmount(stopRotation)
         <img v-if="imageUrl(app)" :src="imageUrl(app)" :alt="app.name" />
         <div v-else class="mini-feature-fallback">{{ app.name.charAt(0) }}</div>
         <div class="mini-feature-content">
-          <div class="badge-row">
-            <span class="badge badge-live">Live app</span>
-            <span v-if="app.category" class="badge">{{ app.category }}</span>
-          </div>
           <h4>{{ app.name }}</h4>
           <p>{{ app.summary || app.description || 'Published Automaton app' }}</p>
         </div>
@@ -233,8 +227,10 @@ onBeforeUnmount(stopRotation)
 <style scoped>
 .featured-showcase {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.58fr);
+  grid-template-rows: 530px;
+  gap: 16px;
+  align-items: stretch;
 }
 
 .feature-card,
@@ -248,7 +244,8 @@ onBeforeUnmount(stopRotation)
 }
 
 .feature-card {
-  min-height: 330px;
+  height: 100%;
+  min-height: 0;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
@@ -258,17 +255,18 @@ onBeforeUnmount(stopRotation)
   position: absolute;
   inset: auto 0 0;
   height: 66%;
-  background: linear-gradient(180deg, transparent, rgba(5, 7, 10, 0.86) 54%, rgba(5, 7, 10, 0.98));
+  background: linear-gradient(180deg, transparent, rgba(5, 7, 10, 0.04) 54%, rgba(5, 7, 10, 0.14));
   pointer-events: none;
 }
 
 .feature-card img,
 .feature-fallback {
   width: 100%;
-  height: 330px;
-  object-fit: cover;
+  height: 100%;
+  min-height: 100%;
+  object-fit: contain;
   background: #080b10;
-  opacity: 0.94;
+  opacity: 1;
 }
 
 .feature-fallback,
@@ -283,29 +281,20 @@ onBeforeUnmount(stopRotation)
 .feature-content {
   position: absolute;
   z-index: 2;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
+  inset: auto 0 0 0;
+  padding: 26px;
 }
 
 .feature-content h3 {
-  margin: 10px 0 6px;
-  max-width: 680px;
+  margin: 0 0 10px;
+  max-width: 720px;
   color: #f5f7fb;
-  font-size: clamp(1.8rem, 3.2vw, 3.15rem);
-  line-height: 0.96;
-  letter-spacing: -0.055em;
-}
-
-.feature-content p {
-  max-width: 620px;
-  margin: 0 0 12px;
-  color: #d8e1f0;
-  font-size: 0.96rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: clamp(2.8rem, 4.6vw, 4rem);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  text-wrap: balance;
 }
 
 .badge-row {
@@ -327,8 +316,9 @@ onBeforeUnmount(stopRotation)
 }
 
 .badge-live {
-  background: rgba(80, 215, 255, 0.12);
-  color: #bdefff;
+  padding: 5px 9px;
+  background: rgba(69, 230, 138, 0.16);
+  color: #45e68a;
 }
 
 .badge-static {
@@ -342,26 +332,10 @@ onBeforeUnmount(stopRotation)
 }
 
 .creator-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 9px;
-  color: #c8ceda;
-  font-size: 0.84rem;
-  font-weight: 750;
-}
-
-.avatar {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #45e68a, #50d7ff);
-  color: #031008;
-  font-size: 0.64rem;
-  font-weight: 950;
+  margin-bottom: 18px;
+  color: #d4d9e2;
+  font-size: 0.96rem;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
 .feature-actions {
@@ -376,14 +350,14 @@ onBeforeUnmount(stopRotation)
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #f5f7fb;
-  font-size: 0.84rem;
-  font-weight: 850;
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: #11161d;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -395,12 +369,13 @@ onBeforeUnmount(stopRotation)
 
 .side-stack {
   display: grid;
+  height: 100%;
   grid-template-rows: 1fr 1fr;
   gap: 14px;
 }
 
 .mini-feature {
-  min-height: 158px;
+  min-height: 0;
   border-color: rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -408,35 +383,27 @@ onBeforeUnmount(stopRotation)
 .mini-feature img,
 .mini-feature-fallback {
   width: 100%;
-  height: 158px;
+  height: 155px;
   object-fit: cover;
   opacity: 0.9;
 }
 
 .mini-feature-content {
-  position: absolute;
-  z-index: 2;
-  left: 14px;
-  right: 14px;
-  bottom: 12px;
+  position: static;
+  padding: 16px;
 }
 
 .mini-feature h4 {
-  margin: 8px 0 4px;
+  margin: 0 0 6px;
   color: #f5f7fb;
-  font-size: 1.12rem;
-  line-height: 1;
-  letter-spacing: -0.035em;
+  font-size: 1.2rem;
+  line-height: 1.1;
 }
 
 .mini-feature p {
   margin: 0;
-  color: #c8ceda;
-  font-size: 0.82rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: #97a1b3;
+  font-size: 0.9rem;
 }
 
 .showcase-controls {
@@ -482,10 +449,12 @@ onBeforeUnmount(stopRotation)
 @media (max-width: 900px) {
   .featured-showcase {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 
   .side-stack {
     grid-template-columns: 1fr 1fr;
+    height: auto;
     grid-template-rows: none;
   }
 }
@@ -496,7 +465,6 @@ onBeforeUnmount(stopRotation)
   }
 
   .feature-card,
-  .feature-card img,
   .feature-fallback {
     min-height: 310px;
   }
@@ -507,8 +475,11 @@ onBeforeUnmount(stopRotation)
   }
 
   .feature-content {
-    left: 14px;
-    right: 14px;
+    padding: 18px 14px;
+  }
+
+  .feature-content h3 {
+    font-size: 3rem;
   }
 }
 </style>

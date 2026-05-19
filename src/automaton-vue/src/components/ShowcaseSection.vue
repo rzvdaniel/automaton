@@ -300,6 +300,7 @@ watch(
     <div class="container showcase-content">
       <template v-if="props.fullPage">
         <section v-if="heroApps.length > 0" class="featured-section" aria-label="Featured apps">
+          <span class="section-label featured-eyebrow">Public apps</span>
           <div class="section-head">
             <h2>Featured apps</h2>
           </div>
@@ -470,7 +471,7 @@ watch(
 .showcase-section-full .showcase-content {
   width: min(1200px, calc(100% - 40px));
   max-width: none;
-  padding-top: 30px;
+  padding-top: 22px;
   padding-right: 0;
   padding-left: 0;
 }
@@ -505,6 +506,21 @@ watch(
   margin-bottom: 18px;
 }
 
+.featured-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border: 1px solid rgba(80, 215, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(80, 215, 255, 0.08);
+  color: #c4f2ff;
+  font-size: 0.82rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-bottom: 12px;
+}
+
 .featured-section,
 .directory-section,
 .market-footer-grid {
@@ -528,9 +544,9 @@ watch(
 .section-head h2 {
   margin: 0;
   color: #f5f7fb;
-  font-size: 1rem;
+  font-size: 1.6rem;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 
 .section-head p {
