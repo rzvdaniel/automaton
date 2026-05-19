@@ -7,9 +7,9 @@ const router = useRouter()
 const route = useRoute()
 const searchText = ref('')
 const searchOpen = ref(false)
-const { apps, loadApps } = useMarketplaceApps(60)
+const { apps, categories, loadApps, loadCategories } = useMarketplaceApps(60)
 
-const categories = ['Featured', 'Games', 'AI Tools', 'Backend Apps', 'Most Forked']
+const categoryTabs = computed(() => ['Featured', ...categories.value])
 
 const activeCategory = computed(() => String(route.query.category || 'Featured'))
 
@@ -70,6 +70,7 @@ function selectCategory(category: string) {
 }
 
 onMounted(() => {
+  void loadCategories()
   void loadApps(60)
 })
 </script>
@@ -79,7 +80,7 @@ onMounted(() => {
     <div class="shell strip-inner">
       <div class="category-tabs" role="tablist" aria-label="App discovery filters">
         <button
-          v-for="category in categories"
+          v-for="category in categoryTabs"
           :key="category"
           class="category-tab"
           :class="{ active: activeCategory === category }"

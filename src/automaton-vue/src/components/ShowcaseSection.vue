@@ -172,16 +172,18 @@ const heroApps = computed(() => {
   const featured = carouselApps.value
   if (featured.length > 0) return featured
   const realApps = apps.value.slice(0, 8)
-  return realApps.length > 0 ? realApps : fallbackApps
+  if (realApps.length > 0) return realApps
+  return props.fullPage ? [] : fallbackApps
 })
 
 const displayedCategories = computed(() => {
   if (categories.value.length > 0) return categories.value
+  if (props.fullPage) return []
   return [...new Set(fallbackApps.flatMap((app) => (app.category ? [app.category] : [])))]
 })
 
 const directoryApps = computed(() => {
-  const source = props.fullPage && apps.value.length === 0 ? fallbackApps : apps.value
+  const source = props.fullPage ? apps.value : (apps.value.length > 0 ? apps.value : fallbackApps)
   if (!activeCategory.value) return source
   return source.filter((app) => app.category === activeCategory.value)
 })
