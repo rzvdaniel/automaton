@@ -32,6 +32,10 @@ class RunnersService {
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/runners/${id}`)
   }
+
+  async restartHostedRunner(id: string): Promise<void> {
+    await apiClient.post(`/api/runners/${id}/restart-hosted`)
+  }
 }
 
 export const runnersService = new RunnersService()

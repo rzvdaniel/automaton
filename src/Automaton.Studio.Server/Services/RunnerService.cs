@@ -50,8 +50,9 @@ public class RunnerService
             runnerEntities.Select(r => r.Id),
             projectId,
             cancellationToken);
+        var hostedRunnerLookup = await BuildHostedRunnerLookup(runnerEntities.Select(r => r.Id), cancellationToken);
 
-        return await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, cancellationToken);
+        return await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, hostedRunnerLookup, cancellationToken);
     }
 
     public Runner Get(Guid id)
@@ -158,6 +159,48 @@ public class RunnerService
         logger.Information("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
     }
 
+    private void LinkHostedRunnerAfterReconnect(Runner runner)
+    {
+        var hostedRunner = dbContext.HostedRunners
+            .Include(x => x.Deployments)
+            .FirstOrDefault(x =>
+                x.UserId == UserId &&
+                x.Name == runner.Name &&
+                x.RunnerId == null &&
+                x.DeletedAt == null &&
+                (x.Status == HostedRunnerStatuses.Pending
+                    || x.Status == HostedRunnerStatuses.Provisioning
+                    || x.Status == HostedRunnerStatuses.Failed));
+
+        if (hostedRunner == null)
+        {
+            return;
+        }
+
+        hostedRunner.RunnerId = runner.Id;
+        hostedRunner.Status = HostedRunnerStatuses.Running;
+        hostedRunner.ProvisionedAt ??= DateTime.UtcNow;
+        hostedRunner.UpdatedAt = DateTime.UtcNow;
+        hostedRunner.LastError = null;
+
+        var deployment = hostedRunner.Deployments
+            .Where(x =>
+                (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
+                && (x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.Succeeded))
+            .OrderByDescending(x => x.StartedAt)
+            .FirstOrDefault();
+
+        if (deployment != null)
+        {
+            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
+            deployment.FinishedAt = DateTime.UtcNow;
+            deployment.Logs = "Runner connected successfully and is linked to this hosted runner.";
+            deployment.Error = null;
+        }
+
+        logger.Information("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
+    }
+
     public async Task UpdateConnection(Guid runnerId, string connectionId, CancellationToken cancellationToken)
     {
         // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
@@ -184,6 +227,9 @@ public class RunnerService
         dbContext.Update(runner);
 
         // Save changes
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        LinkHostedRunnerAfterReconnect(runner);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -284,6 +330,14 @@ public class RunnerService
 
         if (entity != null)
         {
+            var isHostedRunner = await dbContext.HostedRunners
+                .AnyAsync(x => x.RunnerId == id && x.DeletedAt == null, cancellationToken);
+
+            if (isHostedRunner)
+            {
+                throw new InvalidOperationException("Hosted runners cannot be deleted from the generic runners page. Restart the hosted runner instead.");
+            }
+
             dbContext.Runners.Remove(entity);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -392,10 +446,11 @@ public class RunnerService
     private async Task<IEnumerable<RunnerDetails>> GetRunnersWithUpdatedStatus(
         IEnumerable<Runner> runnerEntities,
         IDictionary<Guid, (Guid ProjectId, string ProjectName)> projectLookup,
+        IDictionary<Guid, Guid> hostedRunnerLookup,
         CancellationToken cancellationToken)
     {
         var runners = RunnerMapper
-            .ToRunnerDetailsList(runnerEntities, RunnerStatus.None, projectLookup)
+            .ToRunnerDetailsList(runnerEntities, RunnerStatus.None, projectLookup, hostedRunnerLookup)
             .ToList();
 
         foreach (var runner in runners)
@@ -419,6 +474,20 @@ public class RunnerService
         }
 
         return runners;
+    }
+
+    private async Task<IDictionary<Guid, Guid>> BuildHostedRunnerLookup(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
+    {
+        var ids = runnerIds.ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, Guid>();
+        }
+
+        return await dbContext.HostedRunners
+            .AsNoTracking()
+            .Where(x => x.RunnerId != null && ids.Contains(x.RunnerId.Value) && x.DeletedAt == null)
+            .ToDictionaryAsync(x => x.RunnerId!.Value, x => x.Id, cancellationToken);
     }
 
     private static RunnerStatus GetRunnerStatus(string response)
@@ -541,9 +610,21 @@ public class RunnerService
 
         if (projectLookup.TryGetValue(runner.Id, out var link))
         {
-            return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, link.ProjectId, link.ProjectName);
+            var hostedRunnerId = await dbContext.HostedRunners
+                .AsNoTracking()
+                .Where(x => x.RunnerId == runner.Id && x.DeletedAt == null)
+                .Select(x => (Guid?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, link.ProjectId, link.ProjectName, hostedRunnerId);
         }
 
-        return RunnerMapper.ToRunnerDetails(runner);
+        var fallbackHostedRunnerId = await dbContext.HostedRunners
+            .AsNoTracking()
+            .Where(x => x.RunnerId == runner.Id && x.DeletedAt == null)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, null, null, fallbackHostedRunnerId);
     }
 }

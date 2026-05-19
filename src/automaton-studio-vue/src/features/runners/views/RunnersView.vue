@@ -31,6 +31,7 @@ const loading = ref(true)
 const runners = ref<Runner[]>([])
 const showDeployDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
+const restartingRunnerId = ref<string | null>(null)
 
 // View toggle options
 const viewOptions = [
@@ -85,6 +86,30 @@ async function deleteRunner(runner: Runner) {
       detail: 'Failed to delete runner',
       life: 5000,
     })
+  }
+}
+
+async function restartHostedRunner(runner: Runner) {
+  restartingRunnerId.value = runner.id
+  try {
+    await runnersService.restartHostedRunner(runner.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Restart requested',
+      detail: `Restart requested for ${runner.name}.`,
+      life: 3000,
+    })
+    await loadRunners(projectsStore.activeProjectId)
+  } catch (err: unknown) {
+    console.error('Failed to restart hosted runner:', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to restart hosted runner',
+      life: 5000,
+    })
+  } finally {
+    restartingRunnerId.value = null
   }
 }
 
@@ -286,6 +311,7 @@ watch(
               <div>
                 <div class="flex align-items-center gap-2 mb-1">
                   <span class="font-semibold text-lg">{{ runner.name }}</span>
+                  <Tag v-if="runner.isHostedRunner" value="Hosted" severity="contrast" />
                   <Tag
                     v-if="isRunnerLinkedToProject(runner)"
                     v-tooltip.top="'Linked to a project. Manage under Project settings.'"
@@ -302,16 +328,28 @@ watch(
             </div>
 
             <!-- Actions Menu -->
-            <Button
-              v-if="!isRunnerLinkedToProject(runner)"
-              v-tooltip.top="'Delete runner'"
-              icon="pi pi-trash"
-              text
-              rounded
-              size="small"
-              severity="danger"
-              @click.stop="confirmDelete(runner)"
-            />
+            <div class="flex gap-1">
+              <Button
+                v-if="runner.isHostedRunner"
+                v-tooltip.top="'Restart hosted runner'"
+                icon="pi pi-refresh"
+                text
+                rounded
+                size="small"
+                :loading="restartingRunnerId === runner.id"
+                @click.stop="restartHostedRunner(runner)"
+              />
+              <Button
+                v-else-if="!isRunnerLinkedToProject(runner)"
+                v-tooltip.top="'Delete runner'"
+                icon="pi pi-trash"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                @click.stop="confirmDelete(runner)"
+              />
+            </div>
           </div>
 
           <!-- Connection ID -->
@@ -339,6 +377,7 @@ watch(
               <div class="flex align-items-center gap-2">
                 <i class="pi pi-server text-color-secondary"></i>
                 <span class="font-medium">{{ data.name }}</span>
+                <Tag v-if="data.isHostedRunner" value="Hosted" severity="contrast" />
                 <Tag
                   v-if="isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Linked to a project. Manage under Project settings.'"
@@ -371,7 +410,17 @@ watch(
             <template #body="{ data }">
               <div class="flex gap-1">
                 <Button
-                  v-if="!isRunnerLinkedToProject(data)"
+                  v-if="data.isHostedRunner"
+                  v-tooltip.top="'Restart hosted runner'"
+                  icon="pi pi-refresh"
+                  text
+                  rounded
+                  size="small"
+                  :loading="restartingRunnerId === data.id"
+                  @click.stop="restartHostedRunner(data)"
+                />
+                <Button
+                  v-else-if="!isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Delete runner'"
                   icon="pi pi-trash"
                   text

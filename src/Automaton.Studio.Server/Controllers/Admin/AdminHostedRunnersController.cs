@@ -15,11 +15,16 @@ public class AdminHostedRunnersController : ControllerBase
 {
     private readonly ApplicationDbContext db;
     private readonly HostedRunnerProvisioningService provisioningService;
+    private readonly HostedRunnerManagementService managementService;
 
-    public AdminHostedRunnersController(ApplicationDbContext db, HostedRunnerProvisioningService provisioningService)
+    public AdminHostedRunnersController(
+        ApplicationDbContext db,
+        HostedRunnerProvisioningService provisioningService,
+        HostedRunnerManagementService managementService)
     {
         this.db = db;
         this.provisioningService = provisioningService;
+        this.managementService = managementService;
     }
 
     [HttpGet("hosts")]
@@ -133,6 +138,34 @@ public class AdminHostedRunnersController : ControllerBase
             .FirstAsync(cancellationToken);
 
         return Ok(ToResponse(responseRunner));
+    }
+
+    [HttpPost("runners/{id:guid}/restart")]
+    public async Task<ActionResult<HostedRunnerResponse>> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
+    {
+        await managementService.RestartAsAdminAsync(id, cancellationToken);
+        return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
+    }
+
+    [HttpPost("runners/{id:guid}/reprovision")]
+    public async Task<ActionResult<HostedRunnerResponse>> ReprovisionHostedRunner(Guid id, CancellationToken cancellationToken)
+    {
+        await managementService.ReprovisionAsAdminAsync(id, cancellationToken);
+        return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
+    }
+
+    private async Task<HostedRunnerResponse> ReloadHostedRunnerResponseAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Include(x => x.SubscriptionPlan)
+            .Include(x => x.RunnerHost)
+            .Include(x => x.Runner)
+            .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .FirstAsync(x => x.Id == hostedRunnerId, cancellationToken);
+
+        return ToResponse(runner);
     }
 
     private static RunnerHostResponse ToResponse(RunnerHost host)

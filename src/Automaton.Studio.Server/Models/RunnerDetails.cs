@@ -14,4 +14,6 @@ public class RunnerDetails
     public AccessScope Scope { get; set; }
     public Guid? ProjectId { get; set; }
     public string? ProjectName { get; set; }
+    public Guid? HostedRunnerId { get; set; }
+    public bool IsHostedRunner { get; set; }
 }

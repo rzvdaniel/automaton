@@ -23,6 +23,12 @@ public sealed class SshHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCo
         RunnerHost host,
         string script,
         CancellationToken cancellationToken)
+        => ExecuteScriptAsync(host, script, cancellationToken);
+
+    public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
+        RunnerHost host,
+        string script,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

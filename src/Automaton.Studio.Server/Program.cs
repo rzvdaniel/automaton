@@ -333,6 +333,7 @@ services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<HostedRunnerProvisioningService>();
+services.AddScoped<HostedRunnerManagementService>();
 
 // System Prompt Builders for AI Chat
 services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();

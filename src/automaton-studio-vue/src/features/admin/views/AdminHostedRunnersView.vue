@@ -30,6 +30,8 @@ const loadingHosts = ref(false)
 const loadingRunners = ref(false)
 const loadingProvisioningOptions = ref(false)
 const provisioningUserId = ref<string | null>(null)
+const restartingRunnerId = ref<string | null>(null)
+const reprovisioningRunnerId = ref<string | null>(null)
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -198,6 +200,42 @@ async function retryProvisioning(runner: HostedRunner) {
   }
 }
 
+async function restartHostedRunner(runner: HostedRunner) {
+  restartingRunnerId.value = runner.id
+  try {
+    await adminHostedRunnersService.restartHostedRunner(runner.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Restart requested',
+      detail: `Restarted ${runner.name}.`,
+      life: 3000,
+    })
+    await refreshAll()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to restart hosted runner', life: 3000 })
+  } finally {
+    restartingRunnerId.value = null
+  }
+}
+
+async function reprovisionHostedRunner(runner: HostedRunner) {
+  reprovisioningRunnerId.value = runner.id
+  try {
+    await adminHostedRunnersService.reprovisionHostedRunner(runner.id)
+    toast.add({
+      severity: 'success',
+      summary: 'Reprovision requested',
+      detail: `Reprovision started for ${runner.name}.`,
+      life: 3000,
+    })
+    await refreshAll()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to reprovision hosted runner', life: 3000 })
+  } finally {
+    reprovisioningRunnerId.value = null
+  }
+}
+
 async function openProvisionDialog() {
   selectedProvisionUserId.value = null
   selectedProvisionPlanId.value = null
@@ -353,6 +391,23 @@ onMounted(refreshAll)
             <template #body="{ data }">
               <div class="flex gap-2">
                 <Button label="Details" text size="small" @click="selectedRunner = data" />
+                <Button
+                  label="Restart"
+                  icon="pi pi-refresh"
+                  size="small"
+                  outlined
+                  :loading="restartingRunnerId === data.id"
+                  @click="restartHostedRunner(data)"
+                />
+                <Button
+                  label="Reprovision"
+                  icon="pi pi-replay"
+                  size="small"
+                  severity="secondary"
+                  outlined
+                  :loading="reprovisioningRunnerId === data.id"
+                  @click="reprovisionHostedRunner(data)"
+                />
                 <Button
                   v-if="data.status !== 'running'"
                   label="Retry"

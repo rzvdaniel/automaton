@@ -36,6 +36,8 @@ export interface Runner {
   scope: AccessScope
   projectId?: string | null
   projectName?: string | null
+  hostedRunnerId?: string | null
+  isHostedRunner: boolean
 }
 
 /**

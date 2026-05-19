@@ -13,7 +13,8 @@ public static class RunnerMapper
 	 Runner runner,
 	 RunnerStatus status = RunnerStatus.None,
 	 Guid? projectId = null,
-	 string? projectName = null)
+	 string? projectName = null,
+     Guid? hostedRunnerId = null)
  {
 	var scope = projectId.HasValue ? AccessScope.Project : AccessScope.Personal;
 
@@ -26,22 +27,35 @@ public static class RunnerMapper
 		 Scope = scope,
 		 ProjectId = projectId,
 		 ProjectName = projectName,
+         HostedRunnerId = hostedRunnerId,
+         IsHostedRunner = hostedRunnerId.HasValue,
 	 };
  }
 
  public static IEnumerable<RunnerDetails> ToRunnerDetailsList(
 	 IEnumerable<Runner> runners,
 	 RunnerStatus status = RunnerStatus.None,
-	 IDictionary<Guid, (Guid ProjectId, string ProjectName)>? projectLookup = null)
+	 IDictionary<Guid, (Guid ProjectId, string ProjectName)>? projectLookup = null,
+     IDictionary<Guid, Guid>? hostedRunnerLookup = null)
  {
 	 return runners.Select(r =>
 	 {
 		 if (projectLookup != null && projectLookup.TryGetValue(r.Id, out var link))
 		 {
-			 return ToRunnerDetails(r, status, link.ProjectId, link.ProjectName);
+			 return ToRunnerDetails(
+                 r,
+                 status,
+                 link.ProjectId,
+                 link.ProjectName,
+                 hostedRunnerLookup != null && hostedRunnerLookup.TryGetValue(r.Id, out var hostedRunnerId) ? hostedRunnerId : null);
 		 }
 
-		 return ToRunnerDetails(r, status, null, null);
+         return ToRunnerDetails(
+             r,
+             status,
+             null,
+             null,
+             hostedRunnerLookup != null && hostedRunnerLookup.TryGetValue(r.Id, out var fallbackHostedRunnerId) ? fallbackHostedRunnerId : null);
 	 });
  }
 

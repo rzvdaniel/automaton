@@ -27,6 +27,8 @@ public static class HostedRunnerDeploymentActions
 {
     public const string Provision = "provision";
     public const string Deprovision = "deprovision";
+    public const string Restart = "restart";
+    public const string Reprovision = "reprovision";
 }
 
 public static class HostedRunnerDeploymentStatuses

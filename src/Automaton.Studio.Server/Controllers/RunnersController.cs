@@ -10,10 +10,12 @@ namespace Automaton.Studio.Server.Controllers;
 public class RunnersController : BaseController
 {
     private readonly RunnerService runnersService;
+    private readonly HostedRunnerManagementService hostedRunnerManagementService;
 
-    public RunnersController(RunnerService runnersService)
+    public RunnersController(RunnerService runnersService, HostedRunnerManagementService hostedRunnerManagementService)
     {
         this.runnersService = runnersService;
+        this.hostedRunnerManagementService = hostedRunnerManagementService;
     }
 
     [HttpGet]
@@ -40,10 +42,19 @@ public class RunnersController : BaseController
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await runnersService.Delete(id, cancellationToken);
 
+        return NoContent();
+    }
+
+    [HttpPost("{id}/restart-hosted")]
+    [Authorize]
+    public async Task<IActionResult> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
+    {
+        await hostedRunnerManagementService.RestartOwnedHostedRunnerByRunnerIdAsync(id, cancellationToken);
         return NoContent();
     }
 

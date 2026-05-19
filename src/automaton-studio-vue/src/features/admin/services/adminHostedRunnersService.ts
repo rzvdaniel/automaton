@@ -32,6 +32,16 @@ class AdminHostedRunnersService {
     const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/users/${userId}/provision`, request)
     return response.data
   }
+
+  async restartHostedRunner(id: string): Promise<HostedRunner> {
+    const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/restart`)
+    return response.data
+  }
+
+  async reprovisionHostedRunner(id: string): Promise<HostedRunner> {
+    const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/reprovision`)
+    return response.data
+  }
 }
 
 export const adminHostedRunnersService = new AdminHostedRunnersService()
