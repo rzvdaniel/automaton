@@ -195,21 +195,25 @@ function openDoc(slug: string) {
 
 .docs-eyebrow {
   display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 8px;
   padding: 5px 10px;
   border: 1px solid rgba(80, 215, 255, 0.22);
   border-radius: 999px;
   background: rgba(80, 215, 255, 0.08);
   color: #c4f2ff;
-  font-size: 0.78rem;
-  font-weight: 850;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .docs-page-header h1 {
-  margin: 14px 0 10px;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
+  width: max-content;
+  max-width: 100%;
+  margin: 18px 0 10px;
+  font-size: clamp(3rem, 6.1vw, 6rem);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
 }
 
 .docs-page-header p {
@@ -218,6 +222,12 @@ function openDoc(slug: string) {
   color: #9ba3b4;
   font-size: 1rem;
   line-height: 1.6;
+}
+
+@media (max-width: 820px) {
+  .docs-page-header h1 {
+    width: 100%;
+  }
 }
 
 .docs-layout {

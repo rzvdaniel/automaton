@@ -34,7 +34,7 @@ const activeMeta = computed(() => {
   const app = activeApp.value
   if (!app) return ''
 
-  const parts = [`by ${activeCreatorName.value}`, `${formatCount(app.viewCount)} views`, `${formatCount(app.starCount)} stars`]
+  const parts = [`by ${activeCreatorName.value}`, `${formatCount(app.viewCount)} views`]
   return parts.join(' · ')
 })
 

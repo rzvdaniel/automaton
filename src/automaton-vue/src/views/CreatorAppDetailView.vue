@@ -155,7 +155,6 @@ onMounted(loadPage)
 
               <div class="meta-row">
                 <span v-if="app.category" class="meta-pill">{{ app.category }}</span>
-                <span class="meta-stat"><i class="pi pi-star-fill"></i>{{ app.starCount }} stars</span>
                 <span class="meta-stat"><i class="pi pi-eye"></i>{{ app.viewCount }} views</span>
                 <span v-if="publishedLabel" class="meta-stat">Published {{ publishedLabel }}</span>
               </div>

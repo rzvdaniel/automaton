@@ -304,7 +304,6 @@ onMounted(loadApp)
                     </svg>
                     {{ pluralize(app.forkCount, 'fork') }}
                   </span>
-                  <span><i class="pi pi-star" /> {{ pluralize(app.starCount, 'save') }}</span>
                   <span>{{ updatedLabel }}</span>
                 </div>
 

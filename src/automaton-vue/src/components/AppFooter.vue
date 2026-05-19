@@ -49,9 +49,9 @@ import { publicAppConfig } from '@/config/publicAppConfig'
       </div>
 
       <div class="footer-side">
-        <p class="footer-side-copy">Built by a solo developer. Open to collaboration.</p>
+        <p class="footer-side-copy">Built by a solo developer.</p>
         <a href="mailto:hello@automaton.app" class="footer-cta">Get in touch <i class="pi pi-arrow-right" /></a>
-        <div class="footer-copyright">© 2024 Automaton</div>
+        <div class="footer-copyright">© 2026 Automaton</div>
       </div>
     </div>
   </footer>
