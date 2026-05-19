@@ -221,12 +221,6 @@ onMounted(() => {
               <div>$ automaton setup</div>
               <div><span class="muted"># Then ask:</span> Build a poker planning app for Automaton Monster.</div>
             </div>
-            <div class="live-strip">
-              <div class="live-item"><strong>42</strong>apps shipped</div>
-              <div class="live-item"><strong>18</strong>templates</div>
-              <div class="live-item"><strong>126</strong>remixes</div>
-              <div class="live-item"><strong>self-host</strong>runner ready</div>
-            </div>
           </div>
         </div>
       </header>
