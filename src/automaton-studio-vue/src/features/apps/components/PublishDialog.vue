@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
+import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
@@ -181,13 +182,13 @@ function close() {
       </div>
 
       <div class="field mb-4">
-        <div class="flex align-items-center gap-2">
-          <Checkbox
+        <label for="allowForking" class="block font-semibold mb-2">Forking</label>
+        <div class="flex align-items-center gap-3">
+          <InputSwitch
             id="allowForking"
             v-model="allowForking"
-            :binary="true"
           />
-          <label for="allowForking">Allow others to fork this app</label>
+          <label for="allowForking">{{ allowForking ? 'Others can fork this app' : 'Source stays private' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
           {{ allowForking
@@ -197,17 +198,18 @@ function close() {
       </div>
 
       <div class="field mb-4">
-        <div class="flex align-items-center gap-2">
-          <Checkbox
+        <label for="requiresAuth" class="block font-semibold mb-2">Access Control</label>
+        <div class="flex align-items-center gap-3">
+          <InputSwitch
             id="requiresAuth"
-            v-model="requiresAuthentication"
-            :binary="true"
+            :model-value="!requiresAuthentication"
+            @update:model-value="requiresAuthentication = !$event"
           />
-          <label for="requiresAuth">Require authentication</label>
+          <label for="requiresAuth">{{ requiresAuthentication ? 'Restricted access' : 'Public access' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
           {{ requiresAuthentication
-            ? 'Users must be logged in to access this app'
+            ? 'Only authorized Automaton users can access this app'
             : 'Anyone with the link can access this app' }}
         </small>
       </div>

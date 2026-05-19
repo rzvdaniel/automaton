@@ -718,11 +718,11 @@ async function handleSaveTemplateStatus() {
                     :model-value="!requiresAuthentication"
                     @update:model-value="requiresAuthentication = !$event"
                   />
-                  <span>{{ requiresAuthentication ? 'Requires login' : 'Public access' }}</span>
+                  <span>{{ requiresAuthentication ? 'Restricted access' : 'Public access' }}</span>
                 </div>
                 <small class="text-color-secondary">
                   {{ requiresAuthentication
-                    ? 'Users must be logged in to access this app'
+                    ? 'Only authorized Automaton users can access this app'
                     : 'Anyone with the link can access this app' }}
                 </small>
               </div>
