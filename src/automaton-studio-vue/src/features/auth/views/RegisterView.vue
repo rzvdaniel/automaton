@@ -324,9 +324,10 @@ function hasError(field: keyof RegisterFormErrors): boolean {
               />
               <label for="terms" class="text-sm">
                 I agree to the
-                <a href="#" class="text-primary no-underline hover:underline">Terms of Service</a>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" class="text-primary no-underline hover:underline">Terms of Service</a>
                 and
-                <a href="#" class="text-primary no-underline hover:underline">Privacy Policy</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" class="text-primary no-underline hover:underline">Privacy Policy</a>
+                and understand that Automaton is an experimental preview platform that may experience instability, service interruptions, or data loss.
               </label>
             </div>
             <small v-if="hasError('terms')" class="text-red-500">

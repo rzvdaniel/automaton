@@ -214,6 +214,11 @@ watch(
       <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
     </div>
 
+    <Message severity="warn" :closable="false" class="mb-4">
+      <strong>Experimental Infrastructure:</strong> hosted runners and backend deployments are
+      still evolving. Unexpected disconnects or reconnect delays may occur during redeployments.
+    </Message>
+
     <!-- Stats Cards -->
     <div class="grid mb-5">
       <div class="col-12 md:col-4">

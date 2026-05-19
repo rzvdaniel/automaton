@@ -11,6 +11,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <span>Automaton</span>
         </div>
         <p class="footer-tagline">The fastest way to turn your code into a live app.</p>
+        <p class="footer-preview-note">Automaton is currently available in Preview.</p>
         <div class="footer-social">
           <a href="https://github.com" target="_blank" class="social-link" aria-label="GitHub">
             <i class="pi pi-github" />
@@ -87,6 +88,14 @@ import { publicAppConfig } from '@/config/publicAppConfig'
   font-size: 0.86rem;
   line-height: 1.6;
   color: rgba(233, 236, 245, 0.68);
+}
+
+.footer-preview-note {
+  max-width: 280px;
+  margin: 0 0 18px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: rgba(233, 236, 245, 0.56);
 }
 
 .footer-social {

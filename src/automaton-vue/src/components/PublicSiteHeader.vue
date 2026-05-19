@@ -37,7 +37,8 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
     <div class="shell nav-inner">
       <RouterLink class="brand" to="/">
         <span class="mark">am</span>
-        <span>Automaton Monster</span>
+        <span class="brand-text">Automaton Monster</span>
+        <span class="preview-badge">Preview</span>
       </RouterLink>
 
       <nav class="nav-links desktop-only" aria-label="Primary navigation">
@@ -136,6 +137,25 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
   color: #45e68a;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   box-shadow: 0 0 34px rgba(69, 230, 138, 0.14);
+}
+
+.brand-text {
+  white-space: nowrap;
+}
+
+.preview-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(80, 215, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(80, 215, 255, 0.08);
+  color: #c4f2ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .nav-links {

@@ -332,6 +332,16 @@ onMounted(refreshAll)
       <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
     </div>
 
+    <Card class="mb-4 infrastructure-note">
+      <template #content>
+        <div class="infrastructure-note__eyebrow">Experimental Infrastructure</div>
+        <div class="infrastructure-note__copy">
+          Hosted runners and deployment cutovers are still in preview. Short-lived disconnects,
+          reconnect lag, or manual intervention may still be required while the platform evolves.
+        </div>
+      </template>
+    </Card>
+
     <div class="grid mb-4">
       <div class="col-12 md:col-4">
         <Card>
@@ -588,6 +598,38 @@ onMounted(refreshAll)
 <style scoped>
 .hosted-runners-view :deep(.p-card-content) {
   padding-top: 0;
+}
+
+.infrastructure-note {
+  border: 1px solid color-mix(in srgb, var(--p-orange-500) 28%, var(--p-surface-200));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-orange-500) 10%, transparent), transparent 70%),
+    var(--p-surface-0);
+}
+
+.infrastructure-note__eyebrow {
+  margin-bottom: 0.5rem;
+  color: var(--p-orange-600);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.infrastructure-note__copy {
+  color: var(--p-text-muted-color);
+  line-height: 1.6;
+}
+
+:global(.app-dark) .infrastructure-note {
+  border-color: color-mix(in srgb, var(--p-orange-400) 24%, var(--p-surface-700));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-orange-400) 12%, transparent), transparent 70%),
+    var(--p-surface-900);
+}
+
+:global(.app-dark) .infrastructure-note__eyebrow {
+  color: var(--p-orange-300);
 }
 
 .command-preview {

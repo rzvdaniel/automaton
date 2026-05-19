@@ -11,7 +11,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
     <main class="pricing-main">
       <section class="hero">
         <div class="shell hero-inner">
-          <span class="eyebrow">Current Access</span>
+          <span class="eyebrow">Preview Access</span>
           <h1>Developer-first access, with AI and runtime costs under your control.</h1>
           <p>
             Automaton Monster currently uses a bring-your-own-model approach so developers can work
@@ -26,7 +26,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <article class="plan-card plan-card-primary">
             <div class="plan-top">
               <div>
-                <span class="plan-badge">Available now</span>
+                <span class="plan-badge">Preview access</span>
                 <h2>Free</h2>
               </div>
               <div class="plan-price">$0</div>

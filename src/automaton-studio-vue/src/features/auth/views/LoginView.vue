@@ -171,6 +171,11 @@ function hasError(field: keyof LoginFormErrors): boolean {
               Sign up
             </router-link>
           </div>
+
+          <p class="login-preview-note text-center">
+            Automaton is an experimental developer preview platform. Features and infrastructure
+            may change without notice.
+          </p>
         </form>
       </template>
     </Card>
@@ -188,5 +193,12 @@ function hasError(field: keyof LoginFormErrors): boolean {
 
 .login-card {
   margin: 1rem;
+}
+
+.login-preview-note {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+  line-height: 1.55;
 }
 </style>
