@@ -4,27 +4,6 @@ import AppFooter from '@/components/AppFooter.vue'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 
-const downloadCards = [
-  {
-    title: 'Windows x64',
-    description: 'Portable zip with the self-contained CLI binary.',
-    href: '/cli/automaton-cli-win-x64.zip',
-    badge: 'zip',
-  },
-  {
-    title: 'Linux x64',
-    description: 'Portable tar.gz for Linux servers and developer machines.',
-    href: '/cli/automaton-cli-linux-x64.tar.gz',
-    badge: 'tar.gz',
-  },
-  {
-    title: 'macOS Apple Silicon',
-    description: 'Recommended direct build for Apple Silicon Macs.',
-    href: '/cli/automaton-cli-osx-arm64.tar.gz',
-    badge: 'tar.gz',
-  },
-]
-
 const installModes = [
   {
     title: 'Recommended: .NET global tool',
@@ -35,24 +14,19 @@ const installModes = [
 
 const directScripts = [
   {
-    title: 'PowerShell direct install',
-    description: 'Download the Windows build, extract it, and run the CLI locally.',
+    title: 'PowerShell install script',
+    description: 'Use the hosted installer script. It installs or updates the global tool via dotnet.',
     code: [
-      '$release = "$HOME\\automaton-cli"',
-      'New-Item -ItemType Directory -Force -Path $release | Out-Null',
-      `Invoke-WebRequest ${publicAppConfig.cliDownloadsBaseUrl}automaton-cli-win-x64.zip -OutFile "$release\\automaton-cli-win-x64.zip"`,
-      'Expand-Archive "$release\\automaton-cli-win-x64.zip" -DestinationPath $release -Force',
-      '& "$release\\automaton.exe" --help',
+      `irm ${publicAppConfig.apiBaseUrl}downloads/install.ps1 | iex`,
+      'automaton --help',
     ].join('\n'),
   },
   {
-    title: 'Bash direct install',
-    description: 'Download and extract the Linux build to a local folder.',
+    title: 'Bash install script',
+    description: 'Use the hosted installer script. It installs or updates the global tool via dotnet.',
     code: [
-      'mkdir -p "$HOME/automaton-cli"',
-      `curl -L ${publicAppConfig.cliDownloadsBaseUrl}automaton-cli-linux-x64.tar.gz -o "$HOME/automaton-cli/automaton-cli-linux-x64.tar.gz"`,
-      'tar -xzf "$HOME/automaton-cli/automaton-cli-linux-x64.tar.gz" -C "$HOME/automaton-cli"',
-      '"$HOME/automaton-cli/automaton" --help',
+      `curl -fsSL ${publicAppConfig.apiBaseUrl}downloads/install.sh | bash`,
+      'automaton --help',
     ].join('\n'),
   },
 ]
@@ -68,7 +42,7 @@ const frameworkStarterPrompt = `Build [describe the app] as a [React or Vue] app
 const quickStartSteps = [
   {
     title: 'Install CLI',
-    detail: 'Start with the .NET global tool, or use the portable builds lower on this page if that fits your environment better.',
+    detail: 'Install the global tool once. That is now the only supported CLI installation path.',
     code: 'dotnet tool install -g Automaton.Cli',
   },
   {
@@ -197,45 +171,13 @@ async function copyCode(key: string, code: string) {
         </div>
       </section>
 
-      <section id="downloads" class="cli-section">
-        <div class="container">
-          <div class="cli-section-head">
-            <h2 class="section-title cli-section-title">Downloads</h2>
-            <p class="section-subtitle cli-section-subtitle">
-              Three direct builds are bundled with the website image for the most common install targets.
-              NuGet remains the recommended path for managed developer machines.
-            </p>
-          </div>
-
-          <div class="downloads-grid">
-            <a v-for="download in downloadCards" :key="download.title" :href="download.href" class="download-card">
-              <div class="download-card-head">
-                <h3>{{ download.title }}</h3>
-                <span class="download-badge">{{ download.badge }}</span>
-              </div>
-              <p>{{ download.description }}</p>
-              <span class="download-link">Download <i class="pi pi-arrow-right" /></span>
-            </a>
-
-            <a href="/cli/checksums.txt" class="download-card download-card-secondary">
-              <div class="download-card-head">
-                <h3>Checksums</h3>
-                <span class="download-badge">sha256</span>
-              </div>
-              <p>Verify the integrity of the portable downloads before running them.</p>
-              <span class="download-link">Open checksums <i class="pi pi-arrow-right" /></span>
-            </a>
-          </div>
-        </div>
-      </section>
-
       <section id="install" class="cli-section">
         <div class="container cli-stack">
           <div class="cli-card">
             <div class="cli-card-head">
               <span class="tag">Install</span>
               <h2>Install with NuGet</h2>
-              <p class="cli-card-subtitle">After setup, the AI should usually handle app creation, validation, and deploy. Use the CLI commands directly only as the manual fallback flow.</p>
+              <p class="cli-card-subtitle">Automaton CLI ships as a .NET global tool. After setup, the AI should usually handle app creation, validation, and deploy. Use the CLI commands directly only as the manual fallback flow.</p>
             </div>
 
             <article v-for="mode in installModes" :key="mode.title" class="code-card">
@@ -256,7 +198,7 @@ async function copyCode(key: string, code: string) {
           <div id="scripts" class="cli-card">
             <div class="cli-card-head">
               <span class="tag">Scripts</span>
-              <h2>Portable install scripts</h2>
+              <h2>Install scripts</h2>
             </div>
 
             <div class="script-grid">

@@ -67,8 +67,6 @@ x-website-common: &website-common
   build:
     context: .
     dockerfile: docker/Dockerfile.website
-    args:
-      CLI_ARTIFACTS_IMAGE: automaton-website-cli:latest
   image: automaton-prod-website:latest
   restart: unless-stopped
   networks:
@@ -148,14 +146,6 @@ services:
 
   website-green:
     <<: *website-common
-
-  website-cli-assets:
-    profiles:
-      - build-assets
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.website-cli
-    image: automaton-website-cli:latest
 
 volumes:
   prod-mysql-data:

@@ -25,14 +25,11 @@ const defaultApiBaseUrl = import.meta.env.DEV
 const publicSiteUrl = ensureTrailingSlash(import.meta.env.VITE_PUBLIC_SITE_URL || defaultPublicSiteUrl)
 const studioUrl = ensureTrailingSlash(import.meta.env.VITE_STUDIO_URL || defaultStudioUrl)
 const apiBaseUrl = ensureTrailingSlash(import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl)
-const cliDownloadsBaseUrl = ensureTrailingSlash(import.meta.env.VITE_CLI_DOWNLOADS_BASE_URL || joinUrl(publicSiteUrl, 'cli'))
-
 export const publicAppConfig = {
   publicSiteUrl,
   studioUrl,
   docsUrl: joinUrl(publicSiteUrl, 'docs'),
   apiBaseUrl,
-  cliDownloadsBaseUrl,
   llmsUrl: joinUrl(publicSiteUrl, 'llms.txt'),
   cliInstallGuideUrl: joinUrl(publicSiteUrl, 'llms/automaton-cli-install.md'),
   cliWorkflowGuideUrl: joinUrl(publicSiteUrl, 'llms/automaton-cli-deploy.md'),

@@ -1,9 +1,4 @@
 # Build the public Vue website from local source and serve it with nginx.
-# CLI downloads are supplied by a separately built image so normal website
-# rebuilds do not also republish the CLI.
-
-ARG CLI_ARTIFACTS_IMAGE=automaton-website-cli:latest
-FROM ${CLI_ARTIFACTS_IMAGE} AS cli-artifacts
 
 FROM node:22-alpine AS build
 
@@ -13,8 +8,6 @@ COPY src/automaton-vue/package*.json ./
 RUN npm ci
 
 COPY src/automaton-vue/ ./
-RUN mkdir -p ./public/cli
-COPY --from=cli-artifacts /cli-dist/ ./public/cli/
 RUN npm run build
 
 FROM nginx:1.27-alpine AS final
