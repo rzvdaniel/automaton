@@ -565,7 +565,7 @@ onMounted(loadApp)
 
 .detail-hero {
   display: grid;
-  grid-template-columns: minmax(320px, 0.74fr) minmax(0, 1.26fr);
+  grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.08fr);
   gap: 28px;
   align-items: start;
 }
@@ -801,7 +801,7 @@ onMounted(loadApp)
   position: relative;
   overflow: hidden;
   display: grid;
-  min-height: 520px;
+  height: 520px;
   place-items: center;
   padding: 18px;
   background:
@@ -830,7 +830,7 @@ onMounted(loadApp)
 
 .gallery-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -839,6 +839,7 @@ onMounted(loadApp)
 
 .gallery-thumb {
   overflow: hidden;
+  aspect-ratio: 16 / 9;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
@@ -1193,7 +1194,7 @@ onMounted(loadApp)
   }
 
   .gallery-stage {
-    min-height: 360px;
+    height: 360px;
   }
 }
 
@@ -1220,7 +1221,7 @@ onMounted(loadApp)
   }
 
   .gallery-stage {
-    min-height: 280px;
+    height: 280px;
   }
 
   .stage-image {
