@@ -65,7 +65,16 @@ public sealed class NewAppService
             {
                 AppId = appId,
                 Name = appName,
-                Server = server
+                Server = server,
+                Frontend = new FrontendConfig
+                {
+                    Build = "cd frontend && npm install && npm run build",
+                    DeployDir = "frontend/dist"
+                },
+                Backend = new BackendConfig
+                {
+                    DeployDir = "backend"
+                }
             });
 
             var guidance = _aiGuidancePackService.Sync(directory);

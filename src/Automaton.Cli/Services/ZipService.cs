@@ -4,8 +4,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 namespace Automaton.Cli.Services;
 
 /// <summary>
-/// Creates a zip stream from a local directory, respecting an optional deploy directory
-/// (dist/ → project root → frontend/ compatibility fallback).
+/// Creates a zip stream from a local directory, respecting an explicit deploy directory.
 /// Files inside .git/, node_modules/, and obj/ are excluded.
 /// automaton.json is excluded from the upload (it's local-only).
 /// </summary>
@@ -30,29 +29,28 @@ public static class ZipService
     };
 
     /// <summary>
-    /// Resolves which directory to zip: explicit deployDir → dist → projectRoot → frontend compatibility fallback.
+    /// Resolves which directory to zip from an explicit project-relative deploy directory.
     /// </summary>
     public static string ResolveDeployDirectory(string projectRoot, string? deployDir)
     {
-        if (!string.IsNullOrWhiteSpace(deployDir))
+        if (string.IsNullOrWhiteSpace(deployDir))
         {
-            var explicit_ = Path.Combine(projectRoot, deployDir);
-            if (Directory.Exists(explicit_)) return explicit_;
-            throw new DirectoryNotFoundException(
-                $"deployDir '{deployDir}' configured in automaton.json does not exist: {explicit_}");
+            throw new InvalidOperationException(
+                "frontend.deployDir is required in automaton.json. " +
+                "Use 'frontend/dist' for build-based apps or '.' for an explicit no-build static app.");
         }
 
-        // Auto-detect
-        var dist = Path.Combine(projectRoot, "dist");
-        var frontend = Path.Combine(projectRoot, "frontend");
+        var explicitPath = Path.GetFullPath(Path.Combine(projectRoot, deployDir));
+        var fullProjectRoot = Path.GetFullPath(projectRoot);
+        if (!explicitPath.StartsWith(fullProjectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(explicitPath, fullProjectRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"deployDir '{deployDir}' points outside the project root");
+        }
 
-        if (Directory.Exists(dist)) return dist;
-
-        var rootIndex = Path.Combine(projectRoot, "index.html");
-        if (File.Exists(rootIndex)) return projectRoot;
-
-        if (Directory.Exists(frontend)) return frontend;
-        return projectRoot;
+        if (Directory.Exists(explicitPath)) return explicitPath;
+        throw new DirectoryNotFoundException(
+            $"deployDir '{deployDir}' configured in automaton.json does not exist: {explicitPath}");
     }
 
     /// <summary>

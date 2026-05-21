@@ -170,7 +170,8 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 **Expected Results:**
 
 - ✅ Codex uses the requested framework
-- ✅ `automaton.json` includes `build` and `deployDir` when needed
+- ✅ `automaton.json` includes `frontend.build` and `frontend.deployDir` when needed
+- ✅ Default AI-generated local apps use a `frontend/` project with build output in `frontend/dist`
 - ✅ `automaton validate` succeeds before deploy
 - ✅ `automaton deploy` uses the correct output folder
 

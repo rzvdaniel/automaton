@@ -98,7 +98,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared d
 
 ## FILE STRUCTURE:
 ```
-├─ frontend/                # ALL static UI files live here
+├─ frontend/
 │  ├─ index.html            # Entry point (landing or main page) (REQUIRED)
 │  ├─ pages/                # Additional pages (one file per distinct page)
 │  │  └─ detail.html
@@ -111,7 +111,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared d
    └─ users.py              # Class-based controller (one per resource)
 ```
 
-**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
+**Important:** In Studio source, frontend files live under `frontend/`; backend files live under `backend/`.
 
 ## JAVASCRIPT STRUCTURE:
 
@@ -224,4 +224,3 @@ def handle(action_name: str, inputs: dict) -> dict:
 2. Modifications: `list_files` first, then read, then change
 3. Multi-file always; ES6+; separate CSS; Tailwind; loading/error/empty states
 4. Vanilla JS by default; use ES modules (`type="module"`) when splitting across multiple JS files
-

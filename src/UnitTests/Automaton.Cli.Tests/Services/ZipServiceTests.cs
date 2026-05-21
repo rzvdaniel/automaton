@@ -149,38 +149,31 @@ public class ZipServiceTests
     public void ResolveDeployDirectory_WhenDistExists_PrefersDist()
     {
         var projectRoot = CreateTempDirectory();
-        Directory.CreateDirectory(Path.Combine(projectRoot, "dist"));
-        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
-        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html>root</html>");
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist"));
 
-        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+        var resolved = ZipService.ResolveDeployDirectory(projectRoot, "frontend/dist");
 
-        Assert.That(resolved, Is.EqualTo(Path.Combine(projectRoot, "dist")));
+        Assert.That(resolved, Is.EqualTo(Path.Combine(projectRoot, "frontend", "dist")));
     }
 
     [Test]
-    public void ResolveDeployDirectory_WhenRootAndFrontendExist_PrefersRoot()
+    public void ResolveDeployDirectory_WhenDeployDirIsMissing_ThrowsClearError()
     {
         var projectRoot = CreateTempDirectory();
-        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
-        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html>root</html>");
-        File.WriteAllText(Path.Combine(projectRoot, "frontend", "index.html"), "<html>frontend</html>");
 
-        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+        var ex = Assert.Throws<InvalidOperationException>(() => ZipService.ResolveDeployDirectory(projectRoot, null));
 
-        Assert.That(resolved, Is.EqualTo(projectRoot));
+        Assert.That(ex!.Message, Does.Contain("frontend.deployDir is required"));
     }
 
     [Test]
-    public void ResolveDeployDirectory_WhenOnlyFrontendExists_UsesFrontendAsCompatibilityFallback()
+    public void ResolveDeployDirectory_WhenDeployDirPointsOutsideProject_ThrowsClearError()
     {
         var projectRoot = CreateTempDirectory();
-        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend"));
-        File.WriteAllText(Path.Combine(projectRoot, "frontend", "index.html"), "<html>frontend</html>");
 
-        var resolved = ZipService.ResolveDeployDirectory(projectRoot, null);
+        var ex = Assert.Throws<InvalidOperationException>(() => ZipService.ResolveDeployDirectory(projectRoot, ".."));
 
-        Assert.That(resolved, Is.EqualTo(Path.Combine(projectRoot, "frontend")));
+        Assert.That(ex!.Message, Does.Contain("points outside the project root"));
     }
 
     private string CreateTempDirectory()

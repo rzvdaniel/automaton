@@ -32,7 +32,7 @@ public class AppArchiveService
         }
 
         var ownerId = app.UserId ?? userContextService.GetUserId();
-        var appPath = fileStorageService.GetAppDirectoryPath(ownerId, appId);
+        var sourcePath = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
         var archiveFileName = $"{SanitizeArchiveFileName(app.Name)}.zip";
 
         await using var memoryStream = new MemoryStream();
@@ -40,21 +40,13 @@ public class AppArchiveService
         {
             await WriteManifestAsync(archive, app, cancellationToken);
 
-            if (Directory.Exists(appPath))
+            if (Directory.Exists(sourcePath))
             {
-                var versionsRoot = Path.GetFullPath(Path.Combine(appPath, "versions"));
-
-                foreach (var sourceFile in Directory.EnumerateFiles(appPath, "*", SearchOption.AllDirectories))
+                foreach (var sourceFile in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var fullSourcePath = Path.GetFullPath(sourceFile);
-                    if (fullSourcePath.StartsWith(versionsRoot, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    var relativePath = Path.GetRelativePath(appPath, sourceFile).Replace('\\', '/');
+                    var relativePath = Path.GetRelativePath(sourcePath, sourceFile).Replace('\\', '/');
                     if (ShouldSkipExportFile(relativePath))
                     {
                         continue;
@@ -89,8 +81,8 @@ public class AppArchiveService
             createdAppId = await appsService.Create(new NewApp { Name = appName });
 
             var userId = userContextService.GetUserId();
-            var appPath = fileStorageService.GetAppDirectoryPath(userId, createdAppId.Value);
-            var written = await ExtractImportedArchiveAsync(archive, appPath, cancellationToken);
+            var sourcePath = fileStorageService.GetAppSourceDirectoryPath(userId, createdAppId.Value);
+            var written = await ExtractImportedArchiveAsync(archive, sourcePath, cancellationToken);
 
             var importedApp = appsService.Get(createdAppId.Value)
                 ?? throw new InvalidOperationException("Imported app could not be loaded after creation.");
@@ -190,7 +182,7 @@ public class AppArchiveService
         return await JsonSerializer.DeserializeAsync<AppArchiveManifest>(manifestStream, cancellationToken: cancellationToken);
     }
 
-    private static async Task<List<string>> ExtractImportedArchiveAsync(ZipArchive archive, string appPath, CancellationToken cancellationToken)
+    private static async Task<List<string>> ExtractImportedArchiveAsync(ZipArchive archive, string sourcePath, CancellationToken cancellationToken)
     {
         var written = new List<string>();
 
@@ -219,9 +211,9 @@ public class AppArchiveService
                     $"Python/Batch files must be in backend/. Use 'backend/{Path.GetFileName(relativePath)}'.");
             }
 
-            var destPath = Path.GetFullPath(Path.Combine(appPath, relativePath));
-            var fullAppPath = Path.GetFullPath(appPath);
-            if (!destPath.StartsWith(fullAppPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            var destPath = Path.GetFullPath(Path.Combine(sourcePath, relativePath));
+            var fullSourcePath = Path.GetFullPath(sourcePath);
+            if (!destPath.StartsWith(fullSourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException($"Path traversal detected for '{relativePath}'.");
             }

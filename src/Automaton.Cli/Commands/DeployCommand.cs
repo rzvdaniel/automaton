@@ -9,11 +9,11 @@ namespace Automaton.Cli.Commands;
 /// automaton deploy [--clean] [--skip-backend]
 ///
 /// Workflow:
-///   1. Read automaton.json for appId + optional build/deployDir
-///   2. Run build command if configured
-///   3. Zip resolved deploy directory
-///   4. Upload zip to server
-///   5. Deploy backend scripts (unless --skip-backend)
+///   1. Read automaton.json for appId + frontend/backend deploy config
+///   2. Run frontend.build if configured
+///   3. Zip frontend.deployDir (or --dir override)
+///   4. Upload frontend runtime to the server
+///   5. Upload backend runtime and deploy backend scripts (unless --skip-backend)
 /// </summary>
 public static class DeployCommand
 {
@@ -30,7 +30,7 @@ public static class DeployCommand
 
         var dirOption = new Option<string?>(
             ["--dir", "-d"],
-            "Directory to upload (overrides deployDir in automaton.json)");
+            "Frontend directory to upload (overrides frontend.deployDir in automaton.json)");
 
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 

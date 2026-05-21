@@ -99,7 +99,16 @@ public class ConfigServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Test App",
-            Server = "https://project.example.com"
+            Server = "https://project.example.com",
+            Frontend = new FrontendConfig
+            {
+                Build = "cd frontend && npm install && npm run build",
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
         };
 
         // Act
@@ -131,18 +140,21 @@ public class ConfigServiceTests
     }
 
     [Test]
-    public void RequireCredentials_WhenStoredConfigIsMissing_FallsBackToEnvironmentVariables()
+    public void RequireCredentials_WhenProjectAndLocalConfigProvideNothing_UsesProjectLocalValues()
     {
         var projectRoot = CreateTempDirectory();
         var configService = new ConfigService();
 
-        Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com");
-        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://local-only.example.com",
+            ApiKey = "ak_local_only"
+        });
 
         var (server, apiKey) = configService.RequireCredentials(directory: projectRoot);
 
-        Assert.That(server, Is.EqualTo("https://env.example.com"));
-        Assert.That(apiKey, Is.EqualTo("ak_env"));
+        Assert.That(server, Is.EqualTo("https://local-only.example.com"));
+        Assert.That(apiKey, Is.EqualTo("ak_local_only"));
     }
 
     private string CreateTempDirectory()

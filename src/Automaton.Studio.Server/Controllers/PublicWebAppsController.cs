@@ -11,7 +11,7 @@ namespace Automaton.Studio.Server.Controllers;
 
 /// <summary>
 /// Controller for serving published web apps.
-/// Apps are served from the file system (AppData/apps/{ownerId}/{appId}/).
+/// Apps are served from the frontend runtime file system (AppData/apps/{ownerId}/{appId}/runtime/frontend/).
 ///
 /// Routes:
 /// - GET /api/web/{slug}              → Returns app metadata + index.html content
@@ -107,19 +107,17 @@ public class PublicWebAppsController : ControllerBase
                 _logger.LogWarning(ex, "Failed to increment view count for app {AppId}", app.Id);
             }
 
-            // Read index.html — priority: dist/ (Vite/webpack builds) → frontend/ (AI-generated) → root (legacy)
-            string htmlContent;
-            if (app.OwnerId.HasValue)
+            if (!app.OwnerId.HasValue)
             {
-                htmlContent = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "dist/index.html")
-                           ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/index.html")
-                           ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "index.html")
-                           ?? GetDefaultHtmlContent();
+                _logger.LogWarning("App '{AppId}' has no owner", app.Id);
+                return NotFound(new { message = "App configuration error" });
             }
-            else
+
+            var htmlContent = await _fileStorageService.ReadRuntimeFileAsync(app.OwnerId.Value, app.Id, "index.html");
+            if (htmlContent == null)
             {
-                _logger.LogWarning("App '{AppId}' has no owner, using default content", app.Id);
-                htmlContent = GetDefaultHtmlContent();
+                _logger.LogWarning("Published app '{AppId}' has no runtime/frontend/index.html", app.Id);
+                return NotFound(new { message = "Runtime entry file not found" });
             }
 
             WebAppCachePolicy.ApplyHtmlDocumentHeaders(Response);
@@ -190,21 +188,22 @@ public class PublicWebAppsController : ControllerBase
                 return NotFound(new { message = "App configuration error" });
             }
 
-            // Read file — priority: dist/ (Vite/webpack builds) → frontend/ (AI-generated) → root (legacy)
-            var content = await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "dist/" + path)
-                       ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, "frontend/" + path)
-                       ?? await _fileStorageService.ReadAppFileAsync(app.OwnerId.Value, app.Id, path);
+            if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(path))
+            {
+                return NotFound(new { message = "File not found" });
+            }
+
+            var content = await _fileStorageService.ReadRuntimeFileBytesAsync(app.OwnerId.Value, app.Id, path);
             if (content == null)
             {
                 return NotFound(new { message = "File not found" });
             }
 
-            // Return with appropriate content type
-            var contentType = GetContentType(path);
+            var contentType = WebAppRuntimeFilePolicy.GetContentType(path);
 
             WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, path, _webAppConfig);
 
-            return Content(content, contentType);
+            return File(content, contentType);
         }
         catch (UnauthorizedAccessException)
         {
@@ -218,50 +217,4 @@ public class PublicWebAppsController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Get the MIME content type for a file based on extension
-    /// </summary>
-    private static string GetContentType(string path)
-    {
-        var extension = Path.GetExtension(path).ToLowerInvariant();
-        return extension switch
-        {
-            ".html" or ".htm" => "text/html; charset=utf-8",
-            ".css" => "text/css; charset=utf-8",
-            ".js" or ".mjs" => "application/javascript; charset=utf-8",
-            ".json" => "application/json; charset=utf-8",
-            ".xml" => "application/xml; charset=utf-8",
-            ".txt" => "text/plain; charset=utf-8",
-            ".md" => "text/markdown; charset=utf-8",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".svg" => "image/svg+xml",
-            ".webp" => "image/webp",
-            ".ico" => "image/x-icon",
-            ".woff" => "font/woff",
-            ".woff2" => "font/woff2",
-            ".ttf" => "font/ttf",
-            ".eot" => "application/vnd.ms-fontobject",
-            ".otf" => "font/otf",
-            ".map" => "application/json",
-            _ => "application/octet-stream"
-        };
-    }
-
-    private static string GetDefaultHtmlContent()
-    {
-        return @"<!DOCTYPE html>
-<html lang=""en"">
-<head>
-    <meta charset=""UTF-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>App</title>
-</head>
-<body>
-    <h1>App Content Not Available</h1>
-    <p>This app has no content defined.</p>
-</body>
-</html>";
-    }
 }

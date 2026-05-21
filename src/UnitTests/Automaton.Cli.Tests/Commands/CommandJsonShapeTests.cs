@@ -65,12 +65,14 @@ public class CommandJsonShapeTests
     public async Task StatusCommand_WhenCredentialsAreMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();
-        new ConfigService().SaveProjectConfig(projectRoot, new AutomatonConfig
+        var config = new ConfigService();
+        config.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
             Server = "https://api.example.com"
         });
+        config.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = string.Empty });
 
         var command = StatusCommand.Build(new ConfigService());
 
@@ -83,6 +85,11 @@ public class CommandJsonShapeTests
     public async Task RunnersCommand_WhenCredentialsAreMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();
+        new ConfigService().SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = string.Empty,
+            ApiKey = string.Empty
+        });
         var command = RunnersCommand.Build(new ConfigService());
 
         var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
@@ -105,6 +112,11 @@ public class CommandJsonShapeTests
     public async Task SetupCommand_WhenCredentialsAreMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();
+        new ConfigService().SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = string.Empty,
+            ApiKey = string.Empty
+        });
         var command = SetupCommand.Build(new ConfigService());
 
         var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"], Environment.NewLine);

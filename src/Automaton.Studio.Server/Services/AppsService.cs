@@ -231,7 +231,7 @@ public class AppsService
         var automatonConfig = JsonSerializer.Serialize(
             new { appId = entity.Id, name = entity.Name },
             new JsonSerializerOptions { WriteIndented = true });
-        await fileStorageService.WriteAppFileAsync(UserId, entity.Id, "automaton.json", automatonConfig);
+        await fileStorageService.WriteSourceFileAsync(UserId, entity.Id, "automaton.json", automatonConfig);
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
@@ -569,7 +569,7 @@ public class AppsService
     }
 
     /// <summary>
-    /// Duplicate an app owned by the current user, copying all files.
+    /// Duplicate an app owned by the current user, copying editable source files.
     /// </summary>
     public async Task<Models.AppModel> DuplicateAsync(Guid appId)
     {
@@ -612,7 +612,7 @@ public class AppsService
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
         await dataContext.SaveChangesAsync();
 
-        await fileStorageService.CopyAppFilesAsync(UserId, appId, UserId, newId);
+        await fileStorageService.CopySourceFilesAsync(UserId, appId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
         logger.Information("Duplicated app {SrcAppId} → {NewAppId} for user {UserId}", appId, newId, UserId);
@@ -646,6 +646,9 @@ public class AppsService
         var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
             ?? throw new InvalidOperationException("Fork source app has no owner.");
 
+        if (!fileStorageService.AppSourceExists(sourceOwner, sourceAppId))
+            throw new InvalidOperationException("Fork source app has no source files.");
+
         var creator = await dataContext.Users
             .Where(u => u.Id == sourceOwner)
             .Select(u => new
@@ -655,7 +658,7 @@ public class AppsService
             })
             .FirstOrDefaultAsync();
 
-        var sourceFiles = await fileStorageService.GetAppFilesAsync(sourceOwner, sourceAppId);
+        var sourceFiles = await fileStorageService.GetSourceFilesAsync(sourceOwner, sourceAppId);
         var hasBackendExecution = source.ExecutionRunnerId.HasValue ||
             sourceFiles.Any(file => file.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
 
@@ -695,6 +698,9 @@ public class AppsService
 
         var sourceOwner = source.WebAppUsers.FirstOrDefault()?.UserId
             ?? throw new InvalidOperationException("Fork source app has no owner.");
+
+        if (!fileStorageService.AppSourceExists(sourceOwner, sourceAppId))
+            throw new InvalidOperationException("Fork source app has no source files.");
 
         var creator = await dataContext.Users
             .Where(u => u.Id == sourceOwner)
@@ -758,7 +764,7 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
 
-        await fileStorageService.CopyAppFilesAsync(sourceOwner, sourceAppId, UserId, newId);
+        await fileStorageService.CopySourceFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
         logger.Information("Forked app {SourceAppId} → {NewAppId} for user {UserId}", sourceAppId, newId, UserId);

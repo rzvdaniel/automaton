@@ -91,6 +91,19 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> UploadBackendZipAsync(string appId, Stream zipStream, bool clean = true, CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(zipStream);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        content.Add(streamContent, "file", "backend.zip");
+
+        var url = $"api/apps/{appId}/backend/upload{(clean ? "?clean=true" : "")}";
+        using var resp = await _http.PostAsync(url, content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── Backend deploy ────────────────────────────────────────────────────────
 
     public async Task<JsonElement> DeployBackendAsync(string appId, CancellationToken ct = default)

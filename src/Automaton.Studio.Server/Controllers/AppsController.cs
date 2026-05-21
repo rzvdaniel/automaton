@@ -1045,7 +1045,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get list of all files in an app directory
+    /// Get list of editable source files for an app.
     /// </summary>
     [HttpGet("{id}/files")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1061,7 +1061,7 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetAppFilesAsync(ownerId, id);
+            var files = await fileStorageService.GetSourceFilesAsync(ownerId, id);
 
             return Ok(new
             {
@@ -1077,7 +1077,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Read content of a specific file from app directory
+    /// Read content of a specific editable source file.
     /// </summary>
     [HttpGet("{id}/files/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1093,7 +1093,7 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var content = await fileStorageService.ReadAppFileAsync(ownerId, id, path);
+            var content = await fileStorageService.ReadSourceFileAsync(ownerId, id, path);
 
             if (content == null)
             {
@@ -1120,7 +1120,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Write content to a specific file in app directory
+    /// Write content to a specific editable source file.
     /// </summary>
     [HttpPut("{id}/files/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1136,7 +1136,7 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            await fileStorageService.WriteAppFileAsync(ownerId, id, path, request.Content);
+            await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
 
             // If this is index.html, also update the app definition
             if (path == "index.html")
@@ -1169,7 +1169,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Delete a specific file from app directory
+    /// Delete a specific editable source file.
     /// </summary>
     [HttpDelete("{id}/files/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1191,7 +1191,7 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            await fileStorageService.DeleteAppFileAsync(ownerId, id, path);
+            await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
 
             return Ok(new
             {
@@ -1212,9 +1212,9 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Upload a zip archive of app files.
-    /// Files are merged into the existing app directory.
-    /// Use <c>?clean=true</c> to delete all current app files first (full replace).
+    /// Upload a zip archive of deployed runtime files.
+    /// Files are merged into the app runtime directory.
+    /// Use <c>?clean=true</c> to delete all current runtime files first (full replace).
     /// For delta / incremental updates, include only changed files in the zip (clean=false).
     /// Supported via API key authentication — no browser session required.
     /// </summary>
@@ -1244,18 +1244,16 @@ public class AppsController : BaseController
                 return NotFound(new { success = false, message = "App not found" });
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var appPath = fileStorageService.GetAppDirectoryPath(ownerId, id);
+            var runtimePath = fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id);
 
-            // clean=true: delete all current app files before extracting
-            if (clean && Directory.Exists(appPath))
+            // clean=true: delete current public frontend runtime files before extracting.
+            if (clean)
             {
-                var protectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "_metadata.json", "index.html" };
-                foreach (var f in Directory.GetFiles(appPath, "*", SearchOption.AllDirectories))
-                {
-                    var rel = Path.GetRelativePath(appPath, f);
-                    if (!protectedNames.Contains(Path.GetFileName(f)) && !rel.StartsWith("versions"))
-                        System.IO.File.Delete(f);
-                }
+                await fileStorageService.ClearFrontendRuntimeAsync(ownerId, id);
+            }
+            else
+            {
+                Directory.CreateDirectory(runtimePath);
             }
 
             var written = new List<string>();
@@ -1272,44 +1270,23 @@ public class AppsController : BaseController
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
 
-                // Skip macOS meta-directories and hidden files
-                if (relativePath.StartsWith("__MACOSX/") || Path.GetFileName(relativePath).StartsWith("."))
+                // Skip platform metadata, hidden files, and source/dependency folders that should never be runtime.
+                if (ShouldSkipRuntimeUploadEntry(relativePath))
                 {
                     skipped.Add(relativePath);
                     continue;
                 }
 
-                // Cannot overwrite server-managed files
-                if (relativePath.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase))
+                if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(relativePath))
                 {
                     skipped.Add(relativePath);
                     continue;
                 }
 
-                // Validate allowed extensions
-                try { AppFileStorageService.ValidateFileExtensionPublic(relativePath); }
-                catch
-                {
-                    skipped.Add(relativePath);
-                    continue;
-                }
-
-                // .py and .bat must live in backend/
-                var fileExt = Path.GetExtension(relativePath).ToLowerInvariant();
-                if (fileExt is ".py" or ".bat" && !relativePath.StartsWith("backend/"))
-                {
-                    errors.Add(new
-                    {
-                        path   = relativePath,
-                        reason = $"Python/Batch files must be in backend/. Use 'backend/{Path.GetFileName(relativePath)}'."
-                    });
-                    continue;
-                }
-
-                // Zip-slip protection: verify the resolved path stays inside the app root
-                var destPath    = Path.GetFullPath(Path.Combine(appPath, relativePath));
-                var fullAppPath = Path.GetFullPath(appPath);
-                if (!destPath.StartsWith(fullAppPath + Path.DirectorySeparatorChar))
+                // Zip-slip protection: verify the resolved path stays inside runtime/frontend/.
+                var destPath = Path.GetFullPath(Path.Combine(runtimePath, relativePath));
+                var fullRuntimePath = Path.GetFullPath(runtimePath);
+                if (!destPath.StartsWith(fullRuntimePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 {
                     errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
                     continue;
@@ -1357,6 +1334,163 @@ public class AppsController : BaseController
             logger.LogError(ex, "Failed to upload zip for app {AppId}", id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
+    }
+
+    [HttpPost("{id}/backend/upload")]
+    [Authorize(Policy = "AllowApiKey")]
+    [RequestSizeLimit(52_428_800)]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadBackendZip(Guid id, IFormFile file, [FromQuery] bool clean = true)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
+
+            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Only .zip archives are supported" });
+
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+                return NotFound(new { success = false, message = "App not found" });
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var runtimePath = fileStorageService.GetAppRuntimeBackendDirectoryPath(ownerId, id);
+
+            if (clean)
+            {
+                await fileStorageService.ClearRuntimeBackendAsync(ownerId, id);
+            }
+            else
+            {
+                Directory.CreateDirectory(runtimePath);
+            }
+
+            var written = new List<string>();
+            var skipped = new List<string>();
+            var errors = new List<object>();
+
+            using var stream = file.OpenReadStream();
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            foreach (var entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+
+                var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
+                if (ShouldSkipBackendUploadEntry(relativePath))
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                try
+                {
+                    AppFileStorageService.ValidateFileExtensionPublic(relativePath);
+                }
+                catch
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                var destPath = Path.GetFullPath(Path.Combine(runtimePath, relativePath));
+                var fullRuntimePath = Path.GetFullPath(runtimePath);
+                if (!destPath.StartsWith(fullRuntimePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
+                    continue;
+                }
+
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                    using var entryStream = entry.Open();
+                    using var outStream = System.IO.File.Create(destPath);
+                    await entryStream.CopyToAsync(outStream);
+                    written.Add(relativePath);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new { path = relativePath, reason = ex.Message });
+                }
+            }
+
+            logger.LogInformation(
+                "Backend zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
+                id, written.Count, skipped.Count, errors.Count, clean);
+
+            return Ok(new { success = true, written, skipped, errors });
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest(new { success = false, message = "Invalid or corrupt zip archive" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload backend zip for app {AppId}", id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    private static bool ShouldSkipRuntimeUploadEntry(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return true;
+        }
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var fileName = segments.LastOrDefault() ?? string.Empty;
+        if (fileName.StartsWith(".", StringComparison.Ordinal) ||
+            fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("automaton.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("package.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("package-lock.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.StartsWith("vite.config.", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return segments.Any(segment =>
+            segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("src", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("source", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ShouldSkipBackendUploadEntry(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return true;
+        }
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var fileName = segments.LastOrDefault() ?? string.Empty;
+        if (fileName.StartsWith(".", StringComparison.Ordinal) ||
+            fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("automaton.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return segments.Any(segment =>
+            segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("frontend", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("dist", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("mocks", StringComparison.OrdinalIgnoreCase));
     }
 
 }

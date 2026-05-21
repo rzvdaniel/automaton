@@ -42,7 +42,7 @@ public class ValidationServiceTests
     public async Task ValidateAsync_WhenAutomatonJsonIsMissing_FailsAppLinkAndRemoteAccess()
     {
         var projectRoot = CreateProjectRoot();
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(new ConfigService(), (_, _, _, _) =>
             Task.FromResult(new RemoteAppValidationInfo("runner-1")));
@@ -66,10 +66,13 @@ public class ValidationServiceTests
             AppId = Guid.NewGuid().ToString(),
             Name = "Test App",
             Server = "https://api.example.com",
-            DeployDir = "dist"
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        Directory.CreateDirectory(Path.Combine(projectRoot, "dist"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist"));
 
         var service = new ValidationService(configService, (_, _, _, _) =>
             Task.FromResult(new RemoteAppValidationInfo("runner-1")));
@@ -90,10 +93,18 @@ public class ValidationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Backend App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
         Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
         File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
@@ -118,10 +129,14 @@ public class ValidationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Remote App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
             throw new InvalidOperationException("remote app not found"));
@@ -143,10 +158,14 @@ public class ValidationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
             Task.FromResult(new RemoteAppValidationInfo("runner-1")));
@@ -168,11 +187,15 @@ public class ValidationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
             Task.FromResult(new RemoteAppValidationInfo("runner-1")));
@@ -195,11 +218,15 @@ public class ValidationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
             Task.FromResult(new RemoteAppValidationInfo("runner-1")));
@@ -227,8 +254,10 @@ public class ValidationServiceTests
         return path;
     }
 
-    private static void WriteIndexHtml(string projectRoot)
+    private static void WriteFrontendIndexHtml(string projectRoot)
     {
-        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html><body>ok</body></html>");
+        var frontendDist = Path.Combine(projectRoot, "frontend", "dist");
+        Directory.CreateDirectory(frontendDist);
+        File.WriteAllText(Path.Combine(frontendDist, "index.html"), "<html><body>ok</body></html>");
     }
 }

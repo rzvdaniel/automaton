@@ -30,7 +30,7 @@ namespace Automaton.Studio.Server.Controllers;
 /// ## Available Tools (read / discovery only — deploy via automaton CLI)
 ///   create_app   — Create a new app; returns appId to store in automaton.json
 ///   read_file    — Read a file (supports line ranges)
-///   list_files   — List all app files
+///   list_files   — List editable app source files
 ///   list_runners — List the user's connected runners
 ///
 /// For file writes and deployment use the automaton CLI:
@@ -229,7 +229,7 @@ public class ExternalMcpController : ControllerBase
                 }),
 
             ToolDef("list_files",
-                "List all files currently in the Automaton app.",
+                "List editable source files currently stored for the Automaton app.",
                 Props(
                     Prop("appId", "string", "App ID — read from automaton.json")),
                 ["appId"]),

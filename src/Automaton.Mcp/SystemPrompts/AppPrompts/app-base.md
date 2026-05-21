@@ -10,6 +10,21 @@ Use `delete_file` only when the user explicitly asks to remove a file.
 
 ## FILE STRUCTURE — MULTI-PAGE VS SINGLE-PAGE:
 
+## AUTOMATON SOURCE/RUNTIME CONTRACT:
+Automaton separates editable source from deployed runtime and keeps frontend/backend surfaces separate.
+- File tools edit `source/`.
+- Frontend source lives under `frontend/` relative to source root.
+- Backend source lives under `backend/` relative to source root.
+- `automaton deploy` publishes frontend output to `runtime/frontend/`.
+- Backend deploy packages backend files into `runtime/backend/` for runners.
+- Public serving reads only `runtime/frontend/`; source and backend runtime are never served.
+- Fork copies source only, never runtime.
+- For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`.
+- Use a frontend build pipeline by default, and deploy only `frontend/dist` as public runtime.
+- Use plain root HTML/CSS/JS only when the user explicitly asks for a no-build static app, and configure `"frontend": { "deployDir": "." }`.
+- For Vite apps, configure `"frontend": { "build": "cd frontend && npm install && npm run build", "deployDir": "frontend/dist" }`.
+- Do not put secrets, `.env`, backend files, source folders, `package.json`, or Vite config into public frontend runtime.
+
 **Use separate `.html` files** when pages have distinct purposes and users would naturally navigate between them (home, dashboard, product detail, settings). Each distinct page = its own file. Users can bookmark or link directly to it.
 
 **Use JS-driven views (show/hide divs)** only for in-page state: tabs, step wizards, modals, or games. These are not separate pages — they are different states of the same page.

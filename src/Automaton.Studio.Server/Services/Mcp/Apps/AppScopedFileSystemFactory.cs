@@ -6,7 +6,7 @@ namespace Automaton.Studio.Server.Services.Mcp.Apps;
 /// <summary>
 /// Resolves an <see cref="AppScopedFileSystem"/> for the current request by resolving
 /// userId (from HTTP context) and appId (from tool arguments or conversation context)
-/// into the app's root directory path via <see cref="AppFileStorageService"/>.
+/// into the app's editable source directory path via <see cref="AppFileStorageService"/>.
 /// </summary>
 public class AppScopedFileSystemFactory : IScopedFileSystemFactory
 {
@@ -25,7 +25,7 @@ public class AppScopedFileSystemFactory : IScopedFileSystemFactory
         var appId   = ResolveAppId(arguments, context);
         if (!_storage.AppExists(userId, appId))
             throw new InvalidOperationException($"App {appId} not found or not accessible.");
-        var appPath = _storage.GetAppDirectoryPath(userId, appId);
+        var appPath = _storage.GetAppSourceDirectoryPath(userId, appId);
         return new AppScopedFileSystem(appPath);
     }
 

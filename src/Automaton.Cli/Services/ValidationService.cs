@@ -33,9 +33,11 @@ public sealed class ValidationService
         var frontendCheck = ValidateFrontendDeployShape(directory, projectConfig);
         checks.Add(frontendCheck);
 
+        var backendCheck = ValidateBackendDeployShape(directory, projectConfig, out var backendControllers);
+        checks.Add(backendCheck);
+
         checks.AddRange(CollectWarnings(directory, projectConfig, strict, nextSteps));
 
-        var backendControllers = CountBackendControllers(directory);
         var remoteAppCheck = await ValidateRemoteAppAccessAsync(
             appLinkCheck,
             projectConfig,
@@ -131,18 +133,26 @@ public sealed class ValidationService
 
     private static ValidationCheckResult ValidateFrontendDeployShape(string directory, Models.AutomatonConfig? projectConfig)
     {
-        if (projectConfig != null && projectConfig.Build is not null && string.IsNullOrWhiteSpace(projectConfig.Build))
+        if (projectConfig?.Frontend == null)
         {
             return new ValidationCheckResult(
                 ValidationCheckNames.FrontendDeployShape,
                 false,
-                "build is configured in automaton.json but is empty");
+                "frontend configuration is missing from automaton.json");
+        }
+
+        if (projectConfig.Frontend.Build is not null && string.IsNullOrWhiteSpace(projectConfig.Frontend.Build))
+        {
+            return new ValidationCheckResult(
+                ValidationCheckNames.FrontendDeployShape,
+                false,
+                "frontend.build is configured in automaton.json but is empty");
         }
 
         string deployDirectory;
         try
         {
-            deployDirectory = ZipService.ResolveDeployDirectory(directory, projectConfig?.DeployDir);
+            deployDirectory = ZipService.ResolveDeployDirectory(directory, projectConfig.Frontend.DeployDir);
         }
         catch (Exception ex)
         {
@@ -172,12 +182,49 @@ public sealed class ValidationService
             $"deploy directory ready: {Path.GetRelativePath(directory, deployDirectory)}");
     }
 
-    private static int CountBackendControllers(string directory)
+    private static ValidationCheckResult ValidateBackendDeployShape(
+        string directory,
+        Models.AutomatonConfig? projectConfig,
+        out int backendControllers)
     {
-        var backendDirectory = Path.Combine(directory, "backend");
-        return Directory.Exists(backendDirectory)
-            ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
+        backendControllers = 0;
+        var conventionalBackendDirectory = Path.Combine(directory, "backend");
+        var conventionalBackendControllers = Directory.Exists(conventionalBackendDirectory)
+            ? Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length
             : 0;
+
+        var backendDeployDir = projectConfig?.Backend?.DeployDir;
+        if (string.IsNullOrWhiteSpace(backendDeployDir))
+        {
+            if (conventionalBackendControllers > 0)
+            {
+                return new ValidationCheckResult(
+                    ValidationCheckNames.BackendDeployShape,
+                    false,
+                    "backend controllers were found, but backend.deployDir is missing from automaton.json");
+            }
+
+            return new ValidationCheckResult(
+                ValidationCheckNames.BackendDeployShape,
+                true,
+                "no backend deploy configured");
+        }
+
+        string backendDirectory;
+        try
+        {
+            backendDirectory = ZipService.ResolveDeployDirectory(directory, backendDeployDir);
+        }
+        catch (Exception ex)
+        {
+            return new ValidationCheckResult(ValidationCheckNames.BackendDeployShape, false, ex.Message);
+        }
+
+        backendControllers = Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length;
+        return new ValidationCheckResult(
+            ValidationCheckNames.BackendDeployShape,
+            true,
+            $"backend directory ready: {Path.GetRelativePath(directory, backendDirectory)}");
     }
 
     private static ValidationCheckResult ValidateBackendRunner(

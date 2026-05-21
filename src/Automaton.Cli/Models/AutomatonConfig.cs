@@ -13,13 +13,31 @@ public class AutomatonConfig
     /// </summary>
     public string? Server { get; set; }
 
+    public FrontendConfig? Frontend { get; set; }
+
+    public BackendConfig? Backend { get; set; }
+}
+
+public sealed class FrontendConfig
+{
     /// <summary>
-    /// Optional build command to run before deploying (e.g. "npm run build").
+    /// Optional build command to run before deploying the frontend runtime.
+    /// Example: "cd frontend && npm install && npm run build".
     /// </summary>
     public string? Build { get; set; }
 
     /// <summary>
-    /// Directory to upload as the frontend (default: tries dist/, then root, then frontend/ as a compatibility fallback).
+    /// Required frontend deploy directory relative to the project root.
+    /// Example: "frontend/dist" or "." for explicit no-build static apps.
+    /// </summary>
+    public string? DeployDir { get; set; }
+}
+
+public sealed class BackendConfig
+{
+    /// <summary>
+    /// Backend deploy directory relative to the project root.
+    /// Example: "backend".
     /// </summary>
     public string? DeployDir { get; set; }
 }

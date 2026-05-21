@@ -120,19 +120,24 @@ Created by the AI (or manually) at the project root. Commit it to Git.
 }
 ```
 
-Add `build` and `deployDir` for framework apps:
+For the default AI-generated local app, use nested frontend/backend config:
 
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "build": "npm run build",
-  "deployDir": "dist"
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
 }
 ```
 
-If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields instead of leaving deploy behavior implicit.
+If `automaton.json` already exists, the AI should add missing `frontend` or `backend` deploy fields instead of leaving deploy behavior implicit.
 
 ### Deploy
 
@@ -159,7 +164,7 @@ automaton deploy
 automaton deploy --runner <runner-id-or-name>
 ```
 
-This uploads frontend files and triggers backend deployment. Re-run after any change.
+This uploads `frontend.deployDir` as public frontend runtime, uploads `backend.deployDir` as runner backend runtime when present, and then triggers backend deployment. Re-run after any change.
 
 If the app has no backend scripts, a successful deploy may finish with `No backend scripts found`.
 
@@ -167,27 +172,27 @@ If the app has no backend scripts, a successful deploy may finish with `No backe
 
 ## App Structure Reference
 
-```
+```text
 my-app/
-├── automaton.json          ← app link + optional build/deploy config (commit this)
-├── index.html              ← preferred entry point for plain static apps
-├── *.css / *.js            ← root-level plain app assets
-├── assets/                 ← images, icons, local media
-├── frontend/               ← optional split static source, only when intentional
-├── src/                    ← framework source code can stay in the repo
-├── dist/                   ← common build output for framework apps
+├── automaton.json          ← app link + frontend/backend deploy config (commit this)
+├── frontend/
+│   ├── src/                ← frontend source
+│   ├── public/             ← static frontend assets
+│   ├── dist/               ← build output uploaded as public runtime
+│   ├── package.json
+│   └── vite.config.ts
 └── backend/
-  ├── *.py                ← Python controllers (filename = controller name)
+    ├── *.py                ← Python controllers (filename = controller name)
     ├── requirements.txt    ← pip dependencies (optional)
-  ├── shared/             ← shared Python helpers
+    ├── shared/             ← shared Python helpers
     └── mocks/
         └── {ctrl}.{action}.json   ← local dev mock responses
 ```
 
 Notes:
-- Plain static apps should usually use root-level files; use `frontend/` only when you intentionally want a split source structure
-- Framework apps such as React, Vue, or Angular can keep source code in the repo and deploy the built output, typically from `dist/`
-- Use `build` and `deployDir` in `automaton.json` when the deployable frontend lives somewhere other than the default path
+- Default AI-generated local apps should use `frontend/` with a build step and deploy only `frontend/dist/`.
+- Plain static root apps are still supported, but only as an explicit no-build choice with `"frontend": { "deployDir": "." }`.
+- Source files are local editable project files; public Automaton runtime is produced from `frontend.deployDir`, not from raw frontend source folders.
 
 ## Python Controller Pattern
 

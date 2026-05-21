@@ -47,6 +47,9 @@ public class NewAppServiceTests
         Assert.That(config.AppId, Is.EqualTo("app-123"));
         Assert.That(config.Name, Is.EqualTo("My App"));
         Assert.That(config.Server, Is.EqualTo("https://automaton.monster"));
+        Assert.That(config.Frontend?.Build, Is.EqualTo("cd frontend && npm install && npm run build"));
+        Assert.That(config.Frontend?.DeployDir, Is.EqualTo("frontend/dist"));
+        Assert.That(config.Backend?.DeployDir, Is.EqualTo("backend"));
     }
 
     [Test]

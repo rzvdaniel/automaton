@@ -162,7 +162,7 @@ In every HTML `<head>`:
 
 ## FILE STRUCTURE (enterprise feature-based):
 ```
-├─ frontend/                        # ALL static UI files live here
+├─ frontend/
 │  ├─ index.html                    # App shell (REQUIRED)
 │  ├─ manifest.json                 # PWA manifest
 │  ├─ pages/                        # Top-level pages
@@ -204,7 +204,7 @@ In every HTML `<head>`:
    └─ app.db                        # SQLite DB (created automatically)
 ```
 
-**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
+**Important:** In Studio source, frontend files live under `frontend/`; backend files live under `backend/`.
 
 ## BACKEND CONTROLLERS — handle() DISPATCH:
 Each domain gets its own file. Use `shared/db.py` for database connection.
@@ -325,4 +325,3 @@ updatePagination(total);
 5. Every feature: loading + error + empty states + pagination where needed
 6. Shared components (`modal.js`, `toast.js`, `table.js`) used everywhere — never duplicate UI logic
 7. Validate all inputs in backend controllers — never trust frontend data
-

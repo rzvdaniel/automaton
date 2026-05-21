@@ -45,7 +45,8 @@ public class AppsControllerExecutionService
     /// </summary>
     public async Task<DeployInfoResponse> GetDeployInfoAsync(Guid appId, Guid ownerId)
     {
-        var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
         return new DeployInfoResponse
         {
@@ -64,7 +65,8 @@ public class AppsControllerExecutionService
         List<string>? runnerNames,
         CancellationToken cancellationToken)
     {
-        var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
 
         if (scripts.Count == 0)
@@ -131,7 +133,8 @@ public class AppsControllerExecutionService
     /// </summary>
     private async Task DeployScriptsToRunnerAsync(Guid appId, Guid ownerId, Runner runner, CancellationToken cancellationToken)
     {
-        var scripts = await fileStorageService.ListBackendFilesAsync(ownerId, appId);
+        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var pythonScripts = scripts.Where(s => s.Language != "Text").ToList();
 
         foreach (var script in pythonScripts)
@@ -247,7 +250,7 @@ public class AppsControllerExecutionService
         if (ownerId == null)
             return null;
 
-        var mockContent = await fileStorageService.ReadAppFileAsync(
+        var mockContent = await fileStorageService.ReadSourceFileAsync(
             ownerId.Value,
             app.Id,
             $"backend\\mocks\\{controllerName}.{actionName}.json");

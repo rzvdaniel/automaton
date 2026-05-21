@@ -4,14 +4,21 @@ Automaton supports multiple frontend styles.
 
 ## How to choose a stack
 
-Use the simplest stack that fits the project.
+Use the simplest stack that fits the project, but for AI-generated local apps the default must still be a build-based frontend that outputs to `frontend/dist/`.
+
+### Prefer Vite + vanilla TypeScript when
+
+- the app is AI-generated and the user did not ask for another stack
+- the app will be iterated and redeployed frequently
+- cache-friendly hashed CSS/JS assets matter
+- the app benefits from modules, a dev server, build tooling, or cleaner source organization
 
 ### Prefer plain HTML/CSS/JS when
 
 - the app is mostly one page
 - the state is local or simple
-- the user did not ask for a framework
-- the app is a lightweight internal tool, planning app, utility, dashboard, or form
+- the app is a very small static demo
+- the user explicitly asks for the simplest no-build structure
 
 ### Prefer Vite + vanilla HTML/CSS/JS when
 
@@ -33,24 +40,7 @@ Use the simplest stack that fits the project.
 
 ## Plain HTML/CSS/JS
 
-Use this when the user wants the simplest structure.
-
-```text
-my-app/
-|-- automaton.json
-|-- index.html
-|-- styles.css
-|-- app.js
-`-- backend/
-```
-
-Rules:
-- Prefer putting plain static frontend files at the project root.
-- Use `index.html` at the project root as the entry point.
-- Assets and additional pages can live in root-level folders like `js/`, `css/`, `assets/`, or `pages/`.
-- Do not create empty `backend/` or `data/` folders for frontend-only apps.
-
-If the user explicitly wants a separate frontend source folder, this is acceptable:
+Use this only when the user explicitly wants a no-build static structure.
 
 ```text
 my-app/
@@ -62,30 +52,47 @@ my-app/
 `-- backend/
 ```
 
-In that case:
-- only use `frontend/` when the user asked for a split source structure or there is a clear organizational reason
-- still keep `automaton.json` in the project root
-- do not create empty backend folders unless the app actually uses backend controllers
+Rules:
+- Do not use this as the default AI-generated local app structure.
+- Use it only for an explicit no-build static request.
+- Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
-## Vite + vanilla HTML/CSS/JS
-
-Use this when the app should stay framework-free but still wants modern tooling.
+Root static deployment is acceptable only for an explicit no-build static request where the project root contains public files only:
 
 ```text
 my-app/
 |-- automaton.json
-|-- package.json
 |-- index.html
-|-- src/
-|-- public/          (optional)
-|-- dist/
+|-- styles.css
+`-- app.js
+```
+
+In that case:
+- set `"frontend": { "deployDir": "." }`
+- do not include source-only, backend, secret, or dependency files at the root
+
+## Vite + vanilla TypeScript or HTML/CSS/JS
+
+Use this as the default for AI-generated Automaton apps unless the user asks for another framework.
+
+```text
+my-app/
+|-- automaton.json
+|-- frontend/
+|   |-- package.json
+|   |-- index.html
+|   |-- src/
+|   |-- public/          (optional)
+|   `-- dist/
 `-- backend/
 ```
 
 Rules:
 - Keep the app framework-free unless the user asked for React or Vue.
 - Use Vite for modules, development workflow, and build output.
-- Build to `dist/` and set `build` and `deployDir` in `automaton.json`.
+- Build to `frontend/dist/` and set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- Treat the build pipeline as required for AI-generated local apps.
+- Do not put source files, `package.json`, or Vite config into runtime.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
 Example:
@@ -95,8 +102,10 @@ Example:
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "build": "npm run build",
-  "deployDir": "dist"
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  }
 }
 ```
 
@@ -107,19 +116,20 @@ Use this when the user wants a full local framework project.
 ```text
 my-app/
 |-- automaton.json
-|-- package.json
-|-- src/
-|-- public/
-|-- dist/
+|-- frontend/
+|   |-- package.json
+|   |-- src/
+|   |-- public/
+|   `-- dist/
 `-- backend/
 ```
 
 Rules:
 - Keep framework source code in the repo.
-- For frontend-only apps, build to `dist/` or another static output folder.
-- For apps with Python backend controllers, do not assume `dist/` alone is deployable unless `backend/` is copied into that deploy directory.
-- Put `build` and `deployDir` in `automaton.json` when needed.
-- For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then point `deployDir` at that folder.
+- For frontend-only apps, build to `frontend/dist/` or another static output folder under `frontend/`.
+- For apps with Python backend controllers, keep backend source in `backend/`; frontend runtime deploy still points to the frontend build output.
+- Put `frontend.build` and `frontend.deployDir` in `automaton.json` when needed.
+- `automaton deploy` uploads frontend runtime and backend runtime separately.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
 Frontend-only example:
@@ -129,8 +139,10 @@ Frontend-only example:
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "build": "npm run build",
-  "deployDir": "dist"
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  }
 }
 ```
 
@@ -141,12 +153,17 @@ Frontend-plus-backend example:
   "appId": "your-app-id",
   "name": "My App",
   "server": "https://api.automaton.monster",
-  "build": "npm run build && npm run prepare-deploy",
-  "deployDir": "deploy"
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
 }
 ```
 
-If `automaton.json` already exists, add missing `build` and `deployDir` fields instead of assuming deploy from the project root.
+If `automaton.json` already exists, add missing `frontend.build` and `frontend.deployDir` fields instead of assuming deploy from the project root.
 
 ## Frontend to backend calls
 

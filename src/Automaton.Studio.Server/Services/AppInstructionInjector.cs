@@ -7,7 +7,7 @@ using Serilog;
 namespace Automaton.Studio.Server.Services;
 
 /// <summary>
-/// Reads .instructions/ files from an app's directory and injects them into the system prompt.
+/// Reads .instructions/ files from an app's source directory and injects them into the system prompt.
 ///
 /// Injection rules:
 ///   - _index.md is always injected (if it exists) — it's the summary file, kept short
@@ -38,7 +38,7 @@ public class AppInstructionInjector
     /// </summary>
     public async Task<string?> BuildInjectionBlockAsync(Guid userId, Guid appId)
     {
-        var appDir = _storage.GetAppDirectoryPath(userId, appId);
+        var appDir = _storage.GetAppSourceDirectoryPath(userId, appId);
         var instructionsDir = Path.Combine(appDir, ".instructions");
 
         if (!Directory.Exists(instructionsDir))

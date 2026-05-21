@@ -20,6 +20,8 @@ When the user asks to use the Automaton CLI, the AI should prefer `automaton new
 
 The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
 
+Automaton separates source and runtime, with frontend/backend surfaces. The local project is source. `automaton deploy` uploads `frontend.deployDir` into `runtime/frontend/` and `backend.deployDir` into `runtime/backend/` when present. Public app serving reads only `runtime/frontend/`. Studio source editing, GitHub sync, version history, archive import/export, and fork use source.
+
 `automaton setup`, `automaton new`, and `automaton link` also sync canonical local AI guidance under `.automaton/agents/`, including references under `.automaton/agents/references/`, and write a small root `AGENTS.md` adapter. If those generated files are missing or stale, run:
 
 ```bash
@@ -109,9 +111,8 @@ If `automaton validate` passes but `automaton deploy` fails during upload with t
 - Keep `.automatonignore` in the project root and add custom deploy excludes there when needed.
 - Follow the local generated guidance pack after setup. Start with `.automaton/agents/` when present, then use `.automaton/agents/references/llms.txt` and the linked files as the detailed canonical source. Use the public `llms.txt` only as a fallback when local guidance is unavailable.
 - Treat `automaton sync-ai` as the manual refresh path for the generated local guidance pack, not as a required onboarding step.
-- If the app uses a build step, set `build` and `deployDir` in `automaton.json`.
-- If the app is build-based and also has Python backend controllers, do not assume `deployDir: "dist"` is correct unless `backend/` is copied into that deploy directory.
-- For build-based frontend-plus-backend apps, prepare one deploy-ready folder that contains both the built frontend files and `backend/`, then set `deployDir` to that folder.
+- For AI-generated local apps, always set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- If the app is build-based and also has Python backend controllers, keep backend source in `backend/`. Do not copy backend files into frontend `deployDir`; deploy uploads frontend runtime and backend runtime separately.
 - Use Python backend controllers in `backend/`.
 - If the app includes Python backend controllers, do not consider backend deploy complete until `automaton deploy` assigned or used a runner, or you have clearly reported why it could not be made.
 - Prefer `automaton status` after deploy before declaring success.
@@ -135,21 +136,25 @@ automaton deploy
 automaton deploy --runner <runner-id-or-name>
 ```
 
-`automaton deploy` uploads the frontend archive and then deploys backend scripts using the same API key authentication path. If the app has no backend scripts, a successful deploy may end with `No backend scripts found`.
+`automaton deploy` uploads the frontend archive to `runtime/frontend/`, uploads backend files to `runtime/backend/` when present, and then deploys backend runtime scripts using the same API key authentication path. If the app has no backend scripts, a successful deploy may end with `No backend scripts found`.
 
 ## Framework apps
 
-For React, Vue, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
+For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`. Public runtime must come from `frontend/dist/`. Vite hashed assets reduce stale CSS/JS caching behind Cloudflare; `index.html` should still revalidate on the server.
+
+For React, Vue, Vite vanilla, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
 
 Frontend-only example `automaton.json`:
 
 ```json
 {
-  "appId": "your-app-id",
-  "name": "My App",
-  "server": "https://api.automaton.monster",
-  "build": "npm run build",
-  "deployDir": "dist"
+    "appId": "your-app-id",
+    "name": "My App",
+    "server": "https://api.automaton.monster",
+    "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  }
 }
 ```
 
@@ -157,15 +162,20 @@ Frontend-plus-backend example `automaton.json`:
 
 ```json
 {
-  "appId": "your-app-id",
-  "name": "My App",
-  "server": "https://api.automaton.monster",
-  "build": "npm run build && npm run prepare-deploy",
-  "deployDir": "deploy"
+    "appId": "your-app-id",
+    "name": "My App",
+    "server": "https://api.automaton.monster",
+    "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
 }
 ```
 
-If `automaton.json` already exists, the AI should add missing `build` and `deployDir` fields when the deployable output is not the project root.
+If `automaton.json` already exists, the AI should add missing `frontend.build` and `frontend.deployDir` fields for build-based local apps. Use root deploy only when the user explicitly asked for a no-build static app.
 
 ## Default instruction to the AI
 

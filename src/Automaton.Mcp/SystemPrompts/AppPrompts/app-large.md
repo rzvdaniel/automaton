@@ -117,7 +117,7 @@ Add meta: `<meta name="theme-color" content="#2563eb">`
 
 ## FILE STRUCTURE (feature-based):
 ```
-├─ frontend/                    # ALL static UI files live here
+├─ frontend/
 │  ├─ index.html                # Entry point (REQUIRED)
 │  ├─ manifest.json             # PWA manifest
 │  ├─ pages/                    # Additional HTML pages
@@ -145,7 +145,7 @@ Add meta: `<meta name="theme-color" content="#2563eb">`
    └─ app.db                    # Created automatically by Python
 ```
 
-**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
+**Important:** In Studio source, frontend files live under `frontend/`; backend files live under `backend/`.
 
 ## BACKEND CONTROLLERS — handle() DISPATCH:
 Each controller file handles one resource. Use a class per resource with a `handle()` entry point.
@@ -223,4 +223,3 @@ def handle(action_name: str, inputs: dict) -> dict:
 2. One controller class per file, one file per resource
 3. Feature-based JS structure always; ES modules; Tailwind; full error handling
 4. Never write a file >300 lines — split into feature files
-

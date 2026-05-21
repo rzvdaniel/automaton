@@ -40,7 +40,7 @@ public sealed class DeployPreparationService
             return new DeployPreparationResult { Success = true };
         }
 
-        if (CountBackendControllers(directory) == 0)
+        if (CountBackendControllers(directory, projectConfig.Backend?.DeployDir) == 0)
         {
             return new DeployPreparationResult { Success = true };
         }
@@ -186,9 +186,12 @@ public sealed class DeployPreparationService
         };
     }
 
-    private static int CountBackendControllers(string directory)
+    private static int CountBackendControllers(string directory, string? backendDeployDir)
     {
-        var backendDirectory = Path.Combine(directory, "backend");
+        if (string.IsNullOrWhiteSpace(backendDeployDir))
+            return 0;
+
+        var backendDirectory = Path.Combine(directory, backendDeployDir);
         return Directory.Exists(backendDirectory)
             ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
             : 0;

@@ -126,7 +126,7 @@ public class AppVersionService
     /// </summary>
     public bool AppHasBeenGenerated(Guid appId, Guid userId)
     {
-        var appPath = fileStorageService.GetAppDirectoryPath(userId, appId);
+        var appPath = fileStorageService.GetAppRootPath(userId, appId);
         var metadataPath = Path.Combine(appPath, "_metadata.json");
         return File.Exists(metadataPath);
     }
@@ -286,8 +286,7 @@ public class AppVersionService
             }
 
             // Get current version snapshot files
-            var appPath = fileStorageService.GetAppDirectoryPath(ownerId.Value, appId);
-            var versionsPath = Path.Combine(appPath, "versions");
+            var versionsPath = fileStorageService.GetAppVersionDirectoryPath(ownerId.Value, appId);
             var newVersionPath = Path.Combine(versionsPath, $"v{newVersionNumber:D3}", "files");
 
             if (!Directory.Exists(newVersionPath))

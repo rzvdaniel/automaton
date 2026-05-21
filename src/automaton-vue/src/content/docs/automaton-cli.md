@@ -69,14 +69,19 @@ Every project has an `automaton.json` at the root. Commit it to Git.
 }
 ```
 
-For framework apps (React, Vue, Angular) that need a build step:
+For AI-generated local apps and most framework apps, use nested frontend/backend config:
 
 ```json
 {
   "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "My App",
-  "build": "npm run build",
-  "deployDir": "dist"
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
 }
 ```
 
@@ -84,8 +89,21 @@ For framework apps (React, Vue, Angular) that need a build step:
 |---|---|---|
 | `appId` | ✅ | App ID from Automaton Studio |
 | `name` | ✅ | Display name |
-| `build` | Optional | Shell command to run before upload (e.g. `npm run build`) |
-| `deployDir` | Optional | Directory to upload as frontend (default resolution checks `dist/`, then root, then `frontend/` as a compatibility fallback; for plain HTML/CSS/JS apps prefer root-level files unless you explicitly want split structure) |
+| `frontend.build` | Optional | Frontend build command to run before upload. For default Vite apps use `cd frontend && npm install && npm run build`. |
+| `frontend.deployDir` | Required for build-based frontend deploys | Directory uploaded as public frontend runtime. For default Vite apps use `frontend/dist`. |
+| `backend.deployDir` | Optional | Directory uploaded as backend runtime for runner execution. Usually `backend`. |
+
+For an explicit no-build static app, use:
+
+```json
+{
+  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "My App",
+  "frontend": {
+    "deployDir": "."
+  }
+}
+```
 
 ---
 
@@ -206,11 +224,12 @@ automaton deploy --dir dist        # override the upload directory
 ```
 
 What happens:
-1. Runs the `build` command from `automaton.json` if set
+1. Runs `frontend.build` from `automaton.json` if set
 2. Performs the deploy preflight, including runner selection only when backend controllers require it
-3. Zips the `deployDir` (or the default resolution order: `dist/` → root → `frontend/` compatibility fallback)
-4. Uploads the zip to the server (merge by default, full replace with `--clean`)
-5. Deploys backend Python controllers to the runner (unless `--skip-backend`)
+3. Zips `frontend.deployDir`, or the directory passed with `--dir`
+4. Uploads the frontend zip to `runtime/frontend/` on the server
+5. Uploads `backend.deployDir` to `runtime/backend/` when backend files are configured
+6. Deploys backend Python controllers to the runner (unless `--skip-backend`)
 
 If `automaton validate` already passes but deploy fails during upload with transport-style errors like closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, treat that as a likely CLI or server upload-path issue first instead of immediately restructuring the app.
 
@@ -218,7 +237,7 @@ If `automaton validate` already passes but deploy fails during upload with trans
 
 ### `automaton pull`
 
-Download all app files from the server to the local directory.
+Download editable app source files from the server to the local directory.
 
 ```bash
 automaton pull                  # download to current directory

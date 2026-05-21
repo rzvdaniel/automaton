@@ -11,6 +11,11 @@ namespace Automaton.Studio.Server.Services;
 /// </summary>
 public class AppFileStorageService
 {
+    private const string SourceFolder = "source";
+    private const string RuntimeFolder = "runtime";
+    private const string VersionsFolder = "versions";
+    private const string FrontendFolder = "frontend";
+    private const string BackendFolder = "backend";
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly Serilog.ILogger logger;
     private readonly string baseStoragePath;
@@ -57,49 +62,39 @@ public class AppFileStorageService
         return Path.Combine(baseStoragePath, userId.ToString(), appId.ToString());
     }
 
-    /// <summary>
-    /// Copy all root-level app files from one user/app to another.
-    /// Used for duplicate (same user) and fork (cross-user).
-    /// Skips the versions/ snapshot subdirectory.
-    /// </summary>
-    public Task CopyAppFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
+    private string GetSourcePath(Guid userId, Guid appId)
     {
-        var srcPath = GetAppPath(srcUserId, srcAppId);
-        var dstPath = GetAppPath(dstUserId, dstAppId);
+        return Path.Combine(GetAppPath(userId, appId), SourceFolder);
+    }
 
-        Directory.CreateDirectory(dstPath);
+    private string GetRuntimePath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetAppPath(userId, appId), RuntimeFolder);
+    }
 
-        if (!Directory.Exists(srcPath))
-        {
-            logger.Warning("Source app directory not found when copying: {SrcPath}", srcPath);
-            return Task.CompletedTask;
-        }
+    private string GetVersionsPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetAppPath(userId, appId), VersionsFolder);
+    }
 
-        var versionsPath = Path.GetFullPath(Path.Combine(srcPath, "versions"));
+    private string GetSourceFrontendPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetSourcePath(userId, appId), FrontendFolder);
+    }
 
-        foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
-        {
-            var fullSourcePath = Path.GetFullPath(sourceFile);
-            if (fullSourcePath.StartsWith(versionsPath, StringComparison.OrdinalIgnoreCase))
-                continue; // Skip version snapshots
+    private string GetSourceBackendPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetSourcePath(userId, appId), BackendFolder);
+    }
 
-            var relativePath = Path.GetRelativePath(srcPath, sourceFile);
-            if (IsSensitiveAppFile(relativePath))
-                continue;
+    private string GetRuntimeFrontendPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetRuntimePath(userId, appId), FrontendFolder);
+    }
 
-            var targetFilePath = Path.Combine(dstPath, relativePath);
-            var targetDirectory = Path.GetDirectoryName(targetFilePath);
-
-            if (!string.IsNullOrEmpty(targetDirectory))
-                Directory.CreateDirectory(targetDirectory);
-
-            File.Copy(sourceFile, targetFilePath, overwrite: true);
-        }
-
-        logger.Information("Copied app files from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
-            srcAppId, srcUserId, dstAppId, dstUserId);
-
-        return Task.CompletedTask;
+    private string GetRuntimeBackendPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetRuntimePath(userId, appId), BackendFolder);
     }
 
     private static bool IsSensitiveAppFile(string relativePath)
@@ -123,12 +118,12 @@ public class AppFileStorageService
             var appPath = GetAppPath(userId, appId);
             Directory.CreateDirectory(appPath);
 
-            // Save index.html only when content is provided
+            // Save index.html only when content is provided. Editable frontend content belongs in source/frontend/.
             if (!string.IsNullOrEmpty(definition.HtmlContent))
             {
-                var frontendPath = Path.Combine(appPath, FrontendFolder);
-                Directory.CreateDirectory(frontendPath);
-                var indexPath = Path.Combine(frontendPath, "index.html");
+                var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
+                Directory.CreateDirectory(sourceFrontendPath);
+                var indexPath = Path.Combine(sourceFrontendPath, "index.html");
                 await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
             }
 
@@ -160,29 +155,21 @@ public class AppFileStorageService
     {
         try
         {
-            var appPath = GetAppPath(userId, appId);
-            if (!Directory.Exists(appPath))
+            var sourcePath = GetSourcePath(userId, appId);
+            if (!Directory.Exists(sourcePath))
             {
-                throw new DirectoryNotFoundException($"App directory not found: {appPath}");
+                throw new DirectoryNotFoundException($"App source directory not found: {sourcePath}");
             }
 
-            var versionsPath = Path.Combine(appPath, "versions");
+            var versionsPath = GetVersionsPath(userId, appId);
             var versionFolder = $"v{versionNumber:D3}";
             var targetPath = Path.Combine(versionsPath, versionFolder, "files");
 
             Directory.CreateDirectory(targetPath);
 
-            var versionRoot = Path.GetFullPath(versionsPath);
-
-            foreach (var sourceFile in Directory.EnumerateFiles(appPath, "*", SearchOption.AllDirectories))
+            foreach (var sourceFile in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
             {
-                var fullSourcePath = Path.GetFullPath(sourceFile);
-                if (fullSourcePath.StartsWith(versionRoot))
-                {
-                    continue; // Avoid copying existing versions
-                }
-
-                var relativePath = Path.GetRelativePath(appPath, sourceFile);
+                var relativePath = Path.GetRelativePath(sourcePath, sourceFile);
                 var targetFilePath = Path.Combine(targetPath, relativePath);
                 var targetDirectory = Path.GetDirectoryName(targetFilePath);
 
@@ -212,38 +199,30 @@ public class AppFileStorageService
     {
         try
         {
-            var appPath = GetAppPath(userId, appId);
-            if (!Directory.Exists(appPath))
+            var sourcePath = GetSourcePath(userId, appId);
+            if (!Directory.Exists(sourcePath))
             {
-                throw new DirectoryNotFoundException($"App directory not found: {appPath}");
+                throw new DirectoryNotFoundException($"App source directory not found: {sourcePath}");
             }
 
             var versionFolder = $"v{versionNumber:D3}";
-            var versionSnapshotPath = Path.Combine(appPath, "versions", versionFolder, "files");
+            var versionSnapshotPath = Path.Combine(GetVersionsPath(userId, appId), versionFolder, "files");
 
             if (!Directory.Exists(versionSnapshotPath))
             {
                 throw new DirectoryNotFoundException($"Version snapshot not found: {versionSnapshotPath}");
             }
 
-            // Delete current files (except versions folder)
-            var versionsPath = Path.Combine(appPath, "versions");
-            var currentFiles = Directory.GetFiles(appPath, "*", SearchOption.AllDirectories)
-                .Where(f => !Path.GetFullPath(f).StartsWith(Path.GetFullPath(versionsPath)))
-                .ToList();
-
-            foreach (var file in currentFiles)
+            foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
             {
                 File.Delete(file);
             }
 
-            // Remove empty directories (except versions)
-            foreach (var dir in Directory.GetDirectories(appPath, "*", SearchOption.AllDirectories))
+            foreach (var dir in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
             {
-                var fullDirPath = Path.GetFullPath(dir);
-                if (!fullDirPath.StartsWith(Path.GetFullPath(versionsPath)) && !Directory.EnumerateFileSystemEntries(fullDirPath).Any())
+                if (!Directory.EnumerateFileSystemEntries(dir).Any())
                 {
-                    Directory.Delete(fullDirPath);
+                    Directory.Delete(dir);
                 }
             }
 
@@ -251,7 +230,7 @@ public class AppFileStorageService
             foreach (var sourceFile in Directory.EnumerateFiles(versionSnapshotPath, "*", SearchOption.AllDirectories))
             {
                 var relativePath = Path.GetRelativePath(versionSnapshotPath, sourceFile);
-                var targetFilePath = Path.Combine(appPath, relativePath);
+                var targetFilePath = Path.Combine(sourcePath, relativePath);
                 var targetDirectory = Path.GetDirectoryName(targetFilePath);
 
                 if (!string.IsNullOrEmpty(targetDirectory))
@@ -310,16 +289,11 @@ public class AppFileStorageService
                 definition = new AppDefinition();
             }
 
-            // Load index.html content — check frontend/ first, then root (backward compat)
-            var frontendIndexPath = Path.Combine(appPath, FrontendFolder, "index.html");
-            var legacyIndexPath = Path.Combine(appPath, "index.html");
-            if (File.Exists(frontendIndexPath))
+            // Load editable index.html content from source/frontend/.
+            var sourceIndexPath = Path.Combine(GetSourceFrontendPath(userId, appId), "index.html");
+            if (File.Exists(sourceIndexPath))
             {
-                definition.HtmlContent = await File.ReadAllTextAsync(frontendIndexPath);
-            }
-            else if (File.Exists(legacyIndexPath))
-            {
-                definition.HtmlContent = await File.ReadAllTextAsync(legacyIndexPath);
+                definition.HtmlContent = await File.ReadAllTextAsync(sourceIndexPath);
             }
 
             logger.Information("Loaded app {AppId} for user {UserId} from file system", appId, userId);
@@ -366,84 +340,242 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Get the file system path for an app (useful for direct file access)
+    /// Get the root file system path for an app.
     /// </summary>
-    public string GetAppDirectoryPath(Guid userId, Guid appId)
+    public string GetAppRootPath(Guid userId, Guid appId)
     {
         return GetAppPath(userId, appId);
     }
 
     /// <summary>
-    /// Get all files in an app directory (for listing/inspection)
+    /// Get the editable/forkable source file system path for an app.
     /// </summary>
-    public async Task<IEnumerable<string>> GetAppFilesAsync(Guid userId, Guid appId)
+    public string GetAppSourceDirectoryPath(Guid userId, Guid appId)
     {
-        var appPath = GetAppPath(userId, appId);
-        if (!Directory.Exists(appPath))
-        {
-            return Enumerable.Empty<string>();
-        }
-
-        // Get all files recursively, excluding metadata
-        var files = Directory.GetFiles(appPath, "*.*", SearchOption.AllDirectories)
-            .Where(f => !f.EndsWith("_metadata.json"))
-            .Select(f => Path.GetRelativePath(appPath, f))
-            .ToList();
-
-        return await Task.FromResult(files);
+        return GetSourcePath(userId, appId);
     }
 
     /// <summary>
-    /// Read a specific file from an app directory
+    /// Get the public runtime file system path for an app.
     /// </summary>
-    public async Task<string?> ReadAppFileAsync(Guid userId, Guid appId, string relativePath)
+    public string GetAppRuntimeDirectoryPath(Guid userId, Guid appId)
     {
-        var appPath = GetAppPath(userId, appId);
-        var filePath = Path.Combine(appPath, relativePath);
-        
-        // Security: ensure the path is within the app directory
-        var fullPath = Path.GetFullPath(filePath);
-        var fullAppPath = Path.GetFullPath(appPath);
-        if (!fullPath.StartsWith(fullAppPath))
-        {
-            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
-        }
-
-        if (!File.Exists(filePath))
-        {
-            return null;
-        }
-
-        return await File.ReadAllTextAsync(filePath);
+        return GetRuntimePath(userId, appId);
     }
 
     /// <summary>
-    /// Write a specific file to an app directory
+    /// Get the editable frontend source path for an app.
     /// </summary>
-    public async Task WriteAppFileAsync(Guid userId, Guid appId, string relativePath, string content)
+    public string GetAppSourceFrontendDirectoryPath(Guid userId, Guid appId)
     {
-        var appPath = GetAppPath(userId, appId);
-        var filePath = Path.Combine(appPath, relativePath);
+        return GetSourceFrontendPath(userId, appId);
+    }
 
-        // Security: validate file extension to prevent executable uploads
-        ValidateFileExtension(relativePath);
+    /// <summary>
+    /// Get the editable backend source path for an app.
+    /// </summary>
+    public string GetAppSourceBackendDirectoryPath(Guid userId, Guid appId)
+    {
+        return GetSourceBackendPath(userId, appId);
+    }
 
-        // Security: ensure the path is within the app directory
-        var fullPath = Path.GetFullPath(filePath);
-        var fullAppPath = Path.GetFullPath(appPath);
-        if (!fullPath.StartsWith(fullAppPath))
+    /// <summary>
+    /// Get the public frontend runtime path for an app.
+    /// </summary>
+    public string GetAppRuntimeFrontendDirectoryPath(Guid userId, Guid appId)
+    {
+        return GetRuntimeFrontendPath(userId, appId);
+    }
+
+    /// <summary>
+    /// Get the runner backend runtime path for an app.
+    /// </summary>
+    public string GetAppRuntimeBackendDirectoryPath(Guid userId, Guid appId)
+    {
+        return GetRuntimeBackendPath(userId, appId);
+    }
+
+    /// <summary>
+    /// Get the version snapshot file system path for an app.
+    /// </summary>
+    public string GetAppVersionDirectoryPath(Guid userId, Guid appId)
+    {
+        return GetVersionsPath(userId, appId);
+    }
+
+    /// <summary>
+    /// Returns true when the app has an editable source folder.
+    /// </summary>
+    public bool AppSourceExists(Guid userId, Guid appId)
+    {
+        return Directory.Exists(GetSourcePath(userId, appId));
+    }
+
+    /// <summary>
+    /// Returns true when the app has a deployed runtime folder.
+    /// </summary>
+    public bool AppRuntimeExists(Guid userId, Guid appId)
+    {
+        return Directory.Exists(GetRuntimePath(userId, appId));
+    }
+
+    /// <summary>
+    /// Copy editable source files from one app to another. Runtime and version files are intentionally excluded.
+    /// </summary>
+    public Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
+    {
+        var srcPath = GetSourcePath(srcUserId, srcAppId);
+        var dstPath = GetSourcePath(dstUserId, dstAppId);
+        return CopyDirectoryFilesAsync(srcPath, dstPath, "source files", srcAppId, srcUserId, dstAppId, dstUserId);
+    }
+
+    /// <summary>
+    /// Get all editable source files for an app.
+    /// </summary>
+    public Task<IEnumerable<string>> GetSourceFilesAsync(Guid userId, Guid appId)
+    {
+        return GetFilesAsync(GetSourcePath(userId, appId));
+    }
+
+    /// <summary>
+    /// Read an editable source file for an app.
+    /// </summary>
+    public Task<string?> ReadSourceFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileAsync(GetSourcePath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Write an editable source file for an app.
+    /// </summary>
+    public Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)
+    {
+        return WriteFileAsync(GetSourcePath(userId, appId), relativePath, content, validateExtension: true);
+    }
+
+    /// <summary>
+    /// Delete an editable source file for an app.
+    /// </summary>
+    public Task DeleteSourceFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return DeleteFileAsync(GetSourcePath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Get all deployed frontend runtime files for an app.
+    /// </summary>
+    public Task<IEnumerable<string>> GetRuntimeFilesAsync(Guid userId, Guid appId)
+    {
+        return GetFilesAsync(GetRuntimeFrontendPath(userId, appId));
+    }
+
+    /// <summary>
+    /// Read a deployed frontend runtime file for an app.
+    /// </summary>
+    public Task<string?> ReadRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Read a deployed frontend runtime file as bytes for public serving.
+    /// </summary>
+    public Task<byte[]?> ReadRuntimeFileBytesAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileBytesAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Write a deployed frontend runtime file for an app.
+    /// </summary>
+    public Task WriteRuntimeFileAsync(Guid userId, Guid appId, string relativePath, string content)
+    {
+        return WriteFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath, content, validateExtension: true);
+    }
+
+    /// <summary>
+    /// Delete a deployed frontend runtime file for an app.
+    /// </summary>
+    public Task DeleteRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return DeleteFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Remove all deployed frontend runtime files while preserving source, backend runtime, and versions.
+    /// </summary>
+    public Task ClearRuntimeAsync(Guid userId, Guid appId)
+    {
+        return ClearFrontendRuntimeAsync(userId, appId);
+    }
+
+    /// <summary>
+    /// Remove all deployed frontend runtime files while preserving source, backend runtime, and versions.
+    /// </summary>
+    public Task ClearFrontendRuntimeAsync(Guid userId, Guid appId)
+    {
+        var runtimePath = GetRuntimeFrontendPath(userId, appId);
+        if (Directory.Exists(runtimePath))
         {
-            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
+            Directory.Delete(runtimePath, recursive: true);
         }
 
-        // Ensure directory exists
-        var directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(directory))
+        Directory.CreateDirectory(runtimePath);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Rebuild the runner backend runtime package from editable source/backend files.
+    /// </summary>
+    public Task SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
+    {
+        var sourceBackendPath = GetSourceBackendPath(userId, appId);
+        var runtimeBackendPath = GetRuntimeBackendPath(userId, appId);
+
+        if (Directory.Exists(runtimeBackendPath))
         {
-            Directory.CreateDirectory(directory);
+            Directory.Delete(runtimeBackendPath, recursive: true);
         }
 
-        await File.WriteAllTextAsync(filePath, content);
+        Directory.CreateDirectory(runtimeBackendPath);
+
+        if (!Directory.Exists(sourceBackendPath))
+        {
+            logger.Information("No source/backend directory found for app {AppId}; runtime/backend left empty", appId);
+            return Task.CompletedTask;
+        }
+
+        foreach (var sourceFile in Directory.EnumerateFiles(sourceBackendPath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceBackendPath, sourceFile);
+            if (IsSensitiveAppFile(relativePath))
+                continue;
+
+            var targetFilePath = Path.Combine(runtimeBackendPath, relativePath);
+            var targetDirectory = Path.GetDirectoryName(targetFilePath);
+            if (!string.IsNullOrEmpty(targetDirectory))
+                Directory.CreateDirectory(targetDirectory);
+
+            File.Copy(sourceFile, targetFilePath, overwrite: true);
+        }
+
+        logger.Information("Synced source/backend to runtime/backend for app {AppId}", appId);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Remove all deployed backend runtime files while preserving source, frontend runtime, and versions.
+    /// </summary>
+    public Task ClearRuntimeBackendAsync(Guid userId, Guid appId)
+    {
+        var runtimePath = GetRuntimeBackendPath(userId, appId);
+        if (Directory.Exists(runtimePath))
+        {
+            Directory.Delete(runtimePath, recursive: true);
+        }
+
+        Directory.CreateDirectory(runtimePath);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -476,30 +608,6 @@ public class AppFileStorageService
         }
     }
 
-    /// <summary>
-    /// Delete a specific file from an app directory
-    /// </summary>
-    public async Task DeleteAppFileAsync(Guid userId, Guid appId, string relativePath)
-    {
-        var appPath = GetAppPath(userId, appId);
-        var filePath = Path.Combine(appPath, relativePath);
-        
-        // Security: ensure the path is within the app directory
-        var fullPath = Path.GetFullPath(filePath);
-        var fullAppPath = Path.GetFullPath(appPath);
-        if (!fullPath.StartsWith(fullAppPath))
-        {
-            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
-        }
-
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-        }
-
-        await Task.CompletedTask;
-    }
-
     private class AppMetadata
     {
         public int Version { get; set; }
@@ -510,9 +618,6 @@ public class AppFileStorageService
     }
 
     // ── Backend controller file helpers ──────────────────────────────────────
-
-    private const string BackendFolder = "backend";
-    private const string FrontendFolder = "frontend";
 
     /// <summary>
     /// Returns the file extension for a given script language (e.g. "Python" → ".py").
@@ -525,25 +630,26 @@ public class AppFileStorageService
     };
 
     /// <summary>
-    /// Reads the controller code from the app's backend/ folder.
-    /// File: AppData/apps/{userId}/{appId}/backend/{controllerName}{ext}
+    /// Reads the controller code from the app's source/backend/ folder.
+    /// File: AppData/apps/{userId}/{appId}/source/backend/{controllerName}{ext}
     /// </summary>
     public async Task<string?> ReadControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
     {
-        var appPath = GetAppPath(userId, appId);
+        var appPath = GetSourcePath(userId, appId);
+        var backendPath = GetSourceBackendPath(userId, appId);
         var ext = GetControllerExtension(language);
-        var filePath = Path.Combine(appPath, BackendFolder, controllerName + ext);
+        var filePath = Path.Combine(backendPath, controllerName + ext);
         if (!File.Exists(filePath)) return null;
         return await File.ReadAllTextAsync(filePath);
     }
 
     /// <summary>
-    /// Writes controller code to the app's backend/ folder.
+    /// Writes controller code to the app's source/backend/ folder.
     /// </summary>
     public async Task WriteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language, string code)
     {
-        var appPath = GetAppPath(userId, appId);
-        var backendPath = Path.Combine(appPath, BackendFolder);
+        var appPath = GetSourcePath(userId, appId);
+        var backendPath = GetSourceBackendPath(userId, appId);
         Directory.CreateDirectory(backendPath);
 
         var ext = GetControllerExtension(language);
@@ -562,19 +668,32 @@ public class AppFileStorageService
     /// </summary>
     public Task DeleteControllerCodeAsync(Guid userId, Guid appId, string controllerName, string language)
     {
-        var appPath = GetAppPath(userId, appId);
         var ext = GetControllerExtension(language);
-        var filePath = Path.Combine(appPath, BackendFolder, controllerName + ext);
+        var filePath = Path.Combine(GetSourceBackendPath(userId, appId), controllerName + ext);
         if (File.Exists(filePath)) File.Delete(filePath);
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Lists all controller script files in the app's backend/ folder.
+    /// Lists all controller script files in the app's source/backend/ folder.
     /// </summary>
     public async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesAsync(Guid userId, Guid appId)
     {
-        var backendPath = Path.Combine(GetAppPath(userId, appId), BackendFolder);
+        var backendPath = GetSourceBackendPath(userId, appId);
+        return await ListBackendFilesFromDirectoryAsync(backendPath);
+    }
+
+    /// <summary>
+    /// Lists all script files in the app's runtime/backend/ package.
+    /// </summary>
+    public async Task<IReadOnlyList<BackendScriptFile>> ListRuntimeBackendFilesAsync(Guid userId, Guid appId)
+    {
+        var backendPath = GetRuntimeBackendPath(userId, appId);
+        return await ListBackendFilesFromDirectoryAsync(backendPath);
+    }
+
+    private static async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesFromDirectoryAsync(string backendPath)
+    {
         if (!Directory.Exists(backendPath)) return [];
 
         var results = new List<BackendScriptFile>();
@@ -601,11 +720,11 @@ public class AppFileStorageService
     /// <summary>
     /// Finds a controller file by name (any supported extension) in the app's backend/ folder.
     /// Returns (code, language) or null if not found.
-    /// File: AppData/apps/{userId}/{appId}/backend/{controllerName}.{py|bat|...}
+    /// File: AppData/apps/{userId}/{appId}/source/backend/{controllerName}.{py|bat|...}
     /// </summary>
     public async Task<(string Code, string Language)?> FindControllerFileAsync(Guid userId, Guid appId, string controllerName)
     {
-        var backendPath = Path.Combine(GetAppPath(userId, appId), BackendFolder);
+        var backendPath = GetSourceBackendPath(userId, appId);
         if (!Directory.Exists(backendPath)) return null;
 
         foreach (var ext in new[] { ".py", ".bat", ".txt" })
@@ -627,4 +746,116 @@ public class AppFileStorageService
         ".bat" => "Batch",
         _      => "Text"
     };
+
+    private Task CopyDirectoryFilesAsync(
+        string srcPath,
+        string dstPath,
+        string copyKind,
+        Guid srcAppId,
+        Guid srcUserId,
+        Guid dstAppId,
+        Guid dstUserId)
+    {
+        Directory.CreateDirectory(dstPath);
+
+        if (!Directory.Exists(srcPath))
+        {
+            logger.Warning("Source app {CopyKind} directory not found when copying: {SrcPath}", copyKind, srcPath);
+            return Task.CompletedTask;
+        }
+
+        foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(srcPath, sourceFile);
+            if (IsSensitiveAppFile(relativePath))
+                continue;
+
+            var targetFilePath = Path.Combine(dstPath, relativePath);
+            var targetDirectory = Path.GetDirectoryName(targetFilePath);
+
+            if (!string.IsNullOrEmpty(targetDirectory))
+                Directory.CreateDirectory(targetDirectory);
+
+            File.Copy(sourceFile, targetFilePath, overwrite: true);
+        }
+
+        logger.Information("Copied app {CopyKind} from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
+            copyKind, srcAppId, srcUserId, dstAppId, dstUserId);
+
+        return Task.CompletedTask;
+    }
+
+    private static Task<IEnumerable<string>> GetFilesAsync(string rootPath)
+    {
+        if (!Directory.Exists(rootPath))
+        {
+            return Task.FromResult(Enumerable.Empty<string>());
+        }
+
+        var files = Directory.GetFiles(rootPath, "*.*", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith("_metadata.json"))
+            .Select(f => Path.GetRelativePath(rootPath, f))
+            .ToList()
+            .AsEnumerable();
+
+        return Task.FromResult(files);
+    }
+
+    private static async Task<string?> ReadFileAsync(string rootPath, string relativePath)
+    {
+        var filePath = ResolveSafePath(rootPath, relativePath);
+        return File.Exists(filePath)
+            ? await File.ReadAllTextAsync(filePath)
+            : null;
+    }
+
+    private static async Task<byte[]?> ReadFileBytesAsync(string rootPath, string relativePath)
+    {
+        var filePath = ResolveSafePath(rootPath, relativePath);
+        return File.Exists(filePath)
+            ? await File.ReadAllBytesAsync(filePath)
+            : null;
+    }
+
+    private static async Task WriteFileAsync(string rootPath, string relativePath, string content, bool validateExtension)
+    {
+        if (validateExtension)
+        {
+            ValidateFileExtension(relativePath);
+        }
+
+        var filePath = ResolveSafePath(rootPath, relativePath);
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await File.WriteAllTextAsync(filePath, content);
+    }
+
+    private static Task DeleteFileAsync(string rootPath, string relativePath)
+    {
+        var filePath = ResolveSafePath(rootPath, relativePath);
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string ResolveSafePath(string rootPath, string relativePath)
+    {
+        var filePath = Path.Combine(rootPath, relativePath);
+        var fullPath = Path.GetFullPath(filePath);
+        var fullRootPath = Path.GetFullPath(rootPath);
+        if (!fullPath.StartsWith(fullRootPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fullPath, fullRootPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
+        }
+
+        return fullPath;
+    }
 }

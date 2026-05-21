@@ -58,9 +58,9 @@ The app must already be published for it to appear in the gallery.
 
 ### File Copying
 
-App files are stored at `AppData/apps/{userId}/{appId}/`.
+App files are stored under separate source/runtime surfaces at `AppData/apps/{userId}/{appId}/`.
 
-`AppFileStorageService.CopyAppFilesAsync(srcUserId, srcAppId, dstUserId, dstAppId)` copies all root-level files to the destination directory. Version snapshots (stored under `/versions/`) are intentionally excluded so the fork starts clean without inheriting version history.
+`AppFileStorageService.CopyAppFilesAsync(srcUserId, srcAppId, dstUserId, dstAppId)` copies the app `source/` tree to the destination app. Runtime artifacts are not copied. Version snapshots are intentionally excluded so the fork starts clean without inheriting version history.
 
 ### Duplicate vs Fork
 

@@ -8,7 +8,7 @@ namespace Automaton.Cli.Commands;
 /// <summary>
 /// automaton pull [--dir &lt;target&gt;]
 ///
-/// Downloads all server-side app files to the local project directory.
+/// Downloads editable server-side app source files to the local project directory.
 /// Existing local files are overwritten.
 /// </summary>
 public static class PullCommand
@@ -19,7 +19,7 @@ public static class PullCommand
             ["--dir", "-d"],
             "Target directory (defaults to current directory)");
 
-        var cmd = new Command("pull", "Download all app files from the server to the local directory")
+        var cmd = new Command("pull", "Download editable app source files from the server to the local directory")
         {
             dirOption
         };

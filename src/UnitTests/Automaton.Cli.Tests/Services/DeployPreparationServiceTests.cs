@@ -112,7 +112,9 @@ public class DeployPreparationServiceTests
     {
         var path = Path.Combine(Path.GetTempPath(), "automaton-cli-deployprep-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
-        File.WriteAllText(Path.Combine(path, "index.html"), "<html><body>ok</body></html>");
+        var frontendDist = Path.Combine(path, "frontend", "dist");
+        Directory.CreateDirectory(frontendDist);
+        File.WriteAllText(Path.Combine(frontendDist, "index.html"), "<html><body>ok</body></html>");
         if (withBackend)
         {
             Directory.CreateDirectory(Path.Combine(path, "backend"));
@@ -129,7 +131,15 @@ public class DeployPreparationServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
         });
         config.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         return config;

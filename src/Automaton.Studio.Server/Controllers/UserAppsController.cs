@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Text;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -109,40 +108,28 @@ public class UserAppsController : ControllerBase
                 return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
             }
 
-            // Normalize path
-            if (string.IsNullOrEmpty(path)) path = "index.html";
+            path = string.IsNullOrEmpty(path) ? "index.html" : path;
 
-            // Read the file — priority: dist/ (Vite/webpack builds) → frontend/ (AI-generated) → root (legacy)
-            var content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "dist/" + path)
-                       ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "frontend/" + path)
-                       ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, path);
-
-            if (content == null)
+            // Extensionless public app routes are SPA/document routes, not file paths.
+            var runtimePath = Path.GetExtension(path).Length == 0 ? "index.html" : path;
+            if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(runtimePath))
             {
-                // If requesting a path with no extension, also try index.html inside that directory
-                if (!path.Contains('.'))
-                {
-                    var subPath = path.TrimEnd('/') + "/index.html";
-                    content = await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "dist/" + subPath)
-                           ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, "frontend/" + subPath)
-                           ?? await fileStorageService.ReadAppFileAsync(ownerId.Value, app.Id, subPath);
-                }
-
-                if (content == null)
-                {
-                    return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
-                }
+                return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
             }
 
-            // Determine content type
-            var contentType = GetContentType(path);
+            var content = await fileStorageService.ReadRuntimeFileBytesAsync(ownerId.Value, app.Id, runtimePath);
+            if (content == null)
+            {
+                return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+            }
+
+            var contentType = WebAppRuntimeFilePolicy.GetContentType(runtimePath);
 
             // Smart caching: HTML always revalidates, fingerprinted assets can be immutable,
             // plain app assets stay fresh without forcing users to add manual cache busting.
-            WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, path, webAppConfig);
+            WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, runtimePath, webAppConfig);
 
-            // Return with appropriate content type
-            return Content(content, contentType, Encoding.UTF8);
+            return File(content, contentType);
         }
         catch (UnauthorizedAccessException)
         {
@@ -154,37 +141,6 @@ public class UserAppsController : ControllerBase
             logger.LogError(ex, "Error serving app file: {Slug}/{Path}", slug, path);
             return StatusCode(500, GetErrorPage("Error", "An error occurred while loading this app."));
         }
-    }
-
-    /// <summary>
-    /// Get the MIME content type for a file based on extension
-    /// </summary>
-    private static string GetContentType(string path)
-    {
-        var extension = Path.GetExtension(path).ToLowerInvariant();
-        return extension switch
-        {
-            ".html" or ".htm" => "text/html",
-            ".css" => "text/css",
-            ".js" or ".mjs" => "application/javascript",
-            ".json" => "application/json",
-            ".xml" => "application/xml",
-            ".txt" => "text/plain",
-            ".md" => "text/markdown",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".svg" => "image/svg+xml",
-            ".webp" => "image/webp",
-            ".ico" => "image/x-icon",
-            ".woff" => "font/woff",
-            ".woff2" => "font/woff2",
-            ".ttf" => "font/ttf",
-            ".eot" => "application/vnd.ms-fontobject",
-            ".otf" => "font/otf",
-            ".map" => "application/json",
-            _ => "application/octet-stream"
-        };
     }
 
     /// <summary>

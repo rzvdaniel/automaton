@@ -47,9 +47,14 @@ public class DeployServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
-        WriteIndexHtml(projectRoot);
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = string.Empty });
+        WriteFrontendIndexHtml(projectRoot);
 
         var buildInvoked = false;
         var service = new DeployService(
@@ -77,10 +82,14 @@ public class DeployServiceTests
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
             Server = "https://api.example.com",
-            Build = "npm run build"
+            Frontend = new FrontendConfig
+            {
+                Build = "cd frontend && npm run build",
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new DeployService(
             configService,
@@ -102,10 +111,18 @@ public class DeployServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
         Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
         File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
@@ -113,6 +130,7 @@ public class DeployServiceTests
             configService,
             (_, _, _) => Task.FromResult(0),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.2)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)),
             (_, _, _, _) => Task.FromResult(new DeployBackendResult(false, 0, "No runner assigned")));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
@@ -133,15 +151,20 @@ public class DeployServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 1, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
             (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
@@ -160,10 +183,14 @@ public class DeployServiceTests
         {
             AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
-        WriteIndexHtml(projectRoot);
+        WriteFrontendIndexHtml(projectRoot);
 
         var service = new DeployService(
             configService,
@@ -173,6 +200,7 @@ public class DeployServiceTests
                 await zip.DisposeAsync();
                 return new DeployUploadResult(2, 0, 0);
             },
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
             (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
@@ -197,8 +225,10 @@ public class DeployServiceTests
         return path;
     }
 
-    private static void WriteIndexHtml(string projectRoot)
+    private static void WriteFrontendIndexHtml(string projectRoot)
     {
-        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "<html><body>ok</body></html>");
+        var frontendDist = Path.Combine(projectRoot, "frontend", "dist");
+        Directory.CreateDirectory(frontendDist);
+        File.WriteAllText(Path.Combine(frontendDist, "index.html"), "<html><body>ok</body></html>");
     }
 }

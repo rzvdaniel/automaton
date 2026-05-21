@@ -50,10 +50,10 @@ public static class StatusCommand
                 using var client = new AutomatonApiClient(server!, apiKey!);
                 var app = await client.GetAppAsync(appConfig.AppId);
 
-                var deployDirectory = ZipService.ResolveDeployDirectory(cwd, appConfig.DeployDir);
-                var backendScripts = Directory.Exists(Path.Combine(cwd, "backend"))
-                    ? Directory.GetFiles(Path.Combine(cwd, "backend"), "*.py", SearchOption.AllDirectories).Length
-                    : 0;
+                var deployDirectory = !string.IsNullOrWhiteSpace(appConfig.Frontend?.DeployDir)
+                    ? ZipService.ResolveDeployDirectory(cwd, appConfig.Frontend.DeployDir)
+                    : null;
+                var backendScripts = ResolveBackendScriptCount(cwd, appConfig.Backend?.DeployDir);
 
                 var executionRunnerId = app.TryGetProperty("executionRunnerId", out var runnerProperty)
                     && runnerProperty.ValueKind == JsonValueKind.String
@@ -80,9 +80,10 @@ public static class StatusCommand
                             appId = appConfig.AppId,
                             name = appConfig.Name,
                             server,
-                            build = appConfig.Build,
-                            deployDir = appConfig.DeployDir,
+                            build = appConfig.Frontend?.Build,
+                            deployDir = appConfig.Frontend?.DeployDir,
                             resolvedDeployDir = deployDirectory,
+                            backendDeployDir = appConfig.Backend?.DeployDir,
                             backendScripts
                         },
                         remote = new
@@ -102,8 +103,9 @@ public static class StatusCommand
                 table.AddColumn("Value");
                 table.AddRow("app", $"{appConfig.Name} ({appConfig.AppId})");
                 table.AddRow("server", server);
-                table.AddRow("build", string.IsNullOrWhiteSpace(appConfig.Build) ? "-" : appConfig.Build);
-                table.AddRow("deploy dir", Path.GetRelativePath(cwd, deployDirectory));
+                table.AddRow("build", string.IsNullOrWhiteSpace(appConfig.Frontend?.Build) ? "-" : appConfig.Frontend.Build);
+                table.AddRow("frontend deploy dir", deployDirectory == null ? "-" : Path.GetRelativePath(cwd, deployDirectory));
+                table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
                 table.AddRow("backend scripts", backendScripts.ToString());
                 table.AddRow("runner", string.IsNullOrWhiteSpace(executionRunnerId) ? "-" : executionRunnerId);
                 table.AddRow("published", isPublished ? "yes" : "no");
@@ -128,5 +130,16 @@ public static class StatusCommand
         }, jsonOption);
 
         return cmd;
+    }
+
+    private static int ResolveBackendScriptCount(string cwd, string? backendDeployDir)
+    {
+        if (string.IsNullOrWhiteSpace(backendDeployDir))
+            return 0;
+
+        var backendDirectory = Path.Combine(cwd, backendDeployDir);
+        return Directory.Exists(backendDirectory)
+            ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
+            : 0;
     }
 }

@@ -50,7 +50,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared t
 
 ## FILE STRUCTURE:
 ```
-├─ frontend/            # ALL static UI files live here
+├─ frontend/
 │  ├─ index.html        # Entry point (REQUIRED)
 │  ├─ styles/
 │  │  └─ main.css       # All styles
@@ -61,7 +61,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared t
    └─ controller.py     # (optional) Python controller
 ```
 
-**Important:** All HTML, CSS, and JS files MUST be placed inside `frontend/`. Never write them to the root.
+**Important:** In Studio source, frontend files live under `frontend/`; backend files live under `backend/`.
 
 ## TOOL SEQUENCE:
 
@@ -105,5 +105,3 @@ def handle(action_name: str, inputs: dict) -> dict:
 2. Modifications: read once (or search), then change
 3. Multi-file structure always; ES6+; separate CSS; Tailwind; loading/error/empty states
 4. Vanilla JS by default; jQuery only if genuinely needed
-
-

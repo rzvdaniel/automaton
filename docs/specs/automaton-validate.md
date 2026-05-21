@@ -66,14 +66,14 @@ Failure examples:
 
 Checks:
 
-- deploy root exists
-- `index.html` exists for root-deployed apps
-- if `deployDir` is configured, that directory exists after build or in the current workspace
-- if `build` is configured, the command string is present and non-empty
+- `frontend.deployDir` is present for build-based frontend apps
+- the resolved frontend deploy directory exists
+- `index.html` exists in the resolved frontend deploy directory
+- if `frontend.build` is configured, the command string is present and non-empty
 
 Failure examples:
 
-- configured `deployDir` does not exist
+- configured `frontend.deployDir` does not exist
 - no deployable frontend entry file found
 
 ### 3. Backend presence and runner requirement
@@ -218,7 +218,7 @@ This command is complete for the first release when:
 
 ## Open Questions
 
-1. Should `automaton validate` ever run the configured build command, or only validate static preconditions?
+1. Should `automaton validate` ever run `frontend.build`, or only validate static preconditions?
 2. Should the command fail when `.automatonignore` is missing, or only warn?
 3. Should remote app checks happen only after all local checks pass, or always run when possible?
 4. How stable does the JSON contract need to be in the first version for agent use?

@@ -119,11 +119,11 @@ public class AppPreviewController : ControllerBase
             if (content == null)
             {
                 var filePath = string.IsNullOrEmpty(path) || path == "/" ? "index.html" : path.TrimStart('/');
-                content = await fileStorage.ReadAppFileAsync(effectiveUserId, appId, filePath);
+                content = await fileStorage.ReadSourceFileAsync(effectiveUserId, appId, ToSourceFrontendPath(filePath));
 
                 if (content == null && effectiveUserId != userId)
                 {
-                    content = await fileStorage.ReadAppFileAsync(userId, appId, filePath);
+                    content = await fileStorage.ReadSourceFileAsync(userId, appId, ToSourceFrontendPath(filePath));
                 }
             }
 
@@ -235,5 +235,13 @@ public class AppPreviewController : ControllerBase
     {
         public required string Html { get; set; }
         public Dictionary<string, string>? Files { get; set; }
+    }
+
+    private static string ToSourceFrontendPath(string path)
+    {
+        var normalized = path.Replace('\\', '/').TrimStart('/');
+        return normalized.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase)
+            ? normalized
+            : $"frontend/{normalized}";
     }
 }

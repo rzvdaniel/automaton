@@ -9,17 +9,20 @@ public sealed class DeployService
     private readonly ConfigService _config;
     private readonly Func<string, string, CancellationToken, Task<int>> _runBuildAsync;
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadAsync;
+    private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadBackendAsync;
     private readonly Func<string, string, string, CancellationToken, Task<DeployBackendResult>> _deployBackendAsync;
 
     public DeployService(
         ConfigService config,
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
         Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
     {
         _config = config;
         _runBuildAsync = runBuildAsync ?? RunBuildAsync;
         _uploadAsync = uploadAsync ?? UploadAsync;
+        _uploadBackendAsync = uploadBackendAsync ?? UploadBackendAsync;
         _deployBackendAsync = deployBackendAsync ?? DeployBackendAsync;
     }
 
@@ -51,7 +54,7 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, directoryOverride, uploadResult, backendResult);
         }
 
-        var buildCheck = await RunBuildIfNeededAsync(projectConfig.Build, directory, nextSteps, cancellationToken);
+        var buildCheck = await RunBuildIfNeededAsync(projectConfig.Frontend?.Build, directory, nextSteps, cancellationToken);
         checks.Add(buildCheck);
 
         if (!buildCheck.Success)
@@ -59,7 +62,7 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, directoryOverride, uploadResult, backendResult);
         }
 
-        var packageCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.DeployDir, nextSteps, out var deployDirectory);
+        var packageCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, nextSteps, out var deployDirectory);
         checks.Add(packageCheck);
 
         if (!packageCheck.Success || deployDirectory == null)
@@ -83,7 +86,8 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, uploadResult, backendResult);
         }
 
-        var backendControllers = CountBackendControllers(directory);
+        var backendPackageCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
+        checks.Add(backendPackageCheck);
 
         if (skipBackend)
         {
@@ -92,11 +96,32 @@ public sealed class DeployService
             return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, uploadResult, backendResult);
         }
 
-        if (backendControllers == 0)
+        if (!backendPackageCheck.Success)
+        {
+            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+        }
+
+        if (backendControllers == 0 || backendDirectory == null)
         {
             backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
             checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, true, backendResult.Message ?? "no backend controllers found"));
             return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+        }
+
+        try
+        {
+            using var backendZip = ZipService.CreateZip(directory, backendDirectory);
+            var backendUpload = await _uploadBackendAsync(server, apiKey, projectConfig.AppId, backendZip, true, cancellationToken);
+            checks.Add(new DeployCheckResult(
+                DeployCheckNames.BackendPackage,
+                true,
+                $"uploaded {backendUpload.Written} backend file(s), {backendUpload.Skipped} skipped ({backendUpload.SizeMb:F1} MB)"));
+        }
+        catch (Exception ex)
+        {
+            nextSteps.Add("Verify backend.deployDir in automaton.json and rerun automaton deploy");
+            checks.Add(new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message));
+            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, uploadResult, backendResult);
         }
 
         try
@@ -200,7 +225,7 @@ public sealed class DeployService
         }
         catch (Exception ex)
         {
-            nextSteps.Add("Fix deployDir in automaton.json or pass --dir with a valid directory");
+            nextSteps.Add("Fix frontend.deployDir in automaton.json or pass --dir with a valid directory");
             resolvedDeployDirectory = null;
             return new DeployCheckResult(DeployCheckNames.FrontendPackage, false, ex.Message);
         }
@@ -221,12 +246,55 @@ public sealed class DeployService
             $"deploy directory ready: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
     }
 
-    private static int CountBackendControllers(string directory)
+    private static DeployCheckResult ValidateBackendPackage(
+        string directory,
+        string? deployDir,
+        ISet<string> nextSteps,
+        out string? resolvedBackendDirectory,
+        out int backendControllers)
     {
-        var backendDirectory = Path.Combine(directory, "backend");
-        return Directory.Exists(backendDirectory)
-            ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
-            : 0;
+        resolvedBackendDirectory = null;
+        backendControllers = 0;
+
+        var conventionalBackendDirectory = Path.Combine(directory, "backend");
+        if (string.IsNullOrWhiteSpace(deployDir))
+        {
+            if (Directory.Exists(conventionalBackendDirectory)
+                && Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length > 0)
+            {
+                nextSteps.Add("Add backend.deployDir to automaton.json, usually 'backend'");
+                return new DeployCheckResult(
+                    DeployCheckNames.BackendPackage,
+                    false,
+                    "backend controllers were found, but backend.deployDir is missing from automaton.json");
+            }
+
+            return new DeployCheckResult(DeployCheckNames.BackendPackage, true, "no backend deploy configured");
+        }
+
+        try
+        {
+            resolvedBackendDirectory = ZipService.ResolveDeployDirectory(directory, deployDir);
+        }
+        catch (Exception ex)
+        {
+            nextSteps.Add("Fix backend.deployDir in automaton.json");
+            return new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message);
+        }
+
+        backendControllers = Directory.GetFiles(resolvedBackendDirectory, "*.py", SearchOption.AllDirectories).Length;
+        if (backendControllers == 0)
+        {
+            return new DeployCheckResult(
+                DeployCheckNames.BackendPackage,
+                true,
+                $"backend directory ready but no Python controllers were found: {Path.GetRelativePath(directory, resolvedBackendDirectory)}");
+        }
+
+        return new DeployCheckResult(
+            DeployCheckNames.BackendPackage,
+            true,
+            $"backend directory ready: {Path.GetRelativePath(directory, resolvedBackendDirectory)}");
     }
 
     private static DeployResult CreateResult(
@@ -284,6 +352,27 @@ public sealed class DeployService
         var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
         var uploadResult = await client.UploadZipAsync(appId, zip, clean, cancellationToken);
+        var written = uploadResult.TryGetProperty("written", out var writtenProperty)
+            ? writtenProperty.GetArrayLength()
+            : 0;
+        var skipped = uploadResult.TryGetProperty("skipped", out var skippedProperty)
+            ? skippedProperty.GetArrayLength()
+            : 0;
+
+        return new DeployUploadResult(written, skipped, sizeMb);
+    }
+
+    private static async Task<DeployUploadResult> UploadBackendAsync(
+        string server,
+        string apiKey,
+        string appId,
+        Stream zip,
+        bool clean,
+        CancellationToken cancellationToken)
+    {
+        var sizeMb = zip.Length / 1_048_576.0;
+        using var client = new AutomatonApiClient(server, apiKey);
+        var uploadResult = await client.UploadBackendZipAsync(appId, zip, clean, cancellationToken);
         var written = uploadResult.TryGetProperty("written", out var writtenProperty)
             ? writtenProperty.GetArrayLength()
             : 0;

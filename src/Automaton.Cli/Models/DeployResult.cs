@@ -10,6 +10,7 @@ public static class DeployCheckNames
     public const string RunnerLookup = "runnerLookup";
     public const string RunnerAssignment = "runnerAssignment";
     public const string Upload = "upload";
+    public const string BackendPackage = "backendPackage";
     public const string BackendDeploy = "backendDeploy";
 }
 

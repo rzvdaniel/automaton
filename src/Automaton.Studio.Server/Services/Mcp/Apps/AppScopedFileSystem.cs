@@ -5,14 +5,12 @@ namespace Automaton.Studio.Server.Services.Mcp.Apps;
 /// <summary>
 /// App-scoped file system: extends <see cref="LocalScopedFileSystem"/> with app-specific guards.
 /// - Extension whitelist (prevents uploading executable scripts)
-/// - index.html deletion protection
-/// - Hides internal files (_metadata.json, versions/) from listings
+/// - frontend/index.html deletion protection
+/// - Works inside the app source/ folder only; runtime files are not editable through MCP tools
 /// </summary>
 public class AppScopedFileSystem : LocalScopedFileSystem
 {
     private const string MainAppFile = "frontend/index.html";
-    private const string MainAppFileDist = "dist/index.html";
-    private const string MainAppFileLegacy = "index.html";
 
     public AppScopedFileSystem(string appRootPath) : base(appRootPath) { }
 
@@ -38,10 +36,8 @@ public class AppScopedFileSystem : LocalScopedFileSystem
     public override Task DeleteFileAsync(string relativePath)
     {
         var normalized = relativePath.Replace('\\', '/').TrimStart('/');
-        if (normalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
-            normalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
-            normalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Cannot delete index.html — it is the main app file.");
+        if (normalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot delete frontend/index.html — it is the main app file.");
 
         return base.DeleteFileAsync(relativePath);
     }
@@ -50,16 +46,10 @@ public class AppScopedFileSystem : LocalScopedFileSystem
     {
         var fromNormalized = fromRelativePath.Replace('\\', '/').TrimStart('/');
         var toNormalized   = toRelativePath.Replace('\\', '/').TrimStart('/');
-        if (fromNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
-            fromNormalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
-            fromNormalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Cannot rename index.html — it is the main app file.");
-        if (toNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase) ||
-            toNormalized.Equals(MainAppFileDist, StringComparison.OrdinalIgnoreCase) ||
-            toNormalized.Equals(MainAppFileLegacy, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Cannot replace index.html via rename. Edit index.html directly instead.");
-        if (IsInternalVersionsPath(fromRelativePath) || IsInternalVersionsPath(toRelativePath))
-            throw new InvalidOperationException("Cannot rename files inside internal versions storage.");
+        if (fromNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot rename frontend/index.html — it is the main app file.");
+        if (toNormalized.Equals(MainAppFile, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot replace frontend/index.html via rename. Edit frontend/index.html directly instead.");
 
         AppFileStorageService.ValidateFileExtensionPublic(toRelativePath);
         return base.RenameFileAsync(fromRelativePath, toRelativePath, overwrite);
@@ -67,17 +57,11 @@ public class AppScopedFileSystem : LocalScopedFileSystem
 
     public override Task RenameFolderAsync(string fromRelativePath, string toRelativePath)
     {
-        if (IsInternalVersionsPath(fromRelativePath) || IsInternalVersionsPath(toRelativePath))
-            throw new InvalidOperationException("Cannot rename folders inside internal versions storage.");
-
         return base.RenameFolderAsync(fromRelativePath, toRelativePath);
     }
 
     public override Task DeleteFolderAsync(string relativePath)
     {
-        if (IsInternalVersionsPath(relativePath))
-            throw new InvalidOperationException("Cannot delete the internal versions storage folder.");
-
         return base.DeleteFolderAsync(relativePath);
     }
 
@@ -86,22 +70,10 @@ public class AppScopedFileSystem : LocalScopedFileSystem
         if (!Directory.Exists(RootPath))
             return Task.FromResult(Enumerable.Empty<string>());
 
-        var versionsPath = Path.GetFullPath(Path.Combine(RootPath, "versions"));
-
         var files = Directory
             .GetFiles(RootPath, "*.*", SearchOption.AllDirectories)
-            .Where(f => !f.EndsWith("_metadata.json", StringComparison.OrdinalIgnoreCase))
-            .Where(f => !Path.GetFullPath(f).StartsWith(versionsPath, StringComparison.OrdinalIgnoreCase))
             .Select(f => Path.GetRelativePath(RootPath, f).Replace('\\', '/'));
 
         return Task.FromResult(files);
     }
-
-    private static bool IsInternalVersionsPath(string relativePath)
-    {
-        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
-        return normalized.Equals("versions", StringComparison.OrdinalIgnoreCase) ||
-               normalized.StartsWith("versions/", StringComparison.OrdinalIgnoreCase);
-    }
 }
-

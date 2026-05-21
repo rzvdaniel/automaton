@@ -83,12 +83,12 @@ public class GitHubService
             // Create tree items for all files
             var treeItems = new List<NewTreeItem>();
 
-            // Get all files from the file system
-            var appFiles = await fileStorageService.GetAppFilesAsync(ownerId, app.Id);
+            // Get editable source files from the file system.
+            var appFiles = await fileStorageService.GetSourceFilesAsync(ownerId, app.Id);
             
             foreach (var file in appFiles)
             {
-                var content = await fileStorageService.ReadAppFileAsync(ownerId, app.Id, file);
+                var content = await fileStorageService.ReadSourceFileAsync(ownerId, app.Id, file);
                 if (content != null)
                 {
                     AddFileToTree(treeItems, $"{basePath}/{file}", content);
@@ -160,8 +160,8 @@ public class GitHubService
                 var content = await GetFileContentAsync(client, owner, repoName, item.Path, branch);
                 var relativePath = item.Path.Substring(basePath.Length).TrimStart('/');
                 
-                // Write file to app directory
-                await fileStorageService.WriteAppFileAsync(ownerId, appId, relativePath, content);
+                // Write file to editable source.
+                await fileStorageService.WriteSourceFileAsync(ownerId, appId, relativePath, content);
 
                 // Store index.html content in HtmlContent for editing in UI
                 if (item.Name == "index.html")

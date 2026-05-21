@@ -292,6 +292,13 @@ Provisioning intentionally lives in the API control plane rather than a separate
 Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.
 
 **Key Concepts:**
+- Source and runtime are separate, and each has frontend/backend surfaces: `source/frontend/` is editable frontend source, `source/backend/` is editable Python backend source, `runtime/frontend/` is public static output, and `runtime/backend/` is runner-only backend output.
+- `automaton deploy` writes frontend deploy output to `runtime/frontend/` and backend deploy output to `runtime/backend/`; public serving never reads source files or backend runtime files.
+- Studio editing, GitHub sync, version snapshots, MCP app tools, archive import/export, and marketplace fork use `source/`.
+- Fork copies `source/` only, never `runtime/`.
+- AI-generated local apps should default to Vite + vanilla TypeScript or JavaScript in `frontend/`, with a required frontend build pipeline that outputs to `frontend/dist/`.
+- Fork is available only when source exists and the app is explicitly forkable; runtime files, secrets, logs, and deployment artifacts are never copied.
+- Public runtime serving uses a safe web-file allowlist and returns `404` for unknown or sensitive extensions.
 - Visual app editor (Monaco) with live preview and sandboxed iframe
 - Runner selection for executions triggered from the app
 - PWA settings (manifest, theme colors, icons)
@@ -299,6 +306,7 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Marketplace media metadata: thumbnail plus developer-managed screenshot gallery
 - Uploaded marketplace media must live under `AppData/media/...` so Docker volume mounts preserve thumbnails and screenshots across API redeploys; do not write runtime uploads into `wwwroot`
 - Backend Server tab in the app editor proxies to the selected connected runner and shows the runner's deployed `{RUNNER_SCRIPTS_DIR}/{appId}/backend` files. It supports read-only text preview and deletion of runner-side files without touching Studio source files.
+- Plain root HTML/CSS/JS remains supported only when the user explicitly requests a no-build static app, for example a static template or direct plain-HTML request. It is not the default for generated apps.
 
 **Publishing & Access:**
 - Draft vs. Published states
