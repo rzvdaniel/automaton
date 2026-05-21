@@ -37,6 +37,7 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import type { PublishAppRequest } from '../types/apps.types'
+import { AppFileSystemScope } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { AppChatStats, ChatSession, ChatMessage } from '@/shared/types/ai.types'
@@ -412,7 +413,11 @@ async function handleTokenRequest(event: MessageEvent) {
 function isTokenExpired(token: string): boolean {
   if (!token) return true
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    const encodedPayload = token.split('.')[1]
+    if (!encodedPayload) {
+      return true
+    }
+    const payload = JSON.parse(atob(encodedPayload))
     // Treat token as expired if it expires within the next 30 seconds
     return payload.exp * 1000 < Date.now() + 30_000
   } catch {
@@ -513,6 +518,10 @@ function handleBack() {
   } else {
     router.push('/apps')
   }
+}
+
+async function handleFileScopeChange(scope: (typeof AppFileSystemScope)[keyof typeof AppFileSystemScope]) {
+  await editorStore.setFileScope(scope)
 }
 
 // Handle save all
@@ -1206,7 +1215,34 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 <!-- Left Panel: File Tree -->
                 <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
                   <div class="file-panel">
+                    <div class="file-scope-tabs">
+                      <button
+                        class="file-scope-tab"
+                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Source }"
+                        @click="handleFileScopeChange(AppFileSystemScope.Source)"
+                      >
+                        Source
+                      </button>
+                      <button
+                        class="file-scope-tab"
+                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Runtime }"
+                        @click="handleFileScopeChange(AppFileSystemScope.Runtime)"
+                      >
+                        Runtime
+                      </button>
+                      <button
+                        class="file-scope-tab"
+                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Versions }"
+                        @click="handleFileScopeChange(AppFileSystemScope.Versions)"
+                      >
+                        Versions
+                      </button>
+                    </div>
                     <FileTree
+                      :title="editorStore.currentFileScope"
+                      :show-create="editorStore.currentScopeEditable"
+                      :allow-delete="editorStore.currentScopeEditable"
+                      :empty-message="editorStore.currentFileScope === AppFileSystemScope.Source ? 'No source files yet' : editorStore.currentFileScope === AppFileSystemScope.Runtime ? 'No runtime files yet' : 'No version files yet'"
                       @create-file="showCreateFileDialog = true"
                       @delete-file="handleDeleteFile"
                     />
@@ -1247,12 +1283,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                         v-if="editorStore.activeFilePath"
                         :key="editorStore.activeFilePath"
                         :file-path="editorStore.activeFilePath"
+                        :read-only="editorStore.activeFile?.isReadOnly"
                         @save="handleSaveFile"
                       />
                       <div v-else class="no-file-selected">
                         <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
                         <p>Select a file to edit</p>
                         <Button
+                          v-if="editorStore.currentScopeEditable"
                           label="Create File"
                           icon="pi pi-plus"
                           size="small"
@@ -1643,6 +1681,35 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   border-right: 1px solid var(--p-surface-200);
 }
 
+.file-scope-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--p-surface-200);
+  flex-shrink: 0;
+}
+
+.file-scope-tab {
+  border: none;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--p-border-radius);
+  cursor: pointer;
+}
+
+.file-scope-tab:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.file-scope-tab.active {
+  background: var(--p-primary-100);
+  color: var(--p-primary-600);
+}
+
 .editor-panel {
   width: 100%;
   height: 100%;
@@ -1733,6 +1800,19 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 :global(.app-dark) .file-panel {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .file-scope-tabs {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .file-scope-tab:hover {
+  background: var(--p-surface-700);
+}
+
+:global(.app-dark) .file-scope-tab.active {
+  background: var(--p-primary-900);
+  color: var(--p-primary-300);
 }
 
 :global(.app-dark) .editor-tabs-container {

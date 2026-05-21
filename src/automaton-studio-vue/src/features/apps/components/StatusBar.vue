@@ -50,7 +50,9 @@ const statusText = computed(() => {
   if (!currentFile.value) {
     return 'No file selected'
   }
-  return `${currentFile.value.path} • ${fileType.value} • ${fileSize.value}`
+  const scope = currentFile.value.scope ? `${currentFile.value.scope} • ` : ''
+  const mode = currentFile.value.isReadOnly ? 'read-only • ' : ''
+  return `${scope}${mode}${currentFile.value.path} • ${fileType.value} • ${fileSize.value}`
 })
 </script>
 

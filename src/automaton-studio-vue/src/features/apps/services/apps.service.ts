@@ -11,6 +11,9 @@ import type {
   ExportAppResponse,
   LinkedStepInfo,
   AppFile,
+  AppFileSystemScope,
+  ScopedFileContentResponse,
+  ScopedFilesResponse,
   FileNode,
   CreateAppStepRequest,
   RunnerBackendFileContent,
@@ -338,6 +341,13 @@ class AppsService {
     return data
   }
 
+  async getScopedFiles(id: string, scope: AppFileSystemScope): Promise<ScopedFilesResponse> {
+    const { data } = await apiClient.get<ScopedFilesResponse>(`/api/apps/${id}/filesystem`, {
+      params: { scope },
+    })
+    return data
+  }
+
   /**
    * Read a file content
    * GET /api/apps/{id}/files/{path}
@@ -345,6 +355,18 @@ class AppsService {
   async readFile(id: string, path: string): Promise<{ success: boolean; content: string }> {
     const { data } = await apiClient.get<{ success: boolean; content: string }>(
       `/api/apps/${id}/files/${path}`,
+    )
+    return data
+  }
+
+  async readScopedFile(
+    id: string,
+    scope: AppFileSystemScope,
+    path: string,
+  ): Promise<ScopedFileContentResponse> {
+    const encodedPath = this.encodePath(path)
+    const { data } = await apiClient.get<ScopedFileContentResponse>(
+      `/api/apps/${id}/filesystem/${scope}/${encodedPath}`,
     )
     return data
   }
@@ -456,6 +478,17 @@ class AppsService {
     const response = await this.getFiles(id)
     if (response.success && response.files) {
       // The API returns file paths as strings
+      const filePaths = response.files
+        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
+        .filter((p): p is string => Boolean(p))
+      return this.buildFileTree(filePaths)
+    }
+    return []
+  }
+
+  async getScopedFileTree(id: string, scope: AppFileSystemScope): Promise<FileNode[]> {
+    const response = await this.getScopedFiles(id, scope)
+    if (response.success && response.files) {
       const filePaths = response.files
         .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
         .filter((p): p is string => Boolean(p))

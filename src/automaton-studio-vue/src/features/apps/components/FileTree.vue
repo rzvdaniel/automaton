@@ -111,7 +111,7 @@ function isDirty(path: string): boolean {
 function canDeleteFile(path: string | undefined): boolean {
   if (!props.allowDelete) return false
   if (!path) return false
-  return path !== 'index.html' && path !== '_metadata.json'
+  return path !== 'index.html' && path !== 'frontend/index.html' && path !== '_metadata.json'
 }
 </script>
 

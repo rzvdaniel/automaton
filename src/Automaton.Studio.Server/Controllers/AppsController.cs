@@ -1077,6 +1077,101 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Get files for a specific filesystem scope: source, runtime, or versions.
+    /// </summary>
+    [HttpGet("{id}/filesystem")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> GetAppFilesystem(Guid id, [FromQuery] string scope = "source")
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedScope = NormalizeFileSystemScope(scope);
+            if (normalizedScope == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
+            }
+
+            var files = normalizedScope switch
+            {
+                AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
+                AppFileSystemScopes.Runtime => await GetRuntimeFilesAsync(ownerId, id),
+                AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
+                _ => Enumerable.Empty<string>()
+            };
+
+            return Ok(new
+            {
+                success = true,
+                scope = normalizedScope,
+                editable = normalizedScope == AppFileSystemScopes.Source,
+                files = files.ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get filesystem for app {AppId}", id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Read content of a file from source, runtime, or versions scope.
+    /// </summary>
+    [HttpGet("{id}/filesystem/{scope}/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> GetAppFilesystemFile(Guid id, string scope, string path)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedScope = NormalizeFileSystemScope(scope);
+            if (normalizedScope == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
+            }
+
+            var content = normalizedScope switch
+            {
+                AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
+                AppFileSystemScopes.Runtime => await ReadRuntimeFileAsync(ownerId, id, path),
+                AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
+                _ => null
+            };
+
+            if (content == null)
+            {
+                return NotFound(new { success = false, message = "File not found" });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                scope = normalizedScope,
+                editable = normalizedScope == AppFileSystemScopes.Source,
+                content
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to read filesystem file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Read content of a specific editable source file.
     /// </summary>
     [HttpGet("{id}/files/{*path}")]
@@ -1117,6 +1212,42 @@ public class AppsController : BaseController
             logger.LogError(ex, "Failed to read file {Path} for app {AppId}", path, id);
             return StatusCode(500, new { success = false, message = ex.Message });
         }
+    }
+
+    private async Task<IEnumerable<string>> GetRuntimeFilesAsync(Guid ownerId, Guid appId)
+    {
+        var frontendFiles = await fileStorageService.GetRuntimeFilesAsync(ownerId, appId);
+        var backendFiles = await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId);
+
+        return frontendFiles.Select(path => $"frontend/{path.Replace('\\', '/')}")
+            .Concat(backendFiles.Select(path => $"backend/{path.Replace('\\', '/')}"));
+    }
+
+    private async Task<string?> ReadRuntimeFileAsync(Guid ownerId, Guid appId, string path)
+    {
+        var normalizedPath = path.Replace('\\', '/');
+        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
+        {
+            return await fileStorageService.ReadRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..]);
+        }
+
+        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
+        {
+            return await fileStorageService.ReadRuntimeBackendFileAsync(ownerId, appId, normalizedPath["backend/".Length..]);
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeFileSystemScope(string? scope)
+    {
+        return scope?.Trim().ToLowerInvariant() switch
+        {
+            AppFileSystemScopes.Source => AppFileSystemScopes.Source,
+            AppFileSystemScopes.Runtime => AppFileSystemScopes.Runtime,
+            AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
+            _ => null
+        };
     }
 
     /// <summary>
@@ -1498,6 +1629,13 @@ public class AppsController : BaseController
 public class WriteFileRequest
 {
     public required string Content { get; set; }
+}
+
+public static class AppFileSystemScopes
+{
+    public const string Source = "source";
+    public const string Runtime = "runtime";
+    public const string Versions = "versions";
 }
 
 public class GitHubPushRequest

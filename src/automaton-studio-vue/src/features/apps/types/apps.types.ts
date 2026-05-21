@@ -169,6 +169,28 @@ export interface AppFile {
   lastModified: string
 }
 
+export const AppFileSystemScope = {
+  Source: 'source',
+  Runtime: 'runtime',
+  Versions: 'versions',
+} as const
+
+export type AppFileSystemScope = (typeof AppFileSystemScope)[keyof typeof AppFileSystemScope]
+
+export interface ScopedFilesResponse {
+  success: boolean
+  scope: AppFileSystemScope
+  editable: boolean
+  files: AppFile[]
+}
+
+export interface ScopedFileContentResponse {
+  success: boolean
+  scope: AppFileSystemScope
+  editable: boolean
+  content: string
+}
+
 export interface RunnerBackendFile {
   path: string
   name: string
@@ -227,6 +249,8 @@ export interface OpenFile {
   language: string // 'html', 'css', 'javascript', 'json', etc.
   isDirty: boolean // Has unsaved changes
   originalContent: string // For detecting changes
+  scope?: AppFileSystemScope
+  isReadOnly?: boolean
   isBackendStep?: boolean // True if this is a backend step file
   stepId?: string // Backend step ID if isBackendStep is true
   stepName?: string // Backend step name for display

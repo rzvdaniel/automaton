@@ -470,11 +470,27 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Get all deployed backend runtime files for an app.
+    /// </summary>
+    public Task<IEnumerable<string>> GetRuntimeBackendFilesAsync(Guid userId, Guid appId)
+    {
+        return GetFilesAsync(GetRuntimeBackendPath(userId, appId));
+    }
+
+    /// <summary>
     /// Read a deployed frontend runtime file for an app.
     /// </summary>
     public Task<string?> ReadRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
         return ReadFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Read a deployed backend runtime file for an app.
+    /// </summary>
+    public Task<string?> ReadRuntimeBackendFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileAsync(GetRuntimeBackendPath(userId, appId), relativePath);
     }
 
     /// <summary>
@@ -499,6 +515,24 @@ public class AppFileStorageService
     public Task DeleteRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
         return DeleteFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Get all version snapshot files for an app.
+    /// Paths are relative to the versions root.
+    /// </summary>
+    public Task<IEnumerable<string>> GetVersionFilesAsync(Guid userId, Guid appId)
+    {
+        return GetFilesAsync(GetVersionsPath(userId, appId));
+    }
+
+    /// <summary>
+    /// Read a version snapshot file for an app.
+    /// Path is relative to the versions root.
+    /// </summary>
+    public Task<string?> ReadVersionFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileAsync(GetVersionsPath(userId, appId), relativePath);
     }
 
     /// <summary>

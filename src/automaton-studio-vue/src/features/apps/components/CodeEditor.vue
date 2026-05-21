@@ -33,6 +33,7 @@ const file = computed(() => {
 
 const editorContent = computed(() => props.content ?? file.value?.content ?? '')
 const editorLanguage = computed(() => props.language ?? file.value?.language ?? 'plaintext')
+const isReadOnly = computed(() => props.readOnly ?? file.value?.isReadOnly ?? false)
 
 // Detect if dark mode is enabled
 const isDarkMode = computed(() => {
@@ -48,7 +49,7 @@ onMounted(() => {
     value: editorContent.value,
     language: editorLanguage.value,
     theme: isDarkMode.value ? 'vs-dark' : 'vs',
-    readOnly: props.readOnly,
+    readOnly: isReadOnly.value,
     automaticLayout: true,
     minimap: { enabled: true },
     fontSize: 14,
@@ -77,7 +78,7 @@ onMounted(() => {
   // Listen for content changes
   editorInstance.onDidChangeModelContent(() => {
     if (!editorInstance) return
-    if (props.readOnly) return
+    if (isReadOnly.value) return
     const content = editorInstance.getValue()
     editorStore.updateFileContent(props.filePath, content)
     emit('change', content)
@@ -85,7 +86,7 @@ onMounted(() => {
 
   // Add keyboard shortcuts
   editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-    if (props.readOnly) return
+    if (isReadOnly.value) return
     emit('save')
   })
 })
@@ -158,7 +159,7 @@ watch(
 )
 
 watch(
-  () => props.readOnly,
+  () => isReadOnly.value,
   (readOnly) => {
     editorInstance?.updateOptions({ readOnly })
   },
