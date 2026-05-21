@@ -6,6 +6,7 @@ namespace Automaton.Cli.Services;
 
 /// <summary>
 /// Reads and writes automaton.json (project-level) and ~/.automaton/config.json (global).
+/// Project config and project-local credentials are discovered by walking up from the current directory.
 /// Resolution order for server: project config > project-local config > global config file > env vars > prompt.
 /// Resolution order for api-key: project-local config > global config file > env vars > prompt.
 /// </summary>
@@ -30,7 +31,8 @@ public class ConfigService
 
     public AutomatonConfig? TryLoadProjectConfig(string directory)
     {
-        var path = Path.Combine(directory, ProjectConfigFileName);
+        var projectRoot = FindNearestProjectRoot(directory) ?? directory;
+        var path = Path.Combine(projectRoot, ProjectConfigFileName);
         if (!File.Exists(path)) return null;
         try
         {
@@ -62,7 +64,7 @@ public class ConfigService
 
     public GlobalConfig LoadProjectLocalConfig(string directory)
     {
-        var path = GetProjectLocalConfigPath(directory);
+        var path = FindNearestProjectLocalConfigPath(directory) ?? GetProjectLocalConfigPath(directory);
         if (!File.Exists(path)) return new GlobalConfig();
 
         try
@@ -97,6 +99,33 @@ public class ConfigService
     public string GetProjectLocalConfigPath(string directory)
     {
         return Path.Combine(directory, ProjectConfigDirName, ProjectLocalConfigFileName);
+    }
+
+    public string? FindNearestProjectRoot(string directory)
+    {
+        foreach (var current in EnumerateDirectoryAndParents(directory))
+        {
+            if (File.Exists(Path.Combine(current, ProjectConfigFileName)))
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
+
+    public string? FindNearestProjectLocalConfigPath(string directory)
+    {
+        foreach (var current in EnumerateDirectoryAndParents(directory))
+        {
+            var candidate = GetProjectLocalConfigPath(current);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private static void EnsureProjectIgnoreFile(string directory)
@@ -209,5 +238,15 @@ public class ConfigService
         }
 
         return (server.TrimEnd('/'), apiKey);
+    }
+
+    private static IEnumerable<string> EnumerateDirectoryAndParents(string directory)
+    {
+        var current = new DirectoryInfo(Path.GetFullPath(directory));
+        while (current != null)
+        {
+            yield return current.FullName;
+            current = current.Parent;
+        }
     }
 }

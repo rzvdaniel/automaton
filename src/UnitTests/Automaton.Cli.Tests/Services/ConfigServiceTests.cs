@@ -157,6 +157,53 @@ public class ConfigServiceTests
         Assert.That(apiKey, Is.EqualTo("ak_local_only"));
     }
 
+    [Test]
+    public void RequireCredentials_WhenCalledFromNestedDirectory_UsesNearestProjectLocalConfig()
+    {
+        var projectRoot = CreateTempDirectory();
+        var nestedDirectory = Path.Combine(projectRoot, "frontend", "src");
+        Directory.CreateDirectory(nestedDirectory);
+
+        var configService = new ConfigService();
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://local.example.com",
+            ApiKey = "ak_local"
+        });
+
+        var (server, apiKey) = configService.RequireCredentials(directory: nestedDirectory);
+
+        Assert.That(server, Is.EqualTo("https://local.example.com"));
+        Assert.That(apiKey, Is.EqualTo("ak_local"));
+    }
+
+    [Test]
+    public void LoadProjectConfig_WhenCalledFromNestedDirectory_UsesNearestAutomatonJson()
+    {
+        var projectRoot = CreateTempDirectory();
+        var nestedDirectory = Path.Combine(projectRoot, "frontend");
+        Directory.CreateDirectory(nestedDirectory);
+
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = "app-123",
+            Name = "Nested App",
+            Server = "https://project.example.com",
+            Frontend = new FrontendConfig
+            {
+                Build = "cd frontend && npm install && npm run build",
+                DeployDir = "frontend/dist"
+            }
+        });
+
+        var loaded = configService.LoadProjectConfig(nestedDirectory);
+
+        Assert.That(loaded.AppId, Is.EqualTo("app-123"));
+        Assert.That(loaded.Name, Is.EqualTo("Nested App"));
+        Assert.That(loaded.Server, Is.EqualTo("https://project.example.com"));
+    }
+
     private string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "automaton-cli-tests", Guid.NewGuid().ToString("N"));
