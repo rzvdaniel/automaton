@@ -135,6 +135,7 @@ public static class DeployCommand
                 skipBackend = result.SkipBackend,
                 checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, error = check.Message }),
                 nextSteps = result.NextSteps,
+                sourceUploaded = result.SourceUploaded,
                 uploaded = result.Uploaded,
                 backend = result.Backend
             });

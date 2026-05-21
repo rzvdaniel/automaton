@@ -63,7 +63,8 @@ public class DeployServiceTests
             {
                 buildInvoked = true;
                 return Task.FromResult(0);
-            });
+            },
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
@@ -93,7 +94,8 @@ public class DeployServiceTests
 
         var service = new DeployService(
             configService,
-            (_, _, _) => Task.FromResult(2));
+            (_, _, _) => Task.FromResult(2),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
@@ -129,6 +131,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(4, 0, 0.1)),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.2)),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)),
             (_, _, _, _) => Task.FromResult(new DeployBackendResult(false, 0, "No runner assigned")));
@@ -163,6 +166,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 1, 0.1)),
             (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
             (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")));
@@ -195,6 +199,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
             async (_, _, _, zip, _, _) =>
             {
                 await zip.DisposeAsync();
@@ -210,9 +215,82 @@ public class DeployServiceTests
         AssertCheck(result, DeployCheckNames.Upload, true, "uploaded 2 file(s)");
     }
 
+    [Test]
+    public async Task DeployAsync_WhenSourceUploadFails_ReturnsStructuredFailure()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => throw new InvalidOperationException("source upload failed"));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: true, directoryOverride: null);
+
+        Assert.That(result.Success, Is.False);
+        AssertCheck(result, DeployCheckNames.SourceUpload, false, "source upload failed");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenBackendUploadWritesZeroFiles_FailsBeforeRunnerDeploy()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
+
+        var deployInvoked = false;
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 1, 0.1)),
+            (_, _, _, _) =>
+            {
+                deployInvoked = true;
+                return Task.FromResult(new DeployBackendResult(true, 1, "ok"));
+            });
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.False);
+        Assert.That(deployInvoked, Is.False);
+        AssertCheck(result, DeployCheckNames.BackendPackage, false, "backend upload wrote 0 files");
+    }
+
     private static void AssertCheck(DeployResult result, string name, bool expectedSuccess, string expectedMessageFragment)
     {
-        var check = result.Checks.Single(c => c.Name == name);
+        var check = result.Checks.Last(c => c.Name == name);
         Assert.That(check.Success, Is.EqualTo(expectedSuccess));
         Assert.That(check.Message, Does.Contain(expectedMessageFragment));
     }

@@ -28,6 +28,14 @@ public static class ZipService
         ".automatonignore"
     };
 
+    public static readonly string[] SourceIgnorePatterns =
+    {
+        "frontend/dist/",
+        "dist/",
+        ".vite/",
+        "coverage/"
+    };
+
     /// <summary>
     /// Resolves which directory to zip from an explicit project-relative deploy directory.
     /// </summary>
@@ -59,7 +67,21 @@ public static class ZipService
     /// </summary>
     public static Stream CreateZip(string projectRoot, string sourceDir)
     {
-        var ignoreMatcher = CreateIgnoreMatcher(projectRoot);
+        return CreateZip(projectRoot, sourceDir, includeAutomatonConfig: false, additionalIgnorePatterns: null);
+    }
+
+    public static Stream CreateSourceZip(string projectRoot)
+    {
+        return CreateZip(projectRoot, projectRoot, includeAutomatonConfig: true, additionalIgnorePatterns: SourceIgnorePatterns);
+    }
+
+    private static Stream CreateZip(
+        string projectRoot,
+        string sourceDir,
+        bool includeAutomatonConfig,
+        IEnumerable<string>? additionalIgnorePatterns)
+    {
+        var ignoreMatcher = CreateIgnoreMatcher(projectRoot, includeAutomatonConfig, additionalIgnorePatterns);
         var ms = new MemoryStream();
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -89,13 +111,29 @@ public static class ZipService
         }
     }
 
-    private static Matcher CreateIgnoreMatcher(string projectRoot)
+    private static Matcher CreateIgnoreMatcher(
+        string projectRoot,
+        bool includeAutomatonConfig,
+        IEnumerable<string>? additionalIgnorePatterns)
     {
         var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
 
         foreach (var pattern in DefaultIgnorePatterns)
         {
+            if (includeAutomatonConfig && pattern.Equals("automaton.json", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             AddIgnorePattern(matcher, pattern);
+        }
+
+        if (additionalIgnorePatterns != null)
+        {
+            foreach (var pattern in additionalIgnorePatterns)
+            {
+                AddIgnorePattern(matcher, pattern);
+            }
         }
 
         foreach (var pattern in LoadCustomIgnorePatterns(projectRoot))

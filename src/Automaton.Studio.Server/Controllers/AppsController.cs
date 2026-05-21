@@ -1110,7 +1110,7 @@ public class AppsController : BaseController
             {
                 success = true,
                 scope = normalizedScope,
-                editable = normalizedScope == AppFileSystemScopes.Source,
+                editable = normalizedScope != AppFileSystemScopes.Versions,
                 files = files.ToList()
             });
         }
@@ -1160,7 +1160,7 @@ public class AppsController : BaseController
             {
                 success = true,
                 scope = normalizedScope,
-                editable = normalizedScope == AppFileSystemScopes.Source,
+                editable = normalizedScope != AppFileSystemScopes.Versions,
                 content
             });
         }
@@ -1595,6 +1595,103 @@ public class AppsController : BaseController
         }
     }
 
+    [HttpPost("{id}/source/upload")]
+    [Authorize(Policy = "AllowApiKey")]
+    [RequestSizeLimit(52_428_800)]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadSourceZip(Guid id, IFormFile file, [FromQuery] bool clean = true)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { success = false, message = "No file uploaded or file is empty" });
+
+            if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { success = false, message = "Only .zip archives are supported" });
+
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+                return NotFound(new { success = false, message = "App not found" });
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var sourcePath = fileStorageService.GetAppSourceDirectoryPath(ownerId, id);
+
+            if (clean)
+            {
+                await fileStorageService.ClearSourceAsync(ownerId, id);
+            }
+            else
+            {
+                Directory.CreateDirectory(sourcePath);
+            }
+
+            var written = new List<string>();
+            var skipped = new List<string>();
+            var errors = new List<object>();
+
+            using var stream = file.OpenReadStream();
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            foreach (var entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+
+                var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
+                if (ShouldSkipSourceUploadEntry(relativePath))
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                try
+                {
+                    AppFileStorageService.ValidateFileExtensionPublic(relativePath);
+                }
+                catch
+                {
+                    skipped.Add(relativePath);
+                    continue;
+                }
+
+                var destPath = Path.GetFullPath(Path.Combine(sourcePath, relativePath));
+                var fullSourcePath = Path.GetFullPath(sourcePath);
+                if (!destPath.StartsWith(fullSourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add(new { path = relativePath, reason = "Path traversal detected — file skipped." });
+                    continue;
+                }
+
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+                    using var entryStream = entry.Open();
+                    using var outStream = System.IO.File.Create(destPath);
+                    await entryStream.CopyToAsync(outStream);
+                    written.Add(relativePath);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new { path = relativePath, reason = ex.Message });
+                }
+            }
+
+            logger.LogInformation(
+                "Source zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
+                id, written.Count, skipped.Count, errors.Count, clean);
+
+            return Ok(new { success = true, written, skipped, errors });
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest(new { success = false, message = "Invalid or corrupt zip archive" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload source zip for app {AppId}", id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
     [HttpPost("{id}/backend/upload")]
     [Authorize(Policy = "AllowApiKey")]
     [RequestSizeLimit(52_428_800)]
@@ -1721,6 +1818,36 @@ public class AppsController : BaseController
             segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("src", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("source", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ShouldSkipSourceUploadEntry(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return true;
+        }
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var fileName = segments.LastOrDefault() ?? string.Empty;
+        if (fileName.StartsWith(".", StringComparison.Ordinal) ||
+            fileName.Equals("_metadata.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("automaton.local.json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return segments.Any(segment =>
+            segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("dist", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".vite", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("coverage", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool ShouldSkipBackendUploadEntry(string relativePath)

@@ -5,6 +5,7 @@ public static class DeployCheckNames
     public const string AppLink = "appLink";
     public const string Credentials = "credentials";
     public const string RemoteAppAccess = "remoteAppAccess";
+    public const string SourceUpload = "sourceUpload";
     public const string FrontendPackage = "frontendPackage";
     public const string Build = "build";
     public const string RunnerLookup = "runnerLookup";
@@ -39,6 +40,8 @@ public sealed class DeployResult
     public IReadOnlyList<DeployCheckResult> Checks { get; init; } = [];
 
     public IReadOnlyList<string> NextSteps { get; init; } = [];
+
+    public DeployUploadResult? SourceUploaded { get; init; }
 
     public DeployUploadResult? Uploaded { get; init; }
 

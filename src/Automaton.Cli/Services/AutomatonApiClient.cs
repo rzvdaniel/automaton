@@ -91,6 +91,19 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> UploadSourceZipAsync(string appId, Stream zipStream, bool clean = true, CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(zipStream);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        content.Add(streamContent, "file", "source.zip");
+
+        var url = $"api/apps/{appId}/source/upload{(clean ? "?clean=true" : "")}";
+        using var resp = await _http.PostAsync(url, content, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<JsonElement> UploadBackendZipAsync(string appId, Stream zipStream, bool clean = true, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
@@ -141,10 +154,27 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> ListScopedFilesAsync(string appId, string scope, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/filesystem?scope={Uri.EscapeDataString(scope)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task<string> ReadFileAsync(string appId, string path, CancellationToken ct = default)
     {
         var encoded = Uri.EscapeDataString(path);
         using var resp = await _http.GetAsync($"api/apps/{appId}/files/{encoded}", ct);
+        await EnsureSuccessAsync(resp);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        return UnwrapFileContent(body);
+    }
+
+    public async Task<string> ReadScopedFileAsync(string appId, string scope, string path, CancellationToken ct = default)
+    {
+        var encodedScope = Uri.EscapeDataString(scope);
+        var encodedPath = Uri.EscapeDataString(path);
+        using var resp = await _http.GetAsync($"api/apps/{appId}/filesystem/{encodedScope}/{encodedPath}", ct);
         await EnsureSuccessAsync(resp);
         var body = await resp.Content.ReadAsStringAsync(ct);
         return UnwrapFileContent(body);

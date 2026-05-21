@@ -106,6 +106,28 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateSourceZip_WhenPackagingProjectRoot_IncludesAutomatonConfigButExcludesBuildArtifacts()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "src"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist", "assets"));
+
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('source');");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "index.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "assets", "app.js"), "console.log('runtime');");
+
+        using var zipStream = ZipService.CreateSourceZip(projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("automaton.json"));
+        Assert.That(entries, Does.Contain("frontend/src/main.js"));
+        Assert.That(entries, Does.Not.Contain("frontend/dist/index.html"));
+        Assert.That(entries, Does.Not.Contain("frontend/dist/assets/app.js"));
+    }
+
+    [Test]
     public void CreateZip_WhenAutomatonIgnoreContainsCustomPatterns_ExcludesMatchingFilesFromDeployDir()
     {
         // Arrange

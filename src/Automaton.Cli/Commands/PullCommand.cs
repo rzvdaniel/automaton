@@ -36,7 +36,7 @@ public static class PullCommand
                 AnsiConsole.MarkupLine($"[bold]Pulling[/] [cyan]{appConfig.Name}[/] → {targetDir}");
 
                 using var client = new AutomatonApiClient(server, apiKey);
-                var filesResult = await client.ListFilesAsync(appConfig.AppId);
+                var filesResult = await client.ListScopedFilesAsync(appConfig.AppId, "source");
 
                 List<string> files = [];
 
@@ -68,7 +68,7 @@ public static class PullCommand
                         var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: files.Count);
                         foreach (var filePath in files)
                         {
-                            var content = await client.ReadFileAsync(appConfig.AppId, filePath);
+                            var content = await client.ReadScopedFileAsync(appConfig.AppId, "source", filePath);
                             var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
                             Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
                             await File.WriteAllTextAsync(localPath, content);

@@ -462,6 +462,21 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Remove all editable source files while preserving runtime and versions.
+    /// </summary>
+    public Task ClearSourceAsync(Guid userId, Guid appId)
+    {
+        var sourcePath = GetSourcePath(userId, appId);
+        if (Directory.Exists(sourcePath))
+        {
+            Directory.Delete(sourcePath, recursive: true);
+        }
+
+        Directory.CreateDirectory(sourcePath);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Get all deployed frontend runtime files for an app.
     /// </summary>
     public Task<IEnumerable<string>> GetRuntimeFilesAsync(Guid userId, Guid appId)
