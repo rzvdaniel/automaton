@@ -76,6 +76,27 @@ public class AppsControllerExecutionController : ControllerBase
         }
     }
 
+    [HttpPost("api/apps/{appId:guid}/deploy")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeployAppResponse>> DeployApp(
+        Guid appId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userId = userContextService.GetUserId();
+            logger.Information("Deploy app request: AppId={AppId}, UserId={UserId}", appId, userId);
+
+            var result = await controllerExecutionService.DeployStudioAppAsync(appId, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Deploy app failed: AppId={AppId}", appId);
+            return StatusCode(500, new { error = "Deploy app failed: " + ex.Message });
+        }
+    }
+
     /// <summary>
     /// Execute a controller action from a published app (by slug).
     /// </summary>

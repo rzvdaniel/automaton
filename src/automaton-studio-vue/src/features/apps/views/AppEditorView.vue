@@ -613,6 +613,29 @@ async function handleDeployBackend() {
   }
 }
 
+async function handleDeployApp() {
+  try {
+    const result = await editorStore.deployApp()
+    const backendMessage = result.backendDeploy.totalScripts > 0
+      ? ` Backend: ${result.backendDeploy.deployedCount}/${result.backendDeploy.totalScripts} scripts to ${result.backendDeploy.runnerCount} runner(s).`
+      : ' No backend scripts found.'
+
+    toast.add({
+      severity: 'success',
+      summary: 'App Deployed',
+      detail: `Synced ${result.frontendFilesSynced} frontend file(s) and ${result.backendFilesSynced} backend file(s).${backendMessage}`,
+      life: 5000,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Deploy Failed',
+      detail: err instanceof Error ? err.message : 'Failed to deploy app',
+      life: 5000,
+    })
+  }
+}
+
 // Handle publish
 async function handlePublish(request: PublishAppRequest) {
   try {
@@ -1079,6 +1102,20 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               @click="editorStore.openPreviewOverlay()"
             />
 
+            <Button
+              v-if="activeTab !== 'backend-server'"
+              :label="editorStore.canDeployFromStudio ? 'Deploy App' : 'Managed Locally'"
+              icon="pi pi-cloud-upload"
+              :severity="editorStore.canDeployFromStudio ? 'primary' : 'secondary'"
+              :outlined="!editorStore.canDeployFromStudio"
+              :loading="editorStore.isDeployingApp"
+              :disabled="editorStore.isDeployingApp || !editorStore.canDeployFromStudio"
+              @click="handleDeployApp"
+            />
+            <span v-if="editorStore.deployAppStatusMessage" class="text-sm text-color-secondary">
+              {{ editorStore.deployAppStatusMessage }}
+            </span>
+
             <!-- Publish CTA -->
             <template v-if="editorStore.isPublished">
               <a
@@ -1136,6 +1173,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             </template>
           </template>
         </div>
+      </div>
+
+      <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
+        This app was deployed from local files. Studio is showing the live artifact because source files are not available here. Use <code>automaton deploy</code> from your local project, or upload source files to enable Studio deploy.
+      </div>
+
+      <div v-else-if="editorStore.showsSourceDeployBanner" class="mode-banner mode-banner-source">
+        You are editing source files. Use Deploy App to sync source to live and redeploy backend from <code>live/backend</code>.
       </div>
 
       <!-- Monitor View -->
@@ -1611,6 +1656,22 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   gap: 0.5rem;
 }
 
+.mode-banner {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--p-surface-200);
+  font-size: 0.85rem;
+}
+
+.mode-banner-source {
+  background: color-mix(in srgb, var(--p-blue-100) 72%, white);
+  color: var(--p-blue-900);
+}
+
+.mode-banner-live {
+  background: color-mix(in srgb, var(--p-orange-100) 78%, white);
+  color: var(--p-orange-900);
+}
+
 /* AI Console (terminal) view container */
 .ai-console-view {
   flex: 1;
@@ -1759,6 +1820,20 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 :global(.app-dark) .editor-header {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .mode-banner {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .mode-banner-source {
+  background: color-mix(in srgb, var(--p-blue-900) 58%, transparent);
+  color: var(--p-blue-100);
+}
+
+:global(.app-dark) .mode-banner-live {
+  background: color-mix(in srgb, var(--p-orange-900) 55%, transparent);
+  color: var(--p-orange-100);
 }
 
 :global(.app-dark) .build-mode-toggle {

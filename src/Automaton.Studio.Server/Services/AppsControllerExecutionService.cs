@@ -1,4 +1,5 @@
 using Automaton.Core.Models;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
@@ -124,6 +125,34 @@ public class AppsControllerExecutionService
             HasRequirements = hasRequirements,
             Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
             InstallLogs = installLogs.Count > 0 ? installLogs : null
+        };
+    }
+
+    public async Task<DeployAppResponse> DeployStudioAppAsync(
+        Guid appId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var frontendFilesSynced = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var backendFilesSynced = (await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId)).Count();
+
+        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+            metadata.SourceAvailable = true;
+            metadata.RuntimeSource = AppRuntimeSources.Studio;
+        });
+
+        var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
+
+        return new DeployAppResponse
+        {
+            Success = true,
+            FrontendFilesSynced = frontendFilesSynced,
+            BackendFilesSynced = backendFilesSynced,
+            BackendDeploy = backendDeploy,
+            Message = $"Synced {frontendFilesSynced} frontend file(s) and {backendFilesSynced} backend file(s)"
         };
     }
 

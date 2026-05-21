@@ -14,7 +14,11 @@ import type {
   PreviewMode,
   PublishAppRequest,
 } from '../types/apps.types'
-import { AppFileSystemScope as FileSystemScope, getLanguageFromExtension } from '../types/apps.types'
+import {
+  AppDevelopmentMode as DevelopmentMode,
+  AppFileSystemScope as FileSystemScope,
+  getLanguageFromExtension,
+} from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
 import type { UiLogEntry } from '../types/console.types'
 
@@ -65,8 +69,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const isLoading = ref(false)
   const isSaving = ref(false)
   const isLoadingPreview = ref(false)
+  const isDeployingApp = ref(false)
   const isDeployingBackend = ref(false)
   const deployStatusMessage = ref<string | null>(null)
+  const deployAppStatusMessage = ref<string | null>(null)
 
   // Error state
   const error = ref<string | null>(null)
@@ -141,6 +147,17 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   )
 
   const currentScopeEditable = computed(() => currentFileScope.value !== FileSystemScope.Versions)
+  const defaultEditorScope = computed<AppFileSystemScope>(() => {
+    if (currentApp.value?.developmentMode === DevelopmentMode.Local && !currentApp.value.sourceAvailable) {
+      return FileSystemScope.Live
+    }
+
+    return FileSystemScope.Source
+  })
+  const canDeployFromStudio = computed(() => currentApp.value?.sourceAvailable ?? false)
+  const isLocalManagedApp = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Local)
+  const showsLocalLiveBanner = computed(() => isLocalManagedApp.value && !currentApp.value?.sourceAvailable)
+  const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || currentApp.value?.sourceAvailable)
   const preferredPreviewScope = computed<AppFileSystemScope>(() => {
     const hasLiveIndex = Boolean(findFileInTree(fileTree.value, 'live/frontend/index.html'))
     return hasLiveIndex ? FileSystemScope.Live : FileSystemScope.Source
@@ -201,7 +218,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       currentApp.value = await appsService.get(appId)
 
       // Load file tree
-      currentFileScope.value = FileSystemScope.Source
+      currentFileScope.value = defaultEditorScope.value
       await loadUnifiedFileTree(appId)
 
       // Reset editor state
@@ -210,8 +227,12 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Auto-open index.html if it exists
       const preferredFile =
+        (defaultEditorScope.value === FileSystemScope.Live
+          ? findFileInTree(fileTree.value, 'live/frontend/index.html')
+          : null) ??
         findFileInTree(fileTree.value, 'source/frontend/index.html') ??
-        findFileInTree(fileTree.value, 'source/index.html')
+        findFileInTree(fileTree.value, 'source/index.html') ??
+        findFileInTree(fileTree.value, 'live/frontend/index.html')
       if (preferredFile) {
         await openFile(preferredFile.path)
       }
@@ -667,6 +688,38 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
+  async function deployApp(): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
+    message?: string
+  }> {
+    if (!currentApp.value) throw new Error('No app loaded')
+    if (!canDeployFromStudio.value) {
+      throw new Error('This app is managed locally. Use automaton deploy from your local project or upload source files first.')
+    }
+
+    isDeployingApp.value = true
+    deployAppStatusMessage.value = 'Syncing source to live...'
+    try {
+      if (hasUnsavedChanges.value) {
+        deployAppStatusMessage.value = 'Saving source files...'
+        await saveAllFiles()
+        deployAppStatusMessage.value = 'Syncing source to live...'
+      }
+
+      const result = await appsService.deployApp(currentApp.value.id)
+      await loadUnifiedFileTree(currentApp.value.id)
+      currentApp.value = await appsService.get(currentApp.value.id)
+      await refreshPreview()
+      return result
+    } finally {
+      isDeployingApp.value = false
+      deployAppStatusMessage.value = null
+    }
+  }
+
   /**
    * Update the name of the current app
    */
@@ -964,6 +1017,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoading,
     isSaving,
     isLoadingPreview,
+    isDeployingApp,
     isDeployingBackend,
     error,
     showPreviewOverlay,
@@ -980,6 +1034,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     publicUrl,
     hasBackendFolder,
     currentScopeEditable,
+    defaultEditorScope,
+    canDeployFromStudio,
+    isLocalManagedApp,
+    showsLocalLiveBanner,
+    showsSourceDeployBanner,
     isEditableScope,
     preferredPreviewScope,
 
@@ -997,7 +1056,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewWarning,
     publishApp,
     unpublishApp,
+    deployApp,
     deployBackend,
+    deployAppStatusMessage,
     deployStatusMessage,
     updateAppName,
     updateAppRunner,

@@ -1,4 +1,5 @@
 ﻿using Automaton.Core.Enums;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Automaton.Studio.Server.Enums;
@@ -42,7 +43,15 @@ public class AppsService
         var entities = authorizationService.GetAppsQueryByContext(projectId)
             .Include(x => x.WebAppUsers)
             .Include(x => x.WebAppScreenshots);
-        var apps = entities.Select(e => MapToModel(e, null));
+        var apps = entities
+            .AsEnumerable()
+            .Select(e =>
+            {
+                var app = MapToModel(e, null);
+                var ownerId = e.WebAppUsers?.FirstOrDefault()?.UserId ?? UserId;
+                ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, e.Id).Result);
+                return app;
+            });
 
         return apps;
     }
@@ -75,6 +84,7 @@ public class AppsService
         }
 
         var app = MapToModel(appEntity, definition);
+        ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, id).Result);
 
         return app;
     }
@@ -113,7 +123,9 @@ public class AppsService
             logger.Information("Migrated app {AppId} from database to file system", appEntity.Id);
         }
 
-        return MapToModel(appEntity, definition);
+        var app = MapToModel(appEntity, definition);
+        ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, appEntity.Id).Result);
+        return app;
     }
 
     /// <summary>
@@ -226,6 +238,12 @@ public class AppsService
             Version = 1
         };
         await fileStorageService.SaveAppAsync(UserId, entity.Id, defaultDefinition);
+        await fileStorageService.UpdateAppStorageMetadataAsync(UserId, entity.Id, metadata =>
+        {
+            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+            metadata.SourceAvailable = true;
+            metadata.RuntimeSource = AppRuntimeSources.Studio;
+        });
 
         // Write automaton.json so external AI tools (Copilot, Cursor, Claude) can discover the app ID.
         var automatonConfig = JsonSerializer.Serialize(
@@ -622,7 +640,9 @@ public class AppsService
             .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
-        return MapToModel(newEntity, null);
+        var duplicated = MapToModel(newEntity, null);
+        ApplyStorageMetadata(duplicated, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
+        return duplicated;
     }
 
     /// <summary>
@@ -774,7 +794,9 @@ public class AppsService
             .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
-        return MapToModel(newEntity, null);
+        var forked = MapToModel(newEntity, null);
+        ApplyStorageMetadata(forked, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
+        return forked;
     }
 
     private static string NormalizeForkName(string? requestedName, string sourceName)
@@ -801,6 +823,16 @@ public class AppsService
             .ToListAsync();
 
         return entities.Select(e => MapToModel(e, null));
+    }
+
+    public Task SetLocalDevelopmentMetadataAsync(Guid appId, Guid ownerId, bool sourceAvailable, string runtimeSource)
+    {
+        return fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.DevelopmentMode = AppDevelopmentModes.Local;
+            metadata.SourceAvailable = sourceAvailable;
+            metadata.RuntimeSource = runtimeSource;
+        });
     }
 
     /// <summary>
@@ -901,5 +933,17 @@ public class AppsService
 
         logger.Information("Deleted screenshot {ScreenshotId} for app {AppId}", screenshotId, appId);
         return imageUrl;
+    }
+
+    private static void ApplyStorageMetadata(Models.AppModel app, Models.AppStorageMetadata? metadata)
+    {
+        if (app == null || metadata == null)
+        {
+            return;
+        }
+
+        app.DevelopmentMode = metadata.DevelopmentMode;
+        app.SourceAvailable = metadata.SourceAvailable;
+        app.RuntimeSource = metadata.RuntimeSource;
     }
 }

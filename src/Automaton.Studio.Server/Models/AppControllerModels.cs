@@ -37,6 +37,15 @@ public class DeployBackendRequest
     public List<string>? RunnerNames { get; set; }
 }
 
+public class DeployAppResponse
+{
+    public bool Success { get; set; }
+    public int FrontendFilesSynced { get; set; }
+    public int BackendFilesSynced { get; set; }
+    public DeployBackendResponse BackendDeploy { get; set; } = new();
+    public string? Message { get; set; }
+}
+
 // ── Execution request/response models ────────────────────────────────────────
 
 public class AppControllerActionRequest

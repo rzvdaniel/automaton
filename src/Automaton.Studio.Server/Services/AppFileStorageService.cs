@@ -62,6 +62,11 @@ public class AppFileStorageService
         return Path.Combine(baseStoragePath, userId.ToString(), appId.ToString());
     }
 
+    private string GetMetadataPath(Guid userId, Guid appId)
+    {
+        return Path.Combine(GetAppPath(userId, appId), "_metadata.json");
+    }
+
     private string GetSourcePath(Guid userId, Guid appId)
     {
         return Path.Combine(GetAppPath(userId, appId), SourceFolder);
@@ -127,17 +132,13 @@ public class AppFileStorageService
                 await File.WriteAllTextAsync(indexPath, definition.HtmlContent);
             }
 
-            // Save metadata file
-            var metadataPath = Path.Combine(appPath, "_metadata.json");
-            var metadata = new
-            {
-                version = definition.Version,
-                settings = definition.Settings,
-                github = definition.GitHub,
-                connectedFlowIds = definition.ConnectedFlowIds,
-                lastModified = DateTime.UtcNow
-            };
-            await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+            var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
+            metadata.Version = definition.Version;
+            metadata.Settings = definition.Settings;
+            metadata.GitHub = definition.GitHub;
+            metadata.ConnectedFlowIds = definition.ConnectedFlowIds;
+            metadata.LastModified = DateTime.UtcNow;
+            await SaveStorageMetadataAsync(userId, appId, metadata);
 
             logger.Information("Saved app {AppId} for user {UserId} to file system", appId, userId);
         }
@@ -268,14 +269,10 @@ public class AppFileStorageService
             }
 
             // Load metadata
-            var metadataPath = Path.Combine(appPath, "_metadata.json");
             AppDefinition definition;
-
-            if (File.Exists(metadataPath))
+            var metadata = await LoadStorageMetadataAsync(userId, appId);
+            if (metadata != null)
             {
-                var metadataJson = await File.ReadAllTextAsync(metadataPath);
-                var metadata = JsonSerializer.Deserialize<AppMetadata>(metadataJson);
-                
                 definition = new AppDefinition
                 {
                     Version = metadata?.Version ?? 1,
@@ -393,6 +390,21 @@ public class AppFileStorageService
     public string GetAppRuntimeBackendDirectoryPath(Guid userId, Guid appId)
     {
         return GetLiveBackendPath(userId, appId);
+    }
+
+    public async Task<AppStorageMetadata> GetAppStorageMetadataAsync(Guid userId, Guid appId)
+    {
+        var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
+        metadata.SourceAvailable = HasAnyEntries(GetSourcePath(userId, appId));
+        return metadata;
+    }
+
+    public async Task UpdateAppStorageMetadataAsync(Guid userId, Guid appId, Action<AppStorageMetadata> update)
+    {
+        var metadata = await GetAppStorageMetadataAsync(userId, appId);
+        update(metadata);
+        metadata.LastModified = DateTime.UtcNow;
+        await SaveStorageMetadataAsync(userId, appId, metadata);
     }
 
     /// <summary>
@@ -629,6 +641,44 @@ public class AppFileStorageService
         return Task.CompletedTask;
     }
 
+    public Task<int> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
+    {
+        var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
+        var runtimeFrontendPath = GetLiveFrontendPath(userId, appId);
+
+        if (Directory.Exists(runtimeFrontendPath))
+        {
+            Directory.Delete(runtimeFrontendPath, recursive: true);
+        }
+
+        Directory.CreateDirectory(runtimeFrontendPath);
+
+        if (!Directory.Exists(sourceFrontendPath))
+        {
+            logger.Information("No source/frontend directory found for app {AppId}; live/frontend left empty", appId);
+            return Task.FromResult(0);
+        }
+
+        var copied = 0;
+        foreach (var sourceFile in Directory.EnumerateFiles(sourceFrontendPath, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceFrontendPath, sourceFile);
+            if (IsSensitiveAppFile(relativePath))
+                continue;
+
+            var targetFilePath = Path.Combine(runtimeFrontendPath, relativePath);
+            var targetDirectory = Path.GetDirectoryName(targetFilePath);
+            if (!string.IsNullOrEmpty(targetDirectory))
+                Directory.CreateDirectory(targetDirectory);
+
+            File.Copy(sourceFile, targetFilePath, overwrite: true);
+            copied++;
+        }
+
+        logger.Information("Synced source/frontend to live/frontend for app {AppId}", appId);
+        return Task.FromResult(copied);
+    }
+
     /// <summary>
     /// Remove all deployed backend live files while preserving source, frontend live files, and versions.
     /// </summary>
@@ -674,13 +724,34 @@ public class AppFileStorageService
         }
     }
 
-    private class AppMetadata
+    private static bool HasAnyEntries(string path)
     {
-        public int Version { get; set; }
-        public AppSettings? Settings { get; set; }
-        public GitHubSettings? GitHub { get; set; }
-        public IList<string>? ConnectedFlowIds { get; set; }
-        public DateTime LastModified { get; set; }
+        return Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path, "*", SearchOption.AllDirectories).Any();
+    }
+
+    private static AppStorageMetadata CreateDefaultStorageMetadata()
+    {
+        return new AppStorageMetadata();
+    }
+
+    private async Task<AppStorageMetadata?> LoadStorageMetadataAsync(Guid userId, Guid appId)
+    {
+        var metadataPath = GetMetadataPath(userId, appId);
+        if (!File.Exists(metadataPath))
+        {
+            return null;
+        }
+
+        var metadataJson = await File.ReadAllTextAsync(metadataPath);
+        return JsonSerializer.Deserialize<AppStorageMetadata>(metadataJson);
+    }
+
+    private async Task SaveStorageMetadataAsync(Guid userId, Guid appId, AppStorageMetadata metadata)
+    {
+        var appPath = GetAppPath(userId, appId);
+        Directory.CreateDirectory(appPath);
+        var metadataPath = GetMetadataPath(userId, appId);
+        await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
     }
 
     // ── Backend controller file helpers ──────────────────────────────────────

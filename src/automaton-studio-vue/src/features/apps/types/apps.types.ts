@@ -81,7 +81,25 @@ export interface App {
   forkedFromAuthorUserId?: string | null
   forkedFromAppName?: string | null
   forkedFromAuthorName?: string | null
+  developmentMode: AppDevelopmentMode
+  sourceAvailable: boolean
+  runtimeSource: AppRuntimeSource
 }
+
+export const AppDevelopmentMode = {
+  Studio: 'studio',
+  Local: 'local',
+} as const
+
+export type AppDevelopmentMode = (typeof AppDevelopmentMode)[keyof typeof AppDevelopmentMode]
+
+export const AppRuntimeSource = {
+  Studio: 'studio',
+  CliBuild: 'cli-build',
+  CliDeploy: 'cli-deploy',
+} as const
+
+export type AppRuntimeSource = (typeof AppRuntimeSource)[keyof typeof AppRuntimeSource]
 
 /**
  * Request to create a new app

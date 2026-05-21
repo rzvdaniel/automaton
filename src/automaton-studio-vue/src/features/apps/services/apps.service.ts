@@ -172,6 +172,17 @@ class AppsService {
     return data
   }
 
+  async deployApp(id: string): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
+    message?: string
+  }> {
+    const { data } = await apiClient.post(`/api/apps/${id}/deploy`, {})
+    return data
+  }
+
   async listRunnerBackendFiles(id: string): Promise<RunnerBackendFilesResponse> {
     const { data } = await apiClient.get<RunnerBackendFilesResponse>(
       `/api/apps/${id}/runner-backend/files`,

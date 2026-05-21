@@ -1640,6 +1640,12 @@ public class AppsController : BaseController
                 "Zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
 
+            await appsService.SetLocalDevelopmentMetadataAsync(
+                id,
+                ownerId,
+                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
+                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+
             if (written.Count > 0)
             {
                 try
@@ -1750,6 +1756,12 @@ public class AppsController : BaseController
                 "Source zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
 
+            await appsService.SetLocalDevelopmentMetadataAsync(
+                id,
+                ownerId,
+                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
+                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+
             return Ok(new { success = true, written, skipped, errors });
         }
         catch (InvalidDataException)
@@ -1846,6 +1858,12 @@ public class AppsController : BaseController
             logger.LogInformation(
                 "Backend zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
+
+            await appsService.SetLocalDevelopmentMetadataAsync(
+                id,
+                ownerId,
+                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
+                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
 
             return Ok(new { success = true, written, skipped, errors });
         }
