@@ -171,7 +171,7 @@ export interface AppFile {
 
 export const AppFileSystemScope = {
   Source: 'source',
-  Runtime: 'runtime',
+  Live: 'live',
   Versions: 'versions',
 } as const
 

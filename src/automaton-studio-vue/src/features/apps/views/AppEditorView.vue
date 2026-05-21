@@ -286,7 +286,7 @@ const existingFilePaths = computed(() => {
   return paths
 })
 
-const isEditingRuntimeFile = computed(() => editorStore.activeFile?.scope === AppFileSystemScope.Runtime)
+const isEditingRuntimeFile = computed(() => editorStore.activeFile?.scope === AppFileSystemScope.Live)
 
 // Load app on mount
 onMounted(async () => {
@@ -1227,11 +1227,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       </button>
                       <button
                         class="file-scope-tab"
-                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Runtime }"
-                        @click="handleFileScopeChange(AppFileSystemScope.Runtime)"
-                      >
-                        Runtime
-                      </button>
+                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Live }"
+                        @click="handleFileScopeChange(AppFileSystemScope.Live)"
+                        >
+                          Live
+                        </button>
                       <button
                         class="file-scope-tab"
                         :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Versions }"
@@ -1244,7 +1244,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       :title="editorStore.currentFileScope"
                       :show-create="editorStore.currentScopeEditable"
                       :allow-delete="editorStore.currentScopeEditable"
-                      :empty-message="editorStore.currentFileScope === AppFileSystemScope.Source ? 'No source files yet' : editorStore.currentFileScope === AppFileSystemScope.Runtime ? 'No runtime files yet' : 'No version files yet'"
+                      :empty-message="editorStore.currentFileScope === AppFileSystemScope.Source ? 'No source files yet' : editorStore.currentFileScope === AppFileSystemScope.Live ? 'No live files yet' : 'No version files yet'"
                       @create-file="showCreateFileDialog = true"
                       @delete-file="handleDeleteFile"
                     />
@@ -1282,8 +1282,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                     <!-- Editor Content -->
                     <div class="editor-content">
                       <div v-if="isEditingRuntimeFile" class="runtime-warning-banner">
-                        <strong>LIVE RUNTIME FILE</strong>
-                        Changes apply to deployed runtime and may be overwritten by the next deploy.
+                          <strong>LIVE FILE</strong>
+                          Changes apply to the deployed app and may be overwritten by the next deploy.
                       </div>
                       <CodeEditor
                         v-if="editorStore.activeFilePath"

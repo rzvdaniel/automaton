@@ -1,17 +1,17 @@
 # Automaton App Deploy Structure
 
-This document explains the current deploy contract. It replaces the old "one folder is both source and runtime" model.
+This document explains the current deploy contract. It replaces the old "one folder is both source and live output" model.
 
 ## Core model
 
-Automaton separates editable source from deployed runtime, and each side has frontend/backend surfaces:
+Automaton separates editable source from deployed live output, and each side has frontend/backend surfaces:
 
 ```text
 AppData/apps/{appId}/
 ├─ source/
 │  ├─ frontend/
 │  └─ backend/
-└─ runtime/
+└─ live/
    ├─ frontend/
    └─ backend/
 ```
@@ -19,9 +19,9 @@ AppData/apps/{appId}/
 Rules:
 - `source/frontend/` is editable frontend project source.
 - `source/backend/` is editable backend Python source.
-- `runtime/frontend/` is the only public static runtime.
-- `runtime/backend/` is runner-only backend runtime and is never publicly served.
-- Fork copies `source/` only, never `runtime/`.
+- `live/frontend/` is the only public static output.
+- `live/backend/` is runner-only backend output and is never publicly served.
+- Fork copies `source/` only, never `live/`.
 
 ## CLI deploy contract
 
@@ -44,9 +44,9 @@ For local CLI apps, `automaton.json` now uses explicit nested config:
 
 Deploy behavior:
 1. Run `frontend.build` when configured.
-2. Upload `frontend.deployDir` into `runtime/frontend/`.
-3. Upload `backend.deployDir` into `runtime/backend/` when configured.
-4. Trigger backend runner deployment from `runtime/backend/`.
+2. Upload `frontend.deployDir` into `live/frontend/`.
+3. Upload `backend.deployDir` into `live/backend/` when configured.
+4. Trigger backend runner deployment from `live/backend/`.
 
 There is no automatic fallback to `dist/`, `frontend/`, or project root. `frontend.deployDir` must be explicit unless the caller intentionally overrides it with `automaton deploy --dir ...`.
 
@@ -105,3 +105,4 @@ Avoid these assumptions:
 - Runner backend runtime comes only from `backend.deployDir`.
 - Default AI-generated local apps should use `frontend/` + Vite and deploy only `frontend/dist/`.
 - Root static apps remain supported, but only as an explicit no-build exception.
+

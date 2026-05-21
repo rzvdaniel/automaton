@@ -292,10 +292,10 @@ Provisioning intentionally lives in the API control plane rather than a separate
 Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.
 
 **Key Concepts:**
-- Source and runtime are separate, and each has frontend/backend surfaces: `source/frontend/` is editable frontend source, `source/backend/` is editable Python backend source, `runtime/frontend/` is public static output, and `runtime/backend/` is runner-only backend output.
-- `automaton deploy` writes frontend deploy output to `runtime/frontend/` and backend deploy output to `runtime/backend/`; public serving never reads source files or backend runtime files.
+- Source and live files are separate, and each has frontend/backend surfaces: `source/frontend/` is editable frontend source, `source/backend/` is editable Python backend source, `live/frontend/` is public static output, and `live/backend/` is runner-only deployed backend output.
+- `automaton deploy` writes frontend deploy output to `live/frontend/` and backend deploy output to `live/backend/`; public serving never reads source files or backend live files.
 - Studio editing, GitHub sync, version snapshots, MCP app tools, archive import/export, and marketplace fork use `source/`.
-- Fork copies `source/` only, never `runtime/`.
+- Fork copies `source/` only, never `live/`.
 - AI-generated local apps should default to Vite + vanilla TypeScript or JavaScript in `frontend/`, with a required frontend build pipeline that outputs to `frontend/dist/`.
 - Fork is available only when source exists and the app is explicitly forkable; runtime files, secrets, logs, and deployment artifacts are never copied.
 - Public runtime serving uses a safe web-file allowlist and returns `404` for unknown or sensitive extensions.
@@ -429,3 +429,4 @@ If yes, immediately update the relevant document **without waiting to be asked**
 - **Focus on completeness**: Agents should build the entire feature end-to-end in one implementation pass
 - **Make plans concise**: Sacrifice grammar for brevity. Avoid fluffy timelines.
 - **End with open questions**: List unresolved decisions that need your input before implementation starts
+

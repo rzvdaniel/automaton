@@ -1,8 +1,8 @@
-# App Source And Runtime Split
+# App Source And Live Split
 
 ## Goal
 
-Automaton apps have editable project files and deployed runtime artifacts. They also have two execution surfaces:
+Automaton apps have editable project files and deployed live artifacts. They also have two execution surfaces:
 
 - Frontend: public static browser files.
 - Backend: Python/controller files executed by runners.
@@ -14,15 +14,15 @@ AppData/apps/{ownerId}/{appId}/
 ├─ source/
 │  ├─ frontend/
 │  └─ backend/
-├─ runtime/
+├─ live/
 │  ├─ frontend/
 │  └─ backend/
 └─ versions/
 ```
 
-`source/` is editable and forkable. `runtime/` is deployed output. Only `runtime/frontend/` is publicly served. `runtime/backend/` is runner-only and must never be served as public web content.
+`source/` is editable and forkable. `live/` is deployed output. Only `live/frontend/` is publicly served. `live/backend/` is runner-only and must never be served as public web content.
 
-There is no legacy fallback. If `runtime/frontend/index.html` does not exist, the app is not publicly serveable.
+There is no legacy fallback. If `live/frontend/index.html` does not exist, the app is not publicly serveable.
 
 ## Folder Contract
 
@@ -65,12 +65,12 @@ source/backend/
 
 Mocks are source-only test fixtures for Studio preview. They are not public files.
 
-### `runtime/frontend/`
+### `live/frontend/`
 
 Public static files served by Automaton API/CDN.
 
 ```text
-runtime/frontend/
+live/frontend/
 ├─ index.html
 ├─ assets/
 ├─ manifest.webmanifest
@@ -79,12 +79,12 @@ runtime/frontend/
 
 Public serving must read only from this folder and must apply a safe extension allowlist. Unknown or blocked extensions return `404`.
 
-### `runtime/backend/`
+### `live/backend/`
 
 Backend package deployed to runner containers.
 
 ```text
-runtime/backend/
+live/backend/
 ├─ main.py
 ├─ requirements.txt
 └─ shared/
@@ -151,18 +151,18 @@ For frontend deploy:
 2. Resolve `frontend.deployDir`.
 3. Apply deploy exclusions.
 4. Upload zip entries relative to `frontend.deployDir`.
-5. API writes the result to `runtime/frontend/`.
-6. Public serving reads only `runtime/frontend/`.
+5. API writes the result to `live/frontend/`.
+6. Public serving reads only `live/frontend/`.
 
 For backend deploy:
 
 1. Resolve `backend.deployDir`.
 2. Apply backend deploy exclusions.
 3. Upload zip entries relative to `backend.deployDir`.
-4. API writes the result to `runtime/backend/`.
-5. Runner deployment reads only `runtime/backend/`.
+4. API writes the result to `live/backend/`.
+5. Runner deployment reads only `live/backend/`.
 
-For Studio-created apps, backend deployment may sync `source/backend/` into `runtime/backend/` immediately before runner deployment. This makes `runtime/backend/` the deployed package while preserving `source/backend/` as the editable source.
+For Studio-created apps, backend deployment may sync `source/backend/` into `live/backend/` immediately before runner deployment. This makes `live/backend/` the deployed package while preserving `source/backend/` as the editable source.
 
 For AI-generated local apps, treat `frontend.build` as required by default, not optional. The default expectation is Vite build output under `frontend/dist/`.
 
@@ -204,13 +204,13 @@ coverage/
 
 ## Public Serving Policy
 
-Only `runtime/frontend/` is public. Do not serve:
+Only `live/frontend/` is public. Do not serve:
 
 - `source/`
-- `runtime/backend/`
+- `live/backend/`
 - `versions/`
 - app root metadata
-- previous flat `runtime/` paths
+- previous flat `live/` paths
 - local fallback folders such as `dist/`, `frontend/`, or root
 
 Allowed public extensions:
@@ -241,7 +241,7 @@ Fork is allowed only when:
 
 Fork never copies:
 
-- `runtime/`
+- `live/`
 - secrets
 - logs
 - runner deployment artifacts
@@ -272,22 +272,22 @@ source/
 └─ backend/
 ```
 
-Frontend preview should serve files from `source/frontend/` or in-memory preview content. Published public app serving should serve from `runtime/frontend/`.
+Frontend preview should serve files from `source/frontend/` or in-memory preview content. Published public app serving should serve from `live/frontend/`.
 
-Backend editor writes to `source/backend/`. Deploy Backend packages to `runtime/backend/` and sends that runtime package to the selected runner.
+Backend editor writes to `source/backend/`. Deploy Backend packages to `live/backend/` and sends that runtime package to the selected runner.
 
 ## API Implementation Steps
 
 1. Add storage helpers for:
    - `source/frontend/`
    - `source/backend/`
-   - `runtime/frontend/`
-   - `runtime/backend/`
-2. Change runtime upload to write to `runtime/frontend/`.
-3. Change public app serving to read only from `runtime/frontend/`.
+   - `live/frontend/`
+   - `live/backend/`
+2. Change runtime upload to write to `live/frontend/`.
+3. Change public app serving to read only from `live/frontend/`.
 4. Add frontend runtime extension allowlist and return `404` for blocked paths.
-5. Change backend deploy to sync/package `source/backend/` into `runtime/backend/`.
-6. Change runner deployment to read only from `runtime/backend/`.
+5. Change backend deploy to sync/package `source/backend/` into `live/backend/`.
+6. Change runner deployment to read only from `live/backend/`.
 7. Keep fork, GitHub sync, archive import/export, version snapshots, and MCP tools on `source/`.
 8. Update AGENTS.md, generated CLI agent guidance, and app-generation skill prompts to use the four-folder model.
 
@@ -324,9 +324,9 @@ Generated AGENTS.md and Automaton skill files should say:
 - Runtime is deployed output.
 - Frontend source lives in `source/frontend/`.
 - Backend source lives in `source/backend/`.
-- Public runtime lives in `runtime/frontend/`.
-- Runner backend runtime lives in `runtime/backend/`.
-- Automaton serves only `runtime/frontend/`.
+- Public runtime lives in `live/frontend/`.
+- Runner backend runtime lives in `live/backend/`.
+- Automaton serves only `live/frontend/`.
 - Fork copies `source/` only.
 - Backend deploy packages source backend into runtime backend.
 - Prefer Vite + vanilla TypeScript or JavaScript for AI-generated apps.
@@ -367,17 +367,18 @@ Recommended default config:
 
 ## Validation Checklist
 
-- Runtime upload writes to `runtime/frontend/`.
-- Frontend clean deploy clears `runtime/frontend/` but not `source/` or `runtime/backend/`.
-- Public serving reads `runtime/frontend/index.html`.
-- Public serving returns `404` for files outside `runtime/frontend/`.
-- Public serving returns `404` for blocked extensions inside `runtime/frontend/`.
-- Backend deploy writes/syncs to `runtime/backend/`.
-- Runner deployment reads scripts from `runtime/backend/`.
+- Runtime upload writes to `live/frontend/`.
+- Frontend clean deploy clears `live/frontend/` but not `source/` or `live/backend/`.
+- Public serving reads `live/frontend/index.html`.
+- Public serving returns `404` for files outside `live/frontend/`.
+- Public serving returns `404` for blocked extensions inside `live/frontend/`.
+- Backend deploy writes/syncs to `live/backend/`.
+- Runner deployment reads scripts from `live/backend/`.
 - Backend runtime is not served by public routes.
 - Source upload/source publishing writes to `source/`.
 - Fork fails when `source/` is missing.
 - Fork is hidden or disabled unless `forkable = true`.
-- Fork copies `source/` only and does not copy `runtime/`.
+- Fork copies `source/` only and does not copy `live/`.
 - Studio preview reads editable files from `source/frontend/`.
-- No server-side fallback to app root, flat `runtime/`, `dist/`, or local `frontend/` paths.
+- No server-side fallback to app root, flat `live/`, `dist/`, or local `frontend/` paths.
+

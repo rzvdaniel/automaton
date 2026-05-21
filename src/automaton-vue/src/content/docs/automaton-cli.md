@@ -227,8 +227,8 @@ What happens:
 1. Runs `frontend.build` from `automaton.json` if set
 2. Performs the deploy preflight, including runner selection only when backend controllers require it
 3. Zips `frontend.deployDir`, or the directory passed with `--dir`
-4. Uploads the frontend zip to `runtime/frontend/` on the server
-5. Uploads `backend.deployDir` to `runtime/backend/` when backend files are configured
+4. Uploads the frontend zip to `live/frontend/` on the server
+5. Uploads `backend.deployDir` to `live/backend/` when backend files are configured
 6. Deploys backend Python controllers to the runner (unless `--skip-backend`)
 
 If `automaton validate` already passes but deploy fails during upload with transport-style errors like closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, treat that as a likely CLI or server upload-path issue first instead of immediately restructuring the app.

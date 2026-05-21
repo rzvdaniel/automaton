@@ -1077,7 +1077,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get files for a specific filesystem scope: source, runtime, or versions.
+    /// Get files for a specific filesystem scope: source, live, or versions.
     /// </summary>
     [HttpGet("{id}/filesystem")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1101,7 +1101,7 @@ public class AppsController : BaseController
             var files = normalizedScope switch
             {
                 AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
-                AppFileSystemScopes.Runtime => await GetRuntimeFilesAsync(ownerId, id),
+                AppFileSystemScopes.Live => await GetRuntimeFilesAsync(ownerId, id),
                 AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
                 _ => Enumerable.Empty<string>()
             };
@@ -1122,7 +1122,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Read content of a file from source, runtime, or versions scope.
+    /// Read content of a file from source, live, or versions scope.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1146,7 +1146,7 @@ public class AppsController : BaseController
             var content = normalizedScope switch
             {
                 AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
-                AppFileSystemScopes.Runtime => await ReadRuntimeFileAsync(ownerId, id, path),
+                AppFileSystemScopes.Live => await ReadRuntimeFileAsync(ownerId, id, path),
                 AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
                 _ => null
             };
@@ -1172,7 +1172,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Write content to a file in source or runtime scope.
+    /// Write content to a file in source or live scope.
     /// Versions are immutable and cannot be modified.
     /// </summary>
     [HttpPut("{id}/filesystem/{scope}/{*path}")]
@@ -1218,7 +1218,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Delete a file in source or runtime scope.
+    /// Delete a file in source or live scope.
     /// Versions are immutable and cannot be modified.
     /// </summary>
     [HttpDelete("{id}/filesystem/{scope}/{*path}")]
@@ -1372,7 +1372,8 @@ public class AppsController : BaseController
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            AppFileSystemScopes.Runtime => AppFileSystemScopes.Runtime,
+            "runtime" => AppFileSystemScopes.Live,
+            AppFileSystemScopes.Live => AppFileSystemScopes.Live,
             AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
         };
@@ -1471,9 +1472,9 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Upload a zip archive of deployed runtime files.
-    /// Files are merged into the app runtime directory.
-    /// Use <c>?clean=true</c> to delete all current runtime files first (full replace).
+    /// Upload a zip archive of deployed live files.
+    /// Files are merged into the app live directory.
+    /// Use <c>?clean=true</c> to delete all current live files first (full replace).
     /// For delta / incremental updates, include only changed files in the zip (clean=false).
     /// Supported via API key authentication — no browser session required.
     /// </summary>
@@ -1505,7 +1506,7 @@ public class AppsController : BaseController
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var runtimePath = fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id);
 
-            // clean=true: delete current public frontend runtime files before extracting.
+            // clean=true: delete current public frontend live files before extracting.
             if (clean)
             {
                 await fileStorageService.ClearFrontendRuntimeAsync(ownerId, id);
@@ -1529,7 +1530,7 @@ public class AppsController : BaseController
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
 
-                // Skip platform metadata, hidden files, and source/dependency folders that should never be runtime.
+                // Skip platform metadata, hidden files, and source/dependency folders that should never be live output.
                 if (ShouldSkipRuntimeUploadEntry(relativePath))
                 {
                     skipped.Add(relativePath);
@@ -1542,7 +1543,7 @@ public class AppsController : BaseController
                     continue;
                 }
 
-                // Zip-slip protection: verify the resolved path stays inside runtime/frontend/.
+                // Zip-slip protection: verify the resolved path stays inside live/frontend/.
                 var destPath = Path.GetFullPath(Path.Combine(runtimePath, relativePath));
                 var fullRuntimePath = Path.GetFullPath(runtimePath);
                 if (!destPath.StartsWith(fullRuntimePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
@@ -1889,7 +1890,7 @@ public class WriteFileRequest
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-    public const string Runtime = "runtime";
+    public const string Live = "live";
     public const string Versions = "versions";
 }
 

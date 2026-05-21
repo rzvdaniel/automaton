@@ -11,7 +11,7 @@ namespace Automaton.Studio.Server.Controllers;
 
 /// <summary>
 /// Controller for serving published web apps.
-/// Apps are served from the frontend runtime file system (AppData/apps/{ownerId}/{appId}/runtime/frontend/).
+/// Apps are served from the frontend live file system (AppData/apps/{ownerId}/{appId}/live/frontend/).
 ///
 /// Routes:
 /// - GET /api/web/{slug}              → Returns app metadata + index.html content
@@ -116,7 +116,7 @@ public class PublicWebAppsController : ControllerBase
             var htmlContent = await _fileStorageService.ReadRuntimeFileAsync(app.OwnerId.Value, app.Id, "index.html");
             if (htmlContent == null)
             {
-                _logger.LogWarning("Published app '{AppId}' has no runtime/frontend/index.html", app.Id);
+                _logger.LogWarning("Published app '{AppId}' has no live/frontend/index.html", app.Id);
                 return NotFound(new { message = "Runtime entry file not found" });
             }
 

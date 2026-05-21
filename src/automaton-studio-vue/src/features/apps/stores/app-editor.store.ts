@@ -293,7 +293,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         const fileScope = file.scope ?? FileSystemScope.Source
         if (fileScope === FileSystemScope.Source) {
           await appsService.writeFile(currentApp.value.id, filePath, file.content)
-        } else if (fileScope === FileSystemScope.Runtime) {
+        } else if (fileScope === FileSystemScope.Live) {
           await appsService.writeScopedFile(currentApp.value.id, fileScope, filePath, file.content)
         } else {
           throw new Error('Version snapshots are read-only')
@@ -328,7 +328,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         const fileScope = file.scope ?? FileSystemScope.Source
         if (fileScope === FileSystemScope.Source) {
           await appsService.writeFile(currentApp.value.id, file.path, file.content)
-        } else if (fileScope === FileSystemScope.Runtime) {
+        } else if (fileScope === FileSystemScope.Live) {
           await appsService.writeScopedFile(currentApp.value.id, fileScope, file.path, file.content)
         }
         file.isDirty = false
@@ -354,7 +354,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     try {
       if (currentFileScope.value === FileSystemScope.Source) {
         await appsService.createFile(currentApp.value.id, filePath, content)
-      } else if (currentFileScope.value === FileSystemScope.Runtime) {
+      } else if (currentFileScope.value === FileSystemScope.Live) {
         await appsService.writeScopedFile(currentApp.value.id, currentFileScope.value, filePath, content)
       } else {
         throw new Error('Version snapshots are read-only')
@@ -378,7 +378,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     try {
       if (currentFileScope.value === FileSystemScope.Source) {
         await appsService.deleteFile(currentApp.value.id, filePath)
-      } else if (currentFileScope.value === FileSystemScope.Runtime) {
+      } else if (currentFileScope.value === FileSystemScope.Live) {
         await appsService.deleteScopedFile(currentApp.value.id, currentFileScope.value, filePath)
       } else {
         throw new Error('Version snapshots are read-only')

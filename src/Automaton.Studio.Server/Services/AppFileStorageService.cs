@@ -12,7 +12,7 @@ namespace Automaton.Studio.Server.Services;
 public class AppFileStorageService
 {
     private const string SourceFolder = "source";
-    private const string RuntimeFolder = "runtime";
+    private const string LiveFolder = "live";
     private const string VersionsFolder = "versions";
     private const string FrontendFolder = "frontend";
     private const string BackendFolder = "backend";
@@ -67,9 +67,9 @@ public class AppFileStorageService
         return Path.Combine(GetAppPath(userId, appId), SourceFolder);
     }
 
-    private string GetRuntimePath(Guid userId, Guid appId)
+    private string GetLivePath(Guid userId, Guid appId)
     {
-        return Path.Combine(GetAppPath(userId, appId), RuntimeFolder);
+        return Path.Combine(GetAppPath(userId, appId), LiveFolder);
     }
 
     private string GetVersionsPath(Guid userId, Guid appId)
@@ -87,14 +87,14 @@ public class AppFileStorageService
         return Path.Combine(GetSourcePath(userId, appId), BackendFolder);
     }
 
-    private string GetRuntimeFrontendPath(Guid userId, Guid appId)
+    private string GetLiveFrontendPath(Guid userId, Guid appId)
     {
-        return Path.Combine(GetRuntimePath(userId, appId), FrontendFolder);
+        return Path.Combine(GetLivePath(userId, appId), FrontendFolder);
     }
 
-    private string GetRuntimeBackendPath(Guid userId, Guid appId)
+    private string GetLiveBackendPath(Guid userId, Guid appId)
     {
-        return Path.Combine(GetRuntimePath(userId, appId), BackendFolder);
+        return Path.Combine(GetLivePath(userId, appId), BackendFolder);
     }
 
     private static bool IsSensitiveAppFile(string relativePath)
@@ -356,11 +356,11 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Get the public runtime file system path for an app.
+    /// Get the live file system path for an app.
     /// </summary>
     public string GetAppRuntimeDirectoryPath(Guid userId, Guid appId)
     {
-        return GetRuntimePath(userId, appId);
+        return GetLivePath(userId, appId);
     }
 
     /// <summary>
@@ -380,19 +380,19 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Get the public frontend runtime path for an app.
+    /// Get the live frontend path for an app.
     /// </summary>
     public string GetAppRuntimeFrontendDirectoryPath(Guid userId, Guid appId)
     {
-        return GetRuntimeFrontendPath(userId, appId);
+        return GetLiveFrontendPath(userId, appId);
     }
 
     /// <summary>
-    /// Get the runner backend runtime path for an app.
+    /// Get the live backend path for an app.
     /// </summary>
     public string GetAppRuntimeBackendDirectoryPath(Guid userId, Guid appId)
     {
-        return GetRuntimeBackendPath(userId, appId);
+        return GetLiveBackendPath(userId, appId);
     }
 
     /// <summary>
@@ -412,11 +412,11 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Returns true when the app has a deployed runtime folder.
+    /// Returns true when the app has a deployed live folder.
     /// </summary>
     public bool AppRuntimeExists(Guid userId, Guid appId)
     {
-        return Directory.Exists(GetRuntimePath(userId, appId));
+        return Directory.Exists(GetLivePath(userId, appId));
     }
 
     /// <summary>
@@ -462,7 +462,7 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Remove all editable source files while preserving runtime and versions.
+    /// Remove all editable source files while preserving live files and versions.
     /// </summary>
     public Task ClearSourceAsync(Guid userId, Guid appId)
     {
@@ -477,59 +477,59 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Get all deployed frontend runtime files for an app.
+    /// Get all deployed frontend live files for an app.
     /// </summary>
     public Task<IEnumerable<string>> GetRuntimeFilesAsync(Guid userId, Guid appId)
     {
-        return GetFilesAsync(GetRuntimeFrontendPath(userId, appId));
+        return GetFilesAsync(GetLiveFrontendPath(userId, appId));
     }
 
     /// <summary>
-    /// Get all deployed backend runtime files for an app.
+    /// Get all deployed backend live files for an app.
     /// </summary>
     public Task<IEnumerable<string>> GetRuntimeBackendFilesAsync(Guid userId, Guid appId)
     {
-        return GetFilesAsync(GetRuntimeBackendPath(userId, appId));
+        return GetFilesAsync(GetLiveBackendPath(userId, appId));
     }
 
     /// <summary>
-    /// Read a deployed frontend runtime file for an app.
+    /// Read a deployed frontend live file for an app.
     /// </summary>
     public Task<string?> ReadRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
-        return ReadFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+        return ReadFileAsync(GetLiveFrontendPath(userId, appId), relativePath);
     }
 
     /// <summary>
-    /// Read a deployed backend runtime file for an app.
+    /// Read a deployed backend live file for an app.
     /// </summary>
     public Task<string?> ReadRuntimeBackendFileAsync(Guid userId, Guid appId, string relativePath)
     {
-        return ReadFileAsync(GetRuntimeBackendPath(userId, appId), relativePath);
+        return ReadFileAsync(GetLiveBackendPath(userId, appId), relativePath);
     }
 
     /// <summary>
-    /// Read a deployed frontend runtime file as bytes for public serving.
+    /// Read a deployed frontend live file as bytes for public serving.
     /// </summary>
     public Task<byte[]?> ReadRuntimeFileBytesAsync(Guid userId, Guid appId, string relativePath)
     {
-        return ReadFileBytesAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+        return ReadFileBytesAsync(GetLiveFrontendPath(userId, appId), relativePath);
     }
 
     /// <summary>
-    /// Write a deployed frontend runtime file for an app.
+    /// Write a deployed frontend live file for an app.
     /// </summary>
     public Task WriteRuntimeFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
-        return WriteFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath, content, validateExtension: true);
+        return WriteFileAsync(GetLiveFrontendPath(userId, appId), relativePath, content, validateExtension: true);
     }
 
     /// <summary>
-    /// Delete a deployed frontend runtime file for an app.
+    /// Delete a deployed frontend live file for an app.
     /// </summary>
     public Task DeleteRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
-        return DeleteFileAsync(GetRuntimeFrontendPath(userId, appId), relativePath);
+        return DeleteFileAsync(GetLiveFrontendPath(userId, appId), relativePath);
     }
 
     /// <summary>
@@ -551,7 +551,7 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Remove all deployed frontend runtime files while preserving source, backend runtime, and versions.
+    /// Remove all deployed frontend live files while preserving source, backend live files, and versions.
     /// </summary>
     public Task ClearRuntimeAsync(Guid userId, Guid appId)
     {
@@ -559,11 +559,11 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Remove all deployed frontend runtime files while preserving source, backend runtime, and versions.
+    /// Remove all deployed frontend live files while preserving source, backend live files, and versions.
     /// </summary>
     public Task ClearFrontendRuntimeAsync(Guid userId, Guid appId)
     {
-        var runtimePath = GetRuntimeFrontendPath(userId, appId);
+        var runtimePath = GetLiveFrontendPath(userId, appId);
         if (Directory.Exists(runtimePath))
         {
             Directory.Delete(runtimePath, recursive: true);
@@ -574,12 +574,12 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Rebuild the runner backend runtime package from editable source/backend files.
+    /// Rebuild the runner backend live package from editable source/backend files.
     /// </summary>
     public Task SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
     {
         var sourceBackendPath = GetSourceBackendPath(userId, appId);
-        var runtimeBackendPath = GetRuntimeBackendPath(userId, appId);
+        var runtimeBackendPath = GetLiveBackendPath(userId, appId);
 
         if (Directory.Exists(runtimeBackendPath))
         {
@@ -590,7 +590,7 @@ public class AppFileStorageService
 
         if (!Directory.Exists(sourceBackendPath))
         {
-            logger.Information("No source/backend directory found for app {AppId}; runtime/backend left empty", appId);
+            logger.Information("No source/backend directory found for app {AppId}; live/backend left empty", appId);
             return Task.CompletedTask;
         }
 
@@ -608,16 +608,16 @@ public class AppFileStorageService
             File.Copy(sourceFile, targetFilePath, overwrite: true);
         }
 
-        logger.Information("Synced source/backend to runtime/backend for app {AppId}", appId);
+        logger.Information("Synced source/backend to live/backend for app {AppId}", appId);
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Remove all deployed backend runtime files while preserving source, frontend runtime, and versions.
+    /// Remove all deployed backend live files while preserving source, frontend live files, and versions.
     /// </summary>
     public Task ClearRuntimeBackendAsync(Guid userId, Guid appId)
     {
-        var runtimePath = GetRuntimeBackendPath(userId, appId);
+        var runtimePath = GetLiveBackendPath(userId, appId);
         if (Directory.Exists(runtimePath))
         {
             Directory.Delete(runtimePath, recursive: true);
@@ -733,11 +733,11 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Lists all script files in the app's runtime/backend/ package.
+    /// Lists all script files in the app's live/backend/ package.
     /// </summary>
     public async Task<IReadOnlyList<BackendScriptFile>> ListRuntimeBackendFilesAsync(Guid userId, Guid appId)
     {
-        var backendPath = GetRuntimeBackendPath(userId, appId);
+        var backendPath = GetLiveBackendPath(userId, appId);
         return await ListBackendFilesFromDirectoryAsync(backendPath);
     }
 
