@@ -458,14 +458,21 @@ class AppsService {
       .sort()
 
     for (const filePath of normalizedFiles) {
-      const parts = filePath.split('/')
+      const isDirectoryEntry = filePath.endsWith('/')
+      const normalizedPath = isDirectoryEntry ? filePath.slice(0, -1) : filePath
+      if (!normalizedPath) {
+        continue
+      }
+
+      const parts = normalizedPath.split('/')
       let currentLevel = root
       let currentPath = ''
 
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i]!
         currentPath = currentPath ? `${currentPath}/${part}` : part
-        const isFile = i === parts.length - 1
+        const isTerminal = i === parts.length - 1
+        const isFile = isTerminal && !isDirectoryEntry
 
         if (isFile) {
           // Add file node

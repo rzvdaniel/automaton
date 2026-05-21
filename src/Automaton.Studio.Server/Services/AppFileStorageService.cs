@@ -441,9 +441,9 @@ public class AppFileStorageService
     /// Get all files under the app root, including source, live, versions, and metadata.
     /// Paths are relative to the app root.
     /// </summary>
-    public Task<IEnumerable<string>> GetAppRootFilesAsync(Guid userId, Guid appId)
+    public Task<IEnumerable<string>> GetAppRootEntriesAsync(Guid userId, Guid appId)
     {
-        return GetFilesAsync(GetAppPath(userId, appId));
+        return GetEntriesAsync(GetAppPath(userId, appId));
     }
 
     /// <summary>
@@ -864,6 +864,28 @@ public class AppFileStorageService
             .AsEnumerable();
 
         return Task.FromResult(files);
+    }
+
+    private static Task<IEnumerable<string>> GetEntriesAsync(string rootPath)
+    {
+        if (!Directory.Exists(rootPath))
+        {
+            return Task.FromResult(Enumerable.Empty<string>());
+        }
+
+        var directories = Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(rootPath, path).Replace('\\', '/') + "/");
+
+        var files = Directory.GetFiles(rootPath, "*.*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(rootPath, path).Replace('\\', '/'));
+
+        var entries = directories
+            .Concat(files)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .AsEnumerable();
+
+        return Task.FromResult(entries);
     }
 
     private static async Task<string?> ReadFileAsync(string rootPath, string relativePath)

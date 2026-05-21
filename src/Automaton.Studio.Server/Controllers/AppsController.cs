@@ -1137,7 +1137,7 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
-            var files = await fileStorageService.GetAppRootFilesAsync(ownerId, id);
+            var files = await fileStorageService.GetAppRootEntriesAsync(ownerId, id);
 
             return Ok(new
             {
