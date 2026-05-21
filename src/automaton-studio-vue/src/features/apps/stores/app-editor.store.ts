@@ -168,6 +168,19 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     return scope === FileSystemScope.Source || scope === FileSystemScope.Live
   }
 
+  function normalizePreviewPath(path: string): string | null {
+    const normalizedPath = path.replace(/\\/g, '/').trimStart('/')
+    if (normalizedPath.startsWith('backend/')) {
+      return null
+    }
+
+    if (normalizedPath.startsWith('frontend/')) {
+      return normalizedPath.slice('frontend/'.length)
+    }
+
+    return normalizedPath
+  }
+
   async function loadUnifiedFileTree(appId: string): Promise<void> {
     fileTree.value = await appsService.getRootFileTree(appId)
   }
@@ -524,7 +537,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
           .map((file) => (typeof file === 'string' ? file : file.path))
           .filter((path): path is string => Boolean(path))
           .map((path) => path.replace(/\\/g, '/'))
-          .filter((path) => !path.startsWith('versions/'))
 
         const contents = await Promise.all(
           paths.map(async (path) => {
@@ -533,15 +545,17 @@ export const useAppEditorStore = defineStore('appEditor', () => {
                 scope === FileSystemScope.Source
                   ? await appsService.readFile(appId, path)
                   : await appsService.readScopedFile(appId, scope, path)
-              return { path, content: result.content ?? '' }
+              return { path: normalizePreviewPath(path), content: result.content ?? '' }
             } catch {
-              return { path, content: '' }
+              return { path: normalizePreviewPath(path), content: '' }
             }
           })
         )
 
         for (const entry of contents) {
-          files[entry.path] = entry.content
+          if (entry.path) {
+            files[entry.path] = entry.content
+          }
         }
       }
     } catch (err: unknown) {
@@ -550,8 +564,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     for (const openFile of openFiles.value) {
       if (openFile.path && openFile.scope === scope) {
-        const normalizedPath = getRelativePathFromScopedPath(openFile.path, scope).replace(/\\/g, '/')
-        files[normalizedPath] = openFile.content
+        const normalizedPath = normalizePreviewPath(getRelativePathFromScopedPath(openFile.path, scope))
+        if (normalizedPath) {
+          files[normalizedPath] = openFile.content
+        }
       }
     }
 
