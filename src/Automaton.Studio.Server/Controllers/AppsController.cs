@@ -1172,6 +1172,98 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Write content to a file in source or runtime scope.
+    /// Versions are immutable and cannot be modified.
+    /// </summary>
+    [HttpPut("{id}/filesystem/{scope}/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> WriteAppFilesystemFile(Guid id, string scope, string path, [FromBody] WriteFileRequest request)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedScope = NormalizeFileSystemScope(scope);
+            if (normalizedScope == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Versions)
+            {
+                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Source)
+            {
+                await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
+            }
+            else
+            {
+                await WriteRuntimeFileAsync(ownerId, id, path, request.Content);
+            }
+
+            return Ok(new { success = true, scope = normalizedScope, editable = true });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to write filesystem file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a file in source or runtime scope.
+    /// Versions are immutable and cannot be modified.
+    /// </summary>
+    [HttpDelete("{id}/filesystem/{scope}/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> DeleteAppFilesystemFile(Guid id, string scope, string path)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedScope = NormalizeFileSystemScope(scope);
+            if (normalizedScope == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Versions)
+            {
+                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Source)
+            {
+                await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
+            }
+            else
+            {
+                await DeleteRuntimeFileAsync(ownerId, id, path);
+            }
+
+            return Ok(new { success = true, scope = normalizedScope, editable = true });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete filesystem file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Read content of a specific editable source file.
     /// </summary>
     [HttpGet("{id}/files/{*path}")]
@@ -1237,6 +1329,42 @@ public class AppsController : BaseController
         }
 
         return null;
+    }
+
+    private async Task WriteRuntimeFileAsync(Guid ownerId, Guid appId, string path, string content)
+    {
+        var normalizedPath = path.Replace('\\', '/');
+        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
+        {
+            await fileStorageService.WriteRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..], content);
+            return;
+        }
+
+        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
+        {
+            await fileStorageService.WriteFileAtPathAsync(fileStorageService.GetAppRuntimeBackendDirectoryPath(ownerId, appId), normalizedPath["backend/".Length..], content, validateExtension: true);
+            return;
+        }
+
+        throw new InvalidOperationException("Runtime files must live under frontend/ or backend/");
+    }
+
+    private async Task DeleteRuntimeFileAsync(Guid ownerId, Guid appId, string path)
+    {
+        var normalizedPath = path.Replace('\\', '/');
+        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
+        {
+            await fileStorageService.DeleteRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..]);
+            return;
+        }
+
+        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
+        {
+            await fileStorageService.DeleteFileAtPathAsync(fileStorageService.GetAppRuntimeBackendDirectoryPath(ownerId, appId), normalizedPath["backend/".Length..]);
+            return;
+        }
+
+        throw new InvalidOperationException("Runtime files must live under frontend/ or backend/");
     }
 
     private static string? NormalizeFileSystemScope(string? scope)

@@ -137,7 +137,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree.value.some((node) => node.type === 'folder' && node.name === 'backend'),
   )
 
-  const currentScopeEditable = computed(() => currentFileScope.value === FileSystemScope.Source)
+  const currentScopeEditable = computed(() => currentFileScope.value !== FileSystemScope.Versions)
 
   // ============================================
   // Actions
@@ -227,7 +227,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         isDirty: false,
         originalContent: content,
         scope: currentFileScope.value,
-        isReadOnly: currentFileScope.value !== FileSystemScope.Source,
+        isReadOnly: currentFileScope.value === FileSystemScope.Versions,
       }
 
       openFiles.value.push(openFile)
@@ -290,11 +290,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         // Save backend step code
         await appsService.updateStepCode(file.stepId, file.content)
       } else {
-        if (file.scope && file.scope !== FileSystemScope.Source) {
-          throw new Error('Only source files are editable in this phase')
+        const fileScope = file.scope ?? FileSystemScope.Source
+        if (fileScope === FileSystemScope.Source) {
+          await appsService.writeFile(currentApp.value.id, filePath, file.content)
+        } else if (fileScope === FileSystemScope.Runtime) {
+          await appsService.writeScopedFile(currentApp.value.id, fileScope, filePath, file.content)
+        } else {
+          throw new Error('Version snapshots are read-only')
         }
-        // Save regular app file
-        await appsService.writeFile(currentApp.value.id, filePath, file.content)
       }
 
       file.isDirty = false
@@ -322,10 +325,12 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const dirtyFiles = openFiles.value.filter((f) => f.isDirty)
 
       for (const file of dirtyFiles) {
-        if (file.scope && file.scope !== FileSystemScope.Source) {
-          continue
+        const fileScope = file.scope ?? FileSystemScope.Source
+        if (fileScope === FileSystemScope.Source) {
+          await appsService.writeFile(currentApp.value.id, file.path, file.content)
+        } else if (fileScope === FileSystemScope.Runtime) {
+          await appsService.writeScopedFile(currentApp.value.id, fileScope, file.path, file.content)
         }
-        await appsService.writeFile(currentApp.value.id, file.path, file.content)
         file.isDirty = false
         file.originalContent = file.content
       }
@@ -347,9 +352,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) return
 
     try {
-      await appsService.createFile(currentApp.value.id, filePath, content)
-
-      // Refresh file tree
+      if (currentFileScope.value === FileSystemScope.Source) {
+        await appsService.createFile(currentApp.value.id, filePath, content)
+      } else if (currentFileScope.value === FileSystemScope.Runtime) {
+        await appsService.writeScopedFile(currentApp.value.id, currentFileScope.value, filePath, content)
+      } else {
+        throw new Error('Version snapshots are read-only')
+      }
       fileTree.value = await appsService.getScopedFileTree(currentApp.value.id, currentFileScope.value)
 
       // Open the new file
@@ -367,7 +376,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) return
 
     try {
-      await appsService.deleteFile(currentApp.value.id, filePath)
+      if (currentFileScope.value === FileSystemScope.Source) {
+        await appsService.deleteFile(currentApp.value.id, filePath)
+      } else if (currentFileScope.value === FileSystemScope.Runtime) {
+        await appsService.deleteScopedFile(currentApp.value.id, currentFileScope.value, filePath)
+      } else {
+        throw new Error('Version snapshots are read-only')
+      }
 
       // Close if open (force close)
       closeFile(filePath, true)
@@ -804,6 +819,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value || currentFileScope.value === scope) return
 
     currentFileScope.value = scope
+    openFiles.value = []
+    activeFilePath.value = null
     fileTree.value = await appsService.getScopedFileTree(currentApp.value.id, scope)
   }
 

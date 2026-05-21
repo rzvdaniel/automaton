@@ -868,6 +868,11 @@ public class AppFileStorageService
         await File.WriteAllTextAsync(filePath, content);
     }
 
+    public Task WriteFileAtPathAsync(string rootPath, string relativePath, string content, bool validateExtension = true)
+    {
+        return WriteFileAsync(rootPath, relativePath, content, validateExtension);
+    }
+
     private static Task DeleteFileAsync(string rootPath, string relativePath)
     {
         var filePath = ResolveSafePath(rootPath, relativePath);
@@ -877,6 +882,11 @@ public class AppFileStorageService
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task DeleteFileAtPathAsync(string rootPath, string relativePath)
+    {
+        return DeleteFileAsync(rootPath, relativePath);
     }
 
     private static string ResolveSafePath(string rootPath, string relativePath)

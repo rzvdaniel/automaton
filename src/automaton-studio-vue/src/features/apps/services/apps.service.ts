@@ -371,6 +371,21 @@ class AppsService {
     return data
   }
 
+  async writeScopedFile(
+    id: string,
+    scope: AppFileSystemScope,
+    path: string,
+    content: string,
+  ): Promise<void> {
+    const encodedPath = this.encodePath(path)
+    await apiClient.put(`/api/apps/${id}/filesystem/${scope}/${encodedPath}`, { content })
+  }
+
+  async deleteScopedFile(id: string, scope: AppFileSystemScope, path: string): Promise<void> {
+    const encodedPath = this.encodePath(path)
+    await apiClient.delete(`/api/apps/${id}/filesystem/${scope}/${encodedPath}`)
+  }
+
   /**
    * Write file content
    * PUT /api/apps/{id}/files/{path}

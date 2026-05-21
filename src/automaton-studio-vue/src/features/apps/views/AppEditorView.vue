@@ -286,6 +286,8 @@ const existingFilePaths = computed(() => {
   return paths
 })
 
+const isEditingRuntimeFile = computed(() => editorStore.activeFile?.scope === AppFileSystemScope.Runtime)
+
 // Load app on mount
 onMounted(async () => {
   // Clear ?prompt from URL immediately so navigating back doesn't re-submit it
@@ -1279,6 +1281,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
                     <!-- Editor Content -->
                     <div class="editor-content">
+                      <div v-if="isEditingRuntimeFile" class="runtime-warning-banner">
+                        <strong>LIVE RUNTIME FILE</strong>
+                        Changes apply to deployed runtime and may be overwritten by the next deploy.
+                      </div>
                       <CodeEditor
                         v-if="editorStore.activeFilePath"
                         :key="editorStore.activeFilePath"
@@ -1768,6 +1774,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   overflow: hidden;
 }
 
+.runtime-warning-banner {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--p-orange-300);
+  background: color-mix(in srgb, var(--p-orange-100) 78%, white);
+  color: var(--p-orange-900);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
 .no-file-selected {
   display: flex;
   flex-direction: column;
@@ -1817,6 +1832,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 :global(.app-dark) .editor-tabs-container {
   border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .runtime-warning-banner {
+  background: color-mix(in srgb, var(--p-orange-900) 55%, transparent);
+  border-color: var(--p-orange-700);
+  color: var(--p-orange-100);
 }
 
 :global(.app-dark) .editor-tab {
