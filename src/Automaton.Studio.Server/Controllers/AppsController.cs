@@ -1372,7 +1372,6 @@ public class AppsController : BaseController
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            "runtime" => AppFileSystemScopes.Live,
             AppFileSystemScopes.Live => AppFileSystemScopes.Live,
             AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
