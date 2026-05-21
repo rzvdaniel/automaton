@@ -651,6 +651,13 @@ class AppsService {
     const appBaseUrl = `${baseUrl}/app-preview/${app.userId}/${id}/`
     const baseTag = `<base href="${appBaseUrl}">`
 
+    // Vite production builds often emit root-absolute asset URLs like "/assets/...".
+    // In preview those must resolve under /app-preview/{userId}/{appId}/ rather than site root.
+    html = html.replace(
+      /\b(href|src)=["']\/(?!\/)([^"']+)["']/gi,
+      (_, attr: string, assetPath: string) => `${attr}="${assetPath}"`,
+    )
+
     // Add cache-busting to CSS and JS references to ensure changes are immediately visible
     const cacheBuster = Date.now()
     html = html.replace(
