@@ -141,6 +141,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   )
 
   const currentScopeEditable = computed(() => currentFileScope.value !== FileSystemScope.Versions)
+  const preferredPreviewScope = computed<AppFileSystemScope>(() => {
+    const hasLiveIndex = Boolean(findFileInTree(fileTree.value, 'live/frontend/index.html'))
+    return hasLiveIndex ? FileSystemScope.Live : FileSystemScope.Source
+  })
 
   function getScopePrefix(scope: AppFileSystemScope): string {
     return `${scope}/`
@@ -484,7 +488,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const cacheBuster = Date.now()
       const nextPreviewUrl = `${apiBaseUrl}/app-preview/${userId}/${currentApp.value.id}/index.html?v=${cacheBuster}`
 
-      const previewFiles = await buildPreviewFiles(currentApp.value.id)
+      const previewScope = preferredPreviewScope.value
+      const previewFiles = await buildPreviewFiles(currentApp.value.id, previewScope)
 
       // Use current index.html from files (not stale htmlContent from app definition)
       const currentIndexHtml = previewFiles['index.html'] || undefined
@@ -509,11 +514,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
-  async function buildPreviewFiles(appId: string): Promise<Record<string, string>> {
+  async function buildPreviewFiles(appId: string, scope: AppFileSystemScope): Promise<Record<string, string>> {
     const files: Record<string, string> = {}
 
     try {
-      const response = await appsService.getScopedFiles(appId, FileSystemScope.Source)
+      const response = await appsService.getScopedFiles(appId, scope)
       if (response.success && response.files) {
         const paths = response.files
           .map((file) => (typeof file === 'string' ? file : file.path))
@@ -524,7 +529,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         const contents = await Promise.all(
           paths.map(async (path) => {
             try {
-              const result = await appsService.readFile(appId, path)
+              const result =
+                scope === FileSystemScope.Source
+                  ? await appsService.readFile(appId, path)
+                  : await appsService.readScopedFile(appId, scope, path)
               return { path, content: result.content ?? '' }
             } catch {
               return { path, content: '' }
@@ -541,8 +549,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
 
     for (const openFile of openFiles.value) {
-      if (openFile.path && openFile.scope === FileSystemScope.Source) {
-        const normalizedPath = getRelativePathFromScopedPath(openFile.path, FileSystemScope.Source).replace(/\\/g, '/')
+      if (openFile.path && openFile.scope === scope) {
+        const normalizedPath = getRelativePathFromScopedPath(openFile.path, scope).replace(/\\/g, '/')
         files[normalizedPath] = openFile.content
       }
     }
@@ -957,6 +965,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     hasBackendFolder,
     currentScopeEditable,
     isEditableScope,
+    preferredPreviewScope,
 
     // Actions
     loadApp,
