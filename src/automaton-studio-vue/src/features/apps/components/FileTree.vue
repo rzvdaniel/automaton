@@ -111,7 +111,23 @@ function isDirty(path: string): boolean {
 function canDeleteFile(path: string | undefined): boolean {
   if (!props.allowDelete) return false
   if (!path) return false
-  return path !== 'index.html' && path !== 'frontend/index.html' && path !== '_metadata.json'
+  const normalizedPath = path.replace(/\\/g, '/')
+  const scope = normalizedPath.startsWith('source/')
+    ? 'source'
+    : normalizedPath.startsWith('live/')
+      ? 'live'
+      : normalizedPath.startsWith('versions/')
+        ? 'versions'
+        : null
+
+  if (scope === 'versions' || scope === null) {
+    return false
+  }
+
+  return normalizedPath !== 'source/index.html' &&
+    normalizedPath !== 'source/frontend/index.html' &&
+    normalizedPath !== 'source/_metadata.json' &&
+    normalizedPath !== '_metadata.json'
 }
 </script>
 

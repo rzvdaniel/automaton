@@ -348,6 +348,22 @@ class AppsService {
     return data
   }
 
+  async getRootFiles(id: string): Promise<ScopedFilesResponse> {
+    const { data } = await apiClient.get<ScopedFilesResponse>(`/api/apps/${id}/filesystem/root`)
+    return data
+  }
+
+  async readRootFile(
+    id: string,
+    path: string,
+  ): Promise<{ success: boolean; editable: boolean; content: string }> {
+    const encodedPath = this.encodePath(path)
+    const { data } = await apiClient.get<{ success: boolean; editable: boolean; content: string }>(
+      `/api/apps/${id}/filesystem/root/${encodedPath}`,
+    )
+    return data
+  }
+
   /**
    * Read a file content
    * GET /api/apps/{id}/files/{path}
@@ -431,13 +447,13 @@ class AppsService {
   /**
    * Build file tree from flat list of file paths
    */
-  buildFileTree(files: string[]): FileNode[] {
+  buildFileTree(files: string[], options?: { includeMetadata?: boolean }): FileNode[] {
     const root: FileNode[] = []
     const folderMap = new Map<string, FileNode>()
+    const includeMetadata = options?.includeMetadata ?? false
 
-    // Filter out metadata file and normalize paths
     const normalizedFiles = files
-      .filter((f) => f !== '_metadata.json')
+      .filter((f) => includeMetadata || f !== '_metadata.json')
       .map((f) => f.replace(/\\/g, '/'))
       .sort()
 
@@ -509,6 +525,19 @@ class AppsService {
         .filter((p): p is string => Boolean(p))
       return this.buildFileTree(filePaths)
     }
+    return []
+  }
+
+  async getRootFileTree(id: string): Promise<FileNode[]> {
+    const response = await this.getRootFiles(id)
+    if (response.success && response.files) {
+      const filePaths = response.files
+        .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
+        .filter((path): path is string => Boolean(path))
+
+      return this.buildFileTree(filePaths, { includeMetadata: true })
+    }
+
     return []
   }
 

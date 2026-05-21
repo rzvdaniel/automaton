@@ -1122,6 +1122,77 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Get the real app-root filesystem view: source/, live/, versions/, and metadata files.
+    /// </summary>
+    [HttpGet("{id}/filesystem/root")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> GetAppRootFilesystem(Guid id)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var files = await fileStorageService.GetAppRootFilesAsync(ownerId, id);
+
+            return Ok(new
+            {
+                success = true,
+                scope = "root",
+                editable = false,
+                files = files.ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get root filesystem for app {AppId}", id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Read content of a root-level app file such as _metadata.json.
+    /// Root files are visible in Studio but not editable.
+    /// </summary>
+    [HttpGet("{id}/filesystem/root/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> GetAppRootFilesystemFile(Guid id, string path)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var content = await fileStorageService.ReadAppRootFileAsync(ownerId, id, path);
+            if (content == null)
+            {
+                return NotFound(new { success = false, message = "File not found" });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                scope = "root",
+                editable = false,
+                content
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to read app root file {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Read content of a file from source, live, or versions scope.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]

@@ -522,10 +522,6 @@ function handleBack() {
   }
 }
 
-async function handleFileScopeChange(scope: (typeof AppFileSystemScope)[keyof typeof AppFileSystemScope]) {
-  await editorStore.setFileScope(scope)
-}
-
 // Handle save all
 async function handleSaveAll() {
   try {
@@ -675,12 +671,20 @@ async function handleUnpublish() {
 // Handle create file
 async function handleCreateFile(path: string, content: string) {
   try {
-    await editorStore.createFile(path, content)
+    const normalizedPath = path.replace(/\\/g, '/')
+    const scopedPath =
+      normalizedPath.startsWith(`${AppFileSystemScope.Source}/`) ||
+      normalizedPath.startsWith(`${AppFileSystemScope.Live}/`) ||
+      normalizedPath.startsWith(`${AppFileSystemScope.Versions}/`)
+        ? normalizedPath
+        : `${editorStore.currentFileScope}/${normalizedPath}`
+
+    await editorStore.createFile(scopedPath, content)
     showCreateFileDialog.value = false
     toast.add({
       severity: 'success',
       summary: 'Created',
-      detail: `File "${path}" created`,
+      detail: `File "${scopedPath}" created`,
       life: 3000,
     })
   } catch (err: unknown) {
@@ -1217,34 +1221,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 <!-- Left Panel: File Tree -->
                 <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
                   <div class="file-panel">
-                    <div class="file-scope-tabs">
-                      <button
-                        class="file-scope-tab"
-                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Source }"
-                        @click="handleFileScopeChange(AppFileSystemScope.Source)"
-                      >
-                        Source
-                      </button>
-                      <button
-                        class="file-scope-tab"
-                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Live }"
-                        @click="handleFileScopeChange(AppFileSystemScope.Live)"
-                        >
-                          Live
-                        </button>
-                      <button
-                        class="file-scope-tab"
-                        :class="{ active: editorStore.currentFileScope === AppFileSystemScope.Versions }"
-                        @click="handleFileScopeChange(AppFileSystemScope.Versions)"
-                      >
-                        Versions
-                      </button>
-                    </div>
                     <FileTree
-                      :title="editorStore.currentFileScope"
+                      title="App Files"
                       :show-create="editorStore.currentScopeEditable"
                       :allow-delete="editorStore.currentScopeEditable"
-                      :empty-message="editorStore.currentFileScope === AppFileSystemScope.Source ? 'No source files yet' : editorStore.currentFileScope === AppFileSystemScope.Live ? 'No live files yet' : 'No version files yet'"
+                      empty-message="No app files yet"
                       @create-file="showCreateFileDialog = true"
                       @delete-file="handleDeleteFile"
                     />
@@ -1687,35 +1668,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   border-right: 1px solid var(--p-surface-200);
 }
 
-.file-scope-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-}
-
-.file-scope-tab {
-  border: none;
-  background: transparent;
-  color: var(--p-text-muted-color);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.35rem 0.6rem;
-  border-radius: var(--p-border-radius);
-  cursor: pointer;
-}
-
-.file-scope-tab:hover {
-  background: var(--p-surface-100);
-  color: var(--p-text-color);
-}
-
-.file-scope-tab.active {
-  background: var(--p-primary-100);
-  color: var(--p-primary-600);
-}
-
 .editor-panel {
   width: 100%;
   height: 100%;
@@ -1815,19 +1767,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 :global(.app-dark) .file-panel {
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .file-scope-tabs {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .file-scope-tab:hover {
-  background: var(--p-surface-700);
-}
-
-:global(.app-dark) .file-scope-tab.active {
-  background: var(--p-primary-900);
-  color: var(--p-primary-300);
 }
 
 :global(.app-dark) .editor-tabs-container {

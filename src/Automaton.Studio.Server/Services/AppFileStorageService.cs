@@ -438,6 +438,23 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Get all files under the app root, including source, live, versions, and metadata.
+    /// Paths are relative to the app root.
+    /// </summary>
+    public Task<IEnumerable<string>> GetAppRootFilesAsync(Guid userId, Guid appId)
+    {
+        return GetFilesAsync(GetAppPath(userId, appId));
+    }
+
+    /// <summary>
+    /// Read a file directly from the app root, including metadata files.
+    /// </summary>
+    public Task<string?> ReadAppRootFileAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileAsync(GetAppPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
     /// Read an editable source file for an app.
     /// </summary>
     public Task<string?> ReadSourceFileAsync(Guid userId, Guid appId, string relativePath)
@@ -842,7 +859,6 @@ public class AppFileStorageService
         }
 
         var files = Directory.GetFiles(rootPath, "*.*", SearchOption.AllDirectories)
-            .Where(f => !f.EndsWith("_metadata.json"))
             .Select(f => Path.GetRelativePath(rootPath, f))
             .ToList()
             .AsEnumerable();
