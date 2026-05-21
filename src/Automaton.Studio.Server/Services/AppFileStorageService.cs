@@ -395,7 +395,7 @@ public class AppFileStorageService
     public async Task<AppStorageMetadata> GetAppStorageMetadataAsync(Guid userId, Guid appId)
     {
         var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
-        metadata.SourceAvailable = HasAnyEntries(GetSourcePath(userId, appId));
+        metadata.SourceAvailable = HasEditableSourceEntries(userId, appId);
         return metadata;
     }
 
@@ -722,6 +722,14 @@ public class AppFileStorageService
                 $"File type '{extension}' is not allowed. " +
                 $"Allowed types: {string.Join(", ", AllowedExtensions.Order())}");
         }
+    }
+
+    private bool HasEditableSourceEntries(Guid userId, Guid appId)
+    {
+        var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
+        var sourceBackendPath = GetSourceBackendPath(userId, appId);
+
+        return HasAnyEntries(sourceFrontendPath) || HasAnyEntries(sourceBackendPath);
     }
 
     private static bool HasAnyEntries(string path)
