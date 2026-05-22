@@ -504,8 +504,12 @@ public class HubService
 
             Directory.CreateDirectory(backendDir);
 
+            var relativePath = string.IsNullOrWhiteSpace(payload.RelativePath)
+                ? BuildLegacyRelativePath(payload)
+                : NormalizeBackendRelativePath(payload.RelativePath);
+
             // requirements.txt — write as plain text, then pip install to volume-backed packages dir
-            if (payload.Language == "Text" && payload.ControllerName == "requirements")
+            if (payload.Language == "Text" && string.Equals(relativePath, "requirements.txt", StringComparison.OrdinalIgnoreCase))
             {
                 var reqPath = Path.Combine(backendDir, "requirements.txt");
                 File.WriteAllText(reqPath, payload.Code);
@@ -518,7 +522,7 @@ public class HubService
             }
 
             // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
-            if (payload.Language == "Text" && payload.ControllerName == "system-requirements")
+            if (payload.Language == "Text" && string.Equals(relativePath, "system-requirements.txt", StringComparison.OrdinalIgnoreCase))
             {
                 var sysReqPath = Path.Combine(backendDir, "system-requirements.txt");
                 File.WriteAllText(sysReqPath, payload.Code);
@@ -527,15 +531,13 @@ public class HubService
                 return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
 
-            // ControllerName may include a relative path (e.g. "shared/db") — create subdirs as needed
-            var normalizedName = payload.ControllerName.Replace('/', Path.DirectorySeparatorChar);
-            var scriptPath = Path.Combine(backendDir, normalizedName + ".py");
-            Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
-            File.WriteAllText(scriptPath, payload.Code);
+            var filePath = ResolveBackendUploadPath(backendDir, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+            File.WriteAllText(filePath, payload.Code);
 
-            logger.Information("Deployed controller script {ControllerName} for app {AppId}",
-                payload.ControllerName, payload.AppId);
-            WriteLine($"📦 Deployed controller: {payload.ControllerName} (app {payload.AppId})");
+            logger.Information("Deployed backend file {RelativePath} for app {AppId}",
+                relativePath, payload.AppId);
+            WriteLine($"📦 Deployed backend file: {relativePath} (app {payload.AppId})");
 
             return new AppControllerUploadResult { Success = true };
         }
@@ -546,6 +548,41 @@ public class HubService
             WriteLine($"❌ Failed to deploy controller: {payload.ControllerName} - {ex.Message}");
             return new AppControllerUploadResult { Success = false, Logs = [$"❌ {ex.Message}"] };
         }
+    }
+
+    private static string BuildLegacyRelativePath(AppControllerUploadPayload payload)
+    {
+        var extension = payload.Language switch
+        {
+            "Python" => ".py",
+            "Batch" => ".bat",
+            _ => ".txt"
+        };
+
+        return NormalizeBackendRelativePath(payload.ControllerName + extension);
+    }
+
+    private static string NormalizeBackendRelativePath(string relativePath)
+    {
+        return relativePath.Replace('\\', '/').TrimStart('/');
+    }
+
+    private static string ResolveBackendUploadPath(string backendDir, string relativePath)
+    {
+        var normalized = NormalizeBackendRelativePath(relativePath);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ArgumentException("Invalid backend file path.");
+        }
+
+        var fullPath = Path.GetFullPath(Path.Combine(backendDir, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        if (!fullPath.StartsWith(backendDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fullPath, backendDir, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Backend file path must stay inside the app backend directory.");
+        }
+
+        return fullPath;
     }
 
     private static AppBackendFilesResponse ListAppBackendFiles(string appId)

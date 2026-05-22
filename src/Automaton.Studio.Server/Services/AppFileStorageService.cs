@@ -852,14 +852,14 @@ public class AppFileStorageService
         foreach (var file in Directory.GetFiles(backendPath, "*", SearchOption.AllDirectories))
         {
             var ext = Path.GetExtension(file).ToLowerInvariant();
-            if (ext is ".py" or ".bat" or ".txt")
+            if (IsDeployableBackendFileExtension(ext))
             {
                 var code = await File.ReadAllTextAsync(file);
-                // Use forward-slash relative path as ControllerName (e.g. "shared/db")
-                // so the runner can reconstruct the subdirectory
                 var relativePath = Path.GetRelativePath(backendPath, file);
-                var controllerName = Path.ChangeExtension(relativePath, null).Replace('\\', '/');
+                var normalizedRelativePath = relativePath.Replace('\\', '/');
+                var controllerName = Path.ChangeExtension(normalizedRelativePath, null) ?? normalizedRelativePath;
                 results.Add(new BackendScriptFile(
+                    normalizedRelativePath,
                     controllerName,
                     code,
                     GetLanguageFromExtension(ext)));
@@ -893,9 +893,25 @@ public class AppFileStorageService
     /// <summary>Maps a file extension to a language name.</summary>
     public static string GetLanguageFromExtension(string ext) => ext.ToLowerInvariant() switch
     {
+        ".json" => "Json",
         ".py"  => "Python",
         ".bat" => "Batch",
         _      => "Text"
+    };
+
+    private static bool IsDeployableBackendFileExtension(string ext) => ext.ToLowerInvariant() switch
+    {
+        ".py" => true,
+        ".bat" => true,
+        ".txt" => true,
+        ".json" => true,
+        ".md" => true,
+        ".yml" => true,
+        ".yaml" => true,
+        ".ini" => true,
+        ".cfg" => true,
+        ".csv" => true,
+        _ => false
     };
 
     private Task CopyDirectoryFilesAsync(

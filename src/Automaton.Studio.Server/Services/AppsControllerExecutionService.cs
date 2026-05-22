@@ -91,6 +91,7 @@ public class AppsControllerExecutionService
                     var payload = new
                     {
                         AppId = appId,
+                        RelativePath = script.RelativePath,
                         ControllerName = script.ControllerName,
                         Code = script.Code,
                         Language = script.Language
@@ -231,6 +232,7 @@ public class AppsControllerExecutionService
                 var payload = new
                 {
                     AppId = appId,
+                    RelativePath = script.RelativePath,
                     ControllerName = script.ControllerName,
                     Code = script.Code,
                     Language = script.Language

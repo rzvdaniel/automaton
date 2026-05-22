@@ -4,7 +4,7 @@ namespace Automaton.Studio.Server.Models;
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
-public record BackendScriptFile(string ControllerName, string Code, string Language);
+public record BackendScriptFile(string RelativePath, string ControllerName, string Code, string Language);
 
 // ── Deploy response ───────────────────────────────────────────────────────────
 
