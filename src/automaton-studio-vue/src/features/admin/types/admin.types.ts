@@ -180,6 +180,12 @@ export interface AiProvidersOperationalConfig {
   historyCompaction: HistoryCompactionConfig
 }
 
+export interface AppDeployRulesSettings {
+  sourceExclude: string[]
+  frontendExclude: string[]
+  backendExclude: string[]
+}
+
 /**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend

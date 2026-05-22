@@ -15,6 +15,7 @@ import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
 import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
+import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -67,6 +68,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminLogsView,
         meta: {
           title: 'Server Logs',
+        },
+      },
+      {
+        path: 'app-deploy-rules',
+        name: 'admin-app-deploy-rules',
+        component: AdminAppDeployRulesView,
+        meta: {
+          title: 'App Deploy Rules',
         },
       },
       {

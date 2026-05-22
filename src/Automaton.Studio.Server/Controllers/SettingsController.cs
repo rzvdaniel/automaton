@@ -66,6 +66,7 @@ public class SettingsController : BaseController
     }
 
     [HttpGet("app-deploy-rules")]
+    [Authorize(Roles = "Admin,SysAdmin")]
     public async Task<ActionResult<Automaton.Studio.Server.Models.AppDeployRulesSettings>> GetAppDeployRules()
     {
         try
@@ -80,7 +81,7 @@ public class SettingsController : BaseController
     }
 
     [HttpPut("app-deploy-rules")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,SysAdmin")]
     public async Task<IActionResult> UpdateAppDeployRules([FromBody] Automaton.Studio.Server.Models.AppDeployRulesSettings settings)
     {
         try

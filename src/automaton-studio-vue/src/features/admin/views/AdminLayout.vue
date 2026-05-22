@@ -40,6 +40,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/app-activity',
   },
   {
+    label: 'App Deploy Rules',
+    icon: 'pi pi-filter',
+    to: '/admin/app-deploy-rules',
+    routePrefix: '/admin/app-deploy-rules',
+  },
+  {
     label: 'Server Logs',
     icon: 'pi pi-list',
     to: '/admin/logs',
