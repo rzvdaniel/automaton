@@ -8,8 +8,6 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -31,7 +29,7 @@ import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
-import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
+import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
@@ -349,12 +347,6 @@ onUnmounted(() => {
 })
 
 // Format token count for display (K/M notation)
-function formatTokenCount(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`
-  return tokens.toString()
-}
-
 // Refresh chat statistics from the backend
 async function refreshChatStats() {
   if (appId.value) {
@@ -683,6 +675,14 @@ function openPublishingSettings() {
   void router.replace({ query: { ...route.query, settings: 'publishing' } })
 }
 
+function openPublishedApp() {
+  if (!editorStore.publicUrl) {
+    return
+  }
+
+  window.open(`/web/${editorStore.publicUrl}`, '_blank', 'noopener')
+}
+
 // Handle unpublish
 async function handleUnpublish() {
   confirm.require({
@@ -989,226 +989,41 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
     <!-- Main editor -->
     <template v-else-if="editorStore.currentApp">
-      <!-- Header -->
-      <div class="editor-header">
-        <div class="header-left">
-          <Button
-            v-tooltip.bottom="'Back to Apps'"
-            icon="pi pi-arrow-left"
-            text
-            rounded
-            severity="secondary"
-            @click="handleBack"
-          />
-          <div class="app-info">
-            <div class="flex align-items-center gap-2">
-              <i class="pi pi-globe" style="color: var(--p-primary-500)"></i>
-              <span v-if="!isEditingName" class="app-name" @click="startEditingName">
-                {{ editorStore.currentApp.name }}
-              </span>
-              <InputText
-                v-else
-                v-model="editingName"
-                class="app-name-input"
-                @blur="saveAppName"
-                @keyup.enter="saveAppName"
-                @keyup.escape="cancelEditingName"
-              />
-              <Tag
-                v-if="editorStore.isPublished"
-                value="Published"
-                severity="success"
-              />
-              <Tag v-else value="Draft" severity="warn" />
-            </div>
-            <!-- Tab buttons for Build/Code/Monitor/Settings -->
-            <div class="view-tabs">
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'build' }"
-                @click="activeTab = 'build'"
-              >
-                <i class="pi pi-eye"></i>
-                Build
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'code' }"
-                @click="activeTab = 'code'"
-              >
-                <i class="pi pi-file-edit"></i>
-                Code
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'backend-server' }"
-                @click="activeTab = 'backend-server'"
-              >
-                <i class="pi pi-server"></i>
-                Backend Server
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'monitor' }"
-                @click="activeTab = 'monitor'"
-              >
-                <i class="pi pi-chart-bar"></i>
-                Monitor
-              </button>
-              <button
-                class="view-tab"
-                :class="{ active: activeTab === 'settings' }"
-                @click="activeTab = 'settings'"
-              >
-                <i class="pi pi-cog"></i>
-                Settings
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="header-right">
-          <!-- Build and Code tabs: show action buttons -->
-          <template v-if="activeTab === 'build' || activeTab === 'code' || activeTab === 'backend-server'">
-            <!-- Runner selector (hidden when confirmed no runners; shown while loading or when runners exist) -->
-            <div v-if="hasRunners !== false" class="flex align-items-center gap-2">
-              <span
-                v-tooltip.bottom="'Choose which runner executes this app\'s backend'"
-                class="text-sm text-color-secondary runner-label"
-              >Runs on:</span>
-              <RunnerSelector
-                v-model="selectedRunnerId"
-                :disabled="editorStore.isSaving"
-                @runners-loaded="(count) => hasRunners = count > 0"
-              />
-            </div>
-
-            <!-- Chat statistics display -->
-            <div v-if="chatStats" class="flex align-items-center gap-2">
-              <Button
-                v-tooltip.bottom="`${chatStats.totalPromptsSubmitted} prompts submitted`"
-                :label="`${chatStats.totalPromptsSubmitted}`"
-                icon="pi pi-comments"
-                text
-                severity="secondary"
-                size="small"
-              />
-              <Button
-                v-tooltip.bottom="`${chatStats.totalTokens} tokens used (${chatStats.inputTokens} in / ${chatStats.outputTokens} out)`"
-                :label="formatTokenCount(chatStats.totalTokens)"
-                icon="pi pi-zap"
-                text
-                severity="secondary"
-                size="small"
-              />
-            </div>
-
-            <Button
-              v-if="editorStore.hasUnsavedChanges && activeTab === 'code'"
-              label="Save All"
-              icon="pi pi-save"
-              :loading="editorStore.isSaving"
-              outlined
-              severity="secondary"
-              @click="handleSaveAll"
-            />
-
-            <Button
-              v-if="activeTab !== 'backend-server'"
-              v-tooltip.bottom="'Open full-screen preview'"
-              icon="pi pi-eye"
-              label="Preview"
-              outlined
-              severity="secondary"
-              @click="editorStore.openPreviewOverlay()"
-            />
-
-            <Button
-              v-if="activeTab !== 'backend-server'"
-              :label="editorStore.canDeployFromStudio ? 'Deploy App' : 'Managed Locally'"
-              icon="pi pi-cloud-upload"
-              :severity="editorStore.canDeployFromStudio ? 'primary' : 'secondary'"
-              :outlined="!editorStore.canDeployFromStudio"
-              :loading="editorStore.isDeployingApp"
-              :disabled="editorStore.isDeployingApp || !editorStore.canDeployFromStudio"
-              @click="handleDeployApp"
-            />
-            <Button
-              v-if="activeTab !== 'backend-server'"
-              label="Deploy Frontend"
-              icon="pi pi-desktop"
-              outlined
-              severity="secondary"
-              :loading="editorStore.isDeployingApp"
-              :disabled="editorStore.isDeployingApp || !editorStore.canDeployFrontendFromStudio"
-              @click="handleDeployFrontend"
-            />
-            <span v-if="editorStore.deployAppStatusMessage" class="text-sm text-color-secondary">
-              {{ editorStore.deployAppStatusMessage }}
-            </span>
-
-            <!-- Publish CTA -->
-            <template v-if="editorStore.isPublished">
-              <a
-                :href="`/web/${editorStore.publicUrl}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="no-underline"
-              >
-                <Button
-                  v-tooltip.bottom="'Open published app in new tab'"
-                  label="Open"
-                  icon="pi pi-external-link"
-                  outlined
-                  severity="secondary"
-                />
-              </a>
-              <Button
-                label="Publishing settings"
-                icon="pi pi-cog"
-                outlined
-                severity="secondary"
-                @click="openPublishingSettings"
-              />
-              <Button
-                label="Unpublish"
-                icon="pi pi-cloud-download"
-                outlined
-                severity="secondary"
-                @click="handleUnpublish"
-              />
-            </template>
-            <Button
-              v-else
-              label="Publish App"
-              icon="pi pi-cloud-upload"
-              severity="success"
-              @click="showPublishDialog = true"
-            />
-
-            <Button
-              v-tooltip.bottom="'Update live/backend from source/backend when available, otherwise redeploy the existing live backend'"
-              label="Deploy Backend"
-              icon="pi pi-server"
-              outlined
-              severity="secondary"
-              :loading="editorStore.isDeployingBackend"
-              :disabled="editorStore.isDeployingBackend"
-              @click="handleDeployBackend"
-            />
-            <span v-if="editorStore.deployStatusMessage" class="text-sm text-color-secondary">
-              {{ editorStore.deployStatusMessage }}
-            </span>
-          </template>
-        </div>
-      </div>
+      <AppEditorWorkspaceBar
+        :app-name="editorStore.currentApp.name"
+        :is-editing-name="isEditingName"
+        :editing-name="editingName"
+        :is-published="editorStore.isPublished"
+        :active-tab="activeTab"
+        :has-runners="hasRunners"
+        :selected-runner-id="selectedRunnerId"
+        :is-saving="editorStore.isSaving"
+        :has-unsaved-changes="editorStore.hasUnsavedChanges"
+        :can-deploy-from-studio="editorStore.canDeployFromStudio"
+        :can-deploy-frontend-from-studio="editorStore.canDeployFrontendFromStudio"
+        :is-deploying-app="editorStore.isDeployingApp"
+        :is-deploying-backend="editorStore.isDeployingBackend"
+        @back="handleBack"
+        @update:editing-name="editingName = $event"
+        @start-editing="startEditingName"
+        @save-name="saveAppName"
+        @cancel-editing="cancelEditingName"
+        @update:active-tab="activeTab = $event"
+        @update:selected-runner-id="selectedRunnerId = $event"
+        @runners-loaded="(count) => hasRunners = count > 0"
+        @save-all="handleSaveAll"
+        @preview="editorStore.openPreviewOverlay()"
+        @deploy-app="handleDeployApp"
+        @deploy-frontend="handleDeployFrontend"
+        @deploy-backend="handleDeployBackend"
+        @publish="showPublishDialog = true"
+        @open-published-app="openPublishedApp"
+        @open-publishing-settings="openPublishingSettings"
+        @unpublish="handleUnpublish"
+      />
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
         This app was deployed from local files. Studio is showing the live artifact because source files are not available here. Use <code>automaton deploy</code> from your local project, or upload source files to enable Studio deploy.
-      </div>
-
-      <div v-else-if="editorStore.showsSourceDeployBanner" class="mode-banner mode-banner-source">
-        You are editing source files. Frontend source {{ editorStore.currentApp.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved' }}. Backend source {{ editorStore.currentApp.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved' }}.
       </div>
 
       <!-- Monitor View -->
@@ -1473,62 +1288,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   height: 100%;
 }
 
-.editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.app-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* View tabs (Code/Settings) */
-.view-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.view-tab {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border: none;
-  background: transparent;
-  color: var(--p-text-muted-color);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: var(--p-border-radius);
-  transition: all 0.15s ease;
-}
-
-.view-tab:hover {
-  background: var(--p-surface-100);
-  color: var(--p-text-color);
-}
-
-.view-tab.active {
-  background: var(--p-primary-100);
-  color: var(--p-primary-600);
-}
-
-.view-tab i {
-  font-size: 0.75rem;
-}
-
 /* Right panel tabs */
 .right-panel-container {
   display: flex;
@@ -1616,10 +1375,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 }
 
 /* Runner label in header */
-.runner-label {
-  white-space: nowrap;
-}
-
 /* Monitor view */
 .monitor-view {
   flex: 1;
@@ -1659,29 +1414,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   background: var(--p-primary-500);
   color: white;
   border-radius: 0.625rem;
-}
-
-.app-name {
-  font-size: 1.125rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--p-text-color);
-}
-
-.app-name:hover {
-  text-decoration: underline;
-}
-
-.app-name-input {
-  font-size: 1.125rem;
-  font-weight: 600;
-  width: 200px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .mode-banner {
@@ -1846,10 +1578,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   background-color: var(--p-surface-900);
 }
 
-:global(.app-dark) .editor-header {
-  border-color: var(--p-surface-700);
-}
-
 :global(.app-dark) .mode-banner {
   border-color: var(--p-surface-700);
 }
@@ -1888,15 +1616,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 :global(.app-dark) .ai-sidebar {
   border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .view-tab:hover {
-  background: var(--p-surface-700);
-}
-
-:global(.app-dark) .view-tab.active {
-  background: var(--p-primary-900);
-  color: var(--p-primary-300);
 }
 
 /* Splitter gutter styling */

@@ -57,11 +57,6 @@ onMounted(async () => {
       <!-- Top Toolbar -->
       <AppToolbar />
 
-      <div class="preview-banner">
-        <span class="preview-banner__label">Developer Preview</span>
-        <span class="preview-banner__text">APIs and features may change as the platform evolves.</span>
-      </div>
-
       <!-- Page Content -->
       <main class="app-main">
         <RouterView />
@@ -79,46 +74,4 @@ onMounted(async () => {
   width: 100%;
 }
 
-.preview-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 1.5rem;
-  border-bottom: 1px solid var(--p-surface-200);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--p-cyan-500) 12%, transparent), transparent 70%),
-    var(--p-surface-0);
-  color: var(--p-text-color);
-}
-
-.preview-banner__label {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.7rem;
-  padding: 0 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--p-cyan-500) 34%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--p-cyan-500) 12%, transparent);
-  color: var(--p-cyan-700);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.preview-banner__text {
-  font-size: 0.9rem;
-  color: var(--p-text-muted-color);
-}
-
-:global(.app-dark) .preview-banner {
-  border-bottom-color: var(--p-surface-700);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--p-cyan-400) 18%, transparent), transparent 70%),
-    var(--p-surface-900);
-}
-
-:global(.app-dark) .preview-banner__label {
-  color: var(--p-cyan-200);
-}
 </style>

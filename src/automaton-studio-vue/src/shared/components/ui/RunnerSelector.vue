@@ -43,7 +43,13 @@ const runnerOptions = computed(() => {
     label: `${runner.name} (${runner.status})`,
     value: runner.id,
     disabled: runner.status === 'Offline',
+    status: runner.status,
+    name: runner.name,
   }))
+})
+
+const selectedRunner = computed(() => {
+  return runners.value.find((runner) => runner.id === selectedRunnerId.value) ?? null
 })
 
 // Methods
@@ -92,15 +98,21 @@ onMounted(() => {
   >
     <template #value="slotProps">
       <div v-if="slotProps.value" class="flex align-items-center gap-2">
-        <i class="pi pi-server" style="font-size: 0.875rem"></i>
-        <span>{{ runners.find(r => r.id === slotProps.value)?.name || 'Unknown runner' }}</span>
+        <span
+          class="runner-status-dot"
+          :class="selectedRunner?.status === 'Online' ? 'runner-status-dot-online' : 'runner-status-dot-offline'"
+        ></span>
+        <span>{{ selectedRunner?.name || 'Unknown runner' }}</span>
       </div>
       <span v-else class="text-color-secondary">{{ slotProps.placeholder }}</span>
     </template>
     
     <template #option="slotProps">
       <div class="flex align-items-center gap-2">
-        <i class="pi pi-server" style="font-size: 0.875rem"></i>
+        <span
+          class="runner-status-dot"
+          :class="slotProps.option.status === 'Online' ? 'runner-status-dot-online' : 'runner-status-dot-offline'"
+        ></span>
         <span>{{ slotProps.option.label }}</span>
       </div>
     </template>
@@ -110,5 +122,20 @@ onMounted(() => {
 <style scoped>
 .runner-selector {
   min-width: 200px;
+}
+
+.runner-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.runner-status-dot-online {
+  background: var(--p-green-500);
+}
+
+.runner-status-dot-offline {
+  background: var(--p-surface-400);
 }
 </style>

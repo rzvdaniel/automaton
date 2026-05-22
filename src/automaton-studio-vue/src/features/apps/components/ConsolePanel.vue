@@ -158,7 +158,7 @@ function clearConsole(): void {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid color-mix(in srgb, var(--p-surface-300) 72%, transparent);
   flex-shrink: 0;
 }
 
@@ -180,13 +180,13 @@ function clearConsole(): void {
 
 .console-entry {
   margin-bottom: 0.5rem;
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
+  border-radius: 10px;
   overflow: hidden;
+  background: color-mix(in srgb, var(--p-surface-100) 60%, transparent);
 }
 
 .console-entry.entry-error {
-  border-color: var(--p-red-200);
+  background: color-mix(in srgb, var(--p-red-50) 68%, transparent);
 }
 
 .entry-header {
@@ -194,13 +194,12 @@ function clearConsole(): void {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.75rem;
-  background: var(--p-surface-50);
-  border-bottom: 1px solid var(--p-surface-200);
+  background: transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--p-surface-300) 62%, transparent);
 }
 
 .entry-error .entry-header {
-  background: var(--p-red-50);
-  border-color: var(--p-red-200);
+  border-color: color-mix(in srgb, var(--p-red-200) 60%, transparent);
 }
 
 .step-name {
@@ -229,8 +228,8 @@ function clearConsole(): void {
 .detail-code {
   margin: 0.25rem 0 0 0;
   padding: 0.5rem;
-  background: var(--p-surface-100);
-  border-radius: var(--p-border-radius);
+  background: color-mix(in srgb, var(--p-surface-0) 45%, transparent);
+  border-radius: 8px;
   font-family: monospace;
   font-size: 0.8125rem;
   white-space: pre-wrap;
@@ -245,38 +244,37 @@ function clearConsole(): void {
 
 .error-message {
   padding: 0.5rem;
-  background: var(--p-red-50);
-  border-radius: var(--p-border-radius);
+  background: color-mix(in srgb, var(--p-red-50) 72%, transparent);
+  border-radius: 8px;
 }
 
 /* Dark mode */
 :global(.app-dark) .console-header {
-  border-color: var(--p-surface-700);
+  border-color: color-mix(in srgb, var(--p-surface-600) 68%, transparent);
 }
 
 :global(.app-dark) .console-entry {
-  border-color: var(--p-surface-700);
+  background: color-mix(in srgb, var(--p-surface-800) 72%, transparent);
 }
 
 :global(.app-dark) .console-entry.entry-error {
-  border-color: var(--p-red-800);
+  background: color-mix(in srgb, var(--p-red-900) 28%, transparent);
 }
 
 :global(.app-dark) .entry-header {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--p-surface-600) 68%, transparent);
 }
 
 :global(.app-dark) .entry-error .entry-header {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: var(--p-red-800);
+  border-color: color-mix(in srgb, var(--p-red-700) 55%, transparent);
 }
 
 :global(.app-dark) .detail-code {
-  background: var(--p-surface-800);
+  background: color-mix(in srgb, var(--p-surface-900) 55%, transparent);
 }
 
 :global(.app-dark) .error-message {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--p-red-900) 22%, transparent);
 }
 </style>

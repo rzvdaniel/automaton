@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
-import SelectButton from 'primevue/selectbutton'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
-import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
+import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
 import LiveUiLogPanel from './LiveUiLogPanel.vue'
 
@@ -24,12 +23,7 @@ const props = withDefaults(
 
 const editorStore = useAppEditorStore()
 const router = useRouter()
-
-const previewModes = [
-  { icon: 'pi pi-desktop', value: 'desktop' as PreviewMode, label: 'Desktop' },
-  { icon: 'pi pi-tablet', value: 'tablet' as PreviewMode, label: 'Tablet' },
-  { icon: 'pi pi-mobile', value: 'mobile' as PreviewMode, label: 'Mobile' },
-]
+const { isDark } = useUserSettings()
 
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
 const uiTestEntries = computed(() =>
@@ -50,10 +44,6 @@ const lastUiTestAction = computed(() => {
     : first.message
   return message.split(' — ')[0]
 })
-
-function handleModeChange(mode: PreviewMode) {
-  editorStore.setPreviewMode(mode)
-}
 
 function focusAllLogs() {
   editorStore.setUiLogFilter(UiLogFilter.All)
@@ -207,48 +197,6 @@ const previewViewportStyle = computed(() => {
 
 <template>
   <div class="build-visual-workspace">
-    <!-- Controls bar -->
-    <div class="preview-header">
-      <div class="flex align-items-center gap-2">
-        <!-- Connection status dot — clickable micro-CTA when backend needed -->
-        <div
-          class="connection-status"
-          :class="backendConnected ? 'connected' : (editorStore.hasBackendFolder ? 'needs-runner' : 'ui-only')"
-          :style="editorStore.hasBackendFolder && !backendConnected ? 'cursor:pointer' : ''"
-          v-tooltip.bottom="backendConnected ? 'Backend connected' : (editorStore.hasBackendFolder ? 'UI preview is free · Backend execution requires Pro' : 'This app has no backend')"
-          @click="editorStore.hasBackendFolder && !backendConnected ? (backendCardDismissed = false) : undefined"
-        >
-          <span class="status-dot"></span>
-          <span class="status-label">
-            <template v-if="backendConnected">Live</template>
-            <template v-else-if="editorStore.hasBackendFolder">Backend needed · <u>Set up</u></template>
-            <template v-else>UI only</template>
-          </span>
-        </div>
-        <SelectButton
-          :model-value="editorStore.previewMode"
-          :options="previewModes"
-          option-value="value"
-          :allow-empty="false"
-          @update:model-value="handleModeChange"
-        >
-          <template #option="{ option }">
-            <div class="flex align-items-center gap-2">
-              <i :class="option.icon"></i>
-              <span>{{ option.label }}</span>
-            </div>
-          </template>
-        </SelectButton>
-        <Button
-          icon="pi pi-refresh"
-          text
-          severity="secondary"
-          :loading="editorStore.isLoadingPreview"
-          @click="editorStore.refreshPreview()"
-        />
-      </div>
-    </div>
-
     <!-- Collapsed: preview fills all space -->
     <div v-if="!isAdvancedExpanded" class="preview-only">
       <div class="preview-content">
@@ -326,9 +274,13 @@ const previewViewportStyle = computed(() => {
         </div>
       </div>
       <!-- Logs toggle bar (collapsed) -->
-      <button class="advanced-toggle-bar" @click="isAdvancedExpanded = true">
+      <button
+        class="advanced-toggle-handle"
+        :class="{ 'advanced-toggle-handle-dark': isDark }"
+        @click="isAdvancedExpanded = true"
+      >
         <i class="pi pi-chevron-up"></i>
-        <span>Show Logs</span>
+        <span>Logs</span>
       </button>
     </div>
 
@@ -421,9 +373,13 @@ const previewViewportStyle = computed(() => {
 
       <SplitterPanel :size="splitterSizes[1]" :min-size="12" class="splitter-panel">
         <!-- Logs toggle bar (expanded) -->
-        <button class="advanced-toggle-bar" @click="isAdvancedExpanded = false">
+        <button
+          class="advanced-toggle-handle advanced-toggle-handle-expanded"
+          :class="{ 'advanced-toggle-handle-dark': isDark }"
+          @click="isAdvancedExpanded = false"
+        >
           <i class="pi pi-chevron-down"></i>
-          <span>Hide Logs</span>
+          <span>Logs</span>
         </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
@@ -463,15 +419,6 @@ const previewViewportStyle = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
 }
 
 .visual-splitter {
@@ -670,31 +617,47 @@ const previewViewportStyle = computed(() => {
 }
 
 
-/* Show/Hide Logs toggle bar */
-.advanced-toggle-bar {
+/* Show/Hide Logs toggle handle */
+.advanced-toggle-handle {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  width: 100%;
-  padding: 0.4rem 1rem;
+  align-self: center;
+  min-width: 6rem;
+  height: 1.75rem;
+  margin: 0.35rem 0 0;
+  padding: 0 0.75rem;
   border: none;
-  border-top: 1px solid var(--p-surface-200);
-  background: var(--p-surface-50);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--p-surface-100) 80%, transparent);
   color: var(--p-text-muted-color);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.advanced-toggle-bar:hover {
-  background: var(--p-surface-100);
+.advanced-toggle-handle:hover {
+  background: color-mix(in srgb, var(--p-surface-200) 88%, transparent);
   color: var(--p-text-color);
 }
 
-.advanced-toggle-bar i {
-  font-size: 0.7rem;
+.advanced-toggle-handle i {
+  font-size: 0.65rem;
+}
+
+.advanced-toggle-handle-expanded {
+  margin: 0.45rem auto 0.35rem;
+}
+
+.advanced-toggle-handle-dark {
+  background: color-mix(in srgb, var(--p-surface-800) 88%, transparent);
+}
+
+.advanced-toggle-handle-dark:hover {
+  background: color-mix(in srgb, var(--p-surface-700) 92%, transparent);
 }
 
 .splitter-panel {
@@ -837,23 +800,11 @@ const previewViewportStyle = computed(() => {
   border-top: 1px solid var(--p-surface-200);
 }
 
-:global(.app-dark) .preview-header {
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .advanced-toggle-bar {
-  background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
-}
-
-:global(.app-dark) .advanced-toggle-bar:hover {
-  background: var(--p-surface-700);
-}
-
 :global(.app-dark) .preview-viewport {
   border-color: var(--p-surface-700);
   background: var(--p-surface-900);
 }
+
 
 :global(.app-dark) .logs-placeholder {
   border-color: var(--p-surface-700);

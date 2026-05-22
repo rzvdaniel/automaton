@@ -71,6 +71,7 @@ const emit = defineEmits<{
 }>()
 
 const { showAiDebugDetails } = useUserSettings()
+const { isDark } = useUserSettings()
 const router = useRouter()
 
 // AI Chat composable with tool execution callback
@@ -672,7 +673,7 @@ function handleKeyPress(event: KeyboardEvent) {
     <!-- Sessions List View -->
     <template v-if="currentView === 'sessions'">
       <!-- Header -->
-      <div class="ai-header">
+      <div class="ai-header" :class="{ 'ai-header-dark': isDark }">
         <div class="flex align-items-center justify-content-between w-full gap-2">
           <div class="flex align-items-center gap-2">
             <i class="pi pi-sparkles" style="color: var(--p-primary-500)"></i>
@@ -804,8 +805,8 @@ function handleKeyPress(event: KeyboardEvent) {
       </div>
 
       <!-- Input area always visible -->
-      <div class="input-area">
-        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys }">
+      <div class="input-area" :class="{ 'input-area-dark': isDark }">
+        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys, 'prompt-box-dark': isDark }">
           <Textarea
             v-model="userInput"
             :placeholder="hasNoKeys ? 'Add an AI key to start chatting...' : 'Ask AI a question...'"
@@ -855,7 +856,7 @@ function handleKeyPress(event: KeyboardEvent) {
 
     <!-- Chat View (Session Detail) -->
     <template v-else>
-      <div class="ai-header">
+      <div class="ai-header" :class="{ 'ai-header-dark': isDark }">
         <div class="flex align-items-center justify-content-between w-full gap-2">
           <div class="flex align-items-center gap-2">
             <Button
@@ -1086,8 +1087,8 @@ function handleKeyPress(event: KeyboardEvent) {
       </div>
 
       <!-- Input area -->
-      <div class="input-area">
-        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys }">
+      <div class="input-area" :class="{ 'input-area-dark': isDark }">
+        <div class="prompt-box" :class="{ 'prompt-box--disabled': hasNoKeys, 'prompt-box-dark': isDark }">
           <Textarea
             v-model="userInput"
             :placeholder="hasNoKeys ? 'Add an AI key to start chatting...' : 'Describe what you want...'"
@@ -1235,7 +1236,7 @@ function handleKeyPress(event: KeyboardEvent) {
 .sessions-view {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0.875rem;
 }
 
 .no-keys-banner {
@@ -1245,14 +1246,12 @@ function handleKeyPress(event: KeyboardEvent) {
   text-align: center;
   padding: 1.25rem 1rem;
   margin-bottom: 1rem;
-  border-radius: 8px;
-  background: var(--p-surface-100);
-  border: 1px solid var(--p-surface-200);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--p-surface-100) 72%, transparent);
 }
 
 :root.app-dark .no-keys-banner {
   background: var(--p-surface-800);
-  border-color: var(--p-surface-700);
 }
 
 .loading-state {
@@ -1288,23 +1287,22 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 .session-card {
-  padding: 1rem;
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
+  padding: 0.875rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border-left: 3px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  background: color-mix(in srgb, var(--p-surface-100) 55%, transparent);
 }
 
 .session-card:hover {
-  border-color: var(--p-primary-300);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-color: color-mix(in srgb, var(--p-primary-300) 55%, transparent);
+  background: color-mix(in srgb, var(--p-surface-100) 82%, transparent);
 }
 
 .session-card.active {
-  border-left-color: var(--p-primary-500);
-  border-color: var(--p-primary-300);
-  background: var(--p-highlight-background);
+  border-color: color-mix(in srgb, var(--p-primary-400) 55%, transparent);
+  background: color-mix(in srgb, var(--p-primary-50) 72%, var(--p-surface-0));
 }
 
 .session-card-content {
@@ -1375,8 +1373,12 @@ function handleKeyPress(event: KeyboardEvent) {
 
 .ai-header {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
+  background: color-mix(in srgb, var(--p-surface-0) 92%, transparent);
+}
+
+.ai-header-dark {
+  background: var(--p-surface-900);
 }
 
 .header-strategy-badge {
@@ -1406,7 +1408,7 @@ function handleKeyPress(event: KeyboardEvent) {
 .messages-area {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0.875rem 1rem;
 }
 
 .context-start-notice {
@@ -1640,13 +1642,11 @@ function handleKeyPress(event: KeyboardEvent) {
   font-size: 0.68rem;
   font-family: monospace;
   color: var(--p-surface-400);
-  background: var(--p-surface-100);
-  border: 1px solid var(--p-surface-200);
+  background: color-mix(in srgb, var(--p-surface-100) 70%, transparent);
   border-radius: 999px;
 
   .app-dark & {
     background: var(--p-surface-800);
-    border-color: var(--p-surface-700);
   }
 }
 
@@ -1746,8 +1746,7 @@ function handleKeyPress(event: KeyboardEvent) {
 
 .session-metrics-footer {
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--p-surface-200);
-  background-color: var(--p-surface-50);
+  background-color: color-mix(in srgb, var(--p-surface-100) 60%, transparent);
   flex-shrink: 0;
 }
 
@@ -1793,23 +1792,35 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 .input-area {
-  padding: 0.75rem;
-  border-top: 1px solid var(--p-surface-200);
+  padding: 0.625rem 0.75rem 0.75rem;
   flex-shrink: 0;
+  background: color-mix(in srgb, var(--p-surface-0) 96%, transparent);
+}
+
+.input-area-dark {
+  background: var(--p-surface-900);
 }
 
 .prompt-box {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--p-surface-300);
   border-radius: 10px;
-  background: var(--p-surface-0);
+  background: color-mix(in srgb, var(--p-surface-100) 62%, var(--p-surface-0));
   padding: 6px 8px 4px 10px;
-  transition: border-color 0.15s;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.prompt-box-dark {
+  background: var(--p-surface-800);
 }
 
 .prompt-box:focus-within {
-  border-color: var(--p-primary-400);
+  background: var(--p-surface-0);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--p-primary-400) 75%, transparent);
+}
+
+.prompt-box-dark:focus-within {
+  background: var(--p-surface-800);
 }
 
 .prompt-box--disabled {
@@ -1836,7 +1847,7 @@ function handleKeyPress(event: KeyboardEvent) {
   justify-content: space-between;
   margin-top: 4px;
   padding-top: 5px;
-  border-top: 1px solid var(--p-surface-200);
+  border-top: 1px solid color-mix(in srgb, var(--p-surface-300) 72%, transparent);
 }
 
 .prompt-right {
@@ -1852,7 +1863,11 @@ function handleKeyPress(event: KeyboardEvent) {
 
 /* Dark mode - removed session-card overrides as we now use CSS variables */
 :global(.app-dark) .ai-header {
-  border-color: var(--p-surface-700);
+  background: var(--p-surface-900);
+}
+
+:global(:root.app-dark) .ai-header {
+  background: var(--p-surface-900);
 }
 
 
@@ -1868,11 +1883,18 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 :global(.app-dark) .input-area {
-  border-color: var(--p-surface-700);
+  background: var(--p-surface-900);
+}
+
+:global(:root.app-dark) .input-area {
+  background: var(--p-surface-900);
 }
 
 :global(.app-dark) .prompt-box {
-  border-color: var(--p-surface-600);
+  background: var(--p-surface-800);
+}
+
+:global(:root.app-dark) .prompt-box {
   background: var(--p-surface-800);
 }
 
@@ -1885,7 +1907,7 @@ function handleKeyPress(event: KeyboardEvent) {
 }
 
 :global(.app-dark) .prompt-toolbar {
-  border-color: var(--p-surface-600);
+  border-color: color-mix(in srgb, var(--p-surface-600) 74%, transparent);
 }
 
 </style>

@@ -22,7 +22,7 @@ public class SettingsController : BaseController
     }
 
     [HttpGet("app-deploy-rules")]
-    public async Task<ActionResult<Automaton.Studio.Server.Models.AppDeployRulesSettings>> GetAppDeployRules()
+    public async Task<ActionResult<Models.AppDeployRulesSettings>> GetAppDeployRules()
     {
         try
         {

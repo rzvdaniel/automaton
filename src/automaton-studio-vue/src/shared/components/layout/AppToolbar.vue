@@ -120,6 +120,13 @@ function goToSettings() {
         </div>
         <div class="border-right" style="height: 1.5rem"></div>
         <ProjectSwitcher />
+        <span
+          v-tooltip.bottom="'Developer Preview\nAPIs and features may change as the platform evolves.'"
+          class="preview-badge"
+        >
+          <span class="preview-badge__full">Developer Preview</span>
+          <span class="preview-badge__compact">Preview</span>
+        </span>
       </div>
     </template>
 
@@ -163,5 +170,38 @@ function goToSettings() {
 /* Dark mode styles handled in main.css */
 .app-toolbar {
   padding: 0 1rem;
+}
+
+.preview-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--p-cyan-500) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--p-cyan-500) 10%, transparent);
+  color: var(--p-cyan-700);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.preview-badge__compact {
+  display: none;
+}
+
+:global(.app-dark) .preview-badge {
+  color: var(--p-cyan-200);
+}
+
+@media (max-width: 900px) {
+  .preview-badge__full {
+    display: none;
+  }
+
+  .preview-badge__compact {
+    display: inline;
+  }
 }
 </style>

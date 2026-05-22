@@ -163,7 +163,6 @@ function downloadLogsAsJson(): void {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-top: 1px solid var(--p-surface-200);
 }
 
 .live-logs-header {
@@ -171,7 +170,7 @@ function downloadLogsAsJson(): void {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid color-mix(in srgb, var(--p-surface-300) 72%, transparent);
   gap: 0.5rem;
 }
 
@@ -192,21 +191,18 @@ function downloadLogsAsJson(): void {
 .entries {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.125rem;
 }
 
 .entry {
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
-  padding: 0.5rem;
-  background: var(--p-surface-50);
+  padding: 0.45rem 0.5rem;
+  background: color-mix(in srgb, var(--p-surface-100) 60%, transparent);
+  border-radius: 8px;
 }
 
 .entry.compact {
   padding: 0.25rem 0.4rem;
   background: transparent;
-  border-color: transparent;
-  border-bottom: 1px solid var(--p-surface-200);
   border-radius: 0;
 }
 
@@ -238,15 +234,14 @@ function downloadLogsAsJson(): void {
 }
 
 :global(.app-dark) .live-logs {
-  border-color: var(--p-surface-700);
+  background: transparent;
 }
 
 :global(.app-dark) .live-logs-header {
-  border-color: var(--p-surface-700);
+  border-color: color-mix(in srgb, var(--p-surface-600) 68%, transparent);
 }
 
 :global(.app-dark) .entry {
-  border-color: var(--p-surface-700);
-  background: var(--p-surface-800);
+  background: color-mix(in srgb, var(--p-surface-800) 70%, transparent);
 }
 </style>

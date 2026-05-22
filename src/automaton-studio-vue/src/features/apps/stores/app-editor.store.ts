@@ -160,6 +160,28 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const isLocalManagedApp = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Local)
   const showsLocalLiveBanner = computed(() => isLocalManagedApp.value && !currentApp.value?.frontend.sourceAvailable)
   const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || canDeployFromStudio.value)
+  const editorModeNoticeLabel = computed(() => {
+    if (showsLocalLiveBanner.value) {
+      return 'Editing live files'
+    }
+
+    if (showsSourceDeployBanner.value) {
+      return 'Editing source files'
+    }
+
+    return null
+  })
+  const editorModeNoticeText = computed(() => {
+    if (showsLocalLiveBanner.value) {
+      return 'This app was deployed from local files. Studio is showing the live artifact because source files are not available here. Use automaton deploy from your local project, or upload source files to enable Studio deploy.'
+    }
+
+    if (!showsSourceDeployBanner.value || !currentApp.value) {
+      return null
+    }
+
+    return `You are editing source files. Frontend source ${currentApp.value.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved'}. Backend source ${currentApp.value.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved'}.`
+  })
   const preferredPreviewScope = computed<AppFileSystemScope>(() => {
     const hasLiveIndex = Boolean(findFileInTree(fileTree.value, 'live/frontend/index.html'))
     return hasLiveIndex ? FileSystemScope.Live : FileSystemScope.Source
@@ -1110,6 +1132,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLocalManagedApp,
     showsLocalLiveBanner,
     showsSourceDeployBanner,
+    editorModeNoticeLabel,
+    editorModeNoticeText,
     isEditableScope,
     preferredPreviewScope,
 
