@@ -109,22 +109,23 @@ public sealed class DeployPreparationService
 
         if (connectedRunners.Count == 0)
         {
-            checks.Add(new DeployCheckResult(DeployCheckNames.RunnerLookup, false, "no connected runners are available for backend deploy"));
+            checks.Add(new DeployCheckResult(DeployCheckNames.RunnerLookup, false, "no connected runners are available for backend deploy", IsWarning: true));
             nextSteps.Add("Create or deploy a runner in Automaton Studio, then rerun automaton deploy");
             nextSteps.Add("If a connected runner already exists, rerun automaton deploy with --runner <runner-id-or-name>");
             return new DeployPreparationResult
             {
-                Success = false,
+                Success = true,
                 Checks = checks,
                 NextSteps = nextSteps.ToList()
             };
         }
 
-        checks.Add(new DeployCheckResult(DeployCheckNames.RunnerLookup, false, $"multiple connected runners are available ({connectedRunners.Count})"));
+        checks.Add(new DeployCheckResult(DeployCheckNames.RunnerLookup, false, $"multiple connected runners are available ({connectedRunners.Count})", IsWarning: true));
         nextSteps.Add("Choose a runner during deploy or rerun with --runner <runner-id-or-name>");
         return new DeployPreparationResult
         {
-            Success = false,
+            Success = true,
+            RequiresRunnerSelection = true,
             Checks = checks,
             NextSteps = nextSteps.ToList(),
             AvailableRunners = connectedRunners

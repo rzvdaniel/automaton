@@ -15,7 +15,7 @@ public static class DeployCheckNames
     public const string BackendDeploy = "backendDeploy";
 }
 
-public sealed record DeployCheckResult(string Name, bool Success, string Message);
+public sealed record DeployCheckResult(string Name, bool Success, string Message, bool IsWarning = false);
 
 public sealed record DeploySkippedEntry(string Path, string Reason, string RuleSource);
 
@@ -54,4 +54,8 @@ public sealed class DeployResult
     public DeployUploadResult? BackendUploaded { get; init; }
 
     public DeployBackendResult? Backend { get; init; }
+
+    public bool HasWarnings { get; init; }
+
+    public bool BackendRunning { get; init; }
 }

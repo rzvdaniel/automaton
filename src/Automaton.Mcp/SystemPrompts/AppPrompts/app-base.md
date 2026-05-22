@@ -17,6 +17,9 @@ Automaton separates editable source from deployed live files and keeps frontend/
 - Backend source lives under `backend/` relative to source root.
 - `automaton deploy` publishes frontend output to `live/frontend/`.
 - Backend deploy packages backend files into `live/backend/` for runners.
+- If no runner is assigned or connected, backend files may still be uploaded successfully to `live/backend/`; in that case explain that backend is uploaded but not running yet.
+- After a successful plain deploy, ask the user before running `automaton publish`.
+- `automaton publish` makes the latest deployed app publicly accessible and should return the public URL on success.
 - Public serving reads only `live/frontend/`; source and backend live files are never served.
 - Fork copies source only, never live files.
 - For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`.

@@ -6,124 +6,118 @@ using System.CommandLine;
 namespace Automaton.Cli.Commands;
 
 /// <summary>
-/// automaton publish [--message "what changed"]
+/// automaton publish [--slug my-app] [--yes]
 ///
-/// Creates a version snapshot of the app's current server-side files.
-/// Useful to checkpoint before a new AI-assisted editing session.
+/// Makes the latest deployed app publicly accessible and returns the public URL.
 /// </summary>
 public static class PublishCommand
 {
     public static Command Build(ConfigService config)
     {
-        var messageOption = new Option<string?>(
-            ["--message", "-m"],
-            "One-sentence description of what changed");
-
+        var slugOption = new Option<string?>(["--slug", "-s"], "Public URL slug to use for publishing");
+        var privateOption = new Option<bool>("--private", "Require Automaton login to access the published app");
+        var publicOption = new Option<bool>("--public", "Allow public access without login");
+        var forkableOption = new Option<bool>("--forkable", "Allow other users to fork this published app");
         var yesOption = new Option<bool>("--yes", "Publish without prompting for confirmation");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        var cmd = new Command("publish", "Save a version snapshot of the app's current files")
+        var cmd = new Command("publish", "Make the latest deployed app publicly accessible")
         {
-            messageOption,
+            slugOption,
+            privateOption,
+            publicOption,
+            forkableOption,
             yesOption,
             jsonOption
         };
 
-        cmd.SetHandler(async (string? message, bool yes, bool asJson) =>
+        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool asJson) =>
         {
-            var checks = new List<CommandDiagnosticCheck>();
-            var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (makePrivate && makePublic)
+            {
+                var failure = new PublishResult
+                {
+                    Success = false,
+                    Summary = "Publish failed",
+                    Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "choose either --public or --private, not both")],
+                    NextSteps = ["Rerun automaton publish with at most one access flag"]
+                };
+                WriteResult(failure, asJson);
+                Environment.ExitCode = 1;
+                return;
+            }
 
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
-                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
-                var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
-                checks.Add(appLinkCheck);
-                checks.Add(credentialsCheck);
-
-                if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
-                {
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Publish failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                    if (asJson)
-                    {
-                        CliJson.Write(new
-                        {
-                            success = failure.Success,
-                            summary = failure.Summary,
-                            checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                            nextSteps = failure.NextSteps,
-                            appId = appConfig?.AppId
-                        });
-                    }
-                    else
-                    {
-                        CliDiagnosticsWriter.Write(failure);
-                    }
-                    Environment.ExitCode = 1;
-                    return;
-                }
-
-                if (!yes)
-                {
-                    Console.Write($"Publish the current server-side snapshot for '{appConfig.Name}'? [y/N]: ");
-                    var confirmation = Console.ReadLine()?.Trim();
-                    if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
-                    {
-                        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish cancelled by user"));
-                        var cancelled = new CommandDiagnosticResult { Success = false, Summary = "Publish cancelled", Checks = checks, NextSteps = ["Rerun automaton publish --yes when you are ready to snapshot the app"] };
-                        if (asJson)
-                        {
-                            CliJson.Write(new { success = false, cancelled = true, summary = cancelled.Summary, checks = cancelled.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = cancelled.NextSteps, appId = appConfig.AppId });
-                            return;
-                        }
-
-                        CliDiagnosticsWriter.Write(cancelled);
-                        return;
-                    }
-                }
-
-                if (!asJson)
-                {
-                    AnsiConsole.MarkupLine($"[bold]Publishing snapshot[/] for [cyan]{appConfig.Name}[/]...");
-                }
-
-                using var client = new AutomatonApiClient(server!, apiKey!);
-                var result = await client.PublishAsync(appConfig.AppId, message);
-
-                var version = result.TryGetProperty("versionNumber", out var v) ? v.GetInt32().ToString() : "?";
-                var summary = result.TryGetProperty("summary", out var s) ? s.GetString() : message;
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, true, $"version {version} saved"));
-                var publishResult = new CommandDiagnosticResult { Success = true, Summary = "Publish complete", Checks = checks, NextSteps = [] };
-
-                if (asJson)
-                {
-                    CliJson.Write(new { success = true, summary = publishResult.Summary, checks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = publishResult.NextSteps, appId = appConfig.AppId, version, publishSummary = summary });
-                    return;
-                }
-
-                AnsiConsole.MarkupLine($"[green]✓[/] Version [bold]{version}[/] saved{(summary != null ? $": {summary}" : "")}");
+                var publishService = new PublishService(config);
+                var result = await publishService.PublishAsync(
+                    cwd,
+                    slug,
+                    makePrivate ? true : makePublic ? false : null,
+                    forkable ? true : null,
+                    yes);
+                WriteResult(result, asJson);
+                Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
             {
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, ex.Message));
-                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
-                var failure = new CommandDiagnosticResult { Success = false, Summary = "Publish failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                if (asJson)
+                var failure = new PublishResult
                 {
-                    CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                }
-                else
-                {
-                    CliDiagnosticsWriter.Write(failure);
-                }
+                    Success = false,
+                    Summary = "Publish failed",
+                    Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, ex.Message)],
+                    NextSteps = ["Run automaton whoami to confirm the current server and identity"]
+                };
+                WriteResult(failure, asJson);
                 Environment.ExitCode = 1;
             }
-        }, messageOption, yesOption, jsonOption);
+        }, slugOption, privateOption, publicOption, forkableOption, yesOption, jsonOption);
 
         return cmd;
+    }
+
+    internal static void WriteResult(PublishResult result, bool asJson)
+    {
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = result.Success,
+                cancelled = result.Cancelled,
+                summary = result.Summary,
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = result.NextSteps,
+                appId = result.AppId,
+                appName = result.AppName,
+                slug = result.Slug,
+                url = result.Url,
+                requiresAuthentication = result.RequiresAuthentication,
+                isForkable = result.IsForkable
+            });
+            return;
+        }
+
+        if (!result.Success)
+        {
+            CliDiagnosticsWriter.Write(new CommandDiagnosticResult
+            {
+                Success = false,
+                Summary = result.Summary,
+                Checks = result.Checks,
+                NextSteps = result.NextSteps
+            });
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.AppName))
+        {
+            AnsiConsole.MarkupLine($"[bold]Published[/] [cyan]{result.AppName}[/]");
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.Url))
+        {
+            AnsiConsole.MarkupLine($"[green]Published successfully:[/] {result.Url}");
+        }
     }
 }

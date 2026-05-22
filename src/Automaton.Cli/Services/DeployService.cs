@@ -180,8 +180,10 @@ public sealed class DeployService
         catch (Exception ex)
         {
             nextSteps.Add("Inspect backend deploy logs in Automaton Studio");
-            checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
+            checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, false, ex.Message, IsWarning: true));
+            backendResult = new DeployBackendResult(false, 0, ex.Message);
+            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         if (!backendResult.Success || backendResult.RunnerCount <= 0)
@@ -191,8 +193,9 @@ public sealed class DeployService
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.BackendDeploy,
                 false,
-                backendResult.Message ?? "backend deploy did not reach any runner"));
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+                backendResult.Message ?? "backend deploy did not reach any runner",
+                IsWarning: true));
+            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         checks.Add(new DeployCheckResult(
@@ -362,7 +365,9 @@ public sealed class DeployService
         return new DeployResult
         {
             Success = success,
-            Summary = success ? "Deploy complete" : "Deploy failed",
+            Summary = success
+                ? checks.Any(check => !check.Success && check.IsWarning) ? "Deploy complete with warnings" : "Deploy complete"
+                : "Deploy failed",
             AppId = projectConfig?.AppId,
             AppName = projectConfig?.Name,
             DeployDirectory = deployDirectory,
@@ -373,7 +378,9 @@ public sealed class DeployService
             SourceUploaded = sourceUploadResult,
             Uploaded = uploadResult,
             BackendUploaded = backendUploadResult,
-            Backend = backendResult
+            Backend = backendResult,
+            HasWarnings = checks.Any(check => !check.Success && check.IsWarning),
+            BackendRunning = backendResult?.Success == true && backendResult.RunnerCount > 0
         };
     }
 

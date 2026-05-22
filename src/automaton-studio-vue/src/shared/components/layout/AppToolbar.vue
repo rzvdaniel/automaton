@@ -9,11 +9,13 @@ import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import { useSidebarState } from '@/shared/composables/useSidebarState'
 
 const { isDark, toggleDarkMode } = useUserSettings()
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+const { isMobile, toggleMobile } = useSidebarState()
 
 // User menu reference
 const userMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -114,6 +116,15 @@ function goToSettings() {
   <Toolbar class="app-toolbar border-noround">
     <template #start>
       <div class="flex items-center gap-3">
+        <Button
+          v-if="isMobile"
+          icon="pi pi-bars"
+          severity="secondary"
+          text
+          rounded
+          aria-label="Open Navigation"
+          @click="toggleMobile"
+        />
         <div class="flex items-center gap-2">
           <i class="pi pi-bolt text-xl" style="color: var(--p-primary-500)"></i>
           <span class="font-bold text-xl">Automaton Studio</span>

@@ -79,9 +79,28 @@ public class DeployPreparationServiceTests
 
         var result = await service.PrepareAsync(projectRoot, null);
 
-        Assert.That(result.Success, Is.False);
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.RequiresRunnerSelection, Is.True);
         Assert.That(result.AvailableRunners, Has.Count.EqualTo(2));
-        Assert.That(result.Checks.Any(check => check.Name == DeployCheckNames.RunnerLookup && !check.Success), Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == DeployCheckNames.RunnerLookup && !check.Success && check.IsWarning), Is.True);
+    }
+
+    [Test]
+    public async Task PrepareAsync_WhenNoConnectedRunnerExists_ReturnsWarningButDoesNotBlockDeploy()
+    {
+        var projectRoot = CreateProjectRoot(withBackend: true);
+        var config = CreateConfiguredService(projectRoot);
+        var service = new DeployPreparationService(
+            config,
+            (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
+            (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([]),
+            (_, _, _, _, _) => Task.CompletedTask);
+
+        var result = await service.PrepareAsync(projectRoot, null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.RequiresRunnerSelection, Is.False);
+        Assert.That(result.Checks.Any(check => check.Name == DeployCheckNames.RunnerLookup && !check.Success && check.IsWarning), Is.True);
     }
 
     [Test]

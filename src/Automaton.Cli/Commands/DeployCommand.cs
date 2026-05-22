@@ -6,7 +6,7 @@ using System.CommandLine;
 namespace Automaton.Cli.Commands;
 
 /// <summary>
-/// automaton deploy [--clean] [--skip-backend]
+/// automaton deploy [--clean] [--skip-backend] [--publish]
 ///
 /// Workflow:
 ///   1. Read automaton.json for appId + frontend/backend deploy config
@@ -34,6 +34,7 @@ public static class DeployCommand
 
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var verboseOption = new Option<bool>("--verbose", "Print skipped-file details and exclusion reasons");
+        var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -42,13 +43,15 @@ public static class DeployCommand
             skipBackendOption,
             dirOption,
             jsonOption,
-            verboseOption
+            verboseOption,
+            publishOption
         };
 
-        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose) =>
+        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose, bool publish) =>
         {
             var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
+            var publishService = new PublishService(config);
 
             try
             {
@@ -57,7 +60,7 @@ public static class DeployCommand
                     ? new DeployPreparationResult { Success = true }
                     : await preparationService.PrepareAsync(cwd, runner);
 
-                if (!preparation.Success && !asJson && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
+                if (preparation.RequiresRunnerSelection && !asJson && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
                 {
                     var prompt = new SelectionPrompt<RunnerSelectionItem>()
                         .Title("Select a connected runner for backend deploy")
@@ -86,7 +89,40 @@ public static class DeployCommand
                 var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir);
                 result = MergePreparation(result, preparation);
 
-                WriteResult(result, asJson, verbose);
+                if (result.Success)
+                {
+                    if (publish)
+                    {
+                        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true);
+                        if (asJson)
+                        {
+                            WriteCombinedJson(result, publishResult);
+                        }
+                        else
+                        {
+                            WriteResult(result, asJson, verbose);
+                            PublishCommand.WriteResult(publishResult, asJson);
+                        }
+                        if (!publishResult.Success)
+                        {
+                            Environment.ExitCode = 1;
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        WriteResult(result, asJson, verbose);
+                        if (!asJson)
+                        {
+                            await PromptForPublishAfterDeployAsync(cwd, publishService);
+                        }
+                    }
+                }
+                else
+                {
+                    WriteResult(result, asJson, verbose);
+                }
+
                 Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
@@ -94,7 +130,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.ExitCode = 1;
             }
-        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption);
+        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption, publishOption);
 
         return cmd;
     }
@@ -110,6 +146,7 @@ public static class DeployCommand
         {
             Success = result.Success,
             Summary = result.Summary,
+            HasWarnings = result.HasWarnings || preparation.Checks.Any(check => !check.Success && check.IsWarning),
             AppId = result.AppId,
             AppName = result.AppName,
             DeployDirectory = result.DeployDirectory,
@@ -120,29 +157,32 @@ public static class DeployCommand
             SourceUploaded = result.SourceUploaded,
             Uploaded = result.Uploaded,
             BackendUploaded = result.BackendUploaded,
-            Backend = result.Backend
+            Backend = result.Backend,
+            BackendRunning = result.BackendRunning
         };
     }
 
     private static void WriteResult(DeployResult result, bool asJson, bool verbose)
     {
-        if (asJson)
+                if (asJson)
         {
             CliJson.Write(new
             {
                 success = result.Success,
                 summary = result.Summary,
+                hasWarnings = result.HasWarnings,
                 appId = result.AppId,
                 appName = result.AppName,
                 deployDirectory = result.DeployDirectory,
                 clean = result.Clean,
                 skipBackend = result.SkipBackend,
-                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, error = check.Message }),
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
                 nextSteps = result.NextSteps,
                 sourceUploaded = result.SourceUploaded,
                 uploaded = result.Uploaded,
                 backendUploaded = result.BackendUploaded,
-                backend = result.Backend
+                backend = result.Backend,
+                backendRunning = result.BackendRunning
             });
             return;
         }
@@ -159,7 +199,10 @@ public static class DeployCommand
 
         foreach (var check in result.Checks)
         {
-            table.AddRow(check.Name, check.Success ? "[green]pass[/]" : "[red]fail[/]", check.Message);
+            var status = check.Success
+                ? "[green]pass[/]"
+                : check.IsWarning ? "[yellow]warn[/]" : "[red]fail[/]";
+            table.AddRow(check.Name, status, check.Message);
         }
 
         AnsiConsole.Write(table);
@@ -177,7 +220,9 @@ public static class DeployCommand
 
         if (result.Success)
         {
-            AnsiConsole.MarkupLine("[green bold]Deploy complete.[/]");
+            AnsiConsole.MarkupLine(result.HasWarnings
+                ? "[yellow bold]Deploy complete with warnings.[/]"
+                : "[green bold]Deploy complete.[/]");
         }
     }
 
@@ -209,5 +254,48 @@ public static class DeployCommand
             var reason = Markup.Escape(entry.Reason);
             AnsiConsole.MarkupLine($" - [grey]{path}[/] [[{ruleSource}]] {reason}");
         }
+    }
+
+    private static void WriteCombinedJson(DeployResult deployResult, PublishResult publishResult)
+    {
+        CliJson.Write(new
+        {
+            success = deployResult.Success && publishResult.Success,
+            summary = publishResult.Success ? "Deploy and publish complete" : "Deploy complete, publish failed",
+            deployed = deployResult.Success,
+            published = publishResult.Success,
+            hasWarnings = deployResult.HasWarnings,
+            appId = deployResult.AppId,
+            appName = deployResult.AppName,
+            deployDirectory = deployResult.DeployDirectory,
+            clean = deployResult.Clean,
+            skipBackend = deployResult.SkipBackend,
+            checks = deployResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+            nextSteps = publishResult.Success
+                ? deployResult.NextSteps
+                : deployResult.NextSteps.Concat(publishResult.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase),
+            sourceUploaded = deployResult.SourceUploaded,
+            uploaded = deployResult.Uploaded,
+            backendUploaded = deployResult.BackendUploaded,
+            backend = deployResult.Backend,
+            backendRunning = deployResult.BackendRunning,
+            url = publishResult.Url,
+            slug = publishResult.Slug,
+            publishChecks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message })
+        });
+    }
+
+    private static async Task PromptForPublishAfterDeployAsync(string cwd, PublishService publishService)
+    {
+        Console.Write("The app has been deployed successfully. Do you want to publish it now? [y/N]: ");
+        var confirmation = Console.ReadLine()?.Trim();
+        if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: false);
+        PublishCommand.WriteResult(publishResult, asJson: false);
     }
 }

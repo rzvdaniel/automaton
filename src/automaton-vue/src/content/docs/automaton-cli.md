@@ -218,9 +218,11 @@ Build (if configured), zip the project, upload to Automaton, and deploy backend 
 
 ```bash
 automaton deploy                   # standard deploy
+automaton deploy --publish         # deploy and then publish in one command
 automaton deploy --clean           # full replace — wipes existing server files first
 automaton deploy --skip-backend    # upload files only, skip backend deploy step
 automaton deploy --dir dist        # override the upload directory
+automaton deploy --publish --json  # single JSON payload for agents/automation
 ```
 
 What happens:
@@ -230,6 +232,33 @@ What happens:
 4. Uploads the frontend zip to `live/frontend/` on the server
 5. Uploads `backend.deployDir` to `live/backend/` when backend files are configured
 6. Deploys backend Python controllers to the runner (unless `--skip-backend`)
+
+`deploy` does not publish by default. In interactive console mode, a successful plain deploy asks:
+
+```text
+The app has been deployed successfully. Do you want to publish it now?
+```
+
+If you want a one-step release, use `automaton deploy --publish`.
+
+Backend runner behavior:
+
+- If the app has no backend controllers, deploy finishes normally without runner work.
+- If backend files are configured, deploy uploads them to `live/backend`.
+- If a runner is assigned or selected, deploy also makes the backend runnable on that runner.
+- If no runner is available, deploy still completes, but with warnings:
+
+```text
+Frontend deployed
+Backend uploaded
+Backend is not running because no runner is assigned.
+```
+
+To make the backend runnable later:
+
+```bash
+automaton deploy --runner my-runner
+```
 
 If `automaton validate` already passes but deploy fails during upload with transport-style errors like closed stream, multipart/request stream, socket, timeout, or HTTP pipeline failures, treat that as a likely CLI or server upload-path issue first instead of immediately restructuring the app.
 
@@ -250,12 +279,29 @@ automaton pull --dir ./local    # download to a specific directory
 
 ### `automaton publish`
 
-Save a version snapshot of the app's current server-side files. Useful before a major change.
+Make the latest deployed version publicly accessible and return the public URL.
 
 ```bash
 automaton publish
-automaton publish --message "Add vote reveal feature"
+automaton publish --slug poker-planning
+automaton publish --yes --json
 ```
+
+Behavior:
+
+- Reuses the app's existing publish slug/settings when they already exist
+- Prompts for a slug on first publish in interactive console mode
+- Asks for confirmation unless `--yes` is passed
+- Returns the published URL on success so AI tools can hand the clickable link back to the user
+
+Useful flags:
+
+- `--slug`, `-s` — set or override the public URL slug
+- `--public` — publish without requiring login
+- `--private` — require Automaton login
+- `--forkable` — allow others to fork the published app
+- `--yes` — skip the confirmation prompt
+- `--json` — return machine-readable output including `url`
 
 ---
 
@@ -309,8 +355,8 @@ automaton sync-ai
 # 4. Build your app locally, then deploy
 automaton deploy
 
-# 5. Snapshot before a big change
-automaton publish --message "Initial release"
+# 5. Publish when you want the app live
+automaton publish
 
 # 6. Pull server state if you switched machines
 automaton pull

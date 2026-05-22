@@ -680,11 +680,11 @@ const previewViewportStyle = computed(() => {
 }
 
 .preview-viewport {
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   background: var(--p-surface-0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   min-height: 0;
   transform: translateZ(0);
   position: relative;
@@ -801,7 +801,6 @@ const previewViewportStyle = computed(() => {
 }
 
 :global(.app-dark) .preview-viewport {
-  border-color: var(--p-surface-700);
   background: var(--p-surface-900);
 }
 

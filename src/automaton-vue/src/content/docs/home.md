@@ -20,10 +20,20 @@ Use the CLI + AI workflow, the stack guide, and the starter prompt as the defaul
 
 ## What every Automaton app has
 
-- A frontend that produces static files.
-- A Python backend in `backend/`.
+- A frontend source project, usually in local `frontend/`.
+- A Python backend source project, usually in local `backend/`.
 - An `automaton.json` file at the project root.
 - A deployment step using the Automaton CLI.
+
+## Current file contract
+
+Keep the model simple:
+
+- Local authoring usually uses `frontend/` and `backend/`.
+- Server-side editable files live in `source/frontend/` and `source/backend/`.
+- Deployed runtime files live in `live/frontend/` and `live/backend/`.
+- Public serving reads only `live/frontend/`.
+- Runner execution reads only `live/backend/`.
 
 ## Use this documentation menu for
 
@@ -34,7 +44,7 @@ Use the CLI + AI workflow, the stack guide, and the starter prompt as the defaul
 
 ## Core contract
 
-- Backend controller files live in `backend/`.
+- Backend controller source files usually live in local `backend/`.
 - Each controller exports `handle(action_name, inputs)`.
 - Each action returns `{ success, data, error }`.
 - Frontend code calls `window.automatonApi.callController(controller, action, inputs)`.

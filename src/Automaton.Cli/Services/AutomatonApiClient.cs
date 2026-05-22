@@ -126,9 +126,32 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    // ── Publish (version snapshot) ────────────────────────────────────────────
+    // ── Publish app / versioning ──────────────────────────────────────────────
 
-    public async Task<JsonElement> PublishAsync(string appId, string? summary = null, CancellationToken ct = default)
+    public async Task PublishAppAsync(
+        string appId,
+        string publicUrl,
+        bool requiresAuthentication = false,
+        string? executionRunnerId = null,
+        string? category = null,
+        string? tags = null,
+        bool isForkable = false,
+        CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            publicUrl,
+            requiresAuthentication,
+            executionRunnerId,
+            category,
+            tags,
+            isForkable
+        }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/publish", payload, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task<JsonElement> CreateVersionSnapshotAsync(string appId, string? summary = null, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { summary, trigger = "ManualSave" }, JsonOptions);
         using var resp = await PostJsonAsync($"api/apps/{appId}/versions/snapshot", payload, ct);

@@ -1486,7 +1486,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--p-surface-200);
 }
 
 .editor-panel {
@@ -1500,7 +1499,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .editor-tabs-container {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--p-surface-200);
+  border-bottom: 1px solid color-mix(in srgb, var(--p-surface-300) 60%, transparent);
   overflow-x: auto;
   flex-shrink: 0;
 }
@@ -1510,7 +1509,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   align-items: center;
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
-  border-right: 1px solid var(--p-surface-200);
   cursor: pointer;
   white-space: nowrap;
   transition: background-color 0.2s;
@@ -1570,7 +1568,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--p-surface-200);
 }
 
 /* Dark mode */
@@ -1600,10 +1597,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   border-color: var(--p-surface-700);
 }
 
-:global(.app-dark) .editor-tabs-container {
-  border-color: var(--p-surface-700);
-}
-
 :global(.app-dark) .runtime-warning-banner {
   background: color-mix(in srgb, var(--p-orange-900) 55%, transparent);
   border-color: var(--p-orange-700);
@@ -1614,11 +1607,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   border-color: var(--p-surface-700);
 }
 
-:global(.app-dark) .ai-sidebar {
-  border-color: var(--p-surface-700);
+/* Splitter gutter styling */
+:global(.p-splitter) {
+  border-radius: 0 !important;
+  overflow: hidden;
 }
 
-/* Splitter gutter styling */
 :global(.p-splitter-gutter) {
   background-color: var(--p-surface-200);
   transition: background-color 0.2s ease;

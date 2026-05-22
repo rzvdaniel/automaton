@@ -6,6 +6,8 @@ public sealed class DeployPreparationResult
 {
     public bool Success { get; init; }
 
+    public bool RequiresRunnerSelection { get; init; }
+
     public IReadOnlyList<DeployCheckResult> Checks { get; init; } = [];
 
     public IReadOnlyList<string> NextSteps { get; init; } = [];

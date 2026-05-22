@@ -13,6 +13,7 @@ Common problems and how to fix them.
 - **No runner connected** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, the backend cannot be deployed. Start a runner or check the runner connection.
 - **Python syntax error** — A syntax error in any `backend/*.py` file will stop the deploy. Check the deploy log for the file and line number.
 - **Missing `handle()` export** — Every controller file must export a top-level `handle(action_name, inputs)` function. A file that is missing `handle` will cause the deploy to fail.
+- **No runner available** — Backend runtime can be uploaded successfully but still not be running. If deploy reports that backend was uploaded but is not running, assign/select a runner and rerun deploy.
 
 ---
 
@@ -23,6 +24,7 @@ Common problems and how to fix them.
 **Causes and fixes:**
 
 - **Backend not deployed** — Changes to Python files need a Deploy Backend step before they take effect. Deploy, then reload the preview.
+- **Backend uploaded but not running** — For CLI deploys, frontend and backend runtime may already be synced even when no runner is available. In that case rerun `automaton deploy --runner <runner-id-or-name>` after a runner is online.
 - **Wrong controller or action name** — The controller name is the filename without `.py`. The action name is the method name on the controller class. Check spelling.
 - **Action returned an error** — `callController` throws when the backend returns `{ success: false, ... }`. Add `try/catch` around every call and log `err.message` to see the backend error.
 - **Local development without mocks** — When running locally (not in the Automaton preview), `callController` reads from `backend/mocks/{controller}.{action}.json`. If that file is missing, the call throws. Add a mock file.

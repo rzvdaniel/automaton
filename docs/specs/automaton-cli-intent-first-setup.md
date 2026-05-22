@@ -1,5 +1,13 @@
 # Automaton CLI Intent-First Setup Spec
 
+> Historical spec note:
+> This file captures intent-first CLI design work and may describe earlier workflow assumptions.
+> For the current app storage/deploy contract, prefer:
+> - `AGENTS.md`
+> - `docs/dev/app-source-runtime-split.md`
+> - `docs/dev/app-deploy-structure.md`
+> - `src/automaton-vue/src/content/docs/automaton-cli.md`
+
 ## Goal
 
 Reduce the number of initial CLI commands a user must learn and run before they can successfully build and deploy an Automaton app.

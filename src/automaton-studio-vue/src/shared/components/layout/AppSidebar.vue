@@ -7,14 +7,15 @@ import { useOrganizationRole } from '@/features/organizations/composables/useOrg
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
 import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
+import { useSidebarState } from '@/shared/composables/useSidebarState'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 
 const router = useRouter()
 const route = useRoute()
-const isExpanded = ref(false)
 const authStore = useAuthStore()
 const { hasPaidPlans, ensureLoaded: ensurePaidPlansLoaded } = usePaidPlansAvailable()
+const { isExpanded, isPinned, isMobile, isMobileOpen, setHovered, togglePinned, closeMobile } = useSidebarState()
 
 // Load organization roles for access control
 const { isAppUserOnly, loadOrganizations, loading } = useOrganizationRole()
@@ -29,23 +30,31 @@ interface NavItem {
   icon: string
   to: string
   external?: boolean
-  divider?: boolean
   hideForAppUser?: boolean
 }
 
-const navItems: NavItem[] = [
+interface NavSection {
+  key: string
+  items: NavItem[]
+}
+
+const mainNavItems: NavItem[] = [
   { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
-  // { label: 'Flows', icon: 'pi pi-bolt', to: '/flows' },
   { label: 'Apps', icon: 'pi pi-globe', to: '/apps', hideForAppUser: true },
-  // { label: 'Steps', icon: 'pi pi-code', to: '/steps' },
   { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
   { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
+]
+
+const collaborationNavItems: NavItem[] = [
   { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
   { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
+]
+
+const adminNavItems: NavItem[] = [
   { label: 'Admin', icon: 'pi pi-shield', to: '/admin', hideForAppUser: true },
 ]
 
-const bottomNavItems: NavItem[] = [
+const utilityNavItems: NavItem[] = [
   { label: 'Downloads', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
   { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true },
@@ -86,24 +95,67 @@ const isAdmin = computed(() => {
   return roles.includes('Admin') || roles.includes('SysAdmin')
 })
 
-// Filter navigation items based on user role
-const visibleNavItems = computed(() => {
-  let base = !isAppUserOnly.value
-    ? navItems.filter(item => item.to !== '/my-apps')
-    : navItems.filter(item => !item.hideForAppUser)
-  // Show Admin only for Admin/SysAdmin roles
-  if (!isAdmin.value) {
-    base = base.filter(item => item.to !== '/admin')
+function filterItems(items: NavItem[]) {
+  let filtered = items
+
+  if (isAppUserOnly.value) {
+    filtered = filtered.filter((item) => !item.hideForAppUser)
+  } else {
+    filtered = filtered.filter((item) => item.to !== '/my-apps')
   }
-  return base
+
+  if (!isAdmin.value) {
+    filtered = filtered.filter((item) => item.to !== '/admin')
+  }
+
+  return filtered
+}
+
+const visibleSections = computed<NavSection[]>(() => {
+  const sections: NavSection[] = [
+    { key: 'main', items: filterItems(mainNavItems) },
+    { key: 'collaboration', items: filterItems(collaborationNavItems) },
+    { key: 'admin', items: filterItems(adminNavItems) },
+  ]
+
+  return sections.filter((section) => section.items.length > 0)
 })
 
-const visibleBottomNavItems = computed(() => {
-  if (isAppUserOnly.value) {
-    return bottomNavItems.filter(item => !item.hideForAppUser)
+const visibleBottomNavItems = computed(() => filterItems(utilityNavItems))
+
+const hasTopDividerAfter = (index: number) => {
+  return index < visibleSections.value.length - 1
+}
+
+const sidebarClass = computed(() => ({
+  'app-sidebar': true,
+  expanded: isExpanded.value,
+  pinned: isPinned.value,
+  mobile: isMobile.value,
+  'mobile-open': isMobileOpen.value,
+}))
+
+const shellBackdropClass = computed(() => ({
+  'sidebar-backdrop': true,
+  visible: isMobileOpen.value && isMobile.value,
+}))
+
+const tooltipOptions = (label: string) =>
+  !isExpanded.value && !isMobile.value
+    ? { value: label, showDelay: 0, hideDelay: 0, pt: { text: { style: 'white-space: nowrap;' } } }
+    : undefined
+
+const navigate = (item: NavItem) => {
+  if (item.external) {
+    window.open(item.to, '_blank', 'noopener')
+  } else {
+    router.push(item.to)
   }
-  return bottomNavItems
-})
+
+  if (isMobile.value) {
+    closeMobile()
+  }
+}
 
 const isActive = (to: string) => {
   if (to.startsWith('http')) {
@@ -115,71 +167,71 @@ const isActive = (to: string) => {
   return route.path.startsWith(to)
 }
 
-const navigate = (item: NavItem) => {
-  if (item.external) {
-    window.open(item.to, '_blank', 'noopener')
-    return
-  }
-
-  router.push(item.to)
-}
-
-const sidebarClass = computed(() => ({
-  'app-sidebar': true,
-  expanded: isExpanded.value,
-}))
 </script>
 
 <template>
-  <aside :class="sidebarClass" @mouseenter="isExpanded = true" @mouseleave="isExpanded = false">
+  <div :class="shellBackdropClass" @click="closeMobile"></div>
+  <aside :class="sidebarClass" @mouseenter="setHovered(true)" @mouseleave="setHovered(false)">
     <div class="sidebar-content">
-      <!-- Logo -->
       <div class="sidebar-logo">
-        <i class="pi pi-bolt text-2xl" style="color: var(--p-primary-500)"></i>
-        <span v-if="isExpanded" class="logo-text">Automaton</span>
+        <div class="sidebar-brand">
+          <i class="pi pi-bolt text-2xl" style="color: var(--p-primary-500)"></i>
+          <span v-if="isExpanded" class="logo-text">Automaton</span>
+        </div>
+        <Button
+          v-if="isExpanded && !isMobile"
+          v-tooltip.left="isPinned ? 'Unpin sidebar' : 'Pin sidebar'"
+          :icon="isPinned ? 'pi pi-lock' : 'pi pi-thumbtack'"
+          text
+          rounded
+          severity="secondary"
+          class="sidebar-pin"
+          @click="togglePinned"
+        />
       </div>
 
-      <!-- Main Navigation -->
       <nav class="sidebar-nav">
         <div v-if="loading" class="nav-loading">
           <span v-if="isExpanded">Loading menu...</span>
         </div>
-        <div v-for="item in visibleNavItems" v-else :key="item.to" class="nav-item-wrapper">
-          <Button
-            :title="isExpanded ? undefined : item.label"
-            :class="['nav-item', { active: isActive(item.to) }]"
-            :severity="isActive(item.to) ? 'primary' : 'secondary'"
-            :text="!isActive(item.to)"
-            rounded
-            @click="navigate(item)"
-          >
-            <i :class="item.icon"></i>
-            <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
-          </Button>
-        </div>
+        <template v-else>
+          <div v-for="(section, sectionIndex) in visibleSections" :key="section.key" class="nav-section">
+            <div v-for="item in section.items" :key="item.to" class="nav-item-wrapper">
+              <Button
+                v-tooltip.right="tooltipOptions(item.label)"
+                :class="['nav-item', { active: isActive(item.to) }]"
+                :severity="isActive(item.to) ? 'primary' : 'secondary'"
+                :text="!isActive(item.to)"
+                rounded
+                @click="navigate(item)"
+              >
+                <i :class="item.icon"></i>
+                <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
+              </Button>
+            </div>
+            <div v-if="hasTopDividerAfter(sectionIndex)" class="nav-divider"></div>
+          </div>
+        </template>
       </nav>
 
-      <!-- Spacer -->
       <div class="sidebar-spacer"></div>
 
-      <!-- Billing widget (expanded only) -->
-        <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate({ label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' })">
+      <div v-if="isExpanded && billingStatus" class="billing-widget" @click="navigate({ label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' })">
         <div class="billing-widget-header">
           <span class="billing-plan">{{ billingStatus.planName }}</span>
           <span v-if="billingStatus.hasActiveSubscription" class="billing-status">Active</span>
         </div>
         <div class="billing-widget-footer">
           <span class="text-color-secondary">{{ runnerSummary }}</span>
-              <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate({ label: 'Pricing', icon: 'pi pi-credit-card', to: '/pricing' })">{{ sidebarPlansLabel }}</span>
+          <span v-if="!billingStatus.hasActiveSubscription" class="billing-upgrade" @click.stop="navigate({ label: 'Pricing', icon: 'pi pi-credit-card', to: '/pricing' })">{{ sidebarPlansLabel }}</span>
         </div>
       </div>
 
-      <!-- Bottom Navigation -->
       <nav class="sidebar-nav sidebar-nav-bottom">
         <div class="nav-divider"></div>
         <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
-            :title="isExpanded ? undefined : item.label"
+            v-tooltip.right="tooltipOptions(item.label)"
             :class="['nav-item', { active: isActive(item.to) }]"
             :severity="isActive(item.to) ? 'primary' : 'secondary'"
             :text="!isActive(item.to)"
@@ -196,7 +248,6 @@ const sidebarClass = computed(() => ({
 </template>
 
 <style scoped>
-/* Base sidebar styles - dark mode handled in main.css */
 .app-sidebar {
   position: fixed;
   top: 0;
@@ -204,6 +255,21 @@ const sidebarClass = computed(() => ({
   height: 100vh;
   overflow: hidden;
   z-index: 1000;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 998;
+}
+
+.sidebar-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sidebar-content {
@@ -216,9 +282,15 @@ const sidebarClass = computed(() => ({
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
   padding: 0.5rem;
   margin-bottom: 1.5rem;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .logo-text {
@@ -227,10 +299,20 @@ const sidebarClass = computed(() => ({
   white-space: nowrap;
 }
 
+.sidebar-pin {
+  flex-shrink: 0;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .sidebar-spacer {
@@ -246,13 +328,25 @@ const sidebarClass = computed(() => ({
   justify-content: flex-start;
   gap: 0.75rem;
   padding: 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   transition: all 0.15s ease;
+  position: relative;
 }
 
 .nav-item i {
   font-size: 1.125rem;
   min-width: 1.25rem;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0.35rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--p-primary-500);
 }
 
 .nav-label {
@@ -270,7 +364,7 @@ const sidebarClass = computed(() => ({
 .nav-divider {
   height: 1px;
   background-color: var(--p-surface-200);
-  margin: 0.5rem 0;
+  margin: 0.65rem 0;
 }
 
 .sidebar-nav-bottom {
@@ -327,6 +421,19 @@ const sidebarClass = computed(() => ({
 
 .billing-upgrade:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 1023px) {
+  .app-sidebar {
+    width: 272px !important;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  }
+
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+  }
 }
 
 </style>

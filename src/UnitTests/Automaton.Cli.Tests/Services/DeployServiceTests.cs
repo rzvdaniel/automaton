@@ -105,7 +105,7 @@ public class DeployServiceTests
     }
 
     [Test]
-    public async Task DeployAsync_WhenBackendDeployHasNoRunner_FailsWithRunnerNextSteps()
+    public async Task DeployAsync_WhenBackendDeployHasNoRunner_SucceedsWithWarningsAndRunnerNextSteps()
     {
         var projectRoot = CreateProjectRoot();
         var configService = new ConfigService();
@@ -138,7 +138,9 @@ public class DeployServiceTests
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
-        Assert.That(result.Success, Is.False);
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.HasWarnings, Is.True);
+        Assert.That(result.BackendRunning, Is.False);
         AssertCheck(result, DeployCheckNames.Upload, true, "uploaded 3 file(s)");
         AssertCheck(result, DeployCheckNames.BackendDeploy, false, "No runner assigned");
         Assert.That(result.NextSteps, Has.Some.EqualTo("Rerun automaton deploy with --runner <runner-id-or-name>"));
@@ -174,6 +176,7 @@ public class DeployServiceTests
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
+        Assert.That(result.BackendRunning, Is.False);
         Assert.That(result.Uploaded?.Written, Is.EqualTo(2));
         Assert.That(result.SourceUploaded?.Written, Is.EqualTo(3));
         AssertCheck(result, DeployCheckNames.BackendDeploy, true, "no backend controllers found");
@@ -216,6 +219,7 @@ public class DeployServiceTests
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.True);
+        Assert.That(result.BackendRunning, Is.True);
         Assert.That(result.BackendUploaded?.Written, Is.EqualTo(2));
         Assert.That(result.BackendUploaded?.SkippedEntries, Has.Count.EqualTo(1));
         AssertCheck(result, DeployCheckNames.BackendPackage, true, "reasons: 1 platform");

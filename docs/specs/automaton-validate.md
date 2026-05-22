@@ -1,5 +1,13 @@
 # Automaton Validate Command Spec
 
+> Historical spec note:
+> This file describes validate-command design and may use older shorthand such as local `backend/`.
+> For the current source/live storage contract, prefer:
+> - `AGENTS.md`
+> - `docs/dev/app-source-runtime-split.md`
+> - `docs/dev/app-deploy-structure.md`
+> - `src/automaton-vue/src/content/docs/automaton-cli.md`
+
 ## Goal
 
 Define a narrow, implementable scope for `automaton validate` as a cheap preflight check before `automaton deploy`.
