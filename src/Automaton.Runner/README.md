@@ -116,6 +116,26 @@ automaton-runner
    ```
 3. **Follow the prompts** - the runner will guide you through authentication, registration, and startup automatically!
 
+### FastAPI Backend Note
+
+The runner normally starts and manages the local FastAPI backend for app controllers.
+
+- Preferred: start `automaton-runner` and let it launch FastAPI.
+- Manual FastAPI starts are for debugging only.
+
+If you launch `fastapi_server/main.py` manually, you must point it at the same app data directory the runner uses:
+
+```powershell
+$env:RUNNER_SCRIPTS_DIR="C:\path\to\Automaton.Runner\bin\Debug\net9.0\data\apps"
+python fastapi_server/main.py
+```
+
+Otherwise FastAPI may look under the source-tree `data/apps` folder instead of the runner output folder and return:
+
+```text
+Controller 'xyz' not deployed for app '...'
+```
+
 ### ?? Alternative Approaches
 
 #### **For Automation/CI-CD:**

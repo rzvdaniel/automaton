@@ -38,6 +38,35 @@ def _default_scripts_dir() -> str:
 
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
 
+
+def _print_startup_diagnostics() -> None:
+    env_value = os.environ.get("RUNNER_SCRIPTS_DIR")
+    scripts_dir_abs = os.path.abspath(SCRIPTS_DIR)
+    cwd_abs = os.path.abspath(os.getcwd())
+    source_tree_hint = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "data", "apps")
+    )
+
+    print(f"[Automaton FastAPI] RUNNER_SCRIPTS_DIR resolved to: {scripts_dir_abs}")
+    print(f"[Automaton FastAPI] Working directory: {cwd_abs}")
+    print(
+        "[Automaton FastAPI] RUNNER_SCRIPTS_DIR source: "
+        + ("environment variable" if env_value else "fallback path")
+    )
+
+    if not os.path.isdir(scripts_dir_abs):
+        print(
+            "[Automaton FastAPI] WARNING: scripts directory does not exist yet: "
+            f"{scripts_dir_abs}"
+        )
+
+    if not env_value and scripts_dir_abs == source_tree_hint:
+        print(
+            "[Automaton FastAPI] WARNING: FastAPI appears to be running manually from the source tree. "
+            "If your runner deployed files under bin/.../data/apps, this instance will not see them. "
+            "Start the runner instead, or set RUNNER_SCRIPTS_DIR explicitly before launching FastAPI."
+        )
+
 @app.get("/debug-scripts-dir")
 async def debug_scripts_dir():
     return {"scripts_dir": SCRIPTS_DIR, "runner_scripts_dir_env": os.environ.get("RUNNER_SCRIPTS_DIR", "(not set)")}
@@ -126,6 +155,7 @@ async def health():
 
 
 if __name__ == "__main__":
+    _print_startup_diagnostics()
     # Windows does not support uvicorn multi-worker mode (no fork/socket passing).
     # On Linux (Docker), use 4 workers for true parallelism across GIL boundaries.
     import sys

@@ -1211,6 +1211,8 @@ public class RunnerHostService
 
         try
         {
+            logger.Information("Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir}", scriptsDir);
+            WriteLine($"🔧 FastAPI scripts dir: {scriptsDir}");
             var proc = System.Diagnostics.Process.Start(psi);
             logger.Information("FastAPI backend launched (PID {Pid})", proc?.Id);
         }
