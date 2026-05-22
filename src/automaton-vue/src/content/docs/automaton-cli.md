@@ -14,17 +14,8 @@ The default user flow is AI-first: run `automaton setup`, then let your AI tool 
 
 ## Install
 
-**macOS / Linux — installer script:**
-```bash
-curl -fsSL https://api.automaton.monster/downloads/install.sh | bash
-```
+Install the CLI as a .NET global tool:
 
-**Windows — PowerShell installer:**
-```powershell
-irm https://api.automaton.monster/downloads/install.ps1 | iex
-```
-
-**Via .NET global tool (all platforms, preferred when .NET 9 is available):**
 ```bash
 dotnet tool install -g Automaton.Cli
 ```
@@ -34,7 +25,7 @@ Verify the install:
 automaton --version
 ```
 
-If `.NET 9` is not available or global tools are not practical in this environment, use the platform installer script or the portable downloads instead.
+This is the supported installation path.
 
 ---
 

@@ -6,22 +6,13 @@ Use this path when you want to stay in Cursor, Claude Code, Copilot Chat, or ano
 
 ### 1. Install the Automaton CLI
 
-**macOS / Linux:**
-```bash
-curl -fsSL https://api.automaton.monster/downloads/install.sh | bash
-```
+Install it as a .NET global tool:
 
-**Windows (PowerShell):**
-```powershell
-irm https://api.automaton.monster/downloads/install.ps1 | iex
-```
-
-**Via .NET global tool (requires .NET 9):**
 ```bash
 dotnet tool install -g Automaton.Cli
 ```
 
-If `.NET 9` is already available, prefer the global tool because AI tools can usually install, update, and verify it more easily. If `.NET 9` is not available, use the platform installer script or portable download instead.
+This is the supported installation path. AI tools can usually install, update, and verify it reliably.
 
 ### 2. Prepare the current machine or workspace
 
