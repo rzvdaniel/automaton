@@ -1590,7 +1590,7 @@ public class AppsController : BaseController
             }
 
             var written = new List<string>();
-            var skipped = new List<string>();
+            var skipped = new List<object>();
             var errors  = new List<object>();
 
             using var stream  = file.OpenReadStream();
@@ -1606,13 +1606,13 @@ public class AppsController : BaseController
                 // Skip platform metadata, hidden files, and source/dependency folders that should never be live output.
                 if (ShouldSkipRuntimeUploadEntry(relativePath))
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, "Excluded by platform rule", "platform"));
                     continue;
                 }
 
                 if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(relativePath))
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, "Blocked by public runtime file policy", "platform"));
                     continue;
                 }
 
@@ -1705,7 +1705,7 @@ public class AppsController : BaseController
             }
 
             var written = new List<string>();
-            var skipped = new List<string>();
+            var skipped = new List<object>();
             var errors = new List<object>();
             var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
@@ -1717,9 +1717,9 @@ public class AppsController : BaseController
                 if (string.IsNullOrEmpty(entry.Name)) continue;
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (ShouldSkipSourceUploadEntry(relativePath, deployRules.SourceExclude))
+                if (ShouldSkipSourceUploadEntry(relativePath, deployRules.SourceExclude, out var sourceSkipReason))
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, sourceSkipReason, "platform"));
                     continue;
                 }
 
@@ -1729,7 +1729,7 @@ public class AppsController : BaseController
                 }
                 catch
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, "Blocked by allowed source file extension policy", "platform"));
                     continue;
                 }
 
@@ -1810,7 +1810,7 @@ public class AppsController : BaseController
             }
 
             var written = new List<string>();
-            var skipped = new List<string>();
+            var skipped = new List<object>();
             var errors = new List<object>();
             var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
@@ -1822,9 +1822,9 @@ public class AppsController : BaseController
                 if (string.IsNullOrEmpty(entry.Name)) continue;
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (ShouldSkipBackendUploadEntry(relativePath, deployRules.BackendExclude))
+                if (ShouldSkipBackendUploadEntry(relativePath, deployRules.BackendExclude, out var backendSkipReason, out var backendRuleSource))
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, backendSkipReason, backendRuleSource));
                     continue;
                 }
 
@@ -1834,7 +1834,7 @@ public class AppsController : BaseController
                 }
                 catch
                 {
-                    skipped.Add(relativePath);
+                    skipped.Add(CreateSkippedEntry(relativePath, "Blocked by allowed backend file extension policy", "platform"));
                     continue;
                 }
 
@@ -1915,9 +1915,15 @@ public class AppsController : BaseController
 
     private static bool ShouldSkipSourceUploadEntry(string relativePath, IEnumerable<string> excludeRules)
     {
+        return ShouldSkipSourceUploadEntry(relativePath, excludeRules, out _);
+    }
+
+    private static bool ShouldSkipSourceUploadEntry(string relativePath, IEnumerable<string> excludeRules, out string reason)
+    {
         var normalized = relativePath.Replace('\\', '/').Trim('/');
         if (string.IsNullOrWhiteSpace(normalized))
         {
+            reason = "Empty path";
             return true;
         }
 
@@ -1930,20 +1936,40 @@ public class AppsController : BaseController
             fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase))
         {
+            reason = "Excluded by platform rule";
             return true;
         }
 
-        return segments.Any(segment =>
+        if (segments.Any(segment =>
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase))
-            || AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules);
+            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase)))
+        {
+            reason = "Excluded by platform rule";
+            return true;
+        }
+
+        if (AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules))
+        {
+            reason = "Excluded by admin source deploy rule";
+            return true;
+        }
+
+        reason = string.Empty;
+        return false;
     }
 
     private static bool ShouldSkipBackendUploadEntry(string relativePath, IEnumerable<string> excludeRules)
     {
+        return ShouldSkipBackendUploadEntry(relativePath, excludeRules, out _, out _);
+    }
+
+    private static bool ShouldSkipBackendUploadEntry(string relativePath, IEnumerable<string> excludeRules, out string reason, out string ruleSource)
+    {
         var normalized = relativePath.Replace('\\', '/').Trim('/');
         if (string.IsNullOrWhiteSpace(normalized))
         {
+            reason = "Empty path";
+            ruleSource = "platform";
             return true;
         }
 
@@ -1956,17 +1982,44 @@ public class AppsController : BaseController
             fileName.EndsWith(".key", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
         {
+            reason = "Excluded by platform rule";
+            ruleSource = "platform";
             return true;
         }
 
-        return segments.Any(segment =>
+        if (segments.Any(segment =>
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("venv", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals(".venv", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("frontend", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("mocks", StringComparison.OrdinalIgnoreCase))
-            || AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules);
+            segment.Equals("mocks", StringComparison.OrdinalIgnoreCase)))
+        {
+            reason = "Excluded by platform rule";
+            ruleSource = "platform";
+            return true;
+        }
+
+        if (AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules))
+        {
+            reason = "Excluded by admin backend deploy rule";
+            ruleSource = "admin";
+            return true;
+        }
+
+        reason = string.Empty;
+        ruleSource = string.Empty;
+        return false;
+    }
+
+    private static object CreateSkippedEntry(string path, string reason, string ruleSource)
+    {
+        return new
+        {
+            path,
+            reason,
+            ruleSource
+        };
     }
 
 }

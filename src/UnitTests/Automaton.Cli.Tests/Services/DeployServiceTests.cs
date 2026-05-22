@@ -216,6 +216,44 @@ public class DeployServiceTests
     }
 
     [Test]
+    public async Task DeployAsync_WhenUploadHasStructuredSkipReasons_IncludesReasonSummary()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 1, 0.1, [
+                new DeploySkippedEntry("source/.env", "Excluded by platform rule", "platform")
+            ])),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 2, 0.1, [
+                new DeploySkippedEntry("assets/debug.js", "Excluded by admin frontend deploy rule", "admin"),
+                new DeploySkippedEntry("assets/secret.js", "Excluded by app frontend deploy rule", "app")
+            ])),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        AssertCheck(result, DeployCheckNames.Upload, true, "reasons: 1 admin, 1 app");
+        AssertCheck(result, DeployCheckNames.SourceUpload, true, "reasons: 1 platform");
+    }
+
+    [Test]
     public async Task DeployAsync_WhenSourceUploadFails_ReturnsStructuredFailure()
     {
         var projectRoot = CreateProjectRoot();

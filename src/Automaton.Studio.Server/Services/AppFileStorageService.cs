@@ -833,7 +833,8 @@ public class AppFileStorageService
     public async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesAsync(Guid userId, Guid appId)
     {
         var backendPath = GetSourceBackendPath(userId, appId);
-        return await ListBackendFilesFromDirectoryAsync(backendPath);
+        var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        return await ListBackendFilesFromDirectoryAsync(backendPath, deployRules.BackendExclude);
     }
 
     /// <summary>

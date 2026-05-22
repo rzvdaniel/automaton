@@ -473,7 +473,12 @@ class AppsService {
     id: string,
     zipFile: File,
     clean = false,
-  ): Promise<{ success: boolean; written: string[]; skipped: string[]; errors: { path: string; reason: string }[] }> {
+  ): Promise<{
+    success: boolean
+    written: string[]
+    skipped: { path: string; reason: string; ruleSource: string }[]
+    errors: { path: string; reason: string }[]
+  }> {
     const form = new FormData()
     form.append('file', zipFile)
     const { data } = await apiClient.post(`/api/apps/${id}/upload?clean=${clean}`, form, {

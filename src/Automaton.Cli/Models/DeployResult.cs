@@ -17,7 +17,13 @@ public static class DeployCheckNames
 
 public sealed record DeployCheckResult(string Name, bool Success, string Message);
 
-public sealed record DeployUploadResult(int Written, int Skipped, double SizeMb);
+public sealed record DeploySkippedEntry(string Path, string Reason, string RuleSource);
+
+public sealed record DeployUploadResult(
+    int Written,
+    int Skipped,
+    double SizeMb,
+    IReadOnlyList<DeploySkippedEntry>? SkippedEntries = null);
 
 public sealed record DeployBackendResult(bool Success, int RunnerCount, string? Message);
 

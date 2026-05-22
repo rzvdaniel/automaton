@@ -81,7 +81,7 @@ public sealed class DeployService
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.SourceUpload,
                 true,
-                $"uploaded {sourceUploadResult.Written} source file(s), {sourceUploadResult.Skipped} skipped ({sourceUploadResult.SizeMb:F1} MB)"));
+                FormatUploadMessage("uploaded", "source file(s)", sourceUploadResult)));
         }
         catch (Exception ex)
         {
@@ -106,7 +106,7 @@ public sealed class DeployService
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.Upload,
                 true,
-                $"uploaded {uploadResult.Written} file(s), {uploadResult.Skipped} skipped ({uploadResult.SizeMb:F1} MB)"));
+                FormatUploadMessage("uploaded", "file(s)", uploadResult)));
         }
         catch (Exception ex)
         {
@@ -163,7 +163,7 @@ public sealed class DeployService
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.BackendPackage,
                 true,
-                $"uploaded {backendUpload.Written} backend file(s), {backendUpload.Skipped} skipped ({backendUpload.SizeMb:F1} MB)"));
+                FormatUploadMessage("uploaded", "backend file(s)", backendUpload)));
         }
         catch (Exception ex)
         {
@@ -402,14 +402,7 @@ public sealed class DeployService
         var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
         var uploadResult = await client.UploadSourceZipAsync(appId, zip, clean, cancellationToken);
-        var written = uploadResult.TryGetProperty("written", out var writtenProperty)
-            ? writtenProperty.GetArrayLength()
-            : 0;
-        var skipped = uploadResult.TryGetProperty("skipped", out var skippedProperty)
-            ? skippedProperty.GetArrayLength()
-            : 0;
-
-        return new DeployUploadResult(written, skipped, sizeMb);
+        return ParseUploadResult(uploadResult, sizeMb);
     }
 
     private static async Task<DeployUploadResult> UploadAsync(
@@ -423,14 +416,7 @@ public sealed class DeployService
         var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
         var uploadResult = await client.UploadZipAsync(appId, zip, clean, cancellationToken);
-        var written = uploadResult.TryGetProperty("written", out var writtenProperty)
-            ? writtenProperty.GetArrayLength()
-            : 0;
-        var skipped = uploadResult.TryGetProperty("skipped", out var skippedProperty)
-            ? skippedProperty.GetArrayLength()
-            : 0;
-
-        return new DeployUploadResult(written, skipped, sizeMb);
+        return ParseUploadResult(uploadResult, sizeMb);
     }
 
     private static async Task<DeployUploadResult> UploadBackendAsync(
@@ -444,14 +430,61 @@ public sealed class DeployService
         var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
         var uploadResult = await client.UploadBackendZipAsync(appId, zip, clean, cancellationToken);
+        return ParseUploadResult(uploadResult, sizeMb);
+    }
+
+    private static DeployUploadResult ParseUploadResult(System.Text.Json.JsonElement uploadResult, double sizeMb)
+    {
         var written = uploadResult.TryGetProperty("written", out var writtenProperty)
             ? writtenProperty.GetArrayLength()
             : 0;
-        var skipped = uploadResult.TryGetProperty("skipped", out var skippedProperty)
-            ? skippedProperty.GetArrayLength()
-            : 0;
+        var skippedEntries = new List<DeploySkippedEntry>();
+        if (uploadResult.TryGetProperty("skipped", out var skippedProperty) &&
+            skippedProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in skippedProperty.EnumerateArray())
+            {
+                if (item.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var stringPath = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(stringPath))
+                    {
+                        skippedEntries.Add(new DeploySkippedEntry(stringPath!, "skipped", "unknown"));
+                    }
 
-        return new DeployUploadResult(written, skipped, sizeMb);
+                    continue;
+                }
+
+                if (item.ValueKind != System.Text.Json.JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var skippedPath = item.TryGetProperty("path", out var pathProperty) ? pathProperty.GetString() ?? string.Empty : string.Empty;
+                var reason = item.TryGetProperty("reason", out var reasonProperty) ? reasonProperty.GetString() ?? "skipped" : "skipped";
+                var ruleSource = item.TryGetProperty("ruleSource", out var sourceProperty) ? sourceProperty.GetString() ?? "unknown" : "unknown";
+                skippedEntries.Add(new DeploySkippedEntry(skippedPath, reason, ruleSource));
+            }
+        }
+
+        return new DeployUploadResult(written, skippedEntries.Count, sizeMb, skippedEntries);
+    }
+
+    private static string FormatUploadMessage(string verb, string subject, DeployUploadResult result)
+    {
+        var message = $"{verb} {result.Written} {subject}, {result.Skipped} skipped ({result.SizeMb:F1} MB)";
+        if (result.SkippedEntries == null || result.SkippedEntries.Count == 0)
+        {
+            return message;
+        }
+
+        var byRuleSource = result.SkippedEntries
+            .GroupBy(entry => entry.RuleSource, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => $"{group.Count()} {group.Key}")
+            .ToArray();
+
+        return $"{message}; reasons: {string.Join(", ", byRuleSource)}";
     }
 
     private static async Task<DeployBackendResult> DeployBackendAsync(
