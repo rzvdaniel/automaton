@@ -93,7 +93,7 @@ public class AppsControllerExecutionService
                         AppId = appId,
                         RelativePath = script.RelativePath,
                         ControllerName = script.ControllerName,
-                        Code = script.Code,
+                        Content = script.Content,
                         Language = script.Language
                     };
 
@@ -234,7 +234,7 @@ public class AppsControllerExecutionService
                     AppId = appId,
                     RelativePath = script.RelativePath,
                     ControllerName = script.ControllerName,
-                    Code = script.Code,
+                    Content = script.Content,
                     Language = script.Language
                 };
 

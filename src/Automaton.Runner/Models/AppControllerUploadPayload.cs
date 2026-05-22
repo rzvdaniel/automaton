@@ -9,6 +9,6 @@ public class AppControllerUploadPayload
     public Guid AppId { get; set; }
     public string RelativePath { get; set; } = string.Empty;
     public string ControllerName { get; set; } = string.Empty;
-    public string Code { get; set; } = string.Empty;
+    public byte[] Content { get; set; } = [];
     public string Language { get; set; } = string.Empty;
 }

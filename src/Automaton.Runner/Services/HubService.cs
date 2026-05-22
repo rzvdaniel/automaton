@@ -10,6 +10,8 @@ using Automaton.Core.Models;
 using Automaton.Core.Enums;
 using System.Threading;
 
+using System.Text;
+
 namespace Automaton.Runner.Console.Services;
 
 public class HubService
@@ -512,7 +514,7 @@ public class HubService
             if (payload.Language == "Text" && string.Equals(relativePath, "requirements.txt", StringComparison.OrdinalIgnoreCase))
             {
                 var reqPath = Path.Combine(backendDir, "requirements.txt");
-                File.WriteAllText(reqPath, payload.Code);
+                File.WriteAllBytes(reqPath, payload.Content);
 
                 var packagesDir = Path.Combine(AppsRootDir, payload.AppId.ToString(), "packages");
                 Directory.CreateDirectory(packagesDir);
@@ -525,15 +527,15 @@ public class HubService
             if (payload.Language == "Text" && string.Equals(relativePath, "system-requirements.txt", StringComparison.OrdinalIgnoreCase))
             {
                 var sysReqPath = Path.Combine(backendDir, "system-requirements.txt");
-                File.WriteAllText(sysReqPath, payload.Code);
+                File.WriteAllBytes(sysReqPath, payload.Content);
 
-                var aptLogs = InstallSystemPackages(payload.AppId, payload.Code);
+                var aptLogs = InstallSystemPackages(payload.AppId, Encoding.UTF8.GetString(payload.Content));
                 return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
 
             var filePath = ResolveBackendUploadPath(backendDir, relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-            File.WriteAllText(filePath, payload.Code);
+            File.WriteAllBytes(filePath, payload.Content);
 
             logger.Information("Deployed backend file {RelativePath} for app {AppId}",
                 relativePath, payload.AppId);

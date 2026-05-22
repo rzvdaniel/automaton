@@ -851,19 +851,20 @@ public class AppFileStorageService
         // SearchOption.AllDirectories so backend/shared/*.py files are included
         foreach (var file in Directory.GetFiles(backendPath, "*", SearchOption.AllDirectories))
         {
-            var ext = Path.GetExtension(file).ToLowerInvariant();
-            if (IsDeployableBackendFileExtension(ext))
+            var relativePath = Path.GetRelativePath(backendPath, file);
+            if (IsExcludedBackendDeployPath(relativePath))
             {
-                var code = await File.ReadAllTextAsync(file);
-                var relativePath = Path.GetRelativePath(backendPath, file);
-                var normalizedRelativePath = relativePath.Replace('\\', '/');
-                var controllerName = Path.ChangeExtension(normalizedRelativePath, null) ?? normalizedRelativePath;
-                results.Add(new BackendScriptFile(
-                    normalizedRelativePath,
-                    controllerName,
-                    code,
-                    GetLanguageFromExtension(ext)));
+                continue;
             }
+
+            var ext = Path.GetExtension(file).ToLowerInvariant();
+            var normalizedRelativePath = relativePath.Replace('\\', '/');
+            var controllerName = Path.ChangeExtension(normalizedRelativePath, null) ?? normalizedRelativePath;
+            results.Add(new BackendScriptFile(
+                normalizedRelativePath,
+                controllerName,
+                await File.ReadAllBytesAsync(file),
+                GetLanguageFromExtension(ext)));
         }
         return results;
     }
@@ -899,20 +900,40 @@ public class AppFileStorageService
         _      => "Text"
     };
 
-    private static bool IsDeployableBackendFileExtension(string ext) => ext.ToLowerInvariant() switch
+    private static bool IsExcludedBackendDeployPath(string relativePath)
     {
-        ".py" => true,
-        ".bat" => true,
-        ".txt" => true,
-        ".json" => true,
-        ".md" => true,
-        ".yml" => true,
-        ".yaml" => true,
-        ".ini" => true,
-        ".cfg" => true,
-        ".csv" => true,
-        _ => false
-    };
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        var fileName = Path.GetFileName(normalized);
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length == 0)
+        {
+            return true;
+        }
+
+        if (normalized.Contains("../", StringComparison.Ordinal) || Path.IsPathRooted(normalized))
+        {
+            return true;
+        }
+
+        if (fileName.Equals(".env", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith(".env.", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals(".DS_Store", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".pyc", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".log", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return segments.Any(segment =>
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("venv", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".venv", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("dist", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("build", StringComparison.OrdinalIgnoreCase));
+    }
 
     private Task CopyDirectoryFilesAsync(
         string srcPath,
