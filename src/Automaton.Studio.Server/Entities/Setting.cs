@@ -12,7 +12,7 @@ public class Setting
 {
     /// <summary>
     /// Unique key identifier for the setting
-    /// Example: "Desktop.PythonSettings", "EmailConfiguration", etc.
+    /// Example: "Apps.DeployRules", "EmailConfiguration", etc.
     /// </summary>
     [Key]
     [Required]
