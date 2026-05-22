@@ -47,8 +47,16 @@ public class AppModel
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
+    public AppComponentOwnershipModel Frontend { get; set; } = new();
+    public AppComponentOwnershipModel Backend { get; set; } = new();
 
     public AppDefinition Definition { get; set; } = new AppDefinition();
+}
+
+public class AppComponentOwnershipModel
+{
+    public bool SourceAvailable { get; set; } = true;
+    public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
 }
 
 public class ForkAppRequest

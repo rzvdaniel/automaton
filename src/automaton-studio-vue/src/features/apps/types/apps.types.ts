@@ -84,6 +84,13 @@ export interface App {
   developmentMode: AppDevelopmentMode
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource
+  frontend: AppComponentOwnership
+  backend: AppComponentOwnership
+}
+
+export interface AppComponentOwnership {
+  sourceAvailable: boolean
+  runtimeSource: AppRuntimeSource
 }
 
 export const AppDevelopmentMode = {

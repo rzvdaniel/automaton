@@ -176,10 +176,37 @@ class AppsService {
     success: boolean
     frontendFilesSynced: number
     backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
     backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
     message?: string
   }> {
     const { data } = await apiClient.post(`/api/apps/${id}/deploy`, {})
+    return data
+  }
+
+  async deployFrontend(id: string): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
+    message?: string
+  }> {
+    const { data } = await apiClient.post(`/api/apps/${id}/frontend/deploy`, {})
+    return data
+  }
+
+  async redeployBackendComponent(id: string): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
+    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
+    message?: string
+  }> {
+    const { data } = await apiClient.post(`/api/apps/${id}/backend/redeploy`, {})
     return data
   }
 

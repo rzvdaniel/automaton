@@ -97,6 +97,46 @@ public class AppsControllerExecutionController : ControllerBase
         }
     }
 
+    [HttpPost("api/apps/{appId:guid}/frontend/deploy")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeployAppResponse>> DeployFrontend(Guid appId)
+    {
+        try
+        {
+            var userId = userContextService.GetUserId();
+            logger.Information("Deploy frontend request: AppId={AppId}, UserId={UserId}", appId, userId);
+
+            var result = await controllerExecutionService.DeployFrontendAsync(appId, userId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Deploy frontend failed: AppId={AppId}", appId);
+            return StatusCode(500, new { error = "Deploy frontend failed: " + ex.Message });
+        }
+    }
+
+    [HttpPost("api/apps/{appId:guid}/backend/redeploy")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeployAppResponse>> DeployBackendComponent(
+        Guid appId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userId = userContextService.GetUserId();
+            logger.Information("Deploy backend component request: AppId={AppId}, UserId={UserId}", appId, userId);
+
+            var result = await controllerExecutionService.DeployBackendComponentAsync(appId, userId, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Deploy backend component failed: AppId={AppId}", appId);
+            return StatusCode(500, new { error = "Deploy backend component failed: " + ex.Message });
+        }
+    }
+
     /// <summary>
     /// Execute a controller action from a published app (by slug).
     /// </summary>

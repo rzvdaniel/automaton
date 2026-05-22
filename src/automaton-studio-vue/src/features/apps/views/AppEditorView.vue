@@ -586,20 +586,20 @@ function handleCloseTab(event: Event, path: string) {
 // Handle deploy backend
 async function handleDeployBackend() {
   try {
-    const result = await editorStore.deployBackend()
-    if (result.totalScripts === 0) {
+    const result = await editorStore.deployBackendComponent()
+    if (result.backendDeploy.totalScripts === 0) {
       toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
-    } else if (!result.deployedCount) {
-      toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.message, life: 5000 })
+    } else if (!result.backendDeploy.deployedCount) {
+      toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.backendDeploy.message, life: 5000 })
     } else {
-      const lastInstallLog = result.installLogs?.at(-1)
+      const lastInstallLog = result.backendDeploy.installLogs?.at(-1)
       const packagesNote = lastInstallLog
         ? ` — ${lastInstallLog}`
-        : (result.hasRequirements ? ' (packages installed)' : '')
+        : (result.backendDeploy.hasRequirements ? ' (packages installed)' : '')
       toast.add({
         severity: 'success',
         summary: 'Backend Deployed',
-        detail: `Deployed ${result.deployedCount} script(s) to ${result.runnerCount} runner(s)${packagesNote}`,
+        detail: `${result.backendAction === 'updated' ? `Updated ${result.backendFilesSynced} backend file(s) from source and ` : ''}deployed ${result.backendDeploy.deployedCount} script(s) to ${result.backendDeploy.runnerCount} runner(s)${packagesNote}`,
         life: 4000,
       })
     }
@@ -608,6 +608,27 @@ async function handleDeployBackend() {
       severity: 'error',
       summary: 'Deploy Failed',
       detail: err instanceof Error ? err.message : 'Failed to deploy backend',
+      life: 5000,
+    })
+  }
+}
+
+async function handleDeployFrontend() {
+  try {
+    const result = await editorStore.deployFrontend()
+    toast.add({
+      severity: 'success',
+      summary: 'Frontend Deployed',
+      detail: result.frontendAction === 'updated'
+        ? `Updated live/frontend from source/frontend with ${result.frontendFilesSynced} file(s).`
+        : 'Preserved existing live/frontend because source/frontend is empty.',
+      life: 4000,
+    })
+  } catch (err: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Deploy Failed',
+      detail: err instanceof Error ? err.message : 'Failed to deploy frontend',
       life: 5000,
     })
   }
@@ -623,7 +644,7 @@ async function handleDeployApp() {
     toast.add({
       severity: 'success',
       summary: 'App Deployed',
-      detail: `Synced ${result.frontendFilesSynced} frontend file(s) and ${result.backendFilesSynced} backend file(s).${backendMessage}`,
+      detail: `Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
       life: 5000,
     })
   } catch (err: unknown) {
@@ -1112,6 +1133,16 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               :disabled="editorStore.isDeployingApp || !editorStore.canDeployFromStudio"
               @click="handleDeployApp"
             />
+            <Button
+              v-if="activeTab !== 'backend-server'"
+              label="Deploy Frontend"
+              icon="pi pi-desktop"
+              outlined
+              severity="secondary"
+              :loading="editorStore.isDeployingApp"
+              :disabled="editorStore.isDeployingApp || !editorStore.canDeployFrontendFromStudio"
+              @click="handleDeployFrontend"
+            />
             <span v-if="editorStore.deployAppStatusMessage" class="text-sm text-color-secondary">
               {{ editorStore.deployAppStatusMessage }}
             </span>
@@ -1155,22 +1186,19 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               @click="showPublishDialog = true"
             />
 
-            <!-- Deploy Backend (only when app has backend scripts) -->
-            <template v-if="editorStore.hasBackendFolder">
-              <Button
-                v-tooltip.bottom="'Push backend scripts to runner'"
-                label="Deploy Backend"
-                icon="pi pi-server"
-                outlined
-                severity="secondary"
-                :loading="editorStore.isDeployingBackend"
-                :disabled="editorStore.isDeployingBackend"
-                @click="handleDeployBackend"
-              />
-              <span v-if="editorStore.deployStatusMessage" class="text-sm text-color-secondary">
-                {{ editorStore.deployStatusMessage }}
-              </span>
-            </template>
+            <Button
+              v-tooltip.bottom="'Update live/backend from source/backend when available, otherwise redeploy the existing live backend'"
+              label="Deploy Backend"
+              icon="pi pi-server"
+              outlined
+              severity="secondary"
+              :loading="editorStore.isDeployingBackend"
+              :disabled="editorStore.isDeployingBackend"
+              @click="handleDeployBackend"
+            />
+            <span v-if="editorStore.deployStatusMessage" class="text-sm text-color-secondary">
+              {{ editorStore.deployStatusMessage }}
+            </span>
           </template>
         </div>
       </div>
@@ -1180,7 +1208,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       </div>
 
       <div v-else-if="editorStore.showsSourceDeployBanner" class="mode-banner mode-banner-source">
-        You are editing source files. Use Deploy App to sync source to live and redeploy backend from <code>live/backend</code>.
+        You are editing source files. Frontend source {{ editorStore.currentApp.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved' }}. Backend source {{ editorStore.currentApp.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved' }}.
       </div>
 
       <!-- Monitor View -->

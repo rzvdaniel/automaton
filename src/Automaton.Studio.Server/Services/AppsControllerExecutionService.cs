@@ -46,7 +46,7 @@ public class AppsControllerExecutionService
     /// </summary>
     public async Task<DeployInfoResponse> GetDeployInfoAsync(Guid appId, Guid ownerId)
     {
-        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
         return new DeployInfoResponse
@@ -66,7 +66,7 @@ public class AppsControllerExecutionService
         List<string>? runnerNames,
         CancellationToken cancellationToken)
     {
-        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
 
@@ -133,15 +133,20 @@ public class AppsControllerExecutionService
         Guid ownerId,
         CancellationToken cancellationToken)
     {
-        var frontendFilesSynced = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
-        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
-        var backendFilesSynced = (await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId)).Count();
+        var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+        var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
 
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            metadata.SourceAvailable = true;
-            metadata.RuntimeSource = AppRuntimeSources.Studio;
+            if (metadata.Frontend.SourceAvailable)
+            {
+                metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+            }
+            if (metadata.Backend.SourceAvailable)
+            {
+                metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+            }
         });
 
         var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
@@ -149,10 +154,63 @@ public class AppsControllerExecutionService
         return new DeployAppResponse
         {
             Success = true,
-            FrontendFilesSynced = frontendFilesSynced,
-            BackendFilesSynced = backendFilesSynced,
+            FrontendFilesSynced = frontendSync.CopiedFiles,
+            BackendFilesSynced = backendSync.CopiedFiles,
+            FrontendAction = frontendSync.Updated ? "updated" : "preserved",
+            BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
-            Message = $"Synced {frontendFilesSynced} frontend file(s) and {backendFilesSynced} backend file(s)"
+            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}"
+        };
+    }
+
+    public async Task<DeployAppResponse> DeployFrontendAsync(Guid appId, Guid ownerId)
+    {
+        var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+
+        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+            if (metadata.Frontend.SourceAvailable)
+            {
+                metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+            }
+        });
+
+        return new DeployAppResponse
+        {
+            Success = true,
+            FrontendFilesSynced = frontendSync.CopiedFiles,
+            BackendFilesSynced = 0,
+            FrontendAction = frontendSync.Updated ? "updated" : "preserved",
+            BackendAction = "preserved",
+            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files"
+        };
+    }
+
+    public async Task<DeployAppResponse> DeployBackendComponentAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+
+        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+            if (metadata.Backend.SourceAvailable)
+            {
+                metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+            }
+        });
+
+        var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
+
+        return new DeployAppResponse
+        {
+            Success = true,
+            FrontendFilesSynced = 0,
+            BackendFilesSynced = backendSync.CopiedFiles,
+            FrontendAction = "preserved",
+            BackendAction = backendSync.Updated ? "updated" : "preserved",
+            BackendDeploy = backendDeploy,
+            Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}"
         };
     }
 
@@ -162,7 +220,7 @@ public class AppsControllerExecutionService
     /// </summary>
     private async Task DeployScriptsToRunnerAsync(Guid appId, Guid ownerId, Runner runner, CancellationToken cancellationToken)
     {
-        await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var pythonScripts = scripts.Where(s => s.Language != "Text").ToList();
 
@@ -363,6 +421,9 @@ public class AppsControllerExecutionService
 
         return await query.ToListAsync();
     }
+
+    private static string GetActionLabel(bool updated, int fileCount) =>
+        updated ? $"updated from source ({fileCount} file(s))" : "preserved existing live files";
 
     private async Task<List<RunnerAppControllerResult>> ExecuteViaTunnelAsync(
         Guid appId,

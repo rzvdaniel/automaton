@@ -148,16 +148,18 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   const currentScopeEditable = computed(() => currentFileScope.value !== FileSystemScope.Versions)
   const defaultEditorScope = computed<AppFileSystemScope>(() => {
-    if (currentApp.value?.developmentMode === DevelopmentMode.Local && !currentApp.value.sourceAvailable) {
+    if (currentApp.value?.developmentMode === DevelopmentMode.Local && !currentApp.value.frontend.sourceAvailable) {
       return FileSystemScope.Live
     }
 
     return FileSystemScope.Source
   })
-  const canDeployFromStudio = computed(() => currentApp.value?.sourceAvailable ?? false)
+  const canDeployFrontendFromStudio = computed(() => currentApp.value?.frontend.sourceAvailable ?? false)
+  const canDeployBackendFromStudio = computed(() => currentApp.value?.backend.sourceAvailable ?? false)
+  const canDeployFromStudio = computed(() => canDeployFrontendFromStudio.value || canDeployBackendFromStudio.value)
   const isLocalManagedApp = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Local)
-  const showsLocalLiveBanner = computed(() => isLocalManagedApp.value && !currentApp.value?.sourceAvailable)
-  const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || currentApp.value?.sourceAvailable)
+  const showsLocalLiveBanner = computed(() => isLocalManagedApp.value && !currentApp.value?.frontend.sourceAvailable)
+  const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || canDeployFromStudio.value)
   const preferredPreviewScope = computed<AppFileSystemScope>(() => {
     const hasLiveIndex = Boolean(findFileInTree(fileTree.value, 'live/frontend/index.html'))
     return hasLiveIndex ? FileSystemScope.Live : FileSystemScope.Source
@@ -692,6 +694,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     success: boolean
     frontendFilesSynced: number
     backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
     backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
     message?: string
   }> {
@@ -717,6 +721,71 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     } finally {
       isDeployingApp.value = false
       deployAppStatusMessage.value = null
+    }
+  }
+
+  async function deployFrontend(): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
+    message?: string
+  }> {
+    if (!currentApp.value) throw new Error('No app loaded')
+    if (!canDeployFrontendFromStudio.value) {
+      throw new Error('Frontend source is not available in Studio. Existing live/frontend will be preserved.')
+    }
+
+    isDeployingApp.value = true
+    deployAppStatusMessage.value = 'Syncing frontend source to live...'
+    try {
+      if (hasUnsavedChanges.value) {
+        deployAppStatusMessage.value = 'Saving source files...'
+        await saveAllFiles()
+        deployAppStatusMessage.value = 'Syncing frontend source to live...'
+      }
+
+      const result = await appsService.deployFrontend(currentApp.value.id)
+      await loadUnifiedFileTree(currentApp.value.id)
+      currentApp.value = await appsService.get(currentApp.value.id)
+      await refreshPreview()
+      return result
+    } finally {
+      isDeployingApp.value = false
+      deployAppStatusMessage.value = null
+    }
+  }
+
+  async function deployBackendComponent(): Promise<{
+    success: boolean
+    frontendFilesSynced: number
+    backendFilesSynced: number
+    frontendAction: string
+    backendAction: string
+    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
+    message?: string
+  }> {
+    if (!currentApp.value) throw new Error('No app loaded')
+
+    isDeployingBackend.value = true
+    deployStatusMessage.value = canDeployBackendFromStudio.value
+      ? 'Syncing backend source to live...'
+      : 'Redeploying existing live backend...'
+    try {
+      if (hasUnsavedChanges.value && canDeployBackendFromStudio.value) {
+        deployStatusMessage.value = 'Saving source files...'
+        await saveAllFiles()
+        deployStatusMessage.value = 'Syncing backend source to live...'
+      }
+
+      const result = await appsService.redeployBackendComponent(currentApp.value.id)
+      await loadUnifiedFileTree(currentApp.value.id)
+      currentApp.value = await appsService.get(currentApp.value.id)
+      return result
+    } finally {
+      isDeployingBackend.value = false
+      deployStatusMessage.value = null
     }
   }
 
@@ -1035,6 +1104,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     hasBackendFolder,
     currentScopeEditable,
     defaultEditorScope,
+    canDeployFrontendFromStudio,
+    canDeployBackendFromStudio,
     canDeployFromStudio,
     isLocalManagedApp,
     showsLocalLiveBanner,
@@ -1056,6 +1127,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     setPreviewWarning,
     publishApp,
     unpublishApp,
+    deployFrontend,
+    deployBackendComponent,
     deployApp,
     deployBackend,
     deployAppStatusMessage,

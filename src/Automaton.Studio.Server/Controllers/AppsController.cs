@@ -1643,8 +1643,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
-                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+                frontendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
 
             if (written.Count > 0)
             {
@@ -1759,8 +1758,9 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
-                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+                frontendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Frontend.SourceAvailable,
+                frontendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild,
+                backendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Backend.SourceAvailable);
 
             return Ok(new { success = true, written, skipped, errors });
         }
@@ -1862,8 +1862,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                sourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).SourceAvailable,
-                runtimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+                backendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliDeploy);
 
             return Ok(new { success = true, written, skipped, errors });
         }

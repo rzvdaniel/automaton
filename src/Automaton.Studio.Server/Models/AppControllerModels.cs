@@ -42,6 +42,8 @@ public class DeployAppResponse
     public bool Success { get; set; }
     public int FrontendFilesSynced { get; set; }
     public int BackendFilesSynced { get; set; }
+    public string FrontendAction { get; set; } = "preserved";
+    public string BackendAction { get; set; } = "preserved";
     public DeployBackendResponse BackendDeploy { get; set; } = new();
     public string? Message { get; set; }
 }

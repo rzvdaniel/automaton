@@ -241,8 +241,10 @@ public class AppsService
         await fileStorageService.UpdateAppStorageMetadataAsync(UserId, entity.Id, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            metadata.SourceAvailable = true;
-            metadata.RuntimeSource = AppRuntimeSources.Studio;
+            metadata.Frontend.SourceAvailable = true;
+            metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+            metadata.Backend.SourceAvailable = true;
+            metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
         });
 
         // Write automaton.json so external AI tools (Copilot, Cursor, Claude) can discover the app ID.
@@ -825,13 +827,33 @@ public class AppsService
         return entities.Select(e => MapToModel(e, null));
     }
 
-    public Task SetLocalDevelopmentMetadataAsync(Guid appId, Guid ownerId, bool sourceAvailable, string runtimeSource)
+    public Task SetLocalDevelopmentMetadataAsync(
+        Guid appId,
+        Guid ownerId,
+        bool? frontendSourceAvailable = null,
+        string? frontendRuntimeSource = null,
+        bool? backendSourceAvailable = null,
+        string? backendRuntimeSource = null)
     {
         return fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Local;
-            metadata.SourceAvailable = sourceAvailable;
-            metadata.RuntimeSource = runtimeSource;
+            if (frontendSourceAvailable.HasValue)
+            {
+                metadata.Frontend.SourceAvailable = frontendSourceAvailable.Value;
+            }
+            if (!string.IsNullOrWhiteSpace(frontendRuntimeSource))
+            {
+                metadata.Frontend.RuntimeSource = frontendRuntimeSource;
+            }
+            if (backendSourceAvailable.HasValue)
+            {
+                metadata.Backend.SourceAvailable = backendSourceAvailable.Value;
+            }
+            if (!string.IsNullOrWhiteSpace(backendRuntimeSource))
+            {
+                metadata.Backend.RuntimeSource = backendRuntimeSource;
+            }
         });
     }
 
@@ -943,7 +965,19 @@ public class AppsService
         }
 
         app.DevelopmentMode = metadata.DevelopmentMode;
-        app.SourceAvailable = metadata.SourceAvailable;
-        app.RuntimeSource = metadata.RuntimeSource;
+        app.Frontend = new Models.AppComponentOwnershipModel
+        {
+            SourceAvailable = metadata.Frontend.SourceAvailable,
+            RuntimeSource = metadata.Frontend.RuntimeSource
+        };
+        app.Backend = new Models.AppComponentOwnershipModel
+        {
+            SourceAvailable = metadata.Backend.SourceAvailable,
+            RuntimeSource = metadata.Backend.RuntimeSource
+        };
+        app.SourceAvailable = app.Frontend.SourceAvailable || app.Backend.SourceAvailable;
+        app.RuntimeSource = app.Frontend.RuntimeSource == app.Backend.RuntimeSource
+            ? app.Frontend.RuntimeSource
+            : $"{app.Frontend.RuntimeSource}|{app.Backend.RuntimeSource}";
     }
 }

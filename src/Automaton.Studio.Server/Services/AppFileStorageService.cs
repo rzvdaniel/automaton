@@ -395,7 +395,8 @@ public class AppFileStorageService
     public async Task<AppStorageMetadata> GetAppStorageMetadataAsync(Guid userId, Guid appId)
     {
         var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
-        metadata.SourceAvailable = HasEditableSourceEntries(userId, appId);
+        metadata.Frontend.SourceAvailable = HasFrontendSourceEntries(userId, appId);
+        metadata.Backend.SourceAvailable = HasBackendSourceEntries(userId, appId);
         return metadata;
     }
 
@@ -603,12 +604,19 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Rebuild the runner backend live package from editable source/backend files.
+    /// Rebuild the runner backend live package from editable source/backend files when present.
+    /// Missing source preserves the current live/backend package.
     /// </summary>
-    public Task SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
+    public Task<(int CopiedFiles, bool Updated)> SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
     {
         var sourceBackendPath = GetSourceBackendPath(userId, appId);
         var runtimeBackendPath = GetLiveBackendPath(userId, appId);
+
+        if (!HasAnyEntries(sourceBackendPath))
+        {
+            logger.Information("No source/backend files found for app {AppId}; preserving existing live/backend", appId);
+            return Task.FromResult((0, false));
+        }
 
         if (Directory.Exists(runtimeBackendPath))
         {
@@ -617,12 +625,7 @@ public class AppFileStorageService
 
         Directory.CreateDirectory(runtimeBackendPath);
 
-        if (!Directory.Exists(sourceBackendPath))
-        {
-            logger.Information("No source/backend directory found for app {AppId}; live/backend left empty", appId);
-            return Task.CompletedTask;
-        }
-
+        var copied = 0;
         foreach (var sourceFile in Directory.EnumerateFiles(sourceBackendPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(sourceBackendPath, sourceFile);
@@ -635,16 +638,23 @@ public class AppFileStorageService
                 Directory.CreateDirectory(targetDirectory);
 
             File.Copy(sourceFile, targetFilePath, overwrite: true);
+            copied++;
         }
 
         logger.Information("Synced source/backend to live/backend for app {AppId}", appId);
-        return Task.CompletedTask;
+        return Task.FromResult((copied, true));
     }
 
-    public Task<int> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
+    public Task<(int CopiedFiles, bool Updated)> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
     {
         var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
         var runtimeFrontendPath = GetLiveFrontendPath(userId, appId);
+
+        if (!HasAnyEntries(sourceFrontendPath))
+        {
+            logger.Information("No source/frontend files found for app {AppId}; preserving existing live/frontend", appId);
+            return Task.FromResult((0, false));
+        }
 
         if (Directory.Exists(runtimeFrontendPath))
         {
@@ -652,12 +662,6 @@ public class AppFileStorageService
         }
 
         Directory.CreateDirectory(runtimeFrontendPath);
-
-        if (!Directory.Exists(sourceFrontendPath))
-        {
-            logger.Information("No source/frontend directory found for app {AppId}; live/frontend left empty", appId);
-            return Task.FromResult(0);
-        }
 
         var copied = 0;
         foreach (var sourceFile in Directory.EnumerateFiles(sourceFrontendPath, "*", SearchOption.AllDirectories))
@@ -676,7 +680,7 @@ public class AppFileStorageService
         }
 
         logger.Information("Synced source/frontend to live/frontend for app {AppId}", appId);
-        return Task.FromResult(copied);
+        return Task.FromResult((copied, true));
     }
 
     /// <summary>
@@ -724,12 +728,14 @@ public class AppFileStorageService
         }
     }
 
-    private bool HasEditableSourceEntries(Guid userId, Guid appId)
+    public bool HasFrontendSourceEntries(Guid userId, Guid appId)
     {
-        var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
-        var sourceBackendPath = GetSourceBackendPath(userId, appId);
+        return HasAnyEntries(GetSourceFrontendPath(userId, appId));
+    }
 
-        return HasAnyEntries(sourceFrontendPath) || HasAnyEntries(sourceBackendPath);
+    public bool HasBackendSourceEntries(Guid userId, Guid appId)
+    {
+        return HasAnyEntries(GetSourceBackendPath(userId, appId));
     }
 
     private static bool HasAnyEntries(string path)
