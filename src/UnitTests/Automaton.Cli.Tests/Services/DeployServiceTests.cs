@@ -175,7 +175,50 @@ public class DeployServiceTests
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.Uploaded?.Written, Is.EqualTo(2));
+        Assert.That(result.SourceUploaded?.Written, Is.EqualTo(3));
         AssertCheck(result, DeployCheckNames.BackendDeploy, true, "no backend controllers found");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenBackendUploadSucceeds_PreservesBackendUploadDetails()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 1, 0.1, [
+                new DeploySkippedEntry("backend/.env", "Excluded by platform backend deploy rule", "platform")
+            ])),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 1, "backend deployed")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.BackendUploaded?.Written, Is.EqualTo(2));
+        Assert.That(result.BackendUploaded?.SkippedEntries, Has.Count.EqualTo(1));
+        AssertCheck(result, DeployCheckNames.BackendPackage, true, "reasons: 1 platform");
     }
 
     [Test]

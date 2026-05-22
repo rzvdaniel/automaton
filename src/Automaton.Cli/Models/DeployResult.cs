@@ -51,5 +51,7 @@ public sealed class DeployResult
 
     public DeployUploadResult? Uploaded { get; init; }
 
+    public DeployUploadResult? BackendUploaded { get; init; }
+
     public DeployBackendResult? Backend { get; init; }
 }

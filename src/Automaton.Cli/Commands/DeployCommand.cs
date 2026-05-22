@@ -33,6 +33,7 @@ public static class DeployCommand
             "Frontend directory to upload (overrides frontend.deployDir in automaton.json)");
 
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var verboseOption = new Option<bool>("--verbose", "Print skipped-file details and exclusion reasons");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -40,10 +41,11 @@ public static class DeployCommand
             cleanOption,
             skipBackendOption,
             dirOption,
-            jsonOption
+            jsonOption,
+            verboseOption
         };
 
-        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson) =>
+        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose) =>
         {
             var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
@@ -76,7 +78,7 @@ public static class DeployCommand
                         NextSteps = preparation.NextSteps
                     };
 
-                    WriteResult(failure, asJson);
+                    WriteResult(failure, asJson, verbose);
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -84,7 +86,7 @@ public static class DeployCommand
                 var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir);
                 result = MergePreparation(result, preparation);
 
-                WriteResult(result, asJson);
+                WriteResult(result, asJson, verbose);
                 Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
@@ -92,7 +94,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.ExitCode = 1;
             }
-        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption);
+        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption);
 
         return cmd;
     }
@@ -115,12 +117,14 @@ public static class DeployCommand
             SkipBackend = result.SkipBackend,
             Checks = preparation.Checks.Concat(result.Checks).ToList(),
             NextSteps = preparation.NextSteps.Concat(result.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            SourceUploaded = result.SourceUploaded,
             Uploaded = result.Uploaded,
+            BackendUploaded = result.BackendUploaded,
             Backend = result.Backend
         };
     }
 
-    private static void WriteResult(DeployResult result, bool asJson)
+    private static void WriteResult(DeployResult result, bool asJson, bool verbose)
     {
         if (asJson)
         {
@@ -137,6 +141,7 @@ public static class DeployCommand
                 nextSteps = result.NextSteps,
                 sourceUploaded = result.SourceUploaded,
                 uploaded = result.Uploaded,
+                backendUploaded = result.BackendUploaded,
                 backend = result.Backend
             });
             return;
@@ -158,6 +163,7 @@ public static class DeployCommand
         }
 
         AnsiConsole.Write(table);
+        WriteVerboseSkippedEntries(result, verbose);
 
         if (result.NextSteps.Count > 0)
         {
@@ -172,6 +178,36 @@ public static class DeployCommand
         if (result.Success)
         {
             AnsiConsole.MarkupLine("[green bold]Deploy complete.[/]");
+        }
+    }
+
+    private static void WriteVerboseSkippedEntries(DeployResult result, bool verbose)
+    {
+        if (!verbose)
+        {
+            return;
+        }
+
+        WriteSkippedSection("Source skipped files", result.SourceUploaded);
+        WriteSkippedSection("Frontend skipped files", result.Uploaded);
+        WriteSkippedSection("Backend skipped files", result.BackendUploaded);
+    }
+
+    private static void WriteSkippedSection(string title, DeployUploadResult? uploadResult)
+    {
+        if (uploadResult?.SkippedEntries == null || uploadResult.SkippedEntries.Count == 0)
+        {
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[bold]{title}[/]");
+        foreach (var entry in uploadResult.SkippedEntries)
+        {
+            var path = Markup.Escape(entry.Path);
+            var ruleSource = Markup.Escape(entry.RuleSource);
+            var reason = Markup.Escape(entry.Reason);
+            AnsiConsole.MarkupLine($" - [grey]{path}[/] [[{ruleSource}]] {reason}");
         }
     }
 }
