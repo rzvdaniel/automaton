@@ -19,6 +19,7 @@ public class AppFileStorageService
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly Serilog.ILogger logger;
     private readonly string baseStoragePath;
+    private readonly SettingsService settingsService;
 
     /// <summary>
     /// Whitelist of allowed file extensions for security.
@@ -40,9 +41,10 @@ public class AppFileStorageService
         ".py", ".bat"
     };
 
-    public AppFileStorageService(IWebHostEnvironment webHostEnvironment)
+    public AppFileStorageService(IWebHostEnvironment webHostEnvironment, SettingsService settingsService)
     {
         this.webHostEnvironment = webHostEnvironment;
+        this.settingsService = settingsService;
         this.logger = Log.ForContext<AppFileStorageService>();
         
         // Store apps in /AppData/apps/{userId}/{appId}/
@@ -840,10 +842,11 @@ public class AppFileStorageService
     public async Task<IReadOnlyList<BackendScriptFile>> ListRuntimeBackendFilesAsync(Guid userId, Guid appId)
     {
         var backendPath = GetLiveBackendPath(userId, appId);
-        return await ListBackendFilesFromDirectoryAsync(backendPath);
+        var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        return await ListBackendFilesFromDirectoryAsync(backendPath, deployRules.BackendExclude);
     }
 
-    private static async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesFromDirectoryAsync(string backendPath)
+    private static async Task<IReadOnlyList<BackendScriptFile>> ListBackendFilesFromDirectoryAsync(string backendPath, IEnumerable<string> excludeRules)
     {
         if (!Directory.Exists(backendPath)) return [];
 
@@ -852,7 +855,7 @@ public class AppFileStorageService
         foreach (var file in Directory.GetFiles(backendPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(backendPath, file);
-            if (IsExcludedBackendDeployPath(relativePath))
+            if (IsExcludedBackendDeployPath(relativePath, excludeRules))
             {
                 continue;
             }
@@ -900,10 +903,70 @@ public class AppFileStorageService
         _      => "Text"
     };
 
-    private static bool IsExcludedBackendDeployPath(string relativePath)
+    public static bool MatchesExcludeRule(string relativePath, IEnumerable<string> rules)
     {
         var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var fileName = Path.GetFileName(normalized);
+
+        foreach (var rawRule in rules)
+        {
+            var rule = rawRule?.Replace('\\', '/').Trim();
+            if (string.IsNullOrWhiteSpace(rule))
+            {
+                continue;
+            }
+
+            if (rule.EndsWith("/**", StringComparison.Ordinal))
+            {
+                var prefix = rule[..^3].Trim('/');
+                if (normalized.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (rule.StartsWith("*.", StringComparison.Ordinal))
+            {
+                if (fileName.EndsWith(rule[1..], StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (rule.Contains('/', StringComparison.Ordinal))
+            {
+                if (string.Equals(normalized, rule.Trim('/'), StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (string.Equals(fileName, rule, StringComparison.OrdinalIgnoreCase) ||
+                segments.Any(segment => string.Equals(segment, rule, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsExcludedBackendDeployPath(string relativePath, IEnumerable<string> rules)
+    {
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (segments.Length == 0)
@@ -916,21 +979,7 @@ public class AppFileStorageService
             return true;
         }
 
-        if (fileName.Equals(".env", StringComparison.OrdinalIgnoreCase)
-            || fileName.StartsWith(".env.", StringComparison.OrdinalIgnoreCase)
-            || fileName.Equals(".DS_Store", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".pyc", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".log", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return segments.Any(segment =>
-            segment.Equals(".git", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("venv", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals(".venv", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase));
+        return MatchesExcludeRule(relativePath, rules);
     }
 
     private Task CopyDirectoryFilesAsync(

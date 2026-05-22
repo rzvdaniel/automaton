@@ -18,6 +18,7 @@ public class AppsController : BaseController
     private readonly AppFileStorageService fileStorageService;
     private readonly AppVersionService appVersionService;
     private readonly AppArchiveService appArchiveService;
+    private readonly SettingsService settingsService;
 
     public AppsController(
         AppsService appsService,
@@ -29,6 +30,7 @@ public class AppsController : BaseController
         AppFileStorageService fileStorageService,
         AppVersionService appVersionService,
         AppArchiveService appArchiveService,
+        SettingsService settingsService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -41,6 +43,7 @@ public class AppsController : BaseController
         this.fileStorageService = fileStorageService;
         this.appVersionService = appVersionService;
         this.appArchiveService = appArchiveService;
+        this.settingsService = settingsService;
     }
 
     [HttpGet]
@@ -1704,6 +1707,7 @@ public class AppsController : BaseController
             var written = new List<string>();
             var skipped = new List<string>();
             var errors = new List<object>();
+            var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
             using var stream = file.OpenReadStream();
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
@@ -1713,7 +1717,7 @@ public class AppsController : BaseController
                 if (string.IsNullOrEmpty(entry.Name)) continue;
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (ShouldSkipSourceUploadEntry(relativePath))
+                if (ShouldSkipSourceUploadEntry(relativePath, deployRules.SourceExclude))
                 {
                     skipped.Add(relativePath);
                     continue;
@@ -1808,6 +1812,7 @@ public class AppsController : BaseController
             var written = new List<string>();
             var skipped = new List<string>();
             var errors = new List<object>();
+            var deployRules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
             using var stream = file.OpenReadStream();
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
@@ -1817,7 +1822,7 @@ public class AppsController : BaseController
                 if (string.IsNullOrEmpty(entry.Name)) continue;
 
                 var relativePath = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (ShouldSkipBackendUploadEntry(relativePath))
+                if (ShouldSkipBackendUploadEntry(relativePath, deployRules.BackendExclude))
                 {
                     skipped.Add(relativePath);
                     continue;
@@ -1908,7 +1913,7 @@ public class AppsController : BaseController
             segment.Equals("source", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool ShouldSkipSourceUploadEntry(string relativePath)
+    private static bool ShouldSkipSourceUploadEntry(string relativePath, IEnumerable<string> excludeRules)
     {
         var normalized = relativePath.Replace('\\', '/').Trim('/');
         if (string.IsNullOrWhiteSpace(normalized))
@@ -1930,15 +1935,11 @@ public class AppsController : BaseController
 
         return segments.Any(segment =>
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("dist", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".vite", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("coverage", StringComparison.OrdinalIgnoreCase));
+            segment.Equals(".automaton", StringComparison.OrdinalIgnoreCase))
+            || AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules);
     }
 
-    private static bool ShouldSkipBackendUploadEntry(string relativePath)
+    private static bool ShouldSkipBackendUploadEntry(string relativePath, IEnumerable<string> excludeRules)
     {
         var normalized = relativePath.Replace('\\', '/').Trim('/');
         if (string.IsNullOrWhiteSpace(normalized))
@@ -1960,13 +1961,12 @@ public class AppsController : BaseController
 
         return segments.Any(segment =>
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("venv", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals(".venv", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("frontend", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("mocks", StringComparison.OrdinalIgnoreCase));
+            segment.Equals("mocks", StringComparison.OrdinalIgnoreCase))
+            || AppFileStorageService.MatchesExcludeRule(relativePath, excludeRules);
     }
 
 }
