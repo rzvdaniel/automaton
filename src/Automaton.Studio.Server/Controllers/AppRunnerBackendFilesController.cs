@@ -44,7 +44,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
             .InvokeAsync<AppBackendFilesResponse>(
                 AutomatonHubMethods.ListAppBackendFiles,
-                new object?[] { appId.ToString() },
+                appId.ToString(),
                 cancellationToken);
 
         return response.Success ? Ok(response) : BadRequest(response);
@@ -65,7 +65,8 @@ public class AppRunnerBackendFilesController : ControllerBase
         var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
             .InvokeAsync<AppBackendFileContentResponse>(
                 AutomatonHubMethods.ReadAppBackendFile,
-                new object?[] { appId.ToString(), path },
+                appId.ToString(),
+                path,
                 cancellationToken);
 
         return response.Success ? Ok(response) : BadRequest(response);
@@ -86,7 +87,8 @@ public class AppRunnerBackendFilesController : ControllerBase
         var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
             .InvokeAsync<AppBackendFileDeleteResponse>(
                 AutomatonHubMethods.DeleteAppBackendFile,
-                new object?[] { appId.ToString(), path },
+                appId.ToString(),
+                path,
                 cancellationToken);
 
         return response.Success ? Ok(response) : BadRequest(response);
