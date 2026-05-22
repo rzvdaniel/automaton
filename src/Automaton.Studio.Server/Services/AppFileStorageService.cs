@@ -930,9 +930,7 @@ public class AppFileStorageService
             || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase)
             || segment.Equals("venv", StringComparison.OrdinalIgnoreCase)
             || segment.Equals(".venv", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("dist", StringComparison.OrdinalIgnoreCase)
-            || segment.Equals("build", StringComparison.OrdinalIgnoreCase));
+            || segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase));
     }
 
     private Task CopyDirectoryFilesAsync(

@@ -1962,8 +1962,10 @@ public class AppsController : BaseController
             segment.Equals("__MACOSX", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("venv", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".venv", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("__pycache__", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("frontend", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("dist", StringComparison.OrdinalIgnoreCase) ||
             segment.Equals("mocks", StringComparison.OrdinalIgnoreCase));
     }
 
