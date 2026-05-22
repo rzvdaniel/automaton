@@ -16,6 +16,8 @@ public class AutomatonConfig
     public FrontendConfig? Frontend { get; set; }
 
     public BackendConfig? Backend { get; set; }
+
+    public DeployScopeConfig? Source { get; set; }
 }
 
 public sealed class FrontendConfig
@@ -31,6 +33,10 @@ public sealed class FrontendConfig
     /// Example: "frontend/dist" or "." for explicit no-build static apps.
     /// </summary>
     public string? DeployDir { get; set; }
+
+    public List<string>? Include { get; set; }
+
+    public List<string>? Exclude { get; set; }
 }
 
 public sealed class BackendConfig
@@ -40,4 +46,15 @@ public sealed class BackendConfig
     /// Example: "backend".
     /// </summary>
     public string? DeployDir { get; set; }
+
+    public List<string>? Include { get; set; }
+
+    public List<string>? Exclude { get; set; }
+}
+
+public sealed class DeployScopeConfig
+{
+    public List<string>? Include { get; set; }
+
+    public List<string>? Exclude { get; set; }
 }

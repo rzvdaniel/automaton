@@ -168,6 +168,73 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateZip_WhenScopeExcludeMatches_SkipsFile()
+    {
+        var projectRoot = CreateTempDirectory();
+        var deployDir = Path.Combine(projectRoot, "backend");
+        Directory.CreateDirectory(Path.Combine(deployDir, "cache"));
+
+        File.WriteAllText(Path.Combine(deployDir, "todos.py"), "print('keep')");
+        File.WriteAllText(Path.Combine(deployDir, "cache", "data.json"), "{}");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, deployDir, new DeployScopeConfig
+        {
+            Exclude = ["cache/**"]
+        });
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("todos.py"));
+        Assert.That(entries, Does.Not.Contain("cache/data.json"));
+    }
+
+    [Test]
+    public void CreateZip_WhenScopeIncludeSpecified_OnlyIncludesMatchingFiles()
+    {
+        var projectRoot = CreateTempDirectory();
+        var deployDir = Path.Combine(projectRoot, "backend");
+        Directory.CreateDirectory(Path.Combine(deployDir, "data"));
+
+        File.WriteAllText(Path.Combine(deployDir, "todos.py"), "print('keep')");
+        File.WriteAllText(Path.Combine(deployDir, "README.md"), "skip");
+        File.WriteAllText(Path.Combine(deployDir, "data", "todos.json"), "{}");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, deployDir, new DeployScopeConfig
+        {
+            Include = ["*.py", "data/**"]
+        });
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("todos.py"));
+        Assert.That(entries, Does.Contain("data/todos.json"));
+        Assert.That(entries, Does.Not.Contain("README.md"));
+    }
+
+    [Test]
+    public void CreateSourceZip_WhenSourceScopeExcludeMatches_SkipsFile()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "src"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('keep');");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "secret.tmp"), "skip");
+
+        using var zipStream = ZipService.CreateSourceZip(projectRoot, new DeployScopeConfig
+        {
+            Exclude = ["backend/*.tmp"]
+        });
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("automaton.json"));
+        Assert.That(entries, Does.Contain("frontend/src/main.js"));
+        Assert.That(entries, Does.Not.Contain("backend/secret.tmp"));
+    }
+
+    [Test]
     public void ResolveDeployDirectory_WhenDistExists_PrefersDist()
     {
         var projectRoot = CreateTempDirectory();

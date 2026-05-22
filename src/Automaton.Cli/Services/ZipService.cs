@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Microsoft.Extensions.FileSystemGlobbing;
+using Automaton.Cli.Models;
 
 namespace Automaton.Cli.Services;
 
@@ -65,39 +66,47 @@ public static class ZipService
     /// Creates an in-memory zip of <paramref name="sourceDir"/> and returns the stream.
     /// The returned stream is positioned at 0 — caller is responsible for disposing.
     /// </summary>
-    public static Stream CreateZip(string projectRoot, string sourceDir)
+    public static Stream CreateZip(string projectRoot, string sourceDir, DeployScopeConfig? scopeConfig = null)
     {
-        return CreateZip(projectRoot, sourceDir, includeAutomatonConfig: false, additionalIgnorePatterns: null);
+        return CreateZip(projectRoot, sourceDir, includeAutomatonConfig: false, additionalIgnorePatterns: null, scopeConfig: scopeConfig);
     }
 
-    public static Stream CreateSourceZip(string projectRoot)
+    public static Stream CreateSourceZip(string projectRoot, DeployScopeConfig? scopeConfig = null)
     {
-        return CreateZip(projectRoot, projectRoot, includeAutomatonConfig: true, additionalIgnorePatterns: SourceIgnorePatterns);
+        return CreateZip(projectRoot, projectRoot, includeAutomatonConfig: true, additionalIgnorePatterns: SourceIgnorePatterns, scopeConfig: scopeConfig);
     }
 
     private static Stream CreateZip(
         string projectRoot,
         string sourceDir,
         bool includeAutomatonConfig,
-        IEnumerable<string>? additionalIgnorePatterns)
+        IEnumerable<string>? additionalIgnorePatterns,
+        DeployScopeConfig? scopeConfig)
     {
         var ignoreMatcher = CreateIgnoreMatcher(projectRoot, includeAutomatonConfig, additionalIgnorePatterns);
+        var includeMatcher = CreateIncludeMatcher(scopeConfig?.Include);
         var ms = new MemoryStream();
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddDirectory(archive, sourceDir, sourceDir, ignoreMatcher);
+            AddDirectory(archive, sourceDir, sourceDir, ignoreMatcher, includeMatcher, scopeConfig?.Exclude);
         }
 
         ms.Position = 0;
         return ms;
     }
 
-    private static void AddDirectory(ZipArchive archive, string rootDir, string currentDir, Matcher ignoreMatcher)
+    private static void AddDirectory(
+        ZipArchive archive,
+        string rootDir,
+        string currentDir,
+        Matcher ignoreMatcher,
+        Matcher? includeMatcher,
+        IEnumerable<string>? additionalExcludes)
     {
         foreach (var file in Directory.GetFiles(currentDir))
         {
             var entryName = Path.GetRelativePath(rootDir, file).Replace('\\', '/');
-            if (IsIgnored(ignoreMatcher, entryName)) continue;
+            if (IsIgnored(ignoreMatcher, entryName) || IsExcludedByScope(entryName, includeMatcher, additionalExcludes)) continue;
 
             archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
         }
@@ -107,7 +116,7 @@ public static class ZipService
             var relativeDir = Path.GetRelativePath(rootDir, dir).Replace('\\', '/');
             if (IsIgnored(ignoreMatcher, relativeDir, isDirectory: true)) continue;
 
-            AddDirectory(archive, rootDir, dir, ignoreMatcher);
+            AddDirectory(archive, rootDir, dir, ignoreMatcher, includeMatcher, additionalExcludes);
         }
     }
 
@@ -142,6 +151,22 @@ public static class ZipService
         }
 
         return matcher;
+    }
+
+    private static Matcher? CreateIncludeMatcher(IEnumerable<string>? includePatterns)
+    {
+        if (includePatterns == null) return null;
+
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        var hasPatterns = false;
+        foreach (var pattern in includePatterns)
+        {
+            if (string.IsNullOrWhiteSpace(pattern)) continue;
+            AddIncludePattern(matcher, pattern);
+            hasPatterns = true;
+        }
+
+        return hasPatterns ? matcher : null;
     }
 
     private static IEnumerable<string> LoadCustomIgnorePatterns(string projectRoot)
@@ -179,11 +204,50 @@ public static class ZipService
         matcher.AddInclude(normalized);
     }
 
+    private static void AddIncludePattern(Matcher matcher, string pattern)
+    {
+        var normalized = pattern.Replace('\\', '/').Trim();
+        if (normalized.StartsWith("./", StringComparison.Ordinal))
+            normalized = normalized[2..];
+
+        if (normalized.EndsWith("/", StringComparison.Ordinal))
+        {
+            normalized = normalized.TrimEnd('/');
+            matcher.AddInclude(normalized);
+            matcher.AddInclude($"{normalized}/**");
+            return;
+        }
+
+        matcher.AddInclude(normalized);
+    }
+
     private static bool IsIgnored(Matcher matcher, string relativePath, bool isDirectory = false)
     {
         if (matcher.Match(relativePath).HasMatches)
             return true;
 
         return isDirectory && matcher.Match(relativePath + "/").HasMatches;
+    }
+
+    private static bool IsExcludedByScope(string relativePath, Matcher? includeMatcher, IEnumerable<string>? excludePatterns)
+    {
+        if (includeMatcher != null && !includeMatcher.Match(relativePath).HasMatches)
+        {
+            return true;
+        }
+
+        if (excludePatterns == null)
+        {
+            return false;
+        }
+
+        return excludePatterns.Any(pattern => MatchesPattern(relativePath, pattern));
+    }
+
+    private static bool MatchesPattern(string relativePath, string pattern)
+    {
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        AddIncludePattern(matcher, pattern);
+        return matcher.Match(relativePath).HasMatches;
     }
 }

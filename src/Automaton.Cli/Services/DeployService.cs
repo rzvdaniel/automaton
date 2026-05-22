@@ -76,7 +76,7 @@ public sealed class DeployService
 
         try
         {
-            using var sourceZip = ZipService.CreateSourceZip(directory);
+            using var sourceZip = ZipService.CreateSourceZip(directory, projectConfig.Source);
             sourceUploadResult = await _uploadSourceAsync(server, apiKey, projectConfig.AppId, sourceZip, true, cancellationToken);
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.SourceUpload,
@@ -92,7 +92,16 @@ public sealed class DeployService
 
         try
         {
-            using var zip = ZipService.CreateZip(directory, deployDirectory);
+            using var zip = ZipService.CreateZip(
+                directory,
+                deployDirectory,
+                projectConfig.Frontend == null
+                    ? null
+                    : new DeployScopeConfig
+                    {
+                        Include = projectConfig.Frontend.Include,
+                        Exclude = projectConfig.Frontend.Exclude
+                    });
             uploadResult = await _uploadAsync(server, apiKey, projectConfig.AppId, zip, clean, cancellationToken);
             checks.Add(new DeployCheckResult(
                 DeployCheckNames.Upload,
@@ -130,7 +139,16 @@ public sealed class DeployService
 
         try
         {
-            using var backendZip = ZipService.CreateZip(directory, backendDirectory);
+            using var backendZip = ZipService.CreateZip(
+                directory,
+                backendDirectory,
+                projectConfig.Backend == null
+                    ? null
+                    : new DeployScopeConfig
+                    {
+                        Include = projectConfig.Backend.Include,
+                        Exclude = projectConfig.Backend.Exclude
+                    });
             var backendUpload = await _uploadBackendAsync(server, apiKey, projectConfig.AppId, backendZip, true, cancellationToken);
             if (backendUpload.Written <= 0)
             {
