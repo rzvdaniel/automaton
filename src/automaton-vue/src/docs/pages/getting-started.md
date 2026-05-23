@@ -40,7 +40,6 @@ Keep the model simple:
 - A quick stack guide for plain HTML/CSS/JS, React, and Vue.
 - The in-browser App Editor workflow.
 - External AI workflows with CLI and starter prompts.
-- Templates.
 
 ## Core contract
 

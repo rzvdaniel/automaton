@@ -20,7 +20,7 @@ That is usually the best fit for:
 ## Choose plain HTML/CSS/JS when
 
 - you want the simplest possible project shape
-- you want root-level frontend files by default
+- you want the lightest possible frontend structure
 - you do not need a component-heavy SPA
 - you want the least build tooling
 
@@ -60,5 +60,6 @@ Use `automaton sync-ai` only if the generated local guidance files are missing o
 ## Bottom line
 
 - Default to plain HTML/CSS/JS.
+- For AI-generated local apps, still prefer a normal `frontend/` project with explicit deploy output unless the user explicitly wants a no-build static app.
 - Use React or Vue when the user asks for them or the app clearly needs a heavier SPA structure.
 - After `automaton setup`, prefer the local generated guidance. Treat `llms.txt` as the canonical fallback, not the default.

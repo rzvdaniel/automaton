@@ -4,36 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import AppFooter from '@/components/AppFooter.vue'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
-
-import homeRaw from '@/content/docs/home.md?raw'
-import stackSelectionRaw from '@/content/docs/stack-selection.md?raw'
-import appEditorRaw from '@/content/docs/app-editor.md?raw'
-import cliAiToolsRaw from '@/content/docs/cli-ai-tools.md?raw'
-import templatesRaw from '@/content/docs/templates.md?raw'
-import troubleshootingRaw from '@/content/docs/troubleshooting.md?raw'
-import automatonCliRaw from '@/content/docs/automaton-cli.md?raw'
-
-type DocItem = {
-  slug: string
-  label: string
-  summary: string
-  group: string
-  content: string
-}
+import { defaultDocSlug, docs, type DocItem } from '@/docs'
 
 const router = useRouter()
 const route = useRoute()
 const copyNotice = ref(false)
-
-const docs: DocItem[] = [
-  { slug: 'home', label: 'Home', summary: 'Start here', group: 'Overview', content: homeRaw },
-  { slug: 'stack-selection', label: 'Choose a stack', summary: 'HTML, React, or Vue', group: 'Quick Starts', content: stackSelectionRaw },
-  { slug: 'app-editor', label: 'App Editor', summary: 'Browser-first workflow', group: 'Workflows', content: appEditorRaw },
-  { slug: 'cli-ai-tools', label: 'CLI + AI tools', summary: 'Cursor, Claude, Copilot', group: 'Workflows', content: cliAiToolsRaw },
-  { slug: 'templates', label: 'Templates', summary: 'Start from examples', group: 'Workflows', content: templatesRaw },
-  { slug: 'troubleshooting', label: 'Troubleshooting', summary: 'Common errors and fixes', group: 'Reference', content: troubleshootingRaw },
-  { slug: 'automaton-cli', label: 'Automaton CLI', summary: 'All commands and options', group: 'Reference', content: automatonCliRaw },
-]
 
 const docsByGroup = computed(() => {
   const groups = new Map<string, DocItem[]>()
@@ -45,7 +20,7 @@ const docsByGroup = computed(() => {
   return Array.from(groups.entries()).map(([group, items]) => ({ group, items }))
 })
 
-const currentSlug = computed(() => String(route.params.slug || 'home'))
+const currentSlug = computed(() => String(route.params.slug || defaultDocSlug))
 
 const currentDoc = computed(() => docs.find((doc) => doc.slug === currentSlug.value) || docs[0]!)
 
@@ -106,7 +81,7 @@ async function handleDocsClick(event: MouseEvent) {
 }
 
 function openDoc(slug: string) {
-  void router.push(slug === 'home' ? '/docs' : `/docs/${slug}`)
+  void router.push(slug === defaultDocSlug ? '/docs' : `/docs/${slug}`)
 }
 </script>
 
@@ -119,7 +94,7 @@ function openDoc(slug: string) {
           <div>
             <span class="docs-eyebrow">Public Docs</span>
             <h1>Documentation</h1>
-            <p>Quick starts, workflows, prompts, and reference docs for building apps with Automaton Monster.</p>
+            <p>Current workflows and reference docs for building, deploying, and publishing apps with Automaton Monster.</p>
           </div>
         </div>
 
@@ -146,10 +121,10 @@ function openDoc(slug: string) {
             <div class="docs-content-card">
               <div class="docs-actions">
                 <button
-                  v-if="currentDoc.slug !== 'home'"
+                  v-if="currentDoc.slug !== defaultDocSlug"
                   class="docs-back"
                   type="button"
-                  @click="openDoc('home')"
+                  @click="openDoc(defaultDocSlug)"
                 >
                   <i class="pi pi-arrow-left" />
                   Back to docs home
