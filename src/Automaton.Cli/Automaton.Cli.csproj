@@ -65,6 +65,9 @@
     <EmbeddedResource Include="..\..\shared\ai-guidance\templates\github-skill.md">
       <LogicalName>Automaton.Cli.AiGuidance.templates.github-skill.md</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\gitignore">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.gitignore</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

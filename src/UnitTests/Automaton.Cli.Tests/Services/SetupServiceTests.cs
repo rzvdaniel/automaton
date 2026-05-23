@@ -43,7 +43,10 @@ public class SetupServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".gitignore")), Is.True);
-        Assert.That(File.ReadAllText(Path.Combine(projectRoot, ".gitignore")), Does.Contain(".automaton/"));
+        var gitIgnoreContent = File.ReadAllText(Path.Combine(projectRoot, ".gitignore"));
+        Assert.That(gitIgnoreContent, Does.Contain(".automaton/"));
+        Assert.That(gitIgnoreContent, Does.Contain("node_modules/"));
+        Assert.That(gitIgnoreContent, Does.Contain("frontend/dist/"));
 
         var config = new ConfigService().LoadProjectLocalConfig(projectRoot);
         Assert.That(config.Server, Is.EqualTo(SetupService.DefaultHostedServer));

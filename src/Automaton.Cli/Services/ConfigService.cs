@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,11 +13,13 @@ namespace Automaton.Cli.Services;
 /// </summary>
 public class ConfigService
 {
+    private const string ResourcePrefix = "Automaton.Cli.AiGuidance.";
     private const string ProjectConfigFileName = "automaton.json";
     private const string ProjectIgnoreFileName = ".automatonignore";
     private const string ProjectGitIgnoreFileName = ".gitignore";
     private const string ProjectConfigDirName = ".automaton";
     private const string ProjectLocalConfigFileName = "config.json";
+    private const string GitIgnoreTemplateResourceName = ResourcePrefix + "templates.gitignore";
     private static readonly string GlobalConfigDir  = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton");
     private static readonly string GlobalConfigFile = Path.Combine(GlobalConfigDir, "config.json");
@@ -136,7 +139,7 @@ public class ConfigService
 
         if (!File.Exists(path))
         {
-            File.WriteAllLines(path, [ignoreEntry]);
+            File.WriteAllText(path, LoadEmbeddedText(GitIgnoreTemplateResourceName));
             return;
         }
 
@@ -275,5 +278,14 @@ public class ConfigService
             yield return current.FullName;
             current = current.Parent;
         }
+    }
+
+    private static string LoadEmbeddedText(string resourceName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' was not found.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 }
