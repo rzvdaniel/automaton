@@ -1,8 +1,15 @@
 # Automaton CLI
 
-The Automaton CLI (`automaton`) prepares local app folders, deploys apps, manages versions, and lists runners from the terminal.
+This page is the full CLI reference.
 
-The default user flow is AI-first: run `automaton setup`, then let your AI tool handle the app workflow in the current folder. The direct CLI commands on this page are the manual fallback and the low-level reference for testing, debugging, and automation.
+If you are new to Automaton, start with:
+
+- **Getting Started**
+- **Build with AI**
+- **Deploy**
+- **Publish**
+
+Then come back here only when you need the full command surface.
 
 ---
 
@@ -138,7 +145,7 @@ This writes `automaton.json`, creates `.automatonignore` if missing, and syncs t
 
 ---
 
-### `automaton sync-ai`
+### `automaton sync-ai` (advanced)
 
 Refresh or repair the generated local AI guidance files in the current folder.
 
@@ -164,7 +171,7 @@ By default, `sync-ai` writes only `.automaton/` plus `AGENTS.md`. Optional adapt
 
 ---
 
-### `automaton login`
+### `automaton login` (advanced)
 
 Advanced fallback to store and validate CLI credentials directly. Most users should prefer `automaton setup` instead.
 
@@ -177,7 +184,7 @@ By default, credentials are saved to `./.automaton/config.json` for the current 
 
 ---
 
-### `automaton logout`
+### `automaton logout` (advanced)
 
 Clear stored CLI credentials.
 
@@ -190,7 +197,7 @@ Use this when testing first-run auth flows, switching accounts, or resetting mac
 
 ---
 
-### `automaton whoami`
+### `automaton whoami` (advanced)
 
 Show the current authenticated user and resolved server.
 
@@ -296,7 +303,7 @@ Useful flags:
 
 ---
 
-### `automaton runners`
+### `automaton runners` (advanced)
 
 List all runners registered on your account and their connection status.
 
@@ -306,7 +313,7 @@ automaton runners
 
 ---
 
-### `automaton config`
+### `automaton config` (advanced)
 
 View or update global CLI settings.
 

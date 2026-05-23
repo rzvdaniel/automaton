@@ -4,13 +4,14 @@ Common problems and how to fix them.
 
 ---
 
-## Backend deploy fails immediately
+## Backend APIs are not active after deploy
 
-**Symptom:** Clicking Deploy Backend shows an error right away.
+**Symptom:** You deployed an app with backend code, but the backend APIs are still not running.
 
 **Causes and fixes:**
 
-- **No runner connected** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, the backend cannot be deployed. Start a runner or check the runner connection.
+- **No execution target available yet** — Deploy can still upload backend runtime successfully even when no execution target is online. In that case, bring one online and rerun deploy.
+- **No runner connected in Studio** — Go to **Runners** and check that at least one runner shows as Online. If all runners are Offline or Unknown, backend APIs cannot become active yet.
 - **Python syntax error** — A syntax error in any `backend/*.py` file will stop the deploy. Check the deploy log for the file and line number.
 - **Missing `handle()` export** — Every controller file must export a top-level `handle(action_name, inputs)` function. A file that is missing `handle` will cause the deploy to fail.
 - **No runner available** — Backend runtime can be uploaded successfully but still not be running. If deploy reports that backend was uploaded but is not running, assign/select a runner and rerun deploy.

@@ -1,50 +1,50 @@
-# Automaton Documentation
+# 5-Minute Quickstart
 
-Use this section as the starting point for building and deploying apps in Automaton.
+If you want the shortest path from zero to a deployed app, use this flow:
 
-## Recommended path
+```bash
+dotnet tool install -g Automaton.Cli
+automaton setup
+automaton new "My App"
+```
 
-For most developers, the least-friction workflow is:
+Then open your AI tool in that folder and paste:
 
-1. Install the CLI once.
-2. Run `automaton setup`.
-3. Let your AI tool build and deploy the app in the current folder.
+```text
+Build a task management app for Automaton Monster.
+Use React frontend and Python backend.
+Deploy with automaton deploy.
+Ask me before publish.
+```
 
-Manual fallback:
+When the app is ready:
 
-1. Run `automaton new` or `automaton link`.
-2. Run `automaton deploy`.
-3. Run `automaton validate` only when you need a separate diagnostic check.
+```bash
+automaton deploy
+automaton publish
+```
 
-Use the CLI + AI workflow, the stack guide, and the starter prompt as the default path for external coding tools.
+## What this gives you
 
-## What every Automaton app has
+- A local project you can edit in Cursor, Claude Code, VS Code, or another IDE
+- A deployed app on Automaton
+- A public URL when you choose to publish
 
-- A frontend source project, usually in local `frontend/`.
-- A Python backend source project, usually in local `backend/`.
-- An `automaton.json` file at the project root.
-- A deployment step using the Automaton CLI.
+## Default command model
 
-## Current file contract
+For most users, these are the only commands that matter:
 
-Keep the model simple:
+```bash
+automaton setup
+automaton new
+automaton deploy
+automaton publish
+```
 
-- Local authoring usually uses `frontend/` and `backend/`.
-- Server-side editable files live in `source/frontend/` and `source/backend/`.
-- Deployed runtime files live in `live/frontend/` and `live/backend/`.
-- Public serving reads only `live/frontend/`.
-- Runner execution reads only `live/backend/`.
+Everything else is advanced.
 
-## Use this documentation menu for
+## What to read next
 
-- A quick stack guide for plain HTML/CSS/JS, React, and Vue.
-- The in-browser App Editor workflow.
-- External AI workflows with CLI and starter prompts.
-
-## Core contract
-
-- Backend controller source files usually live in local `backend/`.
-- Each controller exports `handle(action_name, inputs)`.
-- Each action returns `{ success, data, error }`.
-- Frontend code calls `window.automatonApi.callController(controller, action, inputs)`.
-- `callController()` returns `data` directly and throws on error, so use `try/catch`.
+- **Build with AI** if you want copy-paste prompts and the recommended workflow
+- **Choose a Stack** if you need help picking plain HTML, React, or Vue
+- **Deploy** if you want the simplest explanation of what deploy does
