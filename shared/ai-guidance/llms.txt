@@ -16,7 +16,21 @@ Automaton apps are frontend-agnostic static web apps with Python backends.
 - Public app serving reads `runtime/frontend/` only; source and backend runtime are never served.
 - Fork copies source only, never runtime, and only when the app is explicitly forkable.
 
-**Backend** — Python controllers in `backend/`. Every controller file must export:
+**Backend** — CRITICAL: Automaton backends are not standalone HTTP servers. Default to frontend-only. Create `backend/` only when the user-requested core feature requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access that cannot be removed without breaking the requested app.
+
+Never create under `backend/`:
+- FastAPI
+- Flask
+- Express
+- aiohttp
+- uvicorn entrypoints
+- custom HTTP listeners
+
+Do not add a backend only for convenience, caching, minor proxying, or non-essential data such as optional badges, stats, or enrichment. Mixed-content or CORS issues for optional third-party APIs are not sufficient justification for introducing a backend web framework or proxy.
+
+If you think a proxy or API server is needed, first attempt a frontend-only solution. If backend behavior is truly required, implement an Automaton Python controller. Do not introduce a standalone web framework.
+
+When a backend is required, use Automaton Python controllers in `backend/`. Backend files must export:
 ```python
 def handle(action_name: str, inputs: dict) -> dict:
     ...
@@ -57,6 +71,21 @@ For the default AI-generated local app, use this frontend config instead of assu
   "frontend": {
     "build": "cd frontend && npm install && npm run build",
     "deployDir": "frontend/dist"
+  }
+}
+```
+
+If the app also has Python backend controllers, keep backend source in `backend/`. Do not copy backend files into frontend `deployDir` just to make runtime work; `automaton deploy` uploads frontend runtime and backend runtime separately.
+
+When backend controllers exist, use this config:
+```json
+{
+  "appId": "your-app-id",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
   },
   "backend": {
     "deployDir": "backend"
@@ -64,9 +93,7 @@ For the default AI-generated local app, use this frontend config instead of assu
 }
 ```
 
-If the app also has Python backend controllers, keep backend source in `backend/`. Do not copy backend files into frontend `deployDir` just to make runtime work; `automaton deploy` uploads frontend runtime and backend runtime separately.
-
-**Deploy** — `automaton deploy` runs `frontend.build` when configured, checks deploy readiness, uploads `frontend.deployDir` to frontend runtime, uploads `backend.deployDir` to backend runtime when present, and pushes backend runtime to the runner. If the app has Python backend controllers and no runner is assigned, `automaton deploy` should auto-select one connected runner or prompt the user to choose. Tell the user to create/deploy a runner in Automaton Studio only when no connected runner exists.
+**Deploy** — `automaton deploy` runs `frontend.build` when configured, checks deploy readiness, uploads `frontend.deployDir` to frontend runtime, uploads `backend.deployDir` to backend runtime when present, and pushes backend runtime to the runner. Local build commands such as `npm run build`, `python -m py_compile`, or tests are not completion criteria by themselves. Do not claim the app is done until `automaton deploy` has succeeded, or you have reported the exact deploy command, the exact failure, and the required next step. If the app has Python backend controllers and no runner is assigned, `automaton deploy` should auto-select one connected runner or prompt the user to choose. Tell the user to create/deploy a runner in Automaton Studio only when no connected runner exists.
 
 Only files inside `frontend.deployDir` become public runtime. Do not expect `frontend/src/`, `frontend/package.json`, `frontend/vite.config.*`, `backend/`, or local project files to appear in public runtime.
 
@@ -102,7 +129,7 @@ Follow this order:
 14. Open the app in Automaton Studio, preview it there, and inspect the logs there.
 15. Iterate locally and redeploy until the Studio preview looks correct.
 16. Ask for confirmation before public publish.
-17. After approval, run `automaton publish --yes`.
+17. Only after approval, run `automaton publish --yes`.
 18. Run `automaton status` and validate the live app URL.
 
 Completion criteria:
@@ -120,6 +147,7 @@ Choose the simplest frontend stack that fits the requested app.
 
 - Default to Vite + vanilla TypeScript or JavaScript in `frontend/` for AI-generated apps.
 - Always use a frontend build step for AI-generated local apps, and deploy only `frontend/dist/` as public runtime.
+- Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Use plain HTML/CSS/JS at the project root only when the user explicitly wants a no-build static app. Set `"frontend": { "deployDir": "." }` when using this mode.
 - Keep generated frontend source in `frontend/src/` and static public assets in `frontend/public/` unless another framework convention applies.
 - Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs component-heavy SPA structure, richer routing, or more complex reusable UI.

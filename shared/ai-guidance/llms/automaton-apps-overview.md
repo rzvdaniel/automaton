@@ -11,9 +11,13 @@ Use these rules:
 - If the app is build-based and also has Python backend controllers, keep backend source in `backend/`; do not copy it into frontend `deployDir`.
 - Frontend code for AI-generated local apps should default to Vite vanilla TypeScript or JavaScript under `frontend/`.
 - Python backend code lives in `backend/`.
+- Default to frontend-only. Create `backend/` only when the user-requested core feature requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access that cannot be removed without breaking the requested app.
+- Do not create `backend/` only for convenience, caching, minor proxying, CORS or mixed-content workarounds for non-essential data, or optional enrichment.
+- When backend controllers are required, implement Automaton Python controllers that export `handle(action_name, inputs)`. Do not create a standalone FastAPI, Flask, or other web server under `backend/`.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`.
 - AI-generated local apps should always use a frontend build step and deploy only `frontend/dist/` as public runtime.
+- Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Root-level frontend files are an explicit exception only for no-build static apps requested by the user; set `"frontend": { "deployDir": "." }` in that mode.
 - Deploy with `automaton deploy`.
 - If the app has Python backend controllers, let `automaton deploy` auto-select or prompt for a connected runner. Tell the user to create or deploy one in Automaton Studio only when no connected runner exists.
@@ -31,12 +35,15 @@ Recommended workflow for most developers:
 9. Use `automaton validate` only as an optional diagnostic check.
 10. Publish only after user approval.
 
+Do not consider local build, type-check, tests, or `python -m py_compile` to be completion. Before declaring the app done, run `automaton deploy`; if it fails, report the exact command, exact error, and the next step.
+
 Canonical autonomous order:
 
 ```bash
 automaton setup
 automaton new "My App"
 automaton deploy
+# ask user before publish
 automaton publish --yes
 automaton status
 ```

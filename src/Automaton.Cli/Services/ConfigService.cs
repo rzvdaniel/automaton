@@ -14,6 +14,7 @@ public class ConfigService
 {
     private const string ProjectConfigFileName = "automaton.json";
     private const string ProjectIgnoreFileName = ".automatonignore";
+    private const string ProjectGitIgnoreFileName = ".gitignore";
     private const string ProjectConfigDirName = ".automaton";
     private const string ProjectLocalConfigFileName = "config.json";
     private static readonly string GlobalConfigDir  = Path.Combine(
@@ -126,6 +127,32 @@ public class ConfigService
         }
 
         return null;
+    }
+
+    public void EnsureProjectGitIgnoreFile(string directory)
+    {
+        var path = Path.Combine(directory, ProjectGitIgnoreFileName);
+        var ignoreEntry = ".automaton/";
+
+        if (!File.Exists(path))
+        {
+            File.WriteAllLines(path, [ignoreEntry]);
+            return;
+        }
+
+        var lines = File.ReadAllLines(path).ToList();
+        if (lines.Any(line => string.Equals(line.Trim(), ignoreEntry, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines[^1]))
+        {
+            lines.Add(string.Empty);
+        }
+
+        lines.Add(ignoreEntry);
+        File.WriteAllLines(path, lines);
     }
 
     private static void EnsureProjectIgnoreFile(string directory)

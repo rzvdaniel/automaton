@@ -134,32 +134,33 @@ The global path remains:
 
 ### Fast local update workflow when you changed the CLI
 
-If you make more CLI changes and want `dotnet tool update` to replace the globally installed tool, bump the package version in [src/Automaton.Cli/Automaton.Cli.csproj](src/Automaton.Cli/Automaton.Cli.csproj).
+Local `dotnet pack` now stamps the CLI package with a UTC timestamp version by default. A local pack will produce versions like:
 
-Example:
-
-```xml
-<Version>1.0.1</Version>
+```text
+1.0.20260523.170512
 ```
+
+That makes local `dotnet tool update` deterministic without manually editing the project version for day-to-day testing.
+
+If you need a specific release version, pass it explicitly with `-p:Version=...` during pack.
 
 Then run this from the repository root:
 
 ```powershell
 dotnet pack src/Automaton.Cli/Automaton.Cli.csproj --configuration Release --output .tmp/cli-pack
-dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version 1.0.1
+dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version <packed-version>
 automaton --version
 ```
 
 Exact update command:
 
 ```powershell
-dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version 1.0.1
+dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli --version <packed-version>
 ```
 
 Why this matters:
 
-- if the package version does not change, `dotnet tool update` may report that the tool is already installed and keep the old binary
-- bumping the version makes the update deterministic
+- using the freshly packed timestamp version makes the update deterministic
 - `automaton --version` is the fastest check that the refreshed binary is actually running
 
 ### One-command local reinstall script
@@ -206,7 +207,7 @@ dotnet pack src/Automaton.Cli/Automaton.Cli.csproj --configuration Release --out
 This should create a file like:
 
 ```text
-.tmp/cli-pack/Automaton.Cli.1.0.0.nupkg
+.tmp/cli-pack/Automaton.Cli.1.0.20260523.170512.nupkg
 ```
 
 ### Install it globally from the local package source
@@ -221,7 +222,7 @@ If it is already installed globally, update it instead:
 dotnet tool update --global --add-source .\.tmp\cli-pack Automaton.Cli
 ```
 
-If you did not bump the package version, uninstall/install is more reliable than update:
+If another configured NuGet source still wins, uninstall/install with the local-only reinstall script is more reliable than a plain update:
 
 ```powershell
 dotnet tool uninstall --global Automaton.Cli
@@ -320,7 +321,7 @@ No backend scripts found
 
 - If the CLI still prompts for a server URL, check whether the installed global tool is stale and reinstall or update it from the latest local package.
 - If you expected project-local credentials to be used, check `./.automaton/config.json` in the app folder you are deploying from.
-- If `dotnet tool update` says the tool is already installed, bump the package version first or use uninstall/install.
+- If `dotnet tool update` still installs an older package, install the exact packed version or use `.\scripts\dev-reinstall-cli.ps1` so only the local feed is considered.
 - If deploy uploads successfully but backend deploy returns `401`, verify the API key and make sure the local server is running the latest backend build.
 
 ### Local pack

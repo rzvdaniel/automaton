@@ -12,8 +12,18 @@ $packageOutput = Join-Path $repoRoot ".tmp\cli-pack"
 $cliProject = Join-Path $repoRoot "src\Automaton.Cli\Automaton.Cli.csproj"
 $cliTests = Join-Path $repoRoot "src\UnitTests\Automaton.Cli.Tests\Automaton.Cli.Tests.csproj"
 $tempNuGetConfig = Join-Path ([System.IO.Path]::GetTempPath()) ("automaton-cli-local-source-" + [guid]::NewGuid().ToString("N") + ".config")
+$script:LastPackedPackagePath = $null
 
 Write-Host "Repo root: $repoRoot"
+
+function Write-Section {
+    param([string]$Title)
+
+    Write-Host ""
+    Write-Host ("=" * 72)
+    Write-Host $Title
+    Write-Host ("=" * 72)
+}
 
 function New-TempNuGetConfig {
     param(
@@ -48,29 +58,19 @@ function Get-InstalledCliVersion {
 
 function Get-CliBasePackageVersion {
     [xml]$projectXml = Get-Content -Path $cliProject -Raw
-    $version = $projectXml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -ExpandProperty Version -First 1
+    $versionPrefix = $projectXml.Project.PropertyGroup | Where-Object { $_.VersionPrefix } | Select-Object -ExpandProperty VersionPrefix -First 1
 
-    if ([string]::IsNullOrWhiteSpace($version)) {
-        throw "Could not determine base CLI package version from $cliProject"
+    if ([string]::IsNullOrWhiteSpace($versionPrefix)) {
+        throw "Could not determine CLI VersionPrefix from $cliProject"
     }
 
-    return $version.Trim()
+    return $versionPrefix.Trim()
 }
 
 function Get-LocalPackageVersion {
     $baseVersion = Get-CliBasePackageVersion
-    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")
-    $gitCommit = (& git rev-parse --short HEAD 2>$null | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitCommit)) {
-        $gitCommit = "nogit"
-    }
-
-    $gitCommit = ([System.Text.RegularExpressions.Regex]::Replace($gitCommit.Trim().ToLowerInvariant(), '[^0-9a-z-]', ''))
-    if ([string]::IsNullOrWhiteSpace($gitCommit)) {
-        $gitCommit = "nogit"
-    }
-
-    return "$baseVersion-local.$timestamp.$gitCommit"
+    $utcNow = (Get-Date).ToUniversalTime()
+    return "$baseVersion.$($utcNow.ToString("yyyyMMdd")).$($utcNow.ToString("HHmmss"))"
 }
 function Remove-InstalledCli {
     $installedVersion = Get-InstalledCliVersion
@@ -102,7 +102,9 @@ function Build-LocalCliPackage {
         }
     }
 
-    Write-Host "Packing CLI as version $packageVersion..."
+    Write-Section "Packing Local CLI"
+    Write-Host "Package version: $packageVersion"
+    Write-Host "Output folder:    $packageOutput"
     & dotnet pack $cliProject --configuration $Configuration --output $packageOutput -p:Version=$packageVersion | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet pack failed with exit code $LASTEXITCODE"
@@ -112,6 +114,9 @@ function Build-LocalCliPackage {
     if (-not $nupkg) {
         throw "No Automaton.Cli nupkg was produced in $packageOutput for version $packageVersion"
     }
+
+    $script:LastPackedPackagePath = $nupkg.FullName
+    Write-Host "Packed nupkg:     $($nupkg.FullName)"
 
     return $packageVersion
 }
@@ -131,11 +136,18 @@ function Install-OrUpdateCli {
     }
 
     if ([string]::IsNullOrWhiteSpace($installedVersion)) {
-        Write-Host "Installing local Automaton.Cli $PackageVersion from $packageOutput..."
+        Write-Section "Installing Local CLI"
+        Write-Host "Installing exact package version: $PackageVersion"
+        Write-Host "Command:"
+        Write-Host "  dotnet tool install --global --configfile `"$tempNuGetConfig`" --add-source `"$packageOutput`" --version $PackageVersion Automaton.Cli"
         & dotnet tool install --global --configfile $tempNuGetConfig --add-source $packageOutput --version $PackageVersion Automaton.Cli
     }
     else {
-        Write-Host "Updating global Automaton.Cli from $installedVersion to $PackageVersion using local package source..."
+        Write-Section "Updating Local CLI"
+        Write-Host "Installed version:          $installedVersion"
+        Write-Host "Target exact package ver.:  $PackageVersion"
+        Write-Host "Command:"
+        Write-Host "  dotnet tool update --global --configfile `"$tempNuGetConfig`" --add-source `"$packageOutput`" --version $PackageVersion Automaton.Cli"
         & dotnet tool update --global --configfile $tempNuGetConfig --add-source $packageOutput --version $PackageVersion Automaton.Cli
     }
 
@@ -145,6 +157,8 @@ function Install-OrUpdateCli {
 }
 
 function Show-CliStatus {
+    Write-Section "CLI Status"
+
     $installedVersion = Get-InstalledCliVersion
     if ([string]::IsNullOrWhiteSpace($installedVersion)) {
         Write-Host "Global tool: not installed"
@@ -195,7 +209,10 @@ try {
         }
     }
 
-    Write-Host "Installed CLI version:"
+    Write-Section "Installed CLI Version"
+    if ($script:LastPackedPackagePath) {
+        Write-Host "Last packed nupkg: $script:LastPackedPackagePath"
+    }
     & automaton --version
     if ($LASTEXITCODE -ne 0) {
         throw "automaton --version failed with exit code $LASTEXITCODE"

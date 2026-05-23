@@ -91,6 +91,7 @@ Rules:
 - Keep the app framework-free unless the user asked for React or Vue.
 - Use Vite for modules, development workflow, and build output.
 - Build to `frontend/dist/` and set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Treat the build pipeline as required for AI-generated local apps.
 - Do not put source files, `package.json`, or Vite config into runtime.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
@@ -127,6 +128,7 @@ my-app/
 Rules:
 - Keep framework source code in the repo.
 - For frontend-only apps, build to `frontend/dist/` or another static output folder under `frontend/`.
+- Do not move framework build output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that the framework output under `frontend/` cannot work.
 - For apps with Python backend controllers, keep backend source in `backend/`; frontend runtime deploy still points to the frontend build output.
 - Put `frontend.build` and `frontend.deployDir` in `automaton.json` when needed.
 - `automaton deploy` uploads frontend runtime and backend runtime separately.

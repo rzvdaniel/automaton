@@ -22,6 +22,15 @@ public sealed class AiGuidancePackService
         ["llms.automaton-starter-prompts.md"] = "llms/automaton-starter-prompts.md"
     };
 
+    private static readonly IReadOnlyDictionary<string, string> TemplateMap = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["templates.AGENTS.md"] = "AGENTS.md",
+        ["templates.instructions.md"] = "instructions.md",
+        ["templates.SKILL.md"] = "SKILL.md",
+        ["templates.adapter.md"] = "adapter.md",
+        ["templates.github-skill.md"] = "github-skill.md"
+    };
+
     public AiGuidanceSyncResult Sync(string directory, string adapter = AiGuidanceAdapters.None)
     {
         if (!AiGuidanceAdapters.IsKnown(adapter))
@@ -36,7 +45,9 @@ public sealed class AiGuidancePackService
         Directory.CreateDirectory(agentsRoot);
         Directory.CreateDirectory(referencesRoot);
 
-        var sources = LoadSources();
+        var sources = LoadSources(ResourceMap);
+        var templates = LoadSources(TemplateMap);
+        var variables = BuildTemplateVariables(mode);
         foreach (var source in sources)
         {
             var targetPath = Path.Combine(referencesRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -51,28 +62,28 @@ public sealed class AiGuidancePackService
         }
 
         var canonicalInstructionsPath = Path.Combine(agentsRoot, "instructions.md");
-        File.WriteAllText(canonicalInstructionsPath, BuildCanonicalInstructions(mode), Encoding.UTF8);
+        File.WriteAllText(canonicalInstructionsPath, RenderTemplate(templates, "instructions.md", variables), Encoding.UTF8);
         generatedFiles.Add(canonicalInstructionsPath);
 
         var canonicalSkillsRoot = Path.Combine(agentsRoot, "skills", "automaton-app");
         Directory.CreateDirectory(canonicalSkillsRoot);
 
         var canonicalSkillPath = Path.Combine(canonicalSkillsRoot, "SKILL.md");
-        File.WriteAllText(canonicalSkillPath, BuildCanonicalSkillContent(mode), Encoding.UTF8);
+        File.WriteAllText(canonicalSkillPath, RenderTemplate(templates, "SKILL.md", variables), Encoding.UTF8);
         generatedFiles.Add(canonicalSkillPath);
 
         var agentsPath = Path.Combine(directory, "AGENTS.md");
-        File.WriteAllText(agentsPath, BuildAgentsContent(mode), Encoding.UTF8);
+        File.WriteAllText(agentsPath, RenderTemplate(templates, "AGENTS.md", variables), Encoding.UTF8);
         generatedFiles.Add(agentsPath);
 
-        SyncOptionalAdapters(directory, mode, adapter, generatedFiles);
+        SyncOptionalAdapters(directory, adapter, generatedFiles, templates, variables);
         DeleteLegacyAiGuidance(directory);
 
         var manifestPath = Path.Combine(agentsRoot, "manifest.json");
         generatedFiles.Add(manifestPath);
         File.WriteAllText(manifestPath, BuildCanonicalManifest(
             mode,
-            sources,
+            sources.Concat(templates).ToList(),
             generatedFiles.Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToList()), Encoding.UTF8);
 
         return new AiGuidanceSyncResult
@@ -105,10 +116,10 @@ public sealed class AiGuidancePackService
         return AiGuidanceModes.Project;
     }
 
-    private static IReadOnlyList<(string RelativePath, string Content)> LoadSources()
+    private static IReadOnlyList<(string RelativePath, string Content)> LoadSources(IReadOnlyDictionary<string, string> resourceMap)
     {
         var assembly = Assembly.GetExecutingAssembly();
-        return ResourceMap
+        return resourceMap
             .Select(entry =>
             {
                 var resourceName = ResourcePrefix + entry.Key;
@@ -118,6 +129,62 @@ public sealed class AiGuidancePackService
                 return (entry.Value, reader.ReadToEnd());
             })
             .ToList();
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildTemplateVariables(string mode)
+    {
+        var scopeLine = mode switch
+        {
+            AiGuidanceModes.App => "This folder is treated as one Automaton app root.",
+            AiGuidanceModes.Workspace => "This folder is treated as an Automaton apps workspace; apply the app contract inside each app subfolder.",
+            _ => "This folder is treated as a local Automaton project root until an app is created or linked here."
+        };
+
+        var modeDescription = mode switch
+        {
+            AiGuidanceModes.App => "one Automaton app root",
+            AiGuidanceModes.Workspace => "an Automaton apps workspace with one or more app subfolders",
+            _ => "a local project root that may later become an Automaton app root"
+        };
+
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["mode"] = mode,
+            ["scopeLine"] = scopeLine,
+            ["modeDescription"] = modeDescription
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string> WithVariable(
+        IReadOnlyDictionary<string, string> variables,
+        string key,
+        string value)
+    {
+        var copy = new Dictionary<string, string>(variables, StringComparer.Ordinal)
+        {
+            [key] = value
+        };
+        return copy;
+    }
+
+    private static string RenderTemplate(
+        IReadOnlyList<(string RelativePath, string Content)> templates,
+        string relativePath,
+        IReadOnlyDictionary<string, string> variables)
+    {
+        var template = templates.FirstOrDefault(source => string.Equals(source.RelativePath, relativePath, StringComparison.Ordinal));
+        if (string.IsNullOrEmpty(template.RelativePath))
+        {
+            throw new InvalidOperationException($"Embedded AI guidance template '{relativePath}' was not found.");
+        }
+
+        var rendered = template.Content;
+        foreach (var variable in variables)
+        {
+            rendered = rendered.Replace("{{" + variable.Key + "}}", variable.Value, StringComparison.Ordinal);
+        }
+
+        return rendered;
     }
 
     private static string ComputeHash(IEnumerable<string> parts)
@@ -140,9 +207,10 @@ public sealed class AiGuidancePackService
 
     private static void SyncOptionalAdapters(
         string directory,
-        string mode,
         string adapter,
-        ICollection<string> generatedFiles)
+        ICollection<string> generatedFiles,
+        IReadOnlyList<(string RelativePath, string Content)> templates,
+        IReadOnlyDictionary<string, string> variables)
     {
         if (string.Equals(adapter, AiGuidanceAdapters.None, StringComparison.OrdinalIgnoreCase))
         {
@@ -154,7 +222,10 @@ public sealed class AiGuidancePackService
             || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
         {
             var claudePath = Path.Combine(directory, "CLAUDE.md");
-            File.WriteAllText(claudePath, BuildClaudeAdapter(mode), Encoding.UTF8);
+            File.WriteAllText(claudePath, RenderTemplate(
+                templates,
+                "adapter.md",
+                WithVariable(variables, "title", "CLAUDE.md")), Encoding.UTF8);
             generatedFiles.Add(claudePath);
         }
         else
@@ -167,7 +238,10 @@ public sealed class AiGuidancePackService
         {
             var copilotPath = Path.Combine(directory, ".github", "copilot-instructions.md");
             Directory.CreateDirectory(Path.GetDirectoryName(copilotPath)!);
-            File.WriteAllText(copilotPath, BuildCopilotAdapter(mode), Encoding.UTF8);
+            File.WriteAllText(copilotPath, RenderTemplate(
+                templates,
+                "adapter.md",
+                WithVariable(variables, "title", "GitHub Copilot")), Encoding.UTF8);
             generatedFiles.Add(copilotPath);
         }
         else
@@ -180,7 +254,7 @@ public sealed class AiGuidancePackService
         {
             var skillPath = Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md");
             Directory.CreateDirectory(Path.GetDirectoryName(skillPath)!);
-            File.WriteAllText(skillPath, BuildGitHubSkillAdapter(mode), Encoding.UTF8);
+            File.WriteAllText(skillPath, RenderTemplate(templates, "github-skill.md", variables), Encoding.UTF8);
             generatedFiles.Add(skillPath);
         }
         else
@@ -258,213 +332,6 @@ public sealed class AiGuidancePackService
         {
             Directory.Delete(path);
         }
-    }
-
-    private static string BuildAgentsContent(string mode)
-    {
-        var scopeLine = mode switch
-        {
-            AiGuidanceModes.App => "This folder is treated as one Automaton app root.",
-            AiGuidanceModes.Workspace => "This folder is treated as an Automaton apps workspace; apply the app contract inside each app subfolder.",
-            _ => "This folder is treated as a local Automaton project root until an app is created or linked here."
-        };
-
-        return $$"""
-# Automaton Local Guidance
-
-This file is generated by `automaton`. Do not edit it manually.
-
-{{scopeLine}}
-
-Canonical local guidance:
-
-- `.automaton/agents/instructions.md`
-- `.automaton/agents/skills/automaton-app/SKILL.md`
-- `.automaton/agents/references/llms.txt`
-
-Working rules:
-
-- Read `.automaton/agents/instructions.md` first.
-- Then read `.automaton/agents/skills/automaton-app/SKILL.md`.
-- Use `.automaton/agents/references/llms.txt` and the linked files for the detailed Automaton contract.
-- If any local prompt or stale note conflicts with these generated files, prefer the generated files.
-- Run `automaton sync-ai` to refresh this local guidance pack after a CLI upgrade or if the generated files were removed.
-- Keep `automaton.json` in each app root.
-- Keep the mental model simple:
-  - local authoring usually uses `frontend/` and `backend/`
-  - server-side editable files live in `source/frontend/` and `source/backend/`
-  - deployed runtime lives in `live/frontend/` and `live/backend/`
-  - public serving reads only `live/frontend/`
-  - runner execution reads only `live/backend/`
-- Use `automaton setup`, `automaton new`, `automaton link`, `automaton deploy`, and `automaton publish` as the default CLI flow.
-- `automaton deploy` uploads frontend runtime to `live/frontend/` and backend runtime to `live/backend/` when configured.
-- For backend apps, let `automaton deploy` choose or prompt for a connected runner when possible.
-- If no runner exists, `automaton deploy` may still succeed with warnings after upload; explain that backend was uploaded but is not running yet, then suggest `automaton deploy --runner <runner-id-or-name>` or creating/deploying a runner in Automaton Studio.
-- Do not publish automatically on plain deploy. Ask the user first, or use `automaton deploy --publish` only when the user explicitly wants one-step release behavior.
-""";
-    }
-
-    private static string BuildClaudeAdapter(string mode)
-    {
-        return BuildAdapterMarkdown("CLAUDE.md", mode);
-    }
-
-    private static string BuildCopilotAdapter(string mode)
-    {
-        return BuildAdapterMarkdown("GitHub Copilot", mode);
-    }
-
-    private static string BuildAdapterMarkdown(string title, string mode)
-    {
-        var scopeLine = mode switch
-        {
-            AiGuidanceModes.App => "Treat this folder as the Automaton app root.",
-            AiGuidanceModes.Workspace => "Treat this folder as an Automaton apps workspace and apply the app contract inside each app subfolder.",
-            _ => "Treat this folder as the current local Automaton project root."
-        };
-
-        return $$"""
-# Automaton Local Guidance for {{title}}
-
-This file is generated by `automaton`. Do not edit it manually.
-
-{{scopeLine}}
-
-Read first:
-
-1. `.automaton/agents/instructions.md`
-2. `.automaton/agents/skills/automaton-app/SKILL.md`
-3. `.automaton/agents/references/llms.txt`
-
-If these files are missing or stale, run `automaton sync-ai`.
-""";
-    }
-
-    private static string BuildGitHubSkillAdapter(string mode)
-    {
-        return $$"""
----
-name: automaton-app
-description: Thin compatibility wrapper around the canonical local Automaton guidance.
----
-
-# Automaton App
-
-This file is generated by `automaton`. Do not edit it manually.
-
-Mode: `{{mode}}`
-
-Read first:
-
-1. `.automaton/agents/instructions.md`
-2. `.automaton/agents/skills/automaton-app/SKILL.md`
-3. `.automaton/agents/references/llms.txt`
-
-If these files are missing or stale, run `automaton sync-ai`.
-""";
-    }
-
-    private static string BuildCanonicalInstructions(string mode)
-    {
-        var modeDescription = mode switch
-        {
-            AiGuidanceModes.App => "one Automaton app root",
-            AiGuidanceModes.Workspace => "an Automaton apps workspace with one or more app subfolders",
-            _ => "a local project root that may later become an Automaton app root"
-        };
-
-        return $$"""
-# Automaton Agent Instructions
-
-This file is generated by `automaton` as the tool-neutral local guidance entrypoint. Do not edit it manually.
-
-## Purpose
-
-Help an AI tool work correctly in this folder as {{modeDescription}}.
-
-## Read Order
-
-1. Read `.automaton/agents/skills/automaton-app/SKILL.md`.
-2. Read `.automaton/agents/references/llms.txt`.
-3. Read the linked files under `.automaton/agents/references/llms/` before making structure, backend, or deploy decisions.
-4. Use `AGENTS.md` only as the root discovery entrypoint, not as the canonical source.
-
-## Core Rules
-
-- Prefer the generated local Automaton guidance over stale prompts or handwritten notes.
-- Keep `automaton.json` in each app root.
-- Use this contract unless a newer canonical doc explicitly replaces it:
-  - local authoring usually uses `frontend/` and `backend/`
-  - server-side editable files are `source/frontend/` and `source/backend/`
-  - deployed runtime is `live/frontend/` and `live/backend/`
-  - only `live/frontend/` is public
-  - only `live/backend/` is used for runner-side backend execution
-- Use the CLI as the primary execution path.
-- Start with `automaton setup`.
-- Use `automaton new` or `automaton link` to create or connect the app config when needed.
-- Use `automaton deploy` to run the deploy preflight and ship the app.
-- Use `automaton publish` only when the user wants the app publicly accessible.
-- Run `automaton validate` only when you need a separate diagnostic check.
-- For backend apps, let `automaton deploy` choose or prompt for a connected runner when possible.
-- If deploy reports that backend was uploaded but is not running, explain that `live/backend/` is synced successfully and suggest rerunning with `automaton deploy --runner <runner-id-or-name>` after a runner is available.
-- After a successful plain deploy, ask before publish. If the user approves, run `automaton publish` and return the published URL.
-
-## Compatibility
-
-- `.automaton/agents/` is the canonical local agent guidance tree.
-- `AGENTS.md` is the only default root adapter and points back to `.automaton/agents/`.
-- Tool-specific adapters such as `CLAUDE.md` or `.github/copilot-instructions.md` are intentionally not generated by default.
-""";
-    }
-
-    private static string BuildCanonicalSkillContent(string mode)
-    {
-        return $$"""
----
-id: automaton-app
-title: Automaton App Workflow
-version: 1
-mode: {{mode}}
-summary: Universal local guidance for building, linking, and deploying Automaton apps.
----
-
-# Automaton App Workflow
-
-This file is generated by `automaton` as canonical reusable guidance for local AI tools.
-
-## When To Use
-
-- The task involves an Automaton app in this folder.
-- The task involves `automaton.json`, frontend structure, backend controllers, runner selection, or deploy.
-
-## Inputs Expected
-
-- The current workspace contents.
-- `.automaton/agents/references/llms.txt`
-- The linked files under `.automaton/agents/references/llms/`
-
-## Workflow
-
-1. Read `.automaton/agents/references/llms.txt` first.
-2. Use the linked local guidance files before making decisions about structure, backend controllers, or deploy packaging.
-3. Keep `automaton.json` in the app root.
-4. Prefer frontend-only structure unless the app truly needs Python backend controllers in `backend/`.
-5. Keep the storage model straight:
-   - local app files are usually under `frontend/` and `backend/`
-   - server editable files are `source/frontend/` and `source/backend/`
-   - deploy writes runtime files to `live/frontend/` and `live/backend/`
-6. Run `automaton deploy`; it performs deploy preflight, uploads frontend/backend runtime, and prompts for runner selection only when backend controllers require one and multiple connected runners are available.
-7. If deploy succeeds with warnings because no runner is available, explain that backend was uploaded but is not running yet.
-8. Ask before public release, then run `automaton publish` when the user explicitly approves.
-9. Run `automaton validate` only as an optional diagnostic check when deploy readiness is unclear.
-
-## Validation
-
-- `automaton deploy`
-- `automaton validate` only for optional diagnostics.
-- `automaton publish` only after explicit user approval, unless the user explicitly requested `automaton deploy --publish`.
-- Publish only after explicit user approval when approval is needed.
-""";
     }
 
     private static string BuildCanonicalManifest(

@@ -12,7 +12,10 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>automaton</ToolCommandName>
     <PackageId>Automaton.Cli</PackageId>
-    <Version>1.0.0</Version>
+    <VersionPrefix>1.0</VersionPrefix>
+    <Version Condition="'$(Version)' == ''">$(VersionPrefix).$([System.DateTime]::UtcNow.ToString("yyyyMMdd")).$([System.DateTime]::UtcNow.ToString("HHmmss"))</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <Authors>Automaton</Authors>
     <Description>Automaton CLI — deploy apps, manage runners, publish versions</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
@@ -46,6 +49,21 @@
     </EmbeddedResource>
     <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-starter-prompts.md">
       <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-starter-prompts.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\AGENTS.md">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.AGENTS.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\instructions.md">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.instructions.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\SKILL.md">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.SKILL.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\adapter.md">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.adapter.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\github-skill.md">
+      <LogicalName>Automaton.Cli.AiGuidance.templates.github-skill.md</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

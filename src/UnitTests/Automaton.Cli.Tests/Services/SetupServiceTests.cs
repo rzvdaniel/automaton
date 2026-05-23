@@ -42,10 +42,29 @@ public class SetupServiceTests
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".gitignore")), Is.True);
+        Assert.That(File.ReadAllText(Path.Combine(projectRoot, ".gitignore")), Does.Contain(".automaton/"));
 
         var config = new ConfigService().LoadProjectLocalConfig(projectRoot);
         Assert.That(config.Server, Is.EqualTo(SetupService.DefaultHostedServer));
         Assert.That(config.ApiKey, Is.EqualTo("ak_test"));
+    }
+
+    [Test]
+    public async Task SetupAsync_WhenGitIgnoreAlreadyContainsAutomaton_DoesNotDuplicateEntry()
+    {
+        var projectRoot = CreateProjectRoot();
+        File.WriteAllText(Path.Combine(projectRoot, ".gitignore"), ".automaton/" + Environment.NewLine);
+        var service = new SetupService(
+            new ConfigService(),
+            (_, _, _) => Task.FromResult(ParseUser("550e8400-e29b-41d4-a716-446655440000", "Razvan", "razvan@example.com")));
+
+        var result = await service.SetupAsync(projectRoot, null, "ak_test", global: false);
+
+        Assert.That(result.Success, Is.True);
+
+        var lines = File.ReadAllLines(Path.Combine(projectRoot, ".gitignore"));
+        Assert.That(lines.Count(line => string.Equals(line.Trim(), ".automaton/", StringComparison.Ordinal)), Is.EqualTo(1));
     }
 
     [Test]

@@ -73,6 +73,7 @@ public sealed class SetupService
             }
 
             var guidance = _aiGuidancePackService.Sync(directory);
+            _config.EnsureProjectGitIgnoreFile(directory);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
 
             nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");

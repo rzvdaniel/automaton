@@ -3,6 +3,12 @@
 Automaton backends are Python controllers stored in `backend/`.
 
 Rules:
+- CRITICAL: Automaton backends are not standalone HTTP servers.
+- Default to frontend-only. Create `backend/` only when the user-requested core feature requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access that cannot be removed without breaking the requested app.
+- Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`.
+- Do not create `backend/` only for convenience, caching, minor proxying, CORS or mixed-content workarounds for non-essential data, or optional enrichment.
+- Mixed-content or CORS issues for optional third-party APIs are not sufficient justification for introducing a backend web framework or proxy.
+- If you think a proxy or API server is needed, first attempt a frontend-only solution. If backend behavior is truly required, implement an Automaton controller instead.
 - Each controller is one Python file.
 - The controller name is the filename without `.py`.
 - Each controller file must export `handle(action_name, inputs)`.

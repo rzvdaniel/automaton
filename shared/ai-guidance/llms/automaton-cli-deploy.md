@@ -62,6 +62,7 @@ Use this canonical order:
 automaton setup
 automaton new "My App"
 automaton deploy
+# ask user before publish
 automaton publish --yes
 automaton status
 ```
@@ -112,9 +113,13 @@ If `automaton validate` passes but `automaton deploy` fails during upload with t
 - Follow the local generated guidance pack after setup. Start with `.automaton/agents/` when present, then use `.automaton/agents/references/llms.txt` and the linked files as the detailed canonical source. Use the public `llms.txt` only as a fallback when local guidance is unavailable.
 - Treat `automaton sync-ai` as the manual refresh path for the generated local guidance pack, not as a required onboarding step.
 - For AI-generated local apps, always set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- Default to frontend-only. Create `backend/` only when the user-requested core feature requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access that cannot be removed without breaking the requested app.
+- Do not create `backend/` only for convenience, caching, minor proxying, CORS or mixed-content workarounds for non-essential data, or optional enrichment.
+- When backend controllers are required, implement Automaton Python controllers that export `handle(action_name, inputs)`. Do not create a standalone FastAPI, Flask, or other web server under `backend/`.
 - If the app is build-based and also has Python backend controllers, keep backend source in `backend/`. Do not copy backend files into frontend `deployDir`; deploy uploads frontend runtime and backend runtime separately.
 - Use Python backend controllers in `backend/`.
 - If the app includes Python backend controllers, do not consider backend deploy complete until `automaton deploy` assigned or used a runner, or you have clearly reported why it could not be made.
+- Do not consider local build, type-check, tests, or `python -m py_compile` to be completion. Before declaring the app done, run `automaton deploy`; if it fails, report the exact command, exact error, and the next step.
 - Prefer `automaton status` after deploy before declaring success.
 - After deploy, use Automaton Studio preview and logs as the current test/debug loop before proposing publish.
 - Ask before public publish, then use `automaton publish --yes` after approval.
@@ -143,6 +148,8 @@ automaton deploy --runner <runner-id-or-name>
 For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`. Public runtime must come from `frontend/dist/`. Vite hashed assets reduce stale CSS/JS caching behind Cloudflare; `index.html` should still revalidate on the server.
 
 For React, Vue, Vite vanilla, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
+
+Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 
 Frontend-only example `automaton.json`:
 
