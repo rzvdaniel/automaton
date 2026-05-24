@@ -23,6 +23,15 @@ const previewModes = ref([
 
 // Current viewport size
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
+const publishedAppUrl = computed(() => {
+  const publicUrl = editorStore.currentApp?.publicUrl?.trim()
+  return publicUrl ? `/web/${publicUrl}` : ''
+})
+const installMessage = computed(() =>
+  publishedAppUrl.value
+    ? 'Install from the published app. Preview runs inside Studio and cannot provide the app manifest, icon, or standalone launch mode.'
+    : 'Publish app to install on mobile. Preview runs inside Studio and cannot provide the app manifest, icon, or standalone launch mode.',
+)
 
 // Initial load
 onMounted(() => {
@@ -48,6 +57,12 @@ function handleModeChange(mode: PreviewMode) {
 // Handle close
 function handleClose() {
   editorStore.closePreviewOverlay()
+}
+
+function openPublishedApp() {
+  if (publishedAppUrl.value) {
+    window.open(publishedAppUrl.value, '_blank', 'noopener')
+  }
 }
 
 // Handle keyboard shortcuts
@@ -124,6 +139,19 @@ onUnmounted(() => {
 
       <!-- Preview Content -->
       <div class="preview-overlay-content">
+          <div class="install-notice">
+            <i class="pi pi-mobile"></i>
+            <span>{{ installMessage }}</span>
+            <Button
+              v-if="publishedAppUrl"
+              label="Open Published App"
+              icon="pi pi-external-link"
+              size="small"
+              severity="secondary"
+              outlined
+              @click="openPublishedApp"
+            />
+          </div>
           <div v-if="editorStore.previewWarning" class="preview-warning">
             <i class="pi pi-exclamation-triangle"></i>
             <span>{{ editorStore.previewWarning }}</span>
@@ -266,6 +294,27 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
+.install-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--p-blue-50);
+  color: var(--p-blue-700);
+  border: 1px solid var(--p-blue-200);
+  border-radius: var(--p-border-radius);
+  font-size: 0.85rem;
+}
+
+.install-notice > span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .preview-warning > span {
   flex: 1;
   min-width: 0;
@@ -333,6 +382,12 @@ onUnmounted(() => {
 :global(.app-dark) .preview-badge {
   background-color: var(--p-primary-900);
   color: var(--p-primary-300);
+}
+
+:global(.app-dark) .install-notice {
+  background-color: color-mix(in srgb, var(--p-blue-900) 65%, var(--p-surface-900));
+  color: var(--p-blue-100);
+  border-color: var(--p-blue-700);
 }
 
 :global(.app-dark) .preview-overlay-content {
