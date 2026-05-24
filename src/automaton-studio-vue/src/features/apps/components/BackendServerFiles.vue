@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import CodeEditor from './CodeEditor.vue'
 import FileTree from './FileTree.vue'
 import { appsService } from '../services/apps.service'
 import type { FileNode, RunnerBackendFile, RunnerBackendFileContent } from '../types/apps.types'
+
+const CodeEditor = defineAsyncComponent(() => import('./CodeEditor.vue'))
 
 const props = defineProps<{
   appId: string

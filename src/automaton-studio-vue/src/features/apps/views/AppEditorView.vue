@@ -5,7 +5,7 @@
  * AI-first layout: Files | Editor | AI Assistant
  * Preview opens as full-screen overlay
  */
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -16,7 +16,6 @@ import { useToast } from 'primevue/usetoast'
 
 // Import components
 import FileTree from '../components/FileTree.vue'
-import CodeEditor from '../components/CodeEditor.vue'
 import AiAssistant from '../components/AiAssistant.vue'
 import PreviewOverlay from '../components/PreviewOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
@@ -30,6 +29,8 @@ import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
+
+const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'

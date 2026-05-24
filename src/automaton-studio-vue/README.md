@@ -136,7 +136,7 @@ npm run test:e2e   # E2E tests (Playwright)
 - **pinia** ^2.1 - State management
 - **vue-router** ^4.0 - Routing
 - **axios** ^1.6 - HTTP client
-- **monaco-editor** - Code editor
+- **CodeMirror 6** - Code editor
 
 ## 🔐 Security
 

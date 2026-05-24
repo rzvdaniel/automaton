@@ -23,9 +23,5 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       sourcemap: mode !== 'production',
     },
-    // Optimize Monaco Editor for production build
-    optimizeDeps: {
-      include: ['monaco-editor'],
-    },
   }
 })
