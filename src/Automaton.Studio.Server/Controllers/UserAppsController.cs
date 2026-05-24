@@ -127,6 +127,7 @@ public class UserAppsController : ControllerBase
 
             // Smart caching: HTML always revalidates, fingerprinted assets can be immutable,
             // plain app assets stay fresh without forcing users to add manual cache busting.
+            WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
             WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, runtimePath, webAppConfig);
 
             return File(content, contentType);

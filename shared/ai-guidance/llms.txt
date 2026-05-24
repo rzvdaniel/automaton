@@ -62,6 +62,29 @@ try {
 
 For AI-generated local apps, always create a frontend build pipeline by default. Use Vite + vanilla TypeScript or JavaScript in `frontend/` unless the user asks for React, Vue, Angular, or another framework. The build output must go to `frontend/dist/`. Vite build output uses hashed assets, which reduces stale asset caching behind Cloudflare. Plain root HTML/CSS/JS is an explicit exception only; use it only when the user directly asks for a no-build static app.
 
+## Frontend asset versioning
+
+For build-based frontend apps, the build must produce cache-safe versioned assets.
+
+Prefer tools such as Vite that emit hashed asset filenames, for example:
+- `assets/index-C8d3xYz.css`
+- `assets/index-B91kLm2.js`
+
+Do not rely on Automaton Studio or the platform rewriting app HTML to add cache-busting query strings.
+
+Rules:
+- `index.html` may keep a stable filename.
+- CSS, JS, images, fonts, manifests, and worker files should use content-hashed filenames when the build system supports it.
+- Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
+- Do not manually append random `?v=` query strings in source code unless there is no build system available.
+- For Vite apps, keep the default hashed asset output.
+- Set `frontend.deployDir` to the final build output, normally `frontend/dist`.
+
+Responsibility boundary:
+- The app build is responsible for producing cache-safe versioned asset filenames.
+- Automaton is responsible for serving deployed assets with correct cache and CORS headers.
+- Studio should not mutate deployed app HTML to add cache-busting.
+
 For the default AI-generated local app, use this frontend config instead of assuming root deploy:
 ```json
 {

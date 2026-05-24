@@ -122,6 +122,7 @@ public class AppPreviewController : ControllerBase
 
                 SetNoCacheHeaders();
                 Response.Headers.XContentTypeOptions = "nosniff";
+                WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
                 return File(bytes, contentType);
             }
 
@@ -152,6 +153,7 @@ public class AppPreviewController : ControllerBase
 
             Response.Headers.XContentTypeOptions = "nosniff";
             SetNoCacheHeaders();
+            WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
 
             // Return with appropriate content type
             return Content(content, contentType, Encoding.UTF8);

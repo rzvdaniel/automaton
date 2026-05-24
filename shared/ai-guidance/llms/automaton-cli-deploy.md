@@ -196,6 +196,12 @@ For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript 
 
 For React, Vue, Vite vanilla, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
 
+For build-based frontend apps, keep build-generated hashed asset filenames. Do not add cache-busting by rewriting deployed HTML in Studio or by manually appending random `?v=` query strings in app source unless there is no build system available.
+
+Responsibility boundary:
+- App build: hashed CSS, JS, image, font, manifest, and worker asset filenames when supported.
+- Automaton platform: cache headers, CORS headers, and runtime asset serving.
+
 Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 
 Frontend-only example `automaton.json`:

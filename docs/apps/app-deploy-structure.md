@@ -75,6 +75,15 @@ Why this is the default:
 - Public runtime is a clean build artifact from `frontend/dist/`.
 - Backend runtime is packaged separately, so frontend output does not need to contain backend files.
 
+## Asset versioning rule
+
+For build-based apps:
+- `index.html` may keep a stable filename.
+- CSS, JS, images, fonts, manifests, and worker files should use hashed filenames when the build system supports it.
+- Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
+- Do not rely on Automaton Studio mutating app HTML to add `?v=` cache-busting.
+- Automaton is responsible for cache headers, CORS headers, and runtime asset serving.
+
 ## Explicit no-build static exception
 
 Plain root HTML/CSS/JS remains supported only as an explicit no-build option:

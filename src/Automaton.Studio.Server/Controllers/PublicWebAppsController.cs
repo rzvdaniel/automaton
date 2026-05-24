@@ -201,6 +201,7 @@ public class PublicWebAppsController : ControllerBase
 
             var contentType = WebAppRuntimeFilePolicy.GetContentType(path);
 
+            WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
             WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, path, _webAppConfig);
 
             return File(content, contentType);
