@@ -1076,7 +1076,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         <AppSettings />
       </div>
 
-      <div v-show="activeTab === 'backend-server'" class="backend-server-view">
+      <div v-if="activeTab === 'backend-server'" class="backend-server-view">
         <BackendServerFiles :app-id="resolvedAppId" />
       </div>
 

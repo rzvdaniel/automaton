@@ -107,18 +107,35 @@ public class AppPreviewController : ControllerBase
 
             var effectiveUserId = ownerId == Guid.Empty ? userId : ownerId;
 
+            var requestedPath = path ?? "index.html";
+            var filePath = string.IsNullOrEmpty(path) || path == "/" ? "index.html" : path.TrimStart('/');
+            var contentType = GetContentType(requestedPath);
+
+            if (IsBinaryPreviewFile(requestedPath))
+            {
+                var bytes = await ReadPreviewFileBytesAsync(effectiveUserId, userId, appId, filePath);
+                if (bytes == null)
+                {
+                    logger.LogWarning("Preview binary file not found: {Path} for app {AppId}", path, appId);
+                    return NotFound(GetErrorPage("File Not Found", $"The file '{path ?? "index.html"}' was not found in preview."));
+                }
+
+                SetNoCacheHeaders();
+                Response.Headers.XContentTypeOptions = "nosniff";
+                return File(bytes, contentType);
+            }
+
             // First, try to get from memory (live preview)
-            var content = previewStorage.GetPreviewFile(effectiveUserId, appId, path ?? "index.html");
+            var content = previewStorage.GetPreviewFile(effectiveUserId, appId, requestedPath);
 
             if (content == null && effectiveUserId != userId)
             {
-                content = previewStorage.GetPreviewFile(userId, appId, path ?? "index.html");
+                content = previewStorage.GetPreviewFile(userId, appId, requestedPath);
             }
 
             // If not in memory, try loading from file storage (persisted content)
             if (content == null)
             {
-                var filePath = string.IsNullOrEmpty(path) || path == "/" ? "index.html" : path.TrimStart('/');
                 content = await fileStorage.ReadSourceFileAsync(effectiveUserId, appId, ToSourceFrontendPath(filePath));
 
                 if (content == null && effectiveUserId != userId)
@@ -133,16 +150,8 @@ public class AppPreviewController : ControllerBase
                 return NotFound(GetErrorPage("File Not Found", $"The file '{path ?? "index.html"}' was not found in preview."));
             }
 
-            // Determine content type
-            var contentType = GetContentType(path ?? "index.html");
-
-            // Add security headers
             Response.Headers.XContentTypeOptions = "nosniff";
-            
-            // No caching for preview (always fresh)
-            Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
-            Response.Headers.Pragma = "no-cache";
-            Response.Headers.Expires = "0";
+            SetNoCacheHeaders();
 
             // Return with appropriate content type
             return Content(content, contentType, Encoding.UTF8);
@@ -152,6 +161,28 @@ public class AppPreviewController : ControllerBase
             logger.LogError(ex, "Error serving preview file: {AppId}/{Path}", appId, path);
             return StatusCode(500, GetErrorPage("Error", "An error occurred while loading the preview."));
         }
+    }
+
+    private async Task<byte[]?> ReadPreviewFileBytesAsync(Guid effectiveUserId, Guid requestUserId, Guid appId, string path)
+    {
+        var sourcePath = ToSourceFrontendPath(path);
+        var bytes = await fileStorage.ReadSourceFileBytesAsync(effectiveUserId, appId, sourcePath);
+        bytes ??= await fileStorage.ReadRuntimeFileBytesAsync(effectiveUserId, appId, path);
+
+        if (bytes == null && effectiveUserId != requestUserId)
+        {
+            bytes = await fileStorage.ReadSourceFileBytesAsync(requestUserId, appId, sourcePath);
+            bytes ??= await fileStorage.ReadRuntimeFileBytesAsync(requestUserId, appId, path);
+        }
+
+        return bytes;
+    }
+
+    private void SetNoCacheHeaders()
+    {
+        Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
     }
 
     private Guid GetUserId()
@@ -190,6 +221,14 @@ public class AppPreviewController : ControllerBase
             ".map" => "application/json",
             _ => "application/octet-stream"
         };
+    }
+
+    private static bool IsBinaryPreviewFile(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        return extension is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg" or ".ico"
+            or ".woff" or ".woff2" or ".ttf" or ".otf"
+            or ".mp4" or ".webm" or ".mp3" or ".wav" or ".pdf";
     }
 
     private static string GetErrorPage(string title, string message)

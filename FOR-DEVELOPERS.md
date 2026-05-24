@@ -227,6 +227,20 @@ Add `allow-downloads` to the `sandbox` attribute in:
 
 **Lesson:** When apps need to trigger file downloads, always include `allow-downloads` in the iframe `sandbox`. Any time you add a new sandbox capability to apps, check both `WebAppView.vue` and `PreviewOverlay.vue`.
 
+### 2.1 Preview Binary Assets Must Stay Binary
+
+**The Pitfall:**
+Studio preview uploads the current file set into temporary preview storage so the iframe can reload quickly. That path is text-oriented: HTML, CSS, JS, JSON, and manifests are safe to serialize as strings. Binary assets are not. If a PNG map, image, font, or media file is read through the text file API and placed into preview memory as a string, the browser can receive `200 OK` with the right content type but invalid bytes. The symptom is confusing: the Network tab says the image loaded, while the UI shows only fallback colors.
+
+This surfaced with an ISS tracker app where the published `/web/...` version showed the world map, but the Studio build/preview iframe did not. Published serving used real file bytes; preview had an empty/corrupt in-memory PNG entry.
+
+**The Fix:**
+- The Vue preview builder skips binary extensions when uploading the temporary preview file map.
+- `AppPreviewController` serves binary preview assets from source or live app storage using byte reads, not string reads.
+- Text assets still use the in-memory preview path so unsaved editor changes remain visible immediately.
+
+**Lesson:** If preview behavior differs from published behavior for images, fonts, or media, check whether the preview path preserved bytes. A successful status code is not enough for binary assets; the response body must come from byte-based storage.
+
 ### 3. Nullable Reference Types in C#
 
 **The Pitfall:**

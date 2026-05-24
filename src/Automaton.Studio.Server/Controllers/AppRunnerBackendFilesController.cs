@@ -18,34 +18,65 @@ public class AppRunnerBackendFilesController : ControllerBase
     private readonly ApplicationDbContext dataContext;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly UserContextService userContextService;
+    private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly ILogger<AppRunnerBackendFilesController> logger;
 
     public AppRunnerBackendFilesController(
         ApplicationDbContext dataContext,
         ResourceAuthorizationService authorizationService,
         UserContextService userContextService,
-        IHubContext<AutomatonHub> automatonHub)
+        AppFileStorageService fileStorageService,
+        IHubContext<AutomatonHub> automatonHub,
+        ILogger<AppRunnerBackendFilesController> logger)
     {
         this.dataContext = dataContext;
         this.authorizationService = authorizationService;
         this.userContextService = userContextService;
+        this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
+        this.logger = logger;
     }
 
     [HttpGet]
     public async Task<ActionResult<AppBackendFilesResponse>> List(Guid appId, CancellationToken cancellationToken)
     {
+        if (!await authorizationService.CanAccessAppAsync(appId, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var ownerId = await ResolveAppOwnerIdAsync(appId, cancellationToken);
+        var liveBackendFiles = await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId);
+        if (!liveBackendFiles.Any())
+        {
+            return Ok(new AppBackendFilesResponse { Success = true });
+        }
+
         var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {
             return error;
         }
 
-        var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
-            .InvokeAsync<AppBackendFilesResponse>(
-                AutomatonHubMethods.ListAppBackendFiles,
-                appId.ToString(),
-                cancellationToken);
+        AppBackendFilesResponse response;
+        try
+        {
+            response = await automatonHub.Clients.Client(runner!.ConnectionId!)
+                .InvokeAsync<AppBackendFilesResponse>(
+                    AutomatonHubMethods.ListAppBackendFiles,
+                    appId.ToString(),
+                    cancellationToken);
+        }
+        catch (HubException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} failed to list backend files for app {AppId}", runner!.Id, appId);
+            return BadRequest(new AppBackendFilesResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' could not list backend files. Update or reconnect the runner, then redeploy the backend."
+            });
+        }
 
         return response.Success ? Ok(response) : BadRequest(response);
     }
@@ -62,12 +93,26 @@ public class AppRunnerBackendFilesController : ControllerBase
             return error;
         }
 
-        var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
-            .InvokeAsync<AppBackendFileContentResponse>(
-                AutomatonHubMethods.ReadAppBackendFile,
-                appId.ToString(),
-                path,
-                cancellationToken);
+        AppBackendFileContentResponse response;
+        try
+        {
+            response = await automatonHub.Clients.Client(runner!.ConnectionId!)
+                .InvokeAsync<AppBackendFileContentResponse>(
+                    AutomatonHubMethods.ReadAppBackendFile,
+                    appId.ToString(),
+                    path,
+                    cancellationToken);
+        }
+        catch (HubException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} failed to read backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileContentResponse
+            {
+                Success = false,
+                Path = path,
+                Error = $"Runner '{runner.Name}' could not read this backend file. Update or reconnect the runner, then redeploy the backend."
+            });
+        }
 
         return response.Success ? Ok(response) : BadRequest(response);
     }
@@ -84,14 +129,37 @@ public class AppRunnerBackendFilesController : ControllerBase
             return error;
         }
 
-        var response = await automatonHub.Clients.Client(runner!.ConnectionId!)
-            .InvokeAsync<AppBackendFileDeleteResponse>(
-                AutomatonHubMethods.DeleteAppBackendFile,
-                appId.ToString(),
-                path,
-                cancellationToken);
+        AppBackendFileDeleteResponse response;
+        try
+        {
+            response = await automatonHub.Clients.Client(runner!.ConnectionId!)
+                .InvokeAsync<AppBackendFileDeleteResponse>(
+                    AutomatonHubMethods.DeleteAppBackendFile,
+                    appId.ToString(),
+                    path,
+                    cancellationToken);
+        }
+        catch (HubException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} failed to delete backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileDeleteResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' could not delete this backend file. Update or reconnect the runner, then redeploy the backend."
+            });
+        }
 
         return response.Success ? Ok(response) : BadRequest(response);
+    }
+
+    private async Task<Guid> ResolveAppOwnerIdAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        var ownerId = await dataContext.WebAppUsers
+            .Where(webAppUser => webAppUser.WebAppId == appId)
+            .Select(webAppUser => (Guid?)webAppUser.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return ownerId ?? userContextService.GetUserId();
     }
 
     private async Task<(Runner? Runner, ActionResult? Error)> ResolveRunnerAsync(Guid appId, CancellationToken cancellationToken)

@@ -478,6 +478,14 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Read an editable source file as bytes for an app.
+    /// </summary>
+    public Task<byte[]?> ReadSourceFileBytesAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return ReadFileBytesAsync(GetSourcePath(userId, appId), relativePath);
+    }
+
+    /// <summary>
     /// Write an editable source file for an app.
     /// </summary>
     public Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)

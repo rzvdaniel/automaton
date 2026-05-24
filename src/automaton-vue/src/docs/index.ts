@@ -1,6 +1,7 @@
 import appEditorRaw from '@/docs/pages/app-editor.md?raw'
 import automatonCliRaw from '@/docs/pages/automaton-cli.md?raw'
 import cliAiToolsRaw from '@/docs/pages/cli-ai-tools.md?raw'
+import codexBrowserDebuggingRaw from '@/docs/pages/codex-browser-debugging.md?raw'
 import deployRaw from '@/docs/pages/deploy.md?raw'
 import gettingStartedRaw from '@/docs/pages/getting-started.md?raw'
 import publishRaw from '@/docs/pages/publish.md?raw'
@@ -30,6 +31,13 @@ export const docs: DocItem[] = [
     summary: 'Recommended local workflow',
     group: 'Getting Started',
     content: cliAiToolsRaw,
+  },
+  {
+    slug: 'codex-browser-debugging',
+    label: 'Codex Browser Debugging',
+    summary: 'Local UI QA with /browser',
+    group: 'AI Tooling',
+    content: codexBrowserDebuggingRaw,
   },
   {
     slug: 'stack-selection',

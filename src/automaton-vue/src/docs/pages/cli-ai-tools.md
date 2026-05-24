@@ -81,5 +81,6 @@ That is the happy path.
 ## When to read more
 
 - Read **Choose a Stack** if you need help picking plain HTML, React, or Vue
+- Read **Codex Browser Debugging** if you want Codex to open and test your localhost app
 - Read **Deploy** if you want the simplest deploy explanation
 - Read **CLI Reference** only when you need advanced commands

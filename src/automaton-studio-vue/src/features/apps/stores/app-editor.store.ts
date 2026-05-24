@@ -582,6 +582,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
           .map((file) => (typeof file === 'string' ? file : file.path))
           .filter((path): path is string => Boolean(path))
           .map((path) => path.replace(/\\/g, '/'))
+          .filter((path) => isTextPreviewFile(path))
 
         const contents = await Promise.all(
           paths.map(async (path) => {
@@ -617,6 +618,30 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
 
     return files
+  }
+
+  function isTextPreviewFile(path: string): boolean {
+    const extension = path.split('.').pop()?.toLowerCase()
+    if (!extension) return true
+
+    return [
+      'html',
+      'htm',
+      'css',
+      'js',
+      'mjs',
+      'ts',
+      'tsx',
+      'jsx',
+      'json',
+      'xml',
+      'txt',
+      'md',
+      'yml',
+      'yaml',
+      'map',
+      'webmanifest',
+    ].includes(extension)
   }
 
 
