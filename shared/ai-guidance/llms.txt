@@ -105,7 +105,13 @@ Only files inside `frontend.deployDir` become public runtime. Do not expect `fro
 
 **After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
-**Current test loop** — After deploy, use Automaton Studio as the current preview and debugging environment: open the app in Studio, preview it there, inspect logs there, iterate, and publish only after explicit user approval.
+**Current test loop** — Until a dedicated Automaton local runtime exists, test locally first, then deploy, then use Automaton Studio for integration testing. Build the app locally, start the local frontend dev server, use local mock data or a local mock backend when backend-like data is needed, test with a normal browser or AI browser tool, fix local UI/runtime issues, run `automaton deploy`, open the app in Automaton Studio, preview the deployed app, inspect frontend/backend logs, redeploy if needed, and publish only after explicit user approval.
+
+**AI browser testing** — When working in Codex or another AI tool with browser automation, the AI should start or detect the local dev/preview server, open `http://127.0.0.1:<port>` with the available browser tool, inspect DOM/visible state and console errors, exercise main flows, capture screenshots when useful, and patch issues before deploy. In Codex, the user may need to run `/browser` once per session to attach the in-app browser runtime; before initialization browser targets may be empty, and after initialization the in-app browser target is usually `iab`. If browser automation is unavailable, explain that browser setup is needed instead of pretending local browser QA happened.
+
+Do not claim local browser testing was completed unless the app was actually opened in a browser automation target or a normal browser and visible state, console errors, and at least the main screen were inspected.
+
+**Local backend mocking** — If the frontend needs backend-like data before deployment, add a local mock backend or mock data mode. Prefer MSW for Vite, React, and Vue browser mocks, `json-server` for simple CRUD data, Prism for OpenAPI-based mocks, and Mockoon CLI for richer mock API servers. Do not treat the mock server as the production backend. Keep the real Automaton backend in `backend/` and implement it using Automaton Python controllers when deployed backend behavior is needed.
 
 ## Autonomous Full Flow
 

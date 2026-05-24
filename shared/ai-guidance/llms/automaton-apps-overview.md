@@ -22,18 +22,23 @@ Use these rules:
 - Deploy with `automaton deploy`.
 - If the app has Python backend controllers, let `automaton deploy` auto-select or prompt for a connected runner. Tell the user to create or deploy one in Automaton Studio only when no connected runner exists.
 - `automaton setup`, `automaton new`, and `automaton link` automatically sync a local AI guidance pack; use `automaton sync-ai` only when those generated files need a manual refresh.
+- Test locally before deploy: start the local frontend dev server, use mock data when needed, open localhost in a browser or AI browser tool, inspect console errors and visible state, exercise main flows, and fix local UI/runtime issues.
+- Do not claim local browser testing was completed unless the app was actually opened in a browser or browser automation target and the visible state, console errors, and main screen were inspected.
+- If backend-like data is needed before deployment, add a local mock backend or mock data mode. Prefer MSW for Vite/React/Vue browser mocks. Use `json-server` for simple CRUD, Prism for OpenAPI mocks, and Mockoon CLI for richer mock servers. Mocks are local-only scaffolding; the deployed backend still belongs in `backend/` as Automaton Python controllers when backend behavior is required.
 
 Recommended workflow for most developers:
 1. Run `automaton setup`.
 2. Run `automaton new "My App"` for a new app, or `automaton link <app-id>` for an existing one.
 3. Run `automaton sync-ai` only if the generated local guidance files are missing or stale.
-4. Run `automaton deploy`; it performs the deploy preflight.
-5. Keep the project in the local repo.
-6. Build with the user's preferred editor or AI tool.
-7. Make sure `automaton.json` includes `frontend.build` and `frontend.deployDir` when the deployable frontend is not the project root.
-8. For backend apps, let deploy handle runner selection when a connected runner exists.
-9. Use `automaton validate` only as an optional diagnostic check.
-10. Publish only after user approval.
+4. Keep the project in the local repo.
+5. Build with the user's preferred editor or AI tool.
+6. Test locally first with a browser or AI browser tool.
+7. Run `automaton deploy`; it performs the deploy preflight.
+8. Open the deployed app in Automaton Studio, preview it there, and inspect frontend/backend logs.
+9. Make sure `automaton.json` includes `frontend.build` and `frontend.deployDir` when the deployable frontend is not the project root.
+10. For backend apps, let deploy handle runner selection when a connected runner exists.
+11. Use `automaton validate` only as an optional diagnostic check.
+12. Publish only after user approval.
 
 Do not consider local build, type-check, tests, or `python -m py_compile` to be completion. Before declaring the app done, run `automaton deploy`; if it fails, report the exact command, exact error, and the next step.
 
