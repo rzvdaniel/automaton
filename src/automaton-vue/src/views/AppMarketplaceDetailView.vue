@@ -277,7 +277,7 @@ onMounted(loadApp)
               <div class="badge-row">
                 <span class="badge">Live app</span>
                 <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
-                <span v-if="app.isForkable" class="badge badge-forkable">Forkable</span>
+                <span v-if="app.canRemix" class="badge badge-forkable">Forkable</span>
                 <span class="badge badge-static">{{ app.hasBackendExecution ? 'Backend' : 'Static' }}</span>
               </div>
 
@@ -298,7 +298,7 @@ onMounted(loadApp)
 
                 <div class="hero-stats" aria-label="App activity">
                   <span><i class="pi pi-play" /> {{ pluralize(app.viewCount, 'play') }}</span>
-                  <span v-if="app.isForkable">
+                  <span v-if="app.canRemix">
                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                       <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
                     </svg>
@@ -312,7 +312,7 @@ onMounted(loadApp)
                     Open app
                     <i class="pi pi-external-link" />
                   </a>
-                  <a v-if="app.isForkable" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
+                  <a v-if="app.canRemix" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                       <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
                     </svg>
@@ -329,7 +329,7 @@ onMounted(loadApp)
                   <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
                   <span class="hero-pill">{{ app.hasBackendExecution ? 'Backend app' : 'Static app' }}</span>
                   <span class="hero-pill">{{ app.hasBackendExecution ? 'Runner required' : 'Runner not required' }}</span>
-                  <span v-if="app.isForkable" class="hero-pill hero-pill-forkable">Free to fork</span>
+                  <span v-if="app.canRemix" class="hero-pill hero-pill-forkable">Free to fork</span>
                   <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
                 </div>
               </div>
@@ -404,7 +404,7 @@ onMounted(loadApp)
                     <h3>Forks & Remixes</h3>
                     <p>Forks preserve attribution and show how apps evolve over time.</p>
                   </div>
-                  <span v-if="app.isForkable" class="remix-count">{{ pluralize(app.forkCount, 'fork') }}</span>
+                  <span v-if="app.canRemix" class="remix-count">{{ pluralize(app.forkCount, 'fork') }}</span>
                 </div>
 
                 <div v-if="app.forksAndRemixes?.length" class="remix-grid">
@@ -427,15 +427,15 @@ onMounted(loadApp)
                   </RouterLink>
                 </div>
 
-                <p v-else-if="app.isForkable" class="empty-copy">
+                <p v-else-if="app.canRemix" class="empty-copy">
                   No public remixes yet. Fork this app to create a private editable copy, modify it, then publish your version when ready.
                 </p>
-                <p v-else class="empty-copy">This app is published for use. Remixing is not enabled by the creator.</p>
+                <p v-else class="empty-copy">This app is published for use. Remixing is not currently available for this app.</p>
               </section>
             </article>
 
             <aside id="runtime" class="side-stack">
-              <section v-if="app.isForkable" class="detail-card fork-panel">
+              <section v-if="app.canRemix" class="detail-card fork-panel">
                 <h3>Fork this app</h3>
                 <p>Create your own private editable copy, modify it with your AI coding tools, then publish your version when ready.</p>
                 <a :href="forkUrl" class="detail-button fork-action side-action" target="_blank" rel="noopener">

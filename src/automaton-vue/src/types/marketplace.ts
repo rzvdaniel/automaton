@@ -30,6 +30,7 @@ export type MarketplaceAppScreenshot = {
 }
 
 export type MarketplaceAppDetails = MarketplaceAppCard & {
+  canRemix: boolean
   relatedApps: MarketplaceAppCard[]
   forksAndRemixes: MarketplaceAppCard[]
 }

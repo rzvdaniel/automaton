@@ -1,5 +1,6 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Enums;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,14 @@ namespace Automaton.Studio.Server.Controllers;
 public class PublicMarketplaceController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly AppFileStorageService _appFileStorageService;
 
-    public PublicMarketplaceController(ApplicationDbContext dbContext)
+    public PublicMarketplaceController(
+        ApplicationDbContext dbContext,
+        AppFileStorageService appFileStorageService)
     {
         _dbContext = dbContext;
+        _appFileStorageService = appFileStorageService;
     }
 
     [HttpGet("apps")]
@@ -159,6 +164,16 @@ public class PublicMarketplaceController : ControllerBase
         {
             return NotFound(new { message = "App not found or not published" });
         }
+
+        var ownerUserId = await _dbContext.WebAppUsers
+            .AsNoTracking()
+            .Where(wu => wu.WebAppId == app.Id)
+            .Select(wu => (Guid?)wu.UserId)
+            .FirstOrDefaultAsync();
+
+        app.CanRemix = app.IsForkable &&
+            ownerUserId.HasValue &&
+            _appFileStorageService.AppSourceExists(ownerUserId.Value, app.Id);
 
         app.Screenshots = await _dbContext.WebAppScreenshots
             .AsNoTracking()
@@ -429,6 +444,7 @@ public class MarketplaceAppCardDto
 
 public class MarketplaceAppDetailsDto : MarketplaceAppCardDto
 {
+    public bool CanRemix { get; set; }
     public List<MarketplaceAppCardDto> RelatedApps { get; set; } = new();
     public List<MarketplaceAppCardDto> ForksAndRemixes { get; set; } = new();
 }

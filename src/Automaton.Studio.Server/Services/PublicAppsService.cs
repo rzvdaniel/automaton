@@ -77,12 +77,12 @@ public class PublicAppsService
             .ThenByDescending(w => w.StarCount)
             .ThenByDescending(w => w.ViewCount)
             .ThenByDescending(w => w.PublishedAt)
-            .Select(w => new PublicAppCard
+            .Select(w => new
             {
-                Id = w.Id,
-                Name = w.Name,
-                Summary = w.Summary,
-                Description = w.Description,
+                w.Id,
+                w.Name,
+                w.Summary,
+                w.Description,
                 ThumbnailUrl = w.ThumbnailUrl ??
                     dataContext.WebAppScreenshots
                         .Where(s => s.WebAppId == w.Id)
@@ -90,14 +90,13 @@ public class PublicAppsService
                         .ThenBy(s => s.CreatedAt)
                         .Select(s => s.ImageUrl)
                         .FirstOrDefault(),
-                Category = w.Category,
-                PublishedAt = w.PublishedAt,
-                AppUrl = BuildPublicAppUrl(w.PublicUrl),
-                PublicUrl = w.PublicUrl,
-                ViewCount = w.ViewCount,
-                IsFeatured = w.IsFeatured,
-                IsProfileFeatured = w.IsProfileFeatured,
-                StarCount = w.StarCount,
+                w.Category,
+                w.PublishedAt,
+                w.PublicUrl,
+                w.ViewCount,
+                w.IsFeatured,
+                w.IsProfileFeatured,
+                w.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value),
                 Screenshots = dataContext.WebAppScreenshots
@@ -115,7 +114,24 @@ public class PublicAppsService
             })
             .ToListAsync();
 
-        return apps;
+        return apps.Select(app => new PublicAppCard
+        {
+            Id = app.Id,
+            Name = app.Name,
+            Summary = app.Summary,
+            Description = app.Description,
+            ThumbnailUrl = app.ThumbnailUrl,
+            Category = app.Category,
+            PublishedAt = app.PublishedAt,
+            AppUrl = BuildPublicAppUrl(app.PublicUrl),
+            PublicUrl = app.PublicUrl,
+            ViewCount = app.ViewCount,
+            IsFeatured = app.IsFeatured,
+            IsProfileFeatured = app.IsProfileFeatured,
+            StarCount = app.StarCount,
+            IsStarredByCurrentUser = app.IsStarredByCurrentUser,
+            Screenshots = app.Screenshots
+        }).ToList();
     }
 
     /// <summary>
@@ -135,12 +151,12 @@ public class PublicAppsService
             .Where(wu => wu.UserId == user.Id && wu.WebAppId == appId)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
             .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
-            .Select(w => new PublicAppDetails
+            .Select(w => new
             {
-                Id = w.Id,
-                Name = w.Name,
-                Summary = w.Summary,
-                Description = w.Description,
+                w.Id,
+                w.Name,
+                w.Summary,
+                w.Description,
                 ThumbnailUrl = w.ThumbnailUrl ??
                     dataContext.WebAppScreenshots
                         .Where(s => s.WebAppId == w.Id)
@@ -148,15 +164,14 @@ public class PublicAppsService
                         .ThenBy(s => s.CreatedAt)
                         .Select(s => s.ImageUrl)
                         .FirstOrDefault(),
-                Category = w.Category,
-                Tags = w.Tags,
-                PublishedAt = w.PublishedAt,
-                AppUrl = BuildPublicAppUrl(w.PublicUrl),
-                PublicUrl = w.PublicUrl,
-                ViewCount = w.ViewCount,
-                IsFeatured = w.IsFeatured,
-                IsProfileFeatured = w.IsProfileFeatured,
-                StarCount = w.StarCount,
+                w.Category,
+                w.Tags,
+                w.PublishedAt,
+                w.PublicUrl,
+                w.ViewCount,
+                w.IsFeatured,
+                w.IsProfileFeatured,
+                w.StarCount,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     dataContext.WebAppStars.Any(s => s.WebAppId == w.Id && s.UserId == currentUserId.Value)
             })
@@ -164,7 +179,7 @@ public class PublicAppsService
 
         if (app != null)
         {
-            app.Screenshots = await dataContext.WebAppScreenshots
+            var screenshots = await dataContext.WebAppScreenshots
                 .Where(s => s.WebAppId == app.Id)
                 .OrderBy(s => s.SortOrder)
                 .ThenBy(s => s.CreatedAt)
@@ -176,9 +191,29 @@ public class PublicAppsService
                     SortOrder = s.SortOrder
                 })
                 .ToListAsync();
+
+            return new PublicAppDetails
+            {
+                Id = app.Id,
+                Name = app.Name,
+                Summary = app.Summary,
+                Description = app.Description,
+                ThumbnailUrl = app.ThumbnailUrl,
+                Category = app.Category,
+                Tags = app.Tags,
+                PublishedAt = app.PublishedAt,
+                AppUrl = BuildPublicAppUrl(app.PublicUrl),
+                PublicUrl = app.PublicUrl,
+                ViewCount = app.ViewCount,
+                IsFeatured = app.IsFeatured,
+                IsProfileFeatured = app.IsProfileFeatured,
+                StarCount = app.StarCount,
+                IsStarredByCurrentUser = app.IsStarredByCurrentUser,
+                Screenshots = screenshots
+            };
         }
 
-        return app;
+        return null;
     }
 
     /// <summary>

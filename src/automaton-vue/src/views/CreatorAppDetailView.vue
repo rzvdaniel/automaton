@@ -220,9 +220,9 @@ onMounted(loadPage)
 
 .product-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr);
-  gap: 16px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
   padding: 16px;
   background: rgba(22, 34, 49, 0.9);
   border: 1px solid rgba(103, 193, 245, 0.14);
@@ -280,12 +280,11 @@ onMounted(loadPage)
 }
 
 .hero-copy {
-  max-height: min(60vh, 560px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  overflow: auto;
+  min-width: 0;
   background: rgba(0, 0, 0, 0.18);
 }
 
