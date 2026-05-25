@@ -32,7 +32,6 @@ server {
     location ^~ /runtime/ {
         alias /var/www/automaton-app-runtime/;
         add_header Cache-Control "public, max-age=300" always;
-        try_files $uri =404;
     }
 
     location ~ ^/([^/]+)$ {
