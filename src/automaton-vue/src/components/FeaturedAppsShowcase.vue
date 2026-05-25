@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
+import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -79,14 +79,8 @@ function selectApp(app?: MarketplaceAppCard) {
   emit('select', app.id)
 }
 
-function playApp(app?: MarketplaceAppCard) {
+function viewApp(app?: MarketplaceAppCard) {
   if (!app) return
-
-  if (app.publicUrl) {
-    window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
-    return
-  }
-
   emit('select', app.id)
 }
 
@@ -154,9 +148,9 @@ onBeforeUnmount(stopRotation)
         <div class="creator-line">{{ activeMeta }}</div>
 
         <div class="feature-actions">
-          <button class="showcase-button primary" type="button" @click.stop="playApp(activeApp)">
-            <i class="pi pi-play"></i>
-            Play
+          <button class="showcase-button primary" type="button" @click.stop="viewApp(activeApp)">
+            <i class="pi pi-arrow-right"></i>
+            View app
           </button>
           <button v-if="activeApp.isForkable" class="showcase-button" type="button" @click.stop="forkApp(activeApp)">
             <i class="pi pi-copy"></i>

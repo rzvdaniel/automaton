@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FeaturedAppsShowcase from '@/components/FeaturedAppsShowcase.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
-import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
+import { publicAppConfig } from '@/config/publicAppConfig'
 import pacManImage from '@/assets/images/pac-man.png'
 import snakeImage from '@/assets/images/snake.png'
 import tetrisImage from '@/assets/images/tetris.png'
@@ -244,13 +244,8 @@ function openDetails(appId: string) {
   void router.push(`/apps/${appId}`)
 }
 
-function openLiveApp(app: MarketplaceAppCard) {
-  if (!app.publicUrl) {
-    openDetails(app.id)
-    return
-  }
-
-  window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
+function viewApp(app: MarketplaceAppCard) {
+  openDetails(app.id)
 }
 
 function forkApp(app: MarketplaceAppCard) {
@@ -413,9 +408,9 @@ watch(
                 </div>
 
                 <div class="app-actions" :class="{ 'app-actions-single': !app.isForkable }">
-                  <button class="button" type="button" @click.stop="openLiveApp(app)">
-                    <i class="pi pi-play" />
-                    {{ app.publicUrl ? 'Play' : 'Open' }}
+                  <button class="button" type="button" @click.stop="viewApp(app)">
+                    <i class="pi pi-arrow-right" />
+                    View app
                   </button>
                   <button
                     v-if="app.isForkable"
