@@ -4,7 +4,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FeaturedAppsShowcase from '@/components/FeaturedAppsShowcase.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
-import { publicAppConfig } from '@/config/publicAppConfig'
 import pacManImage from '@/assets/images/pac-man.png'
 import snakeImage from '@/assets/images/snake.png'
 import tetrisImage from '@/assets/images/tetris.png'
@@ -248,11 +247,6 @@ function viewApp(app: MarketplaceAppCard) {
   openDetails(app.id)
 }
 
-function forkApp(app: MarketplaceAppCard) {
-  if (!app.isForkable) return
-  window.open(`${publicAppConfig.studioUrl}apps/fork/${app.id}`, '_blank', 'noopener')
-}
-
 function refreshApps() {
   void loadApps()
 }
@@ -376,7 +370,6 @@ watch(
                 <div class="badge-row">
                   <span class="badge badge-live">Live app</span>
                   <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
-                  <span v-if="app.isForkable" class="badge">Forkable</span>
                 </div>
                 <h3 class="app-title">{{ app.name }}</h3>
                 <p class="app-summary">{{ app.summary || app.description || 'Open the detail page to explore the app.' }}</p>
@@ -403,26 +396,13 @@ watch(
 
                 <div class="app-meta-row" aria-label="App metadata">
                   <span><i class="pi pi-play" /> {{ pluralize(app.viewCount, 'play') }}</span>
-                  <span v-if="app.isForkable"><i class="pi pi-copy" /> {{ pluralize(app.forkCount, 'fork') }}</span>
                   <span>{{ updatedLabel(app) }}</span>
                 </div>
 
-                <div class="app-actions" :class="{ 'app-actions-single': !app.isForkable }">
+                <div class="app-actions app-actions-single">
                   <button class="button" type="button" @click.stop="viewApp(app)">
                     <i class="pi pi-arrow-right" />
-                    View app
-                  </button>
-                  <button
-                    v-if="app.isForkable"
-                    class="button ghost"
-                    type="button"
-                    title="Fork this app in Automaton Studio"
-                    @click.stop="forkApp(app)"
-                  >
-                    <svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                      <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />
-                    </svg>
-                    Fork
+                    Open app
                   </button>
                 </div>
               </div>

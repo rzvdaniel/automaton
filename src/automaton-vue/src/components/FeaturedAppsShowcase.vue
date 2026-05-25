@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -36,6 +35,13 @@ const activeMeta = computed(() => {
 
   const parts = [`by ${activeCreatorName.value}`, `${formatCount(app.viewCount)} views`]
   return parts.join(' · ')
+})
+
+const activeDescription = computed(() => {
+  const app = activeApp.value
+  if (!app) return ''
+
+  return app.summary || app.description || 'Open the detail page to explore the app.'
 })
 
 function creatorName(app?: MarketplaceAppCard) {
@@ -84,11 +90,6 @@ function viewApp(app?: MarketplaceAppCard) {
   emit('select', app.id)
 }
 
-function forkApp(app?: MarketplaceAppCard) {
-  if (!app) return
-  window.open(`${publicAppConfig.studioUrl}apps/fork/${app.id}`, '_blank', 'noopener')
-}
-
 function startRotation() {
   stopRotation()
   rotationId = window.setInterval(() => {
@@ -135,30 +136,29 @@ onBeforeUnmount(stopRotation)
       @keydown.enter.prevent="selectApp(activeApp)"
       @keydown.space.prevent="selectApp(activeApp)"
     >
-      <img v-if="imageUrl(activeApp)" :src="imageUrl(activeApp)" :alt="activeApp.name" />
-      <div v-else class="feature-fallback">{{ activeApp.name.charAt(0) }}</div>
+      <div class="feature-media">
+        <img v-if="imageUrl(activeApp)" :src="imageUrl(activeApp)" :alt="activeApp.name" />
+        <div v-else class="feature-fallback">{{ activeApp.name.charAt(0) }}</div>
+        <div class="feature-media-badges">
+          <span class="badge badge-live">Live app</span>
+        </div>
+      </div>
 
       <div class="feature-content">
-        <div class="badge-row">
-          <span class="badge badge-live">Live app</span>
-          <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+        <div class="feature-copy">
+          <div class="badge-row">
+            <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+          </div>
+
+          <h3>{{ activeApp.name }}</h3>
+          <p class="feature-description">{{ activeDescription }}</p>
+          <div class="creator-line">{{ activeMeta }}</div>
         </div>
 
-        <h3>{{ activeApp.name }}</h3>
-        <div class="creator-line">{{ activeMeta }}</div>
-
-        <div class="feature-actions">
+        <div class="feature-actions feature-actions-single">
           <button class="showcase-button primary" type="button" @click.stop="viewApp(activeApp)">
             <i class="pi pi-arrow-right"></i>
-            View app
-          </button>
-          <button v-if="activeApp.isForkable" class="showcase-button" type="button" @click.stop="forkApp(activeApp)">
-            <i class="pi pi-copy"></i>
-            Fork
-          </button>
-          <button class="showcase-button" type="button" @click.stop="selectApp(activeApp)">
-            <i class="pi pi-sparkles"></i>
-            Build similar
+            Open app
           </button>
         </div>
       </div>
@@ -232,25 +232,23 @@ onBeforeUnmount(stopRotation)
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  background: #111924;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(14, 20, 28, 0.98), rgba(9, 13, 19, 0.98));
   cursor: pointer;
 }
 
 .feature-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.72fr);
   height: 100%;
   min-height: 0;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
-.feature-card::after,
-.mini-feature::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0;
-  height: 66%;
-  background: linear-gradient(180deg, transparent, rgba(5, 7, 10, 0.04) 54%, rgba(5, 7, 10, 0.14));
-  pointer-events: none;
+.feature-media {
+  position: relative;
+  min-height: 0;
+  padding: 18px;
 }
 
 .feature-card img,
@@ -258,9 +256,20 @@ onBeforeUnmount(stopRotation)
   width: 100%;
   height: 100%;
   min-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   background: #080b10;
   opacity: 1;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.feature-media-badges {
+  position: absolute;
+  left: 32px;
+  bottom: 14px;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
 }
 
 .feature-fallback,
@@ -273,21 +282,24 @@ onBeforeUnmount(stopRotation)
 }
 
 .feature-content {
-  position: absolute;
-  z-index: 2;
-  inset: auto 0 0 0;
-  padding: 26px;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+  padding: 24px 24px 24px 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 100%;
 }
 
 .feature-content h3 {
   margin: 0 0 10px;
   max-width: 720px;
   color: #f5f7fb;
-  font-size: clamp(2.8rem, 4.6vw, 4rem);
+  font-size: clamp(2.35rem, 3.8vw, 3.4rem);
   font-weight: 800;
-  line-height: 0.92;
-  letter-spacing: -0.06em;
-  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
   text-wrap: balance;
 }
 
@@ -295,6 +307,7 @@ onBeforeUnmount(stopRotation)
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  margin-bottom: 12px;
 }
 
 .badge {
@@ -326,17 +339,34 @@ onBeforeUnmount(stopRotation)
 }
 
 .creator-line {
-  margin-bottom: 18px;
+  margin-top: 18px;
   color: #d4d9e2;
   font-size: 0.96rem;
-  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.feature-description {
+  max-width: 56ch;
+  margin: 0;
+  color: #aeb8c9;
+  font-size: 0.98rem;
+  line-height: 1.6;
 }
 
 .feature-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  align-self: end;
+}
+
+.feature-actions-single {
+  grid-template-columns: minmax(200px, 1fr);
+}
+
+.feature-actions .showcase-button.primary {
+  grid-column: 1 / -1;
 }
 
 .showcase-button {
@@ -345,14 +375,24 @@ onBeforeUnmount(stopRotation)
   justify-content: center;
   gap: 7px;
   min-height: 46px;
-  padding: 0 20px;
+  min-width: 0;
+  padding: 0 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: #11161d;
   color: #fff;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 800;
+  line-height: 1.15;
+  white-space: normal;
+  text-align: center;
   cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.showcase-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .showcase-button.primary {
@@ -446,6 +486,23 @@ onBeforeUnmount(stopRotation)
     grid-template-rows: auto;
   }
 
+  .feature-card {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    padding: 6px 22px 22px;
+    border-left: 0;
+    min-height: 0;
+  }
+
+  .feature-actions {
+    min-width: 0;
+  }
+
   .side-stack {
     grid-template-columns: 1fr 1fr;
     height: auto;
@@ -458,22 +515,42 @@ onBeforeUnmount(stopRotation)
     grid-template-columns: 1fr;
   }
 
-  .feature-card,
-  .feature-fallback {
-    min-height: 310px;
+  .feature-card {
+    border-radius: 18px;
+  }
+
+  .feature-media {
+    padding: 14px;
   }
 
   .feature-card img,
   .feature-fallback {
-    height: 310px;
+    min-height: 260px;
+    height: 260px;
+  }
+
+  .feature-media-badges {
+    left: 24px;
+    bottom: 10px;
   }
 
   .feature-content {
-    padding: 18px 14px;
+    gap: 18px;
+    padding: 4px 14px 16px;
   }
 
   .feature-content h3 {
-    font-size: 3rem;
+    font-size: clamp(1.9rem, 8vw, 2.5rem);
+    line-height: 0.98;
+  }
+
+  .feature-description {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .feature-actions {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>
