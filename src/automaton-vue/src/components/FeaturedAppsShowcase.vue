@@ -256,7 +256,8 @@ onBeforeUnmount(stopRotation)
   width: 100%;
   height: 100%;
   min-height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   background: #080b10;
   opacity: 1;
   border-radius: 16px;
