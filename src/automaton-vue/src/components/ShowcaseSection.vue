@@ -564,7 +564,9 @@ watch(
 .app-thumbnail {
   width: 100%;
   height: 240px;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  background: #05070d;
   display: block;
 }
 

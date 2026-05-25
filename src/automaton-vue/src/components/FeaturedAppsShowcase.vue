@@ -312,8 +312,8 @@ onBeforeUnmount(stopRotation)
 .feature-fallback {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center center;
+  object-fit: contain;
+  object-position: center;
   background: #080b10;
   opacity: 1;
   border-radius: 16px;

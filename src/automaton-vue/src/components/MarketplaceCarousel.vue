@@ -246,7 +246,8 @@ function openCreator(publicUsername: string) {
 }
 
 .market-carousel-compact .carousel-slide {
-  height: 390px;
+  height: 350px;
+  grid-template-columns: minmax(0, 1.75fr) minmax(340px, 0.9fr);
 }
 
 .carousel-main {
@@ -268,6 +269,7 @@ function openCreator(publicUsername: string) {
 
 .market-carousel-compact .carousel-main-media {
   height: 100%;
+  padding: 8px;
 }
 
 .carousel-main-media img,

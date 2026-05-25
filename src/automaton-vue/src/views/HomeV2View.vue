@@ -354,7 +354,7 @@ onMounted(() => {
 }
 
 .shell {
-  width: min(1260px, calc(100% - 40px));
+  width: min(1360px, calc(100% - 40px));
   margin: 0 auto;
 }
 
@@ -447,7 +447,7 @@ onMounted(() => {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.86fr) minmax(560px, 1.14fr);
+  grid-template-columns: minmax(0, 0.74fr) minmax(680px, 1.26fr);
   gap: 44px;
   align-items: center;
 }
@@ -603,8 +603,8 @@ h1 span:last-child {
 
 .featured-app {
   display: grid;
-  grid-template-columns: 1.28fr 0.72fr;
-  height: 410px;
+  grid-template-columns: minmax(0, 1.85fr) minmax(240px, 0.65fr);
+  height: 350px;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -613,13 +613,13 @@ h1 span:last-child {
 .featured-image {
   display: grid;
   place-items: center;
-  padding: 16px 18px;
+  padding: 1px 2px;
   background: #080b10;
 }
 
 .featured-image img {
-  width: min(100%, 520px);
-  max-height: 340px;
+  width: min(100%, 600px);
+  max-height: 318px;
   object-fit: contain;
   border-radius: 6px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
