@@ -25,7 +25,10 @@ const previewModes = ref([
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
 const publishedAppUrl = computed(() => {
   const publicUrl = editorStore.currentApp?.publicUrl?.trim()
-  return publicUrl ? `/web/${publicUrl}` : ''
+  if (!publicUrl) return ''
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin
+  return `${baseUrl.replace(/\/+$/, '')}/web/${publicUrl}`
 })
 const installMessage = computed(() =>
   publishedAppUrl.value
