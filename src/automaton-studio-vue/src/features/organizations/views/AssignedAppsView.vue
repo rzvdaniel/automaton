@@ -6,6 +6,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import { appsService } from '@/features/apps/services/apps.service'
 import type { App } from '@/features/apps/types/apps.types'
 import AppCoverPlaceholder from '@/features/apps/components/AppCoverPlaceholder.vue'
+import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 
 const apps = ref<App[]>([])
 const loading = ref(true)
@@ -41,7 +42,7 @@ function thumbnailSrc(app: App): string {
 
 function openApp(app: App) {
   if (app.publicUrl) {
-    window.open(app.publicUrl, '_blank')
+    window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
   }
 }
 </script>

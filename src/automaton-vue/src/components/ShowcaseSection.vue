@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FeaturedAppsShowcase from '@/components/FeaturedAppsShowcase.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
-import { publicAppConfig } from '@/config/publicAppConfig'
+import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
 import pacManImage from '@/assets/images/pac-man.png'
 import snakeImage from '@/assets/images/snake.png'
 import tetrisImage from '@/assets/images/tetris.png'
@@ -250,7 +250,7 @@ function openLiveApp(app: MarketplaceAppCard) {
     return
   }
 
-  window.open(`${publicAppConfig.studioUrl}web/${app.publicUrl}`, '_blank', 'noopener')
+  window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
 }
 
 function forkApp(app: MarketplaceAppCard) {

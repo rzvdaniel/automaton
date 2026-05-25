@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
 import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
+import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
 import type { MarketplaceAppDetails, PublicUserProfile } from '@/types/marketplace'
 
 const route = useRoute()
@@ -58,7 +58,7 @@ const tagList = computed(() =>
 )
 
 const launchUrl = computed(() =>
-  app.value?.publicUrl ? `${publicAppConfig.studioUrl}web/${app.value.publicUrl}` : null,
+  app.value?.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
 )
 
 const publishedLabel = computed(() => {

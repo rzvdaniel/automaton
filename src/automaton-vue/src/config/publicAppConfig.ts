@@ -18,16 +18,28 @@ const defaultStudioUrl = import.meta.env.DEV
   ? 'http://localhost:5173/'
   : 'https://studio.automaton.monster/'
 
+const defaultPublicAppsBaseUrl = import.meta.env.DEV
+  ? 'http://localhost:4173/'
+  : 'https://apps.automaton.monster/'
+
 const defaultApiBaseUrl = import.meta.env.DEV
   ? 'https://localhost:7091/'
   : 'https://api.automaton.monster/'
 
 const publicSiteUrl = ensureTrailingSlash(import.meta.env.VITE_PUBLIC_SITE_URL || defaultPublicSiteUrl)
 const studioUrl = ensureTrailingSlash(import.meta.env.VITE_STUDIO_URL || defaultStudioUrl)
+const publicAppsBaseUrl = trimTrailingSlash(import.meta.env.VITE_PUBLIC_APPS_BASE_URL || defaultPublicAppsBaseUrl)
 const apiBaseUrl = ensureTrailingSlash(import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl)
+
+export function getPublishedAppUrl(slug?: string | null): string {
+  const normalizedSlug = slug?.trim()
+  return normalizedSlug ? `${publicAppsBaseUrl}/${encodeURIComponent(normalizedSlug)}/` : ''
+}
+
 export const publicAppConfig = {
   publicSiteUrl,
   studioUrl,
+  publicAppsBaseUrl,
   docsUrl: joinUrl(publicSiteUrl, 'docs'),
   apiBaseUrl,
   llmsUrl: joinUrl(publicSiteUrl, 'llms.txt'),

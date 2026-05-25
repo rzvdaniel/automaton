@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { publicAppConfig } from '@/config/publicAppConfig'
+import { getPublishedAppUrl, publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -83,7 +83,7 @@ function playApp(app?: MarketplaceAppCard) {
   if (!app) return
 
   if (app.publicUrl) {
-    window.open(`${publicAppConfig.studioUrl}web/${app.publicUrl}`, '_blank', 'noopener')
+    window.open(getPublishedAppUrl(app.publicUrl), '_blank', 'noopener')
     return
   }
 
