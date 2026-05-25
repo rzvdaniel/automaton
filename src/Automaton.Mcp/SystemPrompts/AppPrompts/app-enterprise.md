@@ -142,7 +142,8 @@ Create `manifest.json` and link it in every HTML file:
 {
   "name": "App Name",
   "short_name": "App",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
@@ -154,7 +155,7 @@ Create `manifest.json` and link it in every HTML file:
 ```
 In every HTML `<head>`:
 ```html
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2563eb">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">

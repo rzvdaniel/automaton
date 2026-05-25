@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Automaton.Studio.Server.Config;
 using Microsoft.Extensions.Options;
 
@@ -18,14 +17,6 @@ public sealed record PublishedAppPackageMetadata(
 /// </summary>
 public class PublishedAppStorageService
 {
-    private static readonly Regex HeadCloseRegex = new("</head>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex OldAutomatonScriptRegex = new(
-        @"<script\b(?=[^>]*(?:id\s*=\s*[""']__automaton_api__[""']|src\s*=\s*[""'][^""']*(?:automaton-api|automaton-config)\.js[""']))[^>]*>(?:[\s\S]*?</script>)?",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex RootAbsoluteAssetRegex = new(
-        @"(?<attr>\b(?:src|href)\s*=\s*[""'])/(?!(?:/|api/|app-content/|app-thumbnails/|app-screenshots/|runtime/))(?<path>[^""'#?]+(?:[?#][^""']*)?)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
     private readonly IWebHostEnvironment environment;
     private readonly AppFileStorageService fileStorageService;
     private readonly PublishedAppsConfig config;
@@ -166,7 +157,8 @@ public class PublishedAppStorageService
     {
         var indexPath = Path.Combine(stagingPath, "index.html");
         var indexHtml = await File.ReadAllTextAsync(indexPath, cancellationToken);
-        await File.WriteAllTextAsync(indexPath, PrepareIndexHtml(indexHtml), cancellationToken);
+        ValidatePortableIndexHtml(indexHtml);
+        await File.WriteAllTextAsync(indexPath, InjectRuntimeScripts(indexHtml), cancellationToken);
 
         var configPath = Path.Combine(stagingPath, "automaton-config.js");
         await File.WriteAllTextAsync(configPath, CreateConfigScript(metadata), cancellationToken);
@@ -176,24 +168,26 @@ public class PublishedAppStorageService
         {
             await File.WriteAllTextAsync(manifestPath, CreateDefaultManifest(metadata), cancellationToken);
         }
+        else
+        {
+            await ValidatePortableManifestAsync(manifestPath, cancellationToken);
+        }
     }
 
-    private static string PrepareIndexHtml(string html)
+    private static string InjectRuntimeScripts(string html)
     {
-        var prepared = OldAutomatonScriptRegex.Replace(html, string.Empty);
-        prepared = RootAbsoluteAssetRegex.Replace(prepared, "${attr}${path}");
-
         const string runtimeScripts = """
     <script src="./automaton-config.js"></script>
     <script src="/runtime/automaton-api.js"></script>
 """;
 
-        if (HeadCloseRegex.IsMatch(prepared))
+        var headCloseIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+        if (headCloseIndex >= 0)
         {
-            return HeadCloseRegex.Replace(prepared, runtimeScripts + "</head>", 1);
+            return html.Insert(headCloseIndex, runtimeScripts);
         }
 
-        return runtimeScripts + prepared;
+        return runtimeScripts + html;
     }
 
     private string CreateConfigScript(PublishedAppPackageMetadata metadata)
@@ -229,6 +223,187 @@ public class PublishedAppStorageService
         return JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
     }
 
+    private static void ValidatePortableIndexHtml(string html)
+    {
+        if (ContainsAutomatonRuntimeReference(html))
+        {
+            throw new InvalidOperationException(
+                "Published app index.html must not include Automaton runtime scripts. " +
+                "Automaton injects automaton-config.js and /runtime/automaton-api.js at publish time.");
+        }
+
+        var invalidReferences = EnumerateHtmlReferences(html)
+            .Where(reference => IsRootRelativeLocalReference(reference.Value))
+            .Select(reference => $"{reference.Attribute}=\"{reference.Value}\"")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+
+        if (invalidReferences.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Published app index.html contains root-relative local URLs. " +
+                "Published apps are hosted under /{slug}/, so app-local assets and navigation must use relative URLs. " +
+                "For Vite, set base: './' in vite.config.ts. Offending references: " +
+                string.Join(", ", invalidReferences));
+        }
+    }
+
+    private static bool ContainsAutomatonRuntimeReference(string html) =>
+        html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase) ||
+        html.Contains("automaton-api.js", StringComparison.OrdinalIgnoreCase) ||
+        html.Contains("__automaton_api__", StringComparison.OrdinalIgnoreCase) ||
+        html.Contains("__AUTOMATON_APP__", StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<HtmlReference> EnumerateHtmlReferences(string html)
+    {
+        for (var i = 0; i < html.Length; i++)
+        {
+            var attribute = TryReadReferenceAttribute(html, i);
+            if (attribute is null)
+            {
+                continue;
+            }
+
+            var valueStart = SkipWhitespace(html, i + attribute.Length);
+            if (valueStart >= html.Length || html[valueStart] != '=')
+            {
+                continue;
+            }
+
+            valueStart = SkipWhitespace(html, valueStart + 1);
+            if (valueStart >= html.Length)
+            {
+                continue;
+            }
+
+            var quote = html[valueStart];
+            if (quote is '"' or '\'')
+            {
+                var valueEnd = html.IndexOf(quote, valueStart + 1);
+                if (valueEnd < 0)
+                {
+                    continue;
+                }
+
+                yield return new HtmlReference(attribute, html[(valueStart + 1)..valueEnd].Trim());
+                i = valueEnd;
+                continue;
+            }
+
+            var unquotedEnd = valueStart;
+            while (unquotedEnd < html.Length &&
+                !char.IsWhiteSpace(html[unquotedEnd]) &&
+                html[unquotedEnd] != '>')
+            {
+                unquotedEnd++;
+            }
+
+            if (unquotedEnd > valueStart)
+            {
+                yield return new HtmlReference(attribute, html[valueStart..unquotedEnd].Trim());
+                i = unquotedEnd;
+            }
+        }
+    }
+
+    private static string? TryReadReferenceAttribute(string html, int index)
+    {
+        if (MatchesAttributeName(html, index, "src"))
+        {
+            return "src";
+        }
+
+        return MatchesAttributeName(html, index, "href") ? "href" : null;
+    }
+
+    private static bool MatchesAttributeName(string html, int index, string attribute)
+    {
+        if (index > 0 && IsHtmlNameCharacter(html[index - 1]))
+        {
+            return false;
+        }
+
+        if (index + attribute.Length > html.Length ||
+            !html.AsSpan(index, attribute.Length).Equals(attribute.AsSpan(), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var nextIndex = index + attribute.Length;
+        return nextIndex >= html.Length || !IsHtmlNameCharacter(html[nextIndex]);
+    }
+
+    private static bool IsHtmlNameCharacter(char value) =>
+        char.IsLetterOrDigit(value) || value is '-' or '_' or ':';
+
+    private static int SkipWhitespace(string value, int index)
+    {
+        while (index < value.Length && char.IsWhiteSpace(value[index]))
+        {
+            index++;
+        }
+
+        return index;
+    }
+
+    private static bool IsRootRelativeLocalReference(string value)
+    {
+        var trimmed = value.Trim();
+        return trimmed.StartsWith("/", StringComparison.Ordinal) &&
+            !trimmed.StartsWith("//", StringComparison.Ordinal);
+    }
+
+    private static async Task ValidatePortableManifestAsync(string manifestPath, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(manifestPath);
+        using var manifest = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+        if (manifest.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("Published app manifest.webmanifest must be a JSON object.");
+        }
+
+        var invalidReferences = new List<string>();
+        AddInvalidManifestProperty(manifest.RootElement, "start_url", invalidReferences);
+        AddInvalidManifestProperty(manifest.RootElement, "scope", invalidReferences);
+
+        if (manifest.RootElement.TryGetProperty("icons", out var icons) && icons.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var icon in icons.EnumerateArray())
+            {
+                AddInvalidManifestProperty(icon, "src", invalidReferences);
+            }
+        }
+
+        if (invalidReferences.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Published app manifest.webmanifest contains root-relative URLs. " +
+                "Use relative URLs such as './' and './icons/icon-192.png'. Offending references: " +
+                string.Join(", ", invalidReferences.Distinct(StringComparer.OrdinalIgnoreCase).Take(10)));
+        }
+    }
+
+    private static void AddInvalidManifestProperty(
+        JsonElement element,
+        string propertyName,
+        ICollection<string> invalidReferences)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return;
+        }
+
+        var value = property.GetString() ?? string.Empty;
+        if (IsRootRelativeLocalReference(value))
+        {
+            invalidReferences.Add($"{propertyName}: {value}");
+        }
+    }
+
     private static bool IsBlockedPath(string relativePath)
     {
         var segments = relativePath
@@ -254,4 +429,6 @@ public class PublishedAppStorageService
 
         return fullPath;
     }
+
+    private readonly record struct HtmlReference(string Attribute, string Value);
 }

@@ -60,7 +60,7 @@ try {
 }
 ```
 
-For AI-generated local apps, always create a frontend build pipeline by default. Use Vite + vanilla TypeScript or JavaScript in `frontend/` unless the user asks for React, Vue, Angular, or another framework. The build output must go to `frontend/dist/`. Vite build output uses hashed assets, which reduces stale asset caching behind Cloudflare. Plain root HTML/CSS/JS is an explicit exception only; use it only when the user directly asks for a no-build static app.
+For AI-generated local apps, always create a frontend build pipeline by default. Use Vite + vanilla TypeScript or JavaScript in `frontend/` unless the user asks for React, Vue, Angular, or another framework. The build output must go to `frontend/dist/`. Vite build output uses hashed assets, which reduces stale asset caching behind Cloudflare. Configure Vite with `base: './'` so published app assets remain relative under `apps.automaton.monster/{slug}/`. Plain root HTML/CSS/JS is an explicit exception only; use it only when the user directly asks for a no-build static app.
 
 ## Frontend asset versioning
 
@@ -76,8 +76,9 @@ Rules:
 - `index.html` may keep a stable filename.
 - CSS, JS, images, fonts, manifests, and worker files should use content-hashed filenames when the build system supports it.
 - Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
+- Do not emit root-relative app-local paths such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`. Published apps live under a slug path and these URLs will fail publish validation.
 - Do not manually append random `?v=` query strings in source code unless there is no build system available.
-- For Vite apps, keep the default hashed asset output.
+- For Vite apps, keep the default hashed asset output and set `base: './'` in `vite.config.ts`.
 - Set `frontend.deployDir` to the final build output, normally `frontend/dist`.
 
 Responsibility boundary:

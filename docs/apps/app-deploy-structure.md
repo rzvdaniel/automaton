@@ -72,6 +72,7 @@ my-app/
 
 Why this is the default:
 - Vite gives hashed asset filenames, which reduces stale CSS/JS behind Cloudflare.
+- Vite can emit relative app-local URLs with `base: './'`, which is required for slug-hosted published apps.
 - Public runtime is a clean build artifact from `frontend/dist/`.
 - Backend runtime is packaged separately, so frontend output does not need to contain backend files.
 
@@ -81,6 +82,8 @@ For build-based apps:
 - `index.html` may keep a stable filename.
 - CSS, JS, images, fonts, manifests, and worker files should use hashed filenames when the build system supports it.
 - Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
+- Do not emit root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`.
+- Published app validation rejects root-relative app-local URLs. For Vite, set `base: './'` in `frontend/vite.config.ts`.
 - Do not rely on Automaton Studio mutating app HTML to add `?v=` cache-busting.
 - Automaton is responsible for cache headers, CORS headers, and runtime asset serving.
 

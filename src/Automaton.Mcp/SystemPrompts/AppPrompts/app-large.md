@@ -51,7 +51,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared t
     <span class="font-bold text-lg">App Name</span>
   </div>
   <nav class="flex-1 px-3 py-4 space-y-1">
-    <a href="/" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-sm">Dashboard</a>
+    <a href="./" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-sm">Dashboard</a>
   </nav>
 </aside>
 ```
@@ -105,7 +105,8 @@ Add PWA support for installable apps. Create `manifest.json`:
 {
   "name": "App Name",
   "short_name": "App",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",

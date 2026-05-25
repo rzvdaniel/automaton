@@ -126,18 +126,33 @@ window.__AUTOMATON_APP__ = {
 };
 ```
 
-7. Ensure `index.html` loads the runtime config and SDK.
+7. Validate that `index.html` is portable for slug hosting:
+
+```text
+No existing Automaton runtime scripts
+No root-relative app-local src/href values such as /assets/..., /manifest.webmanifest, /favicon.ico, or /
+```
+
+Vite apps must set:
+
+```ts
+export default defineConfig({
+  base: './'
+})
+```
+
+8. Ensure `index.html` loads the runtime config and SDK.
 
 Preferred publish-time injection:
 
 ```html
-<script src="/runtime/automaton-api.js"></script>
 <script src="./automaton-config.js"></script>
+<script src="/runtime/automaton-api.js"></script>
 ```
 
-8. Ensure `manifest.webmanifest` exists. If the app did not provide one, generate a minimal manifest from app metadata.
-9. Atomically replace `published-apps/{slug}` with the staging directory.
-10. Update the database:
+9. Ensure `manifest.webmanifest` exists. If the app did not provide one, generate a minimal manifest from app metadata. If the app provides one, validate that `start_url`, `scope`, and icon `src` values are not root-relative.
+10. Atomically replace `published-apps/{slug}` with the staging directory.
+11. Update the database:
 
 ```text
 IsPublished = true
@@ -146,9 +161,9 @@ PublishedAt = now
 Version = Version + 1
 ```
 
-11. Log publish activity.
+12. Log publish activity.
 
-Do not rewrite HTML on every request. Any required HTML/config patching happens at publish time.
+Do not rewrite HTML on every request. Publish may inject platform runtime scripts, but it must not rewrite app-owned asset/navigation URLs. Invalid builds should fail publish with a clear validation error.
 
 ## Unpublish Flow
 

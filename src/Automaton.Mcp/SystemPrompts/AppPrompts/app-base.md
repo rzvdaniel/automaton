@@ -26,6 +26,8 @@ Automaton separates editable source from deployed live files and keeps frontend/
 - Use a frontend build pipeline by default, and deploy only `frontend/dist` as public live output.
 - Use plain root HTML/CSS/JS only when the user explicitly asks for a no-build static app, and configure `"frontend": { "deployDir": "." }`.
 - For Vite apps, configure `"frontend": { "build": "cd frontend && npm install && npm run build", "deployDir": "frontend/dist" }`.
+- For Vite apps, set `base: './'` in `frontend/vite.config.ts`; published app assets must be relative because apps are served under `apps.automaton.monster/{slug}/`.
+- Do not hardcode root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them.
 - Do not put secrets, `.env`, backend files, source folders, `package.json`, or Vite config into public frontend live files.
 
 **Use separate `.html` files** when pages have distinct purposes and users would naturally navigate between them (home, dashboard, product detail, settings). Each distinct page = its own file. Users can bookmark or link directly to it.

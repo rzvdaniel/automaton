@@ -91,12 +91,23 @@ Rules:
 - Keep the app framework-free unless the user asked for React or Vue.
 - Use Vite for modules, development workflow, and build output.
 - Build to `frontend/dist/` and set `frontend.build` and `frontend.deployDir` in `automaton.json`.
+- Set `base: './'` in `frontend/vite.config.ts` so the published build uses relative asset URLs under `apps.automaton.monster/{slug}/`.
+- Do not hardcode root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them.
 - Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Treat the build pipeline as required for AI-generated local apps.
 - Do not put source files, `package.json`, or Vite config into runtime.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 
 Example:
+
+```ts
+// frontend/vite.config.ts
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  base: './'
+})
+```
 
 ```json
 {

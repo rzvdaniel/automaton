@@ -61,7 +61,7 @@ Build **polished, professional UIs** — never plain unstyled HTML. All shared d
 <nav class="bg-slate-900 border-b border-slate-700">
   <div class="max-w-5xl mx-auto px-6 py-4 flex items-center gap-6">
     <span class="text-white font-bold text-lg">App Name</span>
-    <a href="/" class="text-slate-300 hover:text-white text-sm transition-colors">Home</a>
+    <a href="./" class="text-slate-300 hover:text-white text-sm transition-colors">Home</a>
   </div>
 </nav>
 ```
