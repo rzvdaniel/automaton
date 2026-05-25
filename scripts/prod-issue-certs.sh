@@ -51,6 +51,7 @@ CERTBOT_ARGS=(
     -d "www.$WEBSITE_DOMAIN"
     -d "$API_DOMAIN"
     -d "$STUDIO_DOMAIN"
+    -d "$APPS_DOMAIN"
 )
 
 if [[ "$FORCE_RENEWAL" == "true" ]]; then
@@ -59,7 +60,7 @@ else
     CERTBOT_ARGS+=(--keep-until-expiring)
 fi
 
-echo "[INFO] Requesting certificate bundle '$CERT_NAME' for $WEBSITE_DOMAIN, www.$WEBSITE_DOMAIN, $API_DOMAIN, and $STUDIO_DOMAIN"
+echo "[INFO] Requesting certificate bundle '$CERT_NAME' for $WEBSITE_DOMAIN, www.$WEBSITE_DOMAIN, $API_DOMAIN, $STUDIO_DOMAIN, and $APPS_DOMAIN"
 remove_bootstrap_placeholder_certificate
 
 if ! docker compose -f "$COMPOSE_FILE" "${CERTBOT_ARGS[@]}"; then

@@ -10,6 +10,7 @@ import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
 import WelcomeSection from './WelcomeSection.vue'
 import { getUserAiApiKeys } from '@/shared/services/ai/ai-providers-service'
+import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 
 const router = useRouter()
 const toast = useToast()
@@ -68,7 +69,7 @@ const formatTimeAgo = (dateString: string): string => {
 // Copy URL to clipboard
 const copyPublicUrl = async (url: string) => {
   try {
-    const fullUrl = `${window.location.origin}/web/${url}`
+    const fullUrl = getPublishedAppUrl(url)
     await navigator.clipboard.writeText(fullUrl)
     toast.add({
       severity: 'success',
@@ -88,7 +89,7 @@ const copyPublicUrl = async (url: string) => {
 
 // Open published app in new tab
 const openPublishedApp = (url: string) => {
-  window.open(`/web/${url}`, '_blank')
+  window.open(getPublishedAppUrl(url), '_blank')
 }
 
 // Apps display text
@@ -357,7 +358,7 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
               >
                 <div class="published-app-info" @click="openPublishedApp(app.publicUrl)">
                   <span class="published-app-name">{{ app.name }}</span>
-                  <span class="published-app-url">/web/{{ app.publicUrl }}</span>
+                  <span class="published-app-url">{{ getPublishedAppUrl(app.publicUrl) }}</span>
                 </div>
                 <div class="published-app-actions">
                   <span v-if="app.viewCount > 0" class="published-app-views">

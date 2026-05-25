@@ -80,7 +80,7 @@ public sealed class PublishService
 
             if (!yes)
             {
-                Console.Write($"Publish '{appConfig.Name}' at /web/{resolvedSlug}? [y/N]: ");
+                Console.Write($"Publish '{appConfig.Name}' at {BuildPublishedUrl(server!, resolvedSlug)}? [y/N]: ");
                 var confirmation = Console.ReadLine()?.Trim();
                 if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
@@ -160,7 +160,30 @@ public sealed class PublishService
 
     private static string BuildPublishedUrl(string server, string slug)
     {
-        return $"{server.TrimEnd('/')}/web/{slug}";
+        var configuredAppsBaseUrl = Environment.GetEnvironmentVariable("AUTOMATON_APPS_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(configuredAppsBaseUrl))
+        {
+            return $"{configuredAppsBaseUrl.TrimEnd('/')}/{slug}/";
+        }
+
+        if (Uri.TryCreate(server, UriKind.Absolute, out var serverUri))
+        {
+            var host = serverUri.Host;
+            if (host.StartsWith("api.", StringComparison.OrdinalIgnoreCase))
+            {
+                var appsHost = "apps." + host["api.".Length..];
+                var builder = new UriBuilder(serverUri)
+                {
+                    Host = appsHost,
+                    Path = slug,
+                    Query = string.Empty,
+                    Fragment = string.Empty
+                };
+                return builder.Uri.ToString().TrimEnd('/') + "/";
+            }
+        }
+
+        return $"{server.TrimEnd('/')}/{slug}/";
     }
 
     private static string Slugify(string? value)

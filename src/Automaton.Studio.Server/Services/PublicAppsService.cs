@@ -1,7 +1,9 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
+using Automaton.Studio.Server.Config;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -11,13 +13,16 @@ namespace Automaton.Studio.Server.Services;
 public class PublicAppsService
 {
     private readonly ApplicationDbContext dataContext;
+    private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly ILogger<PublicAppsService> logger;
 
     public PublicAppsService(
         ApplicationDbContext dataContext,
+        IOptions<PublishedAppsConfig> publishedAppsConfig,
         ILogger<PublicAppsService> logger)
     {
         this.dataContext = dataContext;
+        this.publishedAppsConfig = publishedAppsConfig.Value;
         this.logger = logger;
     }
 
@@ -87,7 +92,7 @@ public class PublicAppsService
                         .FirstOrDefault(),
                 Category = w.Category,
                 PublishedAt = w.PublishedAt,
-                AppUrl = $"/web/{w.PublicUrl}",
+                AppUrl = BuildPublicAppUrl(w.PublicUrl),
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
                 IsFeatured = w.IsFeatured,
@@ -146,7 +151,7 @@ public class PublicAppsService
                 Category = w.Category,
                 Tags = w.Tags,
                 PublishedAt = w.PublishedAt,
-                AppUrl = $"/web/{w.PublicUrl}",
+                AppUrl = BuildPublicAppUrl(w.PublicUrl),
                 PublicUrl = w.PublicUrl,
                 ViewCount = w.ViewCount,
                 IsFeatured = w.IsFeatured,
@@ -183,6 +188,13 @@ public class PublicAppsService
     {
         return await dataContext.Users
             .AnyAsync(u => u.UserName != null && u.UserName.ToLower() == username.ToLower());
+    }
+
+    private string BuildPublicAppUrl(string? slug)
+    {
+        return string.IsNullOrWhiteSpace(slug)
+            ? string.Empty
+            : $"{publishedAppsConfig.PublicBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(slug.Trim())}/";
     }
 }
 

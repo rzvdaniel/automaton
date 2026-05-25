@@ -45,6 +45,7 @@ import {
   UiAutomationAction,
   type UiAutomationResult,
 } from '../services/preview-automation-bridge'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const route = useRoute()
 const router = useRouter()
@@ -658,7 +659,7 @@ async function handlePublish(request: PublishAppRequest) {
     toast.add({
       severity: 'success',
       summary: 'Published',
-      detail: `App published at /web/${request.publicUrl}`,
+      detail: `App published at ${getPublishedAppUrl(request.publicUrl)}`,
       life: 5000,
     })
   } catch (err: unknown) {
@@ -681,7 +682,7 @@ function openPublishedApp() {
     return
   }
 
-  window.open(`/web/${editorStore.publicUrl}`, '_blank', 'noopener')
+  window.open(getPublishedAppUrl(editorStore.publicUrl), '_blank', 'noopener')
 }
 
 // Handle unpublish

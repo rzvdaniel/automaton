@@ -12,6 +12,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import apiClient from '@/shared/services/api/axios-instance'
+import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 
 interface MarketplaceApp {
   id: string
@@ -151,7 +152,7 @@ function isSavingApp(appId: string): boolean {
 }
 
 function appHref(app: MarketplaceApp): string | null {
-  return app.publicUrl?.trim() ? `/web/${app.publicUrl}` : null
+  return app.publicUrl?.trim() ? getPublishedAppUrl(app.publicUrl) : null
 }
 
 function appInitials(name: string): string {

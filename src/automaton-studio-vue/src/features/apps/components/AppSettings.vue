@@ -20,6 +20,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
+import { getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -165,8 +166,7 @@ const hasChanges = computed(() => {
 
 const fullPublicUrl = computed(() => {
   if (!publicUrl.value) return ''
-  const baseUrl = window.location.origin
-  return `${baseUrl}/web/${publicUrl.value}`
+  return getPublishedAppUrl(publicUrl.value)
 })
 
 // Initialize form from app data
@@ -670,7 +670,7 @@ async function handleSaveTemplateStatus() {
               <div class="flex flex-column gap-2">
                 <label for="public-url" class="font-medium">Public URL Slug</label>
                 <div class="p-inputgroup url-inputgroup">
-                  <span class="p-inputgroup-addon">/web/</span>
+                  <span class="p-inputgroup-addon">{{ getPublicAppsBaseUrl() }}/</span>
                   <InputText
                     id="public-url"
                     v-model="publicUrl"

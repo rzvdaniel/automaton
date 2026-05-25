@@ -10,6 +10,7 @@ import SelectButton from 'primevue/selectbutton'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { PreviewMode } from '../types/apps.types'
 import { PREVIEW_SIZES } from '../types/apps.types'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const editorStore = useAppEditorStore()
 const iframeRef = ref<HTMLIFrameElement>()
@@ -27,8 +28,7 @@ const publishedAppUrl = computed(() => {
   const publicUrl = editorStore.currentApp?.publicUrl?.trim()
   if (!publicUrl) return ''
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin
-  return `${baseUrl.replace(/\/+$/, '')}/web/${publicUrl}`
+  return getPublishedAppUrl(publicUrl)
 })
 const installMessage = computed(() =>
   publishedAppUrl.value

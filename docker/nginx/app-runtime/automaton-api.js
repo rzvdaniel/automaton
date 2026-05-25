@@ -1,0 +1,125 @@
+(function () {
+  const config = window.__AUTOMATON_APP__ || {};
+  const appSlug = String(config.slug || '').trim();
+  const apiBaseUrl = String(config.apiBaseUrl || '').replace(/\/+$/, '');
+
+  if (!appSlug) {
+    console.warn('Automaton app slug is not configured.');
+  }
+
+  async function apiCall(path, method, body) {
+    if (!apiBaseUrl) {
+      throw new Error('Automaton API base URL is not configured.');
+    }
+
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json()
+      : await response.text();
+
+    if (!response.ok) {
+      const message = typeof payload === 'string'
+        ? payload
+        : payload?.message || payload?.error || `Automaton API request failed (${response.status})`;
+      throw new Error(message);
+    }
+
+    return payload;
+  }
+
+  async function executeFlow(flowIdentifier, { inputs = {}, runnerNames = null } = {}) {
+    return apiCall(
+      `/api/web-apps/${encodeURIComponent(appSlug)}/flows/${encodeURIComponent(flowIdentifier)}/execute`,
+      'POST',
+      { inputs, runnerNames },
+    );
+  }
+
+  async function executeController(controllerName, actionName, { inputs = {}, runnerNames = null } = {}) {
+    return apiCall(
+      `/api/web-apps/${encodeURIComponent(appSlug)}/controllers/${encodeURIComponent(controllerName)}/actions/${encodeURIComponent(actionName)}/execute`,
+      'POST',
+      { inputs, runnerNames },
+    );
+  }
+
+  async function callController(controllerName, actionName, inputs = {}) {
+    const res = await executeController(controllerName, actionName, { inputs });
+    if (!res.success) {
+      throw new Error(res.error || 'Request failed');
+    }
+
+    return res.data;
+  }
+
+  async function uploadFile(file, { runnerNames = null } = {}) {
+    if (!apiBaseUrl) {
+      throw new Error('Automaton API base URL is not configured.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (runnerNames) {
+      formData.append('runnerNames', JSON.stringify(runnerNames));
+    }
+
+    const response = await fetch(`${apiBaseUrl}/api/web-apps/${encodeURIComponent(appSlug)}/files/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`File upload failed (${response.status})`);
+    }
+
+    return response.json();
+  }
+
+  function getDownloadUrl(sessionId) {
+    if (!apiBaseUrl) {
+      throw new Error('Automaton API base URL is not configured.');
+    }
+
+    return `${apiBaseUrl}/api/web-apps/${encodeURIComponent(appSlug)}/files/${encodeURIComponent(sessionId)}`;
+  }
+
+  async function downloadFile(sessionId, filename) {
+    const response = await fetch(getDownloadUrl(sessionId), {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const disposition = response.headers.get('content-disposition') || '';
+    const name = filename || disposition.match(/filename="?([^";\n]+)/i)?.[1] || 'download';
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = name;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+  }
+
+  window.automatonApi = {
+    config,
+    executeFlow,
+    callController,
+    uploadFile,
+    downloadFile,
+    getDownloadUrl,
+    getAppId: () => config.appId || null,
+    getAppSlug: () => appSlug || null,
+    getBaseUrl: () => apiBaseUrl,
+  };
+})();

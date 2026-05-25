@@ -8,10 +8,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
 ENV_FILE="$REPO_ROOT/.env"
 NGINX_TEMPLATE_DIR="$REPO_ROOT/docker/nginx/prod"
+APP_RUNTIME_SOURCE_DIR="$REPO_ROOT/docker/nginx/app-runtime"
 RUNTIME_ROOT="$REPO_ROOT/.prod-runtime"
 NGINX_RUNTIME_DIR="$RUNTIME_ROOT/nginx"
 NGINX_CONF_DIR="$NGINX_RUNTIME_DIR/conf.d"
 NGINX_UPSTREAMS_DIR="$NGINX_RUNTIME_DIR/upstreams"
+NGINX_APP_RUNTIME_DIR="$NGINX_RUNTIME_DIR/app-runtime"
 STATE_DIR="$NGINX_RUNTIME_DIR/state"
 STATE_FILE="$STATE_DIR/blue-green-state.env"
 CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
@@ -23,7 +25,7 @@ LIVE_WEBSITE_COLOR_DEFAULT="blue"
 BOOTSTRAP_UPSTREAM_HOST="127.0.0.1"
 
 ensure_runtime_dirs() {
-    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR"
+    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$NGINX_APP_RUNTIME_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR"
 }
 
 ensure_env_file() {
@@ -44,6 +46,7 @@ load_prod_env() {
     : "${API_DOMAIN:?API_DOMAIN is required in .env}"
     : "${STUDIO_DOMAIN:?STUDIO_DOMAIN is required in .env}"
     : "${WEBSITE_DOMAIN:?WEBSITE_DOMAIN is required in .env}"
+    : "${APPS_DOMAIN:?APPS_DOMAIN is required in .env}"
     : "${ACME_EMAIL:?ACME_EMAIL is required in .env}"
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
@@ -91,6 +94,7 @@ render_template() {
         -e "s|__API_DOMAIN__|$API_DOMAIN|g" \
         -e "s|__STUDIO_DOMAIN__|$STUDIO_DOMAIN|g" \
         -e "s|__WEBSITE_DOMAIN__|$WEBSITE_DOMAIN|g" \
+        -e "s|__APPS_DOMAIN__|$APPS_DOMAIN|g" \
         -e "s|__CERT_NAME__|$CERT_NAME|g" \
         "$template_file" > "$destination_file"
 }
@@ -153,6 +157,8 @@ render_nginx_runtime() {
     render_template "$NGINX_TEMPLATE_DIR/conf.d/api.conf.template" "$NGINX_CONF_DIR/api.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/studio.conf.template" "$NGINX_CONF_DIR/studio.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/website.conf.template" "$NGINX_CONF_DIR/website.conf"
+    render_template "$NGINX_TEMPLATE_DIR/conf.d/apps.conf.template" "$NGINX_CONF_DIR/apps.conf"
+    cp "$APP_RUNTIME_SOURCE_DIR/automaton-api.js" "$NGINX_APP_RUNTIME_DIR/automaton-api.js"
 
     if [[ -f "$STATE_FILE" ]]; then
         render_all_upstreams
@@ -178,7 +184,7 @@ ensure_placeholder_certificate() {
         -keyout "$privkey" \
         -out "$fullchain" \
         -subj "/CN=$WEBSITE_DOMAIN" \
-        -addext "subjectAltName=DNS:$WEBSITE_DOMAIN,DNS:www.$WEBSITE_DOMAIN,DNS:$API_DOMAIN,DNS:$STUDIO_DOMAIN" \
+        -addext "subjectAltName=DNS:$WEBSITE_DOMAIN,DNS:www.$WEBSITE_DOMAIN,DNS:$API_DOMAIN,DNS:$STUDIO_DOMAIN,DNS:$APPS_DOMAIN" \
         > /dev/null 2>&1
 
     printf 'bootstrap\n' > "$marker"
@@ -365,6 +371,10 @@ verify_live_origin() {
             exit 1
             ;;
     esac
+}
+
+verify_app_host_origin() {
+    curl -kIfsS --resolve "$APPS_DOMAIN:443:127.0.0.1" "https://$APPS_DOMAIN/runtime/automaton-api.js" > /dev/null
 }
 
 switch_live_color() {

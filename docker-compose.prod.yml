@@ -12,7 +12,7 @@ name: automaton-prod
 #   4. Use ./scripts/prod-redeploy-all.sh for normal blue/green deploys
 #
 # Cloudflare guidance:
-#   - keep @, www, api, and studio proxied once the stack is live
+#   - keep @, www, api, studio, and apps proxied once the stack is live
 #   - set SSL/TLS mode to Full (strict)
 #   - nginx uses static upstream selector files instead of dynamic Docker discovery
 
@@ -28,6 +28,7 @@ x-api-common: &api-common
     ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD};
   volumes:
     - prod-api-appdata:/app/AppData
+    - prod-published-apps:/app/AppData/published-apps
     - prod-api-logs:/app/Logs
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
     - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
@@ -52,6 +53,7 @@ x-studio-common: &studio-common
       VITE_APP_TITLE: Automaton Studio
       VITE_ENABLE_MOCK_API: "false"
       VITE_SUBSCRIPTIONS_ENABLED: "true"
+      VITE_PUBLIC_APPS_BASE_URL: https://${APPS_DOMAIN:?APPS_DOMAIN is required in .env}
   image: automaton-prod-studio:latest
   restart: unless-stopped
   networks:
@@ -90,6 +92,8 @@ services:
       - ./.prod-runtime/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./.prod-runtime/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./.prod-runtime/nginx/upstreams:/etc/nginx/upstreams:ro
+      - ./.prod-runtime/nginx/app-runtime:/var/www/automaton-app-runtime:ro
+      - prod-published-apps:/var/www/automaton-apps:ro
       - ./.prod-runtime/certbot-www:/var/www/certbot:ro
       - ./.prod-runtime/letsencrypt:/etc/letsencrypt:ro
     networks:
@@ -150,6 +154,7 @@ services:
 volumes:
   prod-mysql-data:
   prod-api-appdata:
+  prod-published-apps:
   prod-api-logs:
 
 networks:

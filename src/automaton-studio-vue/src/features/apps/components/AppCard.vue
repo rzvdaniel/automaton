@@ -13,6 +13,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 
 interface Props {
   app: App
@@ -84,7 +85,7 @@ const handleEdit = () => {
 
 const handleView = () => {
   if (props.app.isPublished && props.app.publicUrl) {
-    window.open(`/web/${props.app.publicUrl}`, '_blank')
+    window.open(getPublishedAppUrl(props.app.publicUrl), '_blank')
   }
 }
 

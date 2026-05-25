@@ -10,7 +10,6 @@ public class AppsController : BaseController
 {
     private readonly AppsService appsService;
     private readonly AppStepsService appStepsService;
-    private readonly UserImpersonationServiceFactory<AppsService> appsServiceFactory;
     private readonly ILogger<AppsController> logger;
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly GitHubService? githubService;
@@ -23,7 +22,6 @@ public class AppsController : BaseController
     public AppsController(
         AppsService appsService,
         AppStepsService appStepsService,
-        UserImpersonationServiceFactory<AppsService> appsServiceFactory,
         ILogger<AppsController> logger,
         IWebHostEnvironment webHostEnvironment,
         UserContextService userContextService,
@@ -35,7 +33,6 @@ public class AppsController : BaseController
     {
         this.appsService = appsService;
         this.appStepsService = appStepsService;
-        this.appsServiceFactory = appsServiceFactory;
         this.logger = logger;
         this.webHostEnvironment = webHostEnvironment;
         this.githubService = githubService;
@@ -257,78 +254,6 @@ public class AppsController : BaseController
         {
             logger.LogError(ex, "[AppsController] Error importing app archive {FileName}", file?.FileName);
             return StatusCode(500, new { message = "Failed to import app" });
-        }
-    }
-
-    /// <summary>
-    /// Get published app by public URL slug.
-    /// Used by WebAppViewer to load apps accessed via /web/{slug} URLs.
-    /// Validates authentication requirements and loads app as the owner.
-    /// </summary>
-    [HttpGet("slug/{slug}")]
-    [AllowAnonymous] // We check authentication ourselves based on app settings
-    public async Task<ActionResult<Models.AppModel>> GetBySlug(string slug)
-    {
-        try
-        {
-            logger.LogInformation("[AppsController] Loading app by slug: {Slug}", slug);
-
-            // 1. Get published app metadata (without requiring ownership)
-            var appInfo = await appsService.GetPublishedAppInfoAsync(slug);
-
-            if (appInfo == null)
-            {
-                logger.LogWarning("[AppsController] App not found or not published: {Slug}", slug);
-
-                return NotFound(new { message = "App not found or not published" });
-            }
-
-            // 2. Check authentication requirements
-            var isUserAuthenticated = User.Identity?.IsAuthenticated ?? false;
-            var viewerName = User.Identity?.Name ?? "Anonymous";
-
-            if (appInfo.RequiresAuthentication && !isUserAuthenticated)
-            {
-                logger.LogWarning("[AppsController] Unauthenticated access to protected app: {AppName} (slug: {Slug})",
-                    appInfo.Name, slug);
-
-                return Unauthorized(new { message = "This app requires authentication" });
-            }
-
-            // 3. Validate app has owner
-            if (appInfo.OwnerId == null)
-            {
-                logger.LogError("[AppsController] App has no owner: {AppName} (slug: {Slug})",
-                    appInfo.Name, slug);
-
-                return StatusCode(500, new { message = "App configuration error: no owner" });
-            }
-
-            // 4. Log access for traceability and security auditing
-            logger.LogInformation(
-                "[AppsController] App access: Slug={Slug}, AppId={AppId}, AppName={AppName}, " +
-                "Owner={OwnerId}, Viewer={Viewer}, Authenticated={IsAuth}, RequiresAuth={RequiresAuth}",
-                slug, appInfo.Id, appInfo.Name, appInfo.OwnerId, viewerName,
-                isUserAuthenticated, appInfo.RequiresAuthentication);
-
-            // 5. Load app as owner (with impersonation)
-            var ownerAppsService = appsServiceFactory.CreateForUser(appInfo.OwnerId.Value);
-            var app = ownerAppsService.Get(appInfo.Id);
-
-            if (app == null)
-            {
-                logger.LogError("[AppsController] Failed to load app as owner: {AppId}", appInfo.Id);
-                return NotFound(new { message = "App not found" });
-            }
-
-            logger.LogInformation("[AppsController] Successfully loaded app: {AppName} (ID: {AppId})", app.Name, app.Id);
-
-            return Ok(app);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "[AppsController] Error loading app by slug: {Slug}", slug);
-            return StatusCode(500, new { message = "An error occurred while loading the app" });
         }
     }
 

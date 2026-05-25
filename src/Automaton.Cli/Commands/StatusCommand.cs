@@ -61,7 +61,7 @@ public static class StatusCommand
                         : null;
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
-                var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? $"{server}/web/{publicUrl}" : null;
+                var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? BuildPublishedUrl(server!, publicUrl) : null;
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
                 var statusResult = new CommandDiagnosticResult { Success = true, Summary = "Status loaded", Checks = checks, NextSteps = [] };
 
@@ -141,5 +141,29 @@ public static class StatusCommand
         return Directory.Exists(backendDirectory)
             ? Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length
             : 0;
+    }
+
+    private static string BuildPublishedUrl(string server, string slug)
+    {
+        var configuredAppsBaseUrl = Environment.GetEnvironmentVariable("AUTOMATON_APPS_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(configuredAppsBaseUrl))
+        {
+            return $"{configuredAppsBaseUrl.TrimEnd('/')}/{slug}/";
+        }
+
+        if (Uri.TryCreate(server, UriKind.Absolute, out var serverUri) &&
+            serverUri.Host.StartsWith("api.", StringComparison.OrdinalIgnoreCase))
+        {
+            var builder = new UriBuilder(serverUri)
+            {
+                Host = "apps." + serverUri.Host["api.".Length..],
+                Path = slug,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+            return builder.Uri.ToString().TrimEnd('/') + "/";
+        }
+
+        return $"{server.TrimEnd('/')}/{slug}/";
     }
 }

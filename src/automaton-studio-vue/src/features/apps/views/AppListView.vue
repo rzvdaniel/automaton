@@ -27,6 +27,7 @@ import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
@@ -361,7 +362,7 @@ const handlePublishApp = async (request: PublishAppRequest) => {
     toast.add({
       severity: 'success',
       summary: 'Published',
-      detail: `App is now available at /web/${request.publicUrl}`,
+      detail: `App is now available at ${getPublishedAppUrl(request.publicUrl)}`,
       life: 5000,
     })
     showPublishDialog.value = false

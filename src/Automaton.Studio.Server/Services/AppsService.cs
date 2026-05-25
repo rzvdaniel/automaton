@@ -16,6 +16,7 @@ public class AppsService
     private readonly UserContextService userContextService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly AppFileStorageService fileStorageService;
+    private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -26,7 +27,8 @@ public class AppsService
         UserContextService userContextService,
         RecentActivityService recentActivityService,
         ResourceAuthorizationService authorizationService,
-        AppFileStorageService fileStorageService
+        AppFileStorageService fileStorageService,
+        PublishedAppStorageService publishedAppStorageService
     )
     {
         this.dataContext = dataContext;
@@ -34,6 +36,7 @@ public class AppsService
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
         this.fileStorageService = fileStorageService;
+        this.publishedAppStorageService = publishedAppStorageService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -90,48 +93,9 @@ public class AppsService
     }
 
     /// <summary>
-    /// Get app by public URL slug. Validates published status and ownership.
-    /// Returns app only if it's published and owned by the current user (respects impersonation).
-    /// </summary>
-    public Models.AppModel GetBySlug(string slug)
-    {
-        var appEntity = dataContext.WebApps
-            .Include(x => x.WebAppUsers)
-            .Include(x => x.WebAppScreenshots)
-            .FirstOrDefault(x =>
-                x.PublicUrl != null &&
-                x.PublicUrl.ToLower() == slug.ToLower() &&
-                x.IsPublished &&
-                x.WebAppUsers.Any(u => u.UserId == UserId));
-
-        if (appEntity == null)
-        {
-            return null;
-        }
-
-        // Load app definition from file system
-        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
-        var definition = fileStorageService.LoadAppAsync(ownerId, appEntity.Id).Result;
-        
-        // If not in file system, fall back to database (for migration)
-        if (definition == null && !string.IsNullOrEmpty(appEntity.Definition))
-        {
-            definition = JsonSerializer.Deserialize<Models.AppDefinition>(appEntity.Definition) ?? new Models.AppDefinition();
-            
-            // Migrate to file system
-            fileStorageService.SaveAppAsync(ownerId, appEntity.Id, definition).Wait();
-            logger.Information("Migrated app {AppId} from database to file system", appEntity.Id);
-        }
-
-        var app = MapToModel(appEntity, definition);
-        ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, appEntity.Id).Result);
-        return app;
-    }
-
-    /// <summary>
     /// Get published app metadata by slug for access validation.
     /// Returns app info without requiring ownership (for authentication checks).
-    /// Used by both AppsController and WebAppFlowExecutionController.
+    /// Used by published app runtime execution endpoints.
     /// </summary>
     public async Task<Models.PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
     {
@@ -140,8 +104,7 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
-                x.IsPublished &&
-                x.MarketplaceStatus == MarketplaceAppStatuses.Approved,
+                x.IsPublished,
                 cancellationToken);
 
         if (appEntity == null)
@@ -368,7 +331,9 @@ public class AppsService
             throw new UnauthorizedAccessException($"You do not have permission to publish app {id}");
         }
 
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
+        var entity = dataContext.WebApps
+            .Include(x => x.WebAppUsers)
+            .SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {
@@ -379,6 +344,11 @@ public class AppsService
         if (!IsValidUrlSlug(publicUrl))
         {
             throw new InvalidOperationException("Invalid URL slug format. Use lowercase letters, numbers, and hyphens only.");
+        }
+
+        if (requiresAuthentication)
+        {
+            throw new InvalidOperationException("Restricted published apps are not supported by the public static app host yet. Use Studio preview for private and organization apps.");
         }
 
         // Check if URL is already taken
@@ -399,6 +369,20 @@ public class AppsService
             }
         }
 
+        var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var nextVersion = entity.Version + 1;
+
+        await publishedAppStorageService.PublishAsync(
+            ownerId,
+            id,
+            new PublishedAppPackageMetadata(
+                id,
+                publicUrl,
+                entity.Name,
+                entity.Summary,
+                entity.Description,
+                nextVersion));
+
         entity.IsPublished = true;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
@@ -408,7 +392,7 @@ public class AppsService
         entity.Tags = tags?.Trim();
         if (executionRunnerId.HasValue)
             entity.ExecutionRunnerId = executionRunnerId.Value;
-        entity.Version++;
+        entity.Version = nextVersion;
         entity.Updated = DateTime.UtcNow;
 
         dataContext.SaveChanges();
@@ -434,6 +418,8 @@ public class AppsService
         {
             throw new InvalidOperationException($"App {id} not found");
         }
+
+        await publishedAppStorageService.UnpublishAsync(entity.PublicUrl);
 
         entity.IsPublished = false;
         entity.PublishedAt = null;

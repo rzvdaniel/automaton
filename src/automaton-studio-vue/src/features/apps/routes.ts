@@ -21,13 +21,4 @@ export const appsRoutes: RouteRecordRaw[] = [
     name: 'app-editor',
     component: () => import('./views/AppEditorView.vue'),
   },
-  {
-    path: '/web/:slug',
-    name: 'web-app',
-    component: () => import('./views/WebAppView.vue'),
-    meta: {
-      requiresAuth: false,
-      layout: 'none',
-    },
-  },
 ]

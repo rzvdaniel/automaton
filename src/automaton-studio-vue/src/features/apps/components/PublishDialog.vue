@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Checkbox from 'primevue/checkbox'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -10,6 +9,7 @@ import Select from 'primevue/select'
 import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
 import type { PublishAppRequest } from '../types/apps.types'
+import { getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 const props = defineProps<{
   visible: boolean
@@ -40,7 +40,7 @@ const isVisible = computed({
   set: (value) => emit('update:visible', value),
 })
 
-const publicUrl = computed(() => `/web/${slug.value || 'your-app'}`)
+const publicUrl = computed(() => getPublishedAppUrl(slug.value || 'your-app'))
 
 const isValidSlug = computed(() => {
   if (!slug.value) return false
@@ -75,7 +75,7 @@ watch(isVisible, async (visible) => {
     slug.value = ''
   }
 
-  requiresAuthentication.value = props.requiresAuth ?? false
+  requiresAuthentication.value = false
   allowForking.value = props.isForkable ?? false
   selectedCategory.value = props.currentCategory ?? null
   tags.value = props.currentTags ?? ''
@@ -133,7 +133,7 @@ function close() {
       <div class="field mb-4">
         <label for="slug" class="block font-semibold mb-2">Public URL</label>
         <div class="p-inputgroup">
-          <span class="p-inputgroup-addon">/web/</span>
+          <span class="p-inputgroup-addon">{{ getPublicAppsBaseUrl() }}/</span>
           <InputText
             id="slug"
             v-model="slug"
@@ -203,14 +203,13 @@ function close() {
           <InputSwitch
             id="requiresAuth"
             :model-value="!requiresAuthentication"
+            disabled
             @update:model-value="requiresAuthentication = !$event"
           />
           <label for="requiresAuth">{{ requiresAuthentication ? 'Restricted access' : 'Public access' }}</label>
         </div>
         <small class="text-color-secondary block mt-1 ml-6">
-          {{ requiresAuthentication
-            ? 'Only authorized Automaton users can access this app'
-            : 'Anyone with the link can access this app' }}
+          Public app installs must run from the standalone app host. Private and organization apps stay in Studio preview for now.
         </small>
       </div>
 

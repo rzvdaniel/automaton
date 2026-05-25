@@ -52,6 +52,7 @@ services.Configure<AiProvidersConfig>(applicationBuilder.Configuration.GetSectio
 services.AddSingleton<IAiProvidersSettingsService, AiProvidersSettingsService>();
 
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
+services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSection("PublishedApps"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
@@ -305,6 +306,7 @@ services.AddScoped<RecentActivityService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<AppFileStorageService>();
+services.AddScoped<PublishedAppStorageService>();
 services.AddScoped<AppArchiveService>();
 services.AddSingleton<AppPreviewStorageService>();
 services.AddScoped<AppVersionService>();
