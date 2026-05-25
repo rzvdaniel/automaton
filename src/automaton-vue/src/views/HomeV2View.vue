@@ -643,8 +643,9 @@ h1 span:last-child {
 .featured-detail h2 {
   display: -webkit-box;
   margin: 0 0 8px;
-  font-size: clamp(1.7rem, 2.5vw, 2.5rem);
-  line-height: 1.05;
+  max-width: 9ch;
+  font-size: clamp(1.15rem, 1.5vw, 1.7rem);
+  line-height: 1;
   letter-spacing: -0.04em;
   overflow: hidden;
   -webkit-box-orient: vertical;
