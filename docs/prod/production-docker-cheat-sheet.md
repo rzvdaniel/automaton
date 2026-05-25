@@ -4,7 +4,7 @@ This is the source of truth for the current nginx-based production stack.
 
 Use it for both:
 
-- first-time server bootstrap
+- one-time production setup
 - normal day-to-day deploys and operations
 
 ## Prerequisites
@@ -30,7 +30,7 @@ Recommended Cloudflare settings:
 - keep all five records `Proxied`
 - set SSL/TLS mode to `Full (strict)`
 
-## Fresh Server Bootstrap
+## One-Time Production Setup
 
 ### 1. Install Docker
 
@@ -533,9 +533,9 @@ If the previous color was already stopped because the deploy ran without `--keep
 
 The app host itself does not roll back with blue/green route switching because it is nginx static serving from a shared volume. Roll back platform app-host changes by reverting the nginx/runtime SDK commit and rerunning `prod-redeploy-app-host.sh` or `prod-redeploy-all.sh`. Roll back an individual published app by unpublishing or republishing that app.
 
-## First-Time Bootstrap
+## One-Time Production Setup Commands
 
-If the server is already prepared and you just need the minimal first deploy sequence:
+If the server is already prepared and you just need the minimal command sequence for one-time production setup:
 
 ```bash
 cd /opt/automaton
