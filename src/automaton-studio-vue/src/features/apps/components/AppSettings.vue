@@ -728,13 +728,13 @@ async function handleSaveTemplateStatus() {
               </div>
 
               <div class="flex flex-column gap-2">
-                <label for="forkable" class="font-medium">Forking</label>
+                <label for="forkable" class="font-medium">Remixing</label>
                 <div class="flex align-items-center gap-3">
                   <InputSwitch
                     id="forkable"
                     v-model="isForkable"
                   />
-                  <span>{{ isForkable ? 'Others can fork this app' : 'Source stays private' }}</span>
+                  <span>{{ isForkable ? 'Others can remix this app' : 'Source stays private' }}</span>
                 </div>
                 <small class="text-color-secondary">
                   {{ isForkable
@@ -1074,7 +1074,7 @@ automaton deploy</pre>
           <template #content>
             <div class="flex flex-column gap-4">
               <p class="text-color-secondary mt-0 mb-0">
-                Mark this app as a template so users can fork it into their own account from the Templates gallery.
+                Mark this app as a template so users can remix it into their own account from the Templates gallery.
                 The app must be published before it can appear as a template.
               </p>
               <div class="flex align-items-center gap-3">

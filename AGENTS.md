@@ -295,9 +295,9 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 - Source and live files are separate, and each has frontend/backend surfaces: `source/frontend/` is editable frontend source, `source/backend/` is editable Python backend source, `live/frontend/` is public static output, and `live/backend/` is runner-only deployed backend output.
 - `automaton deploy` writes frontend deploy output to `live/frontend/` and backend deploy output to `live/backend/`; public serving never reads source files or backend live files.
 - Studio editing, GitHub sync, version snapshots, MCP app tools, archive import/export, and marketplace fork use `source/`.
-- Fork copies `source/` only, never `live/`.
+- Remix/fork copies portable `source/` and may copy a sanitized `live/frontend/` runtime snapshot for an immediate working preview; it never copies `live/backend/`, secrets, runner state, or user data.
 - AI-generated local apps should default to Vite + vanilla TypeScript or JavaScript in `frontend/`, with a required frontend build pipeline that outputs to `frontend/dist/`.
-- Fork is available only when source exists and the app is explicitly forkable; runtime files, secrets, logs, and deployment artifacts are never copied.
+- Remix is available only when source exists and the app is explicitly remixable/forkable; runtime backend files, secrets, logs, and deployment artifacts are never copied, and frontend runtime copies are sanitized by configured remix exclusion rules.
 - Public runtime serving uses a safe web-file allowlist and returns `404` for unknown or sensitive extensions.
 - Visual app editor (Monaco) with live preview and sandboxed iframe
 - Runner selection for executions triggered from the app

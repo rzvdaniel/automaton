@@ -40,7 +40,7 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/app-activity',
   },
   {
-    label: 'App Deploy Rules',
+    label: 'App File Exclusions',
     icon: 'pi pi-filter',
     to: '/admin/app-deploy-rules',
     routePrefix: '/admin/app-deploy-rules',

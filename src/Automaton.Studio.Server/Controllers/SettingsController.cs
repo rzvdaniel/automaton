@@ -26,7 +26,7 @@ public class SettingsController : BaseController
     {
         try
         {
-            return Ok(await _settingsService.GetEffectiveAppDeployRulesAsync());
+            return Ok(await _settingsService.GetAppDeployRulesAsync());
         }
         catch (Exception ex)
         {

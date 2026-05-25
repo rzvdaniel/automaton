@@ -1,7 +1,9 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
@@ -15,70 +17,47 @@ public class SettingsService
     
     private readonly ApplicationDbContext _dbContext;
     private readonly UserContextService _userContextService;
+    private readonly AppFileRuleBaselineOptions _appFileRuleBaseline;
     private readonly Serilog.ILogger _logger;
 
     public SettingsService(
         ApplicationDbContext dbContext,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        IOptions<AppFileRuleBaselineOptions> appFileRuleBaseline)
     {
         _dbContext = dbContext;
         _userContextService = userContextService;
+        _appFileRuleBaseline = appFileRuleBaseline.Value ?? new AppFileRuleBaselineOptions();
         _logger = Serilog.Log.ForContext<SettingsService>();
     }
 
     public async Task<AppDeployRulesSettings> GetEffectiveAppDeployRulesAsync()
     {
-        var persisted = await GetSettingAsync<AppDeployRulesSettings>(AppDeployRulesKey);
+        var persisted = await GetAppDeployRulesAsync();
 
         return new AppDeployRulesSettings
         {
             SourceExclude = MergeRules(
-                [
-                    ".env",
-                    ".env.*",
-                    ".DS_Store",
-                    "*.pyc",
-                    "*.log",
-                    ".git",
-                    ".automaton",
-                    "node_modules",
-                    "venv",
-                    ".venv",
-                    "__pycache__",
-                    ".vite",
-                    "coverage",
-                    "dist"
-                ],
+                _appFileRuleBaseline.SourceExclude,
                 persisted?.SourceExclude),
             FrontendExclude = MergeRules(
-                [
-                    ".env",
-                    ".env.*",
-                    ".DS_Store",
-                    "*.pyc",
-                    "*.log",
-                    ".git",
-                    "node_modules",
-                    "venv",
-                    ".venv",
-                    "__pycache__"
-                ],
+                _appFileRuleBaseline.FrontendExclude,
                 persisted?.FrontendExclude),
             BackendExclude = MergeRules(
-                [
-                    ".env",
-                    ".env.*",
-                    ".DS_Store",
-                    "*.pyc",
-                    "*.log",
-                    ".git",
-                    "node_modules",
-                    "venv",
-                    ".venv",
-                    "__pycache__"
-                ],
-                persisted?.BackendExclude)
+                _appFileRuleBaseline.BackendExclude,
+                persisted?.BackendExclude),
+            RemixSourceExclude = MergeRules(
+                _appFileRuleBaseline.RemixSourceExclude,
+                persisted?.RemixSourceExclude),
+            RemixFrontendExclude = MergeRules(
+                _appFileRuleBaseline.RemixFrontendExclude,
+                persisted?.RemixFrontendExclude)
         };
+    }
+
+    public async Task<AppDeployRulesSettings> GetAppDeployRulesAsync()
+    {
+        return await GetSettingAsync<AppDeployRulesSettings>(AppDeployRulesKey) ?? new AppDeployRulesSettings();
     }
 
     public Task SaveAppDeployRulesAsync(AppDeployRulesSettings settings)

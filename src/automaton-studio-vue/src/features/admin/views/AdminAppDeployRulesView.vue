@@ -17,25 +17,70 @@ const form = ref({
   sourceExcludeText: '',
   frontendExcludeText: '',
   backendExcludeText: '',
+  remixSourceExcludeText: '',
+  remixFrontendExcludeText: '',
 })
-
-const builtInRules = [
-  '.env',
-  '.env.*',
-  '.git',
-  'node_modules',
-  'venv',
-  '.venv',
-  '__pycache__',
-  '*.pyc',
-  '.DS_Store',
-]
 
 const parsedPreview = computed(() => ({
   source: parseRules(form.value.sourceExcludeText),
   frontend: parseRules(form.value.frontendExcludeText),
   backend: parseRules(form.value.backendExcludeText),
+  remixSource: parseRules(form.value.remixSourceExcludeText),
+  remixFrontend: parseRules(form.value.remixFrontendExcludeText),
 }))
+
+const exclusionCards = computed(() => [
+  {
+    key: 'source',
+    title: 'Source Upload Excludes',
+    tone: 'Packaging',
+    description:
+      'Applied when CLI or Studio uploads editable source files into source/.',
+    model: 'sourceExcludeText',
+    rows: 6,
+    placeholder: '.cache\ncoverage/**\nlarge-models/**',
+  },
+  {
+    key: 'frontend',
+    title: 'Frontend Live Upload Excludes',
+    tone: 'Runtime',
+    description:
+      'Reserved for future frontend live-package filtering. Kept here so deploy defaults stay in one settings model.',
+    model: 'frontendExcludeText',
+    rows: 5,
+    placeholder: '*.tmp\ndebug/**',
+  },
+  {
+    key: 'backend',
+    title: 'Backend Live Upload Excludes',
+    tone: 'Runtime',
+    description:
+      'Applied when backend packages are uploaded into live/backend and when Studio enumerates runner deploy files.',
+    model: 'backendExcludeText',
+    rows: 6,
+    placeholder: 'cache/**\nlarge-models/**\n*.tmp',
+  },
+  {
+    key: 'remix-source',
+    title: 'Remix Source Excludes',
+    tone: 'Remix',
+    description:
+      'Applied when users remix or duplicate portable source files from source/. Use this for org-specific secret or state patterns.',
+    model: 'remixSourceExcludeText',
+    rows: 6,
+    placeholder: 'custom-secrets/**\ntenant-data/**\n*.private.json',
+  },
+  {
+    key: 'remix-frontend',
+    title: 'Remix Frontend Runtime Excludes',
+    tone: 'Remix',
+    description:
+      'Applied when a public frontend runtime baseline is copied from live/frontend into a remix. This does not affect live/backend.',
+    model: 'remixFrontendExcludeText',
+    rows: 5,
+    placeholder: 'debug-assets/**\n*.diagnostics.json',
+  },
+])
 
 onMounted(async () => {
   await loadSettings()
@@ -64,6 +109,8 @@ async function saveSettings() {
       sourceExclude: parsedPreview.value.source,
       frontendExclude: parsedPreview.value.frontend,
       backendExclude: parsedPreview.value.backend,
+      remixSourceExclude: parsedPreview.value.remixSource,
+      remixFrontendExclude: parsedPreview.value.remixFrontend,
     })
     applySettings(saved)
     toast.add({
@@ -88,6 +135,8 @@ function applySettings(settings: AppDeployRulesSettings) {
   form.value.sourceExcludeText = settings.sourceExclude.join('\n')
   form.value.frontendExcludeText = settings.frontendExclude.join('\n')
   form.value.backendExcludeText = settings.backendExclude.join('\n')
+  form.value.remixSourceExcludeText = settings.remixSourceExclude.join('\n')
+  form.value.remixFrontendExcludeText = settings.remixFrontendExclude.join('\n')
 }
 
 function parseRules(value: string): string[] {
@@ -102,10 +151,10 @@ function parseRules(value: string): string[] {
   <div class="app-deploy-rules-view">
     <div class="flex align-items-center justify-content-between mb-4 gap-3 flex-wrap">
       <div>
-        <h2 class="text-2xl font-bold m-0">App Deploy Rules</h2>
+        <h2 class="text-2xl font-bold m-0">App File Exclusions</h2>
         <p class="text-color-secondary mt-1 mb-0">
-          Default deploy exclusions stored in the database. Changes apply immediately to CLI and
-          Studio uploads without a server restart.
+          Configure additive database exclusions for app packaging and remix copy rules. Changes
+          apply immediately without a server restart.
         </p>
       </div>
       <div class="flex gap-2">
@@ -129,86 +178,33 @@ function parseRules(value: string): string[] {
     </div>
 
     <div class="grid">
-      <div class="col-12 lg:col-5">
+      <div class="col-12">
         <Card>
-          <template #title>Platform Baseline</template>
           <template #content>
-            <p class="text-color-secondary text-sm mt-0 mb-3">
-              These built-in defaults are always merged with the rules below unless the server-side
-              safety core blocks the path first.
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="rule in builtInRules"
-                :key="rule"
-                class="surface-200 border-round px-2 py-1 text-800 text-sm"
-              >
-                {{ rule }}
-              </span>
-            </div>
-
-            <Divider />
-
-            <p class="text-color-secondary text-sm mb-2">
-              Hardcoded safety still applies before these defaults:
-            </p>
-            <ul class="mt-0 mb-0 pl-3 text-sm text-color-secondary">
-              <li>No absolute paths</li>
-              <li>No path traversal</li>
-              <li>No invalid or empty paths</li>
-              <li>No unsafe filesystem escapes</li>
-            </ul>
-          </template>
-        </Card>
-      </div>
-
-      <div class="col-12 lg:col-7">
-        <Card>
-          <template #title>Database-Backed Exclusions</template>
-          <template #content>
-            <div class="flex flex-column gap-4">
-              <div class="field">
-                <label class="font-medium block mb-2">Source Upload Excludes</label>
-                <p class="text-color-secondary text-sm mt-0 mb-2">
-                  Applied when CLI or Studio uploads editable source files into <code>source/</code>.
+            <div class="baseline-strip">
+              <div class="baseline-main">
+                <div class="baseline-title-row">
+                  <div class="baseline-title">Platform Baseline</div>
+                  <span class="rule-chip">Immutable</span>
+                </div>
+                <p class="text-color-secondary text-sm mt-2 mb-0">
+                  Baseline rules come from server configuration in <code>appsettings</code>. The
+                  controls below add database-only overrides. Effective behavior is:
+                  <strong>config baseline</strong>, then <strong>admin rules</strong>, then
+                  structural path-safety checks in code.
                 </p>
-                <Textarea
-                  v-model="form.sourceExcludeText"
-                  rows="6"
-                  class="w-full font-mono"
-                  auto-resize
-                  placeholder=".cache&#10;coverage/**&#10;large-models/**"
-                />
               </div>
 
-              <div class="field">
-                <label class="font-medium block mb-2">Frontend Live Upload Excludes</label>
-                <p class="text-color-secondary text-sm mt-0 mb-2">
-                  Reserved for future frontend live-package filtering. Kept in the same settings
-                  model now so admins can manage all deploy defaults in one place.
-                </p>
-                <Textarea
-                  v-model="form.frontendExcludeText"
-                  rows="5"
-                  class="w-full font-mono"
-                  auto-resize
-                  placeholder="*.tmp&#10;debug/**"
-                />
-              </div>
+              <Divider layout="vertical" class="baseline-divider hidden lg:flex" />
 
-              <div class="field">
-                <label class="font-medium block mb-2">Backend Live Upload Excludes</label>
-                <p class="text-color-secondary text-sm mt-0 mb-2">
-                  Applied when backend packages are uploaded into <code>live/backend</code> and
-                  when Studio enumerates runner deploy files.
-                </p>
-                <Textarea
-                  v-model="form.backendExcludeText"
-                  rows="6"
-                  class="w-full font-mono"
-                  auto-resize
-                  placeholder="cache/**&#10;large-models/**&#10;*.tmp"
-                />
+              <div class="baseline-safety">
+                <div class="text-sm font-medium mb-2">Always enforced in code</div>
+                <div class="baseline-pills">
+                  <span class="baseline-pill">No absolute paths</span>
+                  <span class="baseline-pill">No path traversal</span>
+                  <span class="baseline-pill">No invalid or empty paths</span>
+                  <span class="baseline-pill">No filesystem escapes</span>
+                </div>
               </div>
             </div>
           </template>
@@ -217,25 +213,37 @@ function parseRules(value: string): string[] {
 
       <div class="col-12">
         <Card>
-          <template #title>Parsed Preview</template>
+          <template #title>Admin Exclusions</template>
           <template #content>
-            <p class="text-color-secondary text-sm mt-0 mb-3">
-              One rule per line. Empty lines are ignored. These are the exact values that will be
-              persisted in the <code>Settings</code> table.
+            <p class="text-color-secondary text-sm mt-0 mb-4">
+              Each card adds database-only rules on top of the immutable platform baseline from
+              <code>appsettings</code>.
             </p>
 
             <div class="grid">
-              <div class="col-12 md:col-4">
-                <div class="font-medium mb-2">Source</div>
-                <pre class="rules-preview">{{ parsedPreview.source }}</pre>
-              </div>
-              <div class="col-12 md:col-4">
-                <div class="font-medium mb-2">Frontend</div>
-                <pre class="rules-preview">{{ parsedPreview.frontend }}</pre>
-              </div>
-              <div class="col-12 md:col-4">
-                <div class="font-medium mb-2">Backend</div>
-                <pre class="rules-preview">{{ parsedPreview.backend }}</pre>
+              <div
+                v-for="card in exclusionCards"
+                :key="card.key"
+                class="col-12 xl:col-6"
+              >
+                <div class="rule-card h-full">
+                  <div class="flex align-items-start justify-content-between gap-3 mb-2">
+                    <div>
+                      <div class="font-semibold">{{ card.title }}</div>
+                      <p class="text-color-secondary text-sm mt-2 mb-0">
+                        {{ card.description }}
+                      </p>
+                    </div>
+                    <span class="rule-chip">{{ card.tone }}</span>
+                  </div>
+
+                  <Textarea
+                    v-model="form[card.model as keyof typeof form]"
+                    :rows="card.rows"
+                    class="w-full font-mono rule-textarea"
+                    :placeholder="card.placeholder"
+                  />
+                </div>
               </div>
             </div>
           </template>
@@ -246,12 +254,83 @@ function parseRules(value: string): string[] {
 </template>
 
 <style scoped>
-.rules-preview {
-  margin: 0;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
+.baseline-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) auto minmax(18rem, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.baseline-main,
+.baseline-safety {
+  min-width: 0;
+}
+
+.baseline-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.baseline-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.baseline-divider {
+  align-self: stretch;
+}
+
+.baseline-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.baseline-pill {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
   background: var(--surface-100);
-  overflow-x: auto;
-  font-size: 0.9rem;
+  border: 1px solid var(--surface-border);
+  color: var(--text-color-secondary);
+  font-size: 0.85rem;
+}
+
+.rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, var(--surface-0) 0%, var(--surface-50) 100%);
+}
+
+.rule-textarea {
+  min-height: 11rem;
+}
+
+.rule-textarea :deep(textarea) {
+  min-height: 11rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  resize: none;
+}
+
+.rule-chip {
+  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: var(--primary-50);
+  color: var(--primary-700);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@media (max-width: 991px) {
+  .baseline-strip {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

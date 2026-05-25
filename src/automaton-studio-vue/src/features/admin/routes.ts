@@ -75,7 +75,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'admin-app-deploy-rules',
         component: AdminAppDeployRulesView,
         meta: {
-          title: 'App Deploy Rules',
+          title: 'App File Exclusions',
         },
       },
       {

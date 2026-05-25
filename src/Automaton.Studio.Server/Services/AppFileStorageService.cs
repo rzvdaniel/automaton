@@ -104,17 +104,6 @@ public class AppFileStorageService
         return Path.Combine(GetLivePath(userId, appId), BackendFolder);
     }
 
-    private static bool IsSensitiveAppFile(string relativePath)
-    {
-        var normalized = relativePath.Replace('\\', '/');
-        var fileName = Path.GetFileName(normalized);
-
-        return fileName.Equals(".env", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".local", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".secret", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Contains("/secrets/", StringComparison.OrdinalIgnoreCase);
-    }
-
     /// <summary>
     /// Save app definition to file system
     /// </summary>
@@ -435,13 +424,44 @@ public class AppFileStorageService
     }
 
     /// <summary>
-    /// Copy editable source files from one app to another. Runtime and version files are intentionally excluded.
+    /// Copy portable editable source files from one app to another for duplicate/remix flows.
+    /// This includes portable app-definition folders such as source/frontend and source/backend,
+    /// while excluding secret-like files and runtime/state folders.
     /// </summary>
-    public Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
+    public async Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
     {
         var srcPath = GetSourcePath(srcUserId, srcAppId);
         var dstPath = GetSourcePath(dstUserId, dstAppId);
-        return CopyDirectoryFilesAsync(srcPath, dstPath, "source files", srcAppId, srcUserId, dstAppId, dstUserId);
+        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        await CopyDirectoryFilesAsync(
+            srcPath,
+            dstPath,
+            "source files",
+            srcAppId,
+            srcUserId,
+            dstAppId,
+            dstUserId,
+            relativePath => MatchesExcludeRule(relativePath, rules.RemixSourceExclude));
+    }
+
+    /// <summary>
+    /// Copy the deployed frontend runtime package from one app to another.
+    /// This preserves a working preview baseline for forks without treating live files as source.
+    /// </summary>
+    public async Task CopyRuntimeFrontendFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
+    {
+        var srcPath = GetLiveFrontendPath(srcUserId, srcAppId);
+        var dstPath = GetLiveFrontendPath(dstUserId, dstAppId);
+        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
+        await CopyDirectoryFilesAsync(
+            srcPath,
+            dstPath,
+            "live frontend files",
+            srcAppId,
+            srcUserId,
+            dstAppId,
+            dstUserId,
+            relativePath => MatchesExcludeRule(relativePath, rules.RemixFrontendExclude));
     }
 
     /// <summary>
@@ -617,15 +637,16 @@ public class AppFileStorageService
     /// Rebuild the runner backend live package from editable source/backend files when present.
     /// Missing source preserves the current live/backend package.
     /// </summary>
-    public Task<(int CopiedFiles, bool Updated)> SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
+    public async Task<(int CopiedFiles, bool Updated)> SyncSourceBackendToRuntimeBackendAsync(Guid userId, Guid appId)
     {
         var sourceBackendPath = GetSourceBackendPath(userId, appId);
         var runtimeBackendPath = GetLiveBackendPath(userId, appId);
+        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
         if (!HasAnyEntries(sourceBackendPath))
         {
             logger.Information("No source/backend files found for app {AppId}; preserving existing live/backend", appId);
-            return Task.FromResult((0, false));
+            return (0, false);
         }
 
         if (Directory.Exists(runtimeBackendPath))
@@ -639,7 +660,7 @@ public class AppFileStorageService
         foreach (var sourceFile in Directory.EnumerateFiles(sourceBackendPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(sourceBackendPath, sourceFile);
-            if (IsSensitiveAppFile(relativePath))
+            if (AppFileStorageService.MatchesExcludeRule(relativePath, rules.BackendExclude))
                 continue;
 
             var targetFilePath = Path.Combine(runtimeBackendPath, relativePath);
@@ -652,18 +673,19 @@ public class AppFileStorageService
         }
 
         logger.Information("Synced source/backend to live/backend for app {AppId}", appId);
-        return Task.FromResult((copied, true));
+        return (copied, true);
     }
 
-    public Task<(int CopiedFiles, bool Updated)> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
+    public async Task<(int CopiedFiles, bool Updated)> SyncSourceFrontendToRuntimeFrontendAsync(Guid userId, Guid appId)
     {
         var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
         var runtimeFrontendPath = GetLiveFrontendPath(userId, appId);
+        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
         if (!HasAnyEntries(sourceFrontendPath))
         {
             logger.Information("No source/frontend files found for app {AppId}; preserving existing live/frontend", appId);
-            return Task.FromResult((0, false));
+            return (0, false);
         }
 
         if (Directory.Exists(runtimeFrontendPath))
@@ -677,7 +699,7 @@ public class AppFileStorageService
         foreach (var sourceFile in Directory.EnumerateFiles(sourceFrontendPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(sourceFrontendPath, sourceFile);
-            if (IsSensitiveAppFile(relativePath))
+            if (AppFileStorageService.MatchesExcludeRule(relativePath, rules.FrontendExclude))
                 continue;
 
             var targetFilePath = Path.Combine(runtimeFrontendPath, relativePath);
@@ -690,7 +712,7 @@ public class AppFileStorageService
         }
 
         logger.Information("Synced source/frontend to live/frontend for app {AppId}", appId);
-        return Task.FromResult((copied, true));
+        return (copied, true);
     }
 
     /// <summary>
@@ -998,7 +1020,8 @@ public class AppFileStorageService
         Guid srcAppId,
         Guid srcUserId,
         Guid dstAppId,
-        Guid dstUserId)
+        Guid dstUserId,
+        Func<string, bool>? shouldSkip = null)
     {
         Directory.CreateDirectory(dstPath);
 
@@ -1011,7 +1034,7 @@ public class AppFileStorageService
         foreach (var sourceFile in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(srcPath, sourceFile);
-            if (IsSensitiveAppFile(relativePath))
+            if (shouldSkip?.Invoke(relativePath) ?? false)
                 continue;
 
             var targetFilePath = Path.Combine(dstPath, relativePath);

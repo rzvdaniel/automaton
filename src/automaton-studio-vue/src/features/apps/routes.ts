@@ -12,8 +12,9 @@ export const appsRoutes: RouteRecordRaw[] = [
     component: () => import('./views/AppEditorView.vue'),
   },
   {
-    path: '/apps/fork/:sourceAppId',
-    name: 'app-fork',
+    path: '/apps/remix/:sourceAppId',
+    alias: '/apps/fork/:sourceAppId',
+    name: 'app-remix',
     component: () => import('./views/AppForkView.vue'),
   },
   {

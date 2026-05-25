@@ -26,7 +26,7 @@ const sourceAppId = computed(() => String(route.params.sourceAppId || ''))
 
 const lineageLabel = computed(() => {
   if (!source.value) return ''
-  return `Forked from ${source.value.name} by ${source.value.creatorDisplayName}`
+  return `Remixed from ${source.value.name} by ${source.value.creatorDisplayName}`
 })
 
 function defaultRemixName(name: string) {
@@ -41,7 +41,7 @@ async function loadForkSource() {
     source.value = await appsService.getForkSource(sourceAppId.value)
     appName.value = defaultRemixName(source.value.name)
   } catch {
-    error.value = 'This app is not available to fork.'
+    error.value = 'This app is not available to remix.'
   } finally {
     loading.value = false
   }
@@ -52,7 +52,7 @@ async function submitFork() {
 
   const name = appName.value.trim()
   if (!name) {
-    error.value = 'Choose a name for your fork.'
+    error.value = 'Choose a name for your remix.'
     return
   }
 
@@ -67,14 +67,14 @@ async function submitFork() {
 
     toast.add({
       severity: 'success',
-      summary: 'Fork created',
+      summary: 'Remix created',
       detail: 'Your editable app copy is ready.',
       life: 3000,
     })
 
     await router.push(`/apps/${app.id}`)
   } catch {
-    error.value = 'Could not fork this app right now.'
+    error.value = 'Could not remix this app right now.'
   } finally {
     submitting.value = false
   }
@@ -103,8 +103,8 @@ onMounted(loadForkSource)
 
         <div v-else-if="source" class="fork-layout">
           <div class="fork-intro">
-            <p class="eyebrow">Fork app</p>
-            <h1>Fork “{{ source.name }}”</h1>
+            <p class="eyebrow">Remix app</p>
+            <h1>Remix “{{ source.name }}”</h1>
             <p>Create your own editable copy of this app.</p>
           </div>
 
@@ -134,7 +134,7 @@ onMounted(loadForkSource)
               <Checkbox v-model="publishImmediately" binary />
               <span>
                 <strong>Public immediately</strong>
-                <small>Creates a public URL as part of the fork.</small>
+                <small>Creates a public URL as part of the remix.</small>
               </span>
             </label>
           </section>
@@ -145,14 +145,20 @@ onMounted(loadForkSource)
             <template v-if="source.hasBackendExecution">
               <p class="warning-copy">This app uses backend execution.</p>
               <ul>
-                <li>To run your fork, you need your own Runner.</li>
+                <li>To run your remix, you need your own Runner.</li>
                 <li>Managed Runners will be available when hosted execution rolls out.</li>
               </ul>
             </template>
           </section>
 
           <section class="info-panel">
-            <h2>Lineage</h2>
+            <h2>What gets copied</h2>
+            <p>Source files and public frontend assets are copied into your editable remix.</p>
+            <p>Secrets, runner data, private uploads, and owner-specific settings are not copied.</p>
+          </section>
+
+          <section class="info-panel">
+            <h2>Attribution</h2>
             <p>{{ lineageLabel }}</p>
           </section>
 
@@ -166,7 +172,7 @@ onMounted(loadForkSource)
               @click="goToRunners"
             />
             <Button
-              :label="source.hasBackendExecution ? 'Continue fork' : 'Fork app'"
+              :label="source.hasBackendExecution ? 'Continue remix' : 'Remix app'"
               icon="pi pi-code-branch"
               :loading="submitting"
               @click="submitFork"
@@ -175,7 +181,7 @@ onMounted(loadForkSource)
         </div>
 
         <Message v-else severity="error" :closable="false">
-          {{ error || 'This app is not available to fork.' }}
+          {{ error || 'This app is not available to remix.' }}
         </Message>
       </template>
     </Card>

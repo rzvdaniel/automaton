@@ -130,7 +130,7 @@ const handleUseTemplate = async (template: App) => {
     const newApp = await appsStore.forkTemplate(template.id)
     toast.add({
       severity: 'success',
-      summary: 'Template Forked',
+      summary: 'Template Remixed',
       detail: `"${newApp.name}" has been added to your apps`,
       life: 4000,
     })
@@ -726,7 +726,7 @@ const handleRetry = async () => {
             <i class="pi pi-star text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No templates yet</h3>
             <p class="text-color-secondary mb-0">
-              Published template apps will appear here so you can fork them into your account.
+              Published template apps will appear here so you can remix them into your account.
             </p>
           </div>
         </template>

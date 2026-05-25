@@ -184,6 +184,8 @@ export interface AppDeployRulesSettings {
   sourceExclude: string[]
   frontendExclude: string[]
   backendExclude: string[]
+  remixSourceExclude: string[]
+  remixFrontendExclude: string[]
 }
 
 /**

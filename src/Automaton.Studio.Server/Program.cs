@@ -55,6 +55,7 @@ services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("We
 services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSection("PublishedApps"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
+services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();

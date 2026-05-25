@@ -773,6 +773,7 @@ public class AppsService
         await dataContext.SaveChangesAsync();
 
         await fileStorageService.CopySourceFilesAsync(sourceOwner, sourceAppId, UserId, newId);
+        await fileStorageService.CopyRuntimeFrontendFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
         logger.Information("Forked app {SourceAppId} → {NewAppId} for user {UserId}", sourceAppId, newId, UserId);
