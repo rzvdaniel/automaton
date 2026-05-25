@@ -93,6 +93,8 @@ Rules:
 - Build to `frontend/dist/` and set `frontend.build` and `frontend.deployDir` in `automaton.json`.
 - Set `base: './'` in `frontend/vite.config.ts` so the published build uses relative asset URLs under `apps.automaton.monster/{slug}/`.
 - Do not hardcode root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them.
+- Do not add Automaton runtime script tags such as `automaton-config.js` or `automaton-api.js` to app source; the platform injects those during publish.
+- Keep service worker files and registrations inside the same relative app scope. Avoid root-relative worker URLs.
 - Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Treat the build pipeline as required for AI-generated local apps.
 - Do not put source files, `package.json`, or Vite config into runtime.
@@ -120,6 +122,125 @@ export default defineConfig({
   }
 }
 ```
+
+### Canonical installable PWA starter
+
+Use this pattern when the app should be installable on mobile/desktop.
+
+`frontend/index.html`
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>My App</title>
+  </head>
+  <body>
+    <main>
+      <h1>My App</h1>
+      <button id="installButton" type="button" hidden>Install app</button>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
+```
+
+`frontend/public/manifest.webmanifest`
+
+```json
+{
+  "name": "My App",
+  "short_name": "My App",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+```
+
+`frontend/src/main.ts`
+
+```ts
+let deferredInstallPrompt: Event | null = null
+
+const installButton = document.querySelector<HTMLButtonElement>('#installButton')
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault()
+  deferredInstallPrompt = event
+  installButton?.removeAttribute('hidden')
+})
+
+installButton?.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) {
+    return
+  }
+
+  const promptEvent = deferredInstallPrompt as Event & {
+    prompt: () => Promise<void>
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+  }
+
+  await promptEvent.prompt()
+  await promptEvent.userChoice
+  deferredInstallPrompt = null
+  installButton.hidden = true
+})
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null
+  if (installButton) {
+    installButton.hidden = true
+  }
+})
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('./sw.js')
+  })
+}
+```
+
+`frontend/public/sw.js`
+
+```js
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+```
+
+Rules:
+- Keep manifest, icon, and service worker paths relative.
+- Register the service worker with `./sw.js`, not `/sw.js`.
+- Show the install button only after `beforeinstallprompt` fires.
+- Do not add Automaton runtime scripts here. Publish injects them.
+- Validate install from the published `apps.automaton.monster/{slug}/` URL, not from Studio preview.
 
 ## React, Vue, Angular, or other framework apps
 

@@ -78,6 +78,7 @@ Interpretation rules:
 7. If backend controllers exist and no connected runner is available, tell the user to create or deploy one in Automaton Studio.
 8. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
 9. Ask the user before public publish, then use `automaton publish --yes` only after approval.
+10. For installable PWAs, validate install behavior from the published `apps.automaton.monster/{slug}/` URL, not from the Studio preview URL.
 
 ## Current test and debug loop
 
@@ -197,11 +198,20 @@ For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript 
 For React, Vue, Vite vanilla, or other build-based apps, keep the source in the repo and make the deploy target match the final runtime shape.
 
 For build-based frontend apps, keep build-generated hashed asset filenames. Do not add cache-busting by rewriting deployed HTML in Studio or by manually appending random `?v=` query strings in app source unless there is no build system available. Do not emit root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them because published apps live under a slug path.
+Do not hardcode `automaton-config.js`, `automaton-api.js`, or other Automaton runtime script tags into app source. The platform injects those during publish.
+Keep service worker files and registrations relative to the published slug scope; avoid root-relative worker URLs.
+
+Canonical installable PWA pattern:
+- `frontend/index.html` links `./manifest.webmanifest`
+- `frontend/public/manifest.webmanifest` uses `id`, `start_url`, `scope`, and icon `src` values rooted at `./`
+- `frontend/src/main.ts` listens for `beforeinstallprompt` and registers `./sw.js`
+- `frontend/public/sw.js` exists when the app should be installable offline or install-friendly
 
 Responsibility boundary:
 - App build: hashed CSS, JS, image, font, manifest, and worker asset filenames when supported.
 - App build: relative app-local URLs. For Vite, this means `base: './'`.
 - Automaton platform: cache headers, CORS headers, and runtime asset serving.
+- Automaton platform: publish-time injection of platform runtime scripts.
 
 Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 

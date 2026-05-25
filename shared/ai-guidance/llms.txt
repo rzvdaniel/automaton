@@ -51,6 +51,19 @@ try {
 }
 ```
 
+**Published PWA contract** — Installable public apps run from:
+
+```text
+https://apps.automaton.monster/{slug}/
+```
+
+Rules:
+- Studio preview is for testing, not for real PWA installation.
+- Real install behavior must be validated from the published app URL, not from the Studio shell URL.
+- Do not hardcode `automaton-config.js`, `automaton-api.js`, or other Automaton runtime script tags into app source. Automaton injects its runtime scripts at publish time.
+- App-owned files such as `manifest.webmanifest`, icons, service workers, and app-local assets must use relative URLs so they stay inside the published slug scope.
+- When the app is installable, use a standard `beforeinstallprompt` flow, a relative `manifest.webmanifest`, relative icon paths, and relative service worker registration such as `./sw.js`.
+
 **Project root** — keep `automaton.json` in the project root and commit it to Git:
 ```json
 {
@@ -77,12 +90,14 @@ Rules:
 - CSS, JS, images, fonts, manifests, and worker files should use content-hashed filenames when the build system supports it.
 - Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
 - Do not emit root-relative app-local paths such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`. Published apps live under a slug path and these URLs will fail publish validation.
+- Do not emit root-relative service worker or web worker paths. Keep worker registration and emitted worker URLs relative to the app scope.
 - Do not manually append random `?v=` query strings in source code unless there is no build system available.
 - For Vite apps, keep the default hashed asset output and set `base: './'` in `vite.config.ts`.
 - Set `frontend.deployDir` to the final build output, normally `frontend/dist`.
 
 Responsibility boundary:
 - The app build is responsible for producing cache-safe versioned asset filenames.
+- The app build is responsible for keeping app-local files inside the published slug scope, including manifests, icons, service workers, and worker assets.
 - Automaton is responsible for serving deployed assets with correct cache and CORS headers.
 - Studio should not mutate deployed app HTML to add cache-busting.
 

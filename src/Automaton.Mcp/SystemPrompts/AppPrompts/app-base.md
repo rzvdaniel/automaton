@@ -28,7 +28,10 @@ Automaton separates editable source from deployed live files and keeps frontend/
 - For Vite apps, configure `"frontend": { "build": "cd frontend && npm install && npm run build", "deployDir": "frontend/dist" }`.
 - For Vite apps, set `base: './'` in `frontend/vite.config.ts`; published app assets must be relative because apps are served under `apps.automaton.monster/{slug}/`.
 - Do not hardcode root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`; publish validation rejects them.
+- Do not hardcode `automaton-config.js`, `automaton-api.js`, or other Automaton runtime script tags into app source; Automaton injects them during publish.
+- Keep service worker files and registrations relative to the app scope. Avoid root-relative worker URLs.
 - Do not put secrets, `.env`, backend files, source folders, `package.json`, or Vite config into public frontend live files.
+- Studio preview is for testing. Real PWA install behavior must be validated from the published `apps.automaton.monster/{slug}/` URL.
 
 **Use separate `.html` files** when pages have distinct purposes and users would naturally navigate between them (home, dashboard, product detail, settings). Each distinct page = its own file. Users can bookmark or link directly to it.
 
