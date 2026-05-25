@@ -398,13 +398,6 @@ watch(
                   <span><i class="pi pi-play" /> {{ pluralize(app.viewCount, 'play') }}</span>
                   <span>{{ updatedLabel(app) }}</span>
                 </div>
-
-                <div class="app-actions app-actions-single">
-                  <button class="button" type="button" @click.stop="viewApp(app)">
-                    <i class="pi pi-arrow-right" />
-                    Open app
-                  </button>
-                </div>
               </div>
             </div>
           </article>
@@ -707,16 +700,6 @@ watch(
 .card-meta {
   display: grid;
   gap: 10px;
-}
-
-.app-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-
-.app-actions-single {
-  grid-template-columns: 1fr;
 }
 
 .app-meta-row {

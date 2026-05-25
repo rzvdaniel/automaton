@@ -136,30 +136,34 @@ onBeforeUnmount(stopRotation)
       @keydown.enter.prevent="selectApp(activeApp)"
       @keydown.space.prevent="selectApp(activeApp)"
     >
-      <div class="feature-media">
-        <img v-if="imageUrl(activeApp)" :src="imageUrl(activeApp)" :alt="activeApp.name" />
-        <div v-else class="feature-fallback">{{ activeApp.name.charAt(0) }}</div>
-        <div class="feature-media-badges">
-          <span class="badge badge-live">Live app</span>
+      <div class="feature-layout">
+        <div class="feature-media">
+          <div class="feature-media-frame">
+            <img v-if="imageUrl(activeApp)" :src="imageUrl(activeApp)" :alt="activeApp.name" />
+            <div v-else class="feature-fallback">{{ activeApp.name.charAt(0) }}</div>
+          </div>
+          <div class="feature-media-badges">
+            <span class="badge badge-live">Live app</span>
+          </div>
         </div>
-      </div>
 
-      <div class="feature-content">
-        <div class="feature-copy">
-          <div class="badge-row">
-            <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+        <div class="feature-content">
+          <div class="feature-copy">
+            <div class="badge-row">
+              <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+            </div>
+
+            <h3>{{ activeApp.name }}</h3>
+            <p class="feature-description">{{ activeDescription }}</p>
+            <div class="creator-line">{{ activeMeta }}</div>
           </div>
 
-          <h3>{{ activeApp.name }}</h3>
-          <p class="feature-description">{{ activeDescription }}</p>
-          <div class="creator-line">{{ activeMeta }}</div>
-        </div>
-
-        <div class="feature-actions feature-actions-single">
-          <button class="showcase-button primary" type="button" @click.stop="viewApp(activeApp)">
-            <i class="pi pi-arrow-right"></i>
-            Open app
-          </button>
+          <div class="feature-actions feature-actions-single">
+            <button class="showcase-button primary" type="button" @click.stop="viewApp(activeApp)">
+              <i class="pi pi-arrow-right"></i>
+              View details
+            </button>
+          </div>
         </div>
       </div>
     </article>
@@ -238,26 +242,78 @@ onBeforeUnmount(stopRotation)
 }
 
 .feature-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.72fr);
+  display: block;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+  transition: border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.feature-layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.feature-layout::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.feature-layout::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.92;
+  background:
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.02) 16%,
+      rgba(0, 0, 0, 0.14) 34%,
+      rgba(0, 0, 0, 0.52) 56%,
+      rgba(0, 0, 0, 0.84) 78%,
+      rgba(0, 0, 0, 0.94) 100%
+    ),
+    linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.42) 0%,
+      rgba(0, 0, 0, 0.16) 22%,
+      rgba(0, 0, 0, 0) 40%
+    );
+  pointer-events: none;
+  transition: opacity 0.22s ease;
 }
 
 .feature-media {
   position: relative;
+  display: grid;
+  align-items: center;
+  min-width: 0;
   min-height: 0;
-  padding: 18px;
+  padding: 10px 6px 10px 10px;
+}
+
+.feature-media-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  aspect-ratio: 16 / 10;
+  align-self: center;
 }
 
 .feature-card img,
 .feature-fallback {
   width: 100%;
   height: 100%;
-  min-height: 100%;
-  object-fit: contain;
-  object-position: center;
+  object-fit: cover;
+  object-position: center center;
   background: #080b10;
   opacity: 1;
   border-radius: 16px;
@@ -283,25 +339,33 @@ onBeforeUnmount(stopRotation)
 }
 
 .feature-content {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 24px;
-  align-items: start;
-  padding: 24px 24px 24px 6px;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  min-width: 0;
+  align-items: flex-start;
+  padding: 54px 28px 30px 22px;
   min-height: 100%;
+}
+
+.feature-copy {
+  width: min(100%, 22rem);
+  min-width: 0;
 }
 
 .feature-content h3 {
   margin: 0 0 10px;
-  max-width: 720px;
+  max-width: 10ch;
   color: #f5f7fb;
-  font-size: clamp(2.35rem, 3.8vw, 3.4rem);
+  font-size: clamp(1.9rem, 2.8vw, 2.7rem);
   font-weight: 800;
-  line-height: 0.96;
+  line-height: 0.94;
   letter-spacing: -0.05em;
   text-wrap: balance;
+  text-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
 }
 
 .badge-row {
@@ -340,17 +404,19 @@ onBeforeUnmount(stopRotation)
 }
 
 .creator-line {
-  margin-top: 18px;
-  color: #d4d9e2;
-  font-size: 0.96rem;
+  margin-top: 14px;
+  color: #dce3ee;
+  font-size: 0.94rem;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 
 .feature-description {
-  max-width: 56ch;
+  max-width: 34ch;
   margin: 0;
-  color: #aeb8c9;
-  font-size: 0.98rem;
-  line-height: 1.6;
+  color: #c2cbda;
+  font-size: 0.97rem;
+  line-height: 1.55;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 
 .feature-actions {
@@ -396,10 +462,28 @@ onBeforeUnmount(stopRotation)
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.feature-card:hover {
+  border-color: rgba(80, 215, 255, 0.24);
+  box-shadow: 0 28px 88px rgba(0, 0, 0, 0.42);
+}
+
+.feature-card:hover .feature-layout::after {
+  opacity: 1;
+}
+
+.feature-card:hover .feature-card img {
+  transform: scale(1.03);
+}
+
+.feature-card img {
+  transition: transform 0.28s ease;
+}
+
 .showcase-button.primary {
   border-color: rgba(69, 230, 138, 0.55);
   background: #45e68a;
   color: #041008;
+  min-width: 200px;
 }
 
 .side-stack {
@@ -488,16 +572,33 @@ onBeforeUnmount(stopRotation)
   }
 
   .feature-card {
+    display: grid;
+  }
+
+  .feature-layout {
     grid-template-columns: 1fr;
   }
 
+  .feature-layout::before,
+  .feature-layout::after {
+    display: none;
+  }
+
   .feature-content {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
     align-items: stretch;
-    padding: 6px 22px 22px;
-    border-left: 0;
+    padding: 8px 22px 22px;
     min-height: 0;
+  }
+
+  .feature-copy {
+    width: 100%;
+  }
+
+  .feature-content h3 {
+    max-width: none;
   }
 
   .feature-actions {
@@ -524,10 +625,10 @@ onBeforeUnmount(stopRotation)
     padding: 14px;
   }
 
-  .feature-card img,
-  .feature-fallback {
-    min-height: 260px;
-    height: 260px;
+  .feature-media-frame {
+    min-height: 0;
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
 
   .feature-media-badges {

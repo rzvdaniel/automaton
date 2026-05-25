@@ -800,7 +800,7 @@ onMounted(loadApp)
   position: relative;
   overflow: hidden;
   display: grid;
-  height: 520px;
+  aspect-ratio: 16 / 9;
   place-items: center;
   padding: 18px;
   background:
@@ -809,8 +809,8 @@ onMounted(loadApp)
 }
 
 .stage-image {
-  width: min(100%, 780px);
-  max-height: 486px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
   border-radius: 8px;
@@ -1193,7 +1193,7 @@ onMounted(loadApp)
   }
 
   .gallery-stage {
-    height: 360px;
+    aspect-ratio: 16 / 9;
   }
 }
 
@@ -1220,11 +1220,7 @@ onMounted(loadApp)
   }
 
   .gallery-stage {
-    height: 280px;
-  }
-
-  .stage-image {
-    max-height: 260px;
+    aspect-ratio: 16 / 9;
   }
 
   .gallery-arrow {

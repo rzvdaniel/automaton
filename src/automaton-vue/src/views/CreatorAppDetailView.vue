@@ -254,9 +254,7 @@ onMounted(loadPage)
 
 .hero-media {
   position: relative;
-  min-height: 320px;
-  height: min(60vh, 560px);
-  max-height: min(60vh, 560px);
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #0e141b;
 }
@@ -269,7 +267,8 @@ onMounted(loadPage)
 }
 
 .hero-image {
-  object-fit: cover;
+  object-fit: contain;
+  background: #0e141b;
 }
 
 .hero-fallback {
@@ -411,8 +410,7 @@ onMounted(loadPage)
   }
 
   .hero-media {
-    height: min(46vh, 420px);
-    max-height: min(46vh, 420px);
+    aspect-ratio: 16 / 9;
   }
 
   .hero-copy {
