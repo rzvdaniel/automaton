@@ -285,6 +285,7 @@ public class AppsController : BaseController
     }
 
     [HttpPost("{id}/publish")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request)
     {
         await appsService.Publish(
@@ -300,6 +301,7 @@ public class AppsController : BaseController
     }
 
     [HttpPost("{id}/unpublish")]
+    [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Unpublish(Guid id)
     {
         await appsService.Unpublish(id);
