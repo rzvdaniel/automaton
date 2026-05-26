@@ -1263,6 +1263,52 @@ public class AppsController : BaseController
     }
 
     /// <summary>
+    /// Delete a directory in source or live scope.
+    /// Versions are immutable and cannot be modified.
+    /// </summary>
+    [HttpDelete("{id}/filesystem/{scope}/directory/{*path}")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> DeleteAppFilesystemDirectory(Guid id, string scope, string path)
+    {
+        try
+        {
+            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            if (appInfo == null)
+            {
+                return NotFound(new { success = false, message = "App not found" });
+            }
+
+            var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedScope = NormalizeFileSystemScope(scope);
+            if (normalizedScope == null)
+            {
+                return BadRequest(new { success = false, message = "Invalid filesystem scope" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Versions)
+            {
+                return BadRequest(new { success = false, message = "Version snapshots are read-only" });
+            }
+
+            if (normalizedScope == AppFileSystemScopes.Source)
+            {
+                await fileStorageService.DeleteSourceDirectoryAsync(ownerId, id, path);
+            }
+            else
+            {
+                await fileStorageService.DeleteRuntimeDirectoryAsync(ownerId, id, path);
+            }
+
+            return Ok(new { success = true, scope = normalizedScope, editable = true });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete filesystem directory {Path} for app {AppId}", path, id);
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Read content of a specific editable source file.
     /// </summary>
     [HttpGet("{id}/files/{*path}")]

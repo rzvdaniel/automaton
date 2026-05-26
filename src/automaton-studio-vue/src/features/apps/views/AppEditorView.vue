@@ -773,6 +773,35 @@ async function handleDeleteFile(path: string) {
   })
 }
 
+async function handleDeleteFolder(path: string) {
+  confirm.require({
+    message: `Are you sure you want to delete the folder "${path}" and all of its contents? This action cannot be undone.`,
+    header: 'Confirm Delete',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    accept: async () => {
+      try {
+        await editorStore.deleteFolder(path)
+        toast.add({
+          severity: 'success',
+          summary: 'Deleted',
+          detail: `Folder "${path}" deleted`,
+          life: 3000,
+        })
+      } catch (err: unknown) {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: err instanceof Error ? err.message : 'Failed to delete folder',
+          life: 5000,
+        })
+      }
+    },
+  })
+}
+
 // Handle version created - refresh the history list
 async function handleVersionCreated() {
   if (versionHistoryRef.value?.loadVersions) {
@@ -1118,6 +1147,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       empty-message="No app files yet"
                       @create-file="showCreateFileDialog = true"
                       @delete-file="handleDeleteFile"
+                      @delete-folder="handleDeleteFolder"
                     />
                   </div>
                 </SplitterPanel>

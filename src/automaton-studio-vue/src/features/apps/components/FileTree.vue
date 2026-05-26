@@ -33,6 +33,7 @@ const emit = defineEmits<{
   createFolder: []
   openFile: [path: string]
   deleteFile: [path: string]
+  deleteFolder: [path: string]
   renameFile: [path: string]
 }>()
 
@@ -129,6 +130,30 @@ function canDeleteFile(path: string | undefined): boolean {
     normalizedPath !== 'source/_metadata.json' &&
     normalizedPath !== '_metadata.json'
 }
+
+function canDeleteFolder(path: string | undefined): boolean {
+  if (!props.allowDelete) return false
+  if (!path) return false
+  const normalizedPath = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  const scope = normalizedPath.startsWith('source/')
+    ? 'source'
+    : normalizedPath.startsWith('live/')
+      ? 'live'
+      : normalizedPath.startsWith('versions/')
+        ? 'versions'
+        : null
+
+  if (scope === 'versions' || scope === null) {
+    return false
+  }
+
+  return normalizedPath !== 'source' &&
+    normalizedPath !== 'live' &&
+    normalizedPath !== 'source/frontend' &&
+    normalizedPath !== 'source/backend' &&
+    normalizedPath !== 'live/frontend' &&
+    normalizedPath !== 'live/backend'
+}
 </script>
 
 <template>
@@ -181,6 +206,17 @@ function canDeleteFile(path: string | undefined): boolean {
                 severity="secondary"
                 class="delete-file-button"
                 @click.stop="emit('deleteFile', node.data.path)"
+              />
+              <Button
+                v-else-if="node.data?.type === 'folder' && canDeleteFolder(node.data?.path)"
+                v-tooltip.left="'Delete folder'"
+                icon="pi pi-trash"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                class="delete-file-button"
+                @click.stop="emit('deleteFolder', node.data.path)"
               />
             </div>
           </div>

@@ -522,6 +522,14 @@ public class AppFileStorageService
     }
 
     /// <summary>
+    /// Delete an editable source directory for an app.
+    /// </summary>
+    public Task DeleteSourceDirectoryAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return DeleteDirectoryAsync(GetSourcePath(userId, appId), relativePath);
+    }
+
+    /// <summary>
     /// Remove all editable source files while preserving live files and versions.
     /// </summary>
     public Task ClearSourceAsync(Guid userId, Guid appId)
@@ -590,6 +598,14 @@ public class AppFileStorageService
     public Task DeleteRuntimeFileAsync(Guid userId, Guid appId, string relativePath)
     {
         return DeleteFileAsync(GetLiveFrontendPath(userId, appId), relativePath);
+    }
+
+    /// <summary>
+    /// Delete a deployed frontend live directory for an app.
+    /// </summary>
+    public Task DeleteRuntimeDirectoryAsync(Guid userId, Guid appId, string relativePath)
+    {
+        return DeleteDirectoryAsync(GetLiveFrontendPath(userId, appId), relativePath);
     }
 
     /// <summary>
@@ -680,13 +696,22 @@ public class AppFileStorageService
     {
         var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
         var runtimeFrontendPath = GetLiveFrontendPath(userId, appId);
-        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
         if (!HasAnyEntries(sourceFrontendPath))
         {
             logger.Information("No source/frontend files found for app {AppId}; preserving existing live/frontend", appId);
             return (0, false);
         }
+
+        if (IsBuildBasedFrontendSourcePath(sourceFrontendPath))
+        {
+            logger.Information(
+                "Detected build-based frontend source for app {AppId}; preserving existing live/frontend instead of copying source/frontend directly",
+                appId);
+            return (0, false);
+        }
+
+        var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
 
         if (Directory.Exists(runtimeFrontendPath))
         {
@@ -713,6 +738,35 @@ public class AppFileStorageService
 
         logger.Information("Synced source/frontend to live/frontend for app {AppId}", appId);
         return (copied, true);
+    }
+
+    private static bool IsBuildBasedFrontendSourcePath(string sourceFrontendPath)
+    {
+        if (!Directory.Exists(sourceFrontendPath))
+        {
+            return false;
+        }
+
+        var buildMarkers = new[]
+        {
+            "package.json",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "yarn.lock",
+            "vite.config.js",
+            "vite.config.ts",
+            "vite.config.mjs",
+            "vite.config.cjs",
+            "tsconfig.json"
+        };
+
+        if (buildMarkers.Any(marker => File.Exists(Path.Combine(sourceFrontendPath, marker))))
+        {
+            return true;
+        }
+
+        var buildDirectories = new[] { "src", "public" };
+        return buildDirectories.Any(directory => Directory.Exists(Path.Combine(sourceFrontendPath, directory)));
     }
 
     /// <summary>
@@ -1141,6 +1195,22 @@ public class AppFileStorageService
     public Task DeleteFileAtPathAsync(string rootPath, string relativePath)
     {
         return DeleteFileAsync(rootPath, relativePath);
+    }
+
+    private static Task DeleteDirectoryAsync(string rootPath, string relativePath)
+    {
+        var directoryPath = ResolveSafePath(rootPath, relativePath);
+        if (Directory.Exists(directoryPath))
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteDirectoryAtPathAsync(string rootPath, string relativePath)
+    {
+        return DeleteDirectoryAsync(rootPath, relativePath);
     }
 
     private static string ResolveSafePath(string rootPath, string relativePath)

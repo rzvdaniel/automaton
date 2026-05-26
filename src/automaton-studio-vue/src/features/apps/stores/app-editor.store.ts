@@ -210,7 +210,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   function normalizePreviewPath(path: string): string | null {
-    const normalizedPath = path.replace(/\\/g, '/').trimStart('/')
+    const normalizedPath = path.replace(/\\/g, '/').replace(/^\/+/, '')
     if (normalizedPath.startsWith('backend/')) {
       return null
     }
@@ -515,6 +515,36 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       closeFile(filePath, true)
 
       // Refresh file tree
+      await loadUnifiedFileTree(currentApp.value.id)
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err)
+      throw err
+    }
+  }
+
+  async function deleteFolder(folderPath: string): Promise<void> {
+    if (!currentApp.value) return
+
+    try {
+      const folderScope = getScopeFromScopedPath(folderPath)
+      currentFileScope.value = folderScope
+      const relativePath = getRelativePathFromScopedPath(folderPath, folderScope)
+
+      if (folderScope === FileSystemScope.Source || folderScope === FileSystemScope.Live) {
+        await appsService.deleteScopedDirectory(currentApp.value.id, folderScope, relativePath)
+      } else {
+        throw new Error('Version snapshots are read-only')
+      }
+
+      const folderPrefix = `${folderPath.replace(/\\/g, '/').replace(/\/+$/, '')}/`
+      const openFilePaths = openFiles.value
+        .map((file) => file.path)
+        .filter((path) => path === folderPath || path.startsWith(folderPrefix))
+
+      for (const openFilePath of openFilePaths) {
+        closeFile(openFilePath, true)
+      }
+
       await loadUnifiedFileTree(currentApp.value.id)
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
@@ -1171,6 +1201,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     saveAllFiles,
     createFile,
     deleteFile,
+    deleteFolder,
     refreshPreview,
     setPreviewMode,
     setPreviewWarning,

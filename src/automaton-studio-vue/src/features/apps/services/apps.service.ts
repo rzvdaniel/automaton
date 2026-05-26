@@ -440,6 +440,11 @@ class AppsService {
     await apiClient.delete(`/api/apps/${id}/filesystem/${scope}/${encodedPath}`)
   }
 
+  async deleteScopedDirectory(id: string, scope: AppFileSystemScope, path: string): Promise<void> {
+    const encodedPath = this.encodePath(path)
+    await apiClient.delete(`/api/apps/${id}/filesystem/${scope}/directory/${encodedPath}`)
+  }
+
   /**
    * Write file content
    * PUT /api/apps/{id}/files/{path}

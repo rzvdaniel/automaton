@@ -56,6 +56,7 @@ const tabs = [
 ] as const
 
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 const isEditorActionTab = computed(
   () => props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
@@ -75,18 +76,6 @@ const actionMenuItems = computed<MenuItem[]>(() => {
     command: () => emit('deployBackend'),
   })
 
-  if (props.isPublished) {
-    items.push({ separator: true })
-    items.push({
-      label: 'Open Published App',
-      command: () => emit('openPublishedApp'),
-    })
-    items.push({
-      label: 'Unpublish',
-      command: () => emit('unpublish'),
-    })
-  }
-
   return items
 })
 
@@ -94,8 +83,24 @@ const isPrimaryActionDisabled = computed(() => {
   return !props.canDeployFromStudio || props.isDeployingApp
 })
 
+function getGroupedMenuEvent(event: Event, selector: string) {
+  const trigger = event.currentTarget instanceof HTMLElement
+    ? event.currentTarget.closest(selector) ?? event.currentTarget
+    : event.currentTarget
+
+  return {
+    ...event,
+    currentTarget: trigger,
+    target: trigger,
+  }
+}
+
 function toggleActionMenu(event: Event) {
-  actionMenu.value?.toggle(event)
+  actionMenu.value?.toggle(getGroupedMenuEvent(event, '.deploy-actions'))
+}
+
+function togglePublishedMenu(event: Event) {
+  publishedMenu.value?.toggle(getGroupedMenuEvent(event, '.published-actions'))
 }
 
 function handlePrimaryAction() {
@@ -193,14 +198,33 @@ function handlePrimaryAction() {
         @click="emit('publish')"
       />
 
-      <Button
-        v-else-if="activeTab !== 'backend-server' && isPublished"
-        label="Published"
-        icon="pi pi-external-link"
-        outlined
-        severity="secondary"
-        @click="emit('openPublishedApp')"
-      />
+      <div v-else-if="activeTab !== 'backend-server' && isPublished" class="published-actions">
+        <Button
+          label="Published"
+          icon="pi pi-external-link"
+          outlined
+          severity="secondary"
+          class="published-main-button"
+          @click="emit('openPublishedApp')"
+        />
+        <Button
+          icon="pi pi-chevron-down"
+          outlined
+          severity="secondary"
+          class="published-menu-button"
+          aria-label="Published actions"
+          @click="togglePublishedMenu"
+        />
+        <Menu
+          ref="publishedMenu"
+          class="deploy-menu"
+          :model="[
+            { label: 'Open Published App', command: () => emit('openPublishedApp') },
+            { label: 'Unpublish', command: () => emit('unpublish') },
+          ]"
+          :popup="true"
+        />
+      </div>
 
       <Button
         v-if="hasUnsavedChanges && activeTab === 'code'"
@@ -339,6 +363,15 @@ function handlePrimaryAction() {
   overflow: hidden;
 }
 
+.published-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  overflow: hidden;
+}
+
 .deploy-actions :deep(.deploy-main-button) {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
@@ -351,6 +384,23 @@ function handlePrimaryAction() {
   border-left: 1px solid color-mix(in srgb, white 26%, transparent);
 }
 
+.published-actions :deep(.published-main-button) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+
+.published-actions :deep(.published-menu-button) {
+  min-width: 2.5rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in srgb, var(--p-surface-300) 85%, transparent);
+}
+
+.published-actions :deep(.published-menu-button .p-button-icon) {
+  font-size: 0.8rem;
+}
+
 .deploy-actions :deep(.deploy-menu-button .p-button-icon) {
   font-size: 0.8rem;
 }
@@ -361,6 +411,14 @@ function handlePrimaryAction() {
 
 :global(.app-dark) .deploy-actions .deploy-menu-button {
   border-left-color: color-mix(in srgb, white 14%, transparent);
+}
+
+:global(.app-dark) .published-actions {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+:global(.app-dark) .published-actions .published-menu-button {
+  border-left-color: color-mix(in srgb, var(--p-surface-600) 75%, transparent);
 }
 
 :global(.deploy-menu.p-menu) {
