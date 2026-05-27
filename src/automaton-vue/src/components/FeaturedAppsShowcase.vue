@@ -37,6 +37,8 @@ const activeMeta = computed(() => {
   return parts.join(' · ')
 })
 
+const activeCategory = computed(() => activeApp.value?.category || '')
+
 const activeDescription = computed(() => {
   const app = activeApp.value
   if (!app) return ''
@@ -148,21 +150,18 @@ onBeforeUnmount(stopRotation)
         </div>
 
         <div class="feature-content">
-          <div class="feature-copy">
-            <div class="badge-row">
-              <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+          <div class="feature-bottom-strip">
+            <div class="feature-copy">
+              <div class="badge-row">
+                <span v-if="activeApp.isFeatured" class="badge badge-hot">Featured</span>
+                <span v-if="activeCategory" class="badge badge-live">{{ activeCategory }}</span>
+              </div>
+
+              <h3>{{ activeApp.name }}</h3>
+              <div class="creator-line">{{ activeMeta }}</div>
+              <p class="feature-description">{{ activeDescription }}</p>
             </div>
 
-            <h3>{{ activeApp.name }}</h3>
-            <p class="feature-description">{{ activeDescription }}</p>
-            <div class="creator-line">{{ activeMeta }}</div>
-          </div>
-
-          <div class="feature-actions feature-actions-single">
-            <button class="showcase-button primary" type="button" @click.stop="viewApp(activeApp)">
-              <i class="pi pi-arrow-right"></i>
-              View details
-            </button>
           </div>
         </div>
       </div>
@@ -254,7 +253,7 @@ onBeforeUnmount(stopRotation)
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.95fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
 }
@@ -271,21 +270,15 @@ onBeforeUnmount(stopRotation)
   content: "";
   position: absolute;
   inset: 0;
-  opacity: 0.92;
+  opacity: 0;
   background:
     linear-gradient(
-      to right,
-      rgba(0, 0, 0, 0.02) 16%,
-      rgba(0, 0, 0, 0.14) 34%,
-      rgba(0, 0, 0, 0.52) 56%,
-      rgba(0, 0, 0, 0.84) 78%,
-      rgba(0, 0, 0, 0.94) 100%
-    ),
-    linear-gradient(
       to top,
-      rgba(0, 0, 0, 0.42) 0%,
-      rgba(0, 0, 0, 0.16) 22%,
-      rgba(0, 0, 0, 0) 40%
+      rgba(2, 6, 11, 0.96) 0%,
+      rgba(2, 6, 11, 0.9) 16%,
+      rgba(2, 6, 11, 0.56) 34%,
+      rgba(2, 6, 11, 0.12) 56%,
+      rgba(2, 6, 11, 0) 74%
     );
   pointer-events: none;
   transition: opacity 0.22s ease;
@@ -295,9 +288,10 @@ onBeforeUnmount(stopRotation)
   position: relative;
   display: grid;
   align-items: center;
+  height: 100%;
   min-width: 0;
   min-height: 0;
-  padding: 10px 6px 10px 10px;
+  padding: 10px;
 }
 
 .feature-media-frame {
@@ -323,7 +317,7 @@ onBeforeUnmount(stopRotation)
 .feature-media-badges {
   position: absolute;
   left: 32px;
-  bottom: 14px;
+  top: 28px;
   display: flex;
   gap: 8px;
   pointer-events: none;
@@ -341,38 +335,42 @@ onBeforeUnmount(stopRotation)
 .feature-content {
   position: relative;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 20px;
+  display: block;
   min-width: 0;
-  align-items: flex-start;
-  padding: 54px 28px 30px 22px;
-  min-height: 100%;
+  background: linear-gradient(180deg, rgba(10, 16, 23, 0.98), rgba(6, 10, 16, 0.98));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.feature-copy {
-  width: min(100%, 22rem);
-  min-width: 0;
+.feature-bottom-strip {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 24px 20px;
 }
 
 .feature-content h3 {
-  margin: 0 0 10px;
-  max-width: 10ch;
+  margin: 0;
+  max-width: 14ch;
   color: #f5f7fb;
-  font-size: clamp(1.9rem, 2.8vw, 2.7rem);
+  font-size: clamp(1.8rem, 2.5vw, 2.5rem);
   font-weight: 800;
-  line-height: 0.94;
+  line-height: 0.96;
   letter-spacing: -0.05em;
   text-wrap: balance;
   text-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+.feature-copy {
+  min-width: 0;
+  max-width: 34rem;
 }
 
 .badge-row {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .badge {
@@ -404,62 +402,24 @@ onBeforeUnmount(stopRotation)
 }
 
 .creator-line {
-  margin-top: 14px;
+  margin-top: 6px;
   color: #dce3ee;
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+  opacity: 0.9;
 }
 
 .feature-description {
-  max-width: 34ch;
-  margin: 0;
+  max-width: 44ch;
+  margin: 8px 0 0;
   color: #c2cbda;
-  font-size: 0.97rem;
-  line-height: 1.55;
+  font-size: 0.92rem;
+  line-height: 1.4;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
-}
-
-.feature-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  min-width: 0;
-  width: 100%;
-  align-self: end;
-}
-
-.feature-actions-single {
-  grid-template-columns: minmax(200px, 1fr);
-}
-
-.feature-actions .showcase-button.primary {
-  grid-column: 1 / -1;
-}
-
-.showcase-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 46px;
-  min-width: 0;
-  padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: #11161d;
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 800;
-  line-height: 1.15;
-  white-space: normal;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-
-.showcase-button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.2);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .feature-card:hover {
@@ -468,7 +428,7 @@ onBeforeUnmount(stopRotation)
 }
 
 .feature-card:hover .feature-layout::after {
-  opacity: 1;
+  opacity: 0;
 }
 
 .feature-card:hover .feature-card img {
@@ -477,13 +437,6 @@ onBeforeUnmount(stopRotation)
 
 .feature-card img {
   transition: transform 0.28s ease;
-}
-
-.showcase-button.primary {
-  border-color: rgba(69, 230, 138, 0.55);
-  background: #45e68a;
-  color: #041008;
-  min-width: 200px;
 }
 
 .side-stack {
@@ -523,6 +476,10 @@ onBeforeUnmount(stopRotation)
   margin: 0;
   color: #97a1b3;
   font-size: 0.9rem;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .showcase-controls {
@@ -576,7 +533,7 @@ onBeforeUnmount(stopRotation)
   }
 
   .feature-layout {
-    grid-template-columns: 1fr;
+    display: block;
   }
 
   .feature-layout::before,
@@ -585,24 +542,17 @@ onBeforeUnmount(stopRotation)
   }
 
   .feature-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    padding: 8px 22px 22px;
-    min-height: 0;
+    position: relative;
   }
 
-  .feature-copy {
-    width: 100%;
+  .feature-bottom-strip {
+    display: grid;
+    justify-content: stretch;
+    padding: 18px 22px 22px;
   }
 
   .feature-content h3 {
     max-width: none;
-  }
-
-  .feature-actions {
-    min-width: 0;
   }
 
   .side-stack {
@@ -633,12 +583,12 @@ onBeforeUnmount(stopRotation)
 
   .feature-media-badges {
     left: 24px;
-    bottom: 10px;
+    top: 24px;
   }
 
-  .feature-content {
-    gap: 18px;
-    padding: 4px 14px 16px;
+  .feature-bottom-strip {
+    gap: 16px;
+    padding: 14px 14px 16px;
   }
 
   .feature-content h3 {
@@ -648,11 +598,8 @@ onBeforeUnmount(stopRotation)
 
   .feature-description {
     font-size: 0.95rem;
-    line-height: 1.55;
+    line-height: 1.45;
   }
 
-  .feature-actions {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 </style>

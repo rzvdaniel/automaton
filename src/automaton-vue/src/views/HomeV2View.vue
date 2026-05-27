@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
@@ -26,8 +26,9 @@ type FallbackApp = {
 const router = useRouter()
 const { apps, featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
-const activePreviewUrl = ref<string | null>(null)
 const showCopyNotice = ref(false)
+const isCarouselPaused = ref(false)
+let rotationId: number | undefined
 
 const fallbackApps: FallbackApp[] = [
   {
@@ -50,28 +51,34 @@ const fallbackApps: FallbackApp[] = [
 
 const heroApps = computed<(MarketplaceAppCard | FallbackApp)[]>(() => {
   const realApps = featuredApps.value.length > 0 ? featuredApps.value : apps.value
-  return realApps.length > 0 ? realApps.slice(0, 8) : fallbackApps
+  return realApps.length > 0 ? realApps.slice(0, 3) : fallbackApps
 })
 
 const activeApp = computed(() => heroApps.value[activeIndex.value] ?? heroApps.value[0])
-const activeMainImageUrl = computed(() => activePreviewUrl.value || activeApp.value?.thumbnailUrl || '')
 const activeAppCopy = computed(() => {
   const app = activeApp.value
   if (!app) return ''
 
   return app.summary || app.description || 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.'
 })
-const activeScreenshots = computed(() => {
-  const app = activeApp.value
-  if (!app) return []
-
-  const screenshots = app.screenshots?.slice(0, 3) ?? []
-  if (screenshots.length > 0) return screenshots
-
-  return app.thumbnailUrl
-    ? [{ id: 'thumbnail', imageUrl: app.thumbnailUrl, caption: app.name, sortOrder: 0 }]
-    : []
-})
+const sideApps = computed(() =>
+  heroApps.value
+    .map((app, index) => ({ app, index }))
+    .filter((item) => item.index !== activeIndex.value)
+    .slice(0, 2),
+)
+const activeMetaImageUrl = computed(() => activeApp.value?.thumbnailUrl || '')
+const activeCreatorName = computed(() => activeApp.value?.creatorDisplayName || 'Automaton creator')
+const activeCtaLabel = computed(() => (activeApp.value?.id.startsWith('fallback-') ? 'Browse public apps' : 'View details'))
+const activeSecondaryCtaLabel = computed(() => (activeApp.value?.id.startsWith('fallback-') ? 'Install the CLI' : 'Open app'))
+const activeSecondaryCtaTarget = computed(() => (activeApp.value?.id.startsWith('fallback-') ? '/cli' : `/apps/${activeApp.value?.id}`))
+const previewCardImage = (app: MarketplaceAppCard | FallbackApp) => {
+  const firstScreenshot = app.screenshots?.[0]?.imageUrl
+  return firstScreenshot || app.thumbnailUrl
+}
+const previewCardCopy = (app: MarketplaceAppCard | FallbackApp) => {
+  return app.summary || app.description || 'Published Automaton app'
+}
 
 function appImageUrl(url?: string | null) {
   if (!url) return ''
@@ -82,32 +89,61 @@ function appImageUrl(url?: string | null) {
 }
 
 function previousApp() {
+  if (heroApps.value.length <= 1) return
   activeIndex.value = (activeIndex.value - 1 + heroApps.value.length) % heroApps.value.length
-  activePreviewUrl.value = null
 }
 
 function nextApp() {
+  if (heroApps.value.length <= 1) return
   activeIndex.value = (activeIndex.value + 1) % heroApps.value.length
-  activePreviewUrl.value = null
 }
 
 function selectApp(index: number) {
   activeIndex.value = index
-  activePreviewUrl.value = null
 }
 
-function previewScreenshot(url: string) {
-  activePreviewUrl.value = url
+function pauseCarousel() {
+  isCarouselPaused.value = true
 }
 
-function resetPreview() {
-  activePreviewUrl.value = null
+function resumeCarousel() {
+  isCarouselPaused.value = false
+}
+
+function handleCarouselLeave() {
+  resumeCarousel()
 }
 
 function openActiveApp() {
   const app = activeApp.value
-  if (!app || app.id.startsWith('fallback-')) return
+  if (!app) return
+  if (app.id.startsWith('fallback-')) {
+    void router.push('/apps')
+    return
+  }
   void router.push(`/apps/${app.id}`)
+}
+
+function openSecondaryCta() {
+  const target = activeSecondaryCtaTarget.value
+  if (!target) return
+  void router.push(target)
+}
+
+function startRotation() {
+  stopRotation()
+  rotationId = window.setInterval(() => {
+    if (!isCarouselPaused.value && heroApps.value.length > 1) {
+      nextApp()
+    }
+  }, 6500)
+}
+
+function stopRotation() {
+  if (rotationId !== undefined) {
+    window.clearInterval(rotationId)
+    rotationId = undefined
+  }
 }
 
 async function copySetupFlow() {
@@ -124,7 +160,19 @@ async function copySetupFlow() {
 
 onMounted(() => {
   void loadApps()
+  startRotation()
 })
+
+onBeforeUnmount(stopRotation)
+
+watch(
+  () => heroApps.value.length,
+  (length) => {
+    if (activeIndex.value >= length) {
+      activeIndex.value = 0
+    }
+  },
+)
 </script>
 
 <template>
@@ -155,7 +203,13 @@ onMounted(() => {
           </div>
 
           <div class="hero-showcase">
-            <div class="carousel-frame" @mouseleave="resetPreview">
+            <div
+              class="carousel-frame"
+              @mouseenter="pauseCarousel"
+              @mouseleave="handleCarouselLeave"
+              @focusin="pauseCarousel"
+              @focusout="resumeCarousel"
+            >
               <div class="carousel-label">
                 <span>Featured & recommended</span>
                 <span class="carousel-header-controls">
@@ -169,57 +223,68 @@ onMounted(() => {
                 </span>
               </div>
 
-              <article v-if="activeApp" class="featured-app" role="button" tabindex="0" @click="openActiveApp" @keydown.enter.prevent="openActiveApp">
-                <div class="featured-image">
-                  <img
-                    :src="appImageUrl(activeMainImageUrl)"
-                    :alt="`${activeApp.name} screenshot`"
-                    @focus="resetPreview"
-                    @mouseenter="resetPreview"
-                  />
-                </div>
-                <div class="featured-detail">
-                  <div>
-                    <h2>{{ activeApp.name }}</h2>
-                    <p v-if="activeApp.creatorDisplayName" class="creator-line">by {{ activeApp.creatorDisplayName }}</p>
-                    <p class="featured-description">{{ activeAppCopy }}</p>
-                  </div>
-                  <div class="featured-thumbs">
-                    <button
-                      v-for="screenshot in activeScreenshots"
-                      :key="screenshot.id"
-                      class="thumb-button"
-                      type="button"
-                      :aria-label="screenshot.caption || activeApp.name"
-                      @focus="previewScreenshot(screenshot.imageUrl)"
-                      @mouseenter="previewScreenshot(screenshot.imageUrl)"
-                    >
-                      <img :src="appImageUrl(screenshot.imageUrl)" :alt="screenshot.caption || activeApp.name" />
-                    </button>
-                  </div>
-                  <div class="carousel-controls">
-                    <span class="carousel-bottom-controls">
-                      <span class="carousel-dots">
-                        <button
-                          v-for="(_app, index) in heroApps"
-                          :key="`${_app.id}-${index}`"
-                          class="dot"
-                          :class="{ active: index === activeIndex }"
-                          type="button"
-                          :aria-label="`Show app ${index + 1}`"
-                          @click.stop="selectApp(index)"
-                        />
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </article>
-            </div>
+              <section v-if="activeApp" class="featured-shelf" aria-label="Featured apps">
+                <article class="featured-stage">
+                  <button
+                    class="featured-image-button"
+                    type="button"
+                    @click="openActiveApp"
+                    @keydown.enter.prevent="openActiveApp"
+                  >
+                    <img
+                      :src="appImageUrl(activeMetaImageUrl)"
+                      :alt="`${activeApp.name} cover`"
+                    />
+                  </button>
 
-            <div id="install" class="quick-setup">
-              <div>$ dotnet tool install -g Automaton.Cli</div>
-              <div>$ automaton setup</div>
-              <div><span class="muted"># Then ask:</span> Build a live ISS tracker with Earth view and astronaut telemetry.</div>
+                  <div class="featured-meta">
+                    <div class="featured-copy">
+                      <h2>{{ activeApp.name }}</h2>
+                      <p class="creator-line">by {{ activeCreatorName }}</p>
+                      <p class="featured-description">{{ activeAppCopy }}</p>
+                    </div>
+                    <div class="featured-actions">
+                      <button class="button primary" type="button" @click="openActiveApp">{{ activeCtaLabel }}</button>
+                      <button class="button" type="button" @click="openSecondaryCta">{{ activeSecondaryCtaLabel }}</button>
+                    </div>
+                  </div>
+                </article>
+
+                <aside class="featured-previews" aria-label="More featured apps">
+                  <button
+                    v-for="item in sideApps"
+                    :key="item.app.id"
+                    class="preview-card"
+                    type="button"
+                    :aria-label="`Show ${item.app.name}`"
+                    @click="selectApp(item.index)"
+                  >
+                    <div class="preview-media">
+                      <img :src="appImageUrl(previewCardImage(item.app))" :alt="item.app.name" />
+                    </div>
+                    <div class="preview-copy">
+                      <h3>{{ item.app.name }}</h3>
+                      <p>{{ previewCardCopy(item.app) }}</p>
+                    </div>
+                  </button>
+                </aside>
+              </section>
+
+              <div class="carousel-controls">
+                <span class="carousel-bottom-controls">
+                  <span class="carousel-dots">
+                    <button
+                      v-for="(_app, index) in heroApps"
+                      :key="`${_app.id}-${index}`"
+                      class="dot"
+                      :class="{ active: index === activeIndex }"
+                      type="button"
+                      :aria-label="`Show app ${index + 1}`"
+                      @click.stop="selectApp(index)"
+                    />
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -227,9 +292,13 @@ onMounted(() => {
 
       <section id="build">
         <div class="shell">
-          <div class="section-head">
+          <div class="section-head section-head-build">
             <h2>Install once. Then just describe the app.</h2>
-            <p>Setup teaches your AI how Automaton apps work. After that, you describe the product — the agent handles structure, deployment, and publishing.</p>
+            <div id="install" class="quick-setup quick-setup-large">
+              <div>$ dotnet tool install -g Automaton.Cli</div>
+              <div>$ automaton setup</div>
+              <div><span class="muted"># Then ask:</span> Build a live ISS tracker with Earth view and astronaut telemetry.</div>
+            </div>
           </div>
           <div class="steps">
             <article class="step">
@@ -601,101 +670,140 @@ h1 span:last-child {
   font-size: 0.72rem;
 }
 
-.featured-app {
+.featured-shelf {
   display: grid;
-  grid-template-columns: minmax(0, 1.85fr) minmax(240px, 0.65fr);
-  height: 350px;
-  color: inherit;
-  text-align: left;
+  grid-template-columns: minmax(0, 1.8fr) minmax(240px, 0.62fr);
+  min-height: 392px;
+}
+
+.featured-stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.featured-image-button {
+  display: grid;
+  place-items: center;
+  padding: 10px 12px 0;
+  border: 0;
+  background: #080b10;
   cursor: pointer;
 }
 
-.featured-image {
-  display: grid;
-  place-items: center;
-  padding: 1px 2px;
-  background: #080b10;
-}
-
-.featured-image img {
-  width: min(100%, 600px);
-  max-height: 318px;
-  object-fit: contain;
-  border-radius: 6px;
+.featured-image-button img {
+  width: 100%;
+  height: 100%;
+  max-height: 290px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 10px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
 }
 
-.featured-detail {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 0;
-  gap: 18px;
-  overflow: hidden;
-  padding: 24px;
-  background: #172231;
+.featured-meta {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  background:
+    linear-gradient(180deg, rgba(10, 16, 23, 0), rgba(10, 16, 23, 0.82) 22%, rgba(10, 16, 23, 0.98) 100%);
 }
 
-.featured-detail > div:first-child {
-  min-height: 0;
+.featured-copy {
+  min-width: 0;
 }
 
-.featured-detail h2 {
-  display: -webkit-box;
-  margin: 0 0 8px;
-  max-width: 9ch;
-  font-size: clamp(1.15rem, 1.5vw, 1.7rem);
-  line-height: 1;
-  letter-spacing: -0.04em;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.featured-detail p {
+.featured-meta h2 {
   margin: 0;
-  color: #d8e1f0;
+  font-size: clamp(1.3rem, 1.8vw, 1.9rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
 }
 
 .featured-description {
-  display: -webkit-box;
+  margin: 8px 0 0;
+  color: #d8e1f0;
   font-size: 0.94rem;
   line-height: 1.45;
+  display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 2;
 }
 
 .creator-line {
-  margin: -2px 0 10px !important;
+  margin: 6px 0 0 !important;
   color: var(--v2-cyan) !important;
   font-size: 0.9rem;
   font-weight: 700;
 }
 
-.featured-thumbs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  flex: 0 0 auto;
+.featured-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.thumb-button {
+.featured-previews {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-card {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: #172231;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
 }
 
-.featured-thumbs img {
+.preview-card:hover {
+  background: #1c2a3b;
+}
+
+.preview-media {
+  min-height: 0;
+  padding: 10px 10px 0;
+}
+
+.preview-media img {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #0b0f15;
 }
 
+.preview-copy {
+  padding: 12px 14px 14px;
+}
+
+.preview-copy h3 {
+  margin: 0 0 6px;
+  font-size: 0.96rem;
+  line-height: 1.1;
+}
+
+.preview-copy p {
+  margin: 0;
+  color: #b9c4d5;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .carousel-controls {
+  padding: 12px 16px 14px;
   justify-content: space-between;
   gap: 14px;
   min-height: 24px;
@@ -740,6 +848,12 @@ h1 span:last-child {
   color: #758096;
 }
 
+.quick-setup-large {
+  width: min(100%, 700px);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
 .live-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -782,6 +896,10 @@ section {
   justify-content: space-between;
   gap: 28px;
   margin-bottom: 24px;
+}
+
+.section-head-build {
+  align-items: stretch;
 }
 
 .section-head h2 {
@@ -1080,25 +1198,24 @@ footer {
 
 @media (max-width: 980px) {
   .hero-grid,
-  .featured-app,
+  .featured-shelf,
   .feature-band,
   .cta-box {
     grid-template-columns: 1fr;
   }
 
-  .featured-app {
-    height: auto;
-    max-height: 720px;
-    overflow: hidden;
+  .featured-stage {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .featured-image {
-    min-height: 0;
-    max-height: 300px;
+  .featured-previews {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: 1fr;
   }
 
-  .featured-image img {
-    max-height: 260px;
+  .featured-image-button img {
+    max-height: 320px;
   }
 
   h1 {
@@ -1169,22 +1286,32 @@ footer {
     flex-shrink: 0;
   }
 
-  .featured-app {
-    max-height: 650px;
+  .featured-previews {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
   }
 
-  .featured-image {
-    max-height: 240px;
-    padding: 14px;
+  .featured-image-button {
+    padding: 12px 12px 0;
   }
 
-  .featured-image img {
-    max-height: 210px;
+  .featured-image-button img {
+    max-height: 220px;
   }
 
-  .featured-detail {
+  .featured-meta {
     gap: 12px;
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .featured-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .quick-setup-large {
+    font-size: 0.92rem;
+    line-height: 1.65;
   }
 
   .steps,
