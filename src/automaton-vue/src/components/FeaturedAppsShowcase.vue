@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { resolveMarketplaceAssetUrl } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
@@ -11,6 +12,7 @@ const emit = defineEmits<{
   (e: 'select', appId: string): void
 }>()
 
+const router = useRouter()
 const activeIndex = ref(0)
 const isPaused = ref(false)
 let rotationId: number | undefined
@@ -92,6 +94,12 @@ function viewApp(app?: MarketplaceAppCard) {
   emit('select', app.id)
 }
 
+function openCreator(app?: MarketplaceAppCard) {
+  const publicUsername = app?.creatorPublicUsername
+  if (!publicUsername) return
+  void router.push(`/${publicUsername}`)
+}
+
 function startRotation() {
   stopRotation()
   rotationId = window.setInterval(() => {
@@ -158,7 +166,15 @@ onBeforeUnmount(stopRotation)
               </div>
 
               <h3>{{ activeApp.name }}</h3>
-              <div class="creator-line">{{ activeMeta }}</div>
+              <button
+                v-if="activeApp.creatorPublicUsername"
+                type="button"
+                class="creator-line creator-link"
+                @click.stop="openCreator(activeApp)"
+              >
+                {{ activeMeta }}
+              </button>
+              <div v-else class="creator-line">{{ activeMeta }}</div>
               <p class="feature-description">{{ activeDescription }}</p>
             </div>
 
@@ -407,6 +423,21 @@ onBeforeUnmount(stopRotation)
   font-size: 0.88rem;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
   opacity: 0.9;
+}
+
+.creator-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7ad8ff;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.creator-link:hover {
+  color: #a7ebff;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
 }
 
 .feature-description {
