@@ -69,9 +69,6 @@ const sideApps = computed(() =>
 )
 const activeMetaImageUrl = computed(() => activeApp.value?.thumbnailUrl || '')
 const activeCreatorName = computed(() => activeApp.value?.creatorDisplayName || 'Automaton creator')
-const activeCtaLabel = computed(() => (activeApp.value?.id.startsWith('fallback-') ? 'Browse public apps' : 'View details'))
-const activeSecondaryCtaLabel = computed(() => (activeApp.value?.id.startsWith('fallback-') ? 'Install the CLI' : 'Open app'))
-const activeSecondaryCtaTarget = computed(() => (activeApp.value?.id.startsWith('fallback-') ? '/cli' : `/apps/${activeApp.value?.id}`))
 const previewCardImage = (app: MarketplaceAppCard | FallbackApp) => {
   const firstScreenshot = app.screenshots?.[0]?.imageUrl
   return firstScreenshot || app.thumbnailUrl
@@ -122,12 +119,6 @@ function openActiveApp() {
     return
   }
   void router.push(`/apps/${app.id}`)
-}
-
-function openSecondaryCta() {
-  const target = activeSecondaryCtaTarget.value
-  if (!target) return
-  void router.push(target)
 }
 
 function startRotation() {
@@ -242,10 +233,6 @@ watch(
                       <h2>{{ activeApp.name }}</h2>
                       <p class="creator-line">by {{ activeCreatorName }}</p>
                       <p class="featured-description">{{ activeAppCopy }}</p>
-                    </div>
-                    <div class="featured-actions">
-                      <button class="button primary" type="button" @click="openActiveApp">{{ activeCtaLabel }}</button>
-                      <button class="button" type="button" @click="openSecondaryCta">{{ activeSecondaryCtaLabel }}</button>
                     </div>
                   </div>
                 </article>
@@ -673,20 +660,24 @@ h1 span:last-child {
 .featured-shelf {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(240px, 0.62fr);
-  min-height: 392px;
+  min-height: 360px;
+  padding: 0;
 }
 
 .featured-stage {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
+  min-height: 360px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  align-self: start;
 }
 
 .featured-image-button {
   display: grid;
-  place-items: center;
-  padding: 10px 12px 0;
+  place-items: start center;
+  height: 100%;
+  min-height: 0;
+  padding: 0 12px 0;
   border: 0;
   background: #080b10;
   cursor: pointer;
@@ -695,7 +686,7 @@ h1 span:last-child {
 .featured-image-button img {
   width: 100%;
   height: 100%;
-  max-height: 290px;
+  min-height: 0;
   object-fit: cover;
   object-position: center;
   border-radius: 10px;
@@ -704,8 +695,8 @@ h1 span:last-child {
 
 .featured-meta {
   display: grid;
-  gap: 14px;
-  padding: 18px 20px 20px;
+  gap: 8px;
+  padding: 12px 20px 6px;
   background:
     linear-gradient(180deg, rgba(10, 16, 23, 0), rgba(10, 16, 23, 0.82) 22%, rgba(10, 16, 23, 0.98) 100%);
 }
@@ -729,7 +720,7 @@ h1 span:last-child {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .creator-line {
@@ -739,16 +730,11 @@ h1 span:last-child {
   font-weight: 700;
 }
 
-.featured-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .featured-previews {
   display: grid;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 1px;
+  min-height: 360px;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -776,6 +762,7 @@ h1 span:last-child {
 .preview-media img {
   width: 100%;
   height: 100%;
+  min-height: 0;
   object-fit: cover;
   border-radius: 10px;
   background: #0b0f15;
@@ -803,7 +790,7 @@ h1 span:last-child {
 }
 
 .carousel-controls {
-  padding: 12px 16px 14px;
+  padding: 0 16px 6px;
   justify-content: space-between;
   gap: 14px;
   min-height: 24px;
@@ -849,7 +836,7 @@ h1 span:last-child {
 }
 
 .quick-setup-large {
-  width: min(100%, 700px);
+  width: min(100%, 860px);
   font-size: 1rem;
   line-height: 1.8;
 }
@@ -1215,7 +1202,7 @@ footer {
   }
 
   .featured-image-button img {
-    max-height: 320px;
+    max-height: none;
   }
 
   h1 {
@@ -1289,24 +1276,20 @@ footer {
   .featured-previews {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(2, minmax(0, 1fr));
+    min-height: 0;
   }
 
   .featured-image-button {
-    padding: 12px 12px 0;
+    padding: 0 12px 0;
   }
 
   .featured-image-button img {
-    max-height: 220px;
+    max-height: none;
   }
 
   .featured-meta {
     gap: 12px;
-    padding: 16px;
-  }
-
-  .featured-actions {
-    display: grid;
-    grid-template-columns: 1fr;
+    padding: 12px 16px 6px;
   }
 
   .quick-setup-large {
