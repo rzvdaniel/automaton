@@ -35,6 +35,7 @@ Most users do not need to think about infrastructure details first. Just run dep
 ```bash
 automaton deploy
 automaton deploy --publish
+automaton deploy --publish --yes
 automaton deploy --runner my-runner
 ```
 
@@ -42,5 +43,6 @@ automaton deploy --runner my-runner
 
 - `deploy` = ship the current app
 - `publish` = make it public
+- AI/CI/scripts should use explicit publish flags instead of relying on follow-up prompts
 
 That is the important distinction.

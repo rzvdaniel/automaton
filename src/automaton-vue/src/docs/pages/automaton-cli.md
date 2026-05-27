@@ -221,6 +221,7 @@ automaton deploy --clean           # full replace — wipes existing server file
 automaton deploy --skip-backend    # upload files only, skip backend deploy step
 automaton deploy --dir dist        # override the upload directory
 automaton deploy --publish --json  # single JSON payload for agents/automation
+automaton deploy --publish --yes   # explicit non-interactive deploy + publish
 ```
 
 What happens:
@@ -231,13 +232,7 @@ What happens:
 5. Uploads `backend.deployDir` to `live/backend/` when backend files are configured
 6. Deploys backend Python controllers to the runner (unless `--skip-backend`)
 
-`deploy` does not publish by default. In interactive console mode, a successful plain deploy asks:
-
-```text
-The app has been deployed successfully. Do you want to publish it now?
-```
-
-If you want a one-step release, use `automaton deploy --publish`.
+`deploy` does not publish by default and should not prompt for publish as a side effect. Use `automaton deploy --publish` when publish is intentional. For AI tools, CI, and scripts, prefer explicit commands such as `automaton deploy --publish --yes` or `automaton deploy` followed by `automaton publish --yes`.
 
 Backend runner behavior:
 
@@ -283,6 +278,7 @@ Make the latest deployed version publicly accessible and return the public URL.
 automaton publish
 automaton publish --slug poker-planning
 automaton publish --yes --json
+automaton publish --slug poker-planning --yes
 ```
 
 Behavior:

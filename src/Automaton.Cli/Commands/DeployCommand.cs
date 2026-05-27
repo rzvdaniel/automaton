@@ -51,8 +51,6 @@ public static class DeployCommand
         {
             var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
-            var publishService = new PublishService(config);
-
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
@@ -93,6 +91,7 @@ public static class DeployCommand
                 {
                     if (publish)
                     {
+                        var publishService = new PublishService(config);
                         var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true);
                         if (asJson)
                         {
@@ -112,10 +111,6 @@ public static class DeployCommand
                     else
                     {
                         WriteResult(result, asJson, verbose);
-                        if (!asJson)
-                        {
-                            await PromptForPublishAfterDeployAsync(cwd, publishService);
-                        }
                     }
                 }
                 else
@@ -283,19 +278,5 @@ public static class DeployCommand
             slug = publishResult.Slug,
             publishChecks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message })
         });
-    }
-
-    private static async Task PromptForPublishAfterDeployAsync(string cwd, PublishService publishService)
-    {
-        Console.Write("The app has been deployed successfully. Do you want to publish it now? [y/N]: ");
-        var confirmation = Console.ReadLine()?.Trim();
-        if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: false);
-        PublishCommand.WriteResult(publishResult, asJson: false);
     }
 }
