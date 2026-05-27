@@ -113,6 +113,7 @@ public static class DeployCommand
                     }
                     else
                     {
+                        result = AppendDefaultSuccessNextSteps(result);
                         WriteResult(result, asJson, verbose, nonInteractive);
                     }
                 }
@@ -158,6 +159,47 @@ public static class DeployCommand
             Backend = result.Backend,
             BackendRunning = result.BackendRunning
         };
+    }
+
+    private static DeployResult AppendDefaultSuccessNextSteps(DeployResult result)
+    {
+        if (!result.Success)
+        {
+            return result;
+        }
+
+        var nextSteps = result.NextSteps.ToList();
+        AddNextStep(nextSteps, "Run automaton publish --yes --slug <your-app-slug> when you want to make this deploy public");
+        AddNextStep(nextSteps, "Or use automaton deploy --publish on the next deploy to deploy and publish in one command");
+
+        return new DeployResult
+        {
+            Success = result.Success,
+            Summary = result.Summary,
+            AppId = result.AppId,
+            AppName = result.AppName,
+            DeployDirectory = result.DeployDirectory,
+            Clean = result.Clean,
+            SkipBackend = result.SkipBackend,
+            Checks = result.Checks,
+            NextSteps = nextSteps,
+            SourceUploaded = result.SourceUploaded,
+            Uploaded = result.Uploaded,
+            BackendUploaded = result.BackendUploaded,
+            Backend = result.Backend,
+            HasWarnings = result.HasWarnings,
+            BackendRunning = result.BackendRunning
+        };
+    }
+
+    private static void AddNextStep(ICollection<string> nextSteps, string value)
+    {
+        if (nextSteps.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        nextSteps.Add(value);
     }
 
     private static void WriteResult(DeployResult result, bool asJson, bool verbose, bool nonInteractive)
