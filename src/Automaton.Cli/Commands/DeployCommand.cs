@@ -35,6 +35,7 @@ public static class DeployCommand
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var verboseOption = new Option<bool>("--verbose", "Print skipped-file details and exclusion reasons");
         var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
+        var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -44,13 +45,15 @@ public static class DeployCommand
             dirOption,
             jsonOption,
             verboseOption,
-            publishOption
+            publishOption,
+            nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose, bool publish) =>
+        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose, bool publish, bool nonInteractiveFlag) =>
         {
             var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
+            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
@@ -58,7 +61,7 @@ public static class DeployCommand
                     ? new DeployPreparationResult { Success = true }
                     : await preparationService.PrepareAsync(cwd, runner);
 
-                if (preparation.RequiresRunnerSelection && !asJson && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
+                if (preparation.RequiresRunnerSelection && !nonInteractive && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
                 {
                     var prompt = new SelectionPrompt<RunnerSelectionItem>()
                         .Title("Select a connected runner for backend deploy")
@@ -79,7 +82,7 @@ public static class DeployCommand
                         NextSteps = preparation.NextSteps
                     };
 
-                    WriteResult(failure, asJson, verbose);
+                    WriteResult(failure, asJson, verbose, nonInteractive);
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -99,8 +102,8 @@ public static class DeployCommand
                         }
                         else
                         {
-                            WriteResult(result, asJson, verbose);
-                            PublishCommand.WriteResult(publishResult, asJson);
+                            WriteResult(result, asJson, verbose, nonInteractive);
+                            PublishCommand.WriteResult(publishResult, asJson, nonInteractive);
                         }
                         if (!publishResult.Success)
                         {
@@ -110,12 +113,12 @@ public static class DeployCommand
                     }
                     else
                     {
-                        WriteResult(result, asJson, verbose);
+                        WriteResult(result, asJson, verbose, nonInteractive);
                     }
                 }
                 else
                 {
-                    WriteResult(result, asJson, verbose);
+                    WriteResult(result, asJson, verbose, nonInteractive);
                 }
 
                 Environment.ExitCode = result.Success ? 0 : 1;
@@ -125,7 +128,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.ExitCode = 1;
             }
-        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption, publishOption);
+        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption, publishOption, nonInteractiveOption);
 
         return cmd;
     }
@@ -157,7 +160,7 @@ public static class DeployCommand
         };
     }
 
-    private static void WriteResult(DeployResult result, bool asJson, bool verbose)
+    private static void WriteResult(DeployResult result, bool asJson, bool verbose, bool nonInteractive)
     {
                 if (asJson)
         {
@@ -179,6 +182,12 @@ public static class DeployCommand
                 backend = result.Backend,
                 backendRunning = result.BackendRunning
             });
+            return;
+        }
+
+        if (nonInteractive)
+        {
+            WritePlainResult(result, verbose);
             return;
         }
 
@@ -233,6 +242,38 @@ public static class DeployCommand
         WriteSkippedSection("Backend skipped files", result.BackendUploaded);
     }
 
+    private static void WritePlainResult(DeployResult result, bool verbose)
+    {
+        if (!string.IsNullOrWhiteSpace(result.AppName) && !string.IsNullOrWhiteSpace(result.AppId))
+        {
+            Console.WriteLine($"Deploying {result.AppName} ({result.AppId})");
+        }
+
+        foreach (var check in result.Checks)
+        {
+            var status = check.Success ? "pass" : check.IsWarning ? "warn" : "fail";
+            Console.WriteLine($"Stage: {check.Name} | {status} | {check.Message}");
+        }
+
+        WritePlainSkippedSection("Source skipped files", result.SourceUploaded, verbose);
+        WritePlainSkippedSection("Frontend skipped files", result.Uploaded, verbose);
+        WritePlainSkippedSection("Backend skipped files", result.BackendUploaded, verbose);
+
+        if (result.NextSteps.Count > 0)
+        {
+            Console.WriteLine("Next steps:");
+            foreach (var nextStep in result.NextSteps)
+            {
+                Console.WriteLine($" - {nextStep}");
+            }
+        }
+
+        if (result.Success)
+        {
+            Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
+        }
+    }
+
     private static void WriteSkippedSection(string title, DeployUploadResult? uploadResult)
     {
         if (uploadResult?.SkippedEntries == null || uploadResult.SkippedEntries.Count == 0)
@@ -248,6 +289,20 @@ public static class DeployCommand
             var ruleSource = Markup.Escape(entry.RuleSource);
             var reason = Markup.Escape(entry.Reason);
             AnsiConsole.MarkupLine($" - [grey]{path}[/] [[{ruleSource}]] {reason}");
+        }
+    }
+
+    private static void WritePlainSkippedSection(string title, DeployUploadResult? uploadResult, bool verbose)
+    {
+        if (!verbose || uploadResult?.SkippedEntries == null || uploadResult.SkippedEntries.Count == 0)
+        {
+            return;
+        }
+
+        Console.WriteLine(title);
+        foreach (var entry in uploadResult.SkippedEntries)
+        {
+            Console.WriteLine($" - {entry.Path} [{entry.RuleSource}] {entry.Reason}");
         }
     }
 

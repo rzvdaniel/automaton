@@ -70,10 +70,12 @@ automaton status
 For non-interactive AI, CI, and script workflows, do not rely on deploy prompting for publish later. Use explicit intent:
 
 ```bash
-automaton deploy
-automaton deploy --publish --yes
-automaton publish --yes
+automaton deploy --non-interactive
+automaton deploy --publish --yes --non-interactive
+automaton publish --yes --non-interactive
 ```
+
+The CLI should also auto-switch to non-interactive behavior when `CI=true`, `AUTOMATON_CI=true`, or stdio is redirected. In that mode it should avoid prompts, selection UIs, progress redraws, and rich tables when plain append-only logs are safer.
 
 Interpretation rules:
 
@@ -180,6 +182,7 @@ If `automaton validate` passes but `automaton deploy` fails during upload with t
 - Before deploy, test locally first with a browser or AI browser tool, and use local mocks when backend-like data is needed.
 - Ask before public publish, then use `automaton publish --yes` after approval.
 - Do not rely on deploy asking whether to publish next. Use explicit publish commands or flags.
+- For AI and CI workflows, prefer `--non-interactive` or `--json` so output stays deterministic and append-only.
 - If upload fails after validation already passed, avoid repeatedly restructuring a plain app unless there is clear evidence that `deployDir`, the archive shape, or duplicate deploy roots are the actual problem.
 
 ## Deploy commands

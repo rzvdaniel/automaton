@@ -18,14 +18,17 @@ public static class PullCommand
         var dirOption = new Option<string?>(
             ["--dir", "-d"],
             "Target directory (defaults to current directory)");
+        var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable progress rendering and use plain output");
 
         var cmd = new Command("pull", "Download editable app source files from the server to the local directory")
         {
-            dirOption
+            dirOption,
+            nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? dir) =>
+        cmd.SetHandler(async (string? dir, bool nonInteractiveFlag) =>
         {
+            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag);
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
@@ -33,7 +36,14 @@ public static class PullCommand
                 var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
                 var targetDir = dir ?? cwd;
 
-                AnsiConsole.MarkupLine($"[bold]Pulling[/] [cyan]{appConfig.Name}[/] → {targetDir}");
+                if (nonInteractive)
+                {
+                    Console.WriteLine($"Pulling {appConfig.Name} -> {targetDir}");
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[bold]Pulling[/] [cyan]{appConfig.Name}[/] → {targetDir}");
+                }
 
                 using var client = new AutomatonApiClient(server, apiKey);
                 var filesResult = await client.ListScopedFilesAsync(appConfig.AppId, "source");
@@ -57,34 +67,64 @@ public static class PullCommand
 
                 if (files.Count == 0)
                 {
-                    AnsiConsole.MarkupLine("[yellow]No files found on the server.[/]");
+                    if (nonInteractive)
+                    {
+                        Console.WriteLine("No files found on the server.");
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine("[yellow]No files found on the server.[/]");
+                    }
                     return;
                 }
 
                 var written = 0;
-                await AnsiConsole.Progress()
-                    .StartAsync(async ctx =>
+                if (nonInteractive)
+                {
+                    foreach (var filePath in files)
                     {
-                        var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: files.Count);
-                        foreach (var filePath in files)
-                        {
-                            var content = await client.ReadScopedFileAsync(appConfig.AppId, "source", filePath);
-                            var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
-                            Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-                            await File.WriteAllTextAsync(localPath, content);
-                            written++;
-                            task.Increment(1);
-                        }
-                    });
+                        var content = await client.ReadScopedFileAsync(appConfig.AppId, "source", filePath);
+                        var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
+                        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+                        await File.WriteAllTextAsync(localPath, content);
+                        written++;
+                    }
 
-                AnsiConsole.MarkupLine($"[green]✓[/] Downloaded [bold]{written}[/] file(s)");
+                    Console.WriteLine($"Downloaded {written} file(s)");
+                }
+                else
+                {
+                    await AnsiConsole.Progress()
+                        .StartAsync(async ctx =>
+                        {
+                            var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: files.Count);
+                            foreach (var filePath in files)
+                            {
+                                var content = await client.ReadScopedFileAsync(appConfig.AppId, "source", filePath);
+                                var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
+                                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+                                await File.WriteAllTextAsync(localPath, content);
+                                written++;
+                                task.Increment(1);
+                            }
+                        });
+
+                    AnsiConsole.MarkupLine($"[green]✓[/] Downloaded [bold]{written}[/] file(s)");
+                }
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+                if (nonInteractive)
+                {
+                    Console.WriteLine($"Error: {ex.Message}");
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+                }
                 Environment.Exit(1);
             }
-        }, dirOption);
+        }, dirOption, nonInteractiveOption);
 
         return cmd;
     }

@@ -11,16 +11,19 @@ public static class ValidateCommand
     {
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var strictOption = new Option<bool>("--strict", "Treat warnings as failures");
+        var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable rich terminal rendering and use plain output");
 
         var cmd = new Command("validate", "Validate the current project before deploy or publish")
         {
             jsonOption,
-            strictOption
+            strictOption,
+            nonInteractiveOption
         };
 
-        cmd.SetHandler(async (bool asJson, bool strict) =>
+        cmd.SetHandler(async (bool asJson, bool strict, bool nonInteractiveFlag) =>
         {
             var validationService = new ValidationService(config);
+            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
 
             try
             {
@@ -39,37 +42,29 @@ public static class ValidateCommand
                     return;
                 }
 
-                var table = new Table();
-                table.AddColumn("Check");
-                table.AddColumn("Result");
-                table.AddColumn("Details");
-
-                foreach (var check in result.Checks)
+                CliDiagnosticsWriter.Write(new CommandDiagnosticResult
                 {
-                    var status = check.IsWarning ? "[yellow]warn[/]" : check.Success ? "[green]pass[/]" : "[red]fail[/]";
-                    table.AddRow(check.Name, status, check.Message);
-                }
-
-                AnsiConsole.Write(table);
-
-                if (result.NextSteps.Count > 0)
-                {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine("[yellow]Next steps:[/]");
-                    foreach (var nextStep in result.NextSteps)
-                    {
-                        AnsiConsole.MarkupLine($" - {nextStep}");
-                    }
-                }
+                    Success = result.Success,
+                    Summary = result.Summary,
+                    Checks = result.Checks.Select(check => new CommandDiagnosticCheck(check.Name, check.Success, check.Message, check.IsWarning)).ToList(),
+                    NextSteps = result.NextSteps
+                }, nonInteractive: nonInteractive);
 
                 Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+                if (nonInteractive)
+                {
+                    Console.WriteLine($"Error: {ex.Message}");
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+                }
                 Environment.ExitCode = 1;
             }
-        }, jsonOption, strictOption);
+        }, jsonOption, strictOption, nonInteractiveOption);
 
         return cmd;
     }

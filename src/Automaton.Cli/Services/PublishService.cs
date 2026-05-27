@@ -19,6 +19,7 @@ public sealed class PublishService
         bool? requiresAuthentication,
         bool? isForkable,
         bool yes,
+        bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var checks = new List<CommandDiagnosticCheck>();
@@ -58,7 +59,7 @@ public sealed class PublishService
 
             if (string.IsNullOrWhiteSpace(resolvedSlug))
             {
-                if (yes)
+                if (yes || nonInteractive)
                 {
                     checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "public URL slug is required for first publish"));
                     nextSteps.Add("Rerun automaton publish --slug <your-app-slug>");
@@ -80,6 +81,24 @@ public sealed class PublishService
 
             if (!yes)
             {
+                if (nonInteractive)
+                {
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.PublishApproval, false, "publish requires --yes in non-interactive mode"));
+                    return new PublishResult
+                    {
+                        Success = false,
+                        Summary = "Publish failed",
+                        Checks = checks,
+                        NextSteps = ["Rerun automaton publish --yes once you intend to make the app public"],
+                        AppId = appConfig.AppId,
+                        AppName = appConfig.Name,
+                        Slug = resolvedSlug,
+                        Url = BuildPublishedUrl(server!, resolvedSlug),
+                        RequiresAuthentication = resolvedRequiresAuthentication,
+                        IsForkable = resolvedIsForkable
+                    };
+                }
+
                 Console.Write($"Publish '{appConfig.Name}' at {BuildPublishedUrl(server!, resolvedSlug)}? [y/N]: ");
                 var confirmation = Console.ReadLine()?.Trim();
                 if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)

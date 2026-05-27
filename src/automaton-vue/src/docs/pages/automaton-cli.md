@@ -222,6 +222,7 @@ automaton deploy --skip-backend    # upload files only, skip backend deploy step
 automaton deploy --dir dist        # override the upload directory
 automaton deploy --publish --json  # single JSON payload for agents/automation
 automaton deploy --publish --yes   # explicit non-interactive deploy + publish
+automaton deploy --non-interactive # plain logs, no prompts, no rich redraws
 ```
 
 What happens:
@@ -232,7 +233,13 @@ What happens:
 5. Uploads `backend.deployDir` to `live/backend/` when backend files are configured
 6. Deploys backend Python controllers to the runner (unless `--skip-backend`)
 
-`deploy` does not publish by default and should not prompt for publish as a side effect. Use `automaton deploy --publish` when publish is intentional. For AI tools, CI, and scripts, prefer explicit commands such as `automaton deploy --publish --yes` or `automaton deploy` followed by `automaton publish --yes`.
+`deploy` does not publish by default and should not prompt for publish as a side effect. Use `automaton deploy --publish` when publish is intentional. For AI tools, CI, and scripts, prefer explicit commands such as `automaton deploy --publish --yes --non-interactive` or `automaton deploy` followed by `automaton publish --yes --non-interactive`.
+
+Non-interactive behavior:
+
+- `--non-interactive` disables prompts and rich terminal rendering
+- `--json` is also treated as non-interactive
+- `CI=true`, `AUTOMATON_CI=true`, or redirected stdio automatically switch the CLI to plain append-only output
 
 Backend runner behavior:
 
@@ -279,6 +286,7 @@ automaton publish
 automaton publish --slug poker-planning
 automaton publish --yes --json
 automaton publish --slug poker-planning --yes
+automaton publish --slug poker-planning --yes --non-interactive
 ```
 
 Behavior:
@@ -287,6 +295,7 @@ Behavior:
 - Prompts for a slug on first publish in interactive console mode
 - Asks for confirmation unless `--yes` is passed
 - Returns the published URL on success so AI tools can hand the clickable link back to the user
+- In non-interactive mode, fails fast instead of prompting for missing slug or confirmation
 
 Useful flags:
 
@@ -296,6 +305,7 @@ Useful flags:
 - `--forkable` — allow others to fork the published app
 - `--yes` — skip the confirmation prompt
 - `--json` — return machine-readable output including `url`
+- `--non-interactive` — disable prompts and rich terminal rendering
 
 ---
 

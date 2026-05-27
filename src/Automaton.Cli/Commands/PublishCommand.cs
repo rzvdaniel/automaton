@@ -20,6 +20,7 @@ public static class PublishCommand
         var forkableOption = new Option<bool>("--forkable", "Allow other users to fork this published app");
         var yesOption = new Option<bool>("--yes", "Publish without prompting for confirmation");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
 
         var cmd = new Command("publish", "Make the latest deployed app publicly accessible")
         {
@@ -28,11 +29,14 @@ public static class PublishCommand
             publicOption,
             forkableOption,
             yesOption,
-            jsonOption
+            jsonOption,
+            nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool asJson) =>
+        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool asJson, bool nonInteractiveFlag) =>
         {
+            var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
+
             if (makePrivate && makePublic)
             {
                 var failure = new PublishResult
@@ -42,7 +46,7 @@ public static class PublishCommand
                     Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, "choose either --public or --private, not both")],
                     NextSteps = ["Rerun automaton publish with at most one access flag"]
                 };
-                WriteResult(failure, asJson);
+                WriteResult(failure, asJson, nonInteractive);
                 Environment.ExitCode = 1;
                 return;
             }
@@ -56,8 +60,9 @@ public static class PublishCommand
                     slug,
                     makePrivate ? true : makePublic ? false : null,
                     forkable ? true : null,
-                    yes);
-                WriteResult(result, asJson);
+                    yes,
+                    nonInteractive);
+                WriteResult(result, asJson, nonInteractive);
                 Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
@@ -69,15 +74,15 @@ public static class PublishCommand
                     Checks = [new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, false, ex.Message)],
                     NextSteps = ["Run automaton whoami to confirm the current server and identity"]
                 };
-                WriteResult(failure, asJson);
+                WriteResult(failure, asJson, nonInteractive);
                 Environment.ExitCode = 1;
             }
-        }, slugOption, privateOption, publicOption, forkableOption, yesOption, jsonOption);
+        }, slugOption, privateOption, publicOption, forkableOption, yesOption, jsonOption, nonInteractiveOption);
 
         return cmd;
     }
 
-    internal static void WriteResult(PublishResult result, bool asJson)
+    internal static void WriteResult(PublishResult result, bool asJson, bool nonInteractive = false)
     {
         if (asJson)
         {
@@ -106,7 +111,21 @@ public static class PublishCommand
                 Summary = result.Summary,
                 Checks = result.Checks,
                 NextSteps = result.NextSteps
-            });
+            }, nonInteractive: nonInteractive);
+            return;
+        }
+
+        if (nonInteractive)
+        {
+            if (!string.IsNullOrWhiteSpace(result.AppName))
+            {
+                Console.WriteLine($"Published {result.AppName}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Url))
+            {
+                Console.WriteLine($"Published successfully: {result.Url}");
+            }
             return;
         }
 
@@ -114,7 +133,6 @@ public static class PublishCommand
         {
             AnsiConsole.MarkupLine($"[bold]Published[/] [cyan]{result.AppName}[/]");
         }
-
         if (!string.IsNullOrWhiteSpace(result.Url))
         {
             AnsiConsole.MarkupLine($"[green]Published successfully:[/] {result.Url}");

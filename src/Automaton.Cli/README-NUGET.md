@@ -13,9 +13,9 @@ dotnet tool install --global Automaton.Cli
 ```bash
 automaton setup
 automaton new "My App"
-automaton deploy
-automaton deploy --publish --yes
-automaton publish --yes
+automaton deploy --non-interactive
+automaton deploy --publish --yes --non-interactive
+automaton publish --yes --non-interactive
 automaton --version
 ```
 
