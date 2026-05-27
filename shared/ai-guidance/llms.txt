@@ -91,7 +91,9 @@ Rules:
 - Do not hardcode unversioned production asset paths like `/assets/index.css` or `/assets/app.js`.
 - Do not emit root-relative app-local paths such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`. Published apps live under a slug path and these URLs will fail publish validation.
 - Do not emit root-relative service worker or web worker paths. Keep worker registration and emitted worker URLs relative to the app scope.
-- Do not manually append random `?v=` query strings in source code unless there is no build system available.
+- Do not manually append query versions to ordinary bundled JS/CSS assets when the build system already emits hashed filenames.
+- Exception: for PWA install assets such as `manifest.webmanifest`, manifest-declared icons, `apple-touch-icon`, favicon, splash images, and service worker-controlled install assets, explicitly version active references when replacing the asset.
+- Changing the image file alone is not enough. Update every browser-visible reference that may stay cached: the manifest URL, icon URLs inside the manifest, `apple-touch-icon`, favicon when applicable, and the service worker cache name or precache manifest/entries.
 - For Vite apps, keep the default hashed asset output and set `base: './'` in `vite.config.ts`.
 - Set `frontend.deployDir` to the final build output, normally `frontend/dist`.
 

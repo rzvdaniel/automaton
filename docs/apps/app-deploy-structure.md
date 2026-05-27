@@ -85,6 +85,9 @@ For build-based apps:
 - Do not emit root-relative app-local URLs such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/`.
 - Published app validation rejects root-relative app-local URLs. For Vite, set `base: './'` in `frontend/vite.config.ts`.
 - Do not rely on Automaton Studio mutating app HTML to add `?v=` cache-busting.
+- Do not manually append query versions to ordinary bundled JS/CSS assets when the build system already emits hashed filenames.
+- Exception: for PWA install assets such as `manifest.webmanifest`, manifest-declared icons, `apple-touch-icon`, favicon, splash images, and service worker-controlled install assets, explicitly version active references when replacing the asset.
+- Changing the image file alone is not enough. Update every browser-visible reference that may stay cached: the manifest URL, icon URLs inside the manifest, `apple-touch-icon`, favicon when applicable, and the service worker cache name or precache manifest/entries.
 - Automaton is responsible for cache headers, CORS headers, and runtime asset serving.
 
 ## Explicit no-build static exception
@@ -117,4 +120,3 @@ Avoid these assumptions:
 - Runner backend runtime comes only from `backend.deployDir`.
 - Default AI-generated local apps should use `frontend/` + Vite and deploy only `frontend/dist/`.
 - Root static apps remain supported, but only as an explicit no-build exception.
-
