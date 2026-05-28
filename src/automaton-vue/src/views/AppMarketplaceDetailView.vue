@@ -152,7 +152,7 @@ async function shareApp() {
   shareMessage.value = ''
 
   const title = app.value?.name || 'Automaton app'
-  const url = window.location.href
+  const url = launchUrl.value || window.location.href
 
   try {
     if (navigator.share) {
