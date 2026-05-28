@@ -4,11 +4,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import FeaturedAppsShowcase from '@/components/FeaturedAppsShowcase.vue'
 import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
-import pacManImage from '@/assets/images/pac-man.png'
-import snakeImage from '@/assets/images/snake.png'
-import tetrisImage from '@/assets/images/tetris.png'
-import flappyBirdsImage from '@/assets/images/flappy-birds.png'
-import installRocketImage from '@/assets/images/install-rocket.png'
 import type { MarketplaceAppCard } from '@/types/marketplace'
 
 const props = defineProps<{ fullPage?: boolean }>()
@@ -16,142 +11,6 @@ const route = useRoute()
 const router = useRouter()
 const { activeCategory, apps, categories, featuredApps, loading, loadApps, loadCategories, search } =
   useMarketplaceApps(props.fullPage ? 100 : 10)
-
-const fallbackApps: MarketplaceAppCard[] = [
-  {
-    id: 'fallback-pac-man',
-    name: 'Pac-Man Editor and Game',
-    creatorPublicUsername: 'razvan',
-    creatorDisplayName: 'Razvan Predescu',
-    summary: 'Playable game with editor-style customization and strong screenshots.',
-    description: 'Playable game with editor-style customization and strong screenshots.',
-    thumbnailUrl: pacManImage,
-    category: 'Games',
-    viewCount: 55,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    isFeatured: true,
-    screenshots: [
-      { id: 'pac-snake', imageUrl: snakeImage, caption: 'Snake remix', sortOrder: 1 },
-      { id: 'pac-tetris', imageUrl: tetrisImage, caption: 'Tetris builder', sortOrder: 2 },
-      { id: 'pac-flappy', imageUrl: flappyBirdsImage, caption: 'Flappy Birds', sortOrder: 3 },
-    ],
-  },
-  {
-    id: 'fallback-snake',
-    name: 'Snake Remix',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'A compact arcade app showing fast frontend generation.',
-    description: 'A compact arcade app showing fast frontend generation.',
-    thumbnailUrl: snakeImage,
-    category: 'Games',
-    viewCount: 41,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-tetris',
-    name: 'Tetris Builder',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Classic gameplay with a clean publishable web surface.',
-    description: 'Classic gameplay with a clean publishable web surface.',
-    thumbnailUrl: tetrisImage,
-    category: 'Templates',
-    viewCount: 38,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-flappy',
-    name: 'Flappy Birds',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Simple controls, strong screenshots, and an easy remix prompt.',
-    description: 'Simple controls, strong screenshots, and an easy remix prompt.',
-    thumbnailUrl: flappyBirdsImage,
-    category: 'Games',
-    viewCount: 32,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-sprint-poker',
-    name: 'Sprint Poker',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Planning poker rooms, reveal states, and team estimation.',
-    description: 'Planning poker rooms, reveal states, and team estimation.',
-    thumbnailUrl: pacManImage,
-    category: 'Tools',
-    viewCount: 27,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-cli-helper',
-    name: 'CLI Setup Helper',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Guided setup flow for getting agent builds ready.',
-    description: 'Guided setup flow for getting agent builds ready.',
-    thumbnailUrl: installRocketImage,
-    category: 'Tools',
-    viewCount: 27,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-json-studio',
-    name: 'JSON Studio',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Format, compare, validate, and share JSON snippets.',
-    description: 'Format, compare, validate, and share JSON snippets.',
-    thumbnailUrl: installRocketImage,
-    category: 'Productivity',
-    viewCount: 24,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-  {
-    id: 'fallback-api-tester',
-    name: 'API Tester',
-    creatorPublicUsername: 'automaton',
-    creatorDisplayName: 'Automaton Monster',
-    summary: 'Send requests, inspect responses, and save small collections.',
-    description: 'Send requests, inspect responses, and save small collections.',
-    thumbnailUrl: tetrisImage,
-    category: 'Tools',
-    viewCount: 19,
-    starCount: 0,
-    forkCount: 0,
-    isForkable: true,
-    hasBackendExecution: false,
-    screenshots: [],
-  },
-]
 
 const carouselApps = computed(() => {
   const featured = featuredApps.value.slice(0, 12)
@@ -169,17 +28,16 @@ const subtitle = computed(() =>
 const heroApps = computed(() => {
   const featured = carouselApps.value
   if (featured.length > 0) return featured
-  return props.fullPage ? [] : fallbackApps
+  return []
 })
 
 const displayedCategories = computed(() => {
   if (categories.value.length > 0) return categories.value
-  if (props.fullPage) return []
-  return [...new Set(fallbackApps.flatMap((app) => (app.category ? [app.category] : [])))]
+  return []
 })
 
 const directoryApps = computed(() => {
-  const source = props.fullPage ? apps.value : (apps.value.length > 0 ? apps.value : fallbackApps)
+  const source = apps.value
   if (!activeCategory.value) return source
   return source.filter((app) => app.category === activeCategory.value)
 })

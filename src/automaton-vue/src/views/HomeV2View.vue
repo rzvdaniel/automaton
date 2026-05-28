@@ -5,23 +5,6 @@ import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
-import pacManImage from '@/assets/images/pac-man.png'
-import snakeImage from '@/assets/images/snake.png'
-import tetrisImage from '@/assets/images/tetris.png'
-import flappyBirdsImage from '@/assets/images/flappy-birds.png'
-
-type FallbackApp = {
-  id: string
-  name: string
-  creatorDisplayName: string
-  category: string
-  summary?: string
-  description: string
-  thumbnailUrl: string
-  screenshots: { id: string; imageUrl: string; caption: string; sortOrder: number }[]
-  starCount: number
-  viewCount: number
-}
 
 const router = useRouter()
 const { featuredApps, loadApps } = useMarketplaceApps(12)
@@ -30,28 +13,9 @@ const showCopyNotice = ref(false)
 const isCarouselPaused = ref(false)
 let rotationId: number | undefined
 
-const fallbackApps: FallbackApp[] = [
-  {
-    id: 'fallback-pac-man',
-    name: 'Pac-Man Editor and Game',
-    creatorDisplayName: 'Razvan Predescu',
-    category: 'Games',
-    summary: 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.',
-    description: 'Live apps become templates, remixes, and proof that one person can ship useful software with an AI agent.',
-    thumbnailUrl: pacManImage,
-    screenshots: [
-      { id: 'snake', imageUrl: snakeImage, caption: 'Snake app screenshot', sortOrder: 1 },
-      { id: 'tetris', imageUrl: tetrisImage, caption: 'Tetris app screenshot', sortOrder: 2 },
-      { id: 'flappy', imageUrl: flappyBirdsImage, caption: 'Flappy Birds app screenshot', sortOrder: 3 },
-    ],
-    starCount: 0,
-    viewCount: 55,
-  },
-]
-
-const heroApps = computed<(MarketplaceAppCard | FallbackApp)[]>(() => {
+const heroApps = computed<MarketplaceAppCard[]>(() => {
   const featured = featuredApps.value.slice(0, 3)
-  return featured.length > 0 ? featured : fallbackApps
+  return featured
 })
 
 const activeApp = computed(() => heroApps.value[activeIndex.value] ?? heroApps.value[0])
@@ -69,7 +33,7 @@ const sideApps = computed(() =>
 )
 const activeMetaImageUrl = computed(() => activeApp.value?.thumbnailUrl || '')
 const activeCreatorName = computed(() => activeApp.value?.creatorDisplayName || 'Automaton creator')
-const previewCardImage = (app: MarketplaceAppCard | FallbackApp) => {
+const previewCardImage = (app: MarketplaceAppCard) => {
   if (app.thumbnailUrl) {
     return app.thumbnailUrl
   }
@@ -77,7 +41,7 @@ const previewCardImage = (app: MarketplaceAppCard | FallbackApp) => {
   const firstScreenshot = app.screenshots?.[0]?.imageUrl
   return firstScreenshot || ''
 }
-const previewCardCopy = (app: MarketplaceAppCard | FallbackApp) => {
+const previewCardCopy = (app: MarketplaceAppCard) => {
   return app.summary || app.description || 'Published Automaton app'
 }
 
@@ -117,11 +81,11 @@ function handleCarouselLeave() {
 
 function openActiveApp() {
   const app = activeApp.value
+  openAppDetails(app)
+}
+
+function openAppDetails(app?: MarketplaceAppCard) {
   if (!app) return
-  if (app.id.startsWith('fallback-')) {
-    void router.push('/apps')
-    return
-  }
   void router.push(`/apps/${app.id}`)
 }
 
@@ -247,8 +211,8 @@ watch(
                     :key="item.app.id"
                     class="preview-card"
                     type="button"
-                    :aria-label="`Show ${item.app.name}`"
-                    @click="selectApp(item.index)"
+                    :aria-label="`Open ${item.app.name}`"
+                    @click="openAppDetails(item.app)"
                   >
                     <div class="preview-media">
                       <img :src="appImageUrl(previewCardImage(item.app))" :alt="item.app.name" />
@@ -261,7 +225,7 @@ watch(
                 </aside>
               </section>
 
-              <div class="carousel-controls">
+              <div v-if="heroApps.length > 1" class="carousel-controls">
                 <span class="carousel-bottom-controls">
                   <span class="carousel-dots">
                     <button
