@@ -18,4 +18,6 @@ Canonical local guidance:
 
 The canonical Automaton rules live in `.automaton/agents/references/`. Do not treat this file as the full policy.
 
+If Automaton MCP tools are available, treat them as optional inspection helpers only. Prefer the Automaton CLI as the primary path for app setup, deploy, and publish. Follow `.automaton/agents/references/llms.txt` for the canonical workflow.
+
 Run `automaton sync-ai` to refresh this local guidance pack after a CLI upgrade or if the generated files were removed.

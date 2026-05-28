@@ -18,6 +18,8 @@ For now, treat Automaton Studio as the official preview and debugging environmen
 
 When the user asks to use the Automaton CLI, the AI should prefer `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing one, and should not stop before `automaton.json` exists in the project root, unless it clearly reports why that creation/link step failed.
 
+If Automaton MCP tools are already available in the AI environment, they may be used as an optional inspection layer for existing apps. See `automaton-mcp.md`. Do not block the normal CLI workflow on MCP setup.
+
 The CLI also creates `.automatonignore` in the project root when the project is initialized or linked, if the file does not already exist. It starts with the built-in deploy exclusions like `.automaton/`, `.git/`, `node_modules/`, `bin/`, `obj/`, `automaton.json`, and `.automatonignore` itself.
 
 Automaton separates source and runtime, with frontend/backend surfaces. The local project is source. `automaton deploy` uploads `frontend.deployDir` into `runtime/frontend/` and `backend.deployDir` into `runtime/backend/` when present. Public app serving reads only `runtime/frontend/`. Studio source editing, GitHub sync, version history, archive import/export, and fork use source.

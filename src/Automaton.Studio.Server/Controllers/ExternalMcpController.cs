@@ -28,10 +28,12 @@ namespace Automaton.Studio.Server.Controllers;
 ///   }
 ///
 /// ## Available Tools (read / discovery only — deploy via automaton CLI)
-///   create_app   — Create a new app; returns appId to store in automaton.json
-///   read_file    — Read a file (supports line ranges)
-///   list_files   — List editable app source files
-///   list_runners — List the user's connected runners
+///   create_app      — Create a new app; returns appId to store in automaton.json
+///   list_user_apps  — List the current user's accessible apps
+///   read_file       — Read a file (supports line ranges)
+///   list_files      — List editable app source files
+///   get_file_tree   — Return the editable source file tree for an app
+///   list_runners    — List the user's connected runners
 ///
 /// For file writes and deployment use the automaton CLI:
 ///   automaton deploy   — build, upload, deploy backend
@@ -56,6 +58,7 @@ public class ExternalMcpController : ControllerBase
     ];
 
     private readonly AppsService _appsService;
+    private readonly AppFileStorageService _fileStorageService;
     private readonly FileIoTool _fileIoTool;
     private readonly UserContextService _userContext;
     private readonly ApplicationDbContext _db;
@@ -64,6 +67,7 @@ public class ExternalMcpController : ControllerBase
 
     public ExternalMcpController(
         AppsService appsService,
+        AppFileStorageService fileStorageService,
         FileIoTool fileIoTool,
         UserContextService userContext,
         ApplicationDbContext db,
@@ -71,6 +75,7 @@ public class ExternalMcpController : ControllerBase
         ILogger<ExternalMcpController> logger)
     {
         _appsService = appsService;
+        _fileStorageService = fileStorageService;
         _fileIoTool = fileIoTool;
         _userContext = userContext;
         _db = db;
@@ -213,6 +218,10 @@ public class ExternalMcpController : ControllerBase
                     Prop("name", "string", "Human-readable name for the app")),
                 ["name"]),
 
+            ToolDef("list_user_apps",
+                "List the current user's accessible apps so you can find an existing appId before using read_file or list_files.",
+                new { type = "object", properties = new { }, required = Array.Empty<string>() }),
+
             ToolDef("read_file",
                 "Read a file (or a line range within it) from the Automaton app. Always returns a header showing total lines.",
                 new
@@ -230,6 +239,12 @@ public class ExternalMcpController : ControllerBase
 
             ToolDef("list_files",
                 "List editable source files currently stored for the Automaton app.",
+                Props(
+                    Prop("appId", "string", "App ID — read from automaton.json")),
+                ["appId"]),
+
+            ToolDef("get_file_tree",
+                "Return the editable source file tree for the Automaton app as hierarchical JSON with folders and files.",
                 Props(
                     Prop("appId", "string", "App ID — read from automaton.json")),
                 ["appId"]),
@@ -253,9 +268,11 @@ public class ExternalMcpController : ControllerBase
         {
             var text = name switch
             {
-                "create_app"   => await ExecCreateApp(args, userId),
+                "create_app" => await ExecCreateApp(args, userId),
+                "list_user_apps" => await ExecListUserApps(),
+                "get_file_tree" => await ExecGetFileTree(args),
                 "read_file" or
-                "list_files"   => await ExecFileTool(name, args),
+                "list_files" => await ExecFileTool(name, args),
                 "list_runners" => await ExecListRunners(userId),
                 _ => throw new InvalidOperationException($"Unknown tool: {name}")
             };
@@ -293,7 +310,8 @@ public class ExternalMcpController : ControllerBase
             IMPORTANT: Overwrite (replace entirely) 'automaton.json' in the project root with ONLY this content — do not append to any existing content:
             {
               "appId": "{{appId}}",
-              "name": "{{name}}"
+              "name": "{{name}}",
+              "server": "{{server}}"
             }
             The file must contain exactly one JSON object. Delete any previous content.
 
@@ -312,6 +330,57 @@ public class ExternalMcpController : ControllerBase
         if (!result.Success)
             throw new InvalidOperationException(result.Error ?? "Tool execution failed");
         return result.Content ?? string.Empty;
+    }
+
+    private Task<string> ExecListUserApps()
+    {
+        var apps = _appsService.List()
+            .OrderByDescending(app => app.Updated)
+            .Select(app => new
+            {
+                appId = app.Id,
+                name = app.Name,
+                summary = app.Summary,
+                isPublished = app.IsPublished,
+                publicUrl = app.PublicUrl,
+                updatedAt = app.Updated,
+                createdAt = app.Created,
+                sourceAvailable = app.SourceAvailable,
+                frontendSourceAvailable = app.Frontend.SourceAvailable,
+                backendSourceAvailable = app.Backend.SourceAvailable
+            })
+            .ToList();
+
+        return Task.FromResult(JsonSerializer.Serialize(apps, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+    }
+
+    private string GetAppSourceRootPath(Guid appId)
+    {
+        var app = _appsService.Get(appId)
+            ?? throw new InvalidOperationException($"App {appId} not found or not accessible.");
+
+        var ownerId = app.UserId ?? _userContext.GetUserId();
+        return _fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
+    }
+
+    private Task<string> ExecGetFileTree(JsonElement args)
+    {
+        var appId = RequireAppId(args);
+        var rootPath = GetAppSourceRootPath(appId);
+
+        if (!Directory.Exists(rootPath))
+        {
+            return Task.FromResult("{\n  \"type\": \"folder\",\n  \"name\": \".\",\n  \"path\": \"\",\n  \"children\": []\n}");
+        }
+
+        var tree = BuildFileTree(rootPath, rootPath, ".");
+        return Task.FromResult(JsonSerializer.Serialize(tree, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
     }
 
     private async Task<string> ExecListRunners(Guid userId)
@@ -382,5 +451,37 @@ public class ExternalMcpController : ControllerBase
         if (!args.TryGetProperty(key, out var val) || val.ValueKind != JsonValueKind.String)
             throw new ArgumentException($"Missing required argument '{key}'");
         return val.GetString()!;
+    }
+
+    private static object BuildFileTree(string rootPath, string currentPath, string name)
+    {
+        var relativePath = Path.GetRelativePath(rootPath, currentPath)
+            .Replace('\\', '/');
+
+        if (relativePath == ".")
+        {
+            relativePath = string.Empty;
+        }
+
+        var directories = Directory.GetDirectories(currentPath)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .Select(path => BuildFileTree(rootPath, path, Path.GetFileName(path)));
+
+        var files = Directory.GetFiles(currentPath)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .Select(path => new
+            {
+                type = "file",
+                name = Path.GetFileName(path),
+                path = Path.GetRelativePath(rootPath, path).Replace('\\', '/')
+            });
+
+        return new
+        {
+            type = "folder",
+            name,
+            path = relativePath,
+            children = directories.Concat<object>(files).ToArray()
+        };
     }
 }
