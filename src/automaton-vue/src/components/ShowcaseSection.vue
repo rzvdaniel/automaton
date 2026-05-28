@@ -155,8 +155,7 @@ const fallbackApps: MarketplaceAppCard[] = [
 
 const carouselApps = computed(() => {
   const featured = featuredApps.value.slice(0, 12)
-  if (featured.length > 0) return featured.slice(0, props.fullPage ? 12 : 10)
-  return props.fullPage ? [] : apps.value.slice(0, 10)
+  return featured.length > 0 ? featured.slice(0, props.fullPage ? 12 : 10) : []
 })
 
 const heading = computed(() => (props.fullPage ? 'Discover Apps' : 'Explore apps built with Automaton'))
@@ -170,8 +169,6 @@ const subtitle = computed(() =>
 const heroApps = computed(() => {
   const featured = carouselApps.value
   if (featured.length > 0) return featured
-  const realApps = apps.value.slice(0, 8)
-  if (realApps.length > 0) return realApps
   return props.fullPage ? [] : fallbackApps
 })
 

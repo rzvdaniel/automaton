@@ -24,7 +24,7 @@ type FallbackApp = {
 }
 
 const router = useRouter()
-const { apps, featuredApps, loadApps } = useMarketplaceApps(12)
+const { featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
 const showCopyNotice = ref(false)
 const isCarouselPaused = ref(false)
@@ -50,8 +50,8 @@ const fallbackApps: FallbackApp[] = [
 ]
 
 const heroApps = computed<(MarketplaceAppCard | FallbackApp)[]>(() => {
-  const realApps = featuredApps.value.length > 0 ? featuredApps.value : apps.value
-  return realApps.length > 0 ? realApps.slice(0, 3) : fallbackApps
+  const featured = featuredApps.value.slice(0, 3)
+  return featured.length > 0 ? featured : fallbackApps
 })
 
 const activeApp = computed(() => heroApps.value[activeIndex.value] ?? heroApps.value[0])
@@ -70,8 +70,12 @@ const sideApps = computed(() =>
 const activeMetaImageUrl = computed(() => activeApp.value?.thumbnailUrl || '')
 const activeCreatorName = computed(() => activeApp.value?.creatorDisplayName || 'Automaton creator')
 const previewCardImage = (app: MarketplaceAppCard | FallbackApp) => {
+  if (app.thumbnailUrl) {
+    return app.thumbnailUrl
+  }
+
   const firstScreenshot = app.screenshots?.[0]?.imageUrl
-  return firstScreenshot || app.thumbnailUrl
+  return firstScreenshot || ''
 }
 const previewCardCopy = (app: MarketplaceAppCard | FallbackApp) => {
   return app.summary || app.description || 'Published Automaton app'

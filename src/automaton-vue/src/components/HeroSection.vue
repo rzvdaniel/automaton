@@ -5,10 +5,10 @@ import MarketplaceCarousel from '@/components/MarketplaceCarousel.vue'
 import { useMarketplaceApps } from '@/composables/useMarketplaceApps'
 
 const router = useRouter()
-const { apps, featuredApps, loading, loadApps } = useMarketplaceApps(10)
+const { featuredApps, loading, loadApps } = useMarketplaceApps(10)
 const heroApps = computed(() => {
   const featured = featuredApps.value.slice(0, 6)
-  return featured.length > 0 ? featured : apps.value.slice(0, 6)
+  return featured
 })
 
 function openDetails(appId: string) {
