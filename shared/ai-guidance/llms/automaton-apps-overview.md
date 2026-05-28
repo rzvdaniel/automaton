@@ -28,17 +28,19 @@ Use these rules:
 
 Recommended workflow for most developers:
 1. Run `automaton setup`.
-2. Run `automaton new "My App"` for a new app, or `automaton link <app-id>` for an existing one.
-3. Run `automaton sync-ai` only if the generated local guidance files are missing or stale.
-4. Keep the project in the local repo.
-5. Build with the user's preferred editor or AI tool.
-6. Test locally first with a browser or AI browser tool.
-7. Run `automaton deploy`; it performs the deploy preflight.
-8. Open the deployed app in Automaton Studio, preview it there, and inspect frontend/backend logs.
-9. Make sure `automaton.json` includes `frontend.build` and `frontend.deployDir` when the deployable frontend is not the project root.
-10. For backend apps, let deploy handle runner selection when a connected runner exists.
-11. Use `automaton validate` only as an optional diagnostic check.
-12. Publish only after user approval.
+2. Check whether `automaton.json` exists in the project root.
+3. If it does not exist and this is a new app, run `automaton new "My App"` immediately.
+4. If it does not exist and this is an existing remote app, run `automaton link <app-id>`.
+5. Run `automaton sync-ai` only if the generated local guidance files are missing or stale.
+6. Keep the project in the local repo.
+7. Build with the user's preferred editor or AI tool.
+8. Test locally first with a browser or AI browser tool.
+9. Run `automaton deploy`; it performs the deploy preflight.
+10. Open the deployed app in Automaton Studio, preview it there, and inspect frontend/backend logs.
+11. Make sure `automaton.json` includes `frontend.build` and `frontend.deployDir` when the deployable frontend is not the project root.
+12. For backend apps, let deploy handle runner selection when a connected runner exists.
+13. Use `automaton validate` only as an optional diagnostic check.
+14. Publish only after user approval.
 
 Do not consider local build, type-check, tests, or `python -m py_compile` to be completion. Before declaring the app done, run `automaton deploy`; if it fails, report the exact command, exact error, and the next step.
 

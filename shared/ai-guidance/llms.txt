@@ -6,6 +6,12 @@ If you are an AI assistant helping a user build an app for Automaton, start here
 
 ## Minimum contract (read this even if you don't fetch the linked files)
 
+Bootstrap rule:
+- After `automaton setup`, immediately check whether `automaton.json` exists in the project root.
+- If it does not exist and the user is asking for a new app in this folder, run `automaton new "<app-name>"` before MCP discovery, remote inspection, or file scaffolding.
+- Use `automaton link <app-id>` only for an existing remote app.
+- Do not interpret `automaton setup` by itself as meaning the folder is already linked to an app.
+
 Automaton apps are frontend-agnostic static web apps with Python backends.
 
 **Source/runtime contract** — Automaton separates editable source from deployed runtime, and each side has frontend/backend surfaces:
@@ -148,6 +154,8 @@ Only files inside `frontend.deployDir` become public runtime. Do not expect `fro
 
 **After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
+**New app default** — In a fresh folder after `automaton setup`, absence of `automaton.json` should be treated as "not linked yet", not as "recover with MCP". For a new app request, the default next command is `automaton new "<app-name>"`.
+
 **Current test loop** — Until a dedicated Automaton local runtime exists, test locally first, then deploy, then use Automaton Studio for integration testing. Build the app locally, start the local frontend dev server, use local mock data or a local mock backend when backend-like data is needed, test with a normal browser or AI browser tool, fix local UI/runtime issues, run `automaton deploy`, open the app in Automaton Studio, preview the deployed app, inspect frontend/backend logs, redeploy if needed, and publish only after explicit user approval.
 
 **AI browser testing** — When working in Codex or another AI tool with browser automation, the AI should start or detect the local dev/preview server, open `http://127.0.0.1:<port>` with the available browser tool, inspect DOM/visible state and console errors, exercise main flows, capture screenshots when useful, and patch issues before deploy. In Codex, the user may need to run `/browser` once per session to attach the in-app browser runtime; before initialization browser targets may be empty, and after initialization the in-app browser target is usually `iab`. If browser automation is unavailable, explain that browser setup is needed instead of pretending local browser QA happened.
@@ -166,8 +174,8 @@ Follow this order:
 2. Run `automaton setup`.
 3. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all`, then run `automaton setup` again.
 4. Check whether `automaton.json` exists in the project root.
-5. If it does not exist and the app is new, run `automaton new "<app-name>"`.
-6. If the app already exists remotely, run `automaton link <app-id>`.
+5. If it does not exist and the app is new, run `automaton new "<app-name>"` immediately.
+6. If it does not exist and the app already exists remotely, run `automaton link <app-id>`.
 7. Scaffold or update the app locally using the simplest suitable frontend stack.
 8. The AI should handle most of the remaining work after `automaton setup`.
 9. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
@@ -202,7 +210,7 @@ Choose the simplest frontend stack that fits the requested app.
 - Use React or Vue only when the user explicitly asks for that framework or when the app clearly needs component-heavy SPA structure, richer routing, or more complex reusable UI.
 - If multiple stacks are equally reasonable and the user gave no preference, ask one short question before scaffolding.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
-- When the user asks to use the Automaton CLI, run `automaton new` or `automaton link` and do not consider the app complete until `automaton.json` exists in the project root, or you have clearly reported why it could not be created.
+- When the user asks to use the Automaton CLI, treat missing `automaton.json` as a required bootstrap step: run `automaton new` for a new app or `automaton link` for an existing one before deeper tooling. Do not consider the app complete until `automaton.json` exists in the project root, or you have clearly reported why it could not be created.
 
 ---
 

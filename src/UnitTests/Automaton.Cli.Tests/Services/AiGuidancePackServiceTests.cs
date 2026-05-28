@@ -67,10 +67,13 @@ public class AiGuidancePackServiceTests
         var llmsContent = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt"));
 
         Assert.That(agentsContent, Does.Contain("Do not treat this file as the full policy"));
+        Assert.That(agentsContent, Does.Contain("If `automaton.json` does not exist and the user asked to build a new app in this folder, run `automaton new"));
         Assert.That(instructionsContent, Does.Contain("The canonical Automaton rules live in `.automaton/agents/references/`"));
+        Assert.That(instructionsContent, Does.Contain("Do not default to MCP app creation, remote file inspection, or recovery logic"));
         Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
         Assert.That(skillContent, Does.Contain("Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`"));
         Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
+        Assert.That(llmsContent, Does.Contain("If it does not exist and the user is asking for a new app in this folder, run `automaton new"));
         Assert.That(llmsContent, Does.Contain("Do not add a backend only for convenience"));
         Assert.That(llmsContent, Does.Contain("Do not claim the app is done until `automaton deploy` has succeeded"));
     }

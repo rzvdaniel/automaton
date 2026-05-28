@@ -13,6 +13,15 @@ Help an AI tool work correctly in this folder as {{modeDescription}}.
 3. Read the linked files under `.automaton/agents/references/llms/` before making structure, backend, or deploy decisions.
 4. Use `AGENTS.md` only as the root discovery entrypoint, not as the canonical source.
 
+## First Decision
+
+Before reading remote docs or using MCP tools, check whether `automaton.json` exists in the project root.
+
+- If `automaton.json` exists, treat this folder as an already linked app root and continue locally.
+- If `automaton.json` does not exist and the user asked to build a new app here, run `automaton new "<app-name>"` immediately.
+- If `automaton.json` does not exist and the user gave an existing app ID, run `automaton link <app-id>`.
+- Do not default to MCP app creation, remote file inspection, or recovery logic when the user intent is a normal new local app.
+
 ## Canonical Rules
 
 The canonical Automaton rules live in `.automaton/agents/references/`. If this wrapper conflicts with the reference files, prefer the reference files.
