@@ -190,9 +190,9 @@ onBeforeUnmount(stopRotation)
         class="mini-feature"
         role="button"
         tabindex="0"
-        @click="setActive(apps.findIndex((candidate) => candidate.id === app.id))"
-        @keydown.enter.prevent="setActive(apps.findIndex((candidate) => candidate.id === app.id))"
-        @keydown.space.prevent="setActive(apps.findIndex((candidate) => candidate.id === app.id))"
+        @click="selectApp(app)"
+        @keydown.enter.prevent="selectApp(app)"
+        @keydown.space.prevent="selectApp(app)"
       >
         <img v-if="imageUrl(app)" :src="imageUrl(app)" :alt="app.name" />
         <div v-else class="mini-feature-fallback">{{ app.name.charAt(0) }}</div>
