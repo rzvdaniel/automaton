@@ -9,7 +9,6 @@ Bootstrap rule for this folder:
 - First check whether `automaton.json` exists in the project root.
 - If `automaton.json` does not exist and the user asked to build a new app in this folder, run `automaton new "<app-name>"` before scaffolding files.
 - Use `automaton link <app-id>` only when the user explicitly said this folder should connect to an existing app.
-- Do not default to MCP app creation or remote discovery when the normal local CLI flow applies.
 
 Canonical local guidance:
 

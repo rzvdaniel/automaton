@@ -15,12 +15,11 @@ Help an AI tool work correctly in this folder as {{modeDescription}}.
 
 ## First Decision
 
-Before reading remote docs or using MCP tools, check whether `automaton.json` exists in the project root.
+Before making app bootstrap decisions, check whether `automaton.json` exists in the project root.
 
 - If `automaton.json` exists, treat this folder as an already linked app root and continue locally.
 - If `automaton.json` does not exist and the user asked to build a new app here, run `automaton new "<app-name>"` immediately.
 - If `automaton.json` does not exist and the user gave an existing app ID, run `automaton link <app-id>`.
-- Do not default to MCP app creation, remote file inspection, or recovery logic when the user intent is a normal new local app.
 
 ## Canonical Rules
 
