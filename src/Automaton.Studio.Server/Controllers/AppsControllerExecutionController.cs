@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -142,6 +143,7 @@ public class AppsControllerExecutionController : ControllerBase
     /// </summary>
     [HttpPost("api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppControllerExecution)]
     public async Task<ActionResult<AppControllerActionResponse>> ExecuteAction(
         string appSlug,
         string controllerName,

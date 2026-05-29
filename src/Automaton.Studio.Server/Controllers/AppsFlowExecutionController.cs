@@ -5,6 +5,7 @@ using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -45,6 +46,7 @@ public class AppsFlowExecutionController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("{appSlug}/flows/{flowIdentifier}/execute")]
     [AllowAnonymous] // We check authentication ourselves based on app settings
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppFlowExecution)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

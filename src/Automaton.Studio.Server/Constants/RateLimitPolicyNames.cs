@@ -8,4 +8,7 @@ public static class RateLimitPolicyNames
     public const string AuthResetPassword = "AuthResetPassword";
     public const string AuthRefreshToken = "AuthRefreshToken";
     public const string ApiKeyValidation = "ApiKeyValidation";
+    public const string PublicAppControllerExecution = "PublicAppControllerExecution";
+    public const string PublicAppFlowExecution = "PublicAppFlowExecution";
+    public const string PublicAppStepExecution = "PublicAppStepExecution";
 }

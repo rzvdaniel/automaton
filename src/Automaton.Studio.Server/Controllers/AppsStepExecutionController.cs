@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -36,6 +37,7 @@ public class AppsStepExecutionController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     [HttpPost("{appSlug}/steps/{stepIdentifier}/execute")]
     [AllowAnonymous] // Auth is checked internally based on app settings
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppStepExecution)]
     public async Task<ActionResult<AppStepExecutionResponse>> ExecuteStep(
         string appSlug,
         string stepIdentifier,

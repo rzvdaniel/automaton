@@ -126,6 +126,69 @@ public class RateLimitingPipelineTests
         await AssertGenericTooManyRequestsResponse(blockedResponse);
     }
 
+    [Test]
+    public async Task PublicAppControllerExecutionRateLimiter_Returns429AfterTenthRequest()
+    {
+        using var host = await CreateHostAsync();
+        var client = host.GetTestClient();
+
+        HttpResponseMessage? blockedResponse = null;
+        for (var i = 0; i < 11; i++)
+        {
+            blockedResponse = await client.PostAsJsonAsync("/test-auth/public/controller-execute", new
+            {
+                value = "test"
+            });
+        }
+
+        Assert.That(blockedResponse, Is.Not.Null);
+        Assert.That(blockedResponse!.StatusCode, Is.EqualTo((HttpStatusCode)429));
+        Assert.That(blockedResponse.Headers.TryGetValues("Retry-After", out _), Is.True);
+        await AssertGenericTooManyRequestsResponse(blockedResponse);
+    }
+
+    [Test]
+    public async Task PublicAppFlowExecutionRateLimiter_Returns429AfterTenthRequest()
+    {
+        using var host = await CreateHostAsync();
+        var client = host.GetTestClient();
+
+        HttpResponseMessage? blockedResponse = null;
+        for (var i = 0; i < 11; i++)
+        {
+            blockedResponse = await client.PostAsJsonAsync("/test-auth/public/flow-execute", new
+            {
+                value = "test"
+            });
+        }
+
+        Assert.That(blockedResponse, Is.Not.Null);
+        Assert.That(blockedResponse!.StatusCode, Is.EqualTo((HttpStatusCode)429));
+        Assert.That(blockedResponse.Headers.TryGetValues("Retry-After", out _), Is.True);
+        await AssertGenericTooManyRequestsResponse(blockedResponse);
+    }
+
+    [Test]
+    public async Task PublicAppStepExecutionRateLimiter_Returns429AfterTenthRequest()
+    {
+        using var host = await CreateHostAsync();
+        var client = host.GetTestClient();
+
+        HttpResponseMessage? blockedResponse = null;
+        for (var i = 0; i < 11; i++)
+        {
+            blockedResponse = await client.PostAsJsonAsync("/test-auth/public/step-execute", new
+            {
+                value = "test"
+            });
+        }
+
+        Assert.That(blockedResponse, Is.Not.Null);
+        Assert.That(blockedResponse!.StatusCode, Is.EqualTo((HttpStatusCode)429));
+        Assert.That(blockedResponse.Headers.TryGetValues("Retry-After", out _), Is.True);
+        await AssertGenericTooManyRequestsResponse(blockedResponse);
+    }
+
     private static async Task<IHost> CreateHostAsync()
     {
         var host = await new HostBuilder()
@@ -200,6 +263,27 @@ public class TestAuthRateLimitController : ControllerBase
     {
         return Ok(new { request.ApiKey });
     }
+
+    [HttpPost("public/controller-execute")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppControllerExecution)]
+    public IActionResult PublicControllerExecute([FromBody] TestPublicExecutionRequest request)
+    {
+        return Ok(new { request.Value });
+    }
+
+    [HttpPost("public/flow-execute")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppFlowExecution)]
+    public IActionResult PublicFlowExecute([FromBody] TestPublicExecutionRequest request)
+    {
+        return Ok(new { request.Value });
+    }
+
+    [HttpPost("public/step-execute")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicAppStepExecution)]
+    public IActionResult PublicStepExecute([FromBody] TestPublicExecutionRequest request)
+    {
+        return Ok(new { request.Value });
+    }
 }
 
 public class TestValidateApiKeyRequest
@@ -212,4 +296,9 @@ public class TestResetPasswordCommand
     public required string Email { get; set; }
     public required string Password { get; set; }
     public required string Code { get; set; }
+}
+
+public class TestPublicExecutionRequest
+{
+    public required string Value { get; set; }
 }

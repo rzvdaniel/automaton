@@ -85,6 +85,39 @@ public static class RateLimitingServiceCollectionExtensions
                         QueueLimit = 0,
                         AutoReplenishment = true
                     }));
+
+            options.AddPolicy(RateLimitPolicyNames.PublicAppControllerExecution, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppControllerExecution),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.AddPolicy(RateLimitPolicyNames.PublicAppFlowExecution, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppFlowExecution),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.AddPolicy(RateLimitPolicyNames.PublicAppStepExecution, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppStepExecution),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
         });
 
         return services;
