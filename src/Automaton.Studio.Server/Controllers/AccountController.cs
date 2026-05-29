@@ -83,7 +83,8 @@ public class AccountController : BaseController
             Email = registerUserCommand.Email,
             UserName = registerUserCommand.Email,
             PublicUsername = publicUsername,
-            SecurityStamp = Guid.NewGuid().ToString()
+            SecurityStamp = Guid.NewGuid().ToString(),
+            LockoutEnabled = true
         };
 
         await userManagerService.CreateUser(user, registerUserCommand.Password);

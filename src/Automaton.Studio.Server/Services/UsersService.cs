@@ -141,6 +141,12 @@ public class UsersService
         return await _userManager.FindByEmailAsync(email);
     }
 
+    public async Task<ApplicationUser?> FindByEmailOrUserNameAsync(string emailOrUserName)
+    {
+        return await _userManager.FindByEmailAsync(emailOrUserName) ??
+               await _userManager.FindByNameAsync(emailOrUserName);
+    }
+
     public async Task<bool> ValidateCredentialsAsync(string usernameOrEmail, string password)
     {
         var user = await _userManager.FindByEmailAsync(usernameOrEmail) ??

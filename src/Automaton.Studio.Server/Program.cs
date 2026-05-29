@@ -72,6 +72,9 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
     options.Password.RequireUppercase = configurationService.RequireUppercase;
     options.Password.RequireNonAlphanumeric = configurationService.RequireNonAlphanumeric;
     options.Password.RequiredLength = configurationService.RequiredLength;
+    options.Lockout.AllowedForNewUsers = configurationService.LockoutAllowedForNewUsers;
+    options.Lockout.MaxFailedAccessAttempts = configurationService.MaxFailedAccessAttempts;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(configurationService.DefaultLockoutTimeSpanMinutes);
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();

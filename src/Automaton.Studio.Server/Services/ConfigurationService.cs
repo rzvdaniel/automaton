@@ -10,6 +10,7 @@ public class ConfigurationService
     public readonly AppConfig AppConfig = new();
     public readonly EmailConfig EmailConfig = new();
     private readonly UserPasswordConfig userPasswordConfig = new();
+    private readonly UserLockoutConfig userLockoutConfig = new();
 
     public const string MsSqlDatabaseType = "MsSql";
     public const string MySqlDatabaseType = "MySql";
@@ -25,6 +26,9 @@ public class ConfigurationService
     public bool RequireUppercase => userPasswordConfig.RequireUppercase;
     public bool RequireNonAlphanumeric => userPasswordConfig.RequireNonAlphanumeric;
     public int RequiredLength => userPasswordConfig.RequiredLength;
+    public bool LockoutAllowedForNewUsers => userLockoutConfig.AllowedForNewUsers;
+    public int MaxFailedAccessAttempts => userLockoutConfig.MaxFailedAccessAttempts;
+    public int DefaultLockoutTimeSpanMinutes => userLockoutConfig.DefaultLockoutTimeSpanMinutes;
 
     public ConfigurationService(IConfiguration configuration)
     {
@@ -33,6 +37,7 @@ public class ConfigurationService
         this.configuration.GetSection(nameof(AuthenticationSettings)).Bind(authenticationSettings);
         this.configuration.GetSection(nameof(AppConfig)).Bind(AppConfig);
         this.configuration.GetSection(nameof(UserPasswordConfig)).Bind(userPasswordConfig);
+        this.configuration.GetSection(nameof(UserLockoutConfig)).Bind(userLockoutConfig);
         this.configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
     }
 
