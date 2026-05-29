@@ -157,7 +157,7 @@ Set:
   "ClientId": "YOUR_GITHUB_CLIENT_ID",
   "ClientSecret": "YOUR_GITHUB_CLIENT_SECRET",
   "ApiBaseUrl": "https://api-dev.automaton.monster",
-  "FrontendUrl": "http://localhost:5173"
+  "FrontendUrl": "https://studio-dev.automaton.monster"
 }
 ```
 
@@ -166,6 +166,48 @@ Keep `AppConfig:WebsiteUrl` on its normal local value so other local-development
 `GitHub:ApiBaseUrl` forces the public API origin used for the OAuth `redirect_uri` sent to GitHub.
 
 `GitHub:FrontendUrl` is used only for the final OAuth redirect back into Studio after the API finishes GitHub authentication.
+
+## GitHub config reference
+
+Backend GitHub OAuth uses these settings:
+
+- `GitHub:ClientId`
+  - GitHub OAuth app client ID
+- `GitHub:ClientSecret`
+  - GitHub OAuth app client secret
+- `GitHub:ApiBaseUrl`
+  - public API origin used when building the OAuth callback URL sent to GitHub
+  - example: `https://api-dev.automaton.monster`
+  - callback path is still `/signin-github`
+- `GitHub:FrontendUrl`
+  - frontend origin used for the final redirect back into Studio after the API finishes GitHub authentication
+  - local example: `https://studio-dev.automaton.monster`
+  - production example: `https://studio.automaton.monster`
+
+Typical local tunnel split:
+
+```json
+"AppConfig": {
+  "WebsiteUrl": "http://localhost:5173"
+},
+"GitHub": {
+  "ClientId": "YOUR_GITHUB_CLIENT_ID",
+  "ClientSecret": "YOUR_GITHUB_CLIENT_SECRET",
+  "ApiBaseUrl": "https://api-dev.automaton.monster",
+  "FrontendUrl": "https://studio-dev.automaton.monster"
+}
+```
+
+Typical production split:
+
+```json
+"GitHub": {
+  "ClientId": "YOUR_GITHUB_CLIENT_ID",
+  "ClientSecret": "YOUR_GITHUB_CLIENT_SECRET",
+  "ApiBaseUrl": "https://api.automaton.monster",
+  "FrontendUrl": "https://studio.automaton.monster"
+}
+```
 
 ## 10. Configure frontend API base URL
 
