@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Scripting;
 using Automaton.Studio.Server.Areas.Identity;
 using Automaton.Studio.Server.Authentication;
+using Automaton.Studio.Server.Authentication.GitHub;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
@@ -14,13 +15,11 @@ using FluentValidation.AspNetCore;
 using Hangfire;
 using Hangfire.MySql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
@@ -31,9 +30,6 @@ using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
 using Automaton.Mcp.Client.Extensions;
 using System.Text.Json.Serialization;
-using System.Net.Http.Headers;
-using System.Security.Claims;
-using System.Text.Json;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -121,75 +117,7 @@ services.AddAuthentication()
             options.HeaderName = "X-API-Key";
             options.QueryParameterName = "api_key";
         })
-    .AddOAuth(GitHubAuthenticationDefaults.Scheme, options =>
-    {
-        var githubOptions = applicationBuilder.Configuration.GetSection("GitHub").Get<GitHubOAuthOptions>() ?? new GitHubOAuthOptions();
-
-        options.ClientId = githubOptions.ClientId;
-        options.ClientSecret = githubOptions.ClientSecret;
-        options.CallbackPath = "/signin-github";
-        options.SignInScheme = IdentityConstants.ExternalScheme;
-        options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
-        options.TokenEndpoint = "https://github.com/login/oauth/access_token";
-        options.UserInformationEndpoint = "https://api.github.com/user";
-        options.SaveTokens = true;
-        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-
-        options.Scope.Add("read:user");
-        options.Scope.Add("user:email");
-
-        options.Events.OnCreatingTicket = async context =>
-        {
-            using var profileRequest = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-            profileRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            profileRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-            profileRequest.Headers.UserAgent.ParseAdd("Automaton-Studio");
-
-            using var profileResponse = await context.Backchannel.SendAsync(profileRequest, context.HttpContext.RequestAborted);
-            profileResponse.EnsureSuccessStatusCode();
-
-            using var profileDocument = JsonDocument.Parse(await profileResponse.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
-
-            var email = await GetVerifiedGitHubEmailAsync(context);
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                throw new InvalidOperationException("GitHub account does not expose a verified email.");
-            }
-
-            var name = profileDocument.RootElement.TryGetProperty("name", out var nameElement)
-                ? nameElement.GetString()
-                : null;
-            var login = profileDocument.RootElement.TryGetProperty("login", out var loginElement)
-                ? loginElement.GetString()
-                : null;
-
-            context.Identity?.AddClaim(new Claim(ClaimTypes.Email, email));
-
-            if (!string.IsNullOrWhiteSpace(login))
-            {
-                context.Identity?.AddClaim(new Claim(ClaimTypes.NameIdentifier, login));
-                context.Identity?.AddClaim(new Claim("urn:github:login", login));
-            }
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                context.Identity?.AddClaim(new Claim(ClaimTypes.Name, name));
-            }
-        };
-
-        options.Events.OnRedirectToAuthorizationEndpoint = context =>
-        {
-            if (!string.IsNullOrWhiteSpace(githubOptions.ApiBaseUrl))
-            {
-                var callbackUri = new Uri(new Uri(githubOptions.ApiBaseUrl.TrimEnd('/')), options.CallbackPath).ToString();
-                context.RedirectUri = ReplaceQueryStringValue(context.RedirectUri, "redirect_uri", callbackUri);
-            }
-
-            context.Response.Redirect(context.RedirectUri);
-            return Task.CompletedTask;
-        };
-    });
+    .AddGitHubOAuth(applicationBuilder.Configuration);
 
 // Define specific authorization policies for different access levels
 services.AddAuthorization(options =>
@@ -631,58 +559,4 @@ static void ConfigureStaticMediaPath(WebApplication app, string physicalPath, st
             ctx.Context.Response.Headers.XContentTypeOptions = "nosniff";
         }
     });
-}
-
-static async Task<string?> GetVerifiedGitHubEmailAsync(OAuthCreatingTicketContext context)
-{
-    using var emailRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
-    emailRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    emailRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-    emailRequest.Headers.UserAgent.ParseAdd("Automaton-Studio");
-
-    using var emailResponse = await context.Backchannel.SendAsync(emailRequest, context.HttpContext.RequestAborted);
-    emailResponse.EnsureSuccessStatusCode();
-
-    using var emailDocument = JsonDocument.Parse(await emailResponse.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
-    string? fallbackVerifiedEmail = null;
-
-    foreach (var emailEntry in emailDocument.RootElement.EnumerateArray())
-    {
-        var isVerified = emailEntry.TryGetProperty("verified", out var verifiedElement) && verifiedElement.GetBoolean();
-        if (!isVerified)
-        {
-            continue;
-        }
-
-        if (emailEntry.TryGetProperty("email", out var emailElement))
-        {
-            var email = emailElement.GetString();
-            if (!string.IsNullOrWhiteSpace(email))
-            {
-                var isPrimary = emailEntry.TryGetProperty("primary", out var primaryElement) && primaryElement.GetBoolean();
-                if (isPrimary)
-                {
-                    return email;
-                }
-
-                fallbackVerifiedEmail ??= email;
-            }
-        }
-    }
-
-    return fallbackVerifiedEmail;
-}
-
-static string ReplaceQueryStringValue(string url, string key, string value)
-{
-    var uri = new Uri(url);
-    var queryParams = QueryHelpers.ParseQuery(uri.Query)
-        .ToDictionary(
-            pair => pair.Key,
-            pair => pair.Value.ToString(),
-            StringComparer.OrdinalIgnoreCase);
-
-    queryParams[key] = value;
-
-    return QueryHelpers.AddQueryString(uri.GetLeftPart(UriPartial.Path), queryParams);
 }

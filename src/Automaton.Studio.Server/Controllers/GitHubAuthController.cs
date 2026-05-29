@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Automaton.Studio.Server.Authentication;
+using Automaton.Studio.Server.Authentication.GitHub;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Common.Authentication;
