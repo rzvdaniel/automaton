@@ -30,6 +30,7 @@ using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Studio.Server.Enums;
 using Automaton.Mcp.Client.Extensions;
 using System.Text.Json.Serialization;
+using Automaton.Studio.Server.Security;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -102,8 +103,6 @@ services.ConfigureApplicationCookie(options =>
     };
 });
 
-
-
 services.AddMvc();
 
 services.AddAccessTokenValidator();
@@ -154,13 +153,14 @@ services.AddAuthorization(options =>
 
     options.AddPolicy("ProjectMember", policy =>
         policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
-            Automaton.Studio.Server.Enums.ProjectRole.ProjectAdmin,
-            Automaton.Studio.Server.Enums.ProjectRole.Developer,
-            Automaton.Studio.Server.Enums.ProjectRole.AppUser,
-            Automaton.Studio.Server.Enums.ProjectRole.Viewer)));
+            ProjectRole.ProjectAdmin,
+            ProjectRole.Developer,
+            ProjectRole.AppUser,
+            ProjectRole.Viewer)));
 });
 
 services.AddHttpClient();
+services.AddAutomatonRateLimiting();
 
 services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -457,6 +457,7 @@ var app = applicationBuilder.Build();
 app.ApplyMigrations();
 
 app.UseForwardedHeaders();
+app.UseRateLimiter();
 
 app.UseSerilogRequestLogging(
     options =>

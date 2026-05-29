@@ -1,12 +1,15 @@
-﻿using Automaton.Studio.Server.Core.Commands;
+using Automaton.Studio.Server.Constants;
+using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Middleware;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Common.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -21,7 +24,7 @@ public class AccountController : BaseController
     private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
-        ApplicationDbContext dataContext, 
+        ApplicationDbContext dataContext,
         UsersService userManagerService,
         IEmailService emailService,
         ILogger<AccountController> logger)
@@ -35,6 +38,8 @@ public class AccountController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRegistration)]
+    [EmailRateLimit("auth:register:email", 3, 3600)]
     public async Task<IActionResult> RegisterUser(RegisterUserCommand registerUserCommand)
     {
         if (configurationService.NoUserSignUp)
@@ -47,19 +52,16 @@ public class AccountController : BaseController
             return BadRequest(ModelState);
         }
 
-        // Validate or auto-generate public username
         string publicUsername;
-        
+
         if (!string.IsNullOrWhiteSpace(registerUserCommand.PublicUsername))
         {
-            // Validate user-provided public username
             if (!userManagerService.IsValidPublicUsername(registerUserCommand.PublicUsername))
             {
                 ModelState.AddModelError("PublicUsername", "Public username must be 3-32 characters, using only letters, numbers, hyphens, and underscores.");
                 return BadRequest(ModelState);
             }
 
-            // Check if available
             var isAvailable = await userManagerService.IsPublicUsernameAvailableAsync(registerUserCommand.PublicUsername);
             if (!isAvailable)
             {
@@ -71,7 +73,6 @@ public class AccountController : BaseController
         }
         else
         {
-            // Auto-generate public username from display name
             publicUsername = await userManagerService.GenerateUniquePublicUsernameAsync(registerUserCommand.Name!);
         }
 
@@ -90,10 +91,12 @@ public class AccountController : BaseController
 
         try
         {
-            var userDetails = new EmailData { Template = "AutomatonRegisterUser", 
-                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport }, 
+            var userDetails = new EmailData
+            {
+                Template = "AutomatonRegisterUser",
+                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
                 To = [new EmailAccount { Email = registerUserCommand.Email, Name = registerUserCommand.Name }],
-                Variables = 
+                Variables =
                 {
                     { "Name", registerUserCommand.Name },
                     { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
@@ -105,7 +108,6 @@ public class AccountController : BaseController
         }
         catch (Exception ex)
         {
-            // Email delivery failure should not prevent registration from succeeding
             logger.LogWarning(ex, "Registration email could not be sent to {Email}", registerUserCommand.Email);
         }
 
@@ -116,6 +118,8 @@ public class AccountController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthLogin)]
+    [EmailRateLimit("auth:login:email", 10, 900)]
     public async Task<ActionResult<JsonWebToken>> LoginUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
@@ -125,6 +129,8 @@ public class AccountController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthLogin)]
+    [EmailRateLimit("auth:login-runner:email", 10, 900)]
     public async Task<ActionResult<JsonWebToken>> LoginRunnerUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RunnerRefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
@@ -139,8 +145,8 @@ public class AccountController : BaseController
 
         await userManagerService.UpdatePassword
         (
-            userId, 
-            passwordUpdateCommand.OldPassword, 
+            userId,
+            passwordUpdateCommand.OldPassword,
             passwordUpdateCommand.NewPassword
         );
 
@@ -161,6 +167,8 @@ public class AccountController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthForgotPassword)]
+    [EmailRateLimit("auth:forgot-password:email", 3, 3600)]
     public async Task<IActionResult> ForgotUserPassword(ForgotUserPasswordCommand forgotUserPassword, CancellationToken cancellationToken)
     {
         await Mediator.Send(forgotUserPassword, cancellationToken);
@@ -168,23 +176,15 @@ public class AccountController : BaseController
         return NoContent();
     }
 
-    /// <summary>
-    /// Get current user's public username
-    /// GET /api/Account/GetPublicUsername
-    /// </summary>
     [HttpGet]
     public async Task<ActionResult<string>> GetPublicUsername()
     {
         var userId = GetUserId();
         var user = await userManagerService.GetUserById(userId);
-        
+
         return Ok(user.PublicUsername);
     }
 
-    /// <summary>
-    /// Check if a public username is available
-    /// GET /api/Account/IsPublicUsernameAvailable/{publicUsername}
-    /// </summary>
     [HttpGet]
     [AllowAnonymous]
     public async Task<ActionResult<bool>> IsPublicUsernameAvailable(string publicUsername)
@@ -193,10 +193,6 @@ public class AccountController : BaseController
         return Ok(isAvailable);
     }
 
-    /// <summary>
-    /// Update current user's public username
-    /// PUT /api/Account/UpdatePublicUsername
-    /// </summary>
     [HttpPut]
     public async Task<IActionResult> UpdatePublicUsername([FromBody] UpdatePublicUsernameRequest request)
     {
@@ -206,26 +202,24 @@ public class AccountController : BaseController
             return BadRequest(ModelState);
         }
 
-        // Validate format
         if (!userManagerService.IsValidPublicUsername(request.NewPublicUsername))
         {
             ModelState.AddModelError("NewPublicUsername", "Public username must be 3-32 characters, using only letters, numbers, hyphens, and underscores.");
             return BadRequest(ModelState);
         }
 
-    var userId = GetUserId();
-    var currentUser = await userManagerService.GetUserById(userId);
-    
-    // Only check availability if username is actually changing
-    if (!string.Equals(currentUser?.PublicUsername, request.NewPublicUsername, StringComparison.OrdinalIgnoreCase))
-    {
-        var isAvailable = await userManagerService.IsPublicUsernameAvailableAsync(request.NewPublicUsername);
-        if (!isAvailable)
+        var userId = GetUserId();
+        var currentUser = await userManagerService.GetUserById(userId);
+
+        if (!string.Equals(currentUser?.PublicUsername, request.NewPublicUsername, StringComparison.OrdinalIgnoreCase))
         {
-            ModelState.AddModelError("NewPublicUsername", "This public username is already taken. Please choose another.");
-            return BadRequest(ModelState);
+            var isAvailable = await userManagerService.IsPublicUsernameAvailableAsync(request.NewPublicUsername);
+            if (!isAvailable)
+            {
+                ModelState.AddModelError("NewPublicUsername", "This public username is already taken. Please choose another.");
+                return BadRequest(ModelState);
+            }
         }
-    }
 
         await userManagerService.UpdatePublicUsernameAsync(userId, request.NewPublicUsername);
         await dataContext.SaveChangesAsync();
@@ -235,6 +229,7 @@ public class AccountController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthResetPassword)]
     public async Task<IActionResult> ResetUserPassword(ResetUserPasswordCommand resetUserPassword, CancellationToken cancellationToken)
     {
         await Mediator.Send(resetUserPassword, cancellationToken);

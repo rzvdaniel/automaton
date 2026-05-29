@@ -1,9 +1,11 @@
-﻿using Automaton.Studio.Server.Core.Commands;
+using Automaton.Studio.Server.Constants;
+using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Common.EF;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Authentication;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -20,6 +22,7 @@ public class TokenController : BaseController
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRefreshToken)]
     public async Task<IActionResult> RefreshAccessToken(RefreshAccessTokenCommand command, CancellationToken cancellationToken)
     {
         try
@@ -31,11 +34,12 @@ public class TokenController : BaseController
         catch (AuthenticationException)
         {
             return Unauthorized();
-        }          
+        }
     }
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthRefreshToken)]
     public async Task<IActionResult> RefreshRunnerAccessToken(RefreshAccessTokenCommand command, CancellationToken cancellationToken)
     {
         try

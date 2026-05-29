@@ -1,9 +1,11 @@
 using Automaton.Core.Enums;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -17,7 +19,7 @@ public class ApiKeysController : BaseController
     private readonly ApplicationDbContext dbContext;
 
     public ApiKeysController(
-        ApiKeyService apiKeyService, 
+        ApiKeyService apiKeyService,
         UserContextService userContextService,
         ApplicationDbContext dbContext)
     {
@@ -30,11 +32,11 @@ public class ApiKeysController : BaseController
     public async Task<IActionResult> CreateApiKey([FromBody] CreateApiKeyRequest request)
     {
         var userId = userContextService.GetUserId();
-        
+
         var (apiKey, entity) = await apiKeyService.CreateApiKeyAsync(
-            userId, 
-            request.Name, 
-            request.Description, 
+            userId,
+            request.Name,
+            request.Description,
             request.ExpiresAt,
             request.Scope);
 
@@ -42,7 +44,7 @@ public class ApiKeysController : BaseController
         {
             Id = entity.Id,
             Name = entity.Name,
-            ApiKey = apiKey, // Only returned once during creation
+            ApiKey = apiKey,
             KeyPrefix = entity.KeyPrefix,
             Scope = entity.Scope,
             CreatedAt = entity.CreatedAt,
@@ -79,17 +81,16 @@ public class ApiKeysController : BaseController
         var success = await apiKeyService.DeleteApiKeyAsync(id, userId);
 
         if (!success)
+        {
             return NotFound();
+        }
 
         return NoContent();
     }
 
-    /// <summary>
-    /// Validates an API key and returns authentication status - used by console runners
-    /// Anonymous endpoint - console runners test keys before using them for authentication
-    /// </summary>
     [HttpPost("validate")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.ApiKeyValidation)]
     public async Task<IActionResult> ValidateApiKey([FromBody] ValidateApiKeyRequest request)
     {
         if (string.IsNullOrEmpty(request.ApiKey))
@@ -98,29 +99,27 @@ public class ApiKeysController : BaseController
         }
 
         var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(request.ApiKey);
-        
+
         if (apiKeyEntity == null)
         {
             return Unauthorized(new { message = "Invalid or expired API key" });
         }
 
-        // Check if the API key has appropriate scope for runner operations
         if (apiKeyEntity.Scope == ApiKeyScope.ReadOnly)
         {
             return Forbid("API key does not have sufficient permissions for runner operations. Required: Runner, Execute, or FullAccess scope.");
         }
 
-        // Get the user associated with this API key
         var userId = await dbContext.ApiKeyUsers
             .Where(aku => aku.ApiKeyId == apiKeyEntity.Id)
             .Select(aku => aku.UserId)
             .FirstOrDefaultAsync();
-        
+
         if (userId == Guid.Empty)
         {
             return Unauthorized(new { message = "API key has no associated user" });
         }
-        
+
         var user = await dbContext.Users.FindAsync(userId);
         if (user == null)
         {
@@ -150,7 +149,7 @@ public class CreateApiKeyResponse
 {
     public Guid Id { get; set; }
     public required string Name { get; set; }
-    public required string ApiKey { get; set; } // Only shown during creation
+    public required string ApiKey { get; set; }
     public required string KeyPrefix { get; set; }
     public ApiKeyScope Scope { get; set; }
     public DateTime CreatedAt { get; set; }
