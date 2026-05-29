@@ -15,6 +15,14 @@ import type {
 } from '../types/auth.types'
 
 class AuthService {
+  private getApiBaseUrl(): string {
+    return (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
+  }
+
+  private getGitHubAuthBaseUrl(): string {
+    return (import.meta.env.VITE_GITHUB_AUTH_API_BASE_URL || this.getApiBaseUrl()).replace(/\/$/, '')
+  }
+
   /**
    * Login user with email and password
    * POST /api/Account/LoginUser
@@ -66,6 +74,22 @@ class AuthService {
    */
   logout(): void {
     tokenStorage.clearTokens()
+  }
+
+  storeTokens(token: JsonWebToken): void {
+    tokenStorage.setAccessToken(token.accessToken)
+    tokenStorage.setRefreshToken(token.refreshToken)
+  }
+
+  startGitHubLogin(returnUrl?: string): void {
+    const authBaseUrl = this.getGitHubAuthBaseUrl()
+    const loginUrl = new URL(`${authBaseUrl}/auth/github/login`)
+
+    if (returnUrl) {
+      loginUrl.searchParams.set('returnUrl', returnUrl)
+    }
+
+    window.location.assign(loginUrl.toString())
   }
 
   /**

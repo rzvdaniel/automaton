@@ -49,6 +49,31 @@ public class UsersService
         await AssignDefaultPlanAsync(user.Id);
     }
 
+    public async Task CreateUserWithoutPasswordAsync(ApplicationUser user)
+    {
+        if (_userManager.Users.Any(u => u.UserName == user.UserName))
+        {
+            throw new Exception($"User with user name {user.UserName} already registered");
+        }
+
+        if (_userManager.Users.Any(u => u.Email == user.Email))
+        {
+            throw new Exception($"User with email address {user.Email} already registered");
+        }
+
+        var result = await _userManager.CreateAsync(user);
+
+        if (!result.Succeeded)
+        {
+            var exceptionText = result.Errors.Aggregate(
+                "User Creation Failed - Identity Exception. Errors were: \n\r\n\r",
+                (current, error) => current + (" - " + error.Description + "\n\r"));
+            throw new Exception(exceptionText);
+        }
+
+        await AssignDefaultPlanAsync(user.Id);
+    }
+
     public async Task UpdatePassword(Guid userId, string oldPassword, string newPassword)
     {
         var user = await GetUserById(userId);
@@ -109,6 +134,11 @@ public class UsersService
             throw new Exception($"User with Email or UserName '{emailOrUserName}' not found!");
 
         return result;
+    }
+
+    public async Task<ApplicationUser?> FindByEmailAsync(string email)
+    {
+        return await _userManager.FindByEmailAsync(email);
     }
 
     public async Task<bool> ValidateCredentialsAsync(string usernameOrEmail, string password)
@@ -238,6 +268,35 @@ public class UsersService
             publicUsername = $"{slug}-{randomSuffix}";
         }
         
+        return publicUsername;
+    }
+
+    public async Task<string> GenerateUniquePublicUsernameFromCandidateAsync(string candidate)
+    {
+        var baseSlug = ConvertToSlug(candidate);
+        if (baseSlug.Length < 3)
+        {
+            baseSlug = baseSlug.PadRight(3, '0');
+        }
+
+        var publicUsername = baseSlug;
+
+        while (await _userManager.Users.AnyAsync(u => u.PublicUsername != null && u.PublicUsername.ToLower() == publicUsername.ToLower()))
+        {
+            var randomDigits = Random.Shared.Next(1000, 10000).ToString();
+            var maxBaseLength = Math.Max(0, 32 - randomDigits.Length);
+            var trimmedBase = baseSlug.Length > maxBaseLength
+                ? baseSlug[..maxBaseLength].TrimEnd('-', '_')
+                : baseSlug;
+
+            if (trimmedBase.Length < 3)
+            {
+                trimmedBase = trimmedBase.PadRight(3, '0');
+            }
+
+            publicUsername = $"{trimmedBase}{randomDigits}";
+        }
+
         return publicUsername;
     }
 

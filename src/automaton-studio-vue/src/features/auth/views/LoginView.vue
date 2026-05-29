@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import { useAuth } from '../composables/useAuth'
+import { authService } from '../services/auth.service'
 import type { LoginFormErrors } from '../types/auth.types'
 
 const { login, isLoading, error, clearError } = useAuth()
@@ -86,6 +87,10 @@ async function handleSubmit() {
 function hasError(field: keyof LoginFormErrors): boolean {
   return submitted.value && !!formErrors.value[field]
 }
+
+function continueWithGitHub() {
+  authService.startGitHubLogin(redirectTo.value)
+}
 </script>
 
 <template>
@@ -163,6 +168,17 @@ function hasError(field: keyof LoginFormErrors): boolean {
             class="w-full"
             :loading="isLoading"
             :disabled="isLoading"
+          />
+
+          <Button
+            type="button"
+            label="Continue with GitHub"
+            icon="pi pi-github"
+            severity="secondary"
+            outlined
+            class="w-full"
+            :disabled="isLoading"
+            @click="continueWithGitHub"
           />
 
           <div class="text-center">

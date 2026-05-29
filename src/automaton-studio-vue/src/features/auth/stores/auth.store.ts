@@ -64,6 +64,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function completeExternalLogin(token: { accessToken: string; refreshToken: string }): Promise<void> {
+    accessToken.value = token.accessToken
+    refreshToken.value = token.refreshToken
+    error.value = null
+
+    await fetchUserProfile()
+
+    const { initializeSettings } = useUserSettings()
+    await initializeSettings()
+  }
+
   async function fetchUserProfile(): Promise<void> {
     if (!accessToken.value) return
 
@@ -167,6 +178,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     login,
     register,
+    completeExternalLogin,
     logout,
     initialize,
     fetchUserProfile,

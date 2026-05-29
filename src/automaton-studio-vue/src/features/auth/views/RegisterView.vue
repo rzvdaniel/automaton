@@ -179,6 +179,10 @@ function hasError(field: keyof RegisterFormErrors): boolean {
   return submitted.value && !!formErrors.value[field]
 }
 
+function continueWithGitHub() {
+  authService.startGitHubLogin('/')
+}
+
 </script>
 
 <template>
@@ -341,6 +345,17 @@ function hasError(field: keyof RegisterFormErrors): boolean {
             class="w-full"
             :loading="isLoading"
             :disabled="isLoading"
+          />
+
+          <Button
+            type="button"
+            label="Continue with GitHub"
+            icon="pi pi-github"
+            severity="secondary"
+            outlined
+            class="w-full"
+            :disabled="isLoading"
+            @click="continueWithGitHub"
           />
 
           <div class="text-center">
