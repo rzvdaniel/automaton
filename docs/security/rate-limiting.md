@@ -7,7 +7,7 @@ This document records the rate limiting currently implemented in Automaton, why 
 Current implementation is split across:
 
 - `src/Automaton.Studio.Server/Security/RateLimitingServiceCollectionExtensions.cs`
-  - ASP.NET Core per-IP policies
+  - ASP.NET Core global limiter plus endpoint-specific policies
   - generic `429 Too Many Requests` response
 - `src/Automaton.Studio.Server/Middleware/EmailRateLimitFilter.cs`
   - custom per-email throttling for selected auth endpoints
@@ -16,6 +16,28 @@ Current implementation is split across:
 Policy names are defined in:
 
 - `src/Automaton.Studio.Server/Constants/RateLimitPolicyNames.cs`
+
+## Global Limiter
+
+Automaton now also uses a broad ASP.NET Core `GlobalLimiter` that applies automatically to all requests before any endpoint-specific policy is evaluated.
+
+Current baseline behavior:
+
+- anonymous requests: per IP
+- authenticated requests: per user identity
+- public app execution routes: still keep their stricter endpoint-specific limits
+
+Current baseline values:
+
+- anonymous: 200 requests per minute per IP
+- authenticated: 1000 requests per minute per user
+
+Why this exists:
+
+- catches broad internet noise and scanning across the whole API
+- adds a safety net for unprotected endpoints
+- stays loose enough that Studio/editor traffic is unlikely to break during normal use
+- lets stricter auth and execution limits continue doing the real abuse control
 
 ## Protected So Far
 
@@ -113,8 +135,10 @@ Current limits:
 
 ## Current Policy Values
 
-These are defined in `RateLimitingServiceCollectionExtensions.cs`.
+These are configured under `RateLimiting` in `appsettings.json` and bound by `RateLimitingOptions.cs`.
 
+- `GlobalAnonymous`: 200 requests per minute per IP
+- `GlobalAuthenticated`: 1000 requests per minute per user
 - `AuthLogin`: 5 requests per minute per IP
 - `AuthRegistration`: 3 requests per hour per IP
 - `AuthForgotPassword`: 10 requests per hour per IP
@@ -136,6 +160,7 @@ Custom per-email throttles:
 
 These endpoints were protected first because they match the most common early abuse patterns for a small SaaS:
 
+- broad anonymous API scanning and noisy request floods
 - account creation spam
 - brute-force login attempts
 - credential stuffing

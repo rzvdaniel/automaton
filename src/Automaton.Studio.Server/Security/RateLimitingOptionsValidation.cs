@@ -8,6 +8,8 @@ public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOption
     {
         var errors = new List<string>();
 
+        ValidatePolicy(options.GlobalAnonymous, nameof(options.GlobalAnonymous), errors);
+        ValidatePolicy(options.GlobalAuthenticated, nameof(options.GlobalAuthenticated), errors);
         ValidatePolicy(options.AuthLogin, nameof(options.AuthLogin), errors);
         ValidatePolicy(options.AuthRegistration, nameof(options.AuthRegistration), errors);
         ValidatePolicy(options.AuthForgotPassword, nameof(options.AuthForgotPassword), errors);

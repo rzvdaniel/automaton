@@ -1,6 +1,7 @@
 using Automaton.Studio.Server.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 
 namespace Automaton.Studio.Server.Security;
@@ -24,6 +25,20 @@ public static class RateLimitingServiceCollectionExtensions
                 .Value;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            {
+                var identity = httpContext.User.Identity;
+                if (identity?.IsAuthenticated == true)
+                {
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        GetAuthenticatedPartitionKey(httpContext),
+                        _ => CreatePolicyOptions(rateLimitingOptions.GlobalAuthenticated));
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
+                    _ => CreatePolicyOptions(rateLimitingOptions.GlobalAnonymous));
+            });
             options.OnRejected = (context, cancellationToken) =>
             {
                 context.HttpContext.Response.Headers.RetryAfter = "60";
@@ -96,5 +111,16 @@ public static class RateLimitingServiceCollectionExtensions
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString();
         return $"{policyName}:{remoteIp ?? "unknown"}";
+    }
+
+    private static string GetAuthenticatedPartitionKey(HttpContext httpContext)
+    {
+        var user = httpContext.User;
+        var userId =
+            user.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            user.FindFirstValue("sub") ??
+            user.Identity?.Name;
+
+        return $"global:authenticated:{userId ?? "unknown"}";
     }
 }
