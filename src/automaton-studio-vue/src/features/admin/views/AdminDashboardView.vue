@@ -28,6 +28,8 @@ interface OverviewCard extends DashboardLink {
   tone?: OverviewCardTone
 }
 
+const FAILED_EXECUTIONS_DANGER_THRESHOLD = 10
+
 const quickLinks = [
   { label: 'Users', icon: 'pi pi-users', to: '/admin/users' },
   { label: 'Marketplace Apps', icon: 'pi pi-shop', to: '/admin/marketplace-apps' },
@@ -42,7 +44,7 @@ function getFailedExecutionsTone(failedExecutions: number): OverviewCardTone {
     return 'success'
   }
 
-  if (failedExecutions >= 10) {
+  if (failedExecutions >= FAILED_EXECUTIONS_DANGER_THRESHOLD) {
     return 'danger'
   }
 
@@ -140,12 +142,6 @@ function getToneClass(prefix: string, tone?: OverviewCardTone) {
   return `${prefix}${tone ?? 'primary'}`
 }
 
-function navigateToSection(to?: RouteLocationRaw) {
-  if (to) {
-    navigate(to)
-  }
-}
-
 onMounted(() => {
   void loadSummary()
 })
@@ -189,7 +185,7 @@ onMounted(() => {
               <button
                 class="overview-card__button"
                 type="button"
-                @click="navigateToSection(card.to)"
+                @click="navigate(card.to)"
               >
                 <div class="overview-card__content">
                   <div class="overview-card__main">
