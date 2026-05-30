@@ -11,11 +11,19 @@ public class RunnersController : BaseController
 {
     private readonly RunnerService runnersService;
     private readonly HostedRunnerManagementService hostedRunnerManagementService;
+    private readonly UserContextService userContextService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
 
-    public RunnersController(RunnerService runnersService, HostedRunnerManagementService hostedRunnerManagementService)
+    public RunnersController(
+        RunnerService runnersService,
+        HostedRunnerManagementService hostedRunnerManagementService,
+        UserContextService userContextService,
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.runnersService = runnersService;
         this.hostedRunnerManagementService = hostedRunnerManagementService;
+        this.userContextService = userContextService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     [HttpGet]
@@ -27,8 +35,14 @@ public class RunnersController : BaseController
 
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
-    public ActionResult Post(RunnerDetails runner, CancellationToken cancellationToken)
+    public async Task<ActionResult> Post(RunnerDetails runner, CancellationToken cancellationToken)
     {
+        var userId = userContextService.GetUserId();
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         return Ok(runnersService.Add(runner));
     }
 

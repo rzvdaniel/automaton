@@ -17,6 +17,7 @@ export function useAuth() {
   const user = computed(() => store.user)
   const userName = computed(() => store.userName)
   const userEmail = computed(() => store.userEmail)
+  const isEmailConfirmed = computed(() => store.isEmailConfirmed)
   const error = computed(() => store.error)
 
   /**
@@ -66,6 +67,10 @@ export function useAuth() {
     await store.initialize()
   }
 
+  async function resendConfirmation(): Promise<void> {
+    await store.resendConfirmation()
+  }
+
   return {
     // State
     isAuthenticated,
@@ -73,6 +78,7 @@ export function useAuth() {
     user,
     userName,
     userEmail,
+    isEmailConfirmed,
     error,
     // Actions
     login,
@@ -80,5 +86,6 @@ export function useAuth() {
     logout,
     clearError,
     initialize,
+    resendConfirmation,
   }
 }

@@ -69,6 +69,10 @@ class AuthService {
     return data
   }
 
+  async resendConfirmation(): Promise<void> {
+    await apiClient.post('/api/Account/ResendConfirmation')
+  }
+
   /**
    * Logout - clear stored tokens
    */

@@ -37,6 +37,7 @@ export interface User {
   id: string
   name: string
   email: string
+  emailConfirmed: boolean
   publicUsername: string
   roles: string[]
 }

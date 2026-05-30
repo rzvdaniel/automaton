@@ -23,6 +23,7 @@ const submitted = ref(false)
 
 // Success message (e.g., after registration)
 const successMessage = ref('')
+const confirmationErrorMessage = ref('')
 
 // Get redirect URL from query params
 const redirectTo = computed(() => {
@@ -34,6 +35,10 @@ onMounted(() => {
   // Check for success message from registration
   if (route.query.registered === 'true') {
     successMessage.value = 'Registration successful! Please sign in with your credentials.'
+  } else if (route.query.emailConfirmation === 'success') {
+    successMessage.value = 'Email confirmed successfully. You can now use sensitive actions in Automaton.'
+  } else if (route.query.emailConfirmation === 'failed') {
+    confirmationErrorMessage.value = 'Email confirmation failed or the link is no longer valid. Please sign in and resend the confirmation email.'
   }
   clearError()
 })
@@ -108,6 +113,10 @@ function continueWithGitHub() {
         <!-- Success message -->
         <Message v-if="successMessage" severity="success" :closable="false" class="mb-4">
           {{ successMessage }}
+        </Message>
+
+        <Message v-if="confirmationErrorMessage" severity="error" :closable="false" class="mb-4">
+          {{ confirmationErrorMessage }}
         </Message>
 
         <!-- Error message -->

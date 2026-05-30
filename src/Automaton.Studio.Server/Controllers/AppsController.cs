@@ -18,6 +18,7 @@ public class AppsController : BaseController
     private readonly AppVersionService appVersionService;
     private readonly AppArchiveService appArchiveService;
     private readonly SettingsService settingsService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
 
     public AppsController(
         AppsService appsService,
@@ -29,6 +30,7 @@ public class AppsController : BaseController
         AppVersionService appVersionService,
         AppArchiveService appArchiveService,
         SettingsService settingsService,
+        ConfirmedEmailGuardService confirmedEmailGuardService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -41,6 +43,7 @@ public class AppsController : BaseController
         this.appVersionService = appVersionService;
         this.appArchiveService = appArchiveService;
         this.settingsService = settingsService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     [HttpGet]
@@ -288,6 +291,11 @@ public class AppsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Publish(Guid id, [FromBody] PublishAppRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         await appsService.Publish(
             id,
             request.PublicUrl,
@@ -304,6 +312,11 @@ public class AppsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Unpublish(Guid id)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         await appsService.Unpublish(id);
 
         return NoContent();

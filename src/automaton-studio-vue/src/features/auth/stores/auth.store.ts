@@ -23,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userEmail = computed(() => user.value?.email ?? '')
   const userId = computed(() => user.value?.id ?? '')
   const publicUsername = computed(() => user.value?.publicUsername ?? '')
+  const isEmailConfirmed = computed(() => user.value?.emailConfirmed ?? false)
 
   // Actions
   async function login(request: LoginRequest): Promise<void> {
@@ -85,6 +86,10 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('Failed to fetch user profile:', err)
       user.value = null
     }
+  }
+
+  async function resendConfirmation(): Promise<void> {
+    await authService.resendConfirmation()
   }
 
   async function initialize(): Promise<void> {
@@ -175,6 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
     userEmail,
     userId,
     publicUsername,
+    isEmailConfirmed,
     // Actions
     login,
     register,
@@ -182,6 +188,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     initialize,
     fetchUserProfile,
+    resendConfirmation,
     clearError,
     setPublicUsername,
   }

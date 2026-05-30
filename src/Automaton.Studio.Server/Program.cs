@@ -349,6 +349,7 @@ else
 services.AddScoped<InstallService>();
 services.AddScoped<SettingsService>();
 services.AddTransient<UsersService>();
+services.AddScoped<ConfirmedEmailGuardService>();
 services.AddScoped<AuthTokenService>();
 services.AddTransient<RoleManagerService>();
 services.AddTransient<ScheduleService>();

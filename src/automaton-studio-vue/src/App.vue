@@ -5,6 +5,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
+import EmailConfirmationBanner from '@/features/auth/components/EmailConfirmationBanner.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 
@@ -48,17 +49,18 @@ onMounted(async () => {
   </div>
 
   <!-- Default layout: with sidebar and toolbar -->
-  <div v-else class="app-shell">
+    <div v-else class="app-shell">
     <!-- Sidebar / Navigation Rail -->
     <AppSidebar />
 
     <!-- Main Content Area -->
-    <div class="app-content">
-      <!-- Top Toolbar -->
-      <AppToolbar />
+      <div class="app-content">
+        <!-- Top Toolbar -->
+        <AppToolbar />
+        <EmailConfirmationBanner />
 
-      <!-- Page Content -->
-      <main class="app-main">
+        <!-- Page Content -->
+        <main class="app-main">
         <RouterView />
       </main>
     </div>

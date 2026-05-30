@@ -15,12 +15,18 @@ public class BillingController : BaseController
     private readonly StripeService _stripe;
     private readonly ApplicationDbContext _db;
     private readonly ConfigurationService _config;
+    private readonly ConfirmedEmailGuardService _confirmedEmailGuardService;
 
-    public BillingController(StripeService stripe, ApplicationDbContext db, ConfigurationService config)
+    public BillingController(
+        StripeService stripe,
+        ApplicationDbContext db,
+        ConfigurationService config,
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         _stripe = stripe;
         _db = db;
         _config = config;
+        _confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     /// <summary>
@@ -31,6 +37,10 @@ public class BillingController : BaseController
     public async Task<IActionResult> CreateCheckout([FromQuery] Guid planId)
     {
         var userId = GetUserId();
+        if (!await _confirmedEmailGuardService.IsConfirmedAsync(userId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
 
         var baseUrl = _config.WebsiteUrl.TrimEnd('/');
         var successUrl = $"{baseUrl}/billing/success?session_id={{CHECKOUT_SESSION_ID}}";
@@ -59,6 +69,10 @@ public class BillingController : BaseController
     public async Task<IActionResult> CreatePortal()
     {
         var userId = GetUserId();
+        if (!await _confirmedEmailGuardService.IsConfirmedAsync(userId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
 
         var returnUrl = $"{_config.WebsiteUrl.TrimEnd('/')}/billing";
 

@@ -17,21 +17,28 @@ public class ApiKeysController : BaseController
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
     private readonly ApplicationDbContext dbContext;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
 
     public ApiKeysController(
         ApiKeyService apiKeyService,
         UserContextService userContextService,
-        ApplicationDbContext dbContext)
+        ApplicationDbContext dbContext,
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
         this.dbContext = dbContext;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     [HttpPost]
     public async Task<IActionResult> CreateApiKey([FromBody] CreateApiKeyRequest request)
     {
         var userId = userContextService.GetUserId();
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userId))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
 
         var (apiKey, entity) = await apiKeyService.CreateApiKeyAsync(
             userId,
