@@ -14,13 +14,16 @@ namespace Automaton.Studio.Server.Controllers;
 public class ProjectMembersController : BaseController
 {
     private readonly ProjectMemberService memberService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<ProjectMembersController> logger;
 
     public ProjectMembersController(
         ProjectMemberService memberService,
+        ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<ProjectMembersController> logger)
     {
         this.memberService = memberService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = logger;
     }
 
@@ -91,6 +94,11 @@ public class ProjectMembersController : BaseController
         Guid projectId, 
         [FromBody] AddProjectMemberRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -138,6 +146,11 @@ public class ProjectMembersController : BaseController
         Guid userId,
         [FromBody] UpdateProjectMemberRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -184,6 +197,11 @@ public class ProjectMembersController : BaseController
     [Authorize(Policy = "ProjectAdmin")]
     public async Task<ActionResult> RemoveMember(Guid projectId, Guid userId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await memberService.RemoveMemberAsync(projectId, userId);

@@ -69,6 +69,7 @@ public class AccountControllerTurnstileTests
             null!,
             null!,
             turnstileService,
+            null!,
             NullLogger<AccountController>.Instance)
         {
             ControllerContext = new ControllerContext

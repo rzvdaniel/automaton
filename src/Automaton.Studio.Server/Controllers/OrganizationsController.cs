@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,13 +15,16 @@ namespace Automaton.Studio.Server.Controllers;
 public class OrganizationsController : BaseController
 {
     private readonly IOrganizationService organizationService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<OrganizationsController> logger;
 
     public OrganizationsController(
         IOrganizationService organizationService,
+        ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<OrganizationsController> logger)
     {
         this.organizationService  = organizationService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger               = logger;
     }
 
@@ -83,6 +87,11 @@ public class OrganizationsController : BaseController
     [HttpPost]
     public async Task<ActionResult<OrganizationDto>> CreateOrganization([FromBody] CreateOrganizationRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -115,6 +124,11 @@ public class OrganizationsController : BaseController
     [HttpPut("{id}")]
     public async Task<ActionResult<OrganizationDto>> UpdateOrganization(Guid id, [FromBody] UpdateOrganizationRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -152,6 +166,11 @@ public class OrganizationsController : BaseController
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteOrganization(Guid id)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await organizationService.DeleteOrganizationAsync(id);
@@ -210,6 +229,11 @@ public class OrganizationsController : BaseController
     [HttpPost("{id}/invitations")]
     public async Task<IActionResult> InviteMember(Guid id, [FromBody] InviteMemberRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -329,6 +353,11 @@ public class OrganizationsController : BaseController
     [HttpDelete("{id}/members/{userId}")]
     public async Task<IActionResult> RemoveMember(Guid id, Guid userId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await organizationService.RemoveMemberAsync(id, userId);
@@ -393,6 +422,11 @@ public class OrganizationsController : BaseController
     [HttpPut("{id}/members/{userId}")]
     public async Task<ActionResult<OrganizationMemberDto>> UpdateMemberRole(Guid id, Guid userId, [FromBody] UpdateOrganizationMemberRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -510,6 +544,11 @@ public class OrganizationsController : BaseController
     [HttpPost("{id}/apps/{appId}/assign")]
     public async Task<IActionResult> AssignApp(Guid id, Guid appId, [FromBody] AssignAppRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (!ModelState.IsValid)
@@ -547,6 +586,11 @@ public class OrganizationsController : BaseController
     [HttpDelete("{id}/apps/{appId}/assign/{userId}")]
     public async Task<IActionResult> UnassignApp(Guid id, Guid appId, Guid userId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await organizationService.UnassignAppFromUserAsync(id, appId, userId);
@@ -601,6 +645,11 @@ public class OrganizationsController : BaseController
     [HttpPut("{id}/projects/{projectId}")]
     public async Task<IActionResult> LinkProject(Guid id, Guid projectId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await organizationService.LinkProjectToOrganizationAsync(id, projectId);
@@ -637,6 +686,11 @@ public class OrganizationsController : BaseController
     [HttpDelete("{id}/projects/{projectId}")]
     public async Task<IActionResult> UnlinkProject(Guid id, Guid projectId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var success = await organizationService.UnlinkProjectFromOrganizationAsync(id, projectId);

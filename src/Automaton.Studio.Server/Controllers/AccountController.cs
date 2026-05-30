@@ -23,6 +23,7 @@ public class AccountController : BaseController
     private readonly UsersService userManagerService;
     private readonly IEmailService emailService;
     private readonly ICloudflareTurnstileService cloudflareTurnstileService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
@@ -30,6 +31,7 @@ public class AccountController : BaseController
         UsersService userManagerService,
         IEmailService emailService,
         ICloudflareTurnstileService cloudflareTurnstileService,
+        ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<AccountController> logger)
     {
         this.configurationService = configurationService;
@@ -37,6 +39,7 @@ public class AccountController : BaseController
         this.userManagerService = userManagerService;
         this.emailService = emailService;
         this.cloudflareTurnstileService = cloudflareTurnstileService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = logger;
     }
 
@@ -138,6 +141,11 @@ public class AccountController : BaseController
     [HttpPut]
     public async Task<IActionResult> UpdateUserPassword(UpdateUserPasswordCommand passwordUpdateCommand, CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         var userId = GetUserId();
 
         await userManagerService.UpdatePassword
@@ -155,6 +163,11 @@ public class AccountController : BaseController
     [HttpPut]
     public async Task<IActionResult> UpdateUserProfile(UpdateUserInfoCommand profileUpdateCommand, CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         profileUpdateCommand.Id = GetUserId();
 
         await Mediator.Send(profileUpdateCommand, cancellationToken);
