@@ -3,6 +3,7 @@
  * Connects to ASP.NET backend endpoints
  */
 import apiClient, { tokenStorage } from '@/shared/services/api/axios-instance'
+import axios from 'axios'
 import type {
   LoginRequest,
   RegisterRequest,
@@ -75,7 +76,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      await apiClient.post('/api/Token/Logout', {})
+      await axios.post(`${this.getApiBaseUrl()}/api/Token/Logout`, {}, { withCredentials: true })
     } catch {
       // Best effort - still clear local auth state even if revocation request fails.
     }

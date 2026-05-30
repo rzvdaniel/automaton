@@ -60,6 +60,7 @@ public class TokenController : BaseController
     }
 
     [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> RevokeRefreshToken(RevokeRefreshTokenCommand command, CancellationToken ct)
     {
         var refreshToken = command.Token ?? refreshTokenCookieService.GetRefreshToken(HttpContext);
@@ -69,7 +70,11 @@ public class TokenController : BaseController
             return NoContent();
         }
 
-        command.UserId = GetUserId();
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            command.UserId = GetUserId();
+        }
+
         command.Token = refreshToken;
         await Mediator.Send(command, ct);
         refreshTokenCookieService.ClearRefreshToken(HttpContext);
@@ -78,12 +83,14 @@ public class TokenController : BaseController
     }
 
     [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
         var refreshToken = refreshTokenCookieService.GetRefreshToken(HttpContext);
         if (!string.IsNullOrWhiteSpace(refreshToken))
         {
-            await Mediator.Send(new RevokeRefreshTokenCommand(GetUserId(), refreshToken), ct);
+            var userId = User.Identity?.IsAuthenticated == true ? GetUserId() : Guid.Empty;
+            await Mediator.Send(new RevokeRefreshTokenCommand(userId, refreshToken), ct);
         }
 
         refreshTokenCookieService.ClearRefreshToken(HttpContext);

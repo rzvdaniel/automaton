@@ -25,8 +25,13 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
                 return;
             }
 
-            var refreshToken = await dataContext.Set<RefreshToken>()
-                .SingleOrDefaultAsync(x => x.Token == request.Token && x.UserId == request.UserId, cancellationToken);
+            var refreshTokens = dataContext.Set<RefreshToken>().Where(x => x.Token == request.Token);
+            if (request.UserId != Guid.Empty)
+            {
+                refreshTokens = refreshTokens.Where(x => x.UserId == request.UserId);
+            }
+
+            var refreshToken = await refreshTokens.SingleOrDefaultAsync(cancellationToken);
 
             if (refreshToken == null)
             {

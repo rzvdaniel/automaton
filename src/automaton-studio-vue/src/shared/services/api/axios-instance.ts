@@ -80,7 +80,9 @@ apiClient.interceptors.response.use(
       const isAuthRoute =
         originalRequest.url?.includes('/Account/LoginUser') ||
         originalRequest.url?.includes('/Account/RegisterUser') ||
-        originalRequest.url?.includes('/Token/RefreshAccessToken')
+        originalRequest.url?.includes('/Token/RefreshAccessToken') ||
+        originalRequest.url?.includes('/Token/Logout') ||
+        originalRequest.url?.includes('/Token/RevokeRefreshToken')
 
       if (isAuthRoute) {
         return Promise.reject(error)
