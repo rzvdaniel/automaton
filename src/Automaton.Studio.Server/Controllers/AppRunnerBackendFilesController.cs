@@ -20,6 +20,7 @@ public class AppRunnerBackendFilesController : ControllerBase
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<AppRunnerBackendFilesController> logger;
 
     public AppRunnerBackendFilesController(
@@ -28,6 +29,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
         IHubContext<AutomatonHub> automatonHub,
+        ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<AppRunnerBackendFilesController> logger)
     {
         this.dataContext = dataContext;
@@ -35,12 +37,22 @@ public class AppRunnerBackendFilesController : ControllerBase
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = logger;
     }
 
     [HttpGet]
     public async Task<ActionResult<AppBackendFilesResponse>> List(Guid appId, CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFilesResponse
+            {
+                Success = false,
+                Error = ConfirmedEmailGuardService.SensitiveActionMessage
+            });
+        }
+
         if (!await authorizationService.CanAccessAppAsync(appId, cancellationToken))
         {
             return NotFound();
@@ -87,6 +99,16 @@ public class AppRunnerBackendFilesController : ControllerBase
         string path,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFileContentResponse
+            {
+                Success = false,
+                Path = path,
+                Error = ConfirmedEmailGuardService.SensitiveActionMessage
+            });
+        }
+
         var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {
@@ -123,6 +145,15 @@ public class AppRunnerBackendFilesController : ControllerBase
         string path,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFileDeleteResponse
+            {
+                Success = false,
+                Error = ConfirmedEmailGuardService.SensitiveActionMessage
+            });
+        }
+
         var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {

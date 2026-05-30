@@ -68,6 +68,11 @@ public class RunnersController : BaseController
     [Authorize]
     public async Task<IActionResult> RestartHostedRunner(Guid id, CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         await hostedRunnerManagementService.RestartOwnedHostedRunnerByRunnerIdAsync(id, cancellationToken);
         return NoContent();
     }

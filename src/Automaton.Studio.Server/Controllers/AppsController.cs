@@ -326,6 +326,11 @@ public class AppsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> UpdateRunner(Guid id, [FromBody] UpdateRunnerRequest request)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         await appsService.UpdateRunner(id, request.ExecutionRunnerId);
 
         return NoContent();
@@ -1771,6 +1776,11 @@ public class AppsController : BaseController
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadBackendZip(Guid id, IFormFile file, [FromQuery] bool clean = true)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             if (file == null || file.Length == 0)

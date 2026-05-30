@@ -19,18 +19,21 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly AppsControllerExecutionService controllerExecutionService;
     private readonly UserContextService userContextService;
     private readonly IAppExecutionLogService executionLogService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionController(
         AppsService appsService,
         AppsControllerExecutionService controllerExecutionService,
         UserContextService userContextService,
-        IAppExecutionLogService executionLogService)
+        IAppExecutionLogService executionLogService,
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
         this.userContextService = userContextService;
         this.executionLogService = executionLogService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -60,6 +63,11 @@ public class AppsControllerExecutionController : ControllerBase
         [FromBody] DeployBackendRequest? request,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var userId = userContextService.GetUserId();
@@ -83,6 +91,11 @@ public class AppsControllerExecutionController : ControllerBase
         Guid appId,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var userId = userContextService.GetUserId();
@@ -102,6 +115,11 @@ public class AppsControllerExecutionController : ControllerBase
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployAppResponse>> DeployFrontend(Guid appId)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var userId = userContextService.GetUserId();
@@ -123,6 +141,11 @@ public class AppsControllerExecutionController : ControllerBase
         Guid appId,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         try
         {
             var userId = userContextService.GetUserId();
