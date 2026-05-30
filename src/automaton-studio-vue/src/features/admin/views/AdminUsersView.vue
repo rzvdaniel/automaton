@@ -16,7 +16,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
 import { adminUsersService } from '../services/adminUsersService'
-import type { AdminUser } from '../types/admin.types'
+import type { AdminUser, AdminUserSummary } from '../types/admin.types'
 
 const toast = useToast()
 const router = useRouter()
@@ -26,11 +26,19 @@ const totalCount = ref(0)
 const isLoading = ref(false)
 const pageIndex = ref(0)
 const pageSize = ref(100)
-const sortField = ref('registeredAtUtc')
+const sortField = ref('lastLoginAtUtc')
 const sortOrder = ref(-1)
 const globalSearch = ref('')
 const rowActionMenu = ref()
 const selectedUser = ref<AdminUser | null>(null)
+const summary = ref<AdminUserSummary>({
+  totalCount: 0,
+  verifiedCount: 0,
+  activeCount: 0,
+  joinedTodayCount: 0,
+  joinedThisWeekCount: 0,
+  joinedThisMonthCount: 0,
+})
 const tableFilters = ref({
   global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS },
   registrationProvider: { value: null as string | null, matchMode: FilterMatchMode.EQUALS },
@@ -63,16 +71,14 @@ const lockStatusOptions = [
   { label: 'Locked', value: true },
 ]
 
-const filteredStats = computed(() => {
-  const verified = users.value.filter(user => user.emailConfirmed).length
-  const active = users.value.filter(user => !user.isLocked).length
-  const newThisWeek = users.value.filter(user => isWithinLastWeek(user.registeredAtUtc)).length
-
+const headerStats = computed(() => {
   return [
-    `Users: ${totalCount.value.toLocaleString()}`,
-    `Verified on page: ${verified.toLocaleString()}`,
-    `Active on page: ${active.toLocaleString()}`,
-    `New This Week on page: ${newThisWeek.toLocaleString()}`,
+    `Users: ${summary.value.totalCount.toLocaleString()}`,
+    `Active: ${summary.value.activeCount.toLocaleString()}`,
+    `Verified: ${summary.value.verifiedCount.toLocaleString()}`,
+    `Joined Today: ${summary.value.joinedTodayCount.toLocaleString()}`,
+    `Joined This Week: ${summary.value.joinedThisWeekCount.toLocaleString()}`,
+    `Joined This Month: ${summary.value.joinedThisMonthCount.toLocaleString()}`,
   ]
 })
 
@@ -135,6 +141,7 @@ async function loadUsers() {
       sortOrder: sortOrder.value,
     })
     totalCount.value = result.totalCount
+    summary.value = result.summary
     users.value = result.items
   } catch {
     toast.add({
@@ -173,7 +180,7 @@ function onPageChange(event: { page: number; rows: number }) {
 }
 
 function onSort(event: { sortField?: string | ((item: unknown) => string); sortOrder?: number | null }) {
-  sortField.value = typeof event.sortField === 'string' ? event.sortField : 'registeredAtUtc'
+  sortField.value = typeof event.sortField === 'string' ? event.sortField : 'lastLoginAtUtc'
   sortOrder.value = event.sortOrder ?? -1
   pageIndex.value = 0
   void loadUsers()
@@ -242,21 +249,6 @@ function providerSeverity(value?: string) {
   }
 }
 
-function isWithinLastWeek(value?: string) {
-  if (!value) {
-    return false
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1) {
-    return false
-  }
-
-  const threshold = new Date()
-  threshold.setDate(threshold.getDate() - 7)
-  return date >= threshold
-}
-
 function toggleRowActions(event: Event, user: AdminUser) {
   selectedUser.value = user
   rowActionMenu.value.toggle(event)
@@ -300,16 +292,16 @@ onMounted(async () => {
           Platform-wide user directory for administrators.
         </p>
       </div>
-    </div>
 
-    <div class="users-stats-strip">
-      <span
-        v-for="stat in filteredStats"
-        :key="stat"
-        class="users-stat-chip"
-      >
-        {{ stat }}
-      </span>
+      <div class="users-stats-strip">
+        <span
+          v-for="stat in headerStats"
+          :key="stat"
+          class="users-stat-chip"
+        >
+          {{ stat }}
+        </span>
+      </div>
     </div>
 
     <DataTable
@@ -536,6 +528,9 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  justify-content: flex-end;
+  align-items: flex-start;
+  flex: 1 1 28rem;
 }
 
 .users-stat-chip {
@@ -610,6 +605,10 @@ onMounted(async () => {
   .users-toolbar-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .users-stats-strip {
+    justify-content: flex-start;
   }
 
   .users-filter-select,

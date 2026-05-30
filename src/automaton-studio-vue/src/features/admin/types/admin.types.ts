@@ -203,12 +203,22 @@ export interface AdminUser {
   roles: string[]
 }
 
+export interface AdminUserSummary {
+  totalCount: number
+  verifiedCount: number
+  activeCount: number
+  joinedTodayCount: number
+  joinedThisWeekCount: number
+  joinedThisMonthCount: number
+}
+
 export interface AdminUserPage {
   items: AdminUser[]
   totalCount: number
   page: number
   pageSize: number
   totalPages: number
+  summary: AdminUserSummary
 }
 
 /**

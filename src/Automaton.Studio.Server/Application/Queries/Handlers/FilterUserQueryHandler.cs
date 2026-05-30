@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Application.Queries.Handlers
 {
-    public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, PagedResult<UserDetails>>
+    public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, AdminUserListResponse>
     {
         private readonly UsersService _userManagerService;
         private readonly ApplicationDbContext _db;
@@ -18,7 +18,7 @@ namespace AuthServer.Application.Queries.Handlers
             _db = db;
         }
 
-        public async Task<PagedResult<UserDetails>> Handle(FilterUserQuery request,
+        public async Task<AdminUserListResponse> Handle(FilterUserQuery request,
             CancellationToken cancellationToken)
         {
             var res = await _userManagerService.GetUsers(new UserFilter
@@ -74,12 +74,13 @@ namespace AuthServer.Application.Queries.Handlers
                     .ToList()
             }).ToList();
 
-            return new PagedResult<UserDetails>
+            return new AdminUserListResponse
             {
                 Items = items,
                 TotalCount = res.TotalCount,
                 Page = res.Page,
                 PageSize = res.PageSize,
+                Summary = res.Summary,
             };
         }
     }

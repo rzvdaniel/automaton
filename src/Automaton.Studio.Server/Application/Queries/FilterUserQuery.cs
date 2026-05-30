@@ -3,7 +3,7 @@ using MediatR;
 
 namespace AuthServer.Core.Queries
 {
-    public class FilterUserQuery : IRequest<PagedResult<UserDetails>>
+    public class FilterUserQuery : IRequest<AdminUserListResponse>
     {
         public string? Search { get; set; }
         public string? Name { get; set; }

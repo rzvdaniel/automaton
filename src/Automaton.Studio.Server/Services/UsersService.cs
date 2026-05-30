@@ -196,7 +196,7 @@ public class UsersService
         return false;
     }
 
-    public async Task<PagedResult<ApplicationUser>> GetUsers(UserFilter filter)
+    public async Task<ApplicationUserPageResult> GetUsers(UserFilter filter)
     {
         var searchTerm = filter.Search?.Trim();
         var safePageIndex = Math.Max(0, filter.PageIndex);
@@ -204,6 +204,9 @@ public class UsersService
         var now = DateTimeOffset.UtcNow;
         var sortField = filter.SortField?.Trim();
         var sortDescending = filter.SortOrder == -1;
+        var todayUtc = DateTime.UtcNow.Date;
+        var weekStartUtc = todayUtc.AddDays(-7);
+        var monthStartUtc = new DateTime(todayUtc.Year, todayUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         var query = _userManager.Users
             .AsNoTracking()
@@ -224,13 +227,26 @@ public class UsersService
             );
 
         var totalCount = await query.CountAsync();
+        var verifiedCount = await query.CountAsync(u => u.EmailConfirmed);
+        var activeCount = await query.CountAsync(u => !u.LockoutEnd.HasValue || u.LockoutEnd.Value <= now);
+        var joinedTodayCount = await query.CountAsync(u => u.RegisteredAtUtc >= todayUtc);
+        var joinedThisWeekCount = await query.CountAsync(u => u.RegisteredAtUtc >= weekStartUtc);
+        var joinedThisMonthCount = await query.CountAsync(u => u.RegisteredAtUtc >= monthStartUtc);
 
         query = sortField switch
         {
             "name" => sortDescending ? query.OrderByDescending(u => u.Name) : query.OrderBy(u => u.Name),
-            "lastLoginAtUtc" => sortDescending ? query.OrderByDescending(u => u.LastLoginAtUtc) : query.OrderBy(u => u.LastLoginAtUtc),
+            "lastLoginAtUtc" => sortDescending
+                ? query.OrderByDescending(u => u.LastLoginAtUtc != null)
+                    .ThenByDescending(u => u.LastLoginAtUtc)
+                    .ThenByDescending(u => u.RegisteredAtUtc)
+                : query.OrderBy(u => u.LastLoginAtUtc == null ? 1 : 0)
+                    .ThenBy(u => u.LastLoginAtUtc)
+                    .ThenBy(u => u.RegisteredAtUtc),
             "registeredAtUtc" => sortDescending ? query.OrderByDescending(u => u.RegisteredAtUtc) : query.OrderBy(u => u.RegisteredAtUtc),
-            _ => query.OrderByDescending(u => u.RegisteredAtUtc)
+            _ => query.OrderByDescending(u => u.LastLoginAtUtc != null)
+                .ThenByDescending(u => u.LastLoginAtUtc)
+                .ThenByDescending(u => u.RegisteredAtUtc)
         };
 
         var items = await query
@@ -238,12 +254,21 @@ public class UsersService
             .Take(safePageSize)
             .ToListAsync();
 
-        return new PagedResult<ApplicationUser>
+        return new ApplicationUserPageResult
         {
             Items = items,
             TotalCount = totalCount,
             Page = safePageIndex + 1,
             PageSize = safePageSize,
+            Summary = new UserListSummary
+            {
+                TotalCount = totalCount,
+                VerifiedCount = verifiedCount,
+                ActiveCount = activeCount,
+                JoinedTodayCount = joinedTodayCount,
+                JoinedThisWeekCount = joinedThisWeekCount,
+                JoinedThisMonthCount = joinedThisMonthCount,
+            },
         };
     }
 
