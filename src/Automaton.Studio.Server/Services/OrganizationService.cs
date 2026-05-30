@@ -613,7 +613,7 @@ public class OrganizationService : IOrganizationService
         return invitation;
     }
 
-    public async Task<bool> AcceptInvitationAsync(string token, CancellationToken cancellationToken = default)
+    public async Task<bool> AcceptInvitationAsync(string token, Guid currentUserId, CancellationToken cancellationToken = default)
     {
         var invitation = await dbContext.OrganizationInvitations
             .Include(i => i.Organization)
@@ -631,11 +631,17 @@ public class OrganizationService : IOrganizationService
             return false;
         }
 
-        // Get user by email
-        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == invitation.Email, cancellationToken);
+        // Require the authenticated user to match the invitation email.
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == currentUserId, cancellationToken);
         if (user == null)
         {
-            logger.Warning("User with email {Email} not found", invitation.Email);
+            logger.Warning("Authenticated user {UserId} not found while accepting organization invitation", currentUserId);
+            return false;
+        }
+
+        if (!string.Equals(user.Email, invitation.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.Warning("User {UserId} attempted to accept invitation for {InvitationEmail}", currentUserId, invitation.Email);
             return false;
         }
 
@@ -1170,8 +1176,14 @@ public class OrganizationService : IOrganizationService
             .Select(om => om.OrganizationId)
             .ToListAsync(cancellationToken);
 
+        var currentUserEmail = currentUser.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(currentUserEmail))
+        {
+            return Enumerable.Empty<PendingInvitationDto>();
+        }
+
         var pendingInvitations = await dbContext.OrganizationInvitations
-            .Where(i => i.Email == currentUser.Email 
+            .Where(i => i.Email.ToLower() == currentUserEmail.ToLower()
                 && !i.IsConsumed 
                 && i.ExpiresAt > DateTime.UtcNow
                 && !userOrganizationIds.Contains(i.OrganizationId))
@@ -1214,7 +1226,9 @@ public class OrganizationService : IOrganizationService
 
         // Verify this invitation is for the current user
         var currentUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == UserId, cancellationToken);
-        if (currentUser == null || currentUser.Email != invitation.Email)
+        if (currentUser == null ||
+            string.IsNullOrWhiteSpace(currentUser.Email) ||
+            !string.Equals(currentUser.Email.Trim(), invitation.Email, StringComparison.OrdinalIgnoreCase))
         {
             logger.Warning("User {UserId} attempted to decline invitation not addressed to them", UserId);
             return false;

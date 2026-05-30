@@ -248,7 +248,6 @@ public class OrganizationsController : BaseController
 
             return Ok(new { 
                 message = "Invitation sent successfully",
-                token = invitation.Token,
                 expiresAt = invitation.ExpiresAt
             });
         }
@@ -270,9 +269,9 @@ public class OrganizationsController : BaseController
 
     /// <summary>
     /// Accept an invitation to join an organization.
-    /// Does not require authentication - anyone with a valid token can accept.
+    /// Requires an authenticated user whose email matches the invitation.
     /// </summary>
-    [AllowAnonymous]
+    [Authorize]
     [HttpPost("invitations/accept")]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationRequest request)
     {
@@ -283,7 +282,7 @@ public class OrganizationsController : BaseController
                 return BadRequest(ModelState);
             }
 
-            var success = await organizationService.AcceptInvitationAsync(request.Token);
+            var success = await organizationService.AcceptInvitationAsync(request.Token, GetUserId());
             
             if (!success)
             {

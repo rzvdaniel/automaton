@@ -60,7 +60,7 @@ public interface IOrganizationService
     /// <summary>
     /// Accept an invitation to join an organization
     /// </summary>
-    Task<bool> AcceptInvitationAsync(string token, CancellationToken cancellationToken = default);
+    Task<bool> AcceptInvitationAsync(string token, Guid currentUserId, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get all pending organization invitations for the current user
