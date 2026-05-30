@@ -198,6 +198,18 @@ public class UsersService
         throw new Exception();
     }
 
+    public async Task<string> GenerateEmailConfirmationTokenAsync(Guid userId)
+    {
+        var user = await GetUserById(userId);
+        return await _userManager.GenerateEmailConfirmationTokenAsync(user);
+    }
+
+    public async Task<IdentityResult> ConfirmEmailAsync(Guid userId, string token)
+    {
+        var user = await GetUserById(userId);
+        return await _userManager.ConfirmEmailAsync(user, token);
+    }
+
     public async Task ResetPasswordAsync(Guid userId, string token, string password)
     {
         var user = await GetUserById(userId);

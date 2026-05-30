@@ -30,6 +30,7 @@ namespace AuthServer.Application.Queries.Handlers
                 Id = user.Id,
                 Name = user.Name,
                 Email = user.Email,
+                EmailConfirmed = user.EmailConfirmed,
                 PublicUsername = user.PublicUsername,
                 Roles = roles.ToList()
             };

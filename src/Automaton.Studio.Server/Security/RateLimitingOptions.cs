@@ -9,6 +9,7 @@ public class RateLimitingOptions
     public RateLimitPolicyOptions AuthLogin { get; set; } = new(5, 60);
     public RateLimitPolicyOptions AuthRegistration { get; set; } = new(3, 3600);
     public RateLimitPolicyOptions AuthForgotPassword { get; set; } = new(10, 3600);
+    public RateLimitPolicyOptions AuthResendConfirmation { get; set; } = new(3, 3600);
     public RateLimitPolicyOptions AuthResetPassword { get; set; } = new(5, 3600);
     public RateLimitPolicyOptions AuthRefreshToken { get; set; } = new(30, 300);
     public RateLimitPolicyOptions ApiKeyValidation { get; set; } = new(20, 60);

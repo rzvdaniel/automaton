@@ -10,6 +10,7 @@ using Common.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -100,24 +101,11 @@ public class AccountController : BaseController
 
         try
         {
-            var userDetails = new EmailData
-            {
-                Template = "AutomatonRegisterUser",
-                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
-                To = [new EmailAccount { Email = registerUserCommand.Email, Name = registerUserCommand.Name }],
-                Variables =
-                {
-                    { "Name", registerUserCommand.Name },
-                    { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
-                    { "SupportEmail", configurationService.EmailConfig.EmailSupport }
-                }
-            };
-
-            await emailService.Send(userDetails, CancellationToken.None);
+            await SendEmailConfirmationAsync(user, CancellationToken.None);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Registration email could not be sent to {Email}", registerUserCommand.Email);
+            logger.LogWarning(ex, "Confirmation email could not be sent to {Email}", registerUserCommand.Email);
         }
 
         return CreatedAtRoute("User",
@@ -172,6 +160,57 @@ public class AccountController : BaseController
         await Mediator.Send(profileUpdateCommand, cancellationToken);
 
         return NoContent();
+    }
+
+    [HttpPost]
+    [Authorize]
+    [EnableRateLimiting(RateLimitPolicyNames.AuthResendConfirmation)]
+    public async Task<IActionResult> ResendConfirmation(CancellationToken cancellationToken)
+    {
+        var user = await userManagerService.GetUserById(GetUserId());
+
+        if (user.EmailConfirmed)
+        {
+            return NoContent();
+        }
+
+        try
+        {
+            await SendEmailConfirmationAsync(user, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Confirmation email resend failed for user {UserId}", user.Id);
+        }
+
+        return NoContent();
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmEmail(Guid userId, string token, CancellationToken cancellationToken)
+    {
+        if (userId == Guid.Empty || string.IsNullOrWhiteSpace(token))
+        {
+            return Redirect(BuildEmailConfirmationRedirectUrl(success: false));
+        }
+
+        try
+        {
+            var result = await userManagerService.ConfirmEmailAsync(userId, token);
+            if (!result.Succeeded)
+            {
+                return Redirect(BuildEmailConfirmationRedirectUrl(success: false));
+            }
+
+            await dataContext.SaveChangesAsync(cancellationToken);
+            return Redirect(BuildEmailConfirmationRedirectUrl(success: true));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Email confirmation failed for user {UserId}", userId);
+            return Redirect(BuildEmailConfirmationRedirectUrl(success: false));
+        }
     }
 
     [HttpPost]
@@ -289,5 +328,52 @@ public class AccountController : BaseController
             token,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             cancellationToken);
+    }
+
+    private async Task SendEmailConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        var token = await userManagerService.GenerateEmailConfirmationTokenAsync(user.Id);
+        var confirmationUrl = BuildEmailConfirmationUrl(user.Id, token);
+
+        var userDetails = new EmailData
+        {
+            Template = "AutomatonConfirmEmail",
+            From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+            To = [new EmailAccount { Email = user.Email, Name = user.Name }],
+            Variables =
+            {
+                { "Name", user.Name },
+                { "ConfirmationUrl", confirmationUrl },
+                { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
+                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
+            }
+        };
+
+        await emailService.Send(userDetails, cancellationToken);
+    }
+
+    private string BuildEmailConfirmationUrl(Guid userId, string token)
+    {
+        var apiBaseUrl = $"{Request.Scheme}://{Request.Host}".TrimEnd('/');
+        var query = new Dictionary<string, string?>
+        {
+            ["userId"] = userId.ToString(),
+            ["token"] = token
+        };
+
+        return QueryHelpers.AddQueryString(
+            $"{apiBaseUrl}/api/Account/ConfirmEmail",
+            query);
+    }
+
+    private string BuildEmailConfirmationRedirectUrl(bool success)
+    {
+        var baseUrl = configurationService.WebsiteUrl.TrimEnd('/');
+        return QueryHelpers.AddQueryString(
+            $"{baseUrl}/auth/login",
+            new Dictionary<string, string?>
+            {
+                ["emailConfirmation"] = success ? "success" : "failed"
+            });
     }
 }

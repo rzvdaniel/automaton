@@ -8,6 +8,8 @@ public class UserDetails
 
     public string Email { get; set; }
 
+    public bool EmailConfirmed { get; set; }
+
     public string? PublicUsername { get; set; }
 
     /// <summary>

@@ -62,6 +62,11 @@ public static class RateLimitingServiceCollectionExtensions
                     GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthForgotPassword),
                     _ => CreatePolicyOptions(rateLimitingOptions.AuthForgotPassword)));
 
+            options.AddPolicy(RateLimitPolicyNames.AuthResendConfirmation, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResendConfirmation),
+                    _ => CreatePolicyOptions(rateLimitingOptions.AuthResendConfirmation)));
+
             options.AddPolicy(RateLimitPolicyNames.AuthResetPassword, httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResetPassword),

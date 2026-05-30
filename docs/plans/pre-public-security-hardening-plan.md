@@ -288,11 +288,11 @@ Configure lockout options in:
 - Keep login error messages generic: `Invalid credentials.`
 - Do not reveal whether the account exists or is locked.
 
-## Phase 3: Email Confirmation
+## Phase 3: Email Confirmation With Sensitive-Action Gating
 
 ### Objective
 
-Reduce fake-account churn and prevent unverified accounts from using sensitive product features.
+Reduce fake-account churn and prevent unverified accounts from using sensitive product features, without blocking basic product onboarding.
 
 ### Backend changes
 
@@ -300,7 +300,10 @@ Add confirmation-token generation and email flow in:
 
 - `src/Automaton.Studio.Server/Controllers/AccountController.cs`
 
-Add confirm-email and resend-confirmation endpoints.
+Add endpoints:
+
+- `POST /api/Account/ResendConfirmation`
+- `GET /api/Account/ConfirmEmail?userId=...&token=...`
 
 ### Frontend changes
 
@@ -309,21 +312,37 @@ Update:
 - `src/automaton-studio-vue/src/features/auth/views/RegisterView.vue`
 - `src/automaton-studio-vue/src/features/auth/views/LoginView.vue`
 
-Add confirmation handling route/view in the auth feature.
+Add a persistent “Confirm your email” banner in Studio and a confirmation-result handling route/view in the auth feature.
 
 ### Enforcement
 
-Block login entirely, or at minimum block these actions until email is confirmed:
+Allow login for unconfirmed users, but block sensitive actions until email is confirmed:
 
 - API key creation
 - app publishing
 - runner registration
+- hosted runner usage/provisioning
 - billing-sensitive actions
+- email/password change
+- invitations/org-sharing flows
+- optionally backend deployment actions
+
+Still allow:
+
+- login
+- browsing Studio
+- creating draft/local apps
+- editing app source
+- resending confirmation
+- onboarding/docs/basic exploration
 
 ### Notes
 
 - Rate limit resend-confirmation flow.
-- Keep responses generic.
+- Keep resend responses generic.
+- URL-encode the token in the email link.
+- Redirect the confirm-email endpoint back to Studio with a success/failure indicator.
+- Enforce sensitive-action gating on the server, not only in the frontend.
 
 ## Phase 4: Token Handling Hardening
 

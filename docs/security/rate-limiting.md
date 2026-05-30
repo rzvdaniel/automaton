@@ -180,6 +180,14 @@ Current limits:
 - per IP via `AuthForgotPassword`
 - per email via `EmailRateLimit("auth:forgot-password:email", 3, 3600)`
 
+### `POST /api/Account/ResendConfirmation` in `AccountController.cs`
+
+Why: confirmation resend can be abused for notification spam and should stay throttled even though the endpoint is authenticated.
+
+Current limits:
+
+- per IP via `AuthResendConfirmation`
+
 ### `POST /api/Account/ResetUserPassword` in `AccountController.cs`
 
 Why: slows repeated password reset attempts and token guessing.
@@ -245,6 +253,7 @@ These are configured under `RateLimiting` in `appsettings.json` and bound by `Ra
 - `AuthLogin`: 5 requests per minute per IP
 - `AuthRegistration`: 3 requests per hour per IP
 - `AuthForgotPassword`: 10 requests per hour per IP
+- `AuthResendConfirmation`: 3 requests per hour per IP
 - `AuthResetPassword`: 5 requests per hour per IP
 - `AuthRefreshToken`: 30 requests per 5 minutes per IP
 - `ApiKeyValidation`: 20 requests per minute per IP
