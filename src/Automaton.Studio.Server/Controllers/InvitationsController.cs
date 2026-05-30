@@ -1,4 +1,5 @@
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
@@ -139,7 +140,9 @@ public class InvitationsController : ControllerBase
                 Name = displayName,
                 PublicUsername = publicUsername,
                 EmailConfirmed = true,
-                IsEnterpriseEnabled = true
+                IsEnterpriseEnabled = true,
+                RegisteredAtUtc = DateTime.UtcNow,
+                RegistrationProvider = RegistrationProviders.Invitation
             };
 
             var createResult = await userManager.CreateAsync(user, request.Password);
@@ -198,6 +201,7 @@ public class InvitationsController : ControllerBase
 
         await invitationService.ConsumeInvitationToken(token);
 
+    await usersService.MarkSuccessfulLoginAsync(user);
         await signInManager.SignInAsync(user, isPersistent: false);
 
         return Ok(new { message = "Invitation accepted and account setup complete", redirect = "/projects" });

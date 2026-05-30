@@ -665,6 +665,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<bool>("IsEnterpriseEnabled")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("tinyint(1)");
 
@@ -692,6 +695,12 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("tinyint(1)");
 
                     b.Property<string>("PublicUsername")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("RegisteredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("RegistrationProvider")
                         .HasColumnType("longtext");
 
                     b.Property<string>("SecurityStamp")

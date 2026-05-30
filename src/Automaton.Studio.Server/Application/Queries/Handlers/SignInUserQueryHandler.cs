@@ -12,15 +12,18 @@ public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebTo
     private readonly UserManager<ApplicationUser> userManager;
     private readonly SignInManager<ApplicationUser> signInManager;
     private readonly AuthTokenService authTokenService;
+    private readonly UsersService usersService;
 
     public SignInUserQueryHandler(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
-        AuthTokenService authTokenService)
+        AuthTokenService authTokenService,
+        UsersService usersService)
     {
         this.userManager = userManager;
         this.signInManager = signInManager;
         this.authTokenService = authTokenService;
+        this.usersService = usersService;
     }
 
     public async Task<JsonWebToken> Handle(SignInUserQuery command, CancellationToken cancellationToken)
@@ -47,6 +50,8 @@ public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebTo
         {
             throw new Exception("Invalid credentials.");
         }
+
+        await usersService.MarkSuccessfulLoginAsync(user);
 
         return await authTokenService.IssueForUserAsync(user, command.RefreshTokenExpirationDays, cancellationToken);
     }

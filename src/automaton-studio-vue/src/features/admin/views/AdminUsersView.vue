@@ -45,6 +45,42 @@ function formatRoles(roles: string[]) {
   return roles.join(', ')
 }
 
+function formatDate(value?: string) {
+  if (!value) {
+    return '—'
+  }
+
+  return new Date(value).toLocaleString()
+}
+
+function formatProvider(value?: string) {
+  switch (value) {
+    case 'password':
+      return 'Password'
+    case 'github':
+      return 'GitHub'
+    case 'invitation':
+      return 'Invitation'
+    case 'adminCreated':
+      return 'Admin'
+    default:
+      return value || 'Unknown'
+  }
+}
+
+function providerSeverity(value?: string) {
+  switch (value) {
+    case 'github':
+      return 'info'
+    case 'invitation':
+      return 'contrast'
+    case 'adminCreated':
+      return 'danger'
+    default:
+      return 'secondary'
+  }
+}
+
 onMounted(async () => {
   await loadUsers()
 })
@@ -115,6 +151,14 @@ onMounted(async () => {
           {{ slotProps.data.publicUsername || '—' }}
         </template>
       </Column>
+      <Column header="Provider" style="width: 120px">
+        <template #body="slotProps">
+          <Tag
+            :severity="providerSeverity(slotProps.data.registrationProvider)"
+            :value="formatProvider(slotProps.data.registrationProvider)"
+          />
+        </template>
+      </Column>
       <Column field="emailConfirmed" header="Email" style="width: 120px">
         <template #body="slotProps">
           <Tag
@@ -123,6 +167,26 @@ onMounted(async () => {
           />
         </template>
       </Column>
+      <Column header="Status" style="width: 110px">
+        <template #body="slotProps">
+          <Tag
+            :severity="slotProps.data.isLocked ? 'danger' : 'success'"
+            :value="slotProps.data.isLocked ? 'Locked' : 'Active'"
+          />
+        </template>
+      </Column>
+      <Column header="Registered" style="min-width: 180px">
+        <template #body="slotProps">
+          {{ formatDate(slotProps.data.registeredAtUtc) }}
+        </template>
+      </Column>
+      <Column header="Last Login" style="min-width: 180px">
+        <template #body="slotProps">
+          {{ formatDate(slotProps.data.lastLoginAtUtc) }}
+        </template>
+      </Column>
+      <Column field="appCount" header="Apps" style="width: 90px" />
+      <Column field="runnerCount" header="Runners" style="width: 100px" />
       <Column header="Roles" style="min-width: 220px">
         <template #body="slotProps">
           {{ formatRoles(slotProps.data.roles) }}

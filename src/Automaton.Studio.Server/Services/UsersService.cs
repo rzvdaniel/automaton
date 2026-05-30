@@ -1,4 +1,5 @@
 ﻿using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Common.Authentication;
@@ -26,6 +27,8 @@ public class UsersService
 
     public async Task CreateUser(ApplicationUser user, string password)
     {
+        EnsureRegistrationMetadata(user, RegistrationProviders.Password);
+
         if (_userManager.Users.Any(u => u.UserName == user.UserName))
         {
             throw new Exception($"User with user name {user.UserName} already registered");
@@ -52,6 +55,8 @@ public class UsersService
 
     public async Task CreateUserWithoutPasswordAsync(ApplicationUser user)
     {
+        EnsureRegistrationMetadata(user, RegistrationProviders.GitHub);
+
         if (_userManager.Users.Any(u => u.UserName == user.UserName))
         {
             throw new Exception($"User with user name {user.UserName} already registered");
@@ -194,18 +199,45 @@ public class UsersService
     public async Task<IEnumerable<ApplicationUser>> GetUsers(string name, string email,
         int pageindex, int pageSize)
     {
-        await Task.CompletedTask;
-        var result = _userManager.Users
+        var safePageIndex = Math.Max(0, pageindex);
+        var safePageSize = pageSize <= 0 ? 100 : pageSize;
+
+        return await _userManager.Users
+            .AsNoTracking()
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
-            .Where( u =>
-                (name == null || name == "" || u.Name.StartsWith(name)) &&
-                (email == null || email == "" || u.Name == name)
+            .Where(u =>
+                (string.IsNullOrWhiteSpace(name) || u.Name.StartsWith(name)) &&
+                (string.IsNullOrWhiteSpace(email) || u.Email == email)
             )
-            .Skip(pageindex * pageSize)
-            .Take(pageSize);
+            .OrderByDescending(u => u.RegisteredAtUtc)
+            .Skip(safePageIndex * safePageSize)
+            .Take(safePageSize)
+            .ToListAsync();
+    }
 
-        return result;
+    public async Task MarkSuccessfulLoginAsync(ApplicationUser user)
+    {
+        user.LastLoginAtUtc = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new Exception("Failed to update last login timestamp.");
+        }
+    }
+
+    private static void EnsureRegistrationMetadata(ApplicationUser user, string registrationProvider)
+    {
+        if (user.RegisteredAtUtc == default)
+        {
+            user.RegisteredAtUtc = DateTime.UtcNow;
+        }
+
+        if (string.IsNullOrWhiteSpace(user.RegistrationProvider))
+        {
+            user.RegistrationProvider = registrationProvider;
+        }
     }
 
     public async Task<string> GetResetPasswordToken(Guid userId)

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Automaton.Studio.Server.Authentication.GitHub;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
 using Common.Authentication;
@@ -101,12 +102,15 @@ public class GitHubAuthController : ControllerBase
                     UserName = verifiedEmail,
                     Name = string.IsNullOrWhiteSpace(githubDisplayName) ? githubUsername : githubDisplayName,
                     PublicUsername = publicUsername,
-                    SecurityStamp = Guid.NewGuid().ToString()
+                    SecurityStamp = Guid.NewGuid().ToString(),
+                    RegisteredAtUtc = DateTime.UtcNow,
+                    RegistrationProvider = RegistrationProviders.GitHub
                 };
 
                 await _usersService.CreateUserWithoutPasswordAsync(user);
             }
 
+            await _usersService.MarkSuccessfulLoginAsync(user);
             await _signInManager.SignInAsync(user, isPersistent: false);
 
             var jwt = await _authTokenService.IssueForUserAsync(

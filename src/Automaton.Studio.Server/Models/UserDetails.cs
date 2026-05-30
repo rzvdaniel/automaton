@@ -12,6 +12,18 @@ public class UserDetails
 
     public string? PublicUsername { get; set; }
 
+    public DateTime? RegisteredAtUtc { get; set; }
+
+    public DateTime? LastLoginAtUtc { get; set; }
+
+    public string? RegistrationProvider { get; set; }
+
+    public bool IsLocked { get; set; }
+
+    public int AppCount { get; set; }
+
+    public int RunnerCount { get; set; }
+
     /// <summary>
     /// User's system roles (e.g., "Admin", "SysAdmin", "User")
     /// </summary>

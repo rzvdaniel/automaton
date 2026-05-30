@@ -65,6 +65,21 @@ namespace Automaton.Studio.Server.Entities
         /// </summary>
         public bool CanAccessHostedRunnerTestPlans { get; set; }
 
+        /// <summary>
+        /// UTC timestamp when the account was first registered.
+        /// </summary>
+        public DateTime RegisteredAtUtc { get; set; }
+
+        /// <summary>
+        /// UTC timestamp of the most recent successful interactive login.
+        /// </summary>
+        public DateTime? LastLoginAtUtc { get; set; }
+
+        /// <summary>
+        /// Source used to create the account (password, github, invitation, adminCreated).
+        /// </summary>
+        public string RegistrationProvider { get; set; }
+
         public virtual SubscriptionPlan SubscriptionPlan { get; set; }
     }
 }

@@ -32,6 +32,10 @@ namespace AuthServer.Application.Queries.Handlers
                 Email = user.Email,
                 EmailConfirmed = user.EmailConfirmed,
                 PublicUsername = user.PublicUsername,
+                RegisteredAtUtc = user.RegisteredAtUtc,
+                LastLoginAtUtc = user.LastLoginAtUtc,
+                RegistrationProvider = user.RegistrationProvider,
+                IsLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
                 Roles = roles.ToList()
             };
 

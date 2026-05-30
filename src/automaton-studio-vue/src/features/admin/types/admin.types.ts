@@ -194,6 +194,12 @@ export interface AdminUser {
   email: string
   emailConfirmed: boolean
   publicUsername?: string
+  registeredAtUtc?: string
+  lastLoginAtUtc?: string
+  registrationProvider?: string
+  isLocked: boolean
+  appCount: number
+  runnerCount: number
   roles: string[]
 }
 /**
