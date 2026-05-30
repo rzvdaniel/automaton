@@ -135,56 +135,8 @@ function navigate(to: RouteLocationRaw) {
   void router.push(to)
 }
 
-function getToneClass(tone?: OverviewCardTone) {
-  switch (tone) {
-    case 'success':
-      return 'overview-card--tone-success'
-    case 'warning':
-      return 'overview-card--tone-warning'
-    case 'danger':
-      return 'overview-card--tone-danger'
-    default:
-      return 'overview-card--tone-primary'
-  }
-}
-
-function getIconToneClass(tone?: OverviewCardTone) {
-  switch (tone) {
-    case 'success':
-      return 'overview-card__icon--success'
-    case 'warning':
-      return 'overview-card__icon--warning'
-    case 'danger':
-      return 'overview-card__icon--danger'
-    default:
-      return 'overview-card__icon--primary'
-  }
-}
-
-function getValueToneClass(tone?: OverviewCardTone) {
-  switch (tone) {
-    case 'success':
-      return 'overview-card__value--success'
-    case 'warning':
-      return 'overview-card__value--warning'
-    case 'danger':
-      return 'overview-card__value--danger'
-    default:
-      return 'overview-card__value--primary'
-  }
-}
-
-function getActionToneClass(tone?: OverviewCardTone) {
-  switch (tone) {
-    case 'success':
-      return 'overview-card__action--success'
-    case 'warning':
-      return 'overview-card__action--warning'
-    case 'danger':
-      return 'overview-card__action--danger'
-    default:
-      return 'overview-card__action--primary'
-  }
+function getToneClass(prefix: string, tone?: OverviewCardTone) {
+  return `${prefix}${tone ?? 'primary'}`
 }
 
 function navigateToSection(to?: RouteLocationRaw) {
@@ -230,7 +182,7 @@ onMounted(() => {
         <div v-for="card in overviewCards" :key="card.label" class="col-12 md:col-6 xl:col-4">
           <Card
             class="h-full overview-card overview-card--clickable"
-            :class="getToneClass(card.tone)"
+            :class="getToneClass('overview-card--tone-', card.tone)"
           >
             <template #content>
               <button
@@ -240,18 +192,18 @@ onMounted(() => {
               >
                 <div class="overview-card__content">
                   <div class="overview-card__main">
-                    <div class="overview-card__icon" :class="getIconToneClass(card.tone)">
+                    <div class="overview-card__icon" :class="getToneClass('overview-card__icon--', card.tone)">
                       <i :class="card.icon"></i>
                     </div>
                     <div class="overview-card__text">
                       <div class="text-color-secondary text-sm">{{ card.label }}</div>
-                      <div class="overview-card__value" :class="getValueToneClass(card.tone)">
+                      <div class="overview-card__value" :class="getToneClass('overview-card__value--', card.tone)">
                         {{ formatMetric(card.value) }}
                       </div>
                       <div class="text-color-secondary text-sm">{{ card.helper }}</div>
                     </div>
                   </div>
-                  <div class="overview-card__action" :class="getActionToneClass(card.tone)">
+                  <div class="overview-card__action" :class="getToneClass('overview-card__action--', card.tone)">
                     <span>{{ card.actionLabel }}</span>
                     <i class="pi pi-arrow-right"></i>
                   </div>

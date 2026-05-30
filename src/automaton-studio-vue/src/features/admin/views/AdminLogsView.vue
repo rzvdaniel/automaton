@@ -168,9 +168,7 @@ function toggleAutoRefresh() {
 }
 
 onMounted(() => {
-  syncFilterFromRoute()
   void loadLevels()
-  void loadLogs()
 })
 
 onUnmounted(() => {
@@ -187,6 +185,7 @@ watch(
     syncFilterFromRoute()
     void loadLogs()
   },
+  { immediate: true },
 )
 </script>
 
