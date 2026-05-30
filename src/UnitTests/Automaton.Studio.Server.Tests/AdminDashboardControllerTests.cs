@@ -114,7 +114,7 @@ public class AdminDashboardControllerTests
             });
 
         dbContext.FlowExecutions.AddRange(
-            new FlowExecution
+            new Automaton.Studio.Server.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),
@@ -123,7 +123,7 @@ public class AdminDashboardControllerTests
                 Status = WorkflowStatus.Success.ToString(),
                 Application = "app-1"
             },
-            new FlowExecution
+            new Automaton.Studio.Server.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),
@@ -132,7 +132,7 @@ public class AdminDashboardControllerTests
                 Status = WorkflowStatus.Error.ToString(),
                 Application = "app-2"
             },
-            new FlowExecution
+            new Automaton.Studio.Server.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),
