@@ -28,6 +28,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-settings',
   },
   {
+    label: 'Dashboard',
+    icon: 'pi pi-chart-bar',
+    to: '/admin/dashboard',
+    routePrefix: '/admin/dashboard',
+  },
+  {
     label: 'Users',
     icon: 'pi pi-users',
     to: '/admin/users',

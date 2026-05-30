@@ -3,7 +3,8 @@
  * AdminLogsView.vue
  * Structured Serilog log viewer for administrators.
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -30,6 +31,7 @@ interface LogPage {
   totalPages: number
 }
 
+const route = useRoute()
 const logs = ref<LogEntry[]>([])
 const totalCount = ref(0)
 const totalPages = ref(0)
@@ -48,6 +50,20 @@ const filter = ref({
   pageSize: 100,
 })
 
+function getQueryValue(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value
+  }
+
+  return null
+}
+
+function syncFilterFromRoute() {
+  filter.value.level = getQueryValue(route.query.level)
+  filter.value.search = getQueryValue(route.query.search) ?? ''
+  filter.value.page = 1
+}
+
 async function loadLevels() {
   try {
     const { data } = await apiClient.get<string[]>('/api/admin/logs/levels')
@@ -60,7 +76,7 @@ async function loadLevels() {
 async function loadLogs() {
   isLoading.value = true
   try {
-    const params: Record<string, any> = {
+    const params: Record<string, number | string> = {
       page: filter.value.page,
       pageSize: filter.value.pageSize,
     }
@@ -152,13 +168,26 @@ function toggleAutoRefresh() {
 }
 
 onMounted(() => {
-  loadLevels()
-  loadLogs()
+  syncFilterFromRoute()
+  void loadLevels()
+  void loadLogs()
 })
 
 onUnmounted(() => {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer)
 })
+
+watch(
+  () => [route.query.level, route.query.search],
+  ([level, search], [previousLevel, previousSearch]) => {
+    if (level === previousLevel && search === previousSearch) {
+      return
+    }
+
+    syncFilterFromRoute()
+    void loadLogs()
+  },
+)
 </script>
 
 <template>
