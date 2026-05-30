@@ -188,6 +188,14 @@ export interface AppDeployRulesSettings {
   remixFrontendExclude: string[]
 }
 
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  emailConfirmed: boolean
+  publicUsername?: string
+  roles: string[]
+}
 /**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend

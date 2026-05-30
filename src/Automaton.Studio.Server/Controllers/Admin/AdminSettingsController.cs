@@ -2,20 +2,22 @@ using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Studio.Server.Controllers.Admin;
 
 /// <summary>
-/// Controller for managing application settings
+/// Admin controller for global application settings.
 /// </summary>
-[Authorize(Roles = "Admin,SysAdmin")]
-public class SettingsController : BaseController
+[ApiController]
+[Route("api/admin/settings")]
+[Authorize(Policy = "Administrators")]
+public class AdminSettingsController : ControllerBase
 {
     private readonly SettingsService _settingsService;
-    private readonly ILogger<SettingsController> _logger;
+    private readonly ILogger<AdminSettingsController> _logger;
 
-    public SettingsController(
+    public AdminSettingsController(
         SettingsService settingsService,
-        ILogger<SettingsController> logger)
+        ILogger<AdminSettingsController> logger)
     {
         _settingsService = settingsService;
         _logger = logger;

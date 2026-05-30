@@ -27,7 +27,13 @@ namespace AuthServer.Application.Queries.Handlers
                 Name = user.Name,
                 Email = user.Email,
                 EmailConfirmed = user.EmailConfirmed,
-                PublicUsername = user.PublicUsername
+                PublicUsername = user.PublicUsername,
+                Roles = user.UserRoles
+                    .Where(userRole => userRole.Role != null)
+                    .Select(userRole => userRole.Role.Name)
+                    .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
+                    .Cast<string>()
+                    .ToList()
             });
         }
     }

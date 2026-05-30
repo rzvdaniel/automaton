@@ -16,6 +16,7 @@ import AdminAppActivityView from './views/AdminAppActivityView.vue'
 import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
 import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
+import AdminUsersView from './views/AdminUsersView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -60,6 +61,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminAiSettingsView,
         meta: {
           title: 'AI Settings',
+        },
+      },
+      {
+        path: 'users',
+        name: 'admin-users',
+        component: AdminUsersView,
+        meta: {
+          title: 'Users',
         },
       },
       {
