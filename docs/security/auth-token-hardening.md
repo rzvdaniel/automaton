@@ -40,6 +40,8 @@ Current behavior:
 - refresh reads the cookie when the request body does not provide a token
 - refresh rotates the server-side token and rewrites the cookie
 - logout revokes the server-side refresh token and clears the cookie
+- password change revokes all refresh tokens for that user and clears the current refresh cookie
+- password reset revokes all refresh tokens for that user
 - GitHub OAuth callback also uses the cookie flow and does not send the refresh token through the frontend callback URL
 
 ## Cookie Settings
@@ -93,8 +95,6 @@ What still matters:
 
 ## Remaining Follow-Ups
 
-- verify refresh-token revocation on password change
-- verify refresh-token revocation on password reset
 - review CORS and cookie behavior for production origins
 - review any remaining auth-related logs to ensure tokens are not written accidentally
 - consider adding focused controller tests for cookie-based refresh/logout behavior

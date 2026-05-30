@@ -38,6 +38,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
                 var decodedCode = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(command.Code));
 
                 await UserManagerService.ResetPasswordAsync(user.Id, decodedCode, command.Password);
+                await UserManagerService.RevokeAllRefreshTokensAsync(user.Id, cancellationToken);
 
                 var userDetails = new EmailData
                 {

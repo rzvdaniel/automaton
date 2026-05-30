@@ -62,13 +62,13 @@ async function handleSubmit() {
     })
     success.value = true
   } catch (err: unknown) {
-    // Even if the email doesn't exist, we show success for security reasons
-    // The backend should handle this silently
     const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
     if (axiosError.response?.status === 400 && axiosError.response.data?.message) {
       error.value = axiosError.response.data.message
       turnstileRef.value?.reset()
       turnstileToken.value = ''
+    } else if (!axiosError.response || (axiosError.response.status ?? 0) >= 500) {
+      error.value = 'We could not send reset email right now. Please try again in a moment.'
     } else {
       success.value = true
     }

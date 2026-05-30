@@ -15,15 +15,18 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
         private ConfigurationService ConfigurationService { get; set; }
         private UserManager<ApplicationUser> UserManager { get; set; }
         private IEmailService EmailService { get; set; }
+        private ILogger<ForgotUserPasswordHandler> Logger { get; set; }
 
         public ForgotUserPasswordHandler(
             ConfigurationService configurationService,
             IEmailService emailService,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            ILogger<ForgotUserPasswordHandler> logger)
         {
             ConfigurationService = configurationService;
             UserManager = userManager;
             EmailService = emailService;
+            Logger = logger;
         }
 
         public async Task Handle(ForgotUserPasswordCommand command, CancellationToken cancellationToken)
@@ -32,6 +35,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
 
             if (user is null)
             {
+                Logger.LogInformation("Forgot password requested for non-existent email {Email}", command.Email);
                 return;
             }
             
@@ -54,7 +58,8 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
                 }
             };
 
-            await EmailService.Send(userDetails, CancellationToken.None);         
+            await EmailService.Send(userDetails, CancellationToken.None);
+            Logger.LogInformation("Password reset email sent to {Email}", command.Email);
         }
     }
 }

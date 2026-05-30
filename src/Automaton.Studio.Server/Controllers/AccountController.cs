@@ -151,6 +151,9 @@ public class AccountController : BaseController
             passwordUpdateCommand.NewPassword
         );
 
+        await userManagerService.RevokeAllRefreshTokensAsync(userId, cancellationToken);
+        refreshTokenCookieService.ClearRefreshToken(HttpContext);
+
         await dataContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();

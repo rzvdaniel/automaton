@@ -1,6 +1,7 @@
 ﻿using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Common.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
@@ -84,6 +85,26 @@ public class UsersService
         {
             throw new Exception("Error in updating password!");
         }
+    }
+
+    public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var refreshTokens = await _db.RefreshTokens
+            .Where(x => x.UserId == userId && !x.Revoked)
+            .ToListAsync(cancellationToken);
+
+        if (refreshTokens.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var refreshToken in refreshTokens)
+        {
+            refreshToken.Revoke();
+        }
+
+        _db.RefreshTokens.UpdateRange(refreshTokens);
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateProfile(UserProfile userProfile)

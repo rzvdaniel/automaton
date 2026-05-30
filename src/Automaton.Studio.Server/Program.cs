@@ -465,6 +465,7 @@ app.ApplyMigrations();
 
 app.UseForwardedHeaders();
 app.UseRateLimiter();
+app.UseRouting();
 
 app.UseSerilogRequestLogging(
     options =>
@@ -538,7 +539,6 @@ if (corsOrigins != null && corsOrigins.Length > 0)
 }
 
 app.UseAuthentication();
-app.UseRouting();
 app.UseAuthorization();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
