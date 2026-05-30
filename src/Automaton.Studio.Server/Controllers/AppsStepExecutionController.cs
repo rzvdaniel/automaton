@@ -128,7 +128,7 @@ public class AppsStepExecutionController : ControllerBase
                 appId, stepIdentifier);
 
             // 1. Get app by ID (doesn't need to be published for preview)
-            var app = await appsService.GetAppInfoByIdAsync(appId, cancellationToken);
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
             
             if (app == null)
             {
@@ -216,7 +216,7 @@ public class AppsStepExecutionController : ControllerBase
     {
         try
         {
-            var app = await appsService.GetAppInfoByIdAsync(appId);
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId);
             
             if (app == null)
             {

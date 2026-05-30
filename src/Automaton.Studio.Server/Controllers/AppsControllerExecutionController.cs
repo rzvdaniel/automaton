@@ -300,7 +300,7 @@ public class AppsControllerExecutionController : ControllerBase
                 "Preview controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
 
-            var app = await appsService.GetAppInfoByIdAsync(appId, cancellationToken);
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
 
             if (app == null)
             {

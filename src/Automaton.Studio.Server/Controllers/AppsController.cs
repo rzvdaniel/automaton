@@ -1002,7 +1002,7 @@ public class AppsController : BaseController
         try
         {
             // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1033,7 +1033,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1078,7 +1078,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1112,7 +1112,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1149,7 +1149,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1200,7 +1200,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1246,7 +1246,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1292,7 +1292,7 @@ public class AppsController : BaseController
     {
         try
         {
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1338,7 +1338,7 @@ public class AppsController : BaseController
         try
         {
             // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1453,7 +1453,7 @@ public class AppsController : BaseController
         try
         {
             // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1508,7 +1508,7 @@ public class AppsController : BaseController
             }
 
             // Get the app owner ID from database (not current user)
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
             {
                 return NotFound(new { success = false, message = "App not found" });
@@ -1563,7 +1563,7 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Only .zip archives are supported" });
 
             // Resolve the app owner for file-system path construction
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
                 return NotFound(new { success = false, message = "App not found" });
 
@@ -1679,7 +1679,7 @@ public class AppsController : BaseController
             if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { success = false, message = "Only .zip archives are supported" });
 
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
                 return NotFound(new { success = false, message = "App not found" });
 
@@ -1789,7 +1789,7 @@ public class AppsController : BaseController
             if (!Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { success = false, message = "Only .zip archives are supported" });
 
-            var appInfo = await appsService.GetAppInfoByIdAsync(id);
+            var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(id);
             if (appInfo == null)
                 return NotFound(new { success = false, message = "App not found" });
 

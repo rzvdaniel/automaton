@@ -195,7 +195,7 @@ public class AppsFlowExecutionController : ControllerBase
         logger.LogInformation("Preview flow execution request for app '{AppId}', identifier '{FlowIdentifier}'",
             appId, flowIdentifier);
 
-        var webApp = await appsService.GetAppInfoByIdAsync(appId, cancellationToken);
+        var webApp = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
         if (webApp == null)
             return NotFound(new { message = "Web app not found" });
 

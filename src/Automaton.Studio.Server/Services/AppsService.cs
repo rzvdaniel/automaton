@@ -126,12 +126,13 @@ public class AppsService
     }
 
     /// <summary>
-    /// Get app metadata by ID for preview mode (doesn't require app to be published).
-    /// Used for testing backend steps in the App Designer before publishing.
+    /// Get app metadata by ID only when the current user can access the app.
+    /// Use this on authenticated Studio and preview endpoints to avoid resolving
+    /// another user's storage or execution context from a raw app ID.
     /// </summary>
-    public async Task<Models.PublishedAppInfo> GetAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
+    public async Task<Models.PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
     {
-        var appEntity = await dataContext.WebApps
+        var appEntity = await authorizationService.GetAccessibleAppsQuery()
             .Include(x => x.WebAppUsers)
             .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken);
 
