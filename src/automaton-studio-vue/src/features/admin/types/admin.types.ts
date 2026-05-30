@@ -221,6 +221,15 @@ export interface AdminUserPage {
   summary: AdminUserSummary
 }
 
+export interface AdminDashboardSummary {
+  totalUsers: number
+  newRegistrations: number
+  publishedApps: number
+  activeRunners: number
+  executionsToday: number
+  failedExecutions: number
+}
+
 /**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend

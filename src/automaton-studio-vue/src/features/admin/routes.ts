@@ -10,6 +10,7 @@ import AdminProviderDetailView from './views/AdminProviderDetailView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
 import AdminModelDetailView from './views/AdminModelDetailView.vue'
 import AdminAiSettingsView from './views/AdminAiSettingsView.vue'
+import AdminDashboardView from './views/AdminDashboardView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
 import AdminAppActivityView from './views/AdminAppActivityView.vue'
@@ -29,7 +30,15 @@ export const adminRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/admin/ai-providers',
+        redirect: '/admin/dashboard',
+      },
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: AdminDashboardView,
+        meta: {
+          title: 'Dashboard',
+        },
       },
       {
         path: 'ai-providers',
