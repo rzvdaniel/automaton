@@ -281,26 +281,9 @@ public class AppsStepExecutionService
     /// </summary>
     public async Task<IEnumerable<AppStepInfo>> GetLinkedStepsAsync(Guid appId)
     {
-        // For Phase 1, return all steps owned by app owner
-        // Phase 2+ will use explicit AppCustomSteps linking
-        
-        var app = await dataContext.WebApps
-            .Include(a => a.WebAppUsers)
-            .FirstOrDefaultAsync(a => a.Id == appId);
-
-        if (app == null)
-        {
-            return Enumerable.Empty<AppStepInfo>();
-        }
-
-        var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
-        if (ownerId == null)
-        {
-            return Enumerable.Empty<AppStepInfo>();
-        }
-
-        var stepEntities = await dataContext.CustomSteps
-            .Where(s => s.CustomStepUsers.Any(su => su.UserId == ownerId))
+        var stepEntities = await dataContext.WebAppSteps
+            .Where(link => link.WebAppId == appId)
+            .Select(link => link.CustomStep)
             .ToListAsync();
 
         var steps = stepEntities.Select(s => 
