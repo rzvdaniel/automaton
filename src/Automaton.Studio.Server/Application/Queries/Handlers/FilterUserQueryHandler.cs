@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Application.Queries.Handlers
 {
-    public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, IEnumerable<UserDetails>>
+    public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, PagedResult<UserDetails>>
     {
         private readonly UsersService _userManagerService;
         private readonly ApplicationDbContext _db;
@@ -18,14 +18,24 @@ namespace AuthServer.Application.Queries.Handlers
             _db = db;
         }
 
-        public async Task<IEnumerable<UserDetails>> Handle(FilterUserQuery request,
+        public async Task<PagedResult<UserDetails>> Handle(FilterUserQuery request,
             CancellationToken cancellationToken)
         {
-            var res = await _userManagerService.GetUsers(request.Name,
-                request.Email, request.PageIndex, request.PageSize
-            );
+            var res = await _userManagerService.GetUsers(new UserFilter
+            {
+                Search = request.Search,
+                Name = request.Name,
+                Email = request.Email,
+                RegistrationProvider = request.RegistrationProvider,
+                EmailConfirmed = request.EmailConfirmed,
+                IsLocked = request.IsLocked,
+                RegisteredFromUtc = request.RegisteredFromUtc,
+                RegisteredToUtc = request.RegisteredToUtc,
+                PageIndex = request.PageIndex,
+                PageSize = request.PageSize
+            });
 
-            var userIds = res.Select(user => user.Id).ToList();
+            var userIds = res.Items.Select(user => user.Id).ToList();
 
             var appCounts = await _db.WebAppUsers
                 .AsNoTracking()
@@ -41,7 +51,7 @@ namespace AuthServer.Application.Queries.Handlers
                 .Select(group => new { UserId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
 
-            return res.Select(user => new UserDetails
+            var items = res.Items.Select(user => new UserDetails
             {
                 Id = user.Id,
                 Name = user.Name,
@@ -60,7 +70,15 @@ namespace AuthServer.Application.Queries.Handlers
                     .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
                     .Cast<string>()
                     .ToList()
-            });
+            }).ToList();
+
+            return new PagedResult<UserDetails>
+            {
+                Items = items,
+                TotalCount = res.TotalCount,
+                Page = res.Page,
+                PageSize = res.PageSize,
+            };
         }
     }
 }

@@ -17,7 +17,7 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 public class AdminUsersController : BaseController
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UserDetails>>> GetUsers([FromQuery] FilterUserQuery filterUserQuery, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<UserDetails>>> GetUsers([FromQuery] FilterUserQuery filterUserQuery, CancellationToken cancellationToken)
     {
         return Ok(await Mediator.Send(filterUserQuery, cancellationToken));
     }

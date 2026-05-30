@@ -1,19 +1,31 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { AdminUser } from '../types/admin.types'
+import type { AdminUserPage } from '../types/admin.types'
 
 interface AdminUsersQuery {
+  search?: string
   name?: string
   email?: string
+  registrationProvider?: string
+  emailConfirmed?: boolean
+  isLocked?: boolean
+  registeredFromUtc?: string
+  registeredToUtc?: string
   pageIndex?: number
   pageSize?: number
 }
 
 class AdminUsersService {
-  async getUsers(query: AdminUsersQuery = {}): Promise<AdminUser[]> {
-    const { data } = await apiClient.get<AdminUser[]>('/api/admin/users', {
+  async getUsers(query: AdminUsersQuery = {}): Promise<AdminUserPage> {
+    const { data } = await apiClient.get<AdminUserPage>('/api/admin/users', {
       params: {
+        search: query.search,
         name: query.name,
         email: query.email,
+        registrationProvider: query.registrationProvider,
+        emailConfirmed: query.emailConfirmed,
+        isLocked: query.isLocked,
+        registeredFromUtc: query.registeredFromUtc,
+        registeredToUtc: query.registeredToUtc,
         pageIndex: query.pageIndex ?? 0,
         pageSize: query.pageSize ?? 100,
       },

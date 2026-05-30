@@ -196,24 +196,46 @@ public class UsersService
         return false;
     }
 
-    public async Task<IEnumerable<ApplicationUser>> GetUsers(string name, string email,
-        int pageindex, int pageSize)
+    public async Task<PagedResult<ApplicationUser>> GetUsers(UserFilter filter)
     {
-        var safePageIndex = Math.Max(0, pageindex);
-        var safePageSize = pageSize <= 0 ? 100 : pageSize;
+        var searchTerm = filter.Search?.Trim();
+        var safePageIndex = Math.Max(0, filter.PageIndex);
+        var safePageSize = filter.PageSize <= 0 ? 100 : filter.PageSize;
+        var now = DateTimeOffset.UtcNow;
 
-        return await _userManager.Users
+        var query = _userManager.Users
             .AsNoTracking()
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .Where(u =>
-                (string.IsNullOrWhiteSpace(name) || u.Name.StartsWith(name)) &&
-                (string.IsNullOrWhiteSpace(email) || u.Email == email)
-            )
+                (string.IsNullOrWhiteSpace(searchTerm) ||
+                    (u.Name != null && u.Name.Contains(searchTerm)) ||
+                    (u.Email != null && u.Email.Contains(searchTerm)) ||
+                    (u.PublicUsername != null && u.PublicUsername.Contains(searchTerm))) &&
+                (string.IsNullOrWhiteSpace(filter.Name) || (u.Name != null && u.Name.StartsWith(filter.Name))) &&
+                (string.IsNullOrWhiteSpace(filter.Email) || u.Email == filter.Email) &&
+                (string.IsNullOrWhiteSpace(filter.RegistrationProvider) || u.RegistrationProvider == filter.RegistrationProvider) &&
+                (!filter.EmailConfirmed.HasValue || u.EmailConfirmed == filter.EmailConfirmed.Value) &&
+                (!filter.IsLocked.HasValue || ((u.LockoutEnd.HasValue && u.LockoutEnd.Value > now) == filter.IsLocked.Value)) &&
+                (!filter.RegisteredFromUtc.HasValue || u.RegisteredAtUtc >= filter.RegisteredFromUtc.Value) &&
+                (!filter.RegisteredToUtc.HasValue || u.RegisteredAtUtc <= filter.RegisteredToUtc.Value)
+            );
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
             .OrderByDescending(u => u.RegisteredAtUtc)
             .Skip(safePageIndex * safePageSize)
             .Take(safePageSize)
             .ToListAsync();
+
+        return new PagedResult<ApplicationUser>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = safePageIndex + 1,
+            PageSize = safePageSize,
+        };
     }
 
     public async Task MarkSuccessfulLoginAsync(ApplicationUser user)

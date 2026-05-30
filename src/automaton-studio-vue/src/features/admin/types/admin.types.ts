@@ -202,6 +202,15 @@ export interface AdminUser {
   runnerCount: number
   roles: string[]
 }
+
+export interface AdminUserPage {
+  items: AdminUser[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 /**
  * AI API Key admin model
  * Matches AiApiKeyAdminResponse from backend
