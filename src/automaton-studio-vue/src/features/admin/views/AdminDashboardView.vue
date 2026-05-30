@@ -96,6 +96,7 @@ const overviewCards = computed<OverviewCard[]>(() => {
       icon: 'pi pi-play-circle',
       to: '/admin/app-activity',
       actionLabel: 'Open app activity',
+      tone: 'primary',
     },
     {
       label: 'Failed executions',
@@ -287,7 +288,7 @@ onMounted(() => {
 }
 
 .overview-card--clickable:hover {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--p-surface-900) 8%, transparent);
   transform: translateY(-2px);
 }
 
