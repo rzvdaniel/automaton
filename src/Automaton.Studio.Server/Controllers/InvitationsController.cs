@@ -109,7 +109,9 @@ public class InvitationsController : ControllerBase
         public string Password { get; set; } = string.Empty;
     }
 
-    // Combined accept + setup for unauthenticated users
+    // Combined accept + setup for unauthenticated users.
+    // This is only for first-time invitees or accounts without a local password.
+    // Existing password-bearing accounts must authenticate and use the normal accept flow.
     [AllowAnonymous]
     [HttpPost("accept/{token}/complete")]
     public async Task<IActionResult> Complete(string token, [FromBody] AcceptInvitationRequest request)
@@ -161,12 +163,10 @@ public class InvitationsController : ControllerBase
             }
             else
             {
-                var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
-                var resetResult = await userManager.ResetPasswordAsync(user, resetToken, request.Password);
-                if (!resetResult.Succeeded)
+                return BadRequest(new
                 {
-                    return BadRequest(new { message = "Failed to reset password", errors = resetResult.Errors.Select(e => e.Description) });
-                }
+                    message = "This invited account already has a password. Sign in with that account to accept the invitation."
+                });
             }
         }
 
