@@ -19,6 +19,8 @@ const turnstileToken = ref('')
 const turnstileError = ref<string | null>(null)
 const turnstileRef = ref<InstanceType<typeof CloudflareTurnstile> | null>(null)
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileEnabled =
+  import.meta.env.VITE_TURNSTILE_ENABLED === 'true' && !!turnstileSiteKey
 
 // Form validation
 function validateForm(): boolean {
@@ -33,7 +35,7 @@ function validateForm(): boolean {
     isValid = false
   }
 
-  if (turnstileSiteKey && !turnstileToken.value) {
+  if (turnstileEnabled && !turnstileToken.value) {
     turnstileError.value = 'Please complete the verification challenge'
     isValid = false
   }
@@ -152,7 +154,7 @@ function handleTurnstileError() {
               </small>
             </div>
 
-            <div v-if="turnstileSiteKey" class="flex flex-column gap-2">
+            <div v-if="turnstileEnabled" class="flex flex-column gap-2">
               <CloudflareTurnstile
                 ref="turnstileRef"
                 :site-key="turnstileSiteKey"

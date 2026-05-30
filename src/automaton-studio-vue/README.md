@@ -99,6 +99,7 @@ See [AI_INTEGRATION_PLAN.md](./AI_INTEGRATION_PLAN.md) for details.
 ```env
 VITE_API_BASE_URL=http://localhost:7091
 VITE_APP_TITLE=Automaton Studio (Dev)
+VITE_TURNSTILE_ENABLED=true
 VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
@@ -106,10 +107,16 @@ VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```env
 VITE_API_BASE_URL=https://api.automaton.monster
 VITE_APP_TITLE=Automaton Studio
+VITE_TURNSTILE_ENABLED=true
 VITE_TURNSTILE_SITE_KEY=your-production-turnstile-site-key
 ```
 
-`VITE_TURNSTILE_SITE_KEY` is optional. Leave it unset to hide Turnstile in environments where you do not want bot protection. The backend secret key belongs in `CloudflareTurnstile:SecretKey` on the API side and should come from Cloudflare Turnstile widget settings, not from source control.
+Frontend Turnstile rendering is controlled by both:
+
+- `VITE_TURNSTILE_ENABLED`
+- `VITE_TURNSTILE_SITE_KEY`
+
+Set `VITE_TURNSTILE_ENABLED=false` to hide the widget without removing the site key. The backend secret key belongs in `CloudflareTurnstile:SecretKey` on the API side and should come from Cloudflare Turnstile widget settings, not from source control.
 
 ### Turnstile Local Testing
 
