@@ -101,5 +101,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="containerRef"></div>
+  <div class="turnstile-container">
+    <div ref="containerRef"></div>
+  </div>
 </template>
+
+<style scoped>
+.turnstile-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+</style>
