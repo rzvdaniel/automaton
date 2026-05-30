@@ -134,20 +134,6 @@ public class AccountController : BaseController
         return Ok(jwt);
     }
 
-    [HttpPost]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthLogin)]
-    [EmailRateLimit("auth:login-runner:email", 10, 900)]
-    public async Task<ActionResult<JsonWebToken>> LoginRunnerUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
-    {
-        var signInUserQuery = new SignInUserQuery(configurationService.RunnerRefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
-        var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
-        refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RunnerRefreshTokenLifetime);
-        jwt.RefreshToken = string.Empty;
-
-        return Ok(jwt);
-    }
-
     [HttpPut]
     public async Task<IActionResult> UpdateUserPassword(UpdateUserPasswordCommand passwordUpdateCommand, CancellationToken cancellationToken)
     {

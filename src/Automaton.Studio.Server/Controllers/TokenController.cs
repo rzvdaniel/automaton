@@ -52,27 +52,6 @@ public class TokenController : BaseController
     }
 
     [HttpPost]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimitPolicyNames.AuthRefreshToken)]
-    public async Task<IActionResult> RefreshRunnerAccessToken(RefreshAccessTokenCommand command, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var refreshAccessTokenQuery = new RefreshAccessTokenQuery(configurationService.RunnerRefreshTokenLifetime, command.Token);
-            var jwt = await Mediator.Send(refreshAccessTokenQuery, cancellationToken);
-            refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RunnerRefreshTokenLifetime);
-            jwt.RefreshToken = string.Empty;
-
-            return Ok(jwt);
-        }
-        catch (AuthenticationException)
-        {
-            refreshTokenCookieService.ClearRefreshToken(HttpContext);
-            return Unauthorized();
-        }
-    }
-
-    [HttpPost]
     public async Task<IActionResult> RevokeAccessToken(RevokeAccessTokenCommand command, CancellationToken ct)
     {
         await Mediator.Send(command, ct);

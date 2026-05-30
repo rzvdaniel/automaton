@@ -54,12 +54,10 @@ Apply named policies to:
 - `src/Automaton.Studio.Server/Controllers/AccountController.cs`
   - `RegisterUser`
   - `LoginUser`
-  - `LoginRunnerUser`
   - `ForgotUserPassword`
   - `ResetUserPassword`
 - `src/Automaton.Studio.Server/Controllers/TokenController.cs`
   - `RefreshAccessToken`
-  - `RefreshRunnerAccessToken`
 - `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
   - `ValidateApiKey`
 
@@ -117,7 +115,6 @@ Suggested Cloudflare rules checklist:
 1. Login edge rule
    Path:
    - `POST /api/Account/LoginUser`
-   - `POST /api/Account/LoginRunnerUser`
    Suggested action:
    - `Managed Challenge`
    Suggested starting threshold:

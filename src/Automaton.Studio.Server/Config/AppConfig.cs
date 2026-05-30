@@ -5,7 +5,6 @@ public class AppConfig
     public string DatabaseType { get; set; }
     public bool UserSignUp { get; set; }
     public int RefreshTokenLifetime { get; set; }
-    public int RunnerRefreshTokenLifetime { get; set; }
     public string WebsiteUrl { get; set; }
     public string AiApiEncryptionKey { get; set; }
 }

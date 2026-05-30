@@ -17,7 +17,6 @@ public class ConfigurationService
 
     public string DatabaseType => AppConfig.DatabaseType;
     public int RefreshTokenLifetime => AppConfig.RefreshTokenLifetime;
-    public int RunnerRefreshTokenLifetime => AppConfig.RunnerRefreshTokenLifetime;
     public string WebsiteUrl => AppConfig.WebsiteUrl;
     public bool NoUserSignUp => !AppConfig.UserSignUp;
 

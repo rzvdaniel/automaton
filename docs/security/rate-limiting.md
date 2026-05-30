@@ -75,49 +75,45 @@ Notes:
    - action: `Managed Challenge`
    - suggested threshold: `10-20 requests per minute per IP`
 
-2. `POST /api/Account/LoginRunnerUser`
-   - action: `Managed Challenge`
-   - suggested threshold: `10-20 requests per minute per IP`
-
-3. `POST /api/Account/RegisterUser`
+2. `POST /api/Account/RegisterUser`
    - action: `Managed Challenge`
    - suggested threshold: `5-10 requests per hour per IP`
 
-4. `POST /api/Account/ForgotUserPassword`
+3. `POST /api/Account/ForgotUserPassword`
    - action: `Managed Challenge`
    - suggested threshold: `5-10 requests per hour per IP`
 
-5. `POST /api/Account/ResetUserPassword`
+4. `POST /api/Account/ResetUserPassword`
    - action: `Managed Challenge` first
    - suggested threshold: `10-20 requests per hour per IP`
 
-6. `GET /auth/github/login`
+5. `GET /auth/github/login`
    - action: `Managed Challenge`
    - suggested threshold: `20-30 requests per 10 minutes per IP`
 
-7. `GET /auth/github/callback`
+6. `GET /auth/github/callback`
    - action: `Managed Challenge`
    - suggested threshold: `30-60 requests per 10 minutes per IP`
    - note: keep this looser than login-start rules
 
-8. `POST /api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute`
+7. `POST /api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute`
    - action: `Managed Challenge`
    - suggested threshold: `20-60 requests per minute per IP`
 
-9. `POST /api/web-apps/{appSlug}/flows/{flowIdentifier}/execute`
+8. `POST /api/web-apps/{appSlug}/flows/{flowIdentifier}/execute`
    - action: `Managed Challenge`
    - suggested threshold: `20-60 requests per minute per IP`
 
-10. `POST /api/web-apps/{appSlug}/steps/{stepIdentifier}/execute`
+9. `POST /api/web-apps/{appSlug}/steps/{stepIdentifier}/execute`
    - action: `Managed Challenge`
    - suggested threshold: `20-60 requests per minute per IP`
 
-11. Turnstile rollout
+10. Turnstile rollout
    - add to register form
    - add to forgot-password form
    - optionally add to login later if credential-stuffing noise shows up
 
-12. Origin hygiene
+11. Origin hygiene
    - keep the API behind Cloudflare
    - avoid exposing the origin IP publicly if possible
 
@@ -162,15 +158,6 @@ Current limits:
 - per IP via `AuthLogin`
 - per email via `EmailRateLimit("auth:login:email", 10, 900)`
 
-### `POST /api/Account/LoginRunnerUser` in `AccountController.cs`
-
-Why: same login abuse risk, but against runner-oriented auth.
-
-Current limits:
-
-- per IP via `AuthLogin`
-- per email via `EmailRateLimit("auth:login-runner:email", 10, 900)`
-
 ### `POST /api/Account/ForgotUserPassword` in `AccountController.cs`
 
 Why: prevents reset-email flooding and reduces password-reset abuse against a single account.
@@ -199,14 +186,6 @@ Current limits:
 ### `POST /api/Token/RefreshAccessToken` in `TokenController.cs`
 
 Why: prevents refresh-token hammering and noisy abuse against token rotation.
-
-Current limits:
-
-- per IP via `AuthRefreshToken`
-
-### `POST /api/Token/RefreshRunnerAccessToken` in `TokenController.cs`
-
-Why: same token-abuse risk as normal refresh, but on the runner auth path.
 
 Current limits:
 
@@ -265,7 +244,6 @@ Custom per-email throttles:
 
 - register: 3 per hour per email
 - login: 10 per 15 minutes per email
-- login runner: 10 per 15 minutes per email
 - forgot password: 3 per hour per email
 
 ## Why These Were Prioritized
