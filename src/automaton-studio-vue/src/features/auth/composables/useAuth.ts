@@ -48,9 +48,9 @@ export function useAuth() {
   /**
    * Logout and redirect to login page
    */
-  function logout(redirectTo: string = '/login'): void {
-    store.logout()
-    router.push(redirectTo)
+  async function logout(redirectTo: string = '/login'): Promise<void> {
+    await store.logout()
+    await router.push(redirectTo)
   }
 
   /**

@@ -6,7 +6,6 @@ import apiClient, { tokenStorage } from '@/shared/services/api/axios-instance'
 import type {
   LoginRequest,
   RegisterRequest,
-  RefreshTokenRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
   ChangePasswordRequest,
@@ -30,9 +29,8 @@ class AuthService {
   async login(request: LoginRequest): Promise<JsonWebToken> {
     const { data } = await apiClient.post<JsonWebToken>('/api/Account/LoginUser', request)
 
-    // Store tokens
+    // Store access token in memory only. Refresh token is held in an HttpOnly cookie.
     tokenStorage.setAccessToken(data.accessToken)
-    tokenStorage.setRefreshToken(data.refreshToken)
 
     return data
   }
@@ -50,12 +48,11 @@ class AuthService {
    * Refresh access token
    * POST /api/Token/RefreshAccessToken
    */
-  async refreshToken(request: RefreshTokenRequest): Promise<JsonWebToken> {
-    const { data } = await apiClient.post<JsonWebToken>('/api/Token/RefreshAccessToken', request)
+  async refreshToken(): Promise<JsonWebToken> {
+    const { data } = await apiClient.post<JsonWebToken>('/api/Token/RefreshAccessToken', {})
 
-    // Store new tokens
+    // Store access token in memory only. Refresh token is rotated in an HttpOnly cookie.
     tokenStorage.setAccessToken(data.accessToken)
-    tokenStorage.setRefreshToken(data.refreshToken)
 
     return data
   }
@@ -76,13 +73,18 @@ class AuthService {
   /**
    * Logout - clear stored tokens
    */
-  logout(): void {
+  async logout(): Promise<void> {
+    try {
+      await apiClient.post('/api/Token/Logout', {})
+    } catch {
+      // Best effort - still clear local auth state even if revocation request fails.
+    }
+
     tokenStorage.clearTokens()
   }
 
-  storeTokens(token: JsonWebToken): void {
-    tokenStorage.setAccessToken(token.accessToken)
-    tokenStorage.setRefreshToken(token.refreshToken)
+  storeAccessToken(accessToken: string): void {
+    tokenStorage.setAccessToken(accessToken)
   }
 
   startGitHubLogin(returnUrl?: string): void {
@@ -110,11 +112,8 @@ class AuthService {
     return tokenStorage.getAccessToken()
   }
 
-  /**
-   * Get stored refresh token
-   */
-  getStoredRefreshToken(): string | null {
-    return tokenStorage.getRefreshToken()
+  async restoreSession(): Promise<JsonWebToken> {
+    return this.refreshToken()
   }
 
   /**

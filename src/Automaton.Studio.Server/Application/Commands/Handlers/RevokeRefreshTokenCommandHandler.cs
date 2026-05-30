@@ -20,12 +20,17 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
 
         public async Task Handle(RevokeRefreshTokenCommand request, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return;
+            }
+
             var refreshToken = await dataContext.Set<RefreshToken>()
                 .SingleOrDefaultAsync(x => x.Token == request.Token && x.UserId == request.UserId, cancellationToken);
 
             if (refreshToken == null)
             {
-                throw new Exception("Refresh token was not found.");
+                return;
             }
 
             refreshToken.Revoke();

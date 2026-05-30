@@ -259,7 +259,7 @@ Expected flow:
 3. GitHub prompts for approval
 4. GitHub redirects back to `https://api-dev.automaton.monster/signin-github`
 5. API completes OAuth and redirects to `GitHub:FrontendUrl/auth/github/callback`
-6. Studio stores the Automaton JWT and refresh token
+6. Studio stores the short-lived Automaton access token in memory, and the API sets the refresh token as an `HttpOnly` cookie
 7. User lands in Studio authenticated
 
 ## Production reference

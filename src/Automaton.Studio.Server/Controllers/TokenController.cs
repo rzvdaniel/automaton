@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Authentication;
+using Automaton.Studio.Server.Security;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -14,10 +15,12 @@ namespace Automaton.Studio.Server.Controllers;
 public class TokenController : BaseController
 {
     private readonly ConfigurationService configurationService;
+    private readonly RefreshTokenCookieService refreshTokenCookieService;
 
-    public TokenController(ConfigurationService configurationService)
+    public TokenController(ConfigurationService configurationService, RefreshTokenCookieService refreshTokenCookieService)
     {
         this.configurationService = configurationService;
+        this.refreshTokenCookieService = refreshTokenCookieService;
     }
 
     [HttpPost]
@@ -27,12 +30,23 @@ public class TokenController : BaseController
     {
         try
         {
-            var refreshAccessTokenQuery = new RefreshAccessTokenQuery(configurationService.RefreshTokenLifetime, command.Token);
+            var refreshToken = command.Token ?? refreshTokenCookieService.GetRefreshToken(HttpContext);
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                refreshTokenCookieService.ClearRefreshToken(HttpContext);
+                return Unauthorized();
+            }
 
-            return Ok(await Mediator.Send(refreshAccessTokenQuery, cancellationToken));
+            var refreshAccessTokenQuery = new RefreshAccessTokenQuery(configurationService.RefreshTokenLifetime, refreshToken);
+            var jwt = await Mediator.Send(refreshAccessTokenQuery, cancellationToken);
+            refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
+            jwt.RefreshToken = string.Empty;
+
+            return Ok(jwt);
         }
         catch (AuthenticationException)
         {
+            refreshTokenCookieService.ClearRefreshToken(HttpContext);
             return Unauthorized();
         }
     }
@@ -45,11 +59,15 @@ public class TokenController : BaseController
         try
         {
             var refreshAccessTokenQuery = new RefreshAccessTokenQuery(configurationService.RunnerRefreshTokenLifetime, command.Token);
+            var jwt = await Mediator.Send(refreshAccessTokenQuery, cancellationToken);
+            refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RunnerRefreshTokenLifetime);
+            jwt.RefreshToken = string.Empty;
 
-            return Ok(await Mediator.Send(refreshAccessTokenQuery, cancellationToken));
+            return Ok(jwt);
         }
         catch (AuthenticationException)
         {
+            refreshTokenCookieService.ClearRefreshToken(HttpContext);
             return Unauthorized();
         }
     }
@@ -65,8 +83,31 @@ public class TokenController : BaseController
     [HttpPost]
     public async Task<IActionResult> RevokeRefreshToken(RevokeRefreshTokenCommand command, CancellationToken ct)
     {
-        await Mediator.Send(command, ct);
+        var refreshToken = command.Token ?? refreshTokenCookieService.GetRefreshToken(HttpContext);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            refreshTokenCookieService.ClearRefreshToken(HttpContext);
+            return NoContent();
+        }
 
+        command.UserId = GetUserId();
+        command.Token = refreshToken;
+        await Mediator.Send(command, ct);
+        refreshTokenCookieService.ClearRefreshToken(HttpContext);
+
+        return NoContent();
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        var refreshToken = refreshTokenCookieService.GetRefreshToken(HttpContext);
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            await Mediator.Send(new RevokeRefreshTokenCommand(GetUserId(), refreshToken), ct);
+        }
+
+        refreshTokenCookieService.ClearRefreshToken(HttpContext);
         return NoContent();
     }
 }

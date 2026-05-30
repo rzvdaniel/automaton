@@ -2,7 +2,7 @@
  * Apps service for API calls
  * Connects to ASP.NET backend apps endpoints
  */
-import apiClient from '@/shared/services/api/axios-instance'
+import apiClient, { tokenStorage } from '@/shared/services/api/axios-instance'
 import type {
   App,
   AppScreenshot,
@@ -678,7 +678,7 @@ class AppsService {
     let html = rawHtml || app.definition?.htmlContent || this.getDefaultHtml()
 
     // Get current auth token and base URL for injection
-    const token = localStorage.getItem('automaton_access_token') || ''
+    const token = tokenStorage.getAccessToken() || ''
     const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
 
     // Strip any existing automatonApi injection to prevent double-injection issues.

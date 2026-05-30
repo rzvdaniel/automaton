@@ -7,8 +7,6 @@ import Message from 'primevue/message'
 import Button from 'primevue/button'
 import { useAuthStore } from '../stores/auth.store'
 import { authService } from '../services/auth.service'
-import type { JsonWebToken } from '../types/auth.types'
-
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
@@ -16,22 +14,16 @@ const router = useRouter()
 const errorMessage = ref('')
 const failureTitle = ref('GitHub sign-in failed')
 
-function readTokenFromHash(): JsonWebToken | null {
+function readTokenFromHash(): string | null {
   const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
   const params = new URLSearchParams(hash)
   const accessToken = params.get('accessToken')
-  const refreshToken = params.get('refreshToken')
 
-  if (!accessToken || !refreshToken) {
+  if (!accessToken) {
     return null
   }
 
-  return {
-    accessToken,
-    refreshToken,
-    expires: 0,
-    userId: '',
-  }
+  return accessToken
 }
 
 function readRedirectTarget(): string {
@@ -62,8 +54,8 @@ onMounted(async () => {
   }
 
   try {
-    authService.storeTokens(token)
-    await authStore.completeExternalLogin(token)
+    authService.storeAccessToken(token)
+    await authStore.completeExternalLogin({ accessToken: token })
 
     if (!authStore.user) {
       throw new Error('Failed to load your profile after GitHub login.')
@@ -73,7 +65,7 @@ onMounted(async () => {
     window.history.replaceState({}, document.title, route.path)
     await router.replace(redirect)
   } catch (error) {
-    authStore.logout()
+    void authStore.logout()
     errorMessage.value = 'We couldn’t complete sign-in with GitHub. Please try again.'
   }
 })

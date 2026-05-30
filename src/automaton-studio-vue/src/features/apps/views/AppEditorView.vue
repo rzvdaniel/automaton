@@ -377,26 +377,23 @@ async function handleTokenRequest(event: MessageEvent) {
   let token = tokenStorage.getAccessToken() ?? ''
 
   if (isTokenExpired(token)) {
-    const refreshToken = tokenStorage.getRefreshToken()
-    if (refreshToken) {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/api/Token/RefreshAccessToken`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: refreshToken }),
-          }
-        )
-        if (response.ok) {
-          const data = await response.json()
-          tokenStorage.setAccessToken(data.accessToken)
-          tokenStorage.setRefreshToken(data.refreshToken)
-          token = data.accessToken
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/Token/RefreshAccessToken`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
         }
-      } catch {
-        // Best-effort; fall through with the stale token
+      )
+      if (response.ok) {
+        const data = await response.json()
+        tokenStorage.setAccessToken(data.accessToken)
+        token = data.accessToken
       }
+    } catch {
+      // Best-effort; fall through with the stale token
     }
   }
 

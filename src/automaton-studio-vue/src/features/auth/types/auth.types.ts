@@ -21,14 +21,10 @@ export interface RegisterRequest {
   turnstileToken?: string
 }
 
-export interface RefreshTokenRequest {
-  token: string
-}
-
 // Response types
 export interface JsonWebToken {
   accessToken: string
-  refreshToken: string
+  refreshToken?: string
   expires: number
   userId: string
 }
@@ -46,7 +42,6 @@ export interface User {
 export interface AuthState {
   user: User | null
   accessToken: string | null
-  refreshToken: string | null
   tokenExpires: number | null
   isAuthenticated: boolean
   isLoading: boolean

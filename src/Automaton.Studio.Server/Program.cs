@@ -166,6 +166,7 @@ services.AddAuthorization(options =>
 services.AddHttpClient();
 services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
 services.AddAutomatonRateLimiting();
+services.AddSingleton<RefreshTokenCookieService>();
 
 services.Configure<ForwardedHeadersOptions>(options =>
 {

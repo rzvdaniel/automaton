@@ -63,7 +63,7 @@ export class AiConversationClient {
       }
 
       // Get auth token (use shared token storage to match axios config)
-      const token = tokenStorage.getAccessToken() || localStorage.getItem('auth_token')
+      const token = tokenStorage.getAccessToken()
       if (!token) {
         throw new Error('No authentication token found')
       }
@@ -237,7 +237,7 @@ export class AiConversationClient {
       throw new Error('API base URL is not configured (VITE_API_BASE_URL).')
     }
 
-    const token = tokenStorage.getAccessToken() || localStorage.getItem('auth_token')
+    const token = tokenStorage.getAccessToken()
     if (!token) {
       throw new Error('No authentication token found')
     }

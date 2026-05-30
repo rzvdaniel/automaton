@@ -5,17 +5,15 @@
  */
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-// Storage keys
-const ACCESS_TOKEN_KEY = 'automaton_access_token'
-const REFRESH_TOKEN_KEY = 'automaton_refresh_token'
-
 // Logout callback - will be set by the app
 let onUnauthorized: (() => void) | null = null
+let accessToken: string | null = null
 
 // Create axios instance
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -31,13 +29,12 @@ export const setUnauthorizedCallback = (callback: () => void): void => {
 
 // Token storage helpers
 export const tokenStorage = {
-  getAccessToken: (): string | null => localStorage.getItem(ACCESS_TOKEN_KEY),
-  setAccessToken: (token: string): void => localStorage.setItem(ACCESS_TOKEN_KEY, token),
-  getRefreshToken: (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY),
-  setRefreshToken: (token: string): void => localStorage.setItem(REFRESH_TOKEN_KEY, token),
+  getAccessToken: (): string | null => accessToken,
+  setAccessToken: (token: string | null): void => {
+    accessToken = token
+  },
   clearTokens: (): void => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
+    accessToken = null
   },
 }
 
@@ -106,29 +103,20 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const refreshToken = tokenStorage.getRefreshToken()
-
-      if (!refreshToken) {
-        tokenStorage.clearTokens()
-        // Use callback instead of window.location to avoid page reload
-        if (onUnauthorized) {
-          onUnauthorized()
-        }
-        return Promise.reject(error)
-      }
-
       try {
         // Call refresh token endpoint
         const response = await axios.post(
           `${import.meta.env.VITE_API_BASE_URL}/api/Token/RefreshAccessToken`,
-          { token: refreshToken },
-          { headers: { 'Content-Type': 'application/json' } },
+          {},
+          {
+            withCredentials: true,
+            headers: { 'Content-Type': 'application/json' },
+          },
         )
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data
+        const { accessToken } = response.data
 
         tokenStorage.setAccessToken(accessToken)
-        tokenStorage.setRefreshToken(newRefreshToken)
 
         processQueue(null, accessToken)
 

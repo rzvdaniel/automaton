@@ -5,7 +5,11 @@ namespace Automaton.Studio.Server.Core.Commands
 {
     public class RefreshAccessTokenCommand
     {
-        public string Token { get; }
+        public string? Token { get; set; }
+
+        public RefreshAccessTokenCommand()
+        {
+        }
 
         public RefreshAccessTokenCommand(string token)
         {

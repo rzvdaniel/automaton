@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Collections.Generic;
+using Automaton.Studio.Server.Security;
 
 namespace Automaton.Studio.Server.Tests;
 
@@ -70,6 +71,7 @@ public class AccountControllerTurnstileTests
             null!,
             turnstileService,
             null!,
+            new RefreshTokenCookieService(),
             NullLogger<AccountController>.Instance)
         {
             ControllerContext = new ControllerContext

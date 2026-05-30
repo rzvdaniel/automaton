@@ -4,8 +4,12 @@ namespace Automaton.Studio.Server.Core.Commands
 {
     public class RevokeRefreshTokenCommand : IRequest
     {
-        public Guid UserId { get; }
-        public string Token { get; }
+        public Guid UserId { get; set; }
+        public string? Token { get; set; }
+
+        public RevokeRefreshTokenCommand()
+        {
+        }
 
         public RevokeRefreshTokenCommand(Guid userId, string token)
         {

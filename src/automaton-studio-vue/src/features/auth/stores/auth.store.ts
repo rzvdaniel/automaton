@@ -12,7 +12,6 @@ export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
   const accessToken = ref<string | null>(authService.getStoredAccessToken())
-  const refreshToken = ref<string | null>(authService.getStoredRefreshToken())
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isInitialized = ref(false)
@@ -33,7 +32,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const token = await authService.login(request)
       accessToken.value = token.accessToken
-      refreshToken.value = token.refreshToken
 
       // Fetch user profile after login
       await fetchUserProfile()
@@ -65,9 +63,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function completeExternalLogin(token: { accessToken: string; refreshToken: string }): Promise<void> {
+  async function completeExternalLogin(token: { accessToken: string }): Promise<void> {
     accessToken.value = token.accessToken
-    refreshToken.value = token.refreshToken
     error.value = null
 
     await fetchUserProfile()
@@ -98,7 +95,6 @@ export const useAuthStore = defineStore('auth', () => {
     // Check if we have a stored token
     if (authService.hasStoredToken()) {
       accessToken.value = authService.getStoredAccessToken()
-      refreshToken.value = authService.getStoredRefreshToken()
 
       // Try to fetch user profile to validate token
       try {
@@ -111,16 +107,26 @@ export const useAuthStore = defineStore('auth', () => {
         // Token might be invalid, clear it
         logout()
       }
+    } else {
+      try {
+        const token = await authService.restoreSession()
+        accessToken.value = token.accessToken
+        await fetchUserProfile()
+
+        const { initializeSettings } = useUserSettings()
+        await initializeSettings()
+      } catch {
+        // No valid refresh cookie present.
+      }
     }
 
     isInitialized.value = true
   }
 
-  function logout(): void {
-    authService.logout()
+  async function logout(): Promise<void> {
+    await authService.logout()
     user.value = null
     accessToken.value = null
-    refreshToken.value = null
     error.value = null
 
     // Reset user settings to defaults on logout
@@ -170,7 +176,6 @@ export const useAuthStore = defineStore('auth', () => {
     // State
     user,
     accessToken,
-    refreshToken,
     isLoading,
     error,
     isInitialized,

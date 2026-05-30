@@ -9,6 +9,7 @@ This plan is implementation-oriented and mapped to the current codebase.
 Related implementation notes:
 
 - `docs/security/rate-limiting.md`
+- `docs/security/auth-token-hardening.md`
 
 ## Priorities
 
@@ -31,11 +32,10 @@ Useful building blocks already exist:
 
 Visible gaps from the current implementation:
 
-- No app-wide ASP.NET rate limiting wiring was found in `src/Automaton.Studio.Server/Program.cs`.
-- Login currently uses direct password validation in `src/Automaton.Studio.Server/Application/Queries/Handlers/SignInUserQueryHandler.cs`, which does not appear to enforce lockout.
-- Access and refresh tokens are stored in `localStorage` in `src/automaton-studio-vue/src/shared/services/api/axios-instance.ts`.
-- Email confirmation fields exist on users, but registration/login do not appear to enforce confirmed email before normal product use.
 - Security header middleware was not found in the API bootstrap.
+- A broad authorization audit across apps, flows, steps, projects, organizations, and runners is still pending.
+- Access tokens are still browser-readable and need to remain short-lived.
+- Refresh token revocation needs an explicit verification pass on logout, password change, and password reset flows.
 
 ## Phase 1: Rate Limiting
 
@@ -350,29 +350,21 @@ Still allow:
 
 Reduce the blast radius of XSS or browser-side token theft.
 
-### Current gap
+### Implemented so far
 
-Tokens are stored in browser `localStorage` in:
+- refresh token moved out of browser `localStorage`
+- refresh token now uses a secure `HttpOnly` cookie via `src/Automaton.Studio.Server/Security/RefreshTokenCookieService.cs`
+- Studio auth now keeps the access token in memory instead of persistent browser storage in `src/automaton-studio-vue/src/shared/services/api/axios-instance.ts`
+- refresh endpoint rotates the refresh token and rewrites the cookie in `src/Automaton.Studio.Server/Controllers/TokenController.cs`
+- logout clears the refresh-token cookie and revokes the server-side refresh token in `src/Automaton.Studio.Server/Controllers/TokenController.cs`
+- GitHub callback no longer sends the refresh token through the frontend callback flow in `src/Automaton.Studio.Server/Controllers/GitHubAuthController.cs`
 
-- `src/automaton-studio-vue/src/shared/services/api/axios-instance.ts`
+### Remaining checks
 
-GitHub callback currently passes tokens through the frontend flow in:
-
-- `src/automaton-studio-vue/src/features/auth/views/GitHubCallbackView.vue`
-
-### Changes
-
-Move refresh token to a secure `HttpOnly` cookie.
-
-Keep access token short-lived.
-
-Revoke refresh tokens on:
-
-- password change
-- password reset
-- explicit logout
-
-Review GitHub callback token delivery to avoid query-string exposure in browser history, logs, and third-party tooling.
+- verify refresh-token revocation also happens on password change and password reset flows
+- confirm cookie settings stay correct across localhost, tunnel, staging, and production origins
+- keep access token lifetime short enough that a stolen in-memory token has a limited window
+- review any remaining frontend auth flows for accidental token persistence or logging
 
 ## Phase 5: Server-Side Authorization Audit
 

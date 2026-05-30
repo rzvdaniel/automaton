@@ -29,8 +29,9 @@ app.use(pinia)
 // This prevents full page reloads when tokens expire
 setUnauthorizedCallback(() => {
   const authStore = useAuthStore()
-  authStore.logout()
-  router.push({ path: '/login', query: { session: 'expired' } })
+  void authStore.logout().finally(() => {
+    void router.push({ path: '/login', query: { session: 'expired' } })
+  })
 })
 
 // PrimeVue with Aura theme (default)

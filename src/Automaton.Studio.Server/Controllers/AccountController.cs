@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Studio.Server.Security;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -24,6 +25,7 @@ public class AccountController : BaseController
     private readonly IEmailService emailService;
     private readonly ICloudflareTurnstileService cloudflareTurnstileService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
+    private readonly RefreshTokenCookieService refreshTokenCookieService;
     private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
@@ -32,6 +34,7 @@ public class AccountController : BaseController
         IEmailService emailService,
         ICloudflareTurnstileService cloudflareTurnstileService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
+        RefreshTokenCookieService refreshTokenCookieService,
         ILogger<AccountController> logger)
     {
         this.configurationService = configurationService;
@@ -40,6 +43,7 @@ public class AccountController : BaseController
         this.emailService = emailService;
         this.cloudflareTurnstileService = cloudflareTurnstileService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
+        this.refreshTokenCookieService = refreshTokenCookieService;
         this.logger = logger;
     }
 
@@ -123,8 +127,11 @@ public class AccountController : BaseController
     public async Task<ActionResult<JsonWebToken>> LoginUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
+        var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
+        refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RefreshTokenLifetime);
+        jwt.RefreshToken = string.Empty;
 
-        return Ok(await Mediator.Send(signInUserQuery, cancellationToken));
+        return Ok(jwt);
     }
 
     [HttpPost]
@@ -134,8 +141,11 @@ public class AccountController : BaseController
     public async Task<ActionResult<JsonWebToken>> LoginRunnerUser(SignInUserCommand signInUserCommand, CancellationToken cancellationToken)
     {
         var signInUserQuery = new SignInUserQuery(configurationService.RunnerRefreshTokenLifetime, signInUserCommand.Email, signInUserCommand.Password);
+        var jwt = await Mediator.Send(signInUserQuery, cancellationToken);
+        refreshTokenCookieService.AppendRefreshToken(HttpContext, jwt.RefreshToken, configurationService.RunnerRefreshTokenLifetime);
+        jwt.RefreshToken = string.Empty;
 
-        return Ok(await Mediator.Send(signInUserQuery, cancellationToken));
+        return Ok(jwt);
     }
 
     [HttpPut]
