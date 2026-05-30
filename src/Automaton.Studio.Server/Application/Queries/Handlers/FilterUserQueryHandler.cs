@@ -31,6 +31,8 @@ namespace AuthServer.Application.Queries.Handlers
                 IsLocked = request.IsLocked,
                 RegisteredFromUtc = request.RegisteredFromUtc,
                 RegisteredToUtc = request.RegisteredToUtc,
+                SortField = request.SortField,
+                SortOrder = request.SortOrder,
                 PageIndex = request.PageIndex,
                 PageSize = request.PageSize
             });

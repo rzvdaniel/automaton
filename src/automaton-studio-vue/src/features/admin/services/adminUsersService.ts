@@ -10,6 +10,8 @@ interface AdminUsersQuery {
   isLocked?: boolean
   registeredFromUtc?: string
   registeredToUtc?: string
+  sortField?: string
+  sortOrder?: number
   pageIndex?: number
   pageSize?: number
 }
@@ -26,6 +28,8 @@ class AdminUsersService {
         isLocked: query.isLocked,
         registeredFromUtc: query.registeredFromUtc,
         registeredToUtc: query.registeredToUtc,
+        sortField: query.sortField,
+        sortOrder: query.sortOrder,
         pageIndex: query.pageIndex ?? 0,
         pageSize: query.pageSize ?? 100,
       },

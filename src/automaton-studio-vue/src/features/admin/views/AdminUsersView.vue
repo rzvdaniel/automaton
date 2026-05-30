@@ -1,26 +1,36 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { FilterMatchMode } from '@primevue/core/api'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import DatePicker from 'primevue/datepicker'
+import IconField from 'primevue/iconfield'
 import InputText from 'primevue/inputtext'
+import InputIcon from 'primevue/inputicon'
+import Menu from 'primevue/menu'
 import Paginator from 'primevue/paginator'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import type { MenuItem } from 'primevue/menuitem'
 import { adminUsersService } from '../services/adminUsersService'
 import type { AdminUser } from '../types/admin.types'
 
 const toast = useToast()
+const router = useRouter()
 
 const users = ref<AdminUser[]>([])
 const totalCount = ref(0)
 const isLoading = ref(false)
 const pageIndex = ref(0)
 const pageSize = ref(100)
+const sortField = ref('registeredAtUtc')
+const sortOrder = ref(-1)
 const globalSearch = ref('')
+const rowActionMenu = ref()
+const selectedUser = ref<AdminUser | null>(null)
 const tableFilters = ref({
   global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS },
   registrationProvider: { value: null as string | null, matchMode: FilterMatchMode.EQUALS },
@@ -53,6 +63,58 @@ const lockStatusOptions = [
   { label: 'Locked', value: true },
 ]
 
+const filteredStats = computed(() => {
+  const verified = users.value.filter(user => user.emailConfirmed).length
+  const active = users.value.filter(user => !user.isLocked).length
+  const newThisWeek = users.value.filter(user => isWithinLastWeek(user.registeredAtUtc)).length
+
+  return [
+    `Users: ${totalCount.value.toLocaleString()}`,
+    `Verified on page: ${verified.toLocaleString()}`,
+    `Active on page: ${active.toLocaleString()}`,
+    `New This Week on page: ${newThisWeek.toLocaleString()}`,
+  ]
+})
+
+const rowActionItems = computed<MenuItem[]>(() => {
+  const user = selectedUser.value
+  if (!user) {
+    return []
+  }
+
+  return [
+    {
+      label: 'View profile',
+      icon: 'pi pi-user',
+      command: () => showNotImplemented('View profile'),
+    },
+    {
+      label: 'View apps',
+      icon: 'pi pi-th-large',
+      command: () => router.push('/apps'),
+    },
+    {
+      label: 'View runners',
+      icon: 'pi pi-server',
+      command: () => router.push('/runners'),
+    },
+    {
+      separator: true,
+    },
+    {
+      label: 'Resend confirmation',
+      icon: 'pi pi-envelope',
+      disabled: user.emailConfirmed,
+      command: () => showNotImplemented('Resend confirmation'),
+    },
+    {
+      label: user.isLocked ? 'Enable account' : 'Disable account',
+      icon: user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban',
+      command: () => showNotImplemented(user.isLocked ? 'Enable account' : 'Disable account'),
+    },
+  ]
+})
+
 async function loadUsers() {
   isLoading.value = true
   try {
@@ -69,6 +131,8 @@ async function loadUsers() {
       isLocked: tableFilters.value.isLocked.value ?? undefined,
       registeredFromUtc: registeredFrom ? toStartOfDayIso(registeredFrom) : undefined,
       registeredToUtc: registeredTo ? toEndOfDayIso(registeredTo) : undefined,
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
     })
     totalCount.value = result.totalCount
     users.value = result.items
@@ -86,6 +150,7 @@ async function loadUsers() {
 
 function onGlobalSearchInput() {
   tableFilters.value.global.value = globalSearch.value || null
+  pageIndex.value = 0
 
   if (searchDebounceHandle) {
     clearTimeout(searchDebounceHandle)
@@ -104,6 +169,13 @@ function onColumnFilter() {
 function onPageChange(event: { page: number; rows: number }) {
   pageIndex.value = event.page
   pageSize.value = event.rows
+  void loadUsers()
+}
+
+function onSort(event: { sortField?: string | ((item: unknown) => string); sortOrder?: number | null }) {
+  sortField.value = typeof event.sortField === 'string' ? event.sortField : 'registeredAtUtc'
+  sortOrder.value = event.sortOrder ?? -1
+  pageIndex.value = 0
   void loadUsers()
 }
 
@@ -132,7 +204,12 @@ function formatDate(value?: string) {
     return '—'
   }
 
-  return new Date(value).toLocaleString()
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1) {
+    return '—'
+  }
+
+  return date.toLocaleString()
 }
 
 function formatProvider(value?: string) {
@@ -152,6 +229,8 @@ function formatProvider(value?: string) {
 
 function providerSeverity(value?: string) {
   switch (value) {
+    case 'password':
+      return 'secondary'
     case 'github':
       return 'info'
     case 'invitation':
@@ -161,6 +240,36 @@ function providerSeverity(value?: string) {
     default:
       return 'secondary'
   }
+}
+
+function isWithinLastWeek(value?: string) {
+  if (!value) {
+    return false
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1) {
+    return false
+  }
+
+  const threshold = new Date()
+  threshold.setDate(threshold.getDate() - 7)
+  return date >= threshold
+}
+
+function toggleRowActions(event: Event, user: AdminUser) {
+  selectedUser.value = user
+  rowActionMenu.value.toggle(event)
+}
+
+function showNotImplemented(actionLabel: string) {
+  const userName = selectedUser.value?.name || 'this user'
+  toast.add({
+    severity: 'info',
+    summary: 'Not implemented yet',
+    detail: `${actionLabel} is not wired yet for ${userName}.`,
+    life: 3000,
+  })
 }
 
 function clearFilters() {
@@ -191,15 +300,16 @@ onMounted(async () => {
           Platform-wide user directory for administrators.
         </p>
       </div>
+    </div>
 
-      <Button
-        icon="pi pi-refresh"
-        label="Reload"
-        severity="secondary"
-        outlined
-        :loading="isLoading"
-        @click="loadUsers"
-      />
+    <div class="users-stats-strip">
+      <span
+        v-for="stat in filteredStats"
+        :key="stat"
+        class="users-stat-chip"
+      >
+        {{ stat }}
+      </span>
     </div>
 
     <DataTable
@@ -209,21 +319,24 @@ onMounted(async () => {
       data-key="id"
       filter-display="menu"
       :global-filter-fields="['name', 'email', 'publicUsername']"
+      :sort-field="sortField"
+      :sort-order="sortOrder"
       lazy
       responsive-layout="scroll"
       striped-rows
       @filter="onColumnFilter"
+      @sort="onSort"
     >
       <template #header>
         <div class="users-table-toolbar">
-          <span class="p-input-icon-left users-search">
-            <i class="pi pi-search" />
+          <IconField class="users-search">
+            <InputIcon class="pi pi-search" />
             <InputText
               v-model="globalSearch"
               placeholder="Search users..."
               @input="onGlobalSearchInput"
             />
-          </span>
+          </IconField>
 
           <div class="users-toolbar-actions">
             <span class="users-count">{{ users.length.toLocaleString() }} of {{ totalCount.toLocaleString() }} users</span>
@@ -251,7 +364,7 @@ onMounted(async () => {
         <div class="users-empty">No users found for the current filter.</div>
       </template>
 
-      <Column field="name" header="Name" style="min-width: 180px" />
+      <Column field="name" header="Name" style="min-width: 180px" sortable />
       <Column field="email" header="Email" style="min-width: 240px" />
       <Column field="publicUsername" header="Public Username" style="min-width: 180px">
         <template #body="slotProps">
@@ -335,6 +448,7 @@ onMounted(async () => {
         header="Registered"
         style="min-width: 180px"
         :show-filter-match-modes="false"
+        sortable
       >
         <template #filter="slotProps">
           <DatePicker
@@ -352,7 +466,7 @@ onMounted(async () => {
           {{ formatDate(slotProps.data.registeredAtUtc) }}
         </template>
       </Column>
-      <Column header="Last Login" style="min-width: 180px">
+      <Column field="lastLoginAtUtc" header="Last Login" style="min-width: 180px" sortable>
         <template #body="slotProps">
           {{ formatDate(slotProps.data.lastLoginAtUtc) }}
         </template>
@@ -364,7 +478,21 @@ onMounted(async () => {
           {{ formatRoles(slotProps.data.roles) }}
         </template>
       </Column>
+      <Column header="" style="width: 64px">
+        <template #body="slotProps">
+          <Button
+            icon="pi pi-ellipsis-v"
+            text
+            rounded
+            severity="secondary"
+            size="small"
+            @click="toggleRowActions($event, slotProps.data)"
+          />
+        </template>
+      </Column>
     </DataTable>
+
+    <Menu ref="rowActionMenu" :model="rowActionItems" popup />
 
     <Paginator
       :first="pageIndex * pageSize"
@@ -404,6 +532,20 @@ onMounted(async () => {
   color: var(--p-text-muted-color, var(--p-text-color-secondary));
 }
 
+.users-stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.users-stat-chip {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+  font-size: 0.875rem;
+}
+
 .users-table-toolbar {
   display: flex;
   justify-content: space-between;
@@ -433,6 +575,24 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.admin-users-view :deep(.p-datatable-column-filter-button),
+.admin-users-view :deep(.p-datatable-sort-icon) {
+  color: var(--p-surface-500);
+  opacity: 0.65;
+}
+
+.admin-users-view :deep(th:hover .p-datatable-column-filter-button),
+.admin-users-view :deep(th:hover .p-datatable-sort-icon),
+.admin-users-view :deep(.p-datatable-column-filter-button:focus),
+.admin-users-view :deep(.p-datatable-column-filter-button.p-overlay-badge),
+.admin-users-view :deep(.p-datatable-column-filter-button.p-highlight) {
+  opacity: 1;
+}
+
+.admin-users-view :deep(.p-datatable-column-filter-button) {
+  transform: scale(0.9);
+}
+
 .users-filter-select,
 .users-filter-date {
   min-width: 12rem;
@@ -445,6 +605,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .users-stats-strip,
   .users-table-toolbar,
   .users-toolbar-actions {
     flex-direction: column;

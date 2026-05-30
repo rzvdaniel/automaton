@@ -202,6 +202,8 @@ public class UsersService
         var safePageIndex = Math.Max(0, filter.PageIndex);
         var safePageSize = filter.PageSize <= 0 ? 100 : filter.PageSize;
         var now = DateTimeOffset.UtcNow;
+        var sortField = filter.SortField?.Trim();
+        var sortDescending = filter.SortOrder == -1;
 
         var query = _userManager.Users
             .AsNoTracking()
@@ -223,8 +225,15 @@ public class UsersService
 
         var totalCount = await query.CountAsync();
 
+        query = sortField switch
+        {
+            "name" => sortDescending ? query.OrderByDescending(u => u.Name) : query.OrderBy(u => u.Name),
+            "lastLoginAtUtc" => sortDescending ? query.OrderByDescending(u => u.LastLoginAtUtc) : query.OrderBy(u => u.LastLoginAtUtc),
+            "registeredAtUtc" => sortDescending ? query.OrderByDescending(u => u.RegisteredAtUtc) : query.OrderBy(u => u.RegisteredAtUtc),
+            _ => query.OrderByDescending(u => u.RegisteredAtUtc)
+        };
+
         var items = await query
-            .OrderByDescending(u => u.RegisteredAtUtc)
             .Skip(safePageIndex * safePageSize)
             .Take(safePageSize)
             .ToListAsync();
