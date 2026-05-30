@@ -82,6 +82,123 @@ Apply named policies to:
 
 Use Cloudflare Turnstile or equivalent on the highest-abuse public forms first.
 
+Cloudflare edge protection should complement the API protections, not replace them.
+
+Cloudflare recommendations for pre-announcement:
+
+- Turnstile on registration and forgot-password forms
+- rate limit login
+- rate limit registration
+- rate limit password reset / forgot-password endpoints
+- challenge suspicious IPs with Managed Challenge rather than hard blocking first
+- rate limit public execution paths if they are exposed through Cloudflare
+
+Recommended split of responsibility:
+
+- Cloudflare:
+  - rate limiting on public auth routes
+  - challenge suspicious traffic
+  - basic bot friction on public forms
+- API:
+  - endpoint-specific limits
+  - global loose baseline limits
+  - per-email auth throttles
+  - per-user limits later for authenticated expensive endpoints
+
+Notes:
+
+- Enterprise WAF is not required for this baseline.
+- Turnstile is best for form submissions.
+- Managed Challenge is best for suspicious edge traffic.
+- Keep backend protections in place even when Cloudflare rules exist.
+
+Suggested Cloudflare rules checklist:
+
+1. Login edge rule
+   Path:
+   - `POST /api/Account/LoginUser`
+   - `POST /api/Account/LoginRunnerUser`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `10-20 requests per minute per IP`
+
+2. Registration edge rule
+   Path:
+   - `POST /api/Account/RegisterUser`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `5-10 requests per hour per IP`
+
+3. Forgot-password edge rule
+   Path:
+   - `POST /api/Account/ForgotUserPassword`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `5-10 requests per hour per IP`
+
+4. Reset-password edge rule
+   Path:
+   - `POST /api/Account/ResetUserPassword`
+   Suggested action:
+   - `Managed Challenge` first, `Block` later if abuse is obvious
+   Suggested starting threshold:
+   - `10-20 requests per hour per IP`
+
+5. GitHub auth entrypoint rule
+   Path:
+   - `GET /auth/github/login`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `20-30 requests per 10 minutes per IP`
+
+6. GitHub callback rule
+   Path:
+   - `GET /auth/github/callback`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `30-60 requests per 10 minutes per IP`
+   Notes:
+   - keep this looser than login start to avoid breaking legitimate auth flows
+
+7. Public app execution rules
+   Paths:
+   - `POST /api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute`
+   - `POST /api/web-apps/{appSlug}/flows/{flowIdentifier}/execute`
+   - `POST /api/web-apps/{appSlug}/steps/{stepIdentifier}/execute`
+   Suggested action:
+   - `Managed Challenge`
+   Suggested starting threshold:
+   - `20-60 requests per minute per IP`
+   Notes:
+   - keep Cloudflare looser than the stricter ASP.NET per-endpoint limits
+
+8. Turnstile rollout
+   Forms:
+   - register
+   - forgot password
+   Optional later:
+   - login
+   Notes:
+   - verify on the server
+   - keep generic failure responses
+
+9. Origin protection
+   Actions:
+   - keep the API behind Cloudflare
+   - avoid exposing the origin IP publicly if possible
+   - use Cloudflare as the normal public entry point for auth and app traffic
+
+Rule-shaping notes:
+
+- Prefer `Managed Challenge` before `Block` for login and registration.
+- Use `Block` only after you see clearly abusive patterns that should never be legitimate.
+- Keep Cloudflare thresholds looser than ASP.NET endpoint-specific thresholds so Cloudflare acts as a coarse edge screen and the API keeps the authoritative app-aware limits.
+
 Vue placement:
 
 - `src/automaton-studio-vue/src/features/auth/views/RegisterView.vue`
@@ -102,6 +219,41 @@ Implementation notes:
 - Keep rate limiting and lockout even when bot protection is enabled.
 - Treat Turnstile as an additional abuse-control signal, not a replacement for backend protections.
 - Keep server responses generic when verification fails.
+
+Turnstile versus rate limiting:
+
+- rate limiting protects API capacity and slows brute force, spam bursts, and repeated reset attempts
+- Turnstile adds bot friction before sensitive public forms reach the backend
+- they solve different problems and should be used together on the highest-abuse flows
+
+Recommended rollout policy:
+
+| Area | Rate limiting | Turnstile |
+|------|---------------|-----------|
+| Login | Yes | Only after suspicious attempts or later if abuse appears |
+| Registration | Yes | Yes |
+| Password reset / forgot password | Yes | Yes |
+| Contact / support forms | Yes | Yes |
+| App browsing / public pages | Maybe | No |
+| Authenticated API calls | Yes | No |
+
+Login rollout notes:
+
+1. let users try login normally
+2. if the same IP or email shows repeated failed attempts, require Turnstile
+3. if failures continue, rely on lockout and throttling
+
+Practical recommendation:
+
+- keep rate limiting mandatory on sensitive routes
+- add Turnstile immediately on registration and forgot-password
+- do not add Turnstile to normal login on day one unless telemetry shows abuse
+
+Local testing note:
+
+- use Cloudflare's official Turnstile test keys in development
+- expect the widget to show a `For testing only` banner locally
+- do not use real production widget keys for localhost unless the widget hostname allowlist explicitly includes `localhost`
 
 ## Phase 2: Lockout and Failed Login Protection
 

@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
+import CloudflareTurnstile from '@/shared/components/CloudflareTurnstile.vue'
 import { useAuth } from '../composables/useAuth'
 import { authService } from '../services/auth.service'
 import type { RegisterFormErrors } from '../types/auth.types'
@@ -26,6 +27,10 @@ const formErrors = ref<RegisterFormErrors>({})
 const submitted = ref(false)
 const checkingUsername = ref(false)
 const usernameAvailable = ref<boolean | null>(null)
+const turnstileToken = ref('')
+const turnstileError = ref<string | null>(null)
+const turnstileRef = ref<InstanceType<typeof CloudflareTurnstile> | null>(null)
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 // Auto-generate public username from display name
 function generatePublicUsername(displayName: string): string {
@@ -144,6 +149,11 @@ function validateForm(): boolean {
     isValid = false
   }
 
+  if (turnstileSiteKey && !turnstileToken.value) {
+    turnstileError.value = 'Please complete the verification challenge'
+    isValid = false
+  }
+
   return isValid
 }
 
@@ -151,6 +161,7 @@ function validateForm(): boolean {
 async function handleSubmit() {
   submitted.value = true
   clearError()
+  turnstileError.value = null
 
   // Ensure availability has been checked before validating
   if (publicUsername.value && publicUsername.value.length >= 3) {
@@ -166,12 +177,16 @@ async function handleSubmit() {
     email: email.value,
     password: password.value,
     publicUsername: publicUsername.value,
+    turnstileToken: turnstileToken.value || undefined,
   })
 
   if (success) {
     // Redirect to login with success message
     router.push({ path: '/login', query: { registered: 'true' } })
   }
+
+  turnstileRef.value?.reset()
+  turnstileToken.value = ''
 }
 
 // Check if field has error
@@ -181,6 +196,20 @@ function hasError(field: keyof RegisterFormErrors): boolean {
 
 function continueWithGitHub() {
   authService.startGitHubLogin('/')
+}
+
+function handleTurnstileVerified(token: string) {
+  turnstileToken.value = token
+  turnstileError.value = null
+}
+
+function handleTurnstileExpired() {
+  turnstileToken.value = ''
+}
+
+function handleTurnstileError() {
+  turnstileToken.value = ''
+  turnstileError.value = 'Verification failed to load. Please try again.'
 }
 
 </script>
@@ -336,6 +365,19 @@ function continueWithGitHub() {
             </div>
             <small v-if="hasError('terms')" class="text-red-500">
               {{ formErrors.terms }}
+            </small>
+          </div>
+
+          <div v-if="turnstileSiteKey" class="flex flex-column gap-2">
+            <CloudflareTurnstile
+              ref="turnstileRef"
+              :site-key="turnstileSiteKey"
+              @verified="handleTurnstileVerified"
+              @expired="handleTurnstileExpired"
+              @error="handleTurnstileError"
+            />
+            <small v-if="turnstileError" class="text-red-500">
+              {{ turnstileError }}
             </small>
           </div>
 

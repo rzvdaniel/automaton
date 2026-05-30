@@ -4,6 +4,7 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import CloudflareTurnstile from '@/shared/components/CloudflareTurnstile.vue'
 import { authService } from '../services/auth.service'
 import type { ForgotPasswordFormErrors } from '../types/auth.types'
 
@@ -14,6 +15,10 @@ const submitted = ref(false)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const success = ref(false)
+const turnstileToken = ref('')
+const turnstileError = ref<string | null>(null)
+const turnstileRef = ref<InstanceType<typeof CloudflareTurnstile> | null>(null)
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 // Form validation
 function validateForm(): boolean {
@@ -28,6 +33,11 @@ function validateForm(): boolean {
     isValid = false
   }
 
+  if (turnstileSiteKey && !turnstileToken.value) {
+    turnstileError.value = 'Please complete the verification challenge'
+    isValid = false
+  }
+
   return isValid
 }
 
@@ -35,6 +45,7 @@ function validateForm(): boolean {
 async function handleSubmit() {
   submitted.value = true
   error.value = null
+  turnstileError.value = null
 
   if (!validateForm()) {
     return
@@ -43,12 +54,22 @@ async function handleSubmit() {
   isLoading.value = true
 
   try {
-    await authService.forgotPassword({ email: email.value })
+    await authService.forgotPassword({
+      email: email.value,
+      turnstileToken: turnstileToken.value || undefined,
+    })
     success.value = true
   } catch (err: unknown) {
     // Even if the email doesn't exist, we show success for security reasons
     // The backend should handle this silently
-    success.value = true
+    const axiosError = err as { response?: { data?: { message?: string }; status?: number } }
+    if (axiosError.response?.status === 400 && axiosError.response.data?.message) {
+      error.value = axiosError.response.data.message
+      turnstileRef.value?.reset()
+      turnstileToken.value = ''
+    } else {
+      success.value = true
+    }
   } finally {
     isLoading.value = false
   }
@@ -62,6 +83,20 @@ function hasError(field: keyof ForgotPasswordFormErrors): boolean {
 // Clear error when input changes
 function clearError() {
   error.value = null
+}
+
+function handleTurnstileVerified(token: string) {
+  turnstileToken.value = token
+  turnstileError.value = null
+}
+
+function handleTurnstileExpired() {
+  turnstileToken.value = ''
+}
+
+function handleTurnstileError() {
+  turnstileToken.value = ''
+  turnstileError.value = 'Verification failed to load. Please try again.'
 }
 </script>
 
@@ -114,6 +149,19 @@ function clearError() {
               />
               <small v-if="hasError('email')" class="text-red-500">
                 {{ formErrors.email }}
+              </small>
+            </div>
+
+            <div v-if="turnstileSiteKey" class="flex flex-column gap-2">
+              <CloudflareTurnstile
+                ref="turnstileRef"
+                :site-key="turnstileSiteKey"
+                @verified="handleTurnstileVerified"
+                @expired="handleTurnstileExpired"
+                @error="handleTurnstileError"
+              />
+              <small v-if="turnstileError" class="text-red-500">
+                {{ turnstileError }}
               </small>
             </div>
 

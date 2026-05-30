@@ -59,6 +59,7 @@ services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSect
 services.Configure<GitHubOAuthOptions>(applicationBuilder.Configuration.GetSection("GitHub"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
+services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
 services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
@@ -163,6 +164,7 @@ services.AddAuthorization(options =>
 });
 
 services.AddHttpClient();
+services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
 services.AddAutomatonRateLimiting();
 
 services.Configure<ForwardedHeadersOptions>(options =>

@@ -29,6 +29,7 @@ public class ConfigurationService
     public bool LockoutAllowedForNewUsers => userLockoutConfig.AllowedForNewUsers;
     public int MaxFailedAccessAttempts => userLockoutConfig.MaxFailedAccessAttempts;
     public int DefaultLockoutTimeSpanMinutes => userLockoutConfig.DefaultLockoutTimeSpanMinutes;
+    public CloudflareTurnstileOptions CloudflareTurnstileOptions { get; } = new();
 
     public ConfigurationService(IConfiguration configuration)
     {
@@ -39,6 +40,7 @@ public class ConfigurationService
         this.configuration.GetSection(nameof(UserPasswordConfig)).Bind(userPasswordConfig);
         this.configuration.GetSection(nameof(UserLockoutConfig)).Bind(userLockoutConfig);
         this.configuration.GetSection(nameof(EmailConfig)).Bind(EmailConfig);
+        this.configuration.GetSection(CloudflareTurnstileOptions.SectionName).Bind(CloudflareTurnstileOptions);
     }
 
     public bool IsDatabaseTypeMsSql()

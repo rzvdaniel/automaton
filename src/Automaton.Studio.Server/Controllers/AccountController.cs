@@ -21,18 +21,21 @@ public class AccountController : BaseController
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
     private readonly IEmailService emailService;
+    private readonly ICloudflareTurnstileService cloudflareTurnstileService;
     private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
         ApplicationDbContext dataContext,
         UsersService userManagerService,
         IEmailService emailService,
+        ICloudflareTurnstileService cloudflareTurnstileService,
         ILogger<AccountController> logger)
     {
         this.configurationService = configurationService;
         this.dataContext = dataContext;
         this.userManagerService = userManagerService;
         this.emailService = emailService;
+        this.cloudflareTurnstileService = cloudflareTurnstileService;
         this.logger = logger;
     }
 
@@ -45,6 +48,11 @@ public class AccountController : BaseController
         if (configurationService.NoUserSignUp)
         {
             return NotFound();
+        }
+
+        if (!await ValidateTurnstileAsync(registerUserCommand.TurnstileToken, CancellationToken.None))
+        {
+            return BadRequest(new { message = "Verification failed. Please try again." });
         }
 
         if (!ModelState.IsValid)
@@ -172,6 +180,11 @@ public class AccountController : BaseController
     [EmailRateLimit("auth:forgot-password:email", 3, 3600)]
     public async Task<IActionResult> ForgotUserPassword(ForgotUserPasswordCommand forgotUserPassword, CancellationToken cancellationToken)
     {
+        if (!await ValidateTurnstileAsync(forgotUserPassword.TurnstileToken, cancellationToken))
+        {
+            return BadRequest(new { message = "Verification failed. Please try again." });
+        }
+
         await Mediator.Send(forgotUserPassword, cancellationToken);
 
         return NoContent();
@@ -268,5 +281,13 @@ public class AccountController : BaseController
 
         return Ok(plans.Where(plan =>
             HostedRunnerPlanVisibility.IsVisibleInCatalog(plan.Capabilities, canAccessHostedRunnerTestPlans)));
+    }
+
+    private async Task<bool> ValidateTurnstileAsync(string? token, CancellationToken cancellationToken)
+    {
+        return await cloudflareTurnstileService.ValidateAsync(
+            token,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            cancellationToken);
     }
 }

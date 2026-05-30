@@ -99,13 +99,41 @@ See [AI_INTEGRATION_PLAN.md](./AI_INTEGRATION_PLAN.md) for details.
 ```env
 VITE_API_BASE_URL=http://localhost:7091
 VITE_APP_TITLE=Automaton Studio (Dev)
+VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
 **`.env.production`**:
 ```env
 VITE_API_BASE_URL=https://api.automaton.monster
 VITE_APP_TITLE=Automaton Studio
+VITE_TURNSTILE_SITE_KEY=your-production-turnstile-site-key
 ```
+
+`VITE_TURNSTILE_SITE_KEY` is optional. Leave it unset to hide Turnstile in environments where you do not want bot protection. The backend secret key belongs in `CloudflareTurnstile:SecretKey` on the API side and should come from Cloudflare Turnstile widget settings, not from source control.
+
+### Turnstile Local Testing
+
+For local development, prefer Cloudflare's official test keys instead of a real production widget:
+
+```env
+VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+```
+
+```json
+"CloudflareTurnstile": {
+  "Enabled": true,
+  "AllowBypassWhenNotConfiguredInDevelopment": true,
+  "SiteKey": "1x00000000000000000000AA",
+  "SecretKey": "1x0000000000000000000000000000000AA"
+}
+```
+
+Notes:
+
+- the test widget intentionally renders a visible `For testing only` banner
+- test keys work on `localhost` and other local dev hostnames
+- real production widgets often fail locally unless `localhost` is added to the widget hostname allowlist
+- never use the test keys in production
 
 ## 🧪 Testing
 

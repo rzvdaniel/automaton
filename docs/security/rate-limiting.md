@@ -39,6 +39,109 @@ Why this exists:
 - stays loose enough that Studio/editor traffic is unlikely to break during normal use
 - lets stricter auth and execution limits continue doing the real abuse control
 
+## Cloudflare Complement
+
+Cloudflare should sit in front of these API protections as a coarse edge layer, not as a replacement for backend rate limiting.
+
+Recommended Cloudflare baseline for Automaton:
+
+- rate limit login
+- rate limit registration
+- rate limit forgot-password / reset-password routes
+- challenge suspicious IPs with Managed Challenge
+- use Turnstile on public auth forms such as registration and forgot password
+
+Recommended split:
+
+- Cloudflare:
+  - edge rate limits
+  - suspicious-traffic challenge
+  - form bot friction
+- ASP.NET:
+  - global baseline limiter
+  - endpoint-specific limits
+  - per-email auth throttles
+  - later per-user/per-resource limits
+
+Notes:
+
+- Turnstile is best for form submissions.
+- Managed Challenge is better than immediate hard blocking for early suspicious traffic.
+- Enterprise WAF is not required for this baseline.
+
+### Suggested Cloudflare rules checklist
+
+1. `POST /api/Account/LoginUser`
+   - action: `Managed Challenge`
+   - suggested threshold: `10-20 requests per minute per IP`
+
+2. `POST /api/Account/LoginRunnerUser`
+   - action: `Managed Challenge`
+   - suggested threshold: `10-20 requests per minute per IP`
+
+3. `POST /api/Account/RegisterUser`
+   - action: `Managed Challenge`
+   - suggested threshold: `5-10 requests per hour per IP`
+
+4. `POST /api/Account/ForgotUserPassword`
+   - action: `Managed Challenge`
+   - suggested threshold: `5-10 requests per hour per IP`
+
+5. `POST /api/Account/ResetUserPassword`
+   - action: `Managed Challenge` first
+   - suggested threshold: `10-20 requests per hour per IP`
+
+6. `GET /auth/github/login`
+   - action: `Managed Challenge`
+   - suggested threshold: `20-30 requests per 10 minutes per IP`
+
+7. `GET /auth/github/callback`
+   - action: `Managed Challenge`
+   - suggested threshold: `30-60 requests per 10 minutes per IP`
+   - note: keep this looser than login-start rules
+
+8. `POST /api/web-apps/{appSlug}/controllers/{controllerName}/actions/{actionName}/execute`
+   - action: `Managed Challenge`
+   - suggested threshold: `20-60 requests per minute per IP`
+
+9. `POST /api/web-apps/{appSlug}/flows/{flowIdentifier}/execute`
+   - action: `Managed Challenge`
+   - suggested threshold: `20-60 requests per minute per IP`
+
+10. `POST /api/web-apps/{appSlug}/steps/{stepIdentifier}/execute`
+   - action: `Managed Challenge`
+   - suggested threshold: `20-60 requests per minute per IP`
+
+11. Turnstile rollout
+   - add to register form
+   - add to forgot-password form
+   - optionally add to login later if credential-stuffing noise shows up
+
+12. Origin hygiene
+   - keep the API behind Cloudflare
+   - avoid exposing the origin IP publicly if possible
+
+Cloudflare tuning notes:
+
+- Keep Cloudflare thresholds looser than the ASP.NET endpoint-specific limits.
+- Use Cloudflare as a coarse edge screen.
+- Keep the API as the authoritative app-aware limiter.
+
+Turnstile guidance:
+
+- keep rate limiting as mandatory backend protection
+- add Turnstile on registration and forgot-password from day one
+- avoid Turnstile on normal login initially unless abuse shows up
+- if login abuse appears, add Turnstile conditionally after repeated failed attempts rather than on the first login screen view
+
+Turnstile local-development guidance:
+
+- prefer Cloudflare's official test keys for local development
+- expected local test site key: `1x00000000000000000000AA`
+- expected local test secret key: `1x0000000000000000000000000000000AA`
+- the widget will show a visible `For testing only` banner when those keys are used
+- real production widgets may fail on `localhost` unless `localhost` is explicitly allowed in the widget hostname settings
+
 ## Protected So Far
 
 ### `POST /api/Account/RegisterUser` in `AccountController.cs`

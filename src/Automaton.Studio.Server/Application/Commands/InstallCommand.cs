@@ -22,13 +22,16 @@ namespace Automaton.Studio.Server.Core.Commands
         /// </summary>
         public string? PublicUsername { get; }
 
+        public string? TurnstileToken { get; }
+
         [JsonConstructor]
-        public RegisterUserCommand(string name, string email, string password, string? publicUsername = null)
+        public RegisterUserCommand(string name, string email, string password, string? publicUsername = null, string? turnstileToken = null)
         {
             Name = name;
             Email = email;
             Password = password;
             PublicUsername = publicUsername;
+            TurnstileToken = turnstileToken;
         }
     }
 

@@ -18,6 +18,7 @@ export interface RegisterRequest {
   email: string
   password: string
   publicUsername?: string
+  turnstileToken?: string
 }
 
 export interface RefreshTokenRequest {
@@ -69,6 +70,7 @@ export interface RegisterFormErrors {
 // Password-related request types
 export interface ForgotPasswordRequest {
   email: string
+  turnstileToken?: string
 }
 
 export interface ResetPasswordRequest {

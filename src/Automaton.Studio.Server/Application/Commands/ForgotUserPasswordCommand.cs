@@ -9,9 +9,12 @@ public class ForgotUserPasswordCommand : IRequest
     [EmailAddress(ErrorMessage = "Invalid email address")]
     public string Email { get; }
 
+    public string? TurnstileToken { get; }
+
     [JsonConstructor]
-    public ForgotUserPasswordCommand(string email)
+    public ForgotUserPasswordCommand(string email, string? turnstileToken = null)
     {
         Email = email;
+        TurnstileToken = turnstileToken;
     }
 }
