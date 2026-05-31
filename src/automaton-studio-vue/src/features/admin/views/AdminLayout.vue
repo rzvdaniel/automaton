@@ -15,6 +15,18 @@ interface AdminNavItem {
 }
 
 const navItems: AdminNavItem[] = [
+  {  
+    label: 'Dashboard',
+    icon: 'pi pi-chart-bar',
+    to: '/admin/dashboard',
+    routePrefix: '/admin/dashboard',
+  },
+  {
+    label: 'Users',
+    icon: 'pi pi-users',
+    to: '/admin/users',
+    routePrefix: '/admin/users',
+  },
   {
     label: 'AI Providers',
     icon: 'pi pi-sparkles',
@@ -26,18 +38,6 @@ const navItems: AdminNavItem[] = [
     icon: 'pi pi-sliders-h',
     to: '/admin/ai-settings',
     routePrefix: '/admin/ai-settings',
-  },
-  {
-    label: 'Dashboard',
-    icon: 'pi pi-chart-bar',
-    to: '/admin/dashboard',
-    routePrefix: '/admin/dashboard',
-  },
-  {
-    label: 'Users',
-    icon: 'pi pi-users',
-    to: '/admin/users',
-    routePrefix: '/admin/users',
   },
   {
     label: 'Marketplace Apps',
