@@ -170,7 +170,7 @@ public class ProjectMemberService
                     { "Role", request.Role.ToString() },
                     { "InviteUrl", invitationUrl },
                     { "ExpirationHours", "24" },
-                    { "SupportEmail", configurationService.EmailConfig.EmailSupport },
+                    { "SupportEmail", configurationService.EmailConfig.SupportEmail },
                     { "RequirePasswordSetup", requirePasswordSetup ? "true" : "false" }
                 };
 
@@ -182,7 +182,12 @@ public class ProjectMemberService
                 var emailDetails = new EmailData
                 {
                     Template = "AutomatonProjectInvitation",
-                    From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+                    From = new EmailAccount
+                    {
+                        Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
+                            ? configurationService.EmailConfig.EmailAccount
+                            : configurationService.EmailConfig.FromEmail
+                    },
                     To = new[] { new EmailAccount { Email = request.Email, Name = user.Name } },
                     Variables = variables
                 };

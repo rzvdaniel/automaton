@@ -47,12 +47,17 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
             var userDetails = new EmailData
             {
                 Template = "AutomatonResetPassword",
-                From = new EmailAccount { Email = ConfigurationService.EmailConfig.EmailSupport },
+                From = new EmailAccount
+                {
+                    Email = string.IsNullOrWhiteSpace(ConfigurationService.EmailConfig.FromEmail)
+                        ? ConfigurationService.EmailConfig.EmailAccount
+                        : ConfigurationService.EmailConfig.FromEmail
+                },
                 To = [new EmailAccount { Email = command.Email, Name = user.Name }],
                 Variables =
                 {
                     { "WebsiteUrl", ConfigurationService.WebsiteUrl},
-                    { "SupportEmail", ConfigurationService.EmailConfig.EmailSupport!},
+                    { "SupportEmail", ConfigurationService.EmailConfig.SupportEmail!},
                     { "Name", user.Name },
                     { "ResetPasswordUrl", resetPasswordUrl },
                 }

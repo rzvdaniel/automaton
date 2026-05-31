@@ -117,6 +117,15 @@ public class AccountController : BaseController
             logger.LogWarning(ex, "Confirmation email could not be sent to {Email}", registerUserCommand.Email);
         }
 
+        try
+        {
+            await SendAdminRegistrationNotificationAsync(user, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Admin registration notification could not be sent for user {UserId}", user.Id);
+        }
+
         return CreatedAtRoute("User",
             new { controller = "User", userId = registerUserCommand.Email },
             new { name = registerUserCommand.Name, publicUsername = publicUsername });
@@ -352,14 +361,14 @@ public class AccountController : BaseController
         var userDetails = new EmailData
         {
             Template = "AutomatonConfirmEmail",
-            From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+            From = new EmailAccount { Email = ResolveUserFacingFromEmail() },
             To = [new EmailAccount { Email = user.Email, Name = user.Name }],
             Variables =
             {
                 { "Name", user.Name },
                 { "ConfirmationUrl", confirmationUrl },
                 { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
-                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
+                { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             }
         };
 
@@ -389,5 +398,38 @@ public class AccountController : BaseController
             {
                 ["emailConfirmation"] = success ? "success" : "failed"
             });
+    }
+
+    private async Task SendAdminRegistrationNotificationAsync(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        var notificationRecipient = configurationService.EmailConfig.AdminEmail;
+        if (string.IsNullOrWhiteSpace(notificationRecipient))
+        {
+            return;
+        }
+
+        var adminNotification = new EmailData
+        {
+            Template = "AutomatonAdminNewRegistration",
+            From = new EmailAccount { Email = ResolveUserFacingFromEmail() },
+            To = [new EmailAccount { Email = notificationRecipient, Name = "Automaton Admin" }],
+            Variables =
+            {
+                { "Name", user.Name ?? string.Empty },
+                { "Email", user.Email ?? string.Empty },
+                { "PublicUsername", user.PublicUsername ?? string.Empty },
+                { "RegisteredAtUtc", user.RegisteredAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'") },
+                { "AdminUsersUrl", $"{configurationService.WebsiteUrl.TrimEnd('/')}/admin/users" }
+            }
+        };
+
+        await emailService.Send(adminNotification, cancellationToken);
+    }
+
+    private string ResolveUserFacingFromEmail()
+    {
+        return string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
+            ? configurationService.EmailConfig.EmailAccount
+            : configurationService.EmailConfig.FromEmail;
     }
 }

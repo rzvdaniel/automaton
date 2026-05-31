@@ -116,7 +116,9 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
     {
         var message = new MimeMessage();
 
-        var fromAddress = emailDetails.From?.Email ?? configurationService.EmailConfig.EmailAccount;
+        var fromAddress = emailDetails.From?.Email
+            ?? configurationService.EmailConfig.FromEmail
+            ?? configurationService.EmailConfig.EmailAccount;
         var fromName = emailDetails.From?.Name ?? "Automaton";
 
         message.From.Add(new MailboxAddress(fromName, fromAddress));

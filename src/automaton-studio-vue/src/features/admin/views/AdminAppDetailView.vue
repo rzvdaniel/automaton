@@ -327,7 +327,7 @@ onMounted(() => {
                       class="w-full"
                     />
                     <small class="moderation-help">
-                      Hidden removes the app from marketplace and public runtime access. Disabled blocks it for enforcement or safety reasons. Setting access back to Active republishes the public app URL.
+                      Hidden is for non-punitive removal from marketplace and public runtime access. Disabled is for enforcement or safety blocks. Setting access back to Active republishes the public app URL.
                     </small>
                   </div>
                   <div class="moderation-field">

@@ -577,7 +577,7 @@ public class OrganizationService : IOrganizationService
                 { "InviterName", inviterName },
                 { "Role", request.Role.ToString() },
                 { "ExpirationHours", expirationHours.ToString() },
-                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
+                { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             };
 
             // If user needs to set a password, only send password setup link
@@ -595,7 +595,12 @@ public class OrganizationService : IOrganizationService
             var emailDetails = new EmailData
             {
                 Template = "AutomatonOrganizationInvitation",
-                From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+                From = new EmailAccount
+                {
+                    Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
+                        ? configurationService.EmailConfig.EmailAccount
+                        : configurationService.EmailConfig.FromEmail
+                },
                 To = new[] { new EmailAccount { Email = request.Email, Name = user?.Name ?? request.Email } },
                 Variables = variables
             };

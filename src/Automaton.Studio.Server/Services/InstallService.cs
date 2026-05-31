@@ -49,13 +49,18 @@ public class InstallService
         var userDetails = new EmailData
         {
             Template = "AutomatonRegisterUser",
-            From = new EmailAccount { Email = configurationService.EmailConfig.EmailSupport },
+            From = new EmailAccount
+            {
+                Email = string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
+                    ? configurationService.EmailConfig.EmailAccount
+                    : configurationService.EmailConfig.FromEmail
+            },
             To = [new EmailAccount { Email = installCommand.Email, Name = installCommand.Name }],
             Variables =
             {
                 { "Name", installCommand.Name },
                 { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
-                { "SupportEmail", configurationService.EmailConfig.EmailSupport }
+                { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             }
         };
 

@@ -120,6 +120,55 @@
   <data name="AutomatonRegisterUser.Subject" xml:space="preserve">
     <value>Welcome to Automaton, {{ Name }}!</value>
   </data>
+  <data name="AutomatonAdminNewRegistration.Subject" xml:space="preserve">
+    <value>New Automaton registration: {{ Name }}</value>
+  </data>
+  <data name="AutomatonAdminNewRegistration.Body" xml:space="preserve">
+    <value>
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
+  &lt;title&gt;New Automaton Registration&lt;/title&gt;
+  &lt;style&gt;
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; color: #111827; }
+    .email-container { max-width: 640px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: #111827; padding: 28px 32px; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; }
+    .content { padding: 32px; line-height: 1.6; }
+    .details { margin: 24px 0; padding: 20px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; }
+    .details p { margin: 0 0 10px; }
+    .details p:last-child { margin-bottom: 0; }
+    .label { font-weight: 700; color: #374151; }
+    .button { display: inline-block; margin-top: 8px; padding: 12px 20px; background-color: #2563eb; color: #ffffff !important; text-decoration: none; border-radius: 10px; font-weight: 600; }
+    .footer { padding: 0 32px 32px; color: #6b7280; font-size: 13px; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class="email-container"&gt;
+    &lt;div class="header"&gt;
+      &lt;h1&gt;New registration notification&lt;/h1&gt;
+    &lt;/div&gt;
+    &lt;div class="content"&gt;
+      &lt;p&gt;A new user just registered in Automaton.&lt;/p&gt;
+      &lt;div class="details"&gt;
+        &lt;p&gt;&lt;span class="label"&gt;Name:&lt;/span&gt; {{ Name }}&lt;/p&gt;
+        &lt;p&gt;&lt;span class="label"&gt;Email:&lt;/span&gt; {{ Email }}&lt;/p&gt;
+        &lt;p&gt;&lt;span class="label"&gt;Public username:&lt;/span&gt; {{ PublicUsername }}&lt;/p&gt;
+        &lt;p&gt;&lt;span class="label"&gt;Registered at:&lt;/span&gt; {{ RegisteredAtUtc }}&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;a class="button" href="{{ AdminUsersUrl }}"&gt;Open Admin Users&lt;/a&gt;
+    &lt;/div&gt;
+    &lt;div class="footer"&gt;
+      This message was generated automatically by Automaton.
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+    </value>
+  </data>
   <data name="AutomatonRegisterUser.Body" xml:space="preserve">
     <value>
 &lt;!DOCTYPE html&gt;
