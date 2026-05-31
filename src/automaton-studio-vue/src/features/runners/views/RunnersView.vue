@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -34,6 +34,8 @@ const viewMode = ref<'grid' | 'list'>('grid')
 const restartingRunnerId = ref<string | null>(null)
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
+const autoRefreshIntervalMs = 15000
+let autoRefreshTimer: number | null = null
 
 // View toggle options
 const viewOptions = [
@@ -46,13 +48,24 @@ const onlineCount = computed(() => runners.value.filter((r) => r.status === Runn
 const offlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Offline).length)
 const totalCount = computed(() => runners.value.length)
 
-function formatDateTime(value?: string | null) {
+function parseUtcDate(value?: string | null) {
   if (!value) {
-    return 'Not tracked yet'
+    return null
   }
 
-  const date = new Date(value)
+  const normalizedValue = /z$|[+-]\d{2}:\d{2}$/i.test(value) ? value : `${value}Z`
+  const date = new Date(normalizedValue)
+
   if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date
+}
+
+function formatDateTime(value?: string | null) {
+  const date = parseUtcDate(value)
+  if (!date) {
     return 'Not tracked yet'
   }
 
@@ -60,12 +73,8 @@ function formatDateTime(value?: string | null) {
 }
 
 function formatRelativeTime(value?: string | null) {
-  if (!value) {
-    return 'Not tracked yet'
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
+  const date = parseUtcDate(value)
+  if (!date) {
     return 'Not tracked yet'
   }
 
@@ -107,6 +116,28 @@ async function loadRunners(projectId?: string | null) {
     })
   } finally {
     loading.value = false
+  }
+}
+
+async function refreshRunners(projectId?: string | null) {
+  try {
+    runners.value = await runnersService.list(projectId ?? undefined)
+  } catch (err: unknown) {
+    console.error('Failed to refresh runners:', err)
+  }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh()
+  autoRefreshTimer = window.setInterval(() => {
+    void refreshRunners(projectsStore.activeProjectId)
+  }, autoRefreshIntervalMs)
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer !== null) {
+    window.clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
   }
 }
 
@@ -242,6 +273,12 @@ watch(
   },
   { immediate: true },
 )
+
+startAutoRefresh()
+
+onUnmounted(() => {
+  stopAutoRefresh()
+})
 </script>
 
 <template>
