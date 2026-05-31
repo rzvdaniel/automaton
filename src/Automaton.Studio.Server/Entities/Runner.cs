@@ -11,6 +11,13 @@ public class Runner
     [Required]
     public string Name { get; set; }
     public string ConnectionId { get; set; }
+    public DateTime? LastHeartbeatAtUtc { get; set; }
+    public DateTime? LastConnectedAtUtc { get; set; }
+    public DateTime? LastDisconnectedAtUtc { get; set; }
+    public string Status { get; set; }
+    public string? Version { get; set; }
+    public string? MachineName { get; set; }
+    public string? IpAddress { get; set; }
 
     /// <summary>
     /// JSON-serialized script engine configuration settings

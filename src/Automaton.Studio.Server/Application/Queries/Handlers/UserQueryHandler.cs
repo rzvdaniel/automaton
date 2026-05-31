@@ -5,7 +5,6 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Data;
-using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Application.Queries.Handlers
@@ -57,10 +56,10 @@ namespace AuthServer.Application.Queries.Handlers
                     {
                         Id = runner.Id,
                         Name = runner.Name,
-                        Status = string.IsNullOrWhiteSpace(runner.ConnectionId)
-                            ? RunnerStatus.Offline.ToString()
-                            : RunnerStatus.Online.ToString(),
-                        LastHeartbeatAtUtc = null,
+                        Status = RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString(),
+                        LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc,
+                        LastConnectedAtUtc = runner.LastConnectedAtUtc,
+                        Version = runner.Version,
                     })
                 .OrderBy(runner => runner.Name)
                 .ToListAsync(cancellationToken);

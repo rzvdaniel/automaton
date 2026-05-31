@@ -18,6 +18,8 @@ public class HubService
 {
     private const string RunnerIdHeader = "RunnerId";
     private const string RunnerNameHeader = "RunnerName";
+    private const string RunnerVersionHeader = "RunnerVersion";
+    private const string RunnerMachineNameHeader = "RunnerMachineName";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string UploadControllerScriptMethod = "UploadControllerScript";
@@ -33,6 +35,8 @@ public class HubService
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
+    private const string HeartbeatMethod = "Heartbeat";
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
     private HubConnection? connection;
     private readonly ConfigurationService configService;
@@ -48,6 +52,8 @@ public class HubService
     private int activeOperationCount = 0;
     private int reconnectRequested = 0;
     private int reconnectInProgress = 0;
+    private CancellationTokenSource? heartbeatTokenSource;
+    private Task? heartbeatTask;
 
     public HubService(
         ConfigurationService configService,
@@ -214,6 +220,7 @@ public class HubService
             // Dispose existing connection if any
             if (connection != null)
             {
+                StopHeartbeatLoop();
                 await connection.DisposeAsync();
                 connection = null;
             }
@@ -224,6 +231,8 @@ public class HubService
                     options.Headers.Add("X-API-Key", apiKey);
                     options.Headers.Add(RunnerIdHeader, configService.RunnerId);
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
+                    options.Headers.Add(RunnerVersionHeader, Environment.Version.ToString());
+                    options.Headers.Add(RunnerMachineNameHeader, Environment.MachineName);
                     
                     // Bypass SSL validation in development mode (for self-signed certificates)
                     var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
@@ -388,10 +397,13 @@ public class HubService
                 isReconnecting = false;
                 logger.Information("Reconnected to server with connection ID: {ConnectionId}", connectionId);
                 WriteLine("✅ Reconnected to server successfully");
+                _ = SendHeartbeatAsync();
                 return Task.CompletedTask;
             };
 
             await connection.StartAsync();
+            StartHeartbeatLoop();
+            await SendHeartbeatAsync();
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
             logger.Information("Connected to hub at {HubUrl}", hubUrl);
@@ -1030,6 +1042,7 @@ public class HubService
         // Stop the retry loop
         shouldKeepRetrying = false;
         retryTokenSource?.Cancel();
+        StopHeartbeatLoop();
         
         if (connection != null)
         {
@@ -1130,6 +1143,8 @@ public class HubService
             return;
         }
 
+        StopHeartbeatLoop();
+
         try
         {
             await currentConnection.StopAsync();
@@ -1151,6 +1166,56 @@ public class HubService
         if (ReferenceEquals(connection, currentConnection))
         {
             connection = null;
+        }
+    }
+
+    private void StartHeartbeatLoop()
+    {
+        StopHeartbeatLoop();
+
+        heartbeatTokenSource = new CancellationTokenSource();
+        heartbeatTask = Task.Run(() => RunHeartbeatLoopAsync(heartbeatTokenSource.Token));
+    }
+
+    private void StopHeartbeatLoop()
+    {
+        heartbeatTokenSource?.Cancel();
+        heartbeatTokenSource?.Dispose();
+        heartbeatTokenSource = null;
+        heartbeatTask = null;
+    }
+
+    private async Task RunHeartbeatLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(HeartbeatInterval);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await SendHeartbeatAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task SendHeartbeatAsync()
+    {
+        var currentConnection = connection;
+        if (currentConnection == null || currentConnection.State != HubConnectionState.Connected)
+        {
+            return;
+        }
+
+        try
+        {
+            await currentConnection.SendAsync(HeartbeatMethod);
+        }
+        catch (Exception ex)
+        {
+            logger.Debug(ex, "Runner heartbeat failed");
         }
     }
 

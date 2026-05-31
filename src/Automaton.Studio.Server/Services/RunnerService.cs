@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Automaton.Core.Scripting.Engines;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
@@ -98,7 +99,11 @@ public class RunnerService
         var runner = new Runner()
         {
             Id = runnerModel.Id,
-            Name = runnerModel.Name
+            Name = runnerModel.Name,
+            Status = RunnerConnectivityStatuses.Unknown,
+            Version = runnerModel.Version,
+            MachineName = runnerModel.MachineName,
+            IpAddress = runnerModel.IpAddress,
         };
 
         dbContext.Runners.Add(runner);
@@ -159,12 +164,12 @@ public class RunnerService
         logger.Information("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
     }
 
-    private void LinkHostedRunnerAfterReconnect(Runner runner)
+    private void LinkHostedRunnerAfterReconnect(Runner runner, Guid userId)
     {
         var hostedRunner = dbContext.HostedRunners
             .Include(x => x.Deployments)
             .FirstOrDefault(x =>
-                x.UserId == UserId &&
+                x.UserId == userId &&
                 x.Name == runner.Name &&
                 x.RunnerId == null &&
                 x.DeletedAt == null &&
@@ -201,10 +206,10 @@ public class RunnerService
         logger.Information("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
     }
 
-    public async Task UpdateConnection(Guid runnerId, string connectionId, CancellationToken cancellationToken)
+    public async Task UpdateConnection(Guid runnerId, Guid userId, RunnerDetails runnerConnection, CancellationToken cancellationToken)
     {
         // Check if user can update this runner (personal owner OR project member with Developer/Admin role)
-        if (!await authorizationService.CanUpdateRunnerAsync(runnerId, cancellationToken))
+        if (!await authorizationService.CanUpdateRunnerAsync(runnerId, userId, cancellationToken))
         {
             throw new UnauthorizedAccessException($"You do not have permission to update runner {runnerId}");
         }
@@ -218,7 +223,15 @@ public class RunnerService
             throw new InvalidOperationException($"Runner {runnerId} not found");
         }
 
-        runner.ConnectionId = connectionId;
+        var now = DateTime.UtcNow;
+
+        runner.ConnectionId = runnerConnection.ConnectionId;
+        runner.LastConnectedAtUtc = now;
+        runner.LastHeartbeatAtUtc = now;
+        runner.Status = RunnerConnectivityStatuses.Online;
+        runner.Version = runnerConnection.Version;
+        runner.MachineName = runnerConnection.MachineName;
+        runner.IpAddress = runnerConnection.IpAddress;
 
         // Mark entity as modified
         dbContext.Entry(runner).State = EntityState.Modified;
@@ -229,7 +242,56 @@ public class RunnerService
         // Save changes
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        LinkHostedRunnerAfterReconnect(runner);
+        LinkHostedRunnerAfterReconnect(runner, userId);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordHeartbeatAsync(Guid runnerId, Guid userId, RunnerDetails runnerHeartbeat, CancellationToken cancellationToken)
+    {
+        if (!await authorizationService.CanUpdateRunnerAsync(runnerId, userId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException($"You do not have permission to update runner {runnerId}");
+        }
+
+        var runner = await dbContext.Runners
+            .SingleOrDefaultAsync(x => x.Id == runnerId, cancellationToken);
+
+        if (runner == null)
+        {
+            throw new InvalidOperationException($"Runner {runnerId} not found");
+        }
+
+        runner.ConnectionId = runnerHeartbeat.ConnectionId;
+        runner.LastHeartbeatAtUtc = DateTime.UtcNow;
+        runner.Status = RunnerConnectivityStatuses.Online;
+        runner.Version = runnerHeartbeat.Version;
+        runner.MachineName = runnerHeartbeat.MachineName;
+        runner.IpAddress = runnerHeartbeat.IpAddress;
+
+        dbContext.Entry(runner).State = EntityState.Modified;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkDisconnectedAsync(Guid runnerId, string connectionId, CancellationToken cancellationToken)
+    {
+        var runner = await dbContext.Runners
+            .SingleOrDefaultAsync(x => x.Id == runnerId, cancellationToken);
+
+        if (runner == null)
+        {
+            return;
+        }
+
+        if (!string.Equals(runner.ConnectionId, connectionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        runner.ConnectionId = null;
+        runner.LastDisconnectedAtUtc = DateTime.UtcNow;
+        runner.Status = RunnerConnectivityStatuses.Offline;
+
+        dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -278,6 +340,9 @@ public class RunnerService
         }
 
         entity.Name = runner.Name;
+        entity.Version = runner.Version;
+        entity.MachineName = runner.MachineName;
+        entity.IpAddress = runner.IpAddress;
 
         // Mark entity as modified
         dbContext.Entry(entity).State = EntityState.Modified;
@@ -453,24 +518,11 @@ public class RunnerService
             .ToRunnerDetailsList(runnerEntities, RunnerStatus.None, projectLookup, hostedRunnerLookup)
             .ToList();
 
+        var now = DateTime.UtcNow;
+
         foreach (var runner in runners)
         {
-            try
-            {
-                var client = automatonHub.Clients.Client(runner.ConnectionId);
-
-                var response = await client.InvokeAsync<string>(AutomatonHubMethods.Ping, cancellationToken);
-
-                runner.Status = GetRunnerStatus(response);
-            }
-            catch (Exception ex)
-            {
-                runner.Status = RunnerStatus.Offline;
-
-                logger.ForContext("RunnerName", runner.Name)
-                      .ForContext("RunnerId", runner.Id)
-                      .Error(ex, "Could not get runner status");
-            }
+            runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, now);
         }
 
         return runners;
@@ -488,13 +540,6 @@ public class RunnerService
             .AsNoTracking()
             .Where(x => x.RunnerId != null && ids.Contains(x.RunnerId.Value) && x.DeletedAt == null)
             .ToDictionaryAsync(x => x.RunnerId!.Value, x => x.Id, cancellationToken);
-    }
-
-    private static RunnerStatus GetRunnerStatus(string response)
-    {
-        return response.Equals("Pong", StringComparison.OrdinalIgnoreCase) ?
-            RunnerStatus.Online :
-            RunnerStatus.Offline;
     }
 
     private RunnerFlowResult GetSuccessfulFlowResult(Guid flowId, Guid runnerId, WorkflowExecution flowExecution)
@@ -616,7 +661,12 @@ public class RunnerService
                 .Select(x => (Guid?)x.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, link.ProjectId, link.ProjectName, hostedRunnerId);
+            return RunnerMapper.ToRunnerDetails(
+                runner,
+                RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow),
+                link.ProjectId,
+                link.ProjectName,
+                hostedRunnerId);
         }
 
         var fallbackHostedRunnerId = await dbContext.HostedRunners
@@ -625,6 +675,11 @@ public class RunnerService
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return RunnerMapper.ToRunnerDetails(runner, RunnerStatus.None, null, null, fallbackHostedRunnerId);
+        return RunnerMapper.ToRunnerDetails(
+            runner,
+            RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow),
+            null,
+            null,
+            fallbackHostedRunnerId);
     }
 }

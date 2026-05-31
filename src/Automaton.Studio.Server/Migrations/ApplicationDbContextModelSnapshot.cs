@@ -1667,12 +1667,37 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<string>("ConnectionId")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("LastConnectedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastDisconnectedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastHeartbeatAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("MachineName")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("ScriptEngineSettings")
                         .HasColumnType("longtext");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
                     b.HasKey("Id");
 

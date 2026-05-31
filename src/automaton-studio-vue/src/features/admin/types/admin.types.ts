@@ -216,6 +216,8 @@ export interface AdminUserRunner {
   name: string
   status: string
   lastHeartbeatAtUtc?: string
+  lastConnectedAtUtc?: string
+  version?: string
 }
 
 export interface AdminUserSummary {
@@ -445,6 +447,11 @@ export interface HostedRunner {
   maxApps: number
   containerName: string
   containerId?: string
+  runnerConnectivityStatus: string
+  runnerLastHeartbeatAtUtc?: string
+  runnerLastConnectedAtUtc?: string
+  runnerVersion?: string
+  runnerMachineName?: string
   lastError?: string
   createdAt: string
   updatedAt?: string

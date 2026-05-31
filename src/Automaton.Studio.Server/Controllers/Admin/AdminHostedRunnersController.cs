@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -198,6 +199,10 @@ public class AdminHostedRunnersController : ControllerBase
     private static HostedRunnerResponse ToResponse(HostedRunner runner)
     {
         var deployment = runner.Deployments.OrderByDescending(x => x.StartedAt).FirstOrDefault();
+        var runnerConnectivityStatus = runner.Runner == null
+            ? RunnerStatus.None.ToString()
+            : RunnerPresenceEvaluator.DeriveStatus(runner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString();
+
         return new HostedRunnerResponse
         {
             Id = runner.Id,
@@ -218,6 +223,11 @@ public class AdminHostedRunnersController : ControllerBase
             MaxApps = runner.MaxApps,
             ContainerName = runner.ContainerName,
             ContainerId = runner.ContainerId,
+            RunnerConnectivityStatus = runnerConnectivityStatus,
+            RunnerLastHeartbeatAtUtc = runner.Runner?.LastHeartbeatAtUtc,
+            RunnerLastConnectedAtUtc = runner.Runner?.LastConnectedAtUtc,
+            RunnerVersion = runner.Runner?.Version,
+            RunnerMachineName = runner.Runner?.MachineName,
             LastError = runner.LastError,
             CreatedAt = runner.CreatedAt,
             UpdatedAt = runner.UpdatedAt,
@@ -303,6 +313,11 @@ public record HostedRunnerResponse
     public int MaxApps { get; init; }
     public string ContainerName { get; init; } = string.Empty;
     public string? ContainerId { get; init; }
+    public string RunnerConnectivityStatus { get; init; } = RunnerStatus.None.ToString();
+    public DateTime? RunnerLastHeartbeatAtUtc { get; init; }
+    public DateTime? RunnerLastConnectedAtUtc { get; init; }
+    public string? RunnerVersion { get; init; }
+    public string? RunnerMachineName { get; init; }
     public string? LastError { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }

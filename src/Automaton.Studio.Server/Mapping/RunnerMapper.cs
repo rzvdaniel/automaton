@@ -24,6 +24,12 @@ public static class RunnerMapper
 		 Name = runner.Name,
 		 ConnectionId = runner.ConnectionId,
 		 Status = status,
+		 LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc,
+		 LastConnectedAtUtc = runner.LastConnectedAtUtc,
+		 LastDisconnectedAtUtc = runner.LastDisconnectedAtUtc,
+		 Version = runner.Version,
+		 MachineName = runner.MachineName,
+		 IpAddress = runner.IpAddress,
 		 Scope = scope,
 		 ProjectId = projectId,
 		 ProjectName = projectName,
@@ -65,7 +71,13 @@ public static class RunnerMapper
  {
  Id = details.Id,
  Name = details.Name,
- ConnectionId = details.ConnectionId
+ ConnectionId = details.ConnectionId,
+ LastHeartbeatAtUtc = details.LastHeartbeatAtUtc,
+ LastConnectedAtUtc = details.LastConnectedAtUtc,
+ LastDisconnectedAtUtc = details.LastDisconnectedAtUtc,
+ Version = details.Version,
+ MachineName = details.MachineName,
+ IpAddress = details.IpAddress
  // ScriptEngineSettings and RunnerUsers are not present in RunnerDetails
  };
  }

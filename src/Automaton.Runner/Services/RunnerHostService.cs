@@ -110,6 +110,7 @@ public class RunnerHostService
         {
             await StartFastApiProcessAsync();
             await WaitForFastApiAsync();
+            await EnsureRunnerRegistrationConsistencyAsync();
 
             var connected = await hubService.ConnectAsync();
 
@@ -551,6 +552,7 @@ public class RunnerHostService
 
         await StartFastApiProcessAsync();
         await WaitForFastApiAsync();
+        await EnsureRunnerRegistrationConsistencyAsync();
 
         // Attempt to connect to hub with better error handling
         WriteLine("?? Establishing connection to server...");
@@ -688,12 +690,60 @@ public class RunnerHostService
         logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
     }
 
-    private async Task<bool> RegisterRunnerAsync(string runnerName)
+    private async Task EnsureRunnerRegistrationConsistencyAsync()
+    {
+        if (!configService.IsRunnerRegistered())
+        {
+            return;
+        }
+
+        var runnerName = configService.ApplicationName;
+        if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await httpClient.GetAsync($"{configService.BaseUrl}/api/runners/by-name/{Uri.EscapeDataString(runnerName)}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var runnerDetails = await response.Content.ReadAsAsync<RunnerDetails>();
+                if (runnerDetails != null && !string.Equals(configService.RunnerId, runnerDetails.Id.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    await storageService.SaveRunnerConfigAsync(runnerDetails.Id.ToString(), runnerName);
+                    logger.Information("Recovered runner identity for {RunnerName}. Replaced stale local runner ID {OldRunnerId} with server runner ID {RunnerId}", runnerName, configService.RunnerId, runnerDetails.Id);
+                    WriteLine($"?? Recovered runner identity from server: {runnerDetails.Id}");
+                }
+
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                logger.Information("Runner {RunnerName} is registered locally but not found on server. Re-registering before hub connect.", runnerName);
+                WriteLine($"?? Runner '{runnerName}' was not found on the server. Re-registering...");
+
+                var registerSuccess = await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
+                if (!registerSuccess)
+                {
+                    throw new InvalidOperationException($"Failed to re-register runner '{runnerName}' before connecting to the hub.");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException)
+        {
+            logger.Warning(ex, "Failed to reconcile runner identity before hub connect for {RunnerName}", runnerName);
+        }
+    }
+
+    private async Task<bool> RegisterRunnerAsync(string runnerName, bool ignoreStoredRunnerId = false)
     {
         try
         {
             // Check if we have an existing runner ID stored locally
-            var existingRunnerId = storageService.GetRunnerId();
+            var existingRunnerId = ignoreStoredRunnerId ? null : storageService.GetRunnerId();
             Guid runnerId = Guid.Empty;
             bool isUpdate = false;
 
@@ -758,7 +808,9 @@ public class RunnerHostService
             var runnerData = new
             {
                 Id = runnerId,
-                Name = runnerName
+                Name = runnerName,
+                Version = Environment.Version.ToString(),
+                MachineName = Environment.MachineName,
             };
 
             var json = JsonSerializer.Serialize(runnerData);
@@ -793,6 +845,16 @@ public class RunnerHostService
                 logger.Information("Runner {RunnerName} {Action} with ID {RunnerId}", runnerName, isUpdate ? "updated" : "registered", runnerId);
                 WriteLine($"? Runner {(isUpdate ? "updated" : "registered")} successfully!");
                 return true;
+            }
+
+            if (isUpdate &&
+                (response.StatusCode == System.Net.HttpStatusCode.NotFound
+                || response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                || response.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+            {
+                logger.Information("Stored runner ID {RunnerId} for {RunnerName} was rejected with status {StatusCode}. Retrying registration without the stale local ID.", runnerId, runnerName, response.StatusCode);
+                WriteLine($"?? Stored runner ID was rejected by the server ({response.StatusCode}). Recovering runner identity...");
+                return await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
             }
 
             var errorContent = await response.Content.ReadAsStringAsync();

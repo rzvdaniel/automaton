@@ -19,7 +19,7 @@ public class SignInUserQueryHandlerTests
         {
             NextResult = SignInResult.Failed
         };
-        var handler = new SignInUserQueryHandler(userManager, signInManager, null!);
+        var handler = new SignInUserQueryHandler(userManager, signInManager, null!, null!);
 
         var act = async () => await handler.Handle(new SignInUserQuery(4, "missing@example.com", "pw"), CancellationToken.None);
 
@@ -35,7 +35,7 @@ public class SignInUserQueryHandlerTests
         {
             NextResult = SignInResult.Failed
         };
-        var handler = new SignInUserQueryHandler(userManager, signInManager, null!);
+        var handler = new SignInUserQueryHandler(userManager, signInManager, null!, null!);
 
         try
         {
@@ -60,7 +60,7 @@ public class SignInUserQueryHandlerTests
         {
             NextResult = SignInResult.LockedOut
         };
-        var handler = new SignInUserQueryHandler(userManager, signInManager, null!);
+        var handler = new SignInUserQueryHandler(userManager, signInManager, null!, null!);
 
         var act = async () => await handler.Handle(new SignInUserQuery(4, user.Email!, "pw"), CancellationToken.None);
 

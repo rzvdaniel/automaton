@@ -33,6 +33,12 @@ export interface Runner {
   name: string
   connectionId?: string
   status: RunnerStatus
+  lastHeartbeatAtUtc?: string | null
+  lastConnectedAtUtc?: string | null
+  lastDisconnectedAtUtc?: string | null
+  version?: string | null
+  machineName?: string | null
+  ipAddress?: string | null
   scope: AccessScope
   projectId?: string | null
   projectName?: string | null

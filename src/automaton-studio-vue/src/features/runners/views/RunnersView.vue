@@ -46,6 +46,47 @@ const onlineCount = computed(() => runners.value.filter((r) => r.status === Runn
 const offlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Offline).length)
 const totalCount = computed(() => runners.value.length)
 
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return 'Not tracked yet'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Not tracked yet'
+  }
+
+  return date.toLocaleString()
+}
+
+function formatRelativeTime(value?: string | null) {
+  if (!value) {
+    return 'Not tracked yet'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Not tracked yet'
+  }
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+  if (diffSeconds < 60) {
+    return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`
+  }
+
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  }
+
+  return formatDateTime(value)
+}
+
 // Get status color for grid view indicator
 function getStatusColor(status: RunnerStatus): string {
   return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'
@@ -400,6 +441,21 @@ watch(
             <div class="text-color-secondary text-sm mb-1">Connection ID</div>
             <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
           </div>
+
+          <div class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Last heartbeat</span>
+              <span>{{ formatRelativeTime(runner.lastHeartbeatAtUtc) }}</span>
+            </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Last connected</span>
+              <span>{{ formatDateTime(runner.lastConnectedAtUtc) }}</span>
+            </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Version</span>
+              <span>{{ runner.version || 'Unknown' }}</span>
+            </div>
+          </div>
         </template>
       </Card>
     </div>
@@ -437,6 +493,24 @@ watch(
                 :value="getStatusDisplayName(data.status)"
                 :severity="getStatusSeverity(data.status)"
               />
+            </template>
+          </Column>
+
+          <Column header="Last heartbeat" style="width: 180px">
+            <template #body="{ data }">
+              <span>{{ formatRelativeTime(data.lastHeartbeatAtUtc) }}</span>
+            </template>
+          </Column>
+
+          <Column header="Last connected" style="width: 220px">
+            <template #body="{ data }">
+              <span>{{ formatDateTime(data.lastConnectedAtUtc) }}</span>
+            </template>
+          </Column>
+
+          <Column header="Version" style="width: 140px">
+            <template #body="{ data }">
+              <span>{{ data.version || 'Unknown' }}</span>
             </template>
           </Column>
 
@@ -667,6 +741,18 @@ watch(
   padding: 2px 6px;
   border-radius: 4px;
   background: var(--p-surface-ground);
+}
+
+.runner-telemetry {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.runner-telemetry__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.95rem;
 }
 
 .code-block {

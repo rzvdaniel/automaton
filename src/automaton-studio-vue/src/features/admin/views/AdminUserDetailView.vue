@@ -136,6 +136,26 @@ function formatLastHeartbeat(value?: string) {
     return 'Not tracked yet'
   }
 
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Not tracked yet'
+  }
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+  if (diffSeconds < 60) {
+    return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`
+  }
+
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  }
+
   return formatDate(value)
 }
 
@@ -319,6 +339,12 @@ onMounted(() => {
                   </div>
                   <div class="runner-card__meta">
                     Last heartbeat: {{ formatLastHeartbeat(runner.lastHeartbeatAtUtc) }}
+                  </div>
+                  <div class="runner-card__meta">
+                    Last connected: {{ formatDate(runner.lastConnectedAtUtc) }}
+                  </div>
+                  <div class="runner-card__meta">
+                    Version: {{ runner.version || 'Unknown' }}
                   </div>
                 </button>
               </div>

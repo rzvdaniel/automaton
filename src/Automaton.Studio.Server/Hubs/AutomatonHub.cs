@@ -2,6 +2,7 @@
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace Automaton.Studio.Server.Hubs;
 
@@ -11,31 +12,57 @@ public class AutomatonHub : Hub
     private const string UserIdClaim = "uid";
     private const string RunnerIdHeader = "RunnerId";
     private const string RunnerNameHeader = "RunnerName";
+    private const string RunnerVersionHeader = "RunnerVersion";
+    private const string RunnerMachineNameHeader = "RunnerMachineName";
 
     private readonly RunnerService runnerService;
     private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly FileUploadRegistry fileUploadRegistry;
     private readonly FileDownloadRegistry fileDownloadRegistry;
+    private readonly ILogger<AutomatonHub> logger;
 
     public AutomatonHub(
         RunnerService runnerService,
         TunnelRequestRegistry tunnelRegistry,
         FileUploadRegistry fileUploadRegistry,
-        FileDownloadRegistry fileDownloadRegistry)
+        FileDownloadRegistry fileDownloadRegistry,
+        ILogger<AutomatonHub> logger)
     {
         this.runnerService = runnerService;
         this.tunnelRegistry = tunnelRegistry;
         this.fileUploadRegistry = fileUploadRegistry;
         this.fileDownloadRegistry = fileDownloadRegistry;
+        this.logger = logger;
     }
 
     public override async Task OnConnectedAsync()
     {
         var runner = GetRunner();
 
-        await Clients.Caller.SendAsync("WelcomeRunner", $"Welcome {runner.Name}");
+        try
+        {
+            await UpdateRunnerConnection();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Rejected runner connection for runner {RunnerId} ({RunnerName}) due to authorization mismatch", runner.Id, runner.Name);
+            Context.Abort();
+            return;
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Rejected runner connection for runner {RunnerId} ({RunnerName}) because the runner record is invalid or missing", runner.Id, runner.Name);
+            Context.Abort();
+            return;
+        }
 
-        await UpdateRunnerConnection();
+        logger.LogInformation(
+            "Runner connected successfully: runner {RunnerId} ({RunnerName}) on connection {ConnectionId}",
+            runner.Id,
+            runner.Name,
+            Context.ConnectionId);
+
+        await Clients.Caller.SendAsync("WelcomeRunner", $"Welcome {runner.Name}");
 
         await base.OnConnectedAsync();
     }
@@ -81,12 +108,43 @@ public class AutomatonHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        try
+        {
+            var runner = GetRunner();
+            await runnerService.MarkDisconnectedAsync(runner.Id, Context.ConnectionId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to update runner disconnect state for connection {ConnectionId}", Context.ConnectionId);
+        }
+
         await base.OnDisconnectedAsync(exception);
     }
 
     public bool Ping(string runnerName)
     {
         return !string.IsNullOrEmpty(runnerName);
+    }
+
+    public async Task Heartbeat()
+    {
+        var runner = GetRunner();
+        var userId = GetUserId();
+
+        try
+        {
+            await runnerService.RecordHeartbeatAsync(runner.Id, userId, runner, CancellationToken.None);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogWarning(ex, "Rejected heartbeat for runner {RunnerId} ({RunnerName}) due to authorization mismatch", runner.Id, runner.Name);
+            Context.Abort();
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Rejected heartbeat for runner {RunnerId} ({RunnerName}) because the runner record is invalid or missing", runner.Id, runner.Name);
+            Context.Abort();
+        }
     }
 
     private Models.RunnerDetails GetRunner()
@@ -100,26 +158,35 @@ public class AutomatonHub : Hub
         { 
             Id = Guid.Parse(runnerId),
             Name = runnerName,
-            ConnectionId = connectionId
+            ConnectionId = connectionId,
+            Version = httpContext.Request.Headers[RunnerVersionHeader].ToString(),
+            MachineName = httpContext.Request.Headers[RunnerMachineNameHeader].ToString(),
+            IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
         };
 
         return runner;
     }
 
-    private string GetUserId()
+    private Guid GetUserId()
     {
-        var userIdClaim = Context.User.Claims.SingleOrDefault(x => x.Type == UserIdClaim);
+        var userId = Context.User.Claims
+            .Where(x => x.Type == UserIdClaim || x.Type == ClaimTypes.NameIdentifier)
+            .Select(x => Guid.TryParse(x.Value, out var parsedUserId) ? parsedUserId : Guid.Empty)
+            .FirstOrDefault(x => x != Guid.Empty);
 
-        if (userIdClaim is null)
-            throw new ArgumentNullException("userId");
+        if (userId == Guid.Empty)
+        {
+            throw new InvalidOperationException("Authenticated runner connection is missing a valid user id claim.");
+        }
 
-        return userIdClaim.Value;
+        return userId;
     }
 
     private async Task UpdateRunnerConnection()
     {
         var runner = GetRunner();
+        var userId = GetUserId();
 
-        await runnerService.UpdateConnection(runner.Id, runner.ConnectionId, CancellationToken.None);
+        await runnerService.UpdateConnection(runner.Id, userId, runner, CancellationToken.None);
     }
 }

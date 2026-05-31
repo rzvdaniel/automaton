@@ -145,6 +145,10 @@ namespace Automaton.Studio.Server.Data
             modelBuilder.Entity<Runner>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
+                entity.Property(e => e.Status).HasMaxLength(20);
+                entity.Property(e => e.Version).HasMaxLength(50);
+                entity.Property(e => e.MachineName).HasMaxLength(120);
+                entity.Property(e => e.IpAddress).HasMaxLength(64);
             });
 
             modelBuilder.Entity<RunnerUser>(entity =>

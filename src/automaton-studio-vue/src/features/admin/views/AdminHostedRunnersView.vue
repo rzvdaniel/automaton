@@ -317,6 +317,47 @@ function formatMb(value: number) {
   return `${value} MB`
 }
 
+function formatDateTime(value?: string) {
+  if (!value) {
+    return 'Not tracked yet'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Not tracked yet'
+  }
+
+  return date.toLocaleString()
+}
+
+function formatRelativeTime(value?: string) {
+  if (!value) {
+    return 'Not tracked yet'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Not tracked yet'
+  }
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+  if (diffSeconds < 60) {
+    return `${diffSeconds} second${diffSeconds === 1 ? '' : 's'} ago`
+  }
+
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  }
+
+  return formatDateTime(value)
+}
+
 onMounted(refreshAll)
 </script>
 
@@ -576,6 +617,28 @@ onMounted(refreshAll)
           <div class="col-12 md:col-6">
             <div class="text-color-secondary text-sm">Container</div>
             <div class="font-medium">{{ selectedRunner.containerName }}</div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Runner status</div>
+            <Tag :value="selectedRunner.runnerConnectivityStatus" :severity="statusSeverity(selectedRunner.runnerConnectivityStatus)" />
+          </div>
+          <div class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Runner version</div>
+            <div class="font-medium">{{ selectedRunner.runnerVersion || 'Unknown' }}</div>
+          </div>
+          <div class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Last heartbeat</div>
+            <div class="font-medium">{{ formatRelativeTime(selectedRunner.runnerLastHeartbeatAtUtc) }}</div>
+          </div>
+          <div class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Last connected</div>
+            <div class="font-medium">{{ formatDateTime(selectedRunner.runnerLastConnectedAtUtc) }}</div>
+          </div>
+          <div class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Machine name</div>
+            <div class="font-medium">{{ selectedRunner.runnerMachineName || 'Unknown' }}</div>
           </div>
         </div>
         <div v-if="selectedRunner.lastError">

@@ -52,4 +52,8 @@ public class UserRunnerLink
     public string Status { get; set; } = string.Empty;
 
     public DateTime? LastHeartbeatAtUtc { get; set; }
+
+    public DateTime? LastConnectedAtUtc { get; set; }
+
+    public string? Version { get; set; }
 }

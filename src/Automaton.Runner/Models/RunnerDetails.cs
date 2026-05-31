@@ -8,4 +8,10 @@ public class RunnerDetails
     public string Name { get; set; }
     public string? ConnectionId { get; set; }
     public RunnerStatus Status { get; set; }
+    public DateTime? LastHeartbeatAtUtc { get; set; }
+    public DateTime? LastConnectedAtUtc { get; set; }
+    public DateTime? LastDisconnectedAtUtc { get; set; }
+    public string? Version { get; set; }
+    public string? MachineName { get; set; }
+    public string? IpAddress { get; set; }
 }
