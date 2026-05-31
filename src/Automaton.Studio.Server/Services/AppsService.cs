@@ -502,7 +502,7 @@ public class AppsService
         return !string.IsNullOrEmpty(slug) && Regex.IsMatch(slug, @"^[a-z0-9\-]+$");
     }
 
-    private static Models.AppModel MapToModel(Entities.WebApp entity, Models.AppDefinition? definition = null)
+    internal static Models.AppModel MapToModel(Entities.WebApp entity, Models.AppDefinition? definition = null)
     {
         if (entity == null) return null;
 
@@ -945,7 +945,7 @@ public class AppsService
         return imageUrl;
     }
 
-    private static void ApplyStorageMetadata(Models.AppModel app, Models.AppStorageMetadata? metadata)
+    internal static void ApplyStorageMetadata(Models.AppModel app, Models.AppStorageMetadata? metadata)
     {
         if (app == null || metadata == null)
         {

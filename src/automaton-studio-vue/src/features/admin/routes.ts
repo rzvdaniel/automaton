@@ -19,6 +19,8 @@ import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUsersView from './views/AdminUsersView.vue'
 import AdminUserDetailView from './views/AdminUserDetailView.vue'
+import AdminUserAppsView from './views/AdminUserAppsView.vue'
+import AdminUserRunnersView from './views/AdminUserRunnersView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -87,6 +89,22 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminUserDetailView,
         meta: {
           title: 'User Details',
+        },
+      },
+      {
+        path: 'users/:userId/apps',
+        name: 'admin-user-apps',
+        component: AdminUserAppsView,
+        meta: {
+          title: 'User Apps',
+        },
+      },
+      {
+        path: 'users/:userId/runners',
+        name: 'admin-user-runners',
+        component: AdminUserRunnersView,
+        meta: {
+          title: 'User Runners',
         },
       },
       {

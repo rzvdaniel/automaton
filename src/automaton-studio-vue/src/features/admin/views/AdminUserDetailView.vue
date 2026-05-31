@@ -18,29 +18,6 @@ const user = ref<AdminUser | null>(null)
 
 const userId = computed(() => String(route.params.userId || ''))
 
-const usageItems = computed(() => {
-  if (!user.value) {
-    return []
-  }
-
-  return [
-    {
-      label: 'Apps',
-      value: user.value.appCount.toLocaleString(),
-      actionLabel: `${user.value.appCount.toLocaleString()} App${user.value.appCount === 1 ? '' : 's'}`,
-      to: { path: '/apps', query: { userId: user.value.id, userName: user.value.name } },
-    },
-    {
-      label: 'Runners',
-      value: user.value.runnerCount.toLocaleString(),
-      actionLabel: `${user.value.runnerCount.toLocaleString()} Runner${user.value.runnerCount === 1 ? '' : 's'}`,
-      to: { path: '/runners', query: { userId: user.value.id, userName: user.value.name } },
-    },
-    { label: 'API Keys', value: 'Not tracked yet' },
-    { label: 'AI Keys', value: 'Not tracked yet' },
-  ]
-})
-
 async function loadUser() {
   if (!userId.value) {
     return
@@ -65,24 +42,12 @@ function goBack() {
   void router.push({ name: 'admin-users' })
 }
 
-function navigateToUsage(to?: { path: string; query?: Record<string, string> }) {
+function navigateToUsage(to?: { path?: string; name?: string; params?: Record<string, string>; query?: Record<string, string> }) {
   if (!to) {
     return
   }
 
   void router.push(to)
-}
-
-function navigateToApp(appId: string) {
-  void router.push({ name: 'app-editor', params: { id: appId } })
-}
-
-function navigateToRunners() {
-  if (!user.value) {
-    return
-  }
-
-  void router.push({ path: '/runners', query: { userId: user.value.id, userName: user.value.name } })
 }
 
 function parseUtcDate(value?: string) {
@@ -136,10 +101,6 @@ function statusSeverity(locked: boolean) {
 
 function verificationSeverity(confirmed: boolean) {
   return confirmed ? 'success' : 'warn'
-}
-
-function runnerStatusSeverity(status?: string) {
-  return status?.toLowerCase() === 'online' ? 'success' : 'danger'
 }
 
 function formatLastHeartbeat(value?: string) {
@@ -283,17 +244,20 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Apps</template>
             <template #content>
-              <div v-if="user.apps.length" class="linked-resource-list">
+              <div class="summary-card">
+                <div class="summary-stat">{{ user.appCount.toLocaleString() }} total</div>
+                <div class="summary-detail">{{ user.publishedAppCount.toLocaleString() }} published</div>
+                <div class="summary-detail">{{ user.privateAppCount.toLocaleString() }} private</div>
+                <div class="summary-detail">Last app: {{ user.lastAppName || '—' }}</div>
                 <Button
-                  v-for="app in user.apps"
-                  :key="app.id"
-                  :label="app.name"
+                  label="View Apps"
+                  icon="pi pi-arrow-right"
+                  icon-pos="right"
                   link
-                  class="resource-link"
-                  @click="navigateToApp(app.id)"
+                  class="summary-link"
+                  @click="navigateToUsage({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } })"
                 />
               </div>
-              <p v-else class="empty-state-text">No apps assigned to this user yet.</p>
             </template>
           </Card>
         </div>
@@ -303,22 +267,21 @@ onMounted(() => {
             <template #title>Usage</template>
             <template #content>
               <div class="usage-grid">
-                <div
-                  v-for="item in usageItems"
-                  :key="item.label"
-                  class="usage-card"
-                >
-                  <div class="usage-label">{{ item.label }}</div>
-                  <Button
-                    v-if="item.to && item.actionLabel"
-                    :label="item.actionLabel"
-                    icon="pi pi-arrow-right"
-                    icon-pos="right"
-                    link
-                    class="usage-link"
-                    @click="navigateToUsage(item.to)"
-                  />
-                  <div v-else class="usage-value">{{ item.value }}</div>
+                <div class="usage-card">
+                  <div class="usage-label">Apps</div>
+                  <div class="usage-value">{{ user.appCount.toLocaleString() }}</div>
+                </div>
+                <div class="usage-card">
+                  <div class="usage-label">Runners</div>
+                  <div class="usage-value">{{ user.runnerCount.toLocaleString() }}</div>
+                </div>
+                <div class="usage-card">
+                  <div class="usage-label">API Keys</div>
+                  <div class="usage-value usage-value--muted">Not tracked yet</div>
+                </div>
+                <div class="usage-card">
+                  <div class="usage-label">AI Keys</div>
+                  <div class="usage-value usage-value--muted">Not tracked yet</div>
                 </div>
               </div>
             </template>
@@ -329,33 +292,19 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Runners</template>
             <template #content>
-              <div v-if="user.runners.length" class="runner-list">
-                <button
-                  v-for="runner in user.runners"
-                  :key="runner.id"
-                  type="button"
-                  class="runner-card"
-                  @click="navigateToRunners"
-                >
-                  <div class="runner-card__header">
-                    <strong>{{ runner.name }}</strong>
-                    <Tag
-                      :severity="runnerStatusSeverity(runner.status)"
-                      :value="runner.status"
-                    />
-                  </div>
-                  <div class="runner-card__meta">
-                    Last heartbeat: {{ formatLastHeartbeat(runner.lastHeartbeatAtUtc) }}
-                  </div>
-                  <div class="runner-card__meta">
-                    Last connected: {{ formatDate(runner.lastConnectedAtUtc) }}
-                  </div>
-                  <div class="runner-card__meta">
-                    Version: {{ runner.version || 'Unknown' }}
-                  </div>
-                </button>
+              <div class="summary-card">
+                <div class="summary-stat">{{ user.runnerCount.toLocaleString() }} total</div>
+                <div class="summary-detail">{{ user.onlineRunnerCount.toLocaleString() }} online</div>
+                <div class="summary-detail">Last heartbeat: {{ formatLastHeartbeat(user.lastRunnerHeartbeatAtUtc) }}</div>
+                <Button
+                  label="View Runners"
+                  icon="pi pi-arrow-right"
+                  icon-pos="right"
+                  link
+                  class="summary-link"
+                  @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })"
+                />
               </div>
-              <p v-else class="empty-state-text">No runners assigned to this user yet.</p>
             </template>
           </Card>
         </div>
@@ -423,55 +372,9 @@ onMounted(() => {
   gap: 1rem;
 }
 
-.linked-resource-list {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.resource-link {
-  padding: 0;
-}
-
 .empty-state-text {
   margin: 0;
   color: var(--text-color-secondary);
-}
-
-.runner-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.runner-card {
-  width: 100%;
-  border: 1px solid var(--surface-border);
-  border-radius: 0.875rem;
-  background: transparent;
-  padding: 0.875rem 1rem;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.runner-card:hover {
-  border-color: var(--primary-color);
-  background: color-mix(in srgb, var(--primary-color) 6%, transparent);
-}
-
-.runner-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.runner-card__meta {
-  margin-top: 0.5rem;
-  color: var(--text-color-secondary);
-  font-size: 0.95rem;
 }
 
 .page-header {
@@ -560,10 +463,11 @@ onMounted(() => {
   gap: 0.85rem;
 }
 
+.summary-card,
 .status-item,
 .usage-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1rem;
@@ -571,16 +475,24 @@ onMounted(() => {
   border-radius: 0.9rem;
 }
 
+.summary-card,
 .usage-card {
   flex-direction: column;
   align-items: flex-start;
 }
 
+.summary-stat,
 .usage-value {
   font-size: 1.35rem;
   font-weight: 700;
 }
 
+.summary-detail,
+.usage-value--muted {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+}
+
+.summary-link,
 .usage-link {
   padding: 0;
   font-size: 1.1rem;

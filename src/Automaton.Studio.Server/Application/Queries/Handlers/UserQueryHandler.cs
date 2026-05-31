@@ -30,6 +30,15 @@ namespace AuthServer.Application.Queries.Handlers
             // Get user's roles
             var roles = await _userManager.GetRolesAsync(user);
             var appCount = await _db.WebAppUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
+            var publishedAppCount = await _db.WebAppUsers
+                .AsNoTracking()
+                .Where(item => item.UserId == user.Id)
+                .Join(
+                    _db.WebApps.AsNoTracking(),
+                    webAppUser => webAppUser.WebAppId,
+                    webApp => webApp.Id,
+                    (_, webApp) => webApp)
+                .CountAsync(webApp => webApp.IsPublished, cancellationToken);
             var runnerCount = await _db.RunnerUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
             var apps = await _db.WebAppUsers
                 .AsNoTracking()
@@ -42,9 +51,22 @@ namespace AuthServer.Application.Queries.Handlers
                     {
                         Id = webApp.Id,
                         Name = webApp.Name,
+                        IsPublished = webApp.IsPublished,
                     })
                 .OrderBy(app => app.Name)
                 .ToListAsync(cancellationToken);
+            var lastAppName = await _db.WebAppUsers
+                .AsNoTracking()
+                .Where(item => item.UserId == user.Id)
+                .Join(
+                    _db.WebApps.AsNoTracking(),
+                    webAppUser => webAppUser.WebAppId,
+                    webApp => webApp.Id,
+                    (_, webApp) => new { webApp.Name, webApp.Updated, webApp.Created })
+                .OrderByDescending(app => app.Updated)
+                .ThenByDescending(app => app.Created)
+                .Select(app => app.Name)
+                .FirstOrDefaultAsync(cancellationToken);
             var runners = await _db.RunnerUsers
                 .AsNoTracking()
                 .Where(item => item.UserId == user.Id)
@@ -63,6 +85,12 @@ namespace AuthServer.Application.Queries.Handlers
                     })
                 .OrderBy(runner => runner.Name)
                 .ToListAsync(cancellationToken);
+            var onlineRunnerCount = runners.Count(runner => string.Equals(runner.Status, "Online", StringComparison.OrdinalIgnoreCase));
+            var lastRunnerHeartbeatAtUtc = runners
+                .Where(runner => runner.LastHeartbeatAtUtc.HasValue)
+                .OrderByDescending(runner => runner.LastHeartbeatAtUtc)
+                .Select(runner => runner.LastHeartbeatAtUtc)
+                .FirstOrDefault();
 
             var userDetails = new UserDetails
             {
@@ -77,7 +105,12 @@ namespace AuthServer.Application.Queries.Handlers
                 IsLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
                 AccessFailedCount = user.AccessFailedCount,
                 AppCount = appCount,
+                PublishedAppCount = publishedAppCount,
+                PrivateAppCount = appCount - publishedAppCount,
+                LastAppName = lastAppName,
                 RunnerCount = runnerCount,
+                OnlineRunnerCount = onlineRunnerCount,
+                LastRunnerHeartbeatAtUtc = lastRunnerHeartbeatAtUtc,
                 Apps = apps,
                 Runners = runners,
                 Roles = roles.ToList()
@@ -87,4 +120,3 @@ namespace AuthServer.Application.Queries.Handlers
         }
     }
 }
-

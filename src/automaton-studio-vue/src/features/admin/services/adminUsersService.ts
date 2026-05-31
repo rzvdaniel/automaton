@@ -1,4 +1,6 @@
 import apiClient from '@/shared/services/api/axios-instance'
+import type { App } from '@/features/apps/types/apps.types'
+import type { Runner } from '@/features/runners/types/runners.types'
 import type { AdminUser, AdminUserPage } from '../types/admin.types'
 
 interface AdminUsersQuery {
@@ -40,6 +42,20 @@ class AdminUsersService {
 
   async getUser(userId: string): Promise<AdminUser> {
     const { data } = await apiClient.get<AdminUser>(`/api/admin/users/${userId}`)
+    return data
+  }
+
+  async getUserApps(userId: string, projectId?: string): Promise<App[]> {
+    const { data } = await apiClient.get<App[]>(`/api/admin/users/${userId}/apps`, {
+      params: projectId ? { projectId } : undefined,
+    })
+    return data
+  }
+
+  async getUserRunners(userId: string, projectId?: string): Promise<Runner[]> {
+    const { data } = await apiClient.get<Runner[]>(`/api/admin/users/${userId}/runners`, {
+      params: projectId ? { projectId } : undefined,
+    })
     return data
   }
 }

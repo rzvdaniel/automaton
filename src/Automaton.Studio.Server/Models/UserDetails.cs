@@ -23,8 +23,13 @@ public class UserDetails
     public int AccessFailedCount { get; set; }
 
     public int AppCount { get; set; }
+    public int PublishedAppCount { get; set; }
+    public int PrivateAppCount { get; set; }
+    public string? LastAppName { get; set; }
 
     public int RunnerCount { get; set; }
+    public int OnlineRunnerCount { get; set; }
+    public DateTime? LastRunnerHeartbeatAtUtc { get; set; }
 
     public ICollection<UserAppLink> Apps { get; set; } = new List<UserAppLink>();
 
@@ -41,6 +46,8 @@ public class UserAppLink
     public Guid Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
+
+    public bool IsPublished { get; set; }
 }
 
 public class UserRunnerLink

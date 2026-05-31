@@ -44,12 +44,13 @@ public class RunnerService
     public async Task<IEnumerable<RunnerDetails>> List(Guid? projectId, CancellationToken cancellationToken)
     {
         // Use authorization service to get runners filtered by project context
-        var runnerQuery = authorizationService.GetRunnersQueryByContext(projectId);
+        var runnerQuery = authorizationService.GetRunnersQueryByContext(projectId, UserId);
         var runnerEntities = await runnerQuery.ToListAsync(cancellationToken);
 
         var projectLookup = await BuildRunnerProjectLookup(
             runnerEntities.Select(r => r.Id),
             projectId,
+            UserId,
             cancellationToken);
         var hostedRunnerLookup = await BuildHostedRunnerLookup(runnerEntities.Select(r => r.Id), cancellationToken);
 
@@ -473,6 +474,7 @@ public class RunnerService
     private async Task<Dictionary<Guid, (Guid ProjectId, string ProjectName)>> BuildRunnerProjectLookup(
         IEnumerable<Guid> runnerIds,
         Guid? projectId,
+        Guid userId,
         CancellationToken cancellationToken)
     {
         var ids = runnerIds.Distinct().ToList();
@@ -491,7 +493,6 @@ public class RunnerService
         }
         else
         {
-            var userId = UserId;
             query = query.Where(x => x.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive));
         }
 
@@ -651,6 +652,7 @@ public class RunnerService
         var projectLookup = await BuildRunnerProjectLookup(
             new[] { runner.Id },
             null,
+            UserId,
             cancellationToken);
 
         if (projectLookup.TryGetValue(runner.Id, out var link))

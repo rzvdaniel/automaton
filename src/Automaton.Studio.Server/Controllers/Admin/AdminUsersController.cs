@@ -1,6 +1,7 @@
 using AuthServer.Core.Queries;
 using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services;
 using Common.Validation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,15 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 [Authorize(Policy = "Administrators")]
 public class AdminUsersController : BaseController
 {
+    private readonly AdminAppsService adminAppsService;
+    private readonly AdminRunnersService adminRunnersService;
+
+    public AdminUsersController(AdminAppsService adminAppsService, AdminRunnersService adminRunnersService)
+    {
+        this.adminAppsService = adminAppsService;
+        this.adminRunnersService = adminRunnersService;
+    }
+
     [HttpGet]
     public async Task<ActionResult<AdminUserListResponse>> GetUsers([FromQuery] FilterUserQuery filterUserQuery, CancellationToken cancellationToken)
     {
@@ -26,6 +36,21 @@ public class AdminUsersController : BaseController
     public async Task<ActionResult<UserDetails>> GetUser([FromRoute, NotEmptyGuid] Guid userId)
     {
         return Ok(await Mediator.Send(new UserQuery { Id = userId }));
+    }
+
+    [HttpGet("{userId:guid}/apps")]
+    public ActionResult<IEnumerable<AppModel>> GetUserApps([FromRoute, NotEmptyGuid] Guid userId, [FromQuery] Guid? projectId = null)
+    {
+        return Ok(adminAppsService.ListOwnedByUserForAdmin(userId, projectId));
+    }
+
+    [HttpGet("{userId:guid}/runners")]
+    public async Task<ActionResult<IEnumerable<RunnerDetails>>> GetUserRunners(
+        [FromRoute, NotEmptyGuid] Guid userId,
+        [FromQuery] Guid? projectId,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await adminRunnersService.ListOwnedByUserForAdmin(userId, projectId, cancellationToken));
     }
 
     [HttpPut("{userId:guid}")]

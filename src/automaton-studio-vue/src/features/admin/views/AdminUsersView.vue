@@ -84,12 +84,12 @@ const rowActionItems = computed<MenuItem[]>(() => {
     {
       label: 'View apps',
       icon: 'pi pi-th-large',
-      command: () => router.push('/apps'),
+      command: () => router.push({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } }),
     },
     {
       label: 'View runners',
       icon: 'pi pi-server',
-      command: () => router.push('/runners'),
+      command: () => router.push({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } }),
     },
     {
       separator: true,

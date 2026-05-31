@@ -199,7 +199,12 @@ export interface AdminUser {
   registrationProvider?: string
   isLocked: boolean
   appCount: number
+  publishedAppCount: number
+  privateAppCount: number
+  lastAppName?: string
   runnerCount: number
+  onlineRunnerCount: number
+  lastRunnerHeartbeatAtUtc?: string
   apps: AdminUserApp[]
   runners: AdminUserRunner[]
   roles: string[]
@@ -209,6 +214,7 @@ export interface AdminUser {
 export interface AdminUserApp {
   id: string
   name: string
+  isPublished: boolean
 }
 
 export interface AdminUserRunner {
