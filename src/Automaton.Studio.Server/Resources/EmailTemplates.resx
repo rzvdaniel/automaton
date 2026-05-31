@@ -131,7 +131,7 @@
   &lt;meta charset="UTF-8"&gt;
   &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
   &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt;
-  &lt;title&gt;New Automaton Registration&lt;/title&gt;
+  &lt;title&gt;New registration notification&lt;/title&gt;
   &lt;style&gt;
     body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; color: #111827; }
     .email-container { max-width: 640px; margin: 0 auto; background-color: #ffffff; }

@@ -126,9 +126,11 @@ public class AccountController : BaseController
             logger.LogWarning(ex, "Admin registration notification could not be sent for user {UserId}", user.Id);
         }
 
-        return CreatedAtRoute("User",
-            new { controller = "User", userId = registerUserCommand.Email },
-            new { name = registerUserCommand.Name, publicUsername = publicUsername });
+        return StatusCode(StatusCodes.Status201Created, new
+        {
+            name = registerUserCommand.Name,
+            publicUsername = publicUsername
+        });
     }
 
     [HttpPost]
