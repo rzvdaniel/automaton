@@ -47,12 +47,35 @@ Allowed values:
 Meaning:
 
 - `active`: app is allowed to be publicly reachable
-- `hidden`: removed from marketplace and blocked from public runtime access
+- `hidden`: removed from marketplace and blocked from public runtime access without treating it as an enforcement violation
 - `disabled`: blocked due to enforcement, abuse, safety, or platform action
 
 Important: `hidden` is currently a strict state, not "unlisted but reachable by link".
 
 If we ever need "shareable by direct URL but not discoverable", introduce a separate value such as `unlisted` instead of weakening `hidden`.
+
+### When To Use Hidden vs Disabled
+
+Use `hidden` when the app should be taken out of public circulation, but you are not treating it as a policy or safety violation.
+
+Typical examples:
+
+- low-quality or unfinished app removed from discovery
+- temporarily withdrawn while details are reviewed
+- owner-requested removal from public surfaces
+
+Use `disabled` when the platform is actively blocking the app for enforcement reasons.
+
+Typical examples:
+
+- terms-of-service or abuse violation
+- malware, phishing, or other safety concerns
+- repeated policy breaches after review
+
+Short admin rule:
+
+- `hidden` = non-punitive removal
+- `disabled` = punitive or safety enforcement
 
 ## Effective Behavior
 
