@@ -24,8 +24,18 @@ const usageItems = computed(() => {
   }
 
   return [
-    { label: 'Apps', value: user.value.appCount.toLocaleString() },
-    { label: 'Runners', value: user.value.runnerCount.toLocaleString() },
+    {
+      label: 'Apps',
+      value: user.value.appCount.toLocaleString(),
+      actionLabel: `${user.value.appCount.toLocaleString()} App${user.value.appCount === 1 ? '' : 's'}`,
+      to: { path: '/apps', query: { userId: user.value.id, userName: user.value.name } },
+    },
+    {
+      label: 'Runners',
+      value: user.value.runnerCount.toLocaleString(),
+      actionLabel: `${user.value.runnerCount.toLocaleString()} Runner${user.value.runnerCount === 1 ? '' : 's'}`,
+      to: { path: '/runners', query: { userId: user.value.id, userName: user.value.name } },
+    },
     { label: 'API Keys', value: 'Not tracked yet' },
     { label: 'AI Keys', value: 'Not tracked yet' },
   ]
@@ -55,6 +65,14 @@ function goBack() {
   void router.push({ name: 'admin-users' })
 }
 
+function navigateToUsage(to?: { path: string; query?: Record<string, string> }) {
+  if (!to) {
+    return
+  }
+
+  void router.push(to)
+}
+
 function formatDate(value?: string) {
   if (!value) {
     return '—'
@@ -74,12 +92,18 @@ function formatProvider(value?: string) {
       return 'Password'
     case 'github':
       return 'GitHub'
+    case 'google':
+    case 'Google':
+      return 'Google'
+    case 'microsoft':
+    case 'Microsoft':
+      return 'Microsoft'
     case 'invitation':
       return 'Invitation'
     case 'adminCreated':
       return 'Admin'
     default:
-      return value || 'Unknown'
+      return value || 'Password'
   }
 }
 
@@ -89,6 +113,16 @@ function statusSeverity(locked: boolean) {
 
 function verificationSeverity(confirmed: boolean) {
   return confirmed ? 'success' : 'warn'
+}
+
+function triggerAction(actionLabel: string) {
+  const userName = user.value?.name || 'this user'
+  toast.add({
+    severity: 'info',
+    summary: 'Not implemented yet',
+    detail: `${actionLabel} is not wired yet for ${userName}.`,
+    life: 3000,
+  })
 }
 
 onMounted(() => {
@@ -132,7 +166,7 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Profile</template>
             <template #content>
-              <dl class="detail-list">
+              <dl class="detail-list detail-list--compact">
                 <div class="detail-item">
                   <dt>Name</dt>
                   <dd>{{ user.name || '—' }}</dd>
@@ -205,8 +239,47 @@ onMounted(() => {
                   class="usage-card"
                 >
                   <div class="usage-label">{{ item.label }}</div>
-                  <div class="usage-value">{{ item.value }}</div>
+                  <Button
+                    v-if="item.to && item.actionLabel"
+                    :label="item.actionLabel"
+                    icon="pi pi-arrow-right"
+                    icon-pos="right"
+                    link
+                    class="usage-link"
+                    @click="navigateToUsage(item.to)"
+                  />
+                  <div v-else class="usage-value">{{ item.value }}</div>
                 </div>
+              </div>
+            </template>
+          </Card>
+        </div>
+
+        <div class="col-12 lg:col-6">
+          <Card class="detail-card h-full">
+            <template #title>Actions</template>
+            <template #content>
+              <div class="actions-grid">
+                <Button
+                  label="Resend Confirmation"
+                  icon="pi pi-envelope"
+                  outlined
+                  :disabled="user.emailConfirmed"
+                  @click="triggerAction('Resend confirmation')"
+                />
+                <Button
+                  :label="user.isLocked ? 'Unlock Account' : 'Disable Account'"
+                  :icon="user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban'"
+                  :severity="user.isLocked ? 'success' : 'danger'"
+                  outlined
+                  @click="triggerAction(user.isLocked ? 'Unlock account' : 'Disable account')"
+                />
+                <Button
+                  label="Grant Admin"
+                  icon="pi pi-shield"
+                  outlined
+                  @click="triggerAction('Grant admin')"
+                />
               </div>
             </template>
           </Card>
@@ -216,7 +289,7 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Activity</template>
             <template #content>
-              <dl class="detail-list">
+              <dl class="detail-list detail-list--compact">
                 <div class="detail-item">
                   <dt>Last Login</dt>
                   <dd>{{ formatDate(user.lastLoginAtUtc) }}</dd>
@@ -295,9 +368,20 @@ onMounted(() => {
   margin: 0;
 }
 
+.detail-list--compact {
+  gap: 0.75rem;
+}
+
 .detail-item {
   display: grid;
   gap: 0.3rem;
+}
+
+.detail-list--compact .detail-item {
+  grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 1rem;
+  row-gap: 0;
 }
 
 .detail-item dt {
@@ -309,8 +393,13 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.detail-list--compact .detail-item dd {
+  word-break: break-word;
+}
+
 .status-grid,
-.usage-grid {
+.usage-grid,
+.actions-grid {
   display: grid;
   gap: 0.85rem;
 }
@@ -336,7 +425,14 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.usage-link {
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
+  .detail-list--compact .detail-item,
   .status-item {
     align-items: flex-start;
     flex-direction: column;

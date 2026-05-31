@@ -53,6 +53,8 @@ namespace AuthServer.Application.Queries.Handlers
                 .Select(group => new { UserId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
 
+            var registrationProviders = await _userManagerService.ResolveRegistrationProvidersAsync(res.Items, cancellationToken);
+
             var items = res.Items.Select(user => new UserDetails
             {
                 Id = user.Id,
@@ -62,7 +64,7 @@ namespace AuthServer.Application.Queries.Handlers
                 PublicUsername = user.PublicUsername,
                 RegisteredAtUtc = user.RegisteredAtUtc,
                 LastLoginAtUtc = user.LastLoginAtUtc,
-                RegistrationProvider = user.RegistrationProvider,
+                RegistrationProvider = registrationProviders.GetValueOrDefault(user.Id, user.RegistrationProvider ?? string.Empty),
                 IsLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
                 AppCount = appCounts.GetValueOrDefault(user.Id),
                 RunnerCount = runnerCounts.GetValueOrDefault(user.Id),

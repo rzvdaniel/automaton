@@ -272,6 +272,42 @@ public class UsersService
         };
     }
 
+    public async Task<Dictionary<Guid, string>> ResolveRegistrationProvidersAsync(
+        IEnumerable<ApplicationUser> users,
+        CancellationToken cancellationToken = default)
+    {
+        var userList = users.ToList();
+        var unresolvedUserIds = userList
+            .Where(user => string.IsNullOrWhiteSpace(user.RegistrationProvider))
+            .Select(user => user.Id)
+            .ToList();
+
+        var externalLoginProviders = new Dictionary<Guid, string>();
+        if (unresolvedUserIds.Count > 0)
+        {
+            externalLoginProviders = await _db.Set<IdentityUserLogin<Guid>>()
+                .AsNoTracking()
+                .Where(login => unresolvedUserIds.Contains(login.UserId))
+                .GroupBy(login => login.UserId)
+                .Select(group => new
+                {
+                    UserId = group.Key,
+                    LoginProvider = group.Select(item => item.LoginProvider).FirstOrDefault(),
+                })
+                .Where(item => item.LoginProvider != null)
+                .ToDictionaryAsync(item => item.UserId, item => item.LoginProvider!, cancellationToken);
+
+            if (externalLoginProviders.Count > 0 || unresolvedUserIds.Count > 0)
+            {
+                await BackfillRegistrationProvidersAsync(userList, externalLoginProviders, cancellationToken);
+            }
+        }
+
+        return userList.ToDictionary(
+            user => user.Id,
+            user => ResolveRegistrationProvider(user, externalLoginProviders));
+    }
+
     public async Task MarkSuccessfulLoginAsync(ApplicationUser user)
     {
         user.LastLoginAtUtc = DateTime.UtcNow;
@@ -294,6 +330,89 @@ public class UsersService
         {
             user.RegistrationProvider = registrationProvider;
         }
+    }
+
+    private static string ResolveRegistrationProvider(
+        ApplicationUser user,
+        IReadOnlyDictionary<Guid, string> externalLoginProviders)
+    {
+        if (!string.IsNullOrWhiteSpace(user.RegistrationProvider))
+        {
+            return NormalizeRegistrationProvider(user.RegistrationProvider);
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return RegistrationProviders.Password;
+        }
+
+        if (externalLoginProviders.TryGetValue(user.Id, out var loginProvider) && !string.IsNullOrWhiteSpace(loginProvider))
+        {
+            return NormalizeRegistrationProvider(loginProvider);
+        }
+
+        return RegistrationProviders.Password;
+    }
+
+    private async Task BackfillRegistrationProvidersAsync(
+        IReadOnlyCollection<ApplicationUser> users,
+        IReadOnlyDictionary<Guid, string> externalLoginProviders,
+        CancellationToken cancellationToken)
+    {
+        var unresolvedUserIds = users
+            .Where(user => string.IsNullOrWhiteSpace(user.RegistrationProvider))
+            .Select(user => user.Id)
+            .ToList();
+
+        if (unresolvedUserIds.Count == 0)
+        {
+            return;
+        }
+
+        var trackedUsers = await _userManager.Users
+            .Where(user => unresolvedUserIds.Contains(user.Id))
+            .ToListAsync(cancellationToken);
+
+        if (trackedUsers.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var trackedUser in trackedUsers)
+        {
+            trackedUser.RegistrationProvider = ResolveRegistrationProvider(trackedUser, externalLoginProviders);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        foreach (var user in users)
+        {
+            if (string.IsNullOrWhiteSpace(user.RegistrationProvider) &&
+                trackedUsers.FirstOrDefault(trackedUser => trackedUser.Id == user.Id) is { } persistedUser)
+            {
+                user.RegistrationProvider = persistedUser.RegistrationProvider;
+            }
+        }
+    }
+
+    private static string NormalizeRegistrationProvider(string provider)
+    {
+        var normalizedProvider = provider.Trim();
+        if (normalizedProvider.Length == 0)
+        {
+            return RegistrationProviders.Password;
+        }
+
+        return normalizedProvider.ToLowerInvariant() switch
+        {
+            "password" => RegistrationProviders.Password,
+            "github" => RegistrationProviders.GitHub,
+            "google" => RegistrationProviders.Google,
+            "microsoft" => RegistrationProviders.Microsoft,
+            "invitation" => RegistrationProviders.Invitation,
+            "admincreated" => RegistrationProviders.AdminCreated,
+            _ => normalizedProvider,
+        };
     }
 
     public async Task<string> GetResetPasswordToken(Guid userId)

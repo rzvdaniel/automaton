@@ -25,6 +25,7 @@ namespace AuthServer.Application.Queries.Handlers
         public async Task<UserDetails> Handle(UserQuery request, CancellationToken cancellationToken)
         {
             var user = await _userManagerService.GetUserById(request.Id);
+            var registrationProviders = await _userManagerService.ResolveRegistrationProvidersAsync([user], cancellationToken);
 
             // Get user's roles
             var roles = await _userManager.GetRolesAsync(user);
@@ -40,7 +41,7 @@ namespace AuthServer.Application.Queries.Handlers
                 PublicUsername = user.PublicUsername,
                 RegisteredAtUtc = user.RegisteredAtUtc,
                 LastLoginAtUtc = user.LastLoginAtUtc,
-                RegistrationProvider = user.RegistrationProvider,
+                RegistrationProvider = registrationProviders.GetValueOrDefault(user.Id, user.RegistrationProvider ?? string.Empty),
                 IsLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
                 AccessFailedCount = user.AccessFailedCount,
                 AppCount = appCount,
