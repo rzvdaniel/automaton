@@ -24,4 +24,11 @@ public class AdminAuthorizationService
             throw new UnauthorizedAccessException("Administrator access is required.");
         }
     }
+
+    public Guid? GetCurrentUserId()
+    {
+        var user = httpContextAccessor.HttpContext?.User;
+        var claimValue = user?.FindFirst("sub")?.Value ?? user?.FindFirst("userId")?.Value;
+        return Guid.TryParse(claimValue, out var userId) ? userId : null;
+    }
 }

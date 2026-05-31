@@ -64,7 +64,14 @@ function goBack() {
 }
 
 function openApp(appId: string) {
-  void router.push({ name: 'app-editor', params: { id: appId } })
+  void router.push({
+    name: 'admin-app-detail',
+    params: { appId },
+    query: {
+      ownerUserId: userId.value,
+      ownerUserName: userName.value,
+    },
+  })
 }
 
 function formatDate(value?: string) {

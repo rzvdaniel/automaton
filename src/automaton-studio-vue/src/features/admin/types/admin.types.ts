@@ -468,3 +468,22 @@ export interface HostedRunner {
 export interface ProvisionHostedRunnerRequest {
   planId?: string
 }
+
+export interface AdminAppDetails {
+  app: import('@/features/apps/types/apps.types').App
+  ownerUserId: string
+  ownerName: string
+  ownerEmail: string
+  ownerPublicUsername?: string
+  executionRunnerName?: string
+  projectName?: string
+  sourceFileCount: number
+  publishedFileCount: number
+  backendFileCount: number
+  totalSizeBytes: number
+}
+
+export interface AdminAppModerationRequest {
+  marketplaceStatus?: string
+  marketplaceModerationReason?: string
+}

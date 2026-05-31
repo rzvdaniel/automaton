@@ -21,6 +21,7 @@ import AdminUsersView from './views/AdminUsersView.vue'
 import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import AdminUserAppsView from './views/AdminUserAppsView.vue'
 import AdminUserRunnersView from './views/AdminUserRunnersView.vue'
+import AdminAppDetailView from './views/AdminAppDetailView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -97,6 +98,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminUserAppsView,
         meta: {
           title: 'User Apps',
+        },
+      },
+      {
+        path: 'apps/:appId',
+        name: 'admin-app-detail',
+        component: AdminAppDetailView,
+        meta: {
+          title: 'App Details',
         },
       },
       {
