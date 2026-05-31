@@ -262,7 +262,7 @@ onMounted(() => {
                 </div>
                 <div class="detail-item">
                   <dt>MFA</dt>
-                  <dd>Not tracked yet</dd>
+                  <dd>Not Supported</dd>
                 </div>
               </dl>
             </template>
@@ -303,11 +303,11 @@ onMounted(() => {
           </Card>
         </div>
 
-        <div class="col-12 lg:col-6">
+        <div v-if="hasAccountActions" class="col-12 lg:col-6">
           <Card class="detail-card h-full">
             <template #title>Actions</template>
             <template #content>
-              <div v-if="hasAccountActions" class="actions-grid">
+              <div class="actions-grid">
                 <Button
                   label="Resend Confirmation"
                   icon="pi pi-envelope"
@@ -331,23 +331,6 @@ onMounted(() => {
                   outlined
                   @click="triggerAction('Grant admin')"
                 />
-              </div>
-              <div v-else class="empty-state">
-                <p class="empty-state-text">No direct account actions are available for this user right now.</p>
-                <div class="actions-grid">
-                  <Button
-                    label="View Apps"
-                    icon="pi pi-box"
-                    outlined
-                    @click="navigateToUsage({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } })"
-                  />
-                  <Button
-                    label="View Runners"
-                    icon="pi pi-server"
-                    outlined
-                    @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })"
-                  />
-                </div>
               </div>
             </template>
           </Card>
@@ -384,16 +367,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.empty-state-text {
-  margin: 0;
-  color: var(--text-color-secondary);
-}
-
-.empty-state {
-  display: grid;
-  gap: 0.85rem;
 }
 
 .page-header {
