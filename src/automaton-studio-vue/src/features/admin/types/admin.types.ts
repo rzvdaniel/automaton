@@ -201,6 +201,7 @@ export interface AdminUser {
   appCount: number
   runnerCount: number
   roles: string[]
+  accessFailedCount?: number
 }
 
 export interface AdminUserSummary {

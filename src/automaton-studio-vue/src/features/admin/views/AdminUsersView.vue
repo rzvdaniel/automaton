@@ -6,7 +6,6 @@ import { FilterMatchMode } from '@primevue/core/api'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
-import DatePicker from 'primevue/datepicker'
 import IconField from 'primevue/iconfield'
 import InputText from 'primevue/inputtext'
 import InputIcon from 'primevue/inputicon'
@@ -15,6 +14,7 @@ import Paginator from 'primevue/paginator'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
+import type { DataTableRowClickEvent } from 'primevue/datatable'
 import { adminUsersService } from '../services/adminUsersService'
 import type { AdminUser, AdminUserSummary } from '../types/admin.types'
 
@@ -41,23 +41,10 @@ const summary = ref<AdminUserSummary>({
 })
 const tableFilters = ref({
   global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS },
-  registrationProvider: { value: null as string | null, matchMode: FilterMatchMode.EQUALS },
   emailConfirmed: { value: null as boolean | null, matchMode: FilterMatchMode.EQUALS },
   isLocked: { value: null as boolean | null, matchMode: FilterMatchMode.EQUALS },
-  registeredAtUtc: {
-    value: null as [Date | null, Date | null] | null,
-    matchMode: FilterMatchMode.BETWEEN,
-  },
 })
 let searchDebounceHandle: ReturnType<typeof setTimeout> | undefined
-
-const providerOptions = [
-  { label: 'All providers', value: null },
-  { label: 'Password', value: 'password' },
-  { label: 'GitHub', value: 'github' },
-  { label: 'Invitation', value: 'invitation' },
-  { label: 'Admin', value: 'adminCreated' },
-]
 
 const emailStatusOptions = [
   { label: 'All email states', value: null },
@@ -92,7 +79,7 @@ const rowActionItems = computed<MenuItem[]>(() => {
     {
       label: 'View profile',
       icon: 'pi pi-user',
-      command: () => showNotImplemented('View profile'),
+      command: () => openUserDetails(user),
     },
     {
       label: 'View apps',
@@ -124,19 +111,12 @@ const rowActionItems = computed<MenuItem[]>(() => {
 async function loadUsers() {
   isLoading.value = true
   try {
-    const registeredRange = tableFilters.value.registeredAtUtc.value
-    const registeredFrom = registeredRange?.[0] ?? null
-    const registeredTo = registeredRange?.[1] ?? null
-
     const result = await adminUsersService.getUsers({
       pageIndex: pageIndex.value,
       pageSize: pageSize.value,
       search: globalSearch.value.trim() || undefined,
-      registrationProvider: tableFilters.value.registrationProvider.value || undefined,
       emailConfirmed: tableFilters.value.emailConfirmed.value ?? undefined,
       isLocked: tableFilters.value.isLocked.value ?? undefined,
-      registeredFromUtc: registeredFrom ? toStartOfDayIso(registeredFrom) : undefined,
-      registeredToUtc: registeredTo ? toEndOfDayIso(registeredTo) : undefined,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
     })
@@ -186,18 +166,6 @@ function onSort(event: { sortField?: string | ((item: unknown) => string); sortO
   void loadUsers()
 }
 
-function toStartOfDayIso(date: Date) {
-  const normalized = new Date(date)
-  normalized.setHours(0, 0, 0, 0)
-  return normalized.toISOString()
-}
-
-function toEndOfDayIso(date: Date) {
-  const normalized = new Date(date)
-  normalized.setHours(23, 59, 59, 999)
-  return normalized.toISOString()
-}
-
 function formatRoles(roles: string[]) {
   if (roles.length === 0) {
     return 'No roles'
@@ -219,34 +187,18 @@ function formatDate(value?: string) {
   return date.toLocaleString()
 }
 
-function formatProvider(value?: string) {
-  switch (value) {
-    case 'password':
-      return 'Password'
-    case 'github':
-      return 'GitHub'
-    case 'invitation':
-      return 'Invitation'
-    case 'adminCreated':
-      return 'Admin'
-    default:
-      return value || 'Unknown'
-  }
+function formatUsage(appCount: number, runnerCount: number) {
+  const appLabel = `${appCount} app${appCount === 1 ? '' : 's'}`
+  const runnerLabel = `${runnerCount} runner${runnerCount === 1 ? '' : 's'}`
+  return `${appLabel} • ${runnerLabel}`
 }
 
-function providerSeverity(value?: string) {
-  switch (value) {
-    case 'password':
-      return 'secondary'
-    case 'github':
-      return 'info'
-    case 'invitation':
-      return 'contrast'
-    case 'adminCreated':
-      return 'danger'
-    default:
-      return 'secondary'
-  }
+function openUserDetails(user: AdminUser) {
+  void router.push({ name: 'admin-user-detail', params: { userId: user.id } })
+}
+
+function onRowClick(event: DataTableRowClickEvent) {
+  openUserDetails(event.data as AdminUser)
 }
 
 function toggleRowActions(event: Event, user: AdminUser) {
@@ -269,10 +221,8 @@ function clearFilters() {
   pageIndex.value = 0
   tableFilters.value = {
     global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-    registrationProvider: { value: null, matchMode: FilterMatchMode.EQUALS },
     emailConfirmed: { value: null, matchMode: FilterMatchMode.EQUALS },
     isLocked: { value: null, matchMode: FilterMatchMode.EQUALS },
-    registeredAtUtc: { value: null, matchMode: FilterMatchMode.BETWEEN },
   }
 
   void loadUsers()
@@ -314,9 +264,11 @@ onMounted(async () => {
       :sort-field="sortField"
       :sort-order="sortOrder"
       lazy
+      row-hover
       responsive-layout="scroll"
       striped-rows
       @filter="onColumnFilter"
+      @row-click="onRowClick"
       @sort="onSort"
     >
       <template #header>
@@ -356,37 +308,12 @@ onMounted(async () => {
         <div class="users-empty">No users found for the current filter.</div>
       </template>
 
-      <Column field="name" header="Name" style="min-width: 180px" sortable />
+      <Column field="name" header="Name" style="min-width: 180px" sortable>
+        <template #body="slotProps">
+          <span class="users-name-cell">{{ slotProps.data.name }}</span>
+        </template>
+      </Column>
       <Column field="email" header="Email" style="min-width: 240px" />
-      <Column field="publicUsername" header="Public Username" style="min-width: 180px">
-        <template #body="slotProps">
-          {{ slotProps.data.publicUsername || '—' }}
-        </template>
-      </Column>
-      <Column
-        field="registrationProvider"
-        header="Provider"
-        style="width: 120px"
-        :show-filter-match-modes="false"
-      >
-        <template #filter="slotProps">
-          <Select
-            v-model="slotProps.filterModel.value"
-            :options="providerOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="Any"
-            class="users-filter-select"
-            @change="slotProps.filterCallback()"
-          />
-        </template>
-        <template #body="slotProps">
-          <Tag
-            :severity="providerSeverity(slotProps.data.registrationProvider)"
-            :value="formatProvider(slotProps.data.registrationProvider)"
-          />
-        </template>
-      </Column>
       <Column
         field="emailConfirmed"
         header="Verified"
@@ -435,39 +362,16 @@ onMounted(async () => {
           />
         </template>
       </Column>
-      <Column
-        field="registeredAtUtc"
-        header="Registered"
-        style="min-width: 180px"
-        :show-filter-match-modes="false"
-        sortable
-      >
-        <template #filter="slotProps">
-          <DatePicker
-            v-model="slotProps.filterModel.value"
-            selection-mode="range"
-            :manual-input="false"
-            placeholder="Pick range"
-            show-icon
-            class="users-filter-date"
-            @date-select="slotProps.filterCallback()"
-            @clear-click="slotProps.filterCallback()"
-          />
-        </template>
-        <template #body="slotProps">
-          {{ formatDate(slotProps.data.registeredAtUtc) }}
-        </template>
-      </Column>
       <Column field="lastLoginAtUtc" header="Last Login" style="min-width: 180px" sortable>
         <template #body="slotProps">
           {{ formatDate(slotProps.data.lastLoginAtUtc) }}
         </template>
       </Column>
-      <Column field="appCount" header="Apps" style="width: 90px" />
-      <Column field="runnerCount" header="Runners" style="width: 100px" />
-      <Column header="Roles" style="min-width: 220px">
+      <Column header="Usage" style="min-width: 180px">
         <template #body="slotProps">
-          {{ formatRoles(slotProps.data.roles) }}
+          <span class="users-usage-cell">
+            {{ formatUsage(slotProps.data.appCount, slotProps.data.runnerCount) }}
+          </span>
         </template>
       </Column>
       <Column header="" style="width: 64px">
@@ -478,7 +382,7 @@ onMounted(async () => {
             rounded
             severity="secondary"
             size="small"
-            @click="toggleRowActions($event, slotProps.data)"
+            @click.stop="toggleRowActions($event, slotProps.data)"
           />
         </template>
       </Column>
@@ -570,6 +474,19 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.users-name-cell {
+  font-weight: 600;
+}
+
+.users-usage-cell {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+  white-space: nowrap;
+}
+
+.admin-users-view :deep(.p-datatable-tbody > tr) {
+  cursor: pointer;
+}
+
 .admin-users-view :deep(.p-datatable-column-filter-button),
 .admin-users-view :deep(.p-datatable-sort-icon) {
   color: var(--p-surface-500);
@@ -588,8 +505,7 @@ onMounted(async () => {
   transform: scale(0.9);
 }
 
-.users-filter-select,
-.users-filter-date {
+.users-filter-select {
   min-width: 12rem;
 }
 
@@ -611,8 +527,7 @@ onMounted(async () => {
     justify-content: flex-start;
   }
 
-  .users-filter-select,
-  .users-filter-date {
+  .users-filter-select {
     width: 100%;
   }
 }

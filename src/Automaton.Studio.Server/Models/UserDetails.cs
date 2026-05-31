@@ -4,9 +4,9 @@ public class UserDetails
 {
     public Guid Id { get; set; }
 
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
-    public string Email { get; set; }
+    public string Email { get; set; } = string.Empty;
 
     public bool EmailConfirmed { get; set; }
 
@@ -19,6 +19,8 @@ public class UserDetails
     public string? RegistrationProvider { get; set; }
 
     public bool IsLocked { get; set; }
+
+    public int AccessFailedCount { get; set; }
 
     public int AppCount { get; set; }
 

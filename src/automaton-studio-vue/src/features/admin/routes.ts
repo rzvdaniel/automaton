@@ -18,6 +18,7 @@ import AdminHostedRunnersView from './views/AdminHostedRunnersView.vue'
 import AdminMarketplaceAppsView from './views/AdminMarketplaceAppsView.vue'
 import AdminAppDeployRulesView from './views/AdminAppDeployRulesView.vue'
 import AdminUsersView from './views/AdminUsersView.vue'
+import AdminUserDetailView from './views/AdminUserDetailView.vue'
 import type { RouteRecordRaw } from 'vue-router'
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -78,6 +79,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminUsersView,
         meta: {
           title: 'Users',
+        },
+      },
+      {
+        path: 'users/:userId',
+        name: 'admin-user-detail',
+        component: AdminUserDetailView,
+        meta: {
+          title: 'User Details',
         },
       },
       {

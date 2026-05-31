@@ -4,6 +4,8 @@ using Automaton.Studio.Server.Services;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Application.Queries.Handlers
 {
@@ -11,11 +13,13 @@ namespace AuthServer.Application.Queries.Handlers
     {
         private readonly UsersService _userManagerService;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ApplicationDbContext _db;
 
-        public UserQueryHandler(UsersService userManagerService, UserManager<ApplicationUser> userManager)
+        public UserQueryHandler(UsersService userManagerService, UserManager<ApplicationUser> userManager, ApplicationDbContext db)
         {
             _userManagerService = userManagerService;
             _userManager = userManager;
+            _db = db;
         }
 
         public async Task<UserDetails> Handle(UserQuery request, CancellationToken cancellationToken)
@@ -24,6 +28,8 @@ namespace AuthServer.Application.Queries.Handlers
 
             // Get user's roles
             var roles = await _userManager.GetRolesAsync(user);
+            var appCount = await _db.WebAppUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
+            var runnerCount = await _db.RunnerUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
 
             var userDetails = new UserDetails
             {
@@ -36,6 +42,9 @@ namespace AuthServer.Application.Queries.Handlers
                 LastLoginAtUtc = user.LastLoginAtUtc,
                 RegistrationProvider = user.RegistrationProvider,
                 IsLocked = user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                AccessFailedCount = user.AccessFailedCount,
+                AppCount = appCount,
+                RunnerCount = runnerCount,
                 Roles = roles.ToList()
             };
 

@@ -1,5 +1,5 @@
 import apiClient from '@/shared/services/api/axios-instance'
-import type { AdminUserPage } from '../types/admin.types'
+import type { AdminUser, AdminUserPage } from '../types/admin.types'
 
 interface AdminUsersQuery {
   search?: string
@@ -35,6 +35,11 @@ class AdminUsersService {
       },
     })
 
+    return data
+  }
+
+  async getUser(userId: string): Promise<AdminUser> {
+    const { data } = await apiClient.get<AdminUser>(`/api/admin/users/${userId}`)
     return data
   }
 }
