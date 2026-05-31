@@ -26,8 +26,30 @@ public class UserDetails
 
     public int RunnerCount { get; set; }
 
+    public ICollection<UserAppLink> Apps { get; set; } = new List<UserAppLink>();
+
+    public ICollection<UserRunnerLink> Runners { get; set; } = new List<UserRunnerLink>();
+
     /// <summary>
     /// User's system roles (e.g., "Admin", "SysAdmin", "User")
     /// </summary>
     public ICollection<string> Roles { get; set; } = new List<string>();
+}
+
+public class UserAppLink
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
+public class UserRunnerLink
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public DateTime? LastHeartbeatAtUtc { get; set; }
 }

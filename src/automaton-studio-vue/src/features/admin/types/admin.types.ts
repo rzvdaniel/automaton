@@ -200,8 +200,22 @@ export interface AdminUser {
   isLocked: boolean
   appCount: number
   runnerCount: number
+  apps: AdminUserApp[]
+  runners: AdminUserRunner[]
   roles: string[]
   accessFailedCount?: number
+}
+
+export interface AdminUserApp {
+  id: string
+  name: string
+}
+
+export interface AdminUserRunner {
+  id: string
+  name: string
+  status: string
+  lastHeartbeatAtUtc?: string
 }
 
 export interface AdminUserSummary {

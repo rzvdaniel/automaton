@@ -73,6 +73,18 @@ function navigateToUsage(to?: { path: string; query?: Record<string, string> }) 
   void router.push(to)
 }
 
+function navigateToApp(appId: string) {
+  void router.push({ name: 'app-editor', params: { id: appId } })
+}
+
+function navigateToRunners() {
+  if (!user.value) {
+    return
+  }
+
+  void router.push({ path: '/runners', query: { userId: user.value.id, userName: user.value.name } })
+}
+
 function formatDate(value?: string) {
   if (!value) {
     return '—'
@@ -113,6 +125,18 @@ function statusSeverity(locked: boolean) {
 
 function verificationSeverity(confirmed: boolean) {
   return confirmed ? 'success' : 'warn'
+}
+
+function runnerStatusSeverity(status?: string) {
+  return status?.toLowerCase() === 'online' ? 'success' : 'danger'
+}
+
+function formatLastHeartbeat(value?: string) {
+  if (!value) {
+    return 'Not tracked yet'
+  }
+
+  return formatDate(value)
 }
 
 function triggerAction(actionLabel: string) {
@@ -230,6 +254,25 @@ onMounted(() => {
 
         <div class="col-12 lg:col-6">
           <Card class="detail-card h-full">
+            <template #title>Apps</template>
+            <template #content>
+              <div v-if="user.apps.length" class="linked-resource-list">
+                <Button
+                  v-for="app in user.apps"
+                  :key="app.id"
+                  :label="app.name"
+                  link
+                  class="resource-link"
+                  @click="navigateToApp(app.id)"
+                />
+              </div>
+              <p v-else class="empty-state-text">No apps assigned to this user yet.</p>
+            </template>
+          </Card>
+        </div>
+
+        <div class="col-12 lg:col-6">
+          <Card class="detail-card h-full">
             <template #title>Usage</template>
             <template #content>
               <div class="usage-grid">
@@ -251,6 +294,35 @@ onMounted(() => {
                   <div v-else class="usage-value">{{ item.value }}</div>
                 </div>
               </div>
+            </template>
+          </Card>
+        </div>
+
+        <div class="col-12 lg:col-6">
+          <Card class="detail-card h-full">
+            <template #title>Runners</template>
+            <template #content>
+              <div v-if="user.runners.length" class="runner-list">
+                <button
+                  v-for="runner in user.runners"
+                  :key="runner.id"
+                  type="button"
+                  class="runner-card"
+                  @click="navigateToRunners"
+                >
+                  <div class="runner-card__header">
+                    <strong>{{ runner.name }}</strong>
+                    <Tag
+                      :severity="runnerStatusSeverity(runner.status)"
+                      :value="runner.status"
+                    />
+                  </div>
+                  <div class="runner-card__meta">
+                    Last heartbeat: {{ formatLastHeartbeat(runner.lastHeartbeatAtUtc) }}
+                  </div>
+                </button>
+              </div>
+              <p v-else class="empty-state-text">No runners assigned to this user yet.</p>
             </template>
           </Card>
         </div>
@@ -316,6 +388,57 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.linked-resource-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.resource-link {
+  padding: 0;
+}
+
+.empty-state-text {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.runner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.runner-card {
+  width: 100%;
+  border: 1px solid var(--surface-border);
+  border-radius: 0.875rem;
+  background: transparent;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.runner-card:hover {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 6%, transparent);
+}
+
+.runner-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.runner-card__meta {
+  margin-top: 0.5rem;
+  color: var(--text-color-secondary);
+  font-size: 0.95rem;
 }
 
 .page-header {

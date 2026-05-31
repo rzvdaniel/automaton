@@ -5,6 +5,7 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Data;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Application.Queries.Handlers
@@ -31,6 +32,38 @@ namespace AuthServer.Application.Queries.Handlers
             var roles = await _userManager.GetRolesAsync(user);
             var appCount = await _db.WebAppUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
             var runnerCount = await _db.RunnerUsers.CountAsync(item => item.UserId == user.Id, cancellationToken);
+            var apps = await _db.WebAppUsers
+                .AsNoTracking()
+                .Where(item => item.UserId == user.Id)
+                .Join(
+                    _db.WebApps.AsNoTracking(),
+                    webAppUser => webAppUser.WebAppId,
+                    webApp => webApp.Id,
+                    (_, webApp) => new UserAppLink
+                    {
+                        Id = webApp.Id,
+                        Name = webApp.Name,
+                    })
+                .OrderBy(app => app.Name)
+                .ToListAsync(cancellationToken);
+            var runners = await _db.RunnerUsers
+                .AsNoTracking()
+                .Where(item => item.UserId == user.Id)
+                .Join(
+                    _db.Runners.AsNoTracking(),
+                    runnerUser => runnerUser.RunnerId,
+                    runner => runner.Id,
+                    (_, runner) => new UserRunnerLink
+                    {
+                        Id = runner.Id,
+                        Name = runner.Name,
+                        Status = string.IsNullOrWhiteSpace(runner.ConnectionId)
+                            ? RunnerStatus.Offline.ToString()
+                            : RunnerStatus.Online.ToString(),
+                        LastHeartbeatAtUtc = null,
+                    })
+                .OrderBy(runner => runner.Name)
+                .ToListAsync(cancellationToken);
 
             var userDetails = new UserDetails
             {
@@ -46,6 +79,8 @@ namespace AuthServer.Application.Queries.Handlers
                 AccessFailedCount = user.AccessFailedCount,
                 AppCount = appCount,
                 RunnerCount = runnerCount,
+                Apps = apps,
+                Runners = runners,
                 Roles = roles.ToList()
             };
 
