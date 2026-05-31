@@ -36,7 +36,6 @@ const appId = computed(() => String(route.params.appId || ''))
 const ownerUserId = computed(() => String(route.query.ownerUserId || details.value?.ownerUserId || ''))
 const ownerUserName = computed(() => String(route.query.ownerUserName || details.value?.ownerName || 'User'))
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')
-const isPublished = computed(() => !!details.value?.app.isPublished)
 
 const reviewOptions = [
   { label: 'Approved', value: 'approved' },
@@ -137,35 +136,6 @@ function goBack() {
   }
 
   void router.push({ name: 'admin-users' })
-}
-
-async function unpublishApp() {
-  if (!details.value) {
-    return
-  }
-
-  isSaving.value = true
-  try {
-    await adminAppsService.unpublish(details.value.app.id)
-    details.value.app.isPublished = false
-    details.value.app.publicUrl = undefined
-    details.value.app.publishedAt = undefined
-    toast.add({
-      severity: 'success',
-      summary: 'App unpublished',
-      detail: `${details.value.app.name} is no longer public.`,
-      life: 2500,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Unpublish failed',
-      detail: 'Could not unpublish this app.',
-      life: 3000,
-    })
-  } finally {
-    isSaving.value = false
-  }
 }
 
 async function saveModeration() {
@@ -357,7 +327,7 @@ onMounted(() => {
                       class="w-full"
                     />
                     <small class="moderation-help">
-                      Hidden removes the app from marketplace and public runtime access. Disabled blocks it for enforcement or safety reasons.
+                      Hidden removes the app from marketplace and public runtime access. Disabled blocks it for enforcement or safety reasons. Setting access back to Active republishes the public app URL.
                     </small>
                   </div>
                   <div class="moderation-field">
@@ -377,15 +347,6 @@ onMounted(() => {
                       outlined
                       :loading="isSaving"
                       @click="saveModeration"
-                    />
-                    <Button
-                      v-if="isPublished"
-                      label="Unpublish"
-                      icon="pi pi-eye-slash"
-                      severity="warn"
-                      outlined
-                      :loading="isSaving"
-                      @click="unpublishApp"
                     />
                   </div>
                 </div>

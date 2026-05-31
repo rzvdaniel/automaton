@@ -12,19 +12,22 @@ public class AdminAppsService
     private readonly AppFileStorageService fileStorageService;
     private readonly AdminAuthorizationService adminAuthorizationService;
     private readonly RecentActivityService recentActivityService;
+    private readonly PublishedAppStorageService publishedAppStorageService;
 
     public AdminAppsService(
         ApplicationDbContext dataContext,
         ResourceAuthorizationService authorizationService,
         AppFileStorageService fileStorageService,
         AdminAuthorizationService adminAuthorizationService,
-        RecentActivityService recentActivityService)
+        RecentActivityService recentActivityService,
+        PublishedAppStorageService publishedAppStorageService)
     {
         this.dataContext = dataContext;
         this.authorizationService = authorizationService;
         this.fileStorageService = fileStorageService;
         this.adminAuthorizationService = adminAuthorizationService;
         this.recentActivityService = recentActivityService;
+        this.publishedAppStorageService = publishedAppStorageService;
     }
 
     public IEnumerable<Models.AppModel> ListOwnedByUserForAdmin(Guid userId, Guid? projectId = null)
@@ -124,6 +127,8 @@ public class AdminAppsService
         record.App.MarketplaceModeratedAt = DateTime.UtcNow;
         record.App.MarketplaceModeratedByUserId = adminAuthorizationService.GetCurrentUserId();
         record.App.Updated = DateTime.UtcNow;
+
+        await SyncPublishedProjectionAsync(record, cancellationToken);
         await dataContext.SaveChangesAsync(cancellationToken);
 
         await recentActivityService.LogAppActivityAsync(
@@ -263,6 +268,32 @@ public class AdminAppsService
         }
 
         return MarketplaceAppStatuses.Approved;
+    }
+
+    private async Task SyncPublishedProjectionAsync(AdminOwnedAppRecord record, CancellationToken cancellationToken)
+    {
+        if (!record.App.IsPublished || string.IsNullOrWhiteSpace(record.App.PublicUrl))
+        {
+            return;
+        }
+
+        if (record.App.AccessStatus != AppAccessStatuses.Active)
+        {
+            await publishedAppStorageService.UnpublishAsync(record.App.PublicUrl);
+            return;
+        }
+
+        await publishedAppStorageService.PublishAsync(
+            record.OwnerUserId,
+            record.App.Id,
+            new PublishedAppPackageMetadata(
+                record.App.Id,
+                record.App.PublicUrl,
+                record.App.Name,
+                record.App.Summary,
+                record.App.Description,
+                record.App.Version),
+            cancellationToken);
     }
 
     private static string BuildModerationAuditDescription(

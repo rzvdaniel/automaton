@@ -16,11 +16,16 @@ public class AdminMarketplaceAppsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly RecentActivityService _recentActivityService;
+    private readonly PublishedAppStorageService _publishedAppStorageService;
 
-    public AdminMarketplaceAppsController(ApplicationDbContext dbContext, RecentActivityService recentActivityService)
+    public AdminMarketplaceAppsController(
+        ApplicationDbContext dbContext,
+        RecentActivityService recentActivityService,
+        PublishedAppStorageService publishedAppStorageService)
     {
         _dbContext = dbContext;
         _recentActivityService = recentActivityService;
+        _publishedAppStorageService = publishedAppStorageService;
     }
 
     [HttpGet]
@@ -95,6 +100,33 @@ public class AdminMarketplaceAppsController : ControllerBase
         app.MarketplaceModeratedAt = DateTime.UtcNow;
         app.MarketplaceModeratedByUserId = GetCurrentUserId();
         app.Updated = DateTime.UtcNow;
+
+        var ownerUserId = await _dbContext.WebAppUsers
+            .Where(link => link.WebAppId == app.Id)
+            .OrderBy(link => link.UserId)
+            .Select(link => (Guid?)link.UserId)
+            .FirstOrDefaultAsync();
+
+        if (ownerUserId.HasValue && app.IsPublished && !string.IsNullOrWhiteSpace(app.PublicUrl))
+        {
+            if (app.AccessStatus != AppAccessStatuses.Active)
+            {
+                await _publishedAppStorageService.UnpublishAsync(app.PublicUrl);
+            }
+            else
+            {
+                await _publishedAppStorageService.PublishAsync(
+                    ownerUserId.Value,
+                    app.Id,
+                    new PublishedAppPackageMetadata(
+                        app.Id,
+                        app.PublicUrl,
+                        app.Name,
+                        app.Summary,
+                        app.Description,
+                        app.Version));
+            }
+        }
 
         await _dbContext.SaveChangesAsync();
 
