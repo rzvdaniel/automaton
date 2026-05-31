@@ -6,17 +6,34 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminUsersService } from '../services/adminUsersService'
 import type { AdminUser } from '../types/admin.types'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const authStore = useAuthStore()
 
 const isLoading = ref(false)
 const user = ref<AdminUser | null>(null)
 
 const userId = computed(() => String(route.params.userId || ''))
+const isViewingSelf = computed(() => !!user.value && authStore.userId === user.value.id)
+const isAlreadyAdmin = computed(() => {
+  if (!user.value) {
+    return false
+  }
+
+  return user.value.roles.some((role) => role === 'Admin' || role === 'SysAdmin')
+})
+const hasAccountActions = computed(() => {
+  if (!user.value) {
+    return false
+  }
+
+  return !user.value.emailConfirmed || !isViewingSelf.value || !isAlreadyAdmin.value
+})
 
 async function loadUser() {
   if (!userId.value) {
@@ -196,10 +213,6 @@ onMounted(() => {
                   <dd>{{ user.roles.length ? user.roles.join(', ') : 'No roles' }}</dd>
                 </div>
                 <div class="detail-item">
-                  <dt>Provider</dt>
-                  <dd>{{ formatProvider(user.registrationProvider) }}</dd>
-                </div>
-                <div class="detail-item">
                   <dt>Registered</dt>
                   <dd>{{ formatDate(user.registeredAtUtc) }}</dd>
                 </div>
@@ -216,94 +229,75 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Security</template>
             <template #content>
-              <div class="status-grid">
-                <div class="status-item">
-                  <span class="status-label">Email</span>
-                  <Tag
-                    :severity="verificationSeverity(user.emailConfirmed)"
-                    :value="user.emailConfirmed ? 'Confirmed' : 'Pending'"
-                  />
+              <dl class="detail-list detail-list--compact">
+                <div class="detail-item">
+                  <dt>Email</dt>
+                  <dd>
+                    <Tag
+                      :severity="verificationSeverity(user.emailConfirmed)"
+                      :value="user.emailConfirmed ? 'Confirmed' : 'Pending'"
+                    />
+                  </dd>
                 </div>
-                <div class="status-item">
-                  <span class="status-label">Account</span>
-                  <Tag
-                    :severity="statusSeverity(user.isLocked)"
-                    :value="user.isLocked ? 'Locked' : 'Active'"
-                  />
+                <div class="detail-item">
+                  <dt>Account</dt>
+                  <dd>
+                    <Tag
+                      :severity="statusSeverity(user.isLocked)"
+                      :value="user.isLocked ? 'Locked' : 'Active'"
+                    />
+                  </dd>
                 </div>
-                <div class="status-item">
-                  <span class="status-label">Failed logins</span>
-                  <strong>{{ user.accessFailedCount ?? 0 }}</strong>
+                <div class="detail-item">
+                  <dt>Failed Logins</dt>
+                  <dd>{{ user.accessFailedCount ?? 0 }}</dd>
                 </div>
-              </div>
+                <div class="detail-item">
+                  <dt>Provider</dt>
+                  <dd>{{ formatProvider(user.registrationProvider) }}</dd>
+                </div>
+                <div class="detail-item">
+                  <dt>Lockout</dt>
+                  <dd>{{ user.isLocked ? 'Yes' : 'No' }}</dd>
+                </div>
+                <div class="detail-item">
+                  <dt>MFA</dt>
+                  <dd>Not tracked yet</dd>
+                </div>
+              </dl>
             </template>
           </Card>
         </div>
 
         <div class="col-12 lg:col-6">
-          <Card class="detail-card h-full">
+          <Card class="detail-card detail-card--interactive h-full" @click="navigateToUsage({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } })">
             <template #title>Apps</template>
             <template #content>
-              <div class="summary-card">
-                <div class="summary-stat">{{ user.appCount.toLocaleString() }} total</div>
-                <div class="summary-detail">{{ user.publishedAppCount.toLocaleString() }} published</div>
-                <div class="summary-detail">{{ user.privateAppCount.toLocaleString() }} private</div>
-                <div class="summary-detail">Last app: {{ user.lastAppName || '—' }}</div>
-                <Button
-                  label="View Apps"
-                  icon="pi pi-arrow-right"
-                  icon-pos="right"
-                  link
-                  class="summary-link"
-                  @click="navigateToUsage({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } })"
-                />
+              <div class="summary-card summary-card--compact">
+                <div class="summary-stat-row">
+                  <span class="summary-stat">{{ user.appCount.toLocaleString() }}</span>
+                  <span class="summary-stat-label">total</span>
+                </div>
+                <div class="summary-meta">
+                  {{ user.publishedAppCount.toLocaleString() }} published • {{ user.privateAppCount.toLocaleString() }} private
+                </div>
+                <div class="summary-detail">Last: {{ user.lastAppName || '—' }}</div>
               </div>
             </template>
           </Card>
         </div>
 
         <div class="col-12 lg:col-6">
-          <Card class="detail-card h-full">
-            <template #title>Usage</template>
-            <template #content>
-              <div class="usage-grid">
-                <div class="usage-card">
-                  <div class="usage-label">Apps</div>
-                  <div class="usage-value">{{ user.appCount.toLocaleString() }}</div>
-                </div>
-                <div class="usage-card">
-                  <div class="usage-label">Runners</div>
-                  <div class="usage-value">{{ user.runnerCount.toLocaleString() }}</div>
-                </div>
-                <div class="usage-card">
-                  <div class="usage-label">API Keys</div>
-                  <div class="usage-value usage-value--muted">Not tracked yet</div>
-                </div>
-                <div class="usage-card">
-                  <div class="usage-label">AI Keys</div>
-                  <div class="usage-value usage-value--muted">Not tracked yet</div>
-                </div>
-              </div>
-            </template>
-          </Card>
-        </div>
-
-        <div class="col-12 lg:col-6">
-          <Card class="detail-card h-full">
+          <Card class="detail-card detail-card--interactive h-full" @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })">
             <template #title>Runners</template>
             <template #content>
-              <div class="summary-card">
-                <div class="summary-stat">{{ user.runnerCount.toLocaleString() }} total</div>
-                <div class="summary-detail">{{ user.onlineRunnerCount.toLocaleString() }} online</div>
-                <div class="summary-detail">Last heartbeat: {{ formatLastHeartbeat(user.lastRunnerHeartbeatAtUtc) }}</div>
-                <Button
-                  label="View Runners"
-                  icon="pi pi-arrow-right"
-                  icon-pos="right"
-                  link
-                  class="summary-link"
-                  @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })"
-                />
+              <div class="summary-card summary-card--compact">
+                <div class="summary-stat-row">
+                  <span class="summary-stat">{{ user.onlineRunnerCount.toLocaleString() }}</span>
+                  <span class="summary-stat-label">online</span>
+                </div>
+                <div class="summary-meta">{{ user.runnerCount.toLocaleString() }} total runners</div>
+                <div class="summary-detail">Heartbeat: {{ formatLastHeartbeat(user.lastRunnerHeartbeatAtUtc) }}</div>
               </div>
             </template>
           </Card>
@@ -313,15 +307,17 @@ onMounted(() => {
           <Card class="detail-card h-full">
             <template #title>Actions</template>
             <template #content>
-              <div class="actions-grid">
+              <div v-if="hasAccountActions" class="actions-grid">
                 <Button
                   label="Resend Confirmation"
                   icon="pi pi-envelope"
                   outlined
                   :disabled="user.emailConfirmed"
+                  v-if="!user.emailConfirmed"
                   @click="triggerAction('Resend confirmation')"
                 />
                 <Button
+                  v-if="!isViewingSelf"
                   :label="user.isLocked ? 'Unlock Account' : 'Disable Account'"
                   :icon="user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban'"
                   :severity="user.isLocked ? 'success' : 'danger'"
@@ -329,11 +325,29 @@ onMounted(() => {
                   @click="triggerAction(user.isLocked ? 'Unlock account' : 'Disable account')"
                 />
                 <Button
+                  v-if="!isAlreadyAdmin"
                   label="Grant Admin"
                   icon="pi pi-shield"
                   outlined
                   @click="triggerAction('Grant admin')"
                 />
+              </div>
+              <div v-else class="empty-state">
+                <p class="empty-state-text">No direct account actions are available for this user right now.</p>
+                <div class="actions-grid">
+                  <Button
+                    label="View Apps"
+                    icon="pi pi-box"
+                    outlined
+                    @click="navigateToUsage({ name: 'admin-user-apps', params: { userId: user.id }, query: { userName: user.name } })"
+                  />
+                  <Button
+                    label="View Runners"
+                    icon="pi pi-server"
+                    outlined
+                    @click="navigateToUsage({ name: 'admin-user-runners', params: { userId: user.id }, query: { userName: user.name } })"
+                  />
+                </div>
               </div>
             </template>
           </Card>
@@ -377,6 +391,11 @@ onMounted(() => {
   color: var(--text-color-secondary);
 }
 
+.empty-state {
+  display: grid;
+  gap: 0.85rem;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -400,7 +419,6 @@ onMounted(() => {
 .breadcrumb-current,
 .page-subtitle,
 .detail-list dt,
-.usage-label,
 .status-label {
   color: var(--p-text-muted-color, var(--p-text-color-secondary));
 }
@@ -456,16 +474,13 @@ onMounted(() => {
   word-break: break-word;
 }
 
-.status-grid,
-.usage-grid,
 .actions-grid {
   display: grid;
   gap: 0.85rem;
 }
 
 .summary-card,
-.status-item,
-.usage-card {
+.status-item {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -475,28 +490,65 @@ onMounted(() => {
   border-radius: 0.9rem;
 }
 
-.summary-card,
-.usage-card {
+.summary-card {
   flex-direction: column;
   align-items: flex-start;
 }
 
 .summary-stat,
-.usage-value {
+.summary-stat {
   font-size: 1.35rem;
   font-weight: 700;
 }
 
 .summary-detail,
-.usage-value--muted {
+.summary-meta {
   color: var(--p-text-muted-color, var(--p-text-color-secondary));
 }
 
-.summary-link,
-.usage-link {
+.summary-link {
   padding: 0;
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.summary-card--compact {
+  gap: 0.45rem;
+  padding: 0.9rem 1rem;
+}
+
+.summary-stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.summary-stat-label {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.detail-card--interactive {
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.detail-card--interactive:hover {
+  transform: translateY(-1px);
+}
+
+.detail-card--interactive:deep(.p-card) {
+  height: 100%;
+}
+
+.detail-card--interactive:deep(.p-card-body) {
+  height: 100%;
+}
+
+.detail-card--interactive:hover:deep(.p-card) {
+  border-color: var(--primary-color);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary-color) 10%, transparent);
 }
 
 @media (max-width: 768px) {
