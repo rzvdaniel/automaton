@@ -1,11 +1,13 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Automaton.Studio.Server.Migrations
 {
+    /// <inheritdoc />
     public partial class AddWebAppReviewAndAccessStatuses : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
@@ -14,7 +16,8 @@ namespace Automaton.Studio.Server.Migrations
                 type: "varchar(40)",
                 maxLength: 40,
                 nullable: false,
-                defaultValue: "active");
+                defaultValue: "active")
+                .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.AddColumn<string>(
                 name: "ReviewStatus",
@@ -22,7 +25,8 @@ namespace Automaton.Studio.Server.Migrations
                 type: "varchar(40)",
                 maxLength: 40,
                 nullable: false,
-                defaultValue: "approved");
+                defaultValue: "approved")
+                .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.Sql("""
                 UPDATE WebApps
@@ -43,6 +47,7 @@ namespace Automaton.Studio.Server.Migrations
                 columns: new[] { "IsPublished", "ReviewStatus", "AccessStatus", "Category" });
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(

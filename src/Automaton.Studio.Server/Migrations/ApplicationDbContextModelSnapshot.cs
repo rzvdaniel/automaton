@@ -2046,6 +2046,13 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("AccessStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("active");
+
                     b.Property<string>("AllowedRoles")
                         .HasColumnType("longtext");
 
@@ -2126,13 +2133,6 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("varchar(40)")
                         .HasDefaultValue("approved");
 
-                    b.Property<string>("AccessStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)")
-                        .HasDefaultValue("active");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -2146,15 +2146,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<bool>("RequiresAuthentication")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("ReviewStatus")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)")
                         .HasDefaultValue("approved");
-
-                    b.Property<bool>("RequiresAuthentication")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
