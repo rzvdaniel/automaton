@@ -68,6 +68,16 @@ public class WebApp
     public string MarketplaceStatus { get; set; } = Enums.MarketplaceAppStatuses.Approved;
 
     /// <summary>
+    /// Review workflow status used by admins to mark apps that need review.
+    /// </summary>
+    public string ReviewStatus { get; set; } = Enums.AppReviewStatuses.Approved;
+
+    /// <summary>
+    /// Public access status controlling whether the app is live, hidden, or disabled.
+    /// </summary>
+    public string AccessStatus { get; set; } = Enums.AppAccessStatuses.Active;
+
+    /// <summary>
     /// Optional admin moderation reason shown in the admin review experience.
     /// </summary>
     public string? MarketplaceModerationReason { get; set; }

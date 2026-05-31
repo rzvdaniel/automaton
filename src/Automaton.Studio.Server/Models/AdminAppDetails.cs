@@ -17,6 +17,7 @@ public class AdminAppDetails
 
 public class AdminMarketplaceModerationRequest
 {
-    public string? MarketplaceStatus { get; set; }
+    public string? ReviewStatus { get; set; }
+    public string? AccessStatus { get; set; }
     public string? MarketplaceModerationReason { get; set; }
 }

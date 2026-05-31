@@ -17,7 +17,7 @@ public class WebAppStarService
     {
         var app = await _dbContext.WebApps
             .FirstOrDefaultAsync(
-                a => a.Id == appId && a.IsPublished && a.MarketplaceStatus == MarketplaceAppStatuses.Approved,
+                a => a.Id == appId && a.IsPublished && a.ReviewStatus == AppReviewStatuses.Approved && a.AccessStatus == AppAccessStatuses.Active,
                 cancellationToken);
 
         if (app == null)

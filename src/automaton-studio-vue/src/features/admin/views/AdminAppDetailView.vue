@@ -28,7 +28,8 @@ const details = ref<AdminAppDetails | null>(null)
 const fileTree = ref<FileNode[]>([])
 const activePath = ref<string | null>(null)
 const activeContent = ref('')
-const moderationStatus = ref('approved')
+const reviewStatus = ref('approved')
+const accessStatus = ref('active')
 const moderationReason = ref('')
 
 const appId = computed(() => String(route.params.appId || ''))
@@ -37,14 +38,20 @@ const ownerUserName = computed(() => String(route.query.ownerUserName || details
 const activeLanguage = computed(() => activePath.value ? getLanguageFromExtension(activePath.value) : 'plaintext')
 const isPublished = computed(() => !!details.value?.app.isPublished)
 
-const moderationOptions = [
+const reviewOptions = [
   { label: 'Approved', value: 'approved' },
+  { label: 'Flagged', value: 'flagged' },
+]
+
+const accessOptions = [
+  { label: 'Active', value: 'active' },
   { label: 'Hidden', value: 'hidden' },
-  { label: 'Banned', value: 'banned' },
+  { label: 'Disabled', value: 'disabled' },
 ]
 
 watch(details, (value) => {
-  moderationStatus.value = value?.app.marketplaceStatus || 'approved'
+  reviewStatus.value = value?.app.reviewStatus || 'approved'
+  accessStatus.value = value?.app.accessStatus || 'active'
   moderationReason.value = value?.app.marketplaceModerationReason || ''
 })
 
@@ -169,10 +176,12 @@ async function saveModeration() {
   isSaving.value = true
   try {
     await adminAppsService.updateModeration(details.value.app.id, {
-      marketplaceStatus: moderationStatus.value,
+      reviewStatus: reviewStatus.value,
+      accessStatus: accessStatus.value,
       marketplaceModerationReason: moderationReason.value.trim() || null,
     })
-    details.value.app.marketplaceStatus = moderationStatus.value
+    details.value.app.reviewStatus = reviewStatus.value
+    details.value.app.accessStatus = accessStatus.value
     details.value.app.marketplaceModerationReason = moderationReason.value.trim() || null
     toast.add({
       severity: 'success',
@@ -221,13 +230,24 @@ function formatSize(bytes?: number) {
   return `${gb.toFixed(1)} GB`
 }
 
-function statusSeverity(status?: string) {
+function reviewSeverity(status?: string) {
   switch (status) {
     case 'approved':
       return 'success'
+    case 'flagged':
+      return 'warn'
+    default:
+      return 'secondary'
+  }
+}
+
+function accessSeverity(status?: string) {
+  switch (status) {
+    case 'active':
+      return 'success'
     case 'hidden':
       return 'warn'
-    case 'banned':
+    case 'disabled':
       return 'danger'
     default:
       return 'secondary'
@@ -313,21 +333,43 @@ onMounted(() => {
               <template #title>Moderation</template>
               <template #content>
                 <div class="moderation-stack">
-                  <Tag :value="details.app.marketplaceStatus" :severity="statusSeverity(details.app.marketplaceStatus)" />
-                  <Select
-                    v-model="moderationStatus"
-                    :options="moderationOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="w-full"
-                  />
-                  <Textarea
-                    v-model="moderationReason"
-                    rows="3"
-                    auto-resize
-                    class="w-full"
-                    placeholder="Optional moderation note"
-                  />
+                  <div class="moderation-tags">
+                    <Tag :value="`Review: ${details.app.reviewStatus}`" :severity="reviewSeverity(details.app.reviewStatus)" />
+                    <Tag :value="`Access: ${details.app.accessStatus}`" :severity="accessSeverity(details.app.accessStatus)" />
+                  </div>
+                  <div class="moderation-field">
+                    <label class="moderation-label">Review Status</label>
+                    <Select
+                      v-model="reviewStatus"
+                      :options="reviewOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="w-full"
+                    />
+                  </div>
+                  <div class="moderation-field">
+                    <label class="moderation-label">Access Status</label>
+                    <Select
+                      v-model="accessStatus"
+                      :options="accessOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="w-full"
+                    />
+                    <small class="moderation-help">
+                      Hidden removes the app from marketplace and public runtime access. Disabled blocks it for enforcement or safety reasons.
+                    </small>
+                  </div>
+                  <div class="moderation-field">
+                    <label class="moderation-label">Moderation Note</label>
+                    <Textarea
+                      v-model="moderationReason"
+                      rows="3"
+                      auto-resize
+                      class="w-full"
+                      placeholder="Optional moderation note"
+                    />
+                  </div>
                   <div class="action-row">
                     <Button
                       label="Save Moderation"
@@ -490,6 +532,27 @@ onMounted(() => {
 .moderation-stack {
   display: grid;
   gap: 0.85rem;
+}
+
+.moderation-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.moderation-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.moderation-label {
+  font-size: 0.875rem;
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+}
+
+.moderation-help {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+  line-height: 1.4;
 }
 
 .action-row {

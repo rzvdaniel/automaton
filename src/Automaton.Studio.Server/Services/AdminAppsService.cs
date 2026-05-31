@@ -11,17 +11,20 @@ public class AdminAppsService
     private readonly ResourceAuthorizationService authorizationService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AdminAuthorizationService adminAuthorizationService;
+    private readonly RecentActivityService recentActivityService;
 
     public AdminAppsService(
         ApplicationDbContext dataContext,
         ResourceAuthorizationService authorizationService,
         AppFileStorageService fileStorageService,
-        AdminAuthorizationService adminAuthorizationService)
+        AdminAuthorizationService adminAuthorizationService,
+        RecentActivityService recentActivityService)
     {
         this.dataContext = dataContext;
         this.authorizationService = authorizationService;
         this.fileStorageService = fileStorageService;
         this.adminAuthorizationService = adminAuthorizationService;
+        this.recentActivityService = recentActivityService;
     }
 
     public IEnumerable<Models.AppModel> ListOwnedByUserForAdmin(Guid userId, Guid? projectId = null)
@@ -108,7 +111,13 @@ public class AdminAppsService
     public async Task UpdateModerationForAdminAsync(Guid appId, Models.AdminMarketplaceModerationRequest request, CancellationToken cancellationToken = default)
     {
         var record = await RequireOwnedAppForAdminAsync(appId, cancellationToken);
-        record.App.MarketplaceStatus = NormalizeMarketplaceStatus(request.MarketplaceStatus);
+        var previousReviewStatus = record.App.ReviewStatus;
+        var previousAccessStatus = record.App.AccessStatus;
+        var previousReason = record.App.MarketplaceModerationReason;
+
+        record.App.ReviewStatus = NormalizeReviewStatus(request.ReviewStatus);
+        record.App.AccessStatus = NormalizeAccessStatus(request.AccessStatus);
+        record.App.MarketplaceStatus = MapLegacyMarketplaceStatus(record.App.ReviewStatus, record.App.AccessStatus);
         record.App.MarketplaceModerationReason = string.IsNullOrWhiteSpace(request.MarketplaceModerationReason)
             ? null
             : request.MarketplaceModerationReason.Trim();
@@ -116,6 +125,28 @@ public class AdminAppsService
         record.App.MarketplaceModeratedByUserId = adminAuthorizationService.GetCurrentUserId();
         record.App.Updated = DateTime.UtcNow;
         await dataContext.SaveChangesAsync(cancellationToken);
+
+        await recentActivityService.LogAppActivityAsync(
+            Automaton.Core.Enums.ActivityType.AppUpdated,
+            record.App.Name,
+            record.App.Id,
+            cancellationToken: cancellationToken);
+
+        var moderationDescription = BuildModerationAuditDescription(
+            record.App.Name,
+            previousReviewStatus,
+            record.App.ReviewStatus,
+            previousAccessStatus,
+            record.App.AccessStatus,
+            previousReason,
+            record.App.MarketplaceModerationReason);
+
+        await recentActivityService.LogActivityAsync(
+            Automaton.Core.Enums.ActivityType.AppUpdated,
+            record.App.Name,
+            record.App.Id,
+            moderationDescription,
+            cancellationToken);
     }
 
     private void EnsureAdminAccess() => adminAuthorizationService.EnsureAdmin();
@@ -198,15 +229,74 @@ public class AdminAppsService
         };
     }
 
-    private static string NormalizeMarketplaceStatus(string? value)
+    private static string NormalizeReviewStatus(string? value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
         return normalized switch
         {
-            MarketplaceAppStatuses.Hidden => MarketplaceAppStatuses.Hidden,
-            MarketplaceAppStatuses.Banned => MarketplaceAppStatuses.Banned,
-            _ => MarketplaceAppStatuses.Approved,
+            AppReviewStatuses.Flagged => AppReviewStatuses.Flagged,
+            _ => AppReviewStatuses.Approved,
         };
+    }
+
+    private static string NormalizeAccessStatus(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            AppAccessStatuses.Hidden => AppAccessStatuses.Hidden,
+            AppAccessStatuses.Disabled => AppAccessStatuses.Disabled,
+            _ => AppAccessStatuses.Active,
+        };
+    }
+
+    private static string MapLegacyMarketplaceStatus(string reviewStatus, string accessStatus)
+    {
+        if (accessStatus == AppAccessStatuses.Disabled)
+        {
+            return MarketplaceAppStatuses.Banned;
+        }
+
+        if (accessStatus == AppAccessStatuses.Hidden)
+        {
+            return MarketplaceAppStatuses.Hidden;
+        }
+
+        return MarketplaceAppStatuses.Approved;
+    }
+
+    private static string BuildModerationAuditDescription(
+        string appName,
+        string previousReviewStatus,
+        string newReviewStatus,
+        string previousAccessStatus,
+        string newAccessStatus,
+        string? previousReason,
+        string? newReason)
+    {
+        var changes = new List<string>();
+
+        if (!string.Equals(previousReviewStatus, newReviewStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            changes.Add($"ReviewStatus {previousReviewStatus} -> {newReviewStatus}");
+        }
+
+        if (!string.Equals(previousAccessStatus, newAccessStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            changes.Add($"AccessStatus {previousAccessStatus} -> {newAccessStatus}");
+        }
+
+        if (!string.Equals(previousReason?.Trim(), newReason?.Trim(), StringComparison.Ordinal))
+        {
+            changes.Add($"Note: {(string.IsNullOrWhiteSpace(newReason) ? "cleared" : newReason.Trim())}");
+        }
+
+        if (changes.Count == 0)
+        {
+            changes.Add("Moderation fields saved without state changes");
+        }
+
+        return $"Admin updated moderation for '{appName}': {string.Join("; ", changes)}";
     }
 
     private static long GetDirectorySize(string rootPath)

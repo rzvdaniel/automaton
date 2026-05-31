@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
+using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +15,12 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 public class AdminMarketplaceAppsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly RecentActivityService _recentActivityService;
 
-    public AdminMarketplaceAppsController(ApplicationDbContext dbContext)
+    public AdminMarketplaceAppsController(ApplicationDbContext dbContext, RecentActivityService recentActivityService)
     {
         _dbContext = dbContext;
+        _recentActivityService = recentActivityService;
     }
 
     [HttpGet]
@@ -41,7 +44,8 @@ public class AdminMarketplaceAppsController : ControllerBase
                 IsFeatured = a.IsFeatured,
                 Category = a.Category,
                 Tags = a.Tags,
-                MarketplaceStatus = a.MarketplaceStatus,
+                ReviewStatus = a.ReviewStatus,
+                AccessStatus = a.AccessStatus,
                 MarketplaceModerationReason = a.MarketplaceModerationReason,
                 MarketplaceModeratedAt = a.MarketplaceModeratedAt,
                 MarketplaceModeratedByUserId = a.MarketplaceModeratedByUserId,
@@ -76,9 +80,15 @@ public class AdminMarketplaceAppsController : ControllerBase
             return NotFound();
         }
 
+        var previousReviewStatus = app.ReviewStatus;
+        var previousAccessStatus = app.AccessStatus;
+        var previousReason = app.MarketplaceModerationReason;
+
         app.IsFeatured = request.IsFeatured;
         app.Category = string.IsNullOrWhiteSpace(request.Category) ? null : request.Category.Trim();
-        app.MarketplaceStatus = NormalizeStatus(request.MarketplaceStatus);
+        app.ReviewStatus = NormalizeReviewStatus(request.ReviewStatus);
+        app.AccessStatus = NormalizeAccessStatus(request.AccessStatus);
+        app.MarketplaceStatus = MapLegacyMarketplaceStatus(app.ReviewStatus, app.AccessStatus);
         app.MarketplaceModerationReason = string.IsNullOrWhiteSpace(request.MarketplaceModerationReason)
             ? null
             : request.MarketplaceModerationReason.Trim();
@@ -87,6 +97,22 @@ public class AdminMarketplaceAppsController : ControllerBase
         app.Updated = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync();
+
+        var moderationDescription = BuildModerationAuditDescription(
+            app.Name,
+            previousReviewStatus,
+            app.ReviewStatus,
+            previousAccessStatus,
+            app.AccessStatus,
+            previousReason,
+            app.MarketplaceModerationReason);
+
+        await _recentActivityService.LogActivityAsync(
+            Automaton.Core.Enums.ActivityType.AppUpdated,
+            app.Name,
+            app.Id,
+            moderationDescription);
+
         return NoContent();
     }
 
@@ -160,21 +186,80 @@ public class AdminMarketplaceAppsController : ControllerBase
         return Guid.TryParse(claimValue, out var userId) ? userId : null;
     }
 
-    private static string NormalizeStatus(string? value)
+    private static string NormalizeReviewStatus(string? value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
         return normalized switch
         {
-            MarketplaceAppStatuses.Hidden => MarketplaceAppStatuses.Hidden,
-            MarketplaceAppStatuses.Banned => MarketplaceAppStatuses.Banned,
-            _ => MarketplaceAppStatuses.Approved,
+            AppReviewStatuses.Flagged => AppReviewStatuses.Flagged,
+            _ => AppReviewStatuses.Approved,
         };
+    }
+
+    private static string NormalizeAccessStatus(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            AppAccessStatuses.Hidden => AppAccessStatuses.Hidden,
+            AppAccessStatuses.Disabled => AppAccessStatuses.Disabled,
+            _ => AppAccessStatuses.Active,
+        };
+    }
+
+    private static string MapLegacyMarketplaceStatus(string reviewStatus, string accessStatus)
+    {
+        if (accessStatus == AppAccessStatuses.Disabled)
+        {
+            return MarketplaceAppStatuses.Banned;
+        }
+
+        if (accessStatus == AppAccessStatuses.Hidden)
+        {
+            return MarketplaceAppStatuses.Hidden;
+        }
+
+        return MarketplaceAppStatuses.Approved;
     }
 
     private static string Slugify(string value)
     {
         var slug = Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
         return string.IsNullOrWhiteSpace(slug) ? Guid.NewGuid().ToString("N") : slug;
+    }
+
+    private static string BuildModerationAuditDescription(
+        string appName,
+        string previousReviewStatus,
+        string newReviewStatus,
+        string previousAccessStatus,
+        string newAccessStatus,
+        string? previousReason,
+        string? newReason)
+    {
+        var changes = new List<string>();
+
+        if (!string.Equals(previousReviewStatus, newReviewStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            changes.Add($"ReviewStatus {previousReviewStatus} -> {newReviewStatus}");
+        }
+
+        if (!string.Equals(previousAccessStatus, newAccessStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            changes.Add($"AccessStatus {previousAccessStatus} -> {newAccessStatus}");
+        }
+
+        if (!string.Equals(previousReason?.Trim(), newReason?.Trim(), StringComparison.Ordinal))
+        {
+            changes.Add($"Note: {(string.IsNullOrWhiteSpace(newReason) ? "cleared" : newReason.Trim())}");
+        }
+
+        if (changes.Count == 0)
+        {
+            changes.Add("Moderation fields saved without state changes");
+        }
+
+        return $"Admin updated moderation for '{appName}': {string.Join("; ", changes)}";
     }
 }
 
@@ -190,7 +275,8 @@ public class AdminMarketplaceAppDto
     public bool IsFeatured { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }
-    public string MarketplaceStatus { get; set; } = MarketplaceAppStatuses.Approved;
+    public string ReviewStatus { get; set; } = AppReviewStatuses.Approved;
+    public string AccessStatus { get; set; } = AppAccessStatuses.Active;
     public string? MarketplaceModerationReason { get; set; }
     public DateTime? MarketplaceModeratedAt { get; set; }
     public Guid? MarketplaceModeratedByUserId { get; set; }
@@ -202,6 +288,7 @@ public class UpdateMarketplaceAppRequest
 {
     public bool IsFeatured { get; set; }
     public string? Category { get; set; }
-    public string? MarketplaceStatus { get; set; }
+    public string? ReviewStatus { get; set; }
+    public string? AccessStatus { get; set; }
     public string? MarketplaceModerationReason { get; set; }
 }

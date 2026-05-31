@@ -89,7 +89,7 @@ public class AppFilesController : ControllerBase
     {
         var app = await dataContext.WebApps
             .Include(a => a.WebAppUsers)
-            .Where(a => a.PublicUrl == slug && a.IsPublished && a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Where(a => a.PublicUrl == slug && a.IsPublished && a.AccessStatus == AppAccessStatuses.Active)
             .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
             .FirstOrDefaultAsync(ct);
 
@@ -130,7 +130,7 @@ public class AppFilesController : ControllerBase
     {
         var app = await dataContext.WebApps
             .Include(a => a.WebAppUsers)
-            .Where(a => a.PublicUrl == slug && a.IsPublished && a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Where(a => a.PublicUrl == slug && a.IsPublished && a.AccessStatus == AppAccessStatuses.Active)
             .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
             .FirstOrDefaultAsync(ct);
 

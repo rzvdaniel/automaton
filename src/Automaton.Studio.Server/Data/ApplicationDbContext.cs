@@ -286,6 +286,14 @@ namespace Automaton.Studio.Server.Data
                     .IsRequired()
                     .HasMaxLength(40)
                     .HasDefaultValue(Automaton.Studio.Server.Enums.MarketplaceAppStatuses.Approved);
+                entity.Property(e => e.ReviewStatus)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(Automaton.Studio.Server.Enums.AppReviewStatuses.Approved);
+                entity.Property(e => e.AccessStatus)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(Automaton.Studio.Server.Enums.AppAccessStatuses.Active);
                 entity.Property(e => e.MarketplaceModerationReason)
                     .HasMaxLength(2000);
                 entity.Property(e => e.ForkedFromAppName)
@@ -297,6 +305,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.IsSample, e.IsPublished });
                 entity.HasIndex(e => new { e.IsProfileFeatured, e.IsPublished });
                 entity.HasIndex(e => new { e.IsPublished, e.MarketplaceStatus, e.Category });
+                entity.HasIndex(e => new { e.IsPublished, e.ReviewStatus, e.AccessStatus, e.Category });
                 entity.HasIndex(e => e.ForkedFromAppId);
                 entity.HasIndex(e => new { e.IsPublished, e.IsForkable });
 

@@ -43,7 +43,9 @@ public class PublicAppsService
         var publicAppCount = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Where(w => w.IsPublished &&
+                        w.ReviewStatus == AppReviewStatuses.Approved &&
+                        w.AccessStatus == AppAccessStatuses.Active)
             .CountAsync();
 
         return new PublicUserProfile
@@ -72,7 +74,9 @@ public class PublicAppsService
         var apps = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Where(w => w.IsPublished &&
+                        w.ReviewStatus == AppReviewStatuses.Approved &&
+                        w.AccessStatus == AppAccessStatuses.Active)
             .OrderByDescending(w => w.IsProfileFeatured)
             .ThenByDescending(w => w.StarCount)
             .ThenByDescending(w => w.ViewCount)
@@ -150,7 +154,9 @@ public class PublicAppsService
         var app = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id && wu.WebAppId == appId)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished && w.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+            .Where(w => w.IsPublished &&
+                        w.ReviewStatus == AppReviewStatuses.Approved &&
+                        w.AccessStatus == AppAccessStatuses.Active)
             .Select(w => new
             {
                 w.Id,

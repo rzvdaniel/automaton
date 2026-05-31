@@ -74,6 +74,8 @@ export interface App {
   category?: string | null
   tags?: string | null
   marketplaceStatus: string
+  reviewStatus: string
+  accessStatus: string
   marketplaceModerationReason?: string | null
   marketplaceModeratedAt?: string
   marketplaceModeratedByUserId?: string

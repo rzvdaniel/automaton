@@ -484,6 +484,7 @@ export interface AdminAppDetails {
 }
 
 export interface AdminAppModerationRequest {
-  marketplaceStatus?: string
+  reviewStatus?: string
+  accessStatus?: string
   marketplaceModerationReason?: string
 }

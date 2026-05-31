@@ -2126,6 +2126,13 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("varchar(40)")
                         .HasDefaultValue("approved");
 
+                    b.Property<string>("AccessStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("active");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -2138,6 +2145,13 @@ namespace Automaton.Studio.Server.Migrations
 
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ReviewStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("approved");
 
                     b.Property<bool>("RequiresAuthentication")
                         .HasColumnType("tinyint(1)");
@@ -2191,6 +2205,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("IsSample", "IsPublished");
 
                     b.HasIndex("IsPublished", "MarketplaceStatus", "Category");
+
+                    b.HasIndex("IsPublished", "ReviewStatus", "AccessStatus", "Category");
 
                     b.ToTable("WebApps");
                 });

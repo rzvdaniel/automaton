@@ -75,7 +75,7 @@ public class UserAppsController : ControllerBase
                 .Include(a => a.WebAppUsers)
                 .FirstOrDefaultAsync(a =>
                     a.IsPublished &&
-                    a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
+                    a.AccessStatus == AppAccessStatuses.Active &&
                     a.PublicUrl != null &&
                     a.PublicUrl.ToLower() == slug.ToLower());
 

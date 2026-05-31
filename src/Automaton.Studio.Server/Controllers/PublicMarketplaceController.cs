@@ -34,7 +34,8 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved);
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active);
 
         if (!string.IsNullOrWhiteSpace(category))
         {
@@ -120,7 +121,8 @@ public class PublicMarketplaceController : ControllerBase
             .Where(a =>
                 a.Id == appId &&
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active)
             .Select(a => new MarketplaceAppDetailsDto
             {
                 Id = a.Id,
@@ -194,7 +196,8 @@ public class PublicMarketplaceController : ControllerBase
             .Where(a =>
                 a.Id != app.Id &&
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active &&
                 a.Category != null &&
                 a.Category == app.Category)
             .OrderByDescending(a => a.IsFeatured)
@@ -258,7 +261,8 @@ public class PublicMarketplaceController : ControllerBase
             .Where(a =>
                 a.ForkedFromAppId == app.Id &&
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active)
             .OrderByDescending(a => a.PublishedAt)
             .Take(6)
             .Select(a => new MarketplaceAppCardDto
@@ -325,7 +329,8 @@ public class PublicMarketplaceController : ControllerBase
             .Where(a =>
                 a.Id == appId &&
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved)
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active)
             .Join(_dbContext.WebAppUsers, a => a.Id, wu => wu.WebAppId, (_, wu) => wu.UserId)
             .FirstOrDefaultAsync();
 
@@ -339,7 +344,8 @@ public class PublicMarketplaceController : ControllerBase
             .Where(a =>
                 a.Id != appId &&
                 a.IsPublished &&
-                a.MarketplaceStatus == MarketplaceAppStatuses.Approved &&
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active &&
                 _dbContext.WebAppUsers.Any(wu => wu.WebAppId == a.Id && wu.UserId == creatorUserId))
             .OrderByDescending(a => a.IsProfileFeatured)
             .ThenByDescending(a => a.IsFeatured)

@@ -25,7 +25,8 @@ interface MarketplaceApp {
   isFeatured: boolean
   category?: string | null
   tags?: string | null
-  marketplaceStatus: string
+  reviewStatus: string
+  accessStatus: string
   marketplaceModerationReason?: string | null
   ownerDisplayName?: string | null
   ownerPublicUsername?: string | null
@@ -41,17 +42,22 @@ const toast = useToast()
 const isLoading = ref(false)
 const isSavingCategories = ref(false)
 const search = ref('')
-const selectedStatusFilter = ref<'all' | 'approved' | 'hidden' | 'banned'>('all')
+const selectedStatusFilter = ref<'all' | 'approved' | 'flagged' | 'active' | 'hidden' | 'disabled'>('all')
 const selectedCategoryFilter = ref<string | null>('all')
 const featuredOnly = ref(false)
 const apps = ref<MarketplaceApp[]>([])
 const categoriesText = ref('')
 const savingAppIds = ref<string[]>([])
 
-const statusOptions = [
+const reviewOptions = [
   { label: 'Approved', value: 'approved' },
+  { label: 'Flagged', value: 'flagged' },
+]
+
+const accessOptions = [
+  { label: 'Active', value: 'active' },
   { label: 'Hidden', value: 'hidden' },
-  { label: 'Banned', value: 'banned' },
+  { label: 'Disabled', value: 'disabled' },
 ]
 
 onMounted(loadData)
@@ -104,14 +110,18 @@ const categoryFilterOptions = computed(() => [
 ])
 
 const featuredCount = computed(() => apps.value.filter(app => app.isFeatured).length)
-const moderatedCount = computed(() => apps.value.filter(app => app.marketplaceStatus !== 'approved').length)
+const moderatedCount = computed(() => apps.value.filter(app => app.reviewStatus !== 'approved' || app.accessStatus !== 'active').length)
 const categorizedCount = computed(() => apps.value.filter(app => !!app.category?.trim()).length)
 
 const filteredApps = computed(() => {
   const query = search.value.trim().toLowerCase()
   return apps.value.filter(app => {
-    if (selectedStatusFilter.value !== 'all' && app.marketplaceStatus !== selectedStatusFilter.value) {
-      return false
+    if (selectedStatusFilter.value !== 'all') {
+      const matchesReview = app.reviewStatus === selectedStatusFilter.value
+      const matchesAccess = app.accessStatus === selectedStatusFilter.value
+      if (!matchesReview && !matchesAccess) {
+        return false
+      }
     }
 
     if (selectedCategoryFilter.value === '__uncategorized__' && app.category?.trim()) {
@@ -194,7 +204,8 @@ async function saveApp(app: MarketplaceApp) {
     await apiClient.put(`/api/admin/marketplace-apps/${app.id}`, {
       isFeatured: app.isFeatured,
       category: app.category?.trim() || null,
-      marketplaceStatus: app.marketplaceStatus,
+      reviewStatus: app.reviewStatus,
+      accessStatus: app.accessStatus,
       marketplaceModerationReason: app.marketplaceModerationReason?.trim() || null,
     })
     toast.add({
@@ -217,10 +228,14 @@ async function saveApp(app: MarketplaceApp) {
 }
 
 function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'secondary' {
-  if (status === 'approved') return 'success'
-  if (status === 'hidden') return 'warn'
-  if (status === 'banned') return 'danger'
+  if (status === 'approved' || status === 'active') return 'success'
+  if (status === 'flagged' || status === 'hidden') return 'warn'
+  if (status === 'disabled') return 'danger'
   return 'secondary'
+}
+
+function combinedStatusLabel(app: MarketplaceApp): string {
+  return `${app.reviewStatus} / ${app.accessStatus}`
 }
 </script>
 
@@ -244,7 +259,14 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
         />
         <Select
           v-model="selectedStatusFilter"
-          :options="[{ label: 'All statuses', value: 'all' }, ...statusOptions]"
+          :options="[
+            { label: 'All statuses', value: 'all' },
+            { label: 'Approved', value: 'approved' },
+            { label: 'Flagged', value: 'flagged' },
+            { label: 'Active', value: 'active' },
+            { label: 'Hidden', value: 'hidden' },
+            { label: 'Disabled', value: 'disabled' },
+          ]"
           option-label="label"
           option-value="value"
           class="filter-select"
@@ -290,7 +312,7 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
       <Card>
         <template #content>
           <div class="stat-card">
-            <span class="stat-label">Hidden or banned</span>
+            <span class="stat-label">Flagged, hidden, or disabled</span>
             <span class="stat-value">{{ moderatedCount }}</span>
           </div>
         </template>
@@ -375,7 +397,7 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
             <div class="app-meta">
               <div class="app-meta-topline">
                 <span class="app-name">{{ data.name }}</span>
-                <Tag :value="data.marketplaceStatus" :severity="statusSeverity(data.marketplaceStatus)" />
+                <Tag :value="combinedStatusLabel(data)" :severity="statusSeverity(data.accessStatus === 'disabled' ? data.accessStatus : (data.reviewStatus === 'flagged' ? data.reviewStatus : data.accessStatus))" />
                 <Tag v-if="data.isFeatured" value="Featured" severity="warn" />
               </div>
               <div class="text-sm text-color-secondary">
@@ -439,11 +461,23 @@ function statusSeverity(status: string): 'success' | 'warn' | 'danger' | 'second
         </template>
       </Column>
 
-      <Column header="Status" style="min-width: 170px">
+      <Column header="Review" style="min-width: 170px">
         <template #body="{ data }: { data: MarketplaceApp }">
           <Select
-            v-model="data.marketplaceStatus"
-            :options="statusOptions"
+            v-model="data.reviewStatus"
+            :options="reviewOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+          />
+        </template>
+      </Column>
+
+      <Column header="Access" style="min-width: 170px">
+        <template #body="{ data }: { data: MarketplaceApp }">
+          <Select
+            v-model="data.accessStatus"
+            :options="accessOptions"
             option-label="label"
             option-value="value"
             class="w-full"

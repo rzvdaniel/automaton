@@ -104,7 +104,8 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
-                x.IsPublished,
+                x.IsPublished &&
+                x.AccessStatus == AppAccessStatuses.Active,
                 cancellationToken);
 
         if (appEntity == null)
@@ -550,6 +551,8 @@ public class AppsService
             Category = entity.Category,
             Tags = entity.Tags,
             MarketplaceStatus = entity.MarketplaceStatus,
+            ReviewStatus = entity.ReviewStatus,
+            AccessStatus = entity.AccessStatus,
             MarketplaceModerationReason = entity.MarketplaceModerationReason,
             MarketplaceModeratedAt = entity.MarketplaceModeratedAt,
             MarketplaceModeratedByUserId = entity.MarketplaceModeratedByUserId,
@@ -644,7 +647,8 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.Id == sourceAppId &&
                 x.IsPublished &&
-                x.MarketplaceStatus == MarketplaceAppStatuses.Approved);
+                x.ReviewStatus == AppReviewStatuses.Approved &&
+                x.AccessStatus == AppAccessStatuses.Active);
 
         if (source == null)
             throw new InvalidOperationException("Fork source app not found.");
@@ -697,7 +701,8 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.Id == sourceAppId &&
                 x.IsPublished &&
-                x.MarketplaceStatus == MarketplaceAppStatuses.Approved);
+                x.ReviewStatus == AppReviewStatuses.Approved &&
+                x.AccessStatus == AppAccessStatuses.Active);
 
         if (source == null)
             throw new InvalidOperationException("Fork source app not found.");
