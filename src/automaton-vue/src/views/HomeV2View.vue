@@ -247,97 +247,107 @@ watch(
 
       <section id="architecture" class="architecture-section">
         <div class="shell">
-          <div class="architecture-card">
-            <div class="diagram-title">
-              <h3>Automaton <span>Architecture</span></h3>
-              <p>Build with any AI. Run your backend anywhere.</p>
+          <div class="architecture-intro">
+            <div>
+              <span class="eyebrow">Deployment architecture</span>
+              <h2>One Platform. Two Deployment Paths.</h2>
             </div>
 
-            <div class="architecture-diagram" aria-label="Automaton architecture diagram">
-              <div class="architecture-box architecture-box-ai">
-                <h4>AI Coding Tools</h4>
-                <div class="architecture-item-list">
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-orange">*</span> Claude Code</div>
-                  <div class="architecture-item"><span class="architecture-icon">◎</span> OpenAI Codex</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">◇</span> Cursor</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">⌘</span> GitHub Copilot</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">✦</span> Gemini</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">M</span> Any MCP Client</div>
+            <div>
+              <p class="architecture-summary">
+                <span><strong>Frontend apps</strong> are hosted by Automaton.</span>
+                <span><strong>Backend apps</strong> run on runners you control.</span>
+              </p>
+
+              <div class="path-cards">
+                <div class="path-card frontend">
+                  <span>Frontend</span>
+                  <strong>Hosted by Automaton</strong>
+                </div>
+                <div class="path-card backend">
+                  <span>Backend</span>
+                  <strong>Runs on your runner</strong>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div class="architecture-arrow-wrap"><div class="architecture-arrow"></div></div>
-
-              <div>
-                <div class="architecture-box architecture-box-cli">
-                  <div class="terminal-icon">&gt;_</div>
-                  <h4>Automaton CLI</h4>
-                  <div class="cli-inner">
-                    <div class="checkline">Initialize project</div>
-                    <div class="checkline">Configure runtime</div>
-                    <div class="checkline">Deploy and manage</div>
+          <div class="diagram-placeholder">
+            <div class="architecture-card">
+              <div class="architecture-diagram" aria-label="Automaton architecture diagram">
+                <div class="architecture-box architecture-box-ai">
+                  <h4>AI Coding Tools</h4>
+                  <div class="architecture-item-list">
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-orange">*</span> Claude Code</div>
+                    <div class="architecture-item"><span class="architecture-icon">◎</span> OpenAI Codex</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">◇</span> Cursor</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">⌘</span> GitHub Copilot</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">✦</span> Gemini</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">M</span> Any MCP Client</div>
                   </div>
                 </div>
 
-                <div class="down-arrow"></div>
+                <div class="architecture-arrow-wrap"><div class="architecture-arrow"></div></div>
 
-                <div class="architecture-box architecture-box-frontend">
-                  <h4>Your Frontend</h4>
-                  <p class="architecture-subcopy">Hosted by Automaton</p>
-                  <div class="frontend-icons">
-                    <div class="mini"><span class="architecture-icon">⚡</span>Global CDN</div>
-                    <div class="mini"><span class="architecture-icon">🔒</span>HTTPS</div>
-                    <div class="mini"><span class="architecture-icon">↯</span>Edge caching</div>
+                <div>
+                  <div class="architecture-box architecture-box-cli">
+                    <div class="terminal-icon">&gt;_</div>
+                    <h4>Automaton CLI</h4>
+                    <div class="cli-inner">
+                      <div class="checkline">Initialize project</div>
+                      <div class="checkline">Configure runtime</div>
+                      <div class="checkline">Deploy and manage</div>
+                    </div>
+                  </div>
+
+                  <div class="down-arrow"></div>
+
+                  <div class="architecture-box architecture-box-frontend">
+                    <h4>Your Frontend</h4>
+                    <p class="architecture-subcopy">Hosted by Automaton</p>
+                    <div class="frontend-icons">
+                      <div class="mini"><span class="architecture-icon">⚡</span>Global CDN</div>
+                      <div class="mini"><span class="architecture-icon">🔒</span>HTTPS</div>
+                      <div class="mini"><span class="architecture-icon">↯</span>Edge caching</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="architecture-arrow-wrap"><div class="architecture-arrow architecture-arrow-purple"></div></div>
+
+                <div class="architecture-box architecture-box-backend">
+                  <h4>Your Backend</h4>
+                  <p class="architecture-subcopy">Runs on your runner</p>
+                  <div class="architecture-item-list architecture-backend-list">
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▭</span> Laptop</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▤</span> Home Server / NAS</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">☁</span> VPS / Cloud</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▥</span> Company Network</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">●</span> Raspberry Pi</div>
+                    <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">◎</span> Anywhere</div>
                   </div>
                 </div>
               </div>
 
-              <div class="architecture-arrow-wrap"><div class="architecture-arrow architecture-arrow-purple"></div></div>
-
-              <div class="architecture-box architecture-box-backend">
-                <h4>Your Backend</h4>
-                <p class="architecture-subcopy">Runs on your runner</p>
-                <div class="architecture-item-list architecture-backend-list">
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▭</span> Laptop</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▤</span> Home Server / NAS</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">☁</span> VPS / Cloud</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▥</span> Company Network</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">●</span> Raspberry Pi</div>
-                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">◎</span> Anywhere</div>
+              <div class="mobile-diagram" aria-label="Simplified Automaton architecture diagram">
+                <div class="mobile-step">
+                  <h4>1. Use any AI</h4>
+                  <p>Claude Code, Codex, Cursor, Copilot, Gemini, or any MCP client.</p>
                 </div>
-              </div>
-            </div>
-
-            <div class="mobile-diagram" aria-label="Simplified Automaton architecture diagram">
-              <div class="mobile-step">
-                <h4>1. Use any AI</h4>
-                <p>Claude Code, Codex, Cursor, Copilot, Gemini, or any MCP client.</p>
-              </div>
-              <div class="mobile-arrow">↓</div>
-              <div class="mobile-step">
-                <h4>2. Deploy with Automaton CLI</h4>
-                <p>Initialize the project, configure runtime, and deploy with a repeatable workflow.</p>
-              </div>
-              <div class="mobile-arrow">↙︎ ↘︎</div>
-              <div class="mobile-step">
-                <h4>3. Frontend hosted by Automaton</h4>
-                <p>Public, fast, HTTPS-enabled static app hosting.</p>
-              </div>
-              <div class="mobile-step">
-                <h4>4. Backend runs on your runner</h4>
-                <p>Laptop, VPS, NAS, company network, Raspberry Pi, or anywhere else you want it.</p>
-              </div>
-            </div>
-
-            <div class="architecture-footer-strip">
-              <div>
-                <span class="architecture-logo-mini">am</span>
-                Automaton <strong>connects</strong> AI coding tools to a modern <strong>deployment workflow</strong>.
-              </div>
-              <div class="architecture-badges">
-                <span class="architecture-badge">Bring your own model</span>
-                <span class="architecture-badge">Frontend hosting included</span>
-                <span class="architecture-badge">Backend stays yours</span>
+                <div class="mobile-arrow">↓</div>
+                <div class="mobile-step">
+                  <h4>2. Deploy with Automaton CLI</h4>
+                  <p>Initialize the project, configure runtime, and deploy with a repeatable workflow.</p>
+                </div>
+                <div class="mobile-arrow">↙︎ ↘︎</div>
+                <div class="mobile-step">
+                  <h4>3. Frontend hosted by Automaton</h4>
+                  <p>Public, fast, HTTPS-enabled static app hosting.</p>
+                </div>
+                <div class="mobile-step">
+                  <h4>4. Backend runs on your runner</h4>
+                  <p>Laptop, VPS, NAS, company network, Raspberry Pi, or anywhere else you want it.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -913,38 +923,97 @@ h1 span {
   padding-top: 12px;
 }
 
+.architecture-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 0.65fr);
+  gap: 32px;
+  align-items: end;
+  margin-bottom: 28px;
+}
+
+.architecture-intro h2 {
+  max-width: 820px;
+  margin: 0;
+  font-size: clamp(2.25rem, 5vw, 4.5rem);
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.architecture-summary {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  color: var(--v2-soft);
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.55;
+}
+
+.architecture-summary strong {
+  color: var(--v2-text);
+  font-weight: 800;
+}
+
+.path-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.path-card {
+  padding: 18px;
+  border: 1px solid var(--v2-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.path-card.frontend {
+  border-color: rgba(80, 215, 255, 0.24);
+}
+
+.path-card.backend {
+  border-color: rgba(69, 230, 138, 0.3);
+}
+
+.path-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--v2-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.path-card strong {
+  display: block;
+  color: var(--v2-text);
+  font-size: 1.1rem;
+  letter-spacing: -0.025em;
+}
+
+.diagram-placeholder {
+  display: grid;
+  min-height: 360px;
+  place-items: stretch;
+  padding: 0;
+  border: 1px dashed rgba(69, 230, 138, 0.32);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(69, 230, 138, 0.12), transparent 30%),
+    rgba(255, 255, 255, 0.025);
+}
+
 .architecture-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(69, 230, 138, 0.26);
-  border-radius: 28px;
+  border: 0;
+  border-radius: 27px;
   padding: 34px;
   background:
     radial-gradient(circle at 50% 0%, rgba(69, 230, 138, 0.14), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
   box-shadow: var(--v2-shadow);
-}
-
-.diagram-title {
-  margin-bottom: 34px;
-  text-align: center;
-}
-
-.diagram-title h3 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 1;
-  letter-spacing: -0.045em;
-}
-
-.diagram-title h3 span {
-  color: var(--v2-green);
-}
-
-.diagram-title p {
-  margin: 12px 0 0;
-  color: var(--v2-muted);
-  font-size: 1.05rem;
 }
 
 .architecture-diagram {
@@ -1212,45 +1281,6 @@ h1 span {
   font-size: 46px;
   line-height: 1;
   text-shadow: 0 0 18px rgba(69, 230, 138, 0.55);
-}
-
-.architecture-footer-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 28px;
-  padding: 18px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.035);
-  color: #d9e4ee;
-}
-
-.architecture-footer-strip strong {
-  color: var(--v2-green);
-}
-
-.architecture-logo-mini {
-  margin-right: 8px;
-  color: var(--v2-green);
-  font-weight: 900;
-}
-
-.architecture-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  color: #d9e4ee;
-  font-size: 0.88rem;
-}
-
-.architecture-badge::before {
-  content: "✓";
-  margin-right: 8px;
-  color: var(--v2-green);
-  font-weight: 900;
 }
 
 .live-strip {
@@ -1803,6 +1833,15 @@ footer {
     padding: 22px;
   }
 
+  .architecture-intro {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .path-cards {
+    grid-template-columns: 1fr;
+  }
+
   .terminal-body {
     margin: 18px;
     padding: 18px;
@@ -1910,22 +1949,6 @@ footer {
   .architecture-card {
     padding: 18px;
     border-radius: 22px;
-  }
-
-  .diagram-title {
-    text-align: left;
-  }
-
-  .diagram-title h3 {
-    font-size: 2.1rem;
-  }
-
-  .diagram-title p {
-    font-size: 1rem;
-  }
-
-  .architecture-footer-strip {
-    display: none;
   }
 
   .steps,
