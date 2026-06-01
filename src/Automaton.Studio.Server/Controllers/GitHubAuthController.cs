@@ -92,6 +92,11 @@ public class GitHubAuthController : ControllerBase
             }
 
             var user = await _usersService.FindByEmailAsync(verifiedEmail);
+            if (user?.IsDeleted == true)
+            {
+                return Redirect(BuildFrontendErrorRedirect("This account is no longer available."));
+            }
+
             if (user == null)
             {
                 var publicUsername = await _usersService.GenerateUniquePublicUsernameFromCandidateAsync(githubUsername);

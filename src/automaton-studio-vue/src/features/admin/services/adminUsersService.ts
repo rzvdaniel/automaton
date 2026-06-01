@@ -58,6 +58,24 @@ class AdminUsersService {
     })
     return data
   }
+
+  async disableUser(userId: string): Promise<void> {
+    await apiClient.post(`/api/admin/users/${userId}/disable`)
+  }
+
+  async enableUser(userId: string): Promise<void> {
+    await apiClient.post(`/api/admin/users/${userId}/enable`)
+  }
+
+  async resendConfirmation(userId: string): Promise<void> {
+    await apiClient.post(`/api/admin/users/${userId}/resend-confirmation`)
+  }
+
+  async hardDeleteUser(userId: string, confirmationText: string): Promise<void> {
+    await apiClient.delete(`/api/admin/users/${userId}/hard`, {
+      data: { confirmationText },
+    })
+  }
 }
 
 export const adminUsersService = new AdminUsersService()

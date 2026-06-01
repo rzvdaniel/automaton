@@ -652,6 +652,12 @@ namespace Automaton.Studio.Server.Migrations
                     b.Property<Guid?>("CurrentProjectId")
                         .HasColumnType("char(36)");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("DisplayName")
                         .HasColumnType("longtext");
 
@@ -660,6 +666,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasColumnType("varchar(256)");
 
                     b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsEnterpriseEnabled")

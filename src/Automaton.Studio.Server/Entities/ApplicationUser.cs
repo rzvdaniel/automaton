@@ -80,6 +80,21 @@ namespace Automaton.Studio.Server.Entities
         /// </summary>
         public string RegistrationProvider { get; set; }
 
+        /// <summary>
+        /// Soft-delete flag used for admin cleanup without destroying audit relationships.
+        /// </summary>
+        public bool IsDeleted { get; set; }
+
+        /// <summary>
+        /// UTC timestamp when the account was soft deleted.
+        /// </summary>
+        public DateTime? DeletedAtUtc { get; set; }
+
+        /// <summary>
+        /// Admin user who soft deleted the account.
+        /// </summary>
+        public Guid? DeletedByUserId { get; set; }
+
         public virtual SubscriptionPlan SubscriptionPlan { get; set; }
     }
 }

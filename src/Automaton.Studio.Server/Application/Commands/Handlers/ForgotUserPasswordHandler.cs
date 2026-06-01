@@ -33,7 +33,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
         {
             var user = await UserManager.FindByEmailAsync(command.Email);
 
-            if (user is null)
+            if (user is null || user.IsDeleted)
             {
                 Logger.LogInformation("Forgot password requested for non-existent email {Email}", command.Email);
                 return;

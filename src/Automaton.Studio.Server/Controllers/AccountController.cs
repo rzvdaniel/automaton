@@ -369,7 +369,7 @@ public class AccountController : BaseController
             {
                 { "Name", user.Name },
                 { "ConfirmationUrl", confirmationUrl },
-                { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
+                { "LoginUrl", $"{configurationService.WebsiteUrl}/login" },
                 { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             }
         };
@@ -395,7 +395,7 @@ public class AccountController : BaseController
     {
         var baseUrl = configurationService.WebsiteUrl.TrimEnd('/');
         return QueryHelpers.AddQueryString(
-            $"{baseUrl}/auth/login",
+            $"{baseUrl}/login",
             new Dictionary<string, string?>
             {
                 ["emailConfirmation"] = success ? "success" : "failed"

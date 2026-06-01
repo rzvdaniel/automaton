@@ -36,6 +36,11 @@ public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebTo
             throw new Exception("Invalid credentials.");
         }
 
+        if (user.IsDeleted)
+        {
+            throw new Exception("Invalid credentials.");
+        }
+
         if (!user.LockoutEnabled)
         {
             var lockoutResult = await userManager.SetLockoutEnabledAsync(user, true);

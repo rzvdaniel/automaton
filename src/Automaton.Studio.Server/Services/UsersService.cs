@@ -95,7 +95,7 @@ public class UsersService
     public async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var refreshTokens = await _db.RefreshTokens
-            .Where(x => x.UserId == userId && !x.Revoked)
+            .Where(x => x.UserId == userId && x.RevokedAt == null)
             .ToListAsync(cancellationToken);
 
         if (refreshTokens.Count == 0)
@@ -149,6 +149,9 @@ public class UsersService
         if (result == null)
             throw new Exception($"User with userId {userId} not found!");
 
+        if (result.IsDeleted)
+            throw new Exception($"User with userId {userId} not found!");
+
         return result;
     }
 
@@ -173,12 +176,17 @@ public class UsersService
                await _userManager.FindByNameAsync(emailOrUserName);
     }
 
+    public async Task<ApplicationUser?> FindByIdIncludingDeletedAsync(Guid userId)
+    {
+        return await _userManager.FindByIdAsync(userId.ToString());
+    }
+
     public async Task<bool> ValidateCredentialsAsync(string usernameOrEmail, string password)
     {
         var user = await _userManager.FindByEmailAsync(usernameOrEmail) ??
                    await _userManager.FindByNameAsync(usernameOrEmail);
 
-        if (user != null)
+        if (user != null && !user.IsDeleted)
         {
             return await _userManager.CheckPasswordAsync(user, password);
         }
@@ -213,6 +221,7 @@ public class UsersService
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .Where(u =>
+                !u.IsDeleted &&
                 (string.IsNullOrWhiteSpace(searchTerm) ||
                     (u.Name != null && u.Name.Contains(searchTerm)) ||
                     (u.Email != null && u.Email.Contains(searchTerm)) ||
@@ -310,6 +319,11 @@ public class UsersService
 
     public async Task MarkSuccessfulLoginAsync(ApplicationUser user)
     {
+        if (user.IsDeleted)
+        {
+            throw new Exception("Invalid credentials.");
+        }
+
         user.LastLoginAtUtc = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);
@@ -450,6 +464,111 @@ public class UsersService
         if (!result.Succeeded)
         {
             throw new Exception($"Error in resetting password");
+        }
+    }
+
+    public async Task SetDisabledAsync(Guid userId, bool disabled, CancellationToken cancellationToken = default)
+    {
+        var user = await GetUserById(userId);
+        var lockoutEnd = disabled ? DateTimeOffset.MaxValue : (DateTimeOffset?)null;
+
+        var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
+        if (!result.Succeeded)
+        {
+            throw new Exception(disabled ? "Failed to disable user." : "Failed to enable user.");
+        }
+
+        await RevokeAllRefreshTokensAsync(userId, cancellationToken);
+    }
+
+    public async Task HardDeleteAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await FindByIdIncludingDeletedAsync(userId);
+        if (user == null)
+        {
+            throw new Exception($"User with userId {userId} not found!");
+        }
+
+        var blockers = await GetHardDeleteBlockersAsync(userId, cancellationToken);
+        if (blockers.Count > 0)
+        {
+            var blockerSummary = string.Join(
+                Environment.NewLine,
+                blockers.Select(x => $"- {x.Count} {x.Label}"));
+
+            throw new InvalidOperationException(
+                $"Cannot delete this user.{Environment.NewLine}{Environment.NewLine}" +
+                $"This account still owns:{Environment.NewLine}" +
+                $"{blockerSummary}{Environment.NewLine}{Environment.NewLine}" +
+                "Disable the account instead, or remove or transfer these resources first.");
+        }
+
+        var refreshTokens = await _db.RefreshTokens.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userGitHubTokens = await _db.UserGitHubTokens.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userSettings = await _db.UserSettings.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var recentActivities = await _db.RecentActivities.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userClaims = await _db.Set<IdentityUserClaim<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userLogins = await _db.Set<IdentityUserLogin<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userTokens = await _db.Set<IdentityUserToken<Guid>>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var userRoles = await _db.Set<ApplicationUserRole>().Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var apiKeyLinks = await _db.ApiKeyUsers.Where(x => x.UserId == userId).ToListAsync(cancellationToken);
+        var ownedApiKeyIds = apiKeyLinks.Select(x => x.ApiKeyId).Distinct().ToList();
+        var ownedApiKeys = await _db.ApiKeys
+            .Where(x => ownedApiKeyIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        _db.RefreshTokens.RemoveRange(refreshTokens);
+        _db.UserGitHubTokens.RemoveRange(userGitHubTokens);
+        _db.UserSettings.RemoveRange(userSettings);
+        _db.RecentActivities.RemoveRange(recentActivities);
+        _db.ApiKeyUsers.RemoveRange(apiKeyLinks);
+        _db.ApiKeys.RemoveRange(ownedApiKeys);
+        _db.RemoveRange(userClaims);
+        _db.RemoveRange(userLogins);
+        _db.RemoveRange(userTokens);
+        _db.RemoveRange(userRoles);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            var errorMessage = string.Join("; ", result.Errors.Select(error => error.Description));
+            throw new InvalidOperationException(
+                $"Hard delete failed for user {user.Email ?? user.Id.ToString()}: {errorMessage}");
+        }
+    }
+
+    private async Task<List<(string Label, int Count)>> GetHardDeleteBlockersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var blockers = new List<(string Label, int Count)>();
+
+        await AddHardDeleteBlockerAsync(blockers, "apps", _db.WebAppUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "flows", _db.FlowUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "runners", _db.RunnerUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "custom steps", _db.CustomStepUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "schedules", _db.ScheduleUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "sensitive variables", _db.SensitiveVariableUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "project memberships", _db.ProjectMembers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "organization memberships", _db.OrganizationMembers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "organization app assignments", _db.OrganizationAppAssignments.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "chat sessions", _db.AiChatSessionUsers.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "hosted runners", _db.HostedRunners.AsNoTracking().CountAsync(x => x.UserId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "owned projects", _db.Projects.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
+        await AddHardDeleteBlockerAsync(blockers, "owned organizations", _db.Organizations.AsNoTracking().CountAsync(x => x.OwnerId == userId, cancellationToken));
+
+        return blockers;
+    }
+
+    private static async Task AddHardDeleteBlockerAsync(
+        ICollection<(string Label, int Count)> blockers,
+        string label,
+        Task<int> countTask)
+    {
+        var count = await countTask;
+        if (count > 0)
+        {
+            blockers.Add((label, count));
         }
     }
 

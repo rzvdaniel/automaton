@@ -59,7 +59,7 @@ public class InstallService
             Variables =
             {
                 { "Name", installCommand.Name },
-                { "LoginUrl", $"{configurationService.WebsiteUrl}/auth/login" },
+                { "LoginUrl", $"{configurationService.WebsiteUrl}/login" },
                 { "SupportEmail", configurationService.EmailConfig.SupportEmail }
             }
         };
