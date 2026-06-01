@@ -1,6 +1,7 @@
 ﻿using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Common.Authentication;
 using Microsoft.AspNetCore.Identity;
@@ -481,6 +482,111 @@ public class UsersService
         await RevokeAllRefreshTokensAsync(userId, cancellationToken);
     }
 
+    public async Task EnsureCanManageUserLockStateAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorUserId == targetUserId)
+        {
+            throw new InvalidOperationException("You cannot disable or enable your own account.");
+        }
+
+        if (await IsInRoleAsync(targetUserId, UserRole.SystemAdministrator, cancellationToken))
+        {
+            throw new InvalidOperationException("System administrator accounts cannot be disabled or enabled from this admin surface.");
+        }
+    }
+
+    public async Task EnsureCanHardDeleteUserAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        bool actorIsSystemAdministrator,
+        CancellationToken cancellationToken = default)
+    {
+        if (!actorIsSystemAdministrator)
+        {
+            throw new InvalidOperationException("Only system administrators can permanently delete users.");
+        }
+
+        if (actorUserId == targetUserId)
+        {
+            throw new InvalidOperationException("You cannot delete your own account.");
+        }
+
+        if (await IsInRoleAsync(targetUserId, UserRole.SystemAdministrator, cancellationToken))
+        {
+            throw new InvalidOperationException("System administrator accounts cannot be permanently deleted.");
+        }
+
+        if (await IsInRoleAsync(targetUserId, UserRole.Administrator, cancellationToken))
+        {
+            throw new InvalidOperationException("Administrator accounts cannot be permanently deleted.");
+        }
+    }
+
+    public async Task EnsureCanAddRoleAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        string roleName,
+        bool actorIsSystemAdministrator,
+        CancellationToken cancellationToken = default)
+    {
+        if (!actorIsSystemAdministrator)
+        {
+            throw new InvalidOperationException("Only system administrators can manage admin roles.");
+        }
+
+        if (actorUserId == targetUserId)
+        {
+            throw new InvalidOperationException("You cannot change your own roles.");
+        }
+
+        if (string.Equals(roleName, UserRole.SystemAdministrator, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("System administrator role changes are not allowed from this admin surface.");
+        }
+
+        if (await IsInRoleAsync(targetUserId, UserRole.SystemAdministrator, cancellationToken))
+        {
+            throw new InvalidOperationException("System administrator accounts cannot be changed from this admin surface.");
+        }
+    }
+
+    public async Task EnsureCanRemoveRoleAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        string roleName,
+        bool actorIsSystemAdministrator,
+        CancellationToken cancellationToken = default)
+    {
+        if (!actorIsSystemAdministrator)
+        {
+            throw new InvalidOperationException("Only system administrators can manage admin roles.");
+        }
+
+        if (actorUserId == targetUserId)
+        {
+            throw new InvalidOperationException("You cannot change your own roles.");
+        }
+
+        if (string.Equals(roleName, UserRole.SystemAdministrator, StringComparison.Ordinal))
+        {
+            var sysAdminCount = await CountUsersInRoleAsync(UserRole.SystemAdministrator, cancellationToken);
+            if (sysAdminCount <= 1)
+            {
+                throw new InvalidOperationException("You cannot remove the last system administrator.");
+            }
+
+            throw new InvalidOperationException("System administrator role changes are not allowed from this admin surface.");
+        }
+
+        if (await IsInRoleAsync(targetUserId, UserRole.SystemAdministrator, cancellationToken))
+        {
+            throw new InvalidOperationException("System administrator accounts cannot be changed from this admin surface.");
+        }
+    }
+
     public async Task HardDeleteAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var user = await FindByIdIncludingDeletedAsync(userId);
@@ -570,6 +676,34 @@ public class UsersService
         {
             blockers.Add((label, count));
         }
+    }
+
+    public async Task<bool> IsInRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default)
+    {
+        return await _db.Set<ApplicationUserRole>()
+            .AsNoTracking()
+            .Where(ur => ur.UserId == userId)
+            .Join(
+                _db.Set<ApplicationRole>().AsNoTracking(),
+                ur => ur.RoleId,
+                role => role.Id,
+                (ur, role) => role.Name)
+            .AnyAsync(name => name == roleName, cancellationToken);
+    }
+
+    public async Task<int> CountUsersInRoleAsync(string roleName, CancellationToken cancellationToken = default)
+    {
+        return await _db.Set<ApplicationUserRole>()
+            .AsNoTracking()
+            .Join(
+                _db.Set<ApplicationRole>().AsNoTracking(),
+                ur => ur.RoleId,
+                role => role.Id,
+                (ur, role) => new { ur.UserId, role.Name })
+            .Where(x => x.Name == roleName)
+            .Select(x => x.UserId)
+            .Distinct()
+            .CountAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<string>> GetRoles(Guid userId)

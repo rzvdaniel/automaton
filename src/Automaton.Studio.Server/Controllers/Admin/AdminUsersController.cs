@@ -1,6 +1,7 @@
 using AuthServer.Core.Queries;
 using Automaton.Studio.Server.Core.Commands;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Services.Interfaces;
@@ -86,36 +87,77 @@ public class AdminUsersController : BaseController
     }
 
     [HttpDelete("{userId:guid}/roles/{roleName}")]
-    public async Task<IActionResult> RemoveUserRole([FromRoute, NotEmptyGuid] Guid userId, [FromRoute, Required] string roleName)
+    public async Task<IActionResult> RemoveUserRole([FromRoute, NotEmptyGuid] Guid userId, [FromRoute, Required] string roleName, CancellationToken cancellationToken)
     {
-        await Mediator.Send(new RemoveUserRoleCommand(userId, roleName));
-        return NoContent();
+        try
+        {
+            await usersService.EnsureCanRemoveRoleAsync(
+                GetUserId(),
+                userId,
+                roleName,
+                User.IsInRole(UserRole.SystemAdministrator),
+                cancellationToken);
+
+            await Mediator.Send(new RemoveUserRoleCommand(userId, roleName));
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{userId:guid}/roles/{roleName}")]
-    public async Task<IActionResult> AddUserRole([FromRoute, NotEmptyGuid] Guid userId, [FromRoute, Required] string roleName)
+    public async Task<IActionResult> AddUserRole([FromRoute, NotEmptyGuid] Guid userId, [FromRoute, Required] string roleName, CancellationToken cancellationToken)
     {
-        await Mediator.Send(new AddUserRoleCommand(userId, roleName));
-        return NoContent();
+        try
+        {
+            await usersService.EnsureCanAddRoleAsync(
+                GetUserId(),
+                userId,
+                roleName,
+                User.IsInRole(UserRole.SystemAdministrator),
+                cancellationToken);
+
+            await Mediator.Send(new AddUserRoleCommand(userId, roleName));
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("{userId:guid}/disable")]
     public async Task<IActionResult> DisableUser([FromRoute, NotEmptyGuid] Guid userId, CancellationToken cancellationToken)
     {
-        if (userId == GetUserId())
+        try
         {
-            return BadRequest(new { message = "You cannot disable your own account." });
-        }
+            await usersService.EnsureCanManageUserLockStateAsync(GetUserId(), userId, cancellationToken);
 
-        await usersService.SetDisabledAsync(userId, disabled: true, cancellationToken);
-        return NoContent();
+            await usersService.SetDisabledAsync(userId, disabled: true, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("{userId:guid}/enable")]
     public async Task<IActionResult> EnableUser([FromRoute, NotEmptyGuid] Guid userId, CancellationToken cancellationToken)
     {
-        await usersService.SetDisabledAsync(userId, disabled: false, cancellationToken);
-        return NoContent();
+        try
+        {
+            await usersService.EnsureCanManageUserLockStateAsync(GetUserId(), userId, cancellationToken);
+
+            await usersService.SetDisabledAsync(userId, disabled: false, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("{userId:guid}/resend-confirmation")]
@@ -137,18 +179,26 @@ public class AdminUsersController : BaseController
         [FromBody] HardDeleteUserRequest request,
         CancellationToken cancellationToken)
     {
-        if (userId == GetUserId())
-        {
-            return BadRequest(new { message = "You cannot delete your own account." });
-        }
-
         if (!string.Equals(request?.ConfirmationText, "DELETE", StringComparison.Ordinal))
         {
             return BadRequest(new { message = "Confirmation text must be exactly DELETE." });
         }
 
-        await usersService.HardDeleteAsync(userId, cancellationToken);
-        return NoContent();
+        try
+        {
+            await usersService.EnsureCanHardDeleteUserAsync(
+                GetUserId(),
+                userId,
+                User.IsInRole(UserRole.SystemAdministrator),
+                cancellationToken);
+
+            await usersService.HardDeleteAsync(userId, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     private async Task SendEmailConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)

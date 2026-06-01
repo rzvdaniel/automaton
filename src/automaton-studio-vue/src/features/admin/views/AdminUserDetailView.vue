@@ -20,6 +20,9 @@ const user = ref<AdminUser | null>(null)
 
 const userId = computed(() => String(route.params.userId || ''))
 const isViewingSelf = computed(() => !!user.value && authStore.userId === user.value.id)
+const isCurrentUserSystemAdministrator = computed(() => (authStore.user?.roles ?? []).includes('SysAdmin'))
+const isTargetSystemAdministrator = computed(() => !!user.value && user.value.roles.includes('SysAdmin'))
+const isTargetAdministrator = computed(() => !!user.value && user.value.roles.includes('Admin'))
 const isAlreadyAdmin = computed(() => {
   if (!user.value) {
     return false
@@ -32,7 +35,33 @@ const hasAccountActions = computed(() => {
     return false
   }
 
-  return !user.value.emailConfirmed || !isViewingSelf.value || !isAlreadyAdmin.value
+  return true
+})
+
+const canToggleAccountLock = computed(() => !isViewingSelf.value && !isTargetSystemAdministrator.value)
+const canGrantAdmin = computed(() => !isViewingSelf.value && !isAlreadyAdmin.value && isCurrentUserSystemAdministrator.value && !isTargetSystemAdministrator.value)
+const accountProtectionMessages = computed(() => {
+  if (!user.value) {
+    return []
+  }
+
+  const messages: string[] = []
+
+  if (isViewingSelf.value) {
+    messages.push('You cannot manage your own account from this admin screen.')
+  }
+
+  if (isTargetSystemAdministrator.value) {
+    messages.push('Protected system administrator account.')
+  } else if (isTargetAdministrator.value && !isCurrentUserSystemAdministrator.value) {
+    messages.push('Only system administrators can manage administrator accounts.')
+  }
+
+  if (!isCurrentUserSystemAdministrator.value) {
+    messages.push('Only system administrators can grant administrator access or permanently delete users.')
+  }
+
+  return messages.filter((message, index, values) => values.indexOf(message) === index)
 })
 
 async function loadUser() {
@@ -317,20 +346,29 @@ onMounted(() => {
                   @click="triggerAction('Resend confirmation')"
                 />
                 <Button
-                  v-if="!isViewingSelf"
                   :label="user.isLocked ? 'Unlock Account' : 'Disable Account'"
                   :icon="user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban'"
                   :severity="user.isLocked ? 'success' : 'danger'"
                   outlined
+                  :disabled="!canToggleAccountLock"
                   @click="triggerAction(user.isLocked ? 'Unlock account' : 'Disable account')"
                 />
                 <Button
-                  v-if="!isAlreadyAdmin"
                   label="Grant Admin"
                   icon="pi pi-shield"
                   outlined
+                  :disabled="!canGrantAdmin"
                   @click="triggerAction('Grant admin')"
                 />
+                <div v-if="accountProtectionMessages.length" class="action-protection-list">
+                  <div
+                    v-for="message in accountProtectionMessages"
+                    :key="message"
+                    class="action-protection-item"
+                  >
+                    {{ message }}
+                  </div>
+                </div>
               </div>
             </template>
           </Card>
@@ -450,6 +488,16 @@ onMounted(() => {
 .actions-grid {
   display: grid;
   gap: 0.85rem;
+}
+
+.action-protection-list {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.action-protection-item {
+  color: var(--p-text-muted-color, var(--p-text-color-secondary));
+  font-size: 0.875rem;
 }
 
 .summary-card,

@@ -17,12 +17,14 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
 import type { DataTableRowClickEvent } from 'primevue/datatable'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { adminUsersService } from '../services/adminUsersService'
 import type { AdminUser, AdminUserSummary } from '../types/admin.types'
 
 const toast = useToast()
 const confirm = useConfirm()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const users = ref<AdminUser[]>([])
 const totalCount = ref(0)
@@ -65,6 +67,11 @@ const lockStatusOptions = [
   { label: 'Locked', value: true },
 ]
 
+const isCurrentUserSystemAdministrator = computed(() => {
+  const roles = authStore.user?.roles ?? []
+  return roles.includes('SysAdmin')
+})
+
 const headerStats = computed(() => {
   return [
     `Users: ${summary.value.totalCount.toLocaleString()}`,
@@ -76,13 +83,47 @@ const headerStats = computed(() => {
   ]
 })
 
+function getLockActionProtectionReason(user: AdminUser): string | null {
+  if (authStore.userId === user.id) {
+    return 'You cannot manage your own account.'
+  }
+
+  if (user.roles.includes('SysAdmin')) {
+    return 'Protected system administrator account.'
+  }
+
+  return null
+}
+
+function getHardDeleteProtectionReason(user: AdminUser): string | null {
+  if (!isCurrentUserSystemAdministrator.value) {
+    return 'Only system administrators can permanently delete users.'
+  }
+
+  if (authStore.userId === user.id) {
+    return 'You cannot permanently delete your own account.'
+  }
+
+  if (user.roles.includes('SysAdmin')) {
+    return 'Protected system administrator account.'
+  }
+
+  if (user.roles.includes('Admin')) {
+    return 'Protected administrator account.'
+  }
+
+  return null
+}
+
 const rowActionItems = computed<MenuItem[]>(() => {
   const user = selectedUser.value
   if (!user) {
     return []
   }
 
-  return [
+  const lockProtectionReason = getLockActionProtectionReason(user)
+  const hardDeleteProtectionReason = getHardDeleteProtectionReason(user)
+  const items: MenuItem[] = [
     {
       label: 'View profile',
       icon: 'pi pi-user',
@@ -110,14 +151,33 @@ const rowActionItems = computed<MenuItem[]>(() => {
     {
       label: user.isLocked ? 'Enable account' : 'Disable account',
       icon: user.isLocked ? 'pi pi-lock-open' : 'pi pi-ban',
+      disabled: !!lockProtectionReason,
       command: () => confirmToggleAccountStatus(user),
     },
     {
       label: 'Hard delete permanently',
       icon: 'pi pi-exclamation-triangle',
+      disabled: !!hardDeleteProtectionReason,
       command: () => confirmHardDeleteUser(user),
     },
   ]
+
+  const protectionReasons = [lockProtectionReason, hardDeleteProtectionReason]
+    .filter((reason, index, values): reason is string => !!reason && values.indexOf(reason) === index)
+
+  if (protectionReasons.length > 0) {
+    items.push({ separator: true })
+
+    for (const reason of protectionReasons) {
+      items.push({
+        label: reason,
+        icon: 'pi pi-info-circle',
+        disabled: true,
+      })
+    }
+  }
+
+  return items
 })
 
 async function loadUsers() {
@@ -276,11 +336,17 @@ async function setAccountStatus(user: AdminUser, disabled: boolean) {
     })
 
     await loadUsers()
-  } catch {
+  } catch (error: unknown) {
+    const detail =
+      error && typeof error === 'object' && 'response' in error &&
+      typeof (error as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+        ? (error as { response?: { data?: { message?: string } } }).response!.data!.message!
+        : `Could not ${disabled ? 'disable' : 'enable'} ${user.name}.`
+
     toast.add({
       severity: 'error',
       summary: 'Action Failed',
-      detail: `Could not ${disabled ? 'disable' : 'enable'} ${user.name}.`,
+      detail,
       life: 4000,
     })
   } finally {
