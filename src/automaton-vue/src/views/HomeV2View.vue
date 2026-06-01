@@ -9,7 +9,6 @@ import type { MarketplaceAppCard } from '@/types/marketplace'
 const router = useRouter()
 const { featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
-const showCopyNotice = ref(false)
 const isCarouselPaused = ref(false)
 let rotationId: number | undefined
 
@@ -105,18 +104,6 @@ function stopRotation() {
   }
 }
 
-async function copySetupFlow() {
-  try {
-    await navigator.clipboard.writeText('dotnet tool install -g Automaton.Cli\nautomaton setup')
-    showCopyNotice.value = true
-    window.setTimeout(() => {
-      showCopyNotice.value = false
-    }, 1500)
-  } catch {
-    showCopyNotice.value = false
-  }
-}
-
 onMounted(() => {
   void loadApps()
   startRotation()
@@ -151,10 +138,6 @@ watch(
             <p class="hero-copy">
               Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton gives your agent the deploy path: frontend hosting is included, and your backend runs on your runner.
             </p>
-            <div class="prompt-strip" aria-label="Example AI prompt">
-              <div class="prompt-label">PROMPT</div>
-              <div class="prompt-text">Build a live ISS tracker with Earth view and astronaut telemetry.</div>
-            </div>
             <div class="hero-actions">
               <RouterLink class="button primary" to="/cli">Install CLI</RouterLink>
               <RouterLink class="button" to="/apps">Browse apps</RouterLink>
@@ -410,32 +393,49 @@ watch(
         </div>
       </section>
 
-      <section id="creators">
-        <div class="shell feature-band">
-          <div class="big-card">
-            <h2>A living ecosystem of apps and remixes.</h2>
+      <section id="runners">
+        <div class="shell runners-band">
+          <div class="runners-copy">
+            <span class="eyebrow">Why runners</span>
+            <h2>Keep your backend where your data already lives.</h2>
             <p>
-              Every app has a builder behind it. Profiles, app collections, updates, remixes, and verified templates turn Automaton Monster from a deploy tool into a creation ecosystem.
+              Automaton hosts the frontend, but your backend stays under your control. Run Python and backend services on infrastructure you already trust instead of moving everything into a closed platform.
             </p>
-            <div class="stat-row">
-              <div class="stat"><strong>CLI</strong><span>agent-native setup</span></div>
-              <div class="stat"><strong>Fork</strong><span>start from working apps</span></div>
-              <div class="stat"><strong>Proof</strong><span>runs, remixes, updates</span></div>
+            <div class="runner-chip-grid">
+              <span class="runner-chip">Laptop</span>
+              <span class="runner-chip">VPS</span>
+              <span class="runner-chip">NAS</span>
+              <span class="runner-chip">Company network</span>
+              <span class="runner-chip">Raspberry Pi</span>
             </div>
           </div>
-          <div class="creator-panel">
-            <div class="creator-top">
-              <div>
-                <h3>Live ecosystem feed</h3>
-                <p>Turn new builds into fresh marketplace activity.</p>
-              </div>
-              <span class="status">Live</span>
+
+          <div class="runners-panel">
+            <div class="runners-panel-header">
+              <h3>Backend runtime options</h3>
+              <span class="status">Your infra</span>
             </div>
-            <div class="build-feed">
-              <div class="feed-item"><code>10:42</code><span>Maria published "Support Macro Builder"</span><span class="status">New</span></div>
-              <div class="feed-item"><code>10:28</code><span>Jon remixed "Sprint Poker" for mobile standups</span><span class="status">Remix</span></div>
-              <div class="feed-item"><code>09:51</code><span>Automaton verified "Invoice Triage" screenshots</span><span class="status">Trusted</span></div>
-              <div class="feed-item"><code>09:13</code><span>Team Ops shipped a public changelog update</span><span class="status">Updated</span></div>
+            <div class="runners-list">
+              <div class="runner-item">
+                <strong>Laptop</strong>
+                <p>Local development, fast iteration, private tools.</p>
+              </div>
+              <div class="runner-item">
+                <strong>VPS / Cloud</strong>
+                <p>Public APIs, scheduled jobs, scalable workloads.</p>
+              </div>
+              <div class="runner-item">
+                <strong>Home Server / NAS</strong>
+                <p>Internal dashboards, family systems, media and file automation.</p>
+              </div>
+              <div class="runner-item">
+                <strong>Company Network</strong>
+                <p>Keep access close to internal databases and business systems.</p>
+              </div>
+              <div class="runner-item">
+                <strong>Raspberry Pi</strong>
+                <p>Edge devices, sensors, lightweight always-on automation.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -444,22 +444,11 @@ watch(
       <section class="cta">
         <div class="shell cta-box">
           <div class="cta-copy">
-            <h2>Build and publish your first app in minutes.</h2>
-            <p>Install the setup flow, tell your AI what to build, then deploy directly to Automaton Monster.</p>
-            <div class="cta-command-row">
-              <div class="cta-command-preview">
-                <div>$ dotnet tool install -g Automaton.Cli</div>
-                <div>$ automaton setup</div>
-              </div>
-              <div class="cta-actions">
-                <button class="button primary" type="button" @click="copySetupFlow">
-                  Copy setup flow
-                </button>
-                <div v-if="showCopyNotice" class="copy-notice" role="status" aria-live="polite">
-                  Setup commands copied to clipboard
-                </div>
-              </div>
-            </div>
+            <h2>Ready to build?</h2>
+            <p>Install Automaton CLI and connect it to your favorite AI coding agent.</p>
+          </div>
+          <div class="cta-actions">
+            <RouterLink class="button primary" to="/cli">Get started</RouterLink>
           </div>
         </div>
       </section>
@@ -467,9 +456,27 @@ watch(
 
     <footer>
       <div class="shell footer-inner">
-        <span>Automaton Monster</span>
-        <span>CLI setup · AI app builds · public app discovery</span>
-        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener">Open Studio</a>
+        <p class="footer-trust">Frontend hosted by Automaton. Backend stays under your control.</p>
+
+        <div class="footer-brand-block">
+          <span class="footer-brand">Automaton Monster</span>
+          <p>Build with AI. Run your backend anywhere.</p>
+        </div>
+
+        <nav class="footer-links" aria-label="Footer navigation">
+          <a href="/apps">Apps</a>
+          <a href="/#architecture">How it works</a>
+          <a href="/docs">Docs</a>
+          <a href="/pricing">Pricing</a>
+          <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener">Studio</a>
+        </nav>
+
+        <nav class="footer-links footer-links-secondary" aria-label="Footer legal and social">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+        </nav>
+
+        <div class="footer-meta">© 2026 Automaton Monster</div>
       </div>
     </footer>
   </div>
@@ -1625,77 +1632,94 @@ section {
   align-items: stretch;
 }
 
-.big-card,
-.creator-panel {
+.runners-copy,
+.runners-panel {
   box-shadow: var(--v2-shadow);
 }
 
-.big-card {
+.runners-copy {
   padding: 28px;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.big-card h2 {
+.runners-copy h2 {
   margin: 0 0 12px;
   font-size: clamp(2rem, 4vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.05em;
 }
 
-.stat-row {
-  margin-top: 20px;
-}
-
-.stat {
-  padding: 14px;
-  background: rgba(0, 0, 0, 0.12);
-}
-
-.stat strong {
-  display: block;
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
-.stat span {
+.runners-copy p,
+.runners-panel-header p,
+.runner-item p {
+  margin: 0;
   color: var(--v2-muted);
-  font-size: 0.82rem;
 }
 
-.creator-panel {
+.runner-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.runner-chip {
+  padding: 8px 12px;
+  border: 1px solid rgba(69, 230, 138, 0.2);
+  border-radius: 999px;
+  background: rgba(69, 230, 138, 0.08);
+  color: #dff7ea;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.runners-band {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.runners-panel {
   overflow: hidden;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.creator-top {
+.runners-panel-header {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 20px;
   border-bottom: 1px solid var(--v2-line);
 }
 
-.creator-top h3 {
-  margin: 0 0 6px;
+.runners-panel-header h3 {
+  margin: 0;
 }
 
-.build-feed {
+.runners-list {
   display: grid;
-  gap: 1px;
-  background: var(--v2-line);
-}
-
-.feed-item {
-  display: grid;
-  grid-template-columns: 96px 1fr auto;
   gap: 12px;
-  align-items: center;
-  padding: 14px 20px;
-  background: rgba(16, 18, 24, 0.96);
-  color: var(--v2-soft);
-  font-size: 0.92rem;
+  padding: 20px;
 }
 
-.feed-item code {
-  color: var(--v2-green);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+.runner-item {
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(16, 18, 24, 0.96);
+}
+
+.runner-item strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--v2-text);
+  font-size: 1.02rem;
 }
 
 .status {
@@ -1729,49 +1753,10 @@ section {
   min-width: 0;
 }
 
-.cta-command-row {
+.cta-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.cta-actions {
-  position: relative;
-  display: grid;
-  justify-items: end;
-  gap: 10px;
-}
-
-.copy-notice {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(69, 230, 138, 0.28);
-  border-radius: 8px;
-  background: rgba(7, 8, 11, 0.96);
-  color: #d9ffe8;
-  font-size: 0.82rem;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
-}
-
-.cta-command-preview {
-  width: min(100%, 520px);
-  flex: 1 1 auto;
-  padding: 12px 14px;
-  border: 1px solid rgba(69, 230, 138, 0.18);
-  border-radius: 8px;
-  background: rgba(7, 8, 11, 0.72);
-  color: #d9ffe8;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.88rem;
-}
-
-.cta-command-preview div + div {
-  margin-top: 6px;
+  justify-content: flex-end;
 }
 
 .cta h2 {
@@ -1793,15 +1778,59 @@ footer {
 }
 
 .footer-inner {
-  justify-content: space-between;
-  gap: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.footer-brand-block {
+  display: grid;
+  gap: 6px;
+}
+
+.footer-trust {
+  margin: 0 0 4px;
+  color: var(--v2-soft);
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.footer-brand {
+  color: var(--v2-text);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.footer-brand-block p,
+.footer-meta {
+  margin: 0;
+  color: var(--v2-muted);
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+}
+
+.footer-links a {
+  color: var(--v2-soft);
+}
+
+.footer-links a:hover {
+  color: var(--v2-text);
+}
+
+.footer-links-secondary a {
+  color: var(--v2-muted);
 }
 
 @media (max-width: 980px) {
   .hero-grid,
   .featured-shelf,
   .install-workflow,
-  .feature-band,
+  .runners-band,
   .cta-box {
     grid-template-columns: 1fr;
   }
@@ -1885,25 +1914,8 @@ footer {
     padding: 18px;
   }
 
-  .cta-actions {
-    justify-items: stretch;
-  }
-
-  .copy-notice {
-    position: static;
-    white-space: normal;
-  }
-
-  .cta-command-row {
-    display: grid;
-  }
-
-  .cta-command-preview {
-    width: 100%;
-  }
-
   .prompt-strip,
-  .feed-item {
+  .runners-panel-header {
     grid-template-columns: 1fr;
   }
 
@@ -1954,12 +1966,11 @@ footer {
   .steps,
   .templates-grid,
   .live-strip,
-  .stat-row {
+  .path-cards {
     grid-template-columns: 1fr;
   }
 
-  .section-head,
-  .footer-inner {
+  .section-head {
     display: grid;
   }
 }

@@ -16,6 +16,7 @@ type NavLink = {
 
 const navLinks: NavLink[] = [
   { label: 'Apps', href: '/apps' },
+  { label: 'How it works', href: '/#architecture', hash: true },
   { label: 'Docs', href: '/docs' },
   { label: 'Pricing', href: '/pricing' },
 ]
@@ -26,7 +27,8 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
   }
 
   if (hash) {
-    return route.path === '/' && route.hash === href.slice(1)
+    const hashValue = href.includes('#') ? `#${href.split('#')[1]}` : href
+    return route.path === '/' && route.hash === hashValue
   }
 
   return route.path === href || route.path.startsWith(`${href}/`)
