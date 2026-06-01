@@ -142,22 +142,22 @@ watch(
       <header class="hero">
         <div class="shell hero-grid">
           <div>
-            <span class="eyebrow">AI-built apps, deployed by CLI</span>
+            <span class="eyebrow">Use any AI. Keep your backend.</span>
             <h1>
-              <span>AI can code.</span>
-              <span>Automaton</span>
-              <span>helps it ship.</span>
+              <span>Build with AI.</span>
+              <span>Run your backend</span>
+              <span>anywhere.</span>
             </h1>
             <p class="hero-copy">
-              Install once, run setup, then ask your AI coding agent for the app you want. Automaton Monster gives it the local instructions and CLI path to build, deploy, and remix real software.
+              Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton gives your agent the deploy path: frontend hosting is included, and your backend runs on your runner.
             </p>
             <div class="prompt-strip" aria-label="Example AI prompt">
               <div class="prompt-label">PROMPT</div>
               <div class="prompt-text">Build a live ISS tracker with Earth view and astronaut telemetry.</div>
             </div>
             <div class="hero-actions">
-              <RouterLink class="button primary" to="/cli">Install the CLI</RouterLink>
-              <RouterLink class="button" to="/apps">Browse public apps</RouterLink>
+              <RouterLink class="button primary" to="/cli">Install CLI</RouterLink>
+              <RouterLink class="button" to="/apps">Browse apps</RouterLink>
             </div>
           </div>
 
@@ -170,7 +170,7 @@ watch(
               @focusout="resumeCarousel"
             >
               <div class="carousel-label">
-                <span>Featured & recommended</span>
+                <span>Built with Automaton</span>
                 <span class="carousel-header-controls">
                   <button v-if="heroApps.length > 1" type="button" aria-label="Previous app" @click="previousApp">
                     <i class="pi pi-chevron-left" />
@@ -245,35 +245,157 @@ watch(
         </div>
       </header>
 
-      <section id="build">
+      <section id="architecture" class="architecture-section">
         <div class="shell">
-          <div class="section-head section-head-build">
-            <h2>Install once. Then just describe the app.</h2>
-            <div id="install" class="quick-setup quick-setup-large">
-              <div>$ dotnet tool install -g Automaton.Cli</div>
-              <div>$ automaton setup</div>
-              <div><span class="muted"># Then ask:</span> Build a live ISS tracker with Earth view and astronaut telemetry.</div>
+          <div class="architecture-card">
+            <div class="diagram-title">
+              <h3>Automaton <span>Architecture</span></h3>
+              <p>Build with any AI. Run your backend anywhere.</p>
+            </div>
+
+            <div class="architecture-diagram" aria-label="Automaton architecture diagram">
+              <div class="architecture-box architecture-box-ai">
+                <h4>AI Coding Tools</h4>
+                <div class="architecture-item-list">
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-orange">*</span> Claude Code</div>
+                  <div class="architecture-item"><span class="architecture-icon">◎</span> OpenAI Codex</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">◇</span> Cursor</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">⌘</span> GitHub Copilot</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-cyan">✦</span> Gemini</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">M</span> Any MCP Client</div>
+                </div>
+              </div>
+
+              <div class="architecture-arrow-wrap"><div class="architecture-arrow"></div></div>
+
+              <div>
+                <div class="architecture-box architecture-box-cli">
+                  <div class="terminal-icon">&gt;_</div>
+                  <h4>Automaton CLI</h4>
+                  <div class="cli-inner">
+                    <div class="checkline">Initialize project</div>
+                    <div class="checkline">Configure runtime</div>
+                    <div class="checkline">Deploy and manage</div>
+                  </div>
+                </div>
+
+                <div class="down-arrow"></div>
+
+                <div class="architecture-box architecture-box-frontend">
+                  <h4>Your Frontend</h4>
+                  <p class="architecture-subcopy">Hosted by Automaton</p>
+                  <div class="frontend-icons">
+                    <div class="mini"><span class="architecture-icon">⚡</span>Global CDN</div>
+                    <div class="mini"><span class="architecture-icon">🔒</span>HTTPS</div>
+                    <div class="mini"><span class="architecture-icon">↯</span>Edge caching</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="architecture-arrow-wrap"><div class="architecture-arrow architecture-arrow-purple"></div></div>
+
+              <div class="architecture-box architecture-box-backend">
+                <h4>Your Backend</h4>
+                <p class="architecture-subcopy">Runs on your runner</p>
+                <div class="architecture-item-list architecture-backend-list">
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▭</span> Laptop</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▤</span> Home Server / NAS</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">☁</span> VPS / Cloud</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▥</span> Company Network</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">●</span> Raspberry Pi</div>
+                  <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">◎</span> Anywhere</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mobile-diagram" aria-label="Simplified Automaton architecture diagram">
+              <div class="mobile-step">
+                <h4>1. Use any AI</h4>
+                <p>Claude Code, Codex, Cursor, Copilot, Gemini, or any MCP client.</p>
+              </div>
+              <div class="mobile-arrow">↓</div>
+              <div class="mobile-step">
+                <h4>2. Deploy with Automaton CLI</h4>
+                <p>Initialize the project, configure runtime, and deploy with a repeatable workflow.</p>
+              </div>
+              <div class="mobile-arrow">↙︎ ↘︎</div>
+              <div class="mobile-step">
+                <h4>3. Frontend hosted by Automaton</h4>
+                <p>Public, fast, HTTPS-enabled static app hosting.</p>
+              </div>
+              <div class="mobile-step">
+                <h4>4. Backend runs on your runner</h4>
+                <p>Laptop, VPS, NAS, company network, Raspberry Pi, or anywhere else you want it.</p>
+              </div>
+            </div>
+
+            <div class="architecture-footer-strip">
+              <div>
+                <span class="architecture-logo-mini">am</span>
+                Automaton <strong>connects</strong> AI coding tools to a modern <strong>deployment workflow</strong>.
+              </div>
+              <div class="architecture-badges">
+                <span class="architecture-badge">Bring your own model</span>
+                <span class="architecture-badge">Frontend hosting included</span>
+                <span class="architecture-badge">Backend stays yours</span>
+              </div>
             </div>
           </div>
-          <div class="steps">
-            <article class="step">
-              <div class="step-number">1</div>
-              <h3>Install the CLI</h3>
-              <p>Install the Automaton CLI once so your AI tools can build and deploy apps consistently.</p>
-              <div class="step-snippet">dotnet tool install -g Automaton.Cli</div>
-            </article>
-            <article class="step">
-              <div class="step-number">2</div>
-              <h3>Run setup once</h3>
-              <p>Connect your workspace and give your AI agent local guidance for building Automaton apps.</p>
-              <div class="step-snippet">automaton setup</div>
-            </article>
-            <article class="step">
-              <div class="step-number">3</div>
-              <h3>Ask for the app</h3>
-              <p>Now the prompt becomes the product idea — not deployment instructions.</p>
-              <div class="prompt-bubble">“Build a live ISS tracker with Earth visualization and realtime orbital data.”</div>
-            </article>
+        </div>
+      </section>
+
+      <section id="build">
+        <div class="shell">
+          <div class="install-workflow">
+            <div class="install-copy">
+              <span class="eyebrow">Developer workflow</span>
+              <h2>Install once. Then just describe the app.</h2>
+              <p class="install-lead">
+                Automaton gives your AI the deployment path. Your agent writes code, Automaton handles frontend hosting and backend runner connectivity.
+              </p>
+
+              <div class="install-points">
+                <div class="install-point">Use Claude Code, Codex, Cursor, Copilot, Gemini, or any AI coding agent.</div>
+                <div class="install-point">Deploy frontend apps instantly.</div>
+                <div class="install-point">Connect backend apps to your own runner.</div>
+              </div>
+            </div>
+
+            <div class="terminal-shell">
+              <div class="terminal-top">
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="terminal-title">automaton / deploy</span>
+              </div>
+
+              <div id="install" class="terminal-body">
+                <span class="terminal-comment"># install once</span><br />
+                <span class="terminal-prompt">$</span> <span class="terminal-command">dotnet tool install -g Automaton.Cli</span><br />
+                <span class="terminal-prompt">$</span> <span class="terminal-command">automaton setup</span><br />
+                <br />
+                <span class="terminal-comment"># ask your AI</span><br />
+                <span class="terminal-spoken">Build an inventory dashboard with a Python backend.</span><br />
+                <br />
+                <span class="terminal-prompt">$</span> <span class="terminal-command">automaton deploy</span><br />
+                <span class="terminal-success">✓ frontend hosted</span><br />
+                <span class="terminal-success">✓ backend connected to your runner</span>
+              </div>
+
+              <div class="terminal-result-grid">
+                <div class="terminal-result-card frontend">
+                  <strong>Frontend</strong>
+                  <h3>Hosted by Automaton</h3>
+                  <p>Public, shareable, fast static app hosting.</p>
+                </div>
+
+                <div class="terminal-result-card backend">
+                  <strong>Backend</strong>
+                  <h3>Runs on your runner</h3>
+                  <p>Executes Python where your data already lives.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -471,9 +593,9 @@ watch(
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.74fr) minmax(680px, 1.26fr);
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
   gap: 44px;
-  align-items: center;
+  align-items: start;
 }
 
 .eyebrow {
@@ -490,21 +612,17 @@ watch(
 }
 
 h1 {
-  width: max-content;
-  max-width: none;
+  width: auto;
+  max-width: 520px;
   margin: 18px 0;
-  font-size: clamp(3rem, 6.1vw, 6rem);
+  font-size: clamp(3rem, 5.2vw, 5.5rem);
   line-height: 0.92;
   letter-spacing: -0.06em;
 }
 
 h1 span {
   display: block;
-  white-space: nowrap;
-}
-
-h1 span:last-child {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .hero-copy {
@@ -552,6 +670,7 @@ h1 span:last-child {
   position: relative;
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .hero-showcase::before {
@@ -573,6 +692,7 @@ h1 span:last-child {
   border-radius: 8px;
   background: rgba(15, 18, 24, 0.94);
   box-shadow: var(--v2-shadow);
+  min-height: 430px;
 }
 
 .carousel-label {
@@ -628,16 +748,17 @@ h1 span:last-child {
 .featured-shelf {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(240px, 0.62fr);
-  min-height: 360px;
+  min-height: 392px;
+  height: 392px;
   padding: 0;
 }
 
 .featured-stage {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 360px;
+  min-height: 392px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  align-self: start;
+  align-self: stretch;
 }
 
 .featured-image-button {
@@ -664,7 +785,7 @@ h1 span:last-child {
 .featured-meta {
   display: grid;
   gap: 8px;
-  padding: 12px 20px 6px;
+  padding: 12px 20px 14px;
   background:
     linear-gradient(180deg, rgba(10, 16, 23, 0), rgba(10, 16, 23, 0.82) 22%, rgba(10, 16, 23, 0.98) 100%);
 }
@@ -702,7 +823,8 @@ h1 span:last-child {
   display: grid;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 1px;
-  min-height: 360px;
+  min-height: 392px;
+  height: 392px;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -738,6 +860,7 @@ h1 span:last-child {
 
 .preview-copy {
   padding: 12px 14px 14px;
+  min-height: 88px;
 }
 
 .preview-copy h3 {
@@ -786,27 +909,348 @@ h1 span:last-child {
   background: var(--v2-cyan);
 }
 
-.quick-setup {
-  padding: 16px;
-  border: 1px solid rgba(69, 230, 138, 0.22);
-  border-radius: 8px;
-  background: rgba(7, 8, 11, 0.74);
-  color: #d9ffe8;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+.architecture-section {
+  padding-top: 12px;
 }
 
-.quick-setup div + div {
-  margin-top: 8px;
+.architecture-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(69, 230, 138, 0.26);
+  border-radius: 28px;
+  padding: 34px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(69, 230, 138, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
+  box-shadow: var(--v2-shadow);
 }
 
-.quick-setup .muted {
-  color: #758096;
+.diagram-title {
+  margin-bottom: 34px;
+  text-align: center;
 }
 
-.quick-setup-large {
-  width: min(100%, 860px);
-  font-size: 1rem;
-  line-height: 1.8;
+.diagram-title h3 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.diagram-title h3 span {
+  color: var(--v2-green);
+}
+
+.diagram-title p {
+  margin: 12px 0 0;
+  color: var(--v2-muted);
+  font-size: 1.05rem;
+}
+
+.architecture-diagram {
+  display: grid;
+  grid-template-columns: 1fr 170px 1.15fr 170px 1fr;
+  align-items: center;
+  min-height: 540px;
+}
+
+.architecture-box {
+  position: relative;
+  border: 1px solid var(--v2-line);
+  border-radius: 22px;
+  padding: 22px;
+  background: rgba(8, 13, 19, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.architecture-box-ai {
+  border-color: rgba(80, 215, 255, 0.26);
+}
+
+.architecture-box-cli {
+  border-color: rgba(69, 230, 138, 0.72);
+  box-shadow: 0 0 45px rgba(69, 230, 138, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.architecture-box-backend {
+  border-color: rgba(155, 108, 255, 0.48);
+}
+
+.architecture-box-frontend {
+  text-align: center;
+  border-color: rgba(69, 230, 138, 0.42);
+  background: rgba(10, 28, 20, 0.72);
+}
+
+.architecture-box h4,
+.mobile-step h4 {
+  margin: 0 0 16px;
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+}
+
+.architecture-box-ai h4 {
+  color: #dff8ff;
+}
+
+.architecture-box-cli h4,
+.architecture-box-frontend h4 {
+  color: var(--v2-green);
+}
+
+.architecture-box-backend h4 {
+  color: #b891ff;
+}
+
+.architecture-item-list {
+  display: grid;
+  gap: 10px;
+}
+
+.architecture-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+  color: #edf4fb;
+  font-weight: 700;
+}
+
+.architecture-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(69, 230, 138, 0.12);
+  color: var(--v2-green);
+  font-weight: 900;
+}
+
+.architecture-icon-purple {
+  background: rgba(155, 108, 255, 0.14);
+  color: #9b6cff;
+}
+
+.architecture-icon-cyan {
+  background: rgba(80, 215, 255, 0.12);
+  color: var(--v2-cyan);
+}
+
+.architecture-icon-orange {
+  background: rgba(255, 139, 93, 0.12);
+  color: #ff8b5d;
+}
+
+.architecture-arrow-wrap {
+  display: grid;
+  height: 100%;
+  place-items: center;
+}
+
+.architecture-arrow {
+  position: relative;
+  width: 128px;
+  height: 54px;
+}
+
+.architecture-arrow::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  left: 0;
+  border-top: 4px dashed var(--v2-green);
+  filter: drop-shadow(0 0 10px rgba(69, 230, 138, 0.55));
+}
+
+.architecture-arrow::after {
+  content: "";
+  position: absolute;
+  top: calc(50% - 12px);
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-top: 4px solid var(--v2-green);
+  border-right: 4px solid var(--v2-green);
+  transform: rotate(45deg);
+  filter: drop-shadow(0 0 10px rgba(69, 230, 138, 0.55));
+}
+
+.architecture-arrow-purple::before {
+  border-color: #9b6cff;
+  filter: drop-shadow(0 0 10px rgba(155, 108, 255, 0.55));
+}
+
+.architecture-arrow-purple::after {
+  border-color: #9b6cff;
+  filter: drop-shadow(0 0 10px rgba(155, 108, 255, 0.55));
+}
+
+.terminal-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 8px;
+  place-items: center;
+  border: 1px solid rgba(69, 230, 138, 0.45);
+  border-radius: 14px;
+  background: rgba(69, 230, 138, 0.08);
+  color: var(--v2-green);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 25px;
+  font-weight: 900;
+}
+
+.cli-inner {
+  display: grid;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #dbe7f1;
+  font-size: 1.04rem;
+}
+
+.checkline::before {
+  content: "✓";
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border: 2px solid var(--v2-green);
+  border-radius: 999px;
+  color: var(--v2-green);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.down-arrow {
+  position: relative;
+  width: 4px;
+  height: 76px;
+  margin: 12px auto;
+  border-left: 4px dashed var(--v2-green);
+  filter: drop-shadow(0 0 10px rgba(69, 230, 138, 0.55));
+}
+
+.down-arrow::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: -12px;
+  width: 22px;
+  height: 22px;
+  border-right: 4px solid var(--v2-green);
+  border-bottom: 4px solid var(--v2-green);
+  transform: rotate(45deg);
+}
+
+.architecture-subcopy {
+  margin: -6px 0 0;
+  color: var(--v2-muted);
+}
+
+.frontend-icons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.mini {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  color: #d8e2ec;
+  font-size: 0.88rem;
+}
+
+.mini .architecture-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  font-size: 1.35rem;
+}
+
+.architecture-backend-list {
+  margin-top: 18px;
+}
+
+.mobile-diagram {
+  display: none;
+}
+
+.mobile-step {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 20px;
+  background: rgba(8, 13, 19, 0.82);
+}
+
+.mobile-step p {
+  margin: 0;
+  color: var(--v2-muted);
+  line-height: 1.55;
+}
+
+.mobile-arrow {
+  display: grid;
+  min-height: 54px;
+  place-items: center;
+  color: var(--v2-green);
+  font-size: 46px;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(69, 230, 138, 0.55);
+}
+
+.architecture-footer-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #d9e4ee;
+}
+
+.architecture-footer-strip strong {
+  color: var(--v2-green);
+}
+
+.architecture-logo-mini {
+  margin-right: 8px;
+  color: var(--v2-green);
+  font-weight: 900;
+}
+
+.architecture-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #d9e4ee;
+  font-size: 0.88rem;
+}
+
+.architecture-badge::before {
+  content: "✓";
+  margin-right: 8px;
+  color: var(--v2-green);
+  font-weight: 900;
 }
 
 .live-strip {
@@ -855,6 +1299,178 @@ section {
 
 .section-head-build {
   align-items: stretch;
+}
+
+.install-workflow {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.install-copy h2 {
+  max-width: 620px;
+  margin: 0;
+  font-size: clamp(2.6rem, 5.3vw, 4.5rem);
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.install-lead {
+  max-width: 560px;
+  margin: 22px 0 0;
+  color: var(--v2-muted);
+  font-size: 1.18rem;
+  line-height: 1.55;
+}
+
+.install-points {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.install-point {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: #dbe7f1;
+  font-weight: 700;
+}
+
+.install-point::before {
+  content: "✓";
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  margin-top: 1px;
+  border: 2px solid var(--v2-green);
+  border-radius: 999px;
+  color: var(--v2-green);
+  font-size: 13px;
+}
+
+.terminal-shell {
+  overflow: hidden;
+  border: 1px solid rgba(69, 230, 138, 0.28);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(69, 230, 138, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 19, 0.88);
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.42);
+}
+
+.terminal-top {
+  display: flex;
+  height: 54px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.terminal-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #ff695c;
+}
+
+.terminal-dot:nth-child(2) {
+  background: #ffd166;
+}
+
+.terminal-dot:nth-child(3) {
+  background: #43ec8d;
+}
+
+.terminal-title {
+  margin-left: 8px;
+  color: #7890a4;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.terminal-body {
+  margin: 26px;
+  padding: 24px;
+  overflow-x: auto;
+  border: 1px solid rgba(69, 230, 138, 0.18);
+  border-radius: 20px;
+  background: #020507;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: clamp(13px, 1.55vw, 16px);
+  line-height: 1.78;
+}
+
+.terminal-comment {
+  color: #7d9ab2;
+}
+
+.terminal-prompt {
+  color: var(--v2-green);
+}
+
+.terminal-command {
+  color: #f4fff8;
+  font-weight: 700;
+}
+
+.terminal-spoken {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.terminal-success {
+  color: var(--v2-cyan);
+}
+
+.terminal-result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 0 26px 26px;
+}
+
+.terminal-result-card {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.terminal-result-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #7890a4;
+  font-size: 12px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.terminal-result-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.38rem;
+  letter-spacing: -0.035em;
+}
+
+.terminal-result-card p {
+  margin: 0;
+  color: var(--v2-muted);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.terminal-result-card.frontend {
+  border-color: rgba(80, 215, 255, 0.24);
+}
+
+.terminal-result-card.backend {
+  border-color: rgba(69, 230, 138, 0.3);
 }
 
 .section-head h2 {
@@ -1154,6 +1770,7 @@ footer {
 @media (max-width: 980px) {
   .hero-grid,
   .featured-shelf,
+  .install-workflow,
   .feature-band,
   .cta-box {
     grid-template-columns: 1fr;
@@ -1174,13 +1791,35 @@ footer {
   }
 
   h1 {
-    width: auto;
     max-width: 690px;
   }
 
   .steps,
   .nav-links {
     display: none;
+  }
+
+  .architecture-card {
+    padding: 22px;
+  }
+
+  .terminal-body {
+    margin: 18px;
+    padding: 18px;
+  }
+
+  .terminal-result-grid {
+    grid-template-columns: 1fr;
+    padding: 0 18px 18px;
+  }
+
+  .architecture-diagram {
+    display: none;
+  }
+
+  .mobile-diagram {
+    display: grid;
+    gap: 18px;
   }
 
 }
@@ -1244,7 +1883,8 @@ footer {
   .featured-previews {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(2, minmax(0, 1fr));
-    min-height: 0;
+    min-height: unset;
+    height: auto;
   }
 
   .featured-image-button {
@@ -1260,9 +1900,32 @@ footer {
     padding: 12px 16px 6px;
   }
 
-  .quick-setup-large {
-    font-size: 0.92rem;
-    line-height: 1.65;
+  .carousel-frame,
+  .featured-shelf,
+  .featured-stage {
+    min-height: 0;
+    height: auto;
+  }
+
+  .architecture-card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .diagram-title {
+    text-align: left;
+  }
+
+  .diagram-title h3 {
+    font-size: 2.1rem;
+  }
+
+  .diagram-title p {
+    font-size: 1rem;
+  }
+
+  .architecture-footer-strip {
+    display: none;
   }
 
   .steps,
