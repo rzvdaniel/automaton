@@ -27,6 +27,7 @@
     "codemirror": "^6.0.2",
     "marked": "^15.0.12",
     "pinia": "^3.0.4",
+    "posthog-js": "^1.258.3",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
