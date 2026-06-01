@@ -5,6 +5,7 @@ import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
+import studioScreenshotUrl from '@/assets/studio-apps-screenshot.jpg'
 
 const router = useRouter()
 const { featuredApps, loadApps } = useMarketplaceApps(12)
@@ -386,6 +387,65 @@ watch(
                   <strong>Backend</strong>
                   <h3>Runs on your runner</h3>
                   <p>Executes Python where your data already lives.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="studio">
+        <div class="shell">
+          <div class="studio-section">
+            <div>
+              <span class="eyebrow">Automaton Studio</span>
+              <h2>Everything around your apps. One place.</h2>
+              <p class="studio-lead">
+                The CLI builds and deploys. Automaton Studio gives you the control room for apps, runners, publishing, API keys, screenshots, metadata, and runtime status.
+              </p>
+
+              <div class="studio-feature-list">
+                <div class="studio-feature">Manage apps and deployments</div>
+                <div class="studio-feature">Add covers and screenshots</div>
+                <div class="studio-feature">Create and rotate API keys</div>
+                <div class="studio-feature">Monitor runner status</div>
+                <div class="studio-feature">Edit summaries and descriptions</div>
+                <div class="studio-feature">Publish, fork, and organize apps</div>
+              </div>
+
+              <div class="studio-actions">
+                <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Open Studio</a>
+                <a href="/docs" class="button">Read docs</a>
+              </div>
+            </div>
+
+            <div class="studio-card">
+              <div class="browser-top">
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="terminal-dot"></span>
+                <span class="browser-title">studio.automaton.monster</span>
+              </div>
+
+              <div class="studio-screenshot-slot">
+                <img
+                  :src="studioScreenshotUrl"
+                  alt="Automaton Studio apps dashboard showing app creation, app list, and publishing controls"
+                />
+              </div>
+
+              <div class="studio-caption">
+                <div class="caption-card">
+                  <strong>Apps</strong>
+                  <span>Manage metadata, screenshots, covers, publishing, and forks.</span>
+                </div>
+                <div class="caption-card">
+                  <strong>Runners</strong>
+                  <span>See backend runner status and connected runtime environments.</span>
+                </div>
+                <div class="caption-card">
+                  <strong>Keys</strong>
+                  <span>Create project API keys for CLI, SDKs, and integrations.</span>
                 </div>
               </div>
             </div>
@@ -1510,6 +1570,144 @@ section {
   border-color: rgba(69, 230, 138, 0.3);
 }
 
+.studio-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 34px;
+  align-items: center;
+}
+
+.studio-lead {
+  max-width: 560px;
+  margin: 22px 0 0;
+  color: var(--v2-soft);
+  font-size: clamp(1.05rem, 1.7vw, 1.2rem);
+  line-height: 1.55;
+}
+
+.studio-feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 620px;
+  margin-top: 28px;
+}
+
+.studio-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 54px;
+  padding: 13px 14px;
+  border: 1px solid var(--v2-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #dbe7f1;
+  font-weight: 750;
+}
+
+.studio-feature::before {
+  content: "✓";
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  margin-top: 1px;
+  border: 2px solid var(--v2-green);
+  border-radius: 999px;
+  color: var(--v2-green);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.studio-card {
+  overflow: hidden;
+  border: 1px solid rgba(69, 230, 138, 0.28);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(69, 230, 138, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 19, 0.88);
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.42);
+}
+
+.browser-top {
+  display: flex;
+  height: 54px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.browser-title {
+  margin-left: 8px;
+  color: #7890a4;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.studio-screenshot-slot {
+  position: relative;
+  display: grid;
+  min-height: 430px;
+  place-items: center;
+  margin: 26px;
+  overflow: hidden;
+  border: 1px dashed rgba(80, 215, 255, 0.28);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(80, 215, 255, 0.11), transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(69, 230, 138, 0.1), transparent 28%),
+    #05080c;
+}
+
+.studio-screenshot-slot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 430px;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.studio-caption {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 26px 26px;
+}
+
+.caption-card {
+  min-height: 88px;
+  padding: 16px;
+  border: 1px solid var(--v2-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.caption-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--v2-text);
+  font-size: 0.96rem;
+}
+
+.caption-card span {
+  color: var(--v2-muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
 .section-head h2 {
   max-width: 760px;
   margin: 0;
@@ -1830,6 +2028,7 @@ footer {
   .hero-grid,
   .featured-shelf,
   .install-workflow,
+  .studio-section,
   .runners-band,
   .cta-box {
     grid-template-columns: 1fr;
@@ -1877,6 +2076,24 @@ footer {
   }
 
   .terminal-result-grid {
+    grid-template-columns: 1fr;
+    padding: 0 18px 18px;
+  }
+
+  .studio-feature-list {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-screenshot-slot {
+    min-height: 300px;
+    margin: 18px;
+  }
+
+  .studio-screenshot-slot img {
+    min-height: 300px;
+  }
+
+  .studio-caption {
     grid-template-columns: 1fr;
     padding: 0 18px 18px;
   }
