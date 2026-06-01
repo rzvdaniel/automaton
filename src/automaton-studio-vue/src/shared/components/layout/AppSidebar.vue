@@ -175,7 +175,7 @@ const isActive = (to: string) => {
     <div class="sidebar-content">
       <div class="sidebar-logo">
         <div class="sidebar-brand">
-          <i class="pi pi-bolt text-2xl" style="color: var(--p-primary-500)"></i>
+          <img src="/logo.svg" alt="Automaton" class="sidebar-brand-logo" />
           <span v-if="isExpanded" class="logo-text">Automaton</span>
         </div>
         <Button
@@ -291,6 +291,13 @@ const isActive = (to: string) => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.sidebar-brand-logo {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  display: block;
 }
 
 .logo-text {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { publicAppConfig } from '@/config/publicAppConfig'
+import logoUrl from '@/assets/logo.svg'
 </script>
 
 <template>
@@ -7,7 +8,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
     <div class="container footer-inner">
       <div class="footer-brand">
         <div class="footer-logo">
-          <span>⚡</span>
+          <img :src="logoUrl" alt="" class="footer-logo-icon" aria-hidden="true" />
           <span>Automaton</span>
         </div>
         <p class="footer-tagline">The fastest way to turn your code into a live app.</p>
@@ -80,6 +81,12 @@ import { publicAppConfig } from '@/config/publicAppConfig'
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--color-text);
+}
+
+.footer-logo-icon {
+  width: 28px;
+  height: 28px;
+  display: block;
 }
 
 .footer-tagline {

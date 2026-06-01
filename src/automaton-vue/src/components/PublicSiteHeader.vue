@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { publicAppConfig } from '@/config/publicAppConfig'
+import logoUrl from '@/assets/logo.svg'
 
 const route = useRoute()
 const mobileMenuOpen = ref(false)
@@ -36,7 +37,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
   <header class="public-header">
     <div class="shell nav-inner">
       <RouterLink class="brand" to="/">
-        <span class="mark">am</span>
+        <img :src="logoUrl" alt="" class="mark" aria-hidden="true" />
         <span class="brand-text">Automaton Monster</span>
         <span class="preview-badge">Preview</span>
       </RouterLink>
@@ -127,16 +128,14 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
 }
 
 .mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid rgba(69, 230, 138, 0.48);
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(69, 230, 138, 0.18), rgba(80, 215, 255, 0.12));
-  color: #45e68a;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  box-shadow: 0 0 34px rgba(69, 230, 138, 0.14);
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 52px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .brand-text {

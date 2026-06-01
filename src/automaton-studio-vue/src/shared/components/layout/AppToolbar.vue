@@ -125,10 +125,6 @@ function goToSettings() {
           aria-label="Open Navigation"
           @click="toggleMobile"
         />
-        <div class="flex items-center gap-2">
-          <i class="pi pi-bolt text-xl" style="color: var(--p-primary-500)"></i>
-          <span class="font-bold text-xl">Automaton Studio</span>
-        </div>
         <div class="border-right" style="height: 1.5rem"></div>
         <ProjectSwitcher />
         <span

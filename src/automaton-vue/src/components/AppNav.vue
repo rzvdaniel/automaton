@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { publicAppConfig } from '@/config/publicAppConfig'
+import logoUrl from '@/assets/logo.svg'
 
 const mobileMenuOpen = ref(false)
 const route = useRoute()
@@ -27,9 +28,7 @@ function isActiveLink(href: string, external?: boolean) {
   <header class="nav-header">
     <div class="container nav-inner">
       <RouterLink to="/" :class="['nav-logo', isHomeActive() && 'nav-logo-active']" :aria-current="isHomeActive() ? 'page' : undefined">
-        <span class="logo-icon" aria-hidden="true">
-          <span class="logo-icon-core" />
-        </span>
+        <img :src="logoUrl" alt="" class="logo-icon" aria-hidden="true" />
         <span class="logo-text">Automaton</span>
       </RouterLink>
 
@@ -133,38 +132,10 @@ function isActiveLink(href: string, external?: boolean) {
 }
 
 .logo-icon {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #7c6af5 0%, #4da6ff 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 8px 18px rgba(77, 166, 255, 0.16);
-}
-
-.logo-icon::before {
-  content: '';
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.logo-icon-core {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  background: rgba(9, 12, 18, 0.92);
-  transform: rotate(45deg);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: block;
 }
 
 .logo-text {
