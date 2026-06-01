@@ -514,29 +514,70 @@ watch(
       </section>
     </main>
 
-    <footer>
-      <div class="shell footer-inner">
-        <p class="footer-trust">Frontend hosted by Automaton. Backend stays under your control.</p>
+    <footer class="footer">
+      <div class="shell footer-shell">
+        <div class="footer-positioning">
+          <div>
+            <strong>Frontend hosted by Automaton.</strong>
+            <span>Backend executes on infrastructure you control.</span>
+          </div>
 
-        <div class="footer-brand-block">
-          <span class="footer-brand">Automaton Monster</span>
-          <p>Build with AI. Run your backend anywhere.</p>
+          <div class="status-pills">
+            <span class="pill green">Beta</span>
+            <span class="pill">BYOK</span>
+            <span class="pill">Self-hosted runners</span>
+            <span class="pill">Frontend hosting included</span>
+          </div>
         </div>
 
-        <nav class="footer-links" aria-label="Footer navigation">
-          <a href="/apps">Apps</a>
-          <a href="/#architecture">How it works</a>
-          <a href="/docs">Docs</a>
-          <a href="/pricing">Pricing</a>
-          <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener">Studio</a>
-        </nav>
+        <div class="footer-grid">
+          <div class="brand-column">
+            <div class="brand-row">
+              <span class="footer-logo">am</span>
+              <span class="brand-name">Automaton Monster</span>
+            </div>
+            <p class="brand-copy">
+              Build with AI. Run your backend anywhere. Automaton connects AI-generated apps to frontend hosting and runners you control.
+            </p>
+          </div>
 
-        <nav class="footer-links footer-links-secondary" aria-label="Footer legal and social">
-          <a href="#">Privacy</a>
-          <a href="#">Terms</a>
-        </nav>
+          <div class="footer-column">
+            <h3>Product</h3>
+            <div class="link-list">
+              <a href="/apps">Apps</a>
+              <a href="/#architecture">How it works</a>
+              <a href="/pricing">Pricing</a>
+              <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener">Studio</a>
+            </div>
+          </div>
 
-        <div class="footer-meta">© 2026 Automaton Monster</div>
+          <div class="footer-column">
+            <h3>Resources</h3>
+            <div class="link-list">
+              <a href="/docs">Docs</a>
+              <a href="/cli">CLI setup</a>
+              <a href="/#runners">Runners</a>
+              <a href="/apps">Publishing</a>
+            </div>
+          </div>
+
+          <div class="footer-column">
+            <h3>Legal</h3>
+            <div class="link-list">
+              <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+              <a href="mailto:hello@automaton.monster">Contact</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-bottom">
+          <span>© 2026 Automaton Monster</span>
+          <div class="bottom-links">
+            <a href="/apps">Public apps</a>
+            <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener">Open Studio</a>
+          </div>
+        </div>
       </div>
     </footer>
   </div>
@@ -1968,60 +2009,148 @@ section {
   color: var(--v2-muted);
 }
 
-footer {
-  padding: 24px 0 34px;
+.footer {
+  border-top: 1px solid var(--v2-line);
+  background:
+    radial-gradient(circle at 15% 0%, rgba(80, 215, 255, 0.06), transparent 26rem),
+    rgba(5, 7, 10, 0.92);
+}
+
+.footer-shell {
+  padding: 34px 0 28px;
+}
+
+.footer-positioning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  margin-bottom: 30px;
+  padding: 18px 20px;
+  border: 1px solid rgba(69, 230, 138, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(69, 230, 138, 0.08), rgba(80, 215, 255, 0.035));
+}
+
+.footer-positioning strong {
+  color: var(--v2-text);
+  font-size: clamp(1rem, 1.4vw, 1.12rem);
+  letter-spacing: -0.02em;
+}
+
+.footer-positioning span {
+  color: var(--v2-soft);
+  font-size: 0.96rem;
+}
+
+.status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--v2-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pill.green {
+  border-color: rgba(69, 230, 138, 0.28);
+  background: rgba(69, 230, 138, 0.1);
+  color: #d7ffe8;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(140px, 0.55fr));
+  gap: 34px;
+  align-items: start;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.footer-logo {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(69, 230, 138, 0.48);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(69, 230, 138, 0.18), rgba(80, 215, 255, 0.1));
+  box-shadow: 0 0 30px rgba(69, 230, 138, 0.12);
+  color: var(--v2-green);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 900;
+}
+
+.brand-name {
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+.brand-copy {
+  max-width: 380px;
+  margin: 0;
+  color: var(--v2-muted);
+  line-height: 1.55;
+}
+
+.footer-column h3 {
+  margin: 0 0 12px;
+  color: var(--v2-text);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.link-list {
+  display: grid;
+  gap: 10px;
+}
+
+.link-list a,
+.bottom-links a {
+  color: var(--v2-muted);
+  font-size: 0.94rem;
+}
+
+.link-list a:hover,
+.bottom-links a:hover {
+  color: var(--v2-text);
+}
+
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 34px;
+  padding-top: 22px;
   border-top: 1px solid var(--v2-line);
   color: var(--v2-muted);
   font-size: 0.9rem;
 }
 
-.footer-inner {
-  display: grid;
-  gap: 14px;
-}
-
-.footer-brand-block {
-  display: grid;
-  gap: 6px;
-}
-
-.footer-trust {
-  margin: 0 0 4px;
-  color: var(--v2-soft);
-  font-size: 0.98rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.footer-brand {
-  color: var(--v2-text);
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.footer-brand-block p,
-.footer-meta {
-  margin: 0;
-  color: var(--v2-muted);
-}
-
-.footer-links {
+.bottom-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 18px;
-}
-
-.footer-links a {
-  color: var(--v2-soft);
-}
-
-.footer-links a:hover {
-  color: var(--v2-text);
-}
-
-.footer-links-secondary a {
-  color: var(--v2-muted);
+  gap: 16px;
 }
 
 @media (max-width: 980px) {
@@ -2107,6 +2236,14 @@ footer {
     gap: 18px;
   }
 
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .brand-column {
+    grid-column: 1 / -1;
+  }
+
 }
 
 @media (max-width: 640px) {
@@ -2189,6 +2326,19 @@ footer {
 
   .section-head {
     display: grid;
+  }
+
+  .footer-positioning {
+    align-items: flex-start;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-bottom {
+    display: grid;
+    justify-content: start;
   }
 }
 </style>

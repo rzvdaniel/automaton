@@ -41,7 +41,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       <RouterLink class="brand" to="/">
         <img :src="logoUrl" alt="" class="mark" aria-hidden="true" />
         <span class="brand-text">Automaton Monster</span>
-        <span class="preview-badge">Preview</span>
+        <span class="preview-badge">Beta</span>
       </RouterLink>
 
       <nav class="nav-links desktop-only" aria-label="Primary navigation">
@@ -61,7 +61,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       </nav>
 
       <div class="nav-actions desktop-only">
-        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Build an app</a>
+        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Get Started</a>
       </div>
 
       <button class="mobile-menu-btn mobile-only" type="button" @click="mobileMenuOpen = !mobileMenuOpen">
@@ -85,7 +85,7 @@ function isActiveLink(href: string, hash?: boolean, external?: boolean) {
       </component>
 
       <div class="mobile-menu-actions">
-        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Build an app</a>
+        <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Get Started</a>
       </div>
     </div>
   </header>
