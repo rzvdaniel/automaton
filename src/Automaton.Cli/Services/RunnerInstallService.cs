@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Formats.Tar;
+using System.ComponentModel;
 
 namespace Automaton.Cli.Services;
 
@@ -239,8 +240,30 @@ public sealed class RunnerInstallService
 
     public async Task EnsureDockerAvailableAsync(CancellationToken cancellationToken = default)
     {
-        await RunProcessCheckedAsync("docker", "--version", cancellationToken);
-        await RunProcessCheckedAsync("docker", "info", cancellationToken);
+        try
+        {
+            await RunProcessCheckedAsync("docker", "--version", cancellationToken);
+        }
+        catch (Win32Exception)
+        {
+            throw new InvalidOperationException(
+                "Docker is not installed. Install Docker Desktop or Docker Engine, then rerun automaton runner install.");
+        }
+        catch (InvalidOperationException ex) when (IsMissingCommandError(ex.Message))
+        {
+            throw new InvalidOperationException(
+                "Docker is not installed. Install Docker Desktop or Docker Engine, then rerun automaton runner install.");
+        }
+
+        try
+        {
+            await RunProcessCheckedAsync("docker", "info", cancellationToken);
+        }
+        catch (InvalidOperationException ex) when (IsDockerDaemonUnavailable(ex.Message))
+        {
+            throw new InvalidOperationException(
+                "Docker is installed but not running. Start Docker and rerun automaton runner install.");
+        }
     }
 
     public string GetDefaultServer(string? resolvedServer)
@@ -871,4 +894,17 @@ WantedBy=multi-user.target
 
         return (process.ExitCode, stdout, stderr);
     }
+
+    private static bool IsMissingCommandError(string message)
+        => message.Contains("No such file or directory", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("not recognized as an internal or external command", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("The system cannot find the file specified", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDockerDaemonUnavailable(string message)
+        => message.Contains("daemon", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("docker desktop is not running", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("cannot connect to the docker daemon", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("error during connect", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("docker engine", StringComparison.OrdinalIgnoreCase)
+           || message.Contains("is the docker daemon running", StringComparison.OrdinalIgnoreCase);
 }
