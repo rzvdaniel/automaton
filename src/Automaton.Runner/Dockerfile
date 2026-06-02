@@ -74,13 +74,23 @@ RUN pip install --no-cache-dir \
     requests \
     httpx \
     aiohttp \
+    python-multipart \
+    # Validation & configuration
+    pydantic \
+    pydantic-settings \
     # Data processing
     pandas \
     numpy \
+    pytz \
     # JSON/YAML/CSV
     pyyaml \
     python-dateutil \
+    openpyxl \
+    xlsxwriter \
+    python-docx \
+    pypdf \
     # Database connectors
+    sqlalchemy \
     pymysql \
     psycopg2-binary \
     # Cloud SDKs
@@ -90,7 +100,8 @@ RUN pip install --no-cache-dir \
     lxml \
     Pillow \
     python-dotenv \
-    jinja2
+    jinja2 \
+    markdown
 
 # Create non-root user
 RUN useradd -m -s /bin/bash automaton

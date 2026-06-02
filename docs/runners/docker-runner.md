@@ -173,12 +173,14 @@ The runner image comes with commonly-used Python packages pre-installed:
 
 | Category | Packages |
 |----------|----------|
-| **HTTP & API** | `requests`, `httpx`, `aiohttp` |
-| **Data Processing** | `pandas`, `numpy` |
+| **HTTP & API** | `requests`, `httpx`, `aiohttp`, `python-multipart` |
+| **Validation & Config** | `pydantic`, `pydantic-settings`, `python-dotenv` |
+| **Data Processing** | `pandas`, `numpy`, `pytz` |
+| **Files & Documents** | `openpyxl`, `xlsxwriter`, `python-docx`, `pypdf` |
 | **Serialization** | `pyyaml`, `python-dateutil` |
-| **Databases** | `pymysql`, `psycopg2-binary` |
+| **Databases** | `sqlalchemy`, `pymysql`, `psycopg2-binary` |
 | **Cloud** | `boto3` (AWS SDK) |
-| **Utilities** | `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2` |
+| **Utilities** | `beautifulsoup4`, `lxml`, `Pillow`, `jinja2`, `markdown` |
 | **System Binaries** | `ffmpeg`, `ghostscript`, `imagemagick`, `poppler-utils`, `pandoc` |
 
 ### Installing Additional Packages

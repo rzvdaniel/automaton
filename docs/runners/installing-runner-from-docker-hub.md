@@ -369,12 +369,14 @@ The runner image includes:
 - **.NET 9 Runtime** — Runs the Automaton Runner console application
 - **Python 3.13** — For executing custom Python steps
 - **Pre-installed Python packages**:
-  - HTTP & API: `requests`, `httpx`, `aiohttp`
-  - Data Processing: `pandas`, `numpy`
+  - HTTP & API: `requests`, `httpx`, `aiohttp`, `python-multipart`
+  - Validation & Config: `pydantic`, `pydantic-settings`, `python-dotenv`
+  - Data Processing: `pandas`, `numpy`, `pytz`
+  - Files & Documents: `openpyxl`, `xlsxwriter`, `python-docx`, `pypdf`
   - Serialization: `pyyaml`, `python-dateutil`
-  - Databases: `pymysql`, `psycopg2-binary`
+  - Databases: `sqlalchemy`, `pymysql`, `psycopg2-binary`
   - Cloud: `boto3` (AWS SDK)
-  - Utilities: `beautifulsoup4`, `lxml`, `Pillow`, `python-dotenv`, `jinja2`
+  - Utilities: `beautifulsoup4`, `lxml`, `Pillow`, `jinja2`, `markdown`
 - **Pre-installed system packages**: `ffmpeg`, `ghostscript`, `imagemagick`, `poppler-utils`, `pandoc`
 
 Image size: ~500-600MB
