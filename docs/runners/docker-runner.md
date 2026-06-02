@@ -194,7 +194,7 @@ Create `backend/requirements.txt` in your app with one package per line:
 pydub==0.25.1
 your-package==1.0.0
 ```
-Deploy the backend — the runner installs these to a **persistent volume** so they survive container restarts and image upgrades. The deploy response includes pip output so you can confirm each package installed correctly.
+Deploy the backend — the runner creates an app-specific virtual environment at `runner-data/apps/{appId}/venv`, installs the packages there, and reuses that environment across container restarts and image upgrades. Re-deploying `requirements.txt` rebuilds that app's venv from scratch so removed packages do not linger. The deploy response includes dependency setup output so you can confirm each package installed correctly.
 
 **❗ Never install packages inside controller code.** Do not use `subprocess`, `pip.main()`, or any runtime pip call in Python scripts.
 

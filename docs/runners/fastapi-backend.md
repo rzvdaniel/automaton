@@ -16,6 +16,10 @@ ASP.NET Server  --[SignalR TunnelRequest]--> Runner (C#)
                                                  |
                                            FastAPI (Python)
                                                  |
+                                 launches app-specific venv subprocess
+                                                 |
+                      {RUNNER_SCRIPTS_DIR}/{appId}/venv/bin/python (or Scripts/python.exe)
+                                                 |
                                      loads {RUNNER_SCRIPTS_DIR}/{appId}/backend/{controller}.py
                                      calls handle(action, inputs) -> {success, data, error}
 ```
@@ -36,6 +40,14 @@ The path is configured via the `RUNNER_SCRIPTS_DIR` environment variable:
 | Local dev | `<worktree>/runner-data/apps` (set by `dev-start.ps1`) |
 
 Both the C# runner (`HubService.UploadControllerScriptHandler`) and FastAPI read from this same path.
+
+Each app also gets its own virtual environment:
+
+```
+{RUNNER_SCRIPTS_DIR}/{appId}/venv
+```
+
+FastAPI stays as the shared request router, but controller code executes in a subprocess using that app's venv interpreter. This isolates app-specific Python dependencies without needing one FastAPI server per app.
 
 ## Controller Script Contract
 

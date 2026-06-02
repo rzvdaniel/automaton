@@ -22,7 +22,7 @@ public class DeployBackendResponse
     public int RunnerCount { get; set; }
     public bool HasRequirements { get; set; }
     public string? Message { get; set; }
-    /// <summary>Pip install output lines captured from the runner during requirements.txt installation.</summary>
+    /// <summary>Dependency setup output lines captured from the runner during requirements.txt installation.</summary>
     public List<string>? InstallLogs { get; set; }
 }
 

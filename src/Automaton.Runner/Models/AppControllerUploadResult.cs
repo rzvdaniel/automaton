@@ -2,7 +2,7 @@ namespace Automaton.Runner.Console.Models;
 
 /// <summary>
 /// Result returned to the server after handling an UploadControllerScript request.
-/// When a requirements.txt is installed, Logs contains the pip install output lines.
+/// When requirements.txt is processed, Logs contains the app venv creation and pip install output lines.
 /// </summary>
 public class AppControllerUploadResult
 {

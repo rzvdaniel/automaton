@@ -500,9 +500,8 @@ public class HubService
 
     /// <summary>
     /// Receives a controller script from the server and writes it to local disk for FastAPI to read.
-    /// If the file is requirements.txt, installs packages into the per-app packages directory on the
-    /// persistent volume so they survive container recreates.
-    /// Returns true on success; server uses this as acknowledgement.
+    /// Each app gets its own Python virtual environment under the persistent app data directory.
+    /// requirements.txt rebuilds that app's venv so removed packages do not linger.
     /// </summary>
     private static string AppsRootDir =>
         Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
@@ -512,9 +511,8 @@ public class HubService
     {
         try
         {
-            var backendDir = Path.Combine(
-                AppsRootDir,
-                payload.AppId.ToString(), "backend");
+            var appRootDir = GetAppRootDirectory(payload.AppId);
+            var backendDir = Path.Combine(appRootDir, "backend");
 
             Directory.CreateDirectory(backendDir);
 
@@ -522,17 +520,13 @@ public class HubService
                 ? BuildLegacyRelativePath(payload)
                 : NormalizeBackendRelativePath(payload.RelativePath);
 
-            // requirements.txt — write as plain text, then pip install to volume-backed packages dir
+            // requirements.txt — write as plain text, then rebuild/install the app-specific venv
             if (payload.Language == "Text" && string.Equals(relativePath, "requirements.txt", StringComparison.OrdinalIgnoreCase))
             {
                 var reqPath = Path.Combine(backendDir, "requirements.txt");
                 File.WriteAllBytes(reqPath, payload.Content);
 
-                var packagesDir = Path.Combine(AppsRootDir, payload.AppId.ToString(), "packages");
-                Directory.CreateDirectory(packagesDir);
-
-                var pipLogs = InstallRequirements(payload.AppId, reqPath, packagesDir);
-                return new AppControllerUploadResult { Success = true, Logs = pipLogs };
+                return InstallRequirements(payload.AppId, reqPath);
             }
 
             // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
@@ -544,6 +538,8 @@ public class HubService
                 var aptLogs = InstallSystemPackages(payload.AppId, Encoding.UTF8.GetString(payload.Content));
                 return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
+
+            EnsureAppVirtualEnvironment(payload.AppId, recreate: false);
 
             var filePath = ResolveBackendUploadPath(backendDir, relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
@@ -713,7 +709,17 @@ public class HubService
 
     private static string GetAppBackendDirectory(Guid appId)
     {
-        return Path.GetFullPath(Path.Combine(AppsRootDir, appId.ToString(), "backend"));
+        return Path.GetFullPath(Path.Combine(GetAppRootDirectory(appId), "backend"));
+    }
+
+    private static string GetAppRootDirectory(Guid appId)
+    {
+        return Path.GetFullPath(Path.Combine(AppsRootDir, appId.ToString()));
+    }
+
+    private static string GetAppVenvDirectory(Guid appId)
+    {
+        return Path.Combine(GetAppRootDirectory(appId), "venv");
     }
 
     private static Guid ParseAppId(string appId)
@@ -763,9 +769,6 @@ public class HubService
 
     /// <summary>
     /// Returns true when the runner is executing inside a Docker container.
-    /// In a container the base filesystem is ephemeral, so packages must be installed
-    /// to a volume-backed directory via <c>--target</c> to survive image recreates.
-    /// On a standalone machine packages install to the system / venv Python and persist naturally.
     /// </summary>
     private static bool IsRunningInContainer =>
         // .NET SDK images set this; also set by docker-compose.runner.yml explicitly
@@ -773,70 +776,152 @@ public class HubService
         // Fallback: Linux containers always have this sentinel file
         || File.Exists("/.dockerenv");
 
-    private List<string> InstallRequirements(Guid appId, string requirementsPath, string targetDir)
+    private AppControllerUploadResult InstallRequirements(Guid appId, string requirementsPath)
     {
         var logs = new List<string>();
         try
         {
-            var inContainer = IsRunningInContainer;
-            var args = inContainer
-                ? $"install -r \"{requirementsPath}\" --target \"{targetDir}\" --no-color --progress-bar off --disable-pip-version-check"
-                : $"install -r \"{requirementsPath}\" --no-color --progress-bar off --disable-pip-version-check";
+            logs.AddRange(EnsureAppVirtualEnvironment(appId, recreate: true));
 
-            var installMode = inContainer ? $"volume target: {targetDir}" : "system Python";
+            var venvDir = GetAppVenvDirectory(appId);
+            var pipPath = GetVenvPipPath(venvDir);
+            var pythonPath = GetVenvPythonPath(venvDir);
+            var installMode = $"venv: {venvDir}";
+
             logs.Add($"📦 Installing packages ({installMode})...");
             WriteLine($"📦 Installing packages for app {appId} ({installMode})...");
-            logger.Information("Installing packages for app {AppId} from {ReqPath} (container={InContainer})",
-                appId, requirementsPath, inContainer);
+            logger.Information("Installing packages for app {AppId} from {ReqPath} into {VenvDir}",
+                appId, requirementsPath, venvDir);
 
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "pip",
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+            var (_, stdout, stderr) = RunProcessCapture(
+                pipPath,
+                $"install -r \"{requirementsPath}\" --no-color --progress-bar off --disable-pip-version-check",
+                timeoutMs: 300_000);
 
-            using var process = System.Diagnostics.Process.Start(psi)
-                ?? throw new InvalidOperationException("Failed to start pip process");
+            AppendProcessLogs(logs, stdout, stderr);
 
-            // Read stdout and stderr concurrently to avoid deadlock when output buffers fill
-            var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
-            var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
-            process.WaitForExit(120_000); // 2-minute timeout
-            var stdout = stdoutTask.Result;
-            var stderr = stderrTask.Result;
-
-            foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                logs.Add(line);
-
-            if (!string.IsNullOrWhiteSpace(stderr))
-                foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    logs.Add($"⚠️ {line}");
-
-            if (process.ExitCode == 0)
-            {
-                logs.Add("✅ Packages installed successfully");
-                logger.Information("Packages installed for app {AppId}", appId);
-                WriteLine($"✅ Packages installed for app {appId}");
-            }
-            else
-            {
-                logs.Add($"❌ pip install failed (exit code {process.ExitCode})");
-                logger.Warning("pip install exited {ExitCode} for app {AppId}: {Error}",
-                    process.ExitCode, appId, stderr);
-                WriteLine($"⚠️ Package install warnings for app {appId}: {stderr}");
-            }
+            logs.Add("✅ Packages installed successfully");
+            logs.Add($"🐍 App virtual environment ready: {pythonPath}");
+            logger.Information("Packages installed for app {AppId} into {VenvDir}", appId, venvDir);
+            WriteLine($"✅ Packages installed for app {appId}");
+            return new AppControllerUploadResult { Success = true, Logs = logs };
         }
         catch (Exception ex)
         {
-            logs.Add($"⚠️ pip unavailable: {ex.Message}");
-            logger.Error(ex, "Failed to run pip install for app {AppId}", appId);
-            WriteLine($"⚠️ pip unavailable — packages not installed for app {appId}: {ex.Message}");
+            logs.Add($"❌ {ex.Message}");
+            logger.Error(ex, "Failed to set up app virtual environment for app {AppId}", appId);
+            WriteLine($"⚠️ App dependency install failed for app {appId}: {ex.Message}");
+            return new AppControllerUploadResult { Success = false, Logs = logs };
         }
+    }
+
+    private List<string> EnsureAppVirtualEnvironment(Guid appId, bool recreate)
+    {
+        var logs = new List<string>();
+        var venvDir = GetAppVenvDirectory(appId);
+        var appRootDir = GetAppRootDirectory(appId);
+
+        Directory.CreateDirectory(appRootDir);
+
+        if (recreate && Directory.Exists(venvDir))
+        {
+            logs.Add($"♻️ Rebuilding app virtual environment: {venvDir}");
+            Directory.Delete(venvDir, recursive: true);
+        }
+
+        var pythonPath = GetVenvPythonPath(venvDir);
+        if (File.Exists(pythonPath))
+        {
+            logs.Add($"🐍 Using existing app virtual environment: {pythonPath}");
+            return logs;
+        }
+
+        logs.Add($"🐍 Creating app virtual environment: {venvDir}");
+        WriteLine($"🐍 Creating app virtual environment for app {appId}...");
+        logger.Information("Creating app virtual environment for app {AppId} at {VenvDir}", appId, venvDir);
+
+        var (_, stdout, stderr) = RunProcessCapture(
+            "python",
+            $"-m venv --system-site-packages \"{venvDir}\"",
+            timeoutMs: 120_000);
+
+        AppendProcessLogs(logs, stdout, stderr);
+
+        if (!File.Exists(pythonPath))
+        {
+            throw new InvalidOperationException($"Virtual environment created without python executable at {pythonPath}");
+        }
+
         return logs;
+    }
+
+    private static string GetVenvPythonPath(string venvDir)
+    {
+        return OperatingSystem.IsWindows()
+            ? Path.Combine(venvDir, "Scripts", "python.exe")
+            : Path.Combine(venvDir, "bin", "python");
+    }
+
+    private static string GetVenvPipPath(string venvDir)
+    {
+        return OperatingSystem.IsWindows()
+            ? Path.Combine(venvDir, "Scripts", "pip.exe")
+            : Path.Combine(venvDir, "bin", "pip");
+    }
+
+    private static (int ExitCode, string Stdout, string Stderr) RunProcessCapture(string fileName, string arguments, int timeoutMs)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException($"Failed to start process: {fileName}");
+
+        var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
+        var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
+
+        if (!process.WaitForExit(timeoutMs))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            throw new TimeoutException($"Process timed out after {timeoutMs / 1000}s: {fileName} {arguments}");
+        }
+
+        var stdout = stdoutTask.Result;
+        var stderr = stderrTask.Result;
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Process failed (exit code {process.ExitCode}): {fileName} {arguments}{Environment.NewLine}{stderr}".Trim());
+        }
+
+        return (process.ExitCode, stdout, stderr);
+    }
+
+    private static void AppendProcessLogs(List<string> logs, string stdout, string stderr)
+    {
+        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            logs.Add(line);
+
+        if (!string.IsNullOrWhiteSpace(stderr))
+        {
+            foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                logs.Add($"⚠️ {line}");
+        }
     }
 
     /// <summary>

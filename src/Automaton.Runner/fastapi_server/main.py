@@ -1,8 +1,7 @@
+import json
 import os
+import subprocess
 import sys
-import io
-import importlib.util
-from contextlib import redirect_stdout, redirect_stderr
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -14,14 +13,11 @@ app = FastAPI(title="Automaton Runner Backend")
 async def shutdown():
     """Graceful shutdown endpoint — called by the runner before relaunching with fresh credentials."""
     import threading
+
     threading.Timer(0.1, lambda: os._exit(0)).start()
     return {"status": "shutting down"}
 
-# RUNNER_SCRIPTS_DIR must point to the root of the app data directory.
-# FastAPI resolves controller scripts at: {RUNNER_SCRIPTS_DIR}/{app_id}/backend/{controller_name}.py
-# Per-app pip packages live at:           {RUNNER_SCRIPTS_DIR}/{app_id}/packages/
-# This must match the path where .NET writes scripts:
-#   AppContext.BaseDirectory/data/apps/{appId}/backend/{controllerName}.py
+
 def _default_scripts_dir() -> str:
     if (
         os.environ.get("DOTNET_RUNNING_IN_CONTAINER", "").lower() == "true"
@@ -29,14 +25,12 @@ def _default_scripts_dir() -> str:
     ):
         return "/app/data/apps"
 
-    # Standalone/local runner layout: fastapi_server/main.py sits beside data/apps
-    # in the build output folder. This keeps manual FastAPI starts from falling back
-    # to the Docker-only /app/data/apps path on Windows/macOS/Linux dev machines.
     runner_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(runner_root, "data", "apps")
 
 
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
+RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controller_runner.py")
 
 
 def _print_startup_diagnostics() -> None:
@@ -67,85 +61,87 @@ def _print_startup_diagnostics() -> None:
             "Start the runner instead, or set RUNNER_SCRIPTS_DIR explicitly before launching FastAPI."
         )
 
+
 @app.get("/debug-scripts-dir")
 async def debug_scripts_dir():
-    return {"scripts_dir": SCRIPTS_DIR, "runner_scripts_dir_env": os.environ.get("RUNNER_SCRIPTS_DIR", "(not set)")}
+    return {
+        "scripts_dir": SCRIPTS_DIR,
+        "runner_scripts_dir_env": os.environ.get("RUNNER_SCRIPTS_DIR", "(not set)"),
+    }
 
 
-# In a Docker container the base filesystem is ephemeral; packages installed via
-# requirements.txt land in {SCRIPTS_DIR}/{app_id}/packages/ on the persistent volume.
-# On a standalone machine pip installs to the system / venv Python — no path injection needed.
-_IN_CONTAINER = (
-    os.environ.get("DOTNET_RUNNING_IN_CONTAINER", "").lower() == "true"
-    or os.path.exists("/.dockerenv")
-)
+def _venv_python_path(app_id: str) -> str:
+    if sys.platform == "win32":
+        return os.path.join(SCRIPTS_DIR, app_id, "venv", "Scripts", "python.exe")
+    return os.path.join(SCRIPTS_DIR, app_id, "venv", "bin", "python")
 
 
-def _inject_packages(app_id: str) -> None:
-    """In container mode, prepend the per-app volume packages dir to sys.path.
-    On a standalone runner packages are already on the system path — this is a no-op."""
-    if not _IN_CONTAINER:
-        return
-    packages_dir = os.path.join(SCRIPTS_DIR, app_id, "packages")
-    if os.path.isdir(packages_dir) and packages_dir not in sys.path:
-        sys.path.insert(0, packages_dir)
+def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inputs: dict):
+    python_path = _venv_python_path(app_id)
+    if not os.path.exists(python_path):
+        raise HTTPException(
+            500,
+            f"App virtual environment not found for app '{app_id}'. Deploy the backend again to create it.",
+        )
 
-
-def load_controller(app_id: str, controller_name: str):
-    """Load a controller module from disk by app_id + controller name."""
-    _inject_packages(app_id)
-
-    base = os.path.join(SCRIPTS_DIR, app_id, "backend")
-    script_path = os.path.join(base, controller_name + ".py")
-
-    if not os.path.exists(script_path):
-        raise HTTPException(404, f"Controller '{controller_name}' not deployed for app '{app_id}'")
-
-    # Inject the backend/ dir so controllers can do `from shared.db import get_db`
-    # without needing their own sys.path.insert
-    if base not in sys.path:
-        sys.path.insert(0, base)
-
-    spec = importlib.util.spec_from_file_location(
-        f"{app_id}.{controller_name}", script_path
+    payload = json.dumps({"action": action_name, "inputs": inputs})
+    process = subprocess.run(
+        [python_path, RUNNER_SCRIPT, SCRIPTS_DIR, app_id, controller_name],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
     )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # reads from disk on every request — hot-reload for free
-    return module
+
+    stdout = process.stdout.strip()
+    stderr = process.stderr.strip()
+
+    if process.returncode != 0:
+        detail = stderr or stdout or f"controller runner exit code {process.returncode}"
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Controller process failed: {detail}",
+            "output": None,
+        }
+
+    if not stdout:
+        return {
+            "success": False,
+            "data": None,
+            "error": "Controller process returned no JSON payload.",
+            "output": stderr or None,
+        }
+
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as ex:
+        detail = stderr or stdout
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Controller returned invalid JSON: {ex}",
+            "output": detail or None,
+        }
 
 
 @app.post("/api/controller/{controller_name}")
 async def execute_controller(controller_name: str, request: Request) -> JSONResponse:
     try:
         body = await request.json()
-        app_id = body.get("app_id", "")
+        app_id = str(body.get("app_id", ""))
         action_name = body.get("action", "")
         inputs = body.get("inputs", {})
 
-        module = load_controller(str(app_id), controller_name)
+        result = _execute_in_app_env(app_id, controller_name, action_name, inputs)
 
-        if not hasattr(module, "handle"):
-            raise HTTPException(500, f"Controller '{controller_name}' has no handle() function")
-
-        # Capture print() output from the controller action
-        buf = io.StringIO()
-        with redirect_stdout(buf), redirect_stderr(buf):
-            result = module.handle(action_name, inputs)
-        output = buf.getvalue()
-
-        return JSONResponse({
-            "success": bool(result.get("success", False)),
-            "data": result.get("data"),
-            "error": result.get("error", ""),
-            "output": output if output else None
-        })
-
+        return JSONResponse(status_code=200, content=result)
     except HTTPException:
         raise
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"success": False, "data": None, "error": str(e)}
+            content={"success": False, "data": None, "error": str(e)},
         )
 
 
@@ -156,14 +152,7 @@ async def health():
 
 if __name__ == "__main__":
     _print_startup_diagnostics()
-    # Windows does not support uvicorn multi-worker mode (no fork/socket passing).
-    # On Linux (Docker), use 4 workers for true parallelism across GIL boundaries.
-    import sys
     workers = 1 if sys.platform == "win32" else 4
     uvicorn.run(
-        "main:app",
-        host="127.0.0.1",
-        port=8001,
-        workers=workers,
-        log_level="info"
+        "main:app", host="127.0.0.1", port=8001, workers=workers, log_level="info"
     )
