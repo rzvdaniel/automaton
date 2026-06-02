@@ -51,7 +51,7 @@ public static class RunnerCommand
                 var storedServer = runnerService.GetDefaultServer(config.ResolveCredentials(directory: cwd).server);
 
                 var runnerName = string.IsNullOrWhiteSpace(name) && !asJson
-                    ? AnsiConsole.Prompt(new TextPrompt<string>("Runner name").PromptStyle("green"))
+                    ? PromptForValue("Enter runner name")
                     : name?.Trim();
                 var resolvedServer = string.IsNullOrWhiteSpace(server) ? storedServer : server.Trim().TrimEnd('/');
                 var resolvedKey = string.IsNullOrWhiteSpace(key) ? storedApiKey : key.Trim();
@@ -68,14 +68,14 @@ public static class RunnerCommand
                         throw new InvalidOperationException("Runner API key is required. Run automaton setup first or pass --key.");
                     }
 
-                    resolvedKey = AnsiConsole.Prompt(new TextPrompt<string>("Runner API key").PromptStyle("green").Secret());
+                    resolvedKey = ReadSecretFromConsole("Enter runner API key");
                 }
 
                 var resolvedAutoStart = autoStart ?? (asJson
                     ? true
                     : !native
-                        ? AnsiConsole.Confirm("Start automatically when Docker restarts?", true)
-                        : AnsiConsole.Confirm("Start automatically on machine boot?", true));
+                        ? PromptForYesNo("Start automatically when Docker restarts?", true)
+                        : PromptForYesNo("Start automatically on machine boot?", true));
 
                 var request = new RunnerInstallRequest
                 {
@@ -195,7 +195,7 @@ public static class RunnerCommand
         {
             if (!yes && !asJson)
             {
-                var confirmed = AnsiConsole.Confirm(deleteData
+                var confirmed = PromptForYesNo(deleteData
                     ? "Uninstall the runner and delete its local data?"
                     : "Uninstall the runner and keep its local data?", false);
                 if (!confirmed)
@@ -218,6 +218,74 @@ public static class RunnerCommand
         }, nameOption, deleteDataOption, yesOption, jsonOption);
 
         return cmd;
+    }
+
+    private static string PromptForValue(string label, string? defaultValue = null)
+    {
+        if (string.IsNullOrWhiteSpace(defaultValue))
+        {
+            Console.Write($"{label}: ");
+        }
+        else
+        {
+            Console.Write($"{label} [{defaultValue}]: ");
+        }
+
+        var value = Console.ReadLine()?.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue?.Trim() ?? string.Empty;
+        }
+
+        return value;
+    }
+
+    private static bool PromptForYesNo(string label, bool defaultValue)
+    {
+        Console.Write($"{label} [{(defaultValue ? "Y/n" : "y/N")}]: ");
+        var value = Console.ReadLine()?.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        return value.Equals("y", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadSecretFromConsole(string label)
+    {
+        Console.Write($"{label}: ");
+        var buffer = new List<char>();
+
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (buffer.Count > 0)
+                {
+                    buffer.RemoveAt(buffer.Count - 1);
+                    Console.Write("\b \b");
+                }
+
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar))
+            {
+                buffer.Add(key.KeyChar);
+                Console.Write("*");
+            }
+        }
+
+        return new string(buffer.ToArray()).Trim();
     }
 
     public static void WriteResult(RunnerCommandResult result, bool asJson)
