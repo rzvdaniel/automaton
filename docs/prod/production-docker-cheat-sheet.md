@@ -43,6 +43,50 @@ docker --version
 docker compose version
 ```
 
+### 1.1 Configure Docker log rotation
+
+Create or edit the Docker daemon config:
+
+```bash
+sudo nano /etc/docker/daemon.json
+```
+
+Put this inside:
+
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+
+Validate the JSON before restart:
+
+```bash
+sudo dockerd --validate --config-file=/etc/docker/daemon.json
+```
+
+Restart Docker:
+
+```bash
+sudo systemctl restart docker
+```
+
+Check that containers came back:
+
+```bash
+docker ps
+```
+
+Important notes:
+
+- this applies to newly created containers
+- existing containers can keep their old logging config until recreated
+- for the blue/green `api`, `studio`, and `website` services, the next recreated containers pick this up automatically during normal deploys
+
 ### 2. Clone the repo
 
 Recommended location:
@@ -672,6 +716,82 @@ Run the full production smoke check:
 cd /opt/automaton
 ./scripts/prod-verify.sh
 ```
+
+## Disk Cleanup
+
+When a Hetzner host starts running low on disk, check Docker usage first:
+
+```bash
+docker system df
+df -h
+```
+
+If build cache is the main culprit, clean that first:
+
+```bash
+docker builder prune -a
+```
+
+Confirm with `y` when prompted.
+
+After cleanup, check usage again:
+
+```bash
+docker system df
+df -h
+```
+
+If Docker accounting and filesystem usage do not match, check Docker's actual root directory:
+
+```bash
+docker info | grep "Docker Root Dir"
+```
+
+Also inspect `/opt`, because local repo state, build context, or deployment artifacts may be large there:
+
+```bash
+sudo du -h --max-depth=1 /opt | sort -hr
+```
+
+Safe maintenance rules:
+
+- prefer `docker builder prune -a` first because it reclaims old build cache without touching named volumes
+- do not prune volumes as part of routine cleanup because MySQL data is likely stored in a Docker volume
+- `du /var/lib/docker` can look smaller than `docker system df` when Docker uses a different root dir or when accounting includes reclaimable build cache layers
+
+After a successful production deploy, it is reasonable to run:
+
+```bash
+docker builder prune -a -f
+```
+
+Do not run that in the middle of a deploy. Use it after the deployment and verification steps succeed.
+
+## Server Health Checks
+
+For a quick server summary, run:
+
+```bash
+echo "=== DISK ===" && df -h / && \
+echo "" && \
+echo "=== MEMORY ===" && free -h && \
+echo "" && \
+echo "=== CPU ===" && lscpu | grep "^CPU(s):"
+```
+
+For real-time monitoring, use:
+
+```bash
+htop
+```
+
+If `htop` is not installed:
+
+```bash
+sudo apt install htop -y
+```
+
+`htop` is worth installing on production hosts. It is usually the fastest way to spot CPU pressure, memory pressure, or a noisy process while investigating runner, API, MySQL, or deploy issues.
 
 ## Notes
 
