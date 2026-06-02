@@ -11,7 +11,7 @@ namespace Automaton.Cli.Services;
 public sealed class RunnerInstallService
 {
     private const string DefaultHostedServer = "https://api.automaton.monster";
-    private const string DefaultDockerImage = "automatonmonster/runner:latest";
+    private const string DefaultDockerImage = "rzvdaniel/automaton-runner:latest";
     private const string RunnerDownloadsBase = "https://studio.automaton.monster/downloads/runner/latest";
 
     private static readonly JsonSerializerOptions JsonOptions = new()

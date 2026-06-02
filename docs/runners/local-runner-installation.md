@@ -49,6 +49,12 @@ Environment override for private or alternate images:
 AUTOMATON_RUNNER_IMAGE=your-registry/runner:latest
 ```
 
+Current public default:
+
+```bash
+rzvdaniel/automaton-runner:latest
+```
+
 This is the recommended path for backend app execution because it gives you a known Python/runtime environment with fewer host-machine issues.
 
 ## Native Install
