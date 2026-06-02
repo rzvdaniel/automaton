@@ -17,9 +17,9 @@
     <Description>Automaton Runner native console host for advanced local and machine-level execution.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README-NUGET.md</PackageReadmeFile>
-    <PublishSingleFile>true</PublishSingleFile>
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <SelfContained>false</SelfContained>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableCompressionInSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</EnableCompressionInSingleFile>
     <UserSecretsId>94fcdced-d08b-48ea-a56e-fbfc17fdd073</UserSecretsId>
   </PropertyGroup>
 	<ItemGroup>
