@@ -102,9 +102,9 @@ public sealed class RunnerInstallService
             await UninstallAsync(existing.RunnerName, deleteData: false, force: true, cancellationToken: cancellationToken);
         }
 
-        return request.Docker
-            ? await InstallDockerAsync(request, safeName, checks, nextSteps, cancellationToken)
-            : await InstallNativeAsync(request, safeName, checks, nextSteps, cancellationToken);
+        return string.Equals(request.Mode, RunnerInstallModes.Native, StringComparison.OrdinalIgnoreCase)
+            ? await InstallNativeAsync(request, safeName, checks, nextSteps, cancellationToken)
+            : await InstallDockerAsync(request, safeName, checks, nextSteps, cancellationToken);
     }
 
     public async Task<RunnerCommandResult> RestartAsync(string? runnerName, CancellationToken cancellationToken = default)

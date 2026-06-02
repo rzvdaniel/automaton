@@ -2,11 +2,20 @@
 
 This document describes the current state of native runner download publishing and the intended lightweight path forward.
 
+Status note:
+
+- this is no longer a launch-critical path
+- the default runner install path is Docker
+- advanced native installs can also use the NuGet tool package for `Automaton.Runner`
+- archive hosting is only needed if you want CLI-managed native archive installs
+
 ## Current State
 
-Native runner archives are built by [`azure-pipelines-runner.yml`](/C:/Work/automaton/azure-pipelines-runner.yml).
+Native runner archives are not the primary distribution path anymore.
 
-That pipeline currently produces build artifacts for:
+The runner is now expected to be publishable as a NuGet tool package from [`azure-pipelines-runner.yml`](/C:/Work/automaton/azure-pipelines-runner.yml), while Docker remains the default runner distribution path.
+
+If you still want archive-based native installs later, the archive layout would need to produce:
 
 - `automaton-runner-win-x64.zip`
 - `automaton-runner-win-arm64.zip`
@@ -15,14 +24,13 @@ That pipeline currently produces build artifacts for:
 - `automaton-runner-macos-x64.tar.gz`
 - `automaton-runner-macos-arm64.tar.gz`
 
-The pipeline publishes them as Azure DevOps build artifacts named `automaton-runner-packages`.
+The old archive-hosting approach is now optional rather than required.
 
-What it does not do in the checked-in repo:
+What is no longer required for launch:
 
-- it does not publish those artifacts to `https://studio.automaton.monster/downloads/runner/latest/`
-- it is not connected to `scripts/prod-redeploy-website.sh`
-- it is not connected to `scripts/prod-redeploy-all.sh`
-- it is not served by [`Program.cs`](/C:/Work/automaton/src/Automaton.Studio.Server/Program.cs) static-file mappings today
+- public archive hosting under `https://studio.automaton.monster/downloads/runner/latest/`
+- coupling native runner distribution to `prod-redeploy-website.sh`
+- coupling native runner distribution to `prod-redeploy-all.sh`
 
 ## Why The Old Path Was Removed
 
@@ -32,17 +40,77 @@ The repo still had stale references to a `website-cli-assets` compose profile, b
 - rebuilding cross-platform archives during website deploys is slow
 - blue/green website deploys should stay focused on website delivery, not artifact packaging
 
-## Recommended Lightweight Publish Path
+## Optional Archive Publish Path
 
-Keep runner archive publishing separate from app redeploys.
+If archive-based native installs are revived later, keep archive publishing separate from app redeploys.
 
 Preferred shape:
 
 1. `azure-pipelines-runner.yml` builds the native archives.
 2. A dedicated publish step or follow-up pipeline downloads those artifacts.
-3. That publish job syncs the files to the public downloads location:
+3. That publish job uploads the files to the Hetzner static downloads path:
+   - `/opt/automaton-downloads/runner/releases/<version>/`
+   - `/opt/automaton-downloads/runner/latest/`
+4. Hetzner nginx serves those files at:
    - `/downloads/runner/latest/`
-4. The website and Studio UI simply link to that stable location.
+   - `/downloads/runner/releases/<version>/`
+5. The website and Studio UI simply link to that stable location.
+
+## Hetzner Folder Contract
+
+Create these folders once on the host:
+
+```bash
+sudo mkdir -p /opt/automaton-downloads/runner/latest
+sudo mkdir -p /opt/automaton-downloads/runner/releases
+sudo chown -R runner-deploy:runner-deploy /opt/automaton-downloads
+```
+
+Recommended contents:
+
+- `/opt/automaton-downloads/runner/latest/automaton-runner-win-x64.zip`
+- `/opt/automaton-downloads/runner/latest/automaton-runner-win-arm64.zip`
+- `/opt/automaton-downloads/runner/latest/automaton-runner-linux-x64.tar.gz`
+- `/opt/automaton-downloads/runner/latest/automaton-runner-linux-arm64.tar.gz`
+- `/opt/automaton-downloads/runner/latest/automaton-runner-macos-x64.tar.gz`
+- `/opt/automaton-downloads/runner/latest/automaton-runner-macos-arm64.tar.gz`
+- `/opt/automaton-downloads/runner/latest/version.json`
+- `/opt/automaton-downloads/runner/latest/checksums.txt`
+
+Mirror the same file set under each versioned release directory.
+
+## Nginx Static Mapping
+
+Serve runner downloads from the top-level host nginx, not from the API, Studio, or website containers.
+
+Conceptual nginx block:
+
+```nginx
+location /downloads/runner/ {
+    alias /opt/automaton-downloads/runner/;
+    autoindex off;
+    add_header Cache-Control "public, max-age=300";
+    add_header X-Content-Type-Options "nosniff";
+    try_files $uri =404;
+}
+```
+
+This should make URLs like these work directly:
+
+- `https://studio.automaton.monster/downloads/runner/latest/automaton-runner-linux-x64.tar.gz`
+- `https://studio.automaton.monster/downloads/runner/releases/1.0.12/automaton-runner-linux-x64.tar.gz`
+
+If installer scripts such as `install.sh` and `setup-service.sh` are also served from the same hostname, keep them on the same nginx host and treat them as separate static files under `/downloads/runner/`.
+
+## Native Distribution Direction
+
+[`azure-pipelines-runner.yml`](/C:/Work/automaton/azure-pipelines-runner.yml) now targets NuGet publishing for the native runner tool package instead of SSH upload for archive hosting.
+
+That means:
+
+- Docker Hub remains the default runner distribution path
+- NuGet becomes the advanced native distribution path
+- archive hosting can stay deferred unless CLI-managed native archives become important again
 
 ## Good Properties Of This Model
 

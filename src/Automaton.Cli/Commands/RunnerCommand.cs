@@ -28,7 +28,7 @@ public static class RunnerCommand
         var nameOption = new Option<string?>(["--name", "-n"], "Runner name");
         var serverOption = new Option<string?>("--server", "Automaton server URL");
         var keyOption = new Option<string?>("--key", "Runner API key");
-        var dockerOption = new Option<bool>("--docker", "Install the runner as a Docker container instead of a native service");
+        var nativeOption = new Option<bool>("--native", "Install the runner as a native service instead of the default Docker container");
         var replaceOption = new Option<bool>("--replace", "Replace any existing local runner install with the same name");
         var autoStartOption = new Option<bool?>("--auto-start", "Start automatically on boot / Docker restart");
         var imageOption = new Option<string?>("--image", "Docker runner image override");
@@ -36,10 +36,10 @@ public static class RunnerCommand
 
         var cmd = new Command("install", "Install a local Automaton runner")
         {
-            nameOption, serverOption, keyOption, dockerOption, replaceOption, autoStartOption, imageOption, jsonOption
+            nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption
         };
 
-        cmd.SetHandler(async (string? name, string? server, string? key, bool docker, bool replace, bool? autoStart, string? image, bool asJson) =>
+        cmd.SetHandler(async (string? name, string? server, string? key, bool native, bool replace, bool? autoStart, string? image, bool asJson) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new List<string>();
@@ -73,7 +73,7 @@ public static class RunnerCommand
 
                 var resolvedAutoStart = autoStart ?? (asJson
                     ? true
-                    : docker
+                    : !native
                         ? AnsiConsole.Confirm("Start automatically when Docker restarts?", true)
                         : AnsiConsole.Confirm("Start automatically on machine boot?", true));
 
@@ -82,7 +82,7 @@ public static class RunnerCommand
                     RunnerName = runnerName!,
                     ApiServerUrl = resolvedServer,
                     ApiKey = resolvedKey!,
-                    Docker = docker,
+                    Mode = native ? RunnerInstallModes.Native : RunnerInstallModes.Docker,
                     AutoStart = resolvedAutoStart,
                     DockerImage = image,
                     ReplaceExisting = replace
@@ -100,7 +100,9 @@ public static class RunnerCommand
                 WriteResult(failure, asJson);
                 Environment.ExitCode = 1;
             }
-        }, nameOption, serverOption, keyOption, dockerOption, replaceOption, autoStartOption, imageOption, jsonOption);
+        }, nameOption, serverOption, keyOption, nativeOption, replaceOption, autoStartOption, imageOption, jsonOption);
+
+        cmd.AddAlias("up");
 
         return cmd;
     }
@@ -137,7 +139,6 @@ public static class RunnerCommand
             await runnerService.TailLogsAsync(name);
         }, nameOption);
 
-        cmd.AddAlias("up");
         return cmd;
     }
 

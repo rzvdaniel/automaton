@@ -10,7 +10,7 @@ public sealed class RunnerInstallRecord
 {
     public string RunnerName { get; set; } = string.Empty;
     public string SafeRunnerName { get; set; } = string.Empty;
-    public string Mode { get; set; } = RunnerInstallModes.Native;
+    public string Mode { get; set; } = RunnerInstallModes.Docker;
     public string ApiServerUrl { get; set; } = string.Empty;
     public string InstallRoot { get; set; } = string.Empty;
     public string BinaryPath { get; set; } = string.Empty;
@@ -30,7 +30,7 @@ public sealed class RunnerInstallRequest
     public string RunnerName { get; set; } = string.Empty;
     public string ApiServerUrl { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
-    public bool Docker { get; set; }
+    public string Mode { get; set; } = RunnerInstallModes.Docker;
     public bool AutoStart { get; set; } = true;
     public string? DockerImage { get; set; }
     public bool ReplaceExisting { get; set; }

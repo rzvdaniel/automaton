@@ -6,6 +6,17 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Automaton.Runner.Console</RootNamespace>
     <AssemblyName>automaton-runner</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>automaton-runner</ToolCommandName>
+    <PackageId>Automaton.Runner</PackageId>
+    <VersionPrefix>1.0</VersionPrefix>
+    <Version Condition="'$(Version)' == ''">$(VersionPrefix).$([System.DateTime]::UtcNow.ToString("yyyyMMdd")).$([System.DateTime]::UtcNow.ToString("HHmmss"))</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Authors>Automaton</Authors>
+    <Description>Automaton Runner native console host for advanced local and machine-level execution.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README-NUGET.md</PackageReadmeFile>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
@@ -45,6 +56,7 @@
     <None Update="fastapi_server\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="README-NUGET.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

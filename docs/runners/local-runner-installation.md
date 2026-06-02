@@ -8,17 +8,17 @@ Recommended:
 automaton runner install
 ```
 
-By default this installs a native runner service on the current machine. Docker remains available as an opt-in mode:
+By default this installs the Docker runner. Native install remains available as an explicit power-user option:
 
 ```bash
-automaton runner install --docker
+automaton runner install --native
 ```
 
 ## Requirements
 
 - Automaton CLI configured with `automaton setup`
-- Docker Desktop / Docker Engine only if using `--docker`
-- Python 3.11+ only if you want backend Python apps to run on this machine
+- Docker Desktop / Docker Engine for the default install path
+- Python 3.11+ only if you use `--native` and want backend Python apps to run on this machine
 
 The runner itself uses the CLI's stored credentials when possible, so in the common case you only need to provide a runner name.
 
@@ -28,10 +28,33 @@ The service/runtime receives:
 - `AUTOMATON_API_KEY`
 - `AUTOMATON_RUNNER_NAME`
 
-## Native Install
+## Docker Install
 
 ```bash
 automaton runner install
+```
+
+The CLI will:
+
+1. Prompt for a runner name
+2. Reuse the server URL and API key already configured in the CLI
+3. Validate Docker
+4. Pull the configured runner image
+5. Create a named volume
+6. Start the container with the CLI's stored server URL and API key
+
+Environment override for private or alternate images:
+
+```bash
+AUTOMATON_RUNNER_IMAGE=your-registry/runner:latest
+```
+
+This is the recommended path for backend app execution because it gives you a known Python/runtime environment with fewer host-machine issues.
+
+## Native Install
+
+```bash
+automaton runner install --native
 ```
 
 The CLI will:
@@ -43,35 +66,30 @@ The CLI will:
 5. Create a platform-native service
 6. Start the service
 
-Current download source:
-
-- the CLI expects the latest native runner archives at `https://studio.automaton.monster/downloads/runner/latest/`
-- those archives are built separately from the production website deploy flow
-- if the download endpoint is missing or stale, publish fresh runner artifacts before asking users to rely on `automaton runner install`
-
 Platform service managers:
 
 - Windows: Windows Service
 - Linux: `systemd`
 - macOS: `launchd`
 
-## Docker Install
+Use this when you intentionally want the runner to access the host machine directly.
+
+Advanced manual native install is also available as a .NET tool:
 
 ```bash
-automaton runner install --docker
+dotnet tool install -g Automaton.Runner
 ```
 
-The CLI will:
+Then configure:
 
-1. Validate Docker
-2. Pull the configured runner image
-3. Create a named volume
-4. Start the container with the CLI's stored server URL and API key
+- `AUTOMATON_SERVER_URL`
+- `AUTOMATON_API_KEY`
+- `AUTOMATON_RUNNER_NAME`
 
-Environment override for private or alternate images:
+and start it with:
 
 ```bash
-AUTOMATON_RUNNER_IMAGE=your-registry/runner:latest
+automaton-runner
 ```
 
 ## Runner Management
@@ -89,14 +107,15 @@ Useful options:
 ```bash
 automaton runner status --name my-laptop
 automaton runner uninstall --delete-data
-automaton runner install --docker --replace
+automaton runner install --replace
+automaton runner install --native --replace
 ```
 
 ## Troubleshooting
 
 ### Docker not running
 
-If `automaton runner install --docker` fails with a Docker check error:
+If `automaton runner install` fails with a Docker check error:
 
 - Install Docker Desktop or Docker Engine
 - Start the Docker daemon
@@ -133,6 +152,12 @@ The native installer downloads a prebuilt archive. If the URL returns `404` or a
 - verify the latest runner artifacts were published to `/downloads/runner/latest/`
 - do not expect `prod-redeploy-website.sh` or `prod-redeploy-all.sh` to refresh those files
 - republish runner download artifacts separately from the website deploy flow
+
+If you only need a native runner and do not want to rely on archive hosting, prefer:
+
+```bash
+dotnet tool install -g Automaton.Runner
+```
 
 ### Remove the runner
 

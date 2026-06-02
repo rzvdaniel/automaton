@@ -674,8 +674,19 @@ Reason:
 Recommended direction:
 
 - keep website deploys focused on app containers
-- publish runner archives from CI artifacts to a stable downloads location
+- publish runner archives from CI artifacts to a stable downloads location on Hetzner or object storage
 - if needed later, add a small dedicated `publish-runner-downloads` script or pipeline that syncs artifacts to `/downloads/runner/latest` without rebuilding the website
+
+Current recommended host path:
+
+- `/opt/automaton-downloads/runner/releases/<version>/`
+- `/opt/automaton-downloads/runner/latest/`
+
+Recommended public URL:
+
+- `https://studio.automaton.monster/downloads/runner/latest/...`
+
+See [`docs/runners/runner-download-publishing.md`](/C:/Work/automaton/docs/runners/runner-download-publishing.md) for the current native runner distribution direction and optional archive-hosting notes.
 
 ## Logs
 
