@@ -1,6 +1,5 @@
 #!/bin/bash
 # Rebuild and redeploy the production website using a blue/green cutover.
-# Pass --with-cli-assets when src/Automaton.Cli or shared/ai-guidance changed and the website should serve new CLI downloads.
 
 set -euo pipefail
 
@@ -10,14 +9,12 @@ source "$SCRIPT_DIR/prod-blue-green-common.sh"
 
 TARGET_COLOR=""
 KEEP_PREVIOUS=false
-WITH_CLI_ASSETS=false
 
 print_usage() {
     cat <<'EOF'
-Usage: ./scripts/prod-redeploy-website.sh [--with-cli-assets] [--color blue|green] [--keep-previous]
+Usage: ./scripts/prod-redeploy-website.sh [--color blue|green] [--keep-previous]
 
 Options:
-  --with-cli-assets   Rebuild the downloadable CLI bundles before rebuilding the website. Use this when src/Automaton.Cli or shared/ai-guidance changed.
   --color blue|green  Deploy to a specific color. Default: deploy to the inactive color.
   --keep-previous     Leave the previous color running after the cutover for easy rollback.
 EOF
@@ -25,10 +22,6 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --with-cli-assets)
-            WITH_CLI_ASSETS=true
-            shift
-            ;;
         --color)
             TARGET_COLOR="${2:-}"
             shift 2
@@ -55,11 +48,6 @@ if [[ -n "$TARGET_COLOR" && "$TARGET_COLOR" != "blue" && "$TARGET_COLOR" != "gre
 fi
 
 ensure_infrastructure
-
-if [[ "$WITH_CLI_ASSETS" == "true" ]]; then
-    echo "[INFO] Rebuilding website CLI assets image"
-    docker compose -f "$COMPOSE_FILE" --profile build-assets build website-cli-assets
-fi
 
 CURRENT_COLOR="$(get_live_color website)"
 TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color website)}"

@@ -95,7 +95,7 @@ FastAPI backend ready
 
 | Volume | Mount path | Contents |
 |--------|-----------|----------|
-| `runner-config` | `/home/automaton/.config/AutomatonRunner` | Runner registration token, server binding |
+| `runner-config` | `/home/automaton/.config/AutomatonRunner` | Runner local configuration and server binding |
 | `runner-logs` | `/app/logs` | Serilog structured log files |
 | `runner-data` | `/app/data` | Deployed app controller scripts (`/app/data/apps`) |
 

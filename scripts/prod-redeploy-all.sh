@@ -1,6 +1,5 @@
 #!/bin/bash
 # Rebuild and redeploy the public-facing production application stack with blue/green cutovers.
-# Pass --with-cli-assets when src/Automaton.Cli or shared/ai-guidance changed and the website should serve new CLI downloads.
 
 set -euo pipefail
 
@@ -8,7 +7,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/prod-blue-green-common.sh"
 
-WITH_CLI_ASSETS=false
 KEEP_PREVIOUS=false
 API_COLOR=""
 STUDIO_COLOR=""
@@ -16,10 +14,9 @@ WEBSITE_COLOR=""
 
 print_usage() {
     cat <<'EOF'
-Usage: ./scripts/prod-redeploy-all.sh [--with-cli-assets] [--keep-previous] [--api-color blue|green] [--studio-color blue|green] [--website-color blue|green]
+Usage: ./scripts/prod-redeploy-all.sh [--keep-previous] [--api-color blue|green] [--studio-color blue|green] [--website-color blue|green]
 
 Options:
-  --with-cli-assets       Rebuild the downloadable CLI bundles before rebuilding the website. Use this when src/Automaton.Cli or shared/ai-guidance changed.
   --keep-previous         Leave the previous color running after the cutover for easy rollback.
   --api-color blue|green      Force the API deploy target color.
   --studio-color blue|green   Force the Studio deploy target color.
@@ -38,10 +35,6 @@ validate_color() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --with-cli-assets)
-            WITH_CLI_ASSETS=true
-            shift
-            ;;
         --keep-previous)
             KEEP_PREVIOUS=true
             shift
@@ -76,11 +69,6 @@ validate_color "$WEBSITE_COLOR" "--website-color"
 
 ensure_infrastructure
 DRAIN_WAIT_SECONDS="$RUNNER_RECONNECT_GRACE_SECONDS"
-
-if [[ "$WITH_CLI_ASSETS" == "true" ]]; then
-    echo "[INFO] Rebuilding website CLI assets image"
-    docker compose -f "$COMPOSE_FILE" --profile build-assets build website-cli-assets
-fi
 
 CURRENT_API_COLOR="$(get_live_color api)"
 CURRENT_STUDIO_COLOR="$(get_live_color studio)"

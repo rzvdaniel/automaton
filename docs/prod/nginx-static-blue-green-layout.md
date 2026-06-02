@@ -55,7 +55,6 @@ Internal Docker network:
 - `website-blue`
 - `website-green`
 - optional `certbot`
-- optional `website-cli-assets` build profile
 
 Runners remain separate and unchanged.
 
@@ -150,7 +149,6 @@ Production services:
 - `studio-green`
 - `website-blue`
 - `website-green`
-- `website-cli-assets` profile build image
 
 Compose network:
 
@@ -385,7 +383,7 @@ Keep current build args:
 
 ### Website services
 
-Keep current website image and optional `website-cli-assets` profile exactly as-is.
+Keep the website image focused on static site delivery only. Downloadable runner archives should be published separately from the website blue/green deploy flow.
 
 ### Shared volumes
 

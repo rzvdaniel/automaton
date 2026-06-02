@@ -29,10 +29,15 @@ var root = new RootCommand("Automaton CLI — create, deploy, and publish Automa
     DeployCommand.Build(config),
     PullCommand.Build(config),
     PublishCommand.Build(config),
+    RunnerCommand.Build(config),
     RunnersCommand.Build(config),
     SetRunnerCommand.Build(config),
     ConfigCommand.Build(config),
 };
+
+var installAlias = new Command("install", "Install local Automaton components");
+installAlias.AddCommand(RunnerCommand.Build(config));
+root.AddCommand(installAlias);
 
 root.Name = "automaton";
 

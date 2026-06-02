@@ -307,7 +307,7 @@ Normal redeploy when website CLI downloads changed too:
 ```bash
 cd /opt/automaton
 git pull
-./scripts/prod-redeploy-all.sh --with-cli-assets
+./scripts/prod-redeploy-all.sh
 ```
 
 Keep the previous color running for rollback:
@@ -472,7 +472,7 @@ Website with refreshed CLI downloads:
 
 ```bash
 cd /opt/automaton
-./scripts/prod-redeploy-website.sh --with-cli-assets
+./scripts/prod-redeploy-website.sh
 ```
 
 App host runtime/static infrastructure:
@@ -655,27 +655,27 @@ This checks renewal daily at `03:17` server time. Certbot only renews when the c
 
 `prod-renew-certs.sh` runs `nginx -t` and then reloads nginx after the renew command. Reloading nginx is graceful: nginx keeps listening on `80/443`, starts workers with the current config, and lets old workers finish existing requests.
 
-## Website CLI Downloads
+## Runner And CLI Downloads
 
-Rebuild the downloadable CLI bundles when `src/Automaton.Cli` or `shared/ai-guidance` changed:
+The production website deploy no longer rebuilds downloadable runner or CLI assets.
 
-```bash
-cd /opt/automaton
-docker compose -f docker-compose.prod.yml --profile build-assets build website-cli-assets
-```
+Current state:
 
-Then redeploy the website:
+- `./scripts/prod-redeploy-website.sh` deploys only the website image
+- `./scripts/prod-redeploy-all.sh` deploys only the API, Studio, and website images
+- standalone runner archives are built separately by [`azure-pipelines-runner.yml`](/C:/Work/automaton/azure-pipelines-runner.yml)
+- if public `/downloads/...` assets are needed, publish them from CI artifacts or a dedicated asset-publish job outside the website blue/green deploy path
 
-```bash
-cd /opt/automaton
-./scripts/prod-redeploy-website.sh --with-cli-assets
-```
+Reason:
 
-Rule of thumb:
+- cross-platform runner packaging is slow
+- tying asset builds to every website deploy made redeploys slower and the repo no longer contains the old `website-cli-assets` compose service
 
-- CLI code changed: rebuild `website-cli-assets`
-- Shared AI guidance changed: rebuild `website-cli-assets`
-- Website UI or docs changed without CLI asset changes: redeploy `website` only
+Recommended direction:
+
+- keep website deploys focused on app containers
+- publish runner archives from CI artifacts to a stable downloads location
+- if needed later, add a small dedicated `publish-runner-downloads` script or pipeline that syncs artifacts to `/downloads/runner/latest` without rebuilding the website
 
 ## Logs
 
@@ -707,7 +707,6 @@ Check the resolved compose config:
 ```bash
 cd /opt/automaton
 docker compose -f docker-compose.prod.yml config
-docker compose -f docker-compose.prod.yml --profile build-assets config
 ```
 
 Run the full production smoke check:
