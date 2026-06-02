@@ -48,12 +48,13 @@ public static class RunnerCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var (_, storedApiKey) = config.ResolveCredentials(directory: cwd);
-                var storedServer = runnerService.GetDefaultServer(config.ResolveCredentials(directory: cwd).server);
 
                 var runnerName = string.IsNullOrWhiteSpace(name) && !asJson
                     ? PromptForValue("Enter runner name")
                     : name?.Trim();
-                var resolvedServer = string.IsNullOrWhiteSpace(server) ? storedServer : server.Trim().TrimEnd('/');
+                var resolvedServer = string.IsNullOrWhiteSpace(server)
+                    ? runnerService.GetDefaultServer(null)
+                    : runnerService.GetDefaultServer(server);
                 var resolvedKey = string.IsNullOrWhiteSpace(key) ? storedApiKey : key.Trim();
 
                 if (string.IsNullOrWhiteSpace(runnerName))
@@ -85,7 +86,8 @@ public static class RunnerCommand
                     Mode = native ? RunnerInstallModes.Native : RunnerInstallModes.Docker,
                     AutoStart = resolvedAutoStart,
                     DockerImage = image,
-                    ReplaceExisting = replace
+                    ReplaceExisting = replace,
+                    ProgressReporter = asJson ? null : message => Console.WriteLine(message)
                 };
 
                 var result = await runnerService.InstallAsync(request);

@@ -34,6 +34,7 @@ public sealed class RunnerInstallRequest
     public bool AutoStart { get; set; } = true;
     public string? DockerImage { get; set; }
     public bool ReplaceExisting { get; set; }
+    public Action<string>? ProgressReporter { get; set; }
 }
 
 public sealed class RunnerCommandResult

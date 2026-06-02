@@ -80,6 +80,7 @@ public sealed class RunnerInstallService
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new List<string>();
+        request.ProgressReporter?.Invoke(string.Empty);
 
         var safeName = SanitizeRunnerName(request.RunnerName);
         if (string.IsNullOrWhiteSpace(safeName))
@@ -284,6 +285,7 @@ public sealed class RunnerInstallService
         List<string> nextSteps,
         CancellationToken cancellationToken)
     {
+        request.ProgressReporter?.Invoke("Installing native runner...");
         var installRoot = Path.Combine(RunnerInstallsDir, safeName);
         var logsDir = Path.Combine(installRoot, "logs");
         var extractedDir = Path.Combine(installRoot, "runner");
@@ -296,6 +298,7 @@ public sealed class RunnerInstallService
         checks.Add(await CheckPythonAsync(cancellationToken));
 
         var downloadUrl = GetDownloadUrl();
+        request.ProgressReporter?.Invoke("Downloading native runner package...");
         var archivePath = Path.Combine(installRoot, Path.GetFileName(new Uri(downloadUrl).AbsolutePath));
         await DownloadFileAsync(downloadUrl, archivePath, cancellationToken);
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, true, $"downloaded runner archive from {downloadUrl}"));
@@ -306,6 +309,7 @@ public sealed class RunnerInstallService
         }
 
         Directory.CreateDirectory(extractedDir);
+        request.ProgressReporter?.Invoke("Extracting native runner package...");
         ExtractArchive(archivePath, extractedDir);
 
         var binaryPath = ResolveExtractedBinaryPath(extractedDir);
@@ -328,6 +332,7 @@ public sealed class RunnerInstallService
             InstalledAtUtc = DateTime.UtcNow
         };
 
+        request.ProgressReporter?.Invoke("Creating native runner service...");
         await InstallNativeServiceAsync(install, cancellationToken);
         SaveInstallRecord(install);
         SetActiveRunner(install.SafeRunnerName);
@@ -354,6 +359,7 @@ public sealed class RunnerInstallService
         List<string> nextSteps,
         CancellationToken cancellationToken)
     {
+        request.ProgressReporter?.Invoke("Checking Docker...");
         await EnsureDockerAvailableAsync(cancellationToken);
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Docker, true, "docker is installed and reachable"));
 
@@ -361,15 +367,18 @@ public sealed class RunnerInstallService
         var containerName = $"automaton-runner-{safeName}";
         var volumeName = $"automaton-runner-data-{safeName}";
 
+        request.ProgressReporter?.Invoke("Pulling runner image...");
         await RunProcessCheckedAsync("docker", $"pull {image}", cancellationToken);
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Docker, true, $"pulled image {image}"));
 
         var exists = await DockerContainerExistsAsync(containerName, cancellationToken);
         if (exists)
         {
+            request.ProgressReporter?.Invoke("Replacing existing runner container...");
             await RunProcessCheckedAsync("docker", $"rm -f {containerName}", cancellationToken);
         }
 
+        request.ProgressReporter?.Invoke("Creating runner data volume...");
         await RunProcessCheckedAsync("docker", $"volume create {volumeName}", cancellationToken);
 
         var restartPolicy = request.AutoStart ? "unless-stopped" : "no";
@@ -385,6 +394,7 @@ public sealed class RunnerInstallService
             image
         });
 
+        request.ProgressReporter?.Invoke("Starting runner container...");
         await RunProcessCheckedAsync("docker", args, cancellationToken);
 
         var install = new RunnerInstallRecord

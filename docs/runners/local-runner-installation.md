@@ -20,7 +20,7 @@ automaton runner install --native
 - Docker Desktop / Docker Engine for the default install path
 - Python 3.11+ only if you use `--native` and want backend Python apps to run on this machine
 
-The runner itself uses the CLI's stored credentials when possible, so in the common case you only need to provide a runner name.
+The runner installer reuses the CLI API key when possible, but defaults the server target to the hosted API unless you explicitly pass `--server`.
 
 The service/runtime receives:
 
@@ -37,11 +37,12 @@ automaton runner install
 The CLI will:
 
 1. Prompt for a runner name
-2. Reuse the server URL and API key already configured in the CLI
-3. Validate Docker
-4. Pull the configured runner image
-5. Create a named volume
-6. Start the container with the CLI's stored server URL and API key
+2. Default to `https://api.automaton.monster`
+3. Reuse the API key already configured in the CLI when available
+4. Validate Docker
+5. Pull the configured runner image
+6. Create a named volume
+7. Start the container with the selected server URL and API key
 
 Environment override for private or alternate images:
 
@@ -66,11 +67,12 @@ automaton runner install --native
 The CLI will:
 
 1. Prompt for a runner name
-2. Reuse the server URL and API key already configured in the CLI
-3. Download the latest native runner archive
-4. Extract it under `~/.automaton/runner/installs/<runner-name>/`
-5. Create a platform-native service
-6. Start the service
+2. Default to `https://api.automaton.monster` unless `--server` is provided
+3. Reuse the API key already configured in the CLI when available
+4. Download the latest native runner archive
+5. Extract it under `~/.automaton/runner/installs/<runner-name>/`
+6. Create a platform-native service
+7. Start the service
 
 Platform service managers:
 
