@@ -87,7 +87,7 @@ Interpretation rules:
 4. Use `automaton new` for new apps; reserve `automaton link` for existing remote apps.
 5. Run `automaton sync-ai` only when the generated local guidance files need a manual refresh.
 6. Run `automaton deploy`; it performs deploy preflight and handles runner selection only when backend controllers require it.
-7. If backend controllers exist and no connected runner is available, tell the user to create or deploy one in Automaton Studio.
+7. If backend controllers exist and no connected runner is available, ask for confirmation and prefer `automaton runner install` to create a local Docker runner. Tell the user to use Automaton Studio runner setup only when the CLI path is unavailable or they explicitly prefer it.
 8. After `automaton deploy`, open the app in Automaton Studio, use Preview there, and inspect logs there before considering publish.
 9. Ask the user before public publish, then use `automaton publish --yes` only after approval.
 10. For installable PWAs, validate install behavior from the published `apps.automaton.monster/{slug}/` URL, not from the Studio preview URL.

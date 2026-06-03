@@ -20,7 +20,7 @@ Use these rules:
 - Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Root-level frontend files are an explicit exception only for no-build static apps requested by the user; set `"frontend": { "deployDir": "." }` in that mode.
 - Deploy with `automaton deploy`.
-- If the app has Python backend controllers, let `automaton deploy` auto-select or prompt for a connected runner. Tell the user to create or deploy one in Automaton Studio only when no connected runner exists.
+- If the app has Python backend controllers, let `automaton deploy` auto-select or prompt for a connected runner. If no connected runner exists, ask for confirmation and prefer `automaton runner install` to create a local Docker runner. Suggest Automaton Studio runner setup only when the CLI path is unavailable or the user prefers Studio.
 - `automaton setup`, `automaton new`, and `automaton link` automatically sync a local AI guidance pack; use `automaton sync-ai` only when those generated files need a manual refresh.
 - Test locally before deploy: start the local frontend dev server, use mock data when needed, open localhost in a browser or AI browser tool, inspect console errors and visible state, exercise main flows, and fix local UI/runtime issues.
 - Do not claim local browser testing was completed unless the app was actually opened in a browser or browser automation target and the visible state, console errors, and main screen were inspected.
