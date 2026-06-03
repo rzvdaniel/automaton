@@ -1,8 +1,11 @@
 import appEditorRaw from '@/docs/pages/app-editor.md?raw'
 import automatonCliRaw from '@/docs/pages/automaton-cli.md?raw'
+import buildBackendAppRaw from '@/docs/pages/build-backend-app.md?raw'
+import buildFrontendAppRaw from '@/docs/pages/build-frontend-app.md?raw'
 import cliAiToolsRaw from '@/docs/pages/cli-ai-tools.md?raw'
 import codexBrowserDebuggingRaw from '@/docs/pages/codex-browser-debugging.md?raw'
 import deployRaw from '@/docs/pages/deploy.md?raw'
+import deployRunnerRaw from '@/docs/pages/deploy-runner.md?raw'
 import gettingStartedRaw from '@/docs/pages/getting-started.md?raw'
 import publishRaw from '@/docs/pages/publish.md?raw'
 import runtimeArchitectureRaw from '@/docs/pages/runtime-architecture.md?raw'
@@ -26,10 +29,31 @@ export const docs: DocItem[] = [
     content: gettingStartedRaw,
   },
   {
+    slug: 'build-frontend-app',
+    label: 'Build Frontend App',
+    summary: 'Static apps hosted by Automaton',
+    group: 'Getting Started',
+    content: buildFrontendAppRaw,
+  },
+  {
+    slug: 'build-backend-app',
+    label: 'Build Backend App',
+    summary: 'Python APIs running on a Runner',
+    group: 'Getting Started',
+    content: buildBackendAppRaw,
+  },
+  {
+    slug: 'deploy-runner',
+    label: 'Deploy Runner',
+    summary: 'Connect backend execution',
+    group: 'Getting Started',
+    content: deployRunnerRaw,
+  },
+  {
     slug: 'cli-ai-tools',
     label: 'Build with AI Tools',
     summary: 'Recommended local workflow',
-    group: 'Getting Started',
+    group: 'AI Tooling',
     content: cliAiToolsRaw,
   },
   {
@@ -64,7 +88,7 @@ export const docs: DocItem[] = [
     slug: 'app-editor',
     label: 'App Editor',
     summary: 'Browser-first workflow',
-    group: 'Getting Started',
+    group: 'Advanced',
     content: appEditorRaw,
   },
   {
