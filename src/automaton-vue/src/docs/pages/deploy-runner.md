@@ -10,9 +10,11 @@ Backend apps run on a Runner that you control.
 
 Create an API key in Automaton Studio before installing a Runner.
 
-Location:
+Open the API Keys menu:
 
-Settings / API Keys / Create API Key
+[https://studio.automaton.monster/apikeys](https://studio.automaton.monster/apikeys)
+
+Then create a new API key and copy it before starting the Runner install.
 
 ## Install a Runner
 
