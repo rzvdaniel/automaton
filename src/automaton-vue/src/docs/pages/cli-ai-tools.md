@@ -2,6 +2,8 @@
 
 This is the recommended local workflow for most developers.
 
+Use Automaton with the AI coding tool you already like: Cursor, Claude Code, GitHub Copilot, Codex, VS Code, or another local assistant.
+
 ## One-time setup
 
 Install the CLI:
@@ -26,10 +28,10 @@ automaton link <app-id>
 
 ## Recommended AI-first flow
 
-1. Open the app folder in Cursor, Claude Code, Copilot Chat, or another AI tool.
-2. Ask the AI to build the app.
+1. Open the app folder in your AI coding tool.
+2. Ask the AI to build the app locally.
 3. Tell it to deploy with `automaton deploy`.
-4. Tell it to ask before publish.
+4. Tell it to ask before publishing.
 
 ## Best starter prompt
 
@@ -78,9 +80,14 @@ Ask me before publish.
 
 That is the happy path.
 
-## When to read more
+## Next steps
 
-- Read **Choose a Stack** if you need help picking plain HTML, React, or Vue
-- Read **Codex Browser Debugging** if you want Codex to open and test your localhost app
-- Read **Deploy** if you want the simplest deploy explanation
-- Read **CLI Reference** only when you need advanced commands
+Read the frontend app guide if you are building a static app, Vue app, React app, or browser-only tool.
+
+Read the backend app guide if your app needs Python APIs, server-side logic, integrations, or private credentials.
+
+Read the runner guide before publishing a backend app.
+
+Read the deploy and publish guides when you want the shortest explanation of shipping an app live.
+
+Use the CLI reference only when you need advanced commands or flags.
