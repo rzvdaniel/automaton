@@ -6,7 +6,6 @@ import deployRaw from '@/docs/pages/deploy.md?raw'
 import deployRunnerRaw from '@/docs/pages/deploy-runner.md?raw'
 import gettingStartedRaw from '@/docs/pages/getting-started.md?raw'
 import publishRaw from '@/docs/pages/publish.md?raw'
-import stackSelectionRaw from '@/docs/pages/stack-selection.md?raw'
 
 export type DocItem = {
   slug: string
@@ -23,6 +22,13 @@ export const docs: DocItem[] = [
     summary: '5-minute quickstart',
     group: 'Start here',
     content: gettingStartedRaw,
+  },
+  {
+    slug: 'cli-ai-tools',
+    label: 'Build with AI Tools',
+    summary: 'Recommended local workflow',
+    group: 'Start here',
+    content: cliAiToolsRaw,
   },
   {
     slug: 'build-frontend-app',
@@ -58,20 +64,6 @@ export const docs: DocItem[] = [
     summary: 'Make the app public',
     group: 'Start here',
     content: publishRaw,
-  },
-  {
-    slug: 'cli-ai-tools',
-    label: 'Build with AI Tools',
-    summary: 'Recommended local workflow',
-    group: 'Optional',
-    content: cliAiToolsRaw,
-  },
-  {
-    slug: 'stack-selection',
-    label: 'Choose a Stack',
-    summary: 'Plain HTML, React, or Vue',
-    group: 'Optional',
-    content: stackSelectionRaw,
   },
   {
     slug: 'automaton-cli',
