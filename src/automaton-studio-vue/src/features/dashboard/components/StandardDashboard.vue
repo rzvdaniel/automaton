@@ -53,6 +53,10 @@ const handleViewAllApps = () => {
   router.push('/apps')
 }
 
+const handleOpenDocumentation = () => {
+  window.open('https://automaton.monster/docs', '_blank', 'noopener')
+}
+
 const handleAppClick = (appId: string) => {
   router.push(`/apps/${appId}`)
 }
@@ -112,6 +116,12 @@ const apiKeysCountText = computed(() => {
   return `${total} keys available`
 })
 
+const heroState = computed(() => {
+  if (dashboardStore.publishedApps > 0) return 'published'
+  if (hasApiKeys.value) return 'ready'
+  return 'setup'
+})
+
 const cliQuickStartCommand = computed(() =>
   hasApiKeys.value
     ? 'dotnet tool install -g Automaton.Cli\nautomaton setup\nautomaton deploy'
@@ -152,17 +162,52 @@ const handlePrimaryCta = () => {
 
     <section class="dashboard-hero mb-4">
       <div class="dashboard-hero-copy">
-        <h2>Start by connecting the Automaton CLI</h2>
-        <p>
-          Create a Studio API key, install the CLI, then deploy frontend and backend apps from
-          your machine or CI.
-        </p>
-        <div class="dashboard-hero-actions">
-          <Button label="Create API Key" @click="handleCreateApiKey" />
-          <Button label="Install CLI" severity="secondary" outlined @click="router.push('/downloads')" />
-        </div>
+        <template v-if="heroState === 'setup'">
+          <h2>Start by connecting the Automaton CLI</h2>
+          <p>
+            Create a Studio API key, install the CLI, then deploy frontend and backend apps from
+            your machine or CI.
+          </p>
+          <div class="dashboard-hero-actions">
+            <Button label="Create API Key" @click="handleCreateApiKey" />
+            <Button label="Install CLI" severity="secondary" outlined @click="router.push('/downloads')" />
+          </div>
+        </template>
+        <template v-else-if="heroState === 'ready'">
+          <h2>You're ready to deploy</h2>
+          <p>
+            Your API key is in place. Create an app locally, deploy with the CLI, and connect a
+            runner when you need backend execution.
+          </p>
+          <div class="dashboard-hero-actions">
+            <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
+            <Button label="Open Documentation" severity="secondary" outlined @click="handleOpenDocumentation" />
+          </div>
+        </template>
+        <template v-else>
+          <h2>Welcome back</h2>
+          <p>
+            Your workspace is active and ready. Continue shipping apps, managing runners, and
+            iterating on published deployments.
+          </p>
+          <div class="dashboard-hero-actions">
+            <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
+            <Button
+              label="Open Documentation"
+              severity="secondary"
+              outlined
+              @click="handleOpenDocumentation"
+            />
+            <Button
+              label="Manage Runners"
+              severity="secondary"
+              outlined
+              @click="router.push('/runners')"
+            />
+          </div>
+        </template>
       </div>
-      <div class="dashboard-hero-steps">
+      <div v-if="heroState === 'setup'" class="dashboard-hero-steps">
         <div class="hero-step">
           <div class="hero-step-num">1</div>
           <div>
@@ -182,6 +227,46 @@ const handlePrimaryCta = () => {
           <div>
             <div class="hero-step-title">Deploy your app</div>
             <div class="hero-step-desc"><code>automaton deploy</code></div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="dashboard-hero-panel">
+        <div class="hero-panel-title">
+          {{ heroState === 'ready' ? 'CLI Quick Start' : 'Workspace Status' }}
+        </div>
+        <pre v-if="heroState === 'ready'" class="quickstart-code dashboard-hero-code">
+{{ cliQuickStartCommand }}</pre
+        >
+        <div v-else class="hero-status-list">
+          <div class="hero-status-item">
+            <span class="hero-status-label">Recent deployments</span>
+            <span class="hero-status-value">
+              {{
+                dashboardStore.recentApps.length > 0
+                  ? `Updated ${formatTimeAgo(dashboardStore.recentApps[0].updated)}`
+                  : 'No recent deploys'
+              }}
+            </span>
+          </div>
+          <div class="hero-status-item">
+            <span class="hero-status-label">Last published app</span>
+            <span class="hero-status-value">
+              {{
+                dashboardStore.publishedAppsList.length > 0
+                  ? dashboardStore.publishedAppsList[0].name
+                  : 'No published apps yet'
+              }}
+            </span>
+          </div>
+          <div class="hero-status-item">
+            <span class="hero-status-label">Runner health</span>
+            <span class="hero-status-value">
+              {{
+                dashboardStore.runnersOnline > 0
+                  ? `${dashboardStore.runnersOnline} online`
+                  : 'No runners online'
+              }}
+            </span>
           </div>
         </div>
       </div>
@@ -507,6 +592,18 @@ const handlePrimaryCta = () => {
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
+.dashboard-hero-panel {
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.hero-panel-title {
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+}
+
 .hero-step {
   display: flex;
   gap: 0.85rem;
@@ -544,6 +641,37 @@ const handlePrimaryCta = () => {
 
 .hero-step-desc code {
   color: #f0fdfa;
+}
+
+.dashboard-hero-code {
+  background: rgba(6, 19, 26, 0.92);
+}
+
+.hero-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hero-status-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.hero-status-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.hero-status-label {
+  color: #ccfbf1;
+}
+
+.hero-status-value {
+  font-weight: 700;
 }
 
 .stat-card {

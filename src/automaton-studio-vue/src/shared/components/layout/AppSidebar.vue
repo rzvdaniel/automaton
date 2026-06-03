@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import { useOrganizationRole } from '@/features/organizations/composables/useOrganizationRole'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import billingService, { type BillingStatusResponse } from '@/features/settings/services/billingService'
+import { apiKeysService } from '@/features/settings/services/apikeys.service'
 import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 
@@ -32,7 +33,7 @@ interface NavItem {
   external?: boolean
   hideForAppUser?: boolean
   accent?: 'green'
-  badge?: string
+  badge?: string | null
 }
 
 interface NavSection {
@@ -57,16 +58,15 @@ const adminNavItems: NavItem[] = [
 ]
 
 const utilityNavItems: NavItem[] = [
-  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true, accent: 'green', badge: 'Setup' },
-  { label: 'Downloads / CLI', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
+  { label: 'CLI & SDKs', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
-  { label: 'AI Keys', icon: 'pi pi-key', to: '/ai-keys' },
   { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },
 ]
 
 // Billing usage widget
 const billingStatus = ref<BillingStatusResponse | null>(null)
+const apiKeysCount = ref(0)
 
 async function loadBillingStatus() {
   try {
@@ -76,11 +76,21 @@ async function loadBillingStatus() {
   }
 }
 
+async function loadApiKeysCount() {
+  try {
+    const keys = await apiKeysService.list()
+    apiKeysCount.value = keys.length
+  } catch {
+    apiKeysCount.value = 0
+  }
+}
+
 onMounted(async () => {
   // Load organizations to determine user's roles
   await loadOrganizations()
   await Promise.all([
     loadBillingStatus(),
+    loadApiKeysCount(),
     ensurePaidPlansLoaded(),
   ])
 })
@@ -96,6 +106,28 @@ const isAdmin = computed(() => {
   if (!roles) return false
   return roles.includes('Admin') || roles.includes('SysAdmin')
 })
+
+const apiKeysBadge = computed(() => {
+  if (apiKeysCount.value <= 0) return 'Setup'
+  return apiKeysCount.value > 9 ? '9+' : String(apiKeysCount.value)
+})
+
+const apiKeysNavItem = computed<NavItem>(() => ({
+  label: 'API Keys',
+  icon: 'pi pi-key',
+  to: '/apikeys',
+  hideForAppUser: true,
+  accent: 'green',
+  badge: apiKeysBadge.value,
+}))
+
+const primaryNavItems = computed<NavItem[]>(() => [
+  mainNavItems[0],
+  mainNavItems[1],
+  mainNavItems[2],
+  apiKeysNavItem.value,
+  mainNavItems[3],
+])
 
 function filterItems(items: NavItem[]) {
   let filtered = items
@@ -115,7 +147,7 @@ function filterItems(items: NavItem[]) {
 
 const visibleSections = computed<NavSection[]>(() => {
   const sections: NavSection[] = [
-    { key: 'main', items: filterItems(mainNavItems) },
+    { key: 'main', items: filterItems(primaryNavItems.value) },
     { key: 'collaboration', items: filterItems(collaborationNavItems) },
     { key: 'admin', items: filterItems(adminNavItems) },
   ]
@@ -201,14 +233,36 @@ const isActive = (to: string) => {
             <div v-for="item in section.items" :key="item.to" class="nav-item-wrapper">
               <Button
                 v-tooltip.right="tooltipOptions(item.label)"
-                :class="['nav-item', { active: isActive(item.to) }]"
+                :class="[
+                  'nav-item',
+                  {
+                    active: isActive(item.to),
+                    'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
+                    'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
+                  },
+                ]"
                 :severity="isActive(item.to) ? 'primary' : 'secondary'"
                 :text="!isActive(item.to)"
                 rounded
                 @click="navigate(item)"
               >
-                <i :class="item.icon"></i>
+                <span
+                  class="nav-icon-wrap"
+                  :class="{
+                    'nav-icon-wrap-green': item.accent === 'green',
+                    'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
+                  }"
+                >
+                  <i :class="item.icon"></i>
+                </span>
                 <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
+                <span
+                  v-if="isExpanded && item.badge"
+                  class="nav-badge"
+                  :class="{ 'nav-badge-green': item.accent === 'green' }"
+                >
+                  {{ item.badge }}
+                </span>
               </Button>
             </div>
             <div v-if="hasTopDividerAfter(sectionIndex)" class="nav-divider"></div>
