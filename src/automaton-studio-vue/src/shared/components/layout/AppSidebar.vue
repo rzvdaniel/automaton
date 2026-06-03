@@ -31,6 +31,8 @@ interface NavItem {
   to: string
   external?: boolean
   hideForAppUser?: boolean
+  accent?: 'green'
+  badge?: string
 }
 
 interface NavSection {
@@ -55,11 +57,11 @@ const adminNavItems: NavItem[] = [
 ]
 
 const utilityNavItems: NavItem[] = [
-  { label: 'Downloads', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
+  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true, accent: 'green', badge: 'Setup' },
+  { label: 'Downloads / CLI', icon: 'pi pi-download', to: '/downloads', hideForAppUser: true },
   { label: 'Billing', icon: 'pi pi-credit-card', to: '/billing' },
-  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true },
-  { label: 'AI Keys', icon: 'pi pi-key', to: '/ai-keys' },
   { label: 'Settings', icon: 'pi pi-cog', to: '/settings' },
+  { label: 'AI Keys', icon: 'pi pi-key', to: '/ai-keys' },
   { label: 'Documentation', icon: 'pi pi-book', to: publicDocsUrl, external: true },
 ]
 
@@ -232,14 +234,36 @@ const isActive = (to: string) => {
         <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
             v-tooltip.right="tooltipOptions(item.label)"
-            :class="['nav-item', { active: isActive(item.to) }]"
+            :class="[
+              'nav-item',
+              {
+                active: isActive(item.to),
+                'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
+                'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
+              },
+            ]"
             :severity="isActive(item.to) ? 'primary' : 'secondary'"
             :text="!isActive(item.to)"
             rounded
             @click="navigate(item)"
           >
-            <i :class="item.icon"></i>
+            <span
+              class="nav-icon-wrap"
+              :class="{
+                'nav-icon-wrap-green': item.accent === 'green',
+                'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
+              }"
+            >
+              <i :class="item.icon"></i>
+            </span>
             <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
+            <span
+              v-if="isExpanded && item.badge"
+              class="nav-badge"
+              :class="{ 'nav-badge-green': item.accent === 'green' }"
+            >
+              {{ item.badge }}
+            </span>
           </Button>
         </div>
       </nav>
@@ -316,6 +340,21 @@ const isActive = (to: string) => {
   gap: 0.5rem;
 }
 
+.nav-badge {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.18rem 0.48rem;
+  border-radius: 999px;
+  background: var(--p-surface-200);
+  color: var(--p-text-muted-color);
+}
+
+.nav-badge-green {
+  background: #dcfce7;
+  color: #047857;
+}
+
 .nav-section {
   display: flex;
   flex-direction: column;
@@ -345,6 +384,26 @@ const isActive = (to: string) => {
   min-width: 1.25rem;
 }
 
+.nav-icon-wrap {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-icon-wrap-green {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.nav-icon-wrap-green-active {
+  background: rgba(255, 255, 255, 0.2);
+  color: currentColor;
+}
+
 .nav-item.active::before {
   content: '';
   position: absolute;
@@ -366,6 +425,28 @@ const isActive = (to: string) => {
   padding: 0.5rem;
   color: var(--p-text-muted-color);
   font-size: 0.875rem;
+}
+
+.nav-item-accent-green {
+  background: linear-gradient(135deg, #16a34a, #059669);
+  border: 1px solid #22c55e;
+  color: #f0fdf4;
+  box-shadow: 0 10px 22px rgba(22, 163, 74, 0.22);
+}
+
+.nav-item-accent-green:hover {
+  background: linear-gradient(135deg, #15803d, #047857);
+  border-color: #34d399;
+  color: #ffffff;
+}
+
+.nav-item-accent-green-active {
+  background: linear-gradient(135deg, #15803d, #059669);
+}
+
+.nav-item-accent-green :deep(.p-button-label),
+.nav-item-accent-green-active :deep(.p-button-label) {
+  color: inherit;
 }
 
 .nav-divider {
@@ -428,6 +509,32 @@ const isActive = (to: string) => {
 
 .billing-upgrade:hover {
   text-decoration: underline;
+}
+
+:global(.app-dark) .nav-item-accent-green {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--p-green-500) 68%, #052e16),
+    color-mix(in srgb, var(--p-emerald-500) 62%, #022c22)
+  );
+  border: 1px solid color-mix(in srgb, var(--p-green-400) 54%, transparent);
+  color: #d1fae5;
+  box-shadow: 0 12px 28px rgba(5, 150, 105, 0.28);
+}
+
+:global(.app-dark) .nav-item-accent-green:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--p-green-500) 78%, #052e16),
+    color-mix(in srgb, var(--p-emerald-500) 72%, #022c22)
+  );
+  border-color: color-mix(in srgb, var(--p-green-300) 62%, transparent);
+  color: #ecfdf5;
+}
+
+:global(.app-dark) .nav-icon-wrap-green {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ecfdf5;
 }
 
 @media (max-width: 1023px) {

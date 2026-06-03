@@ -140,7 +140,7 @@ When backend controllers exist, use this config:
 }
 ```
 
-**Deploy** — `automaton deploy` runs `frontend.build` when configured, checks deploy readiness, uploads `frontend.deployDir` to frontend runtime, uploads `backend.deployDir` to backend runtime when present, and pushes backend runtime to the runner. Local build commands such as `npm run build`, `python -m py_compile`, or tests are not completion criteria by themselves. Do not claim the app is done until `automaton deploy` has succeeded, or you have reported the exact deploy command, the exact failure, and the required next step. If the app has Python backend controllers and no runner is assigned, `automaton deploy` should auto-select one connected runner or prompt the user to choose. Tell the user to create/deploy a runner in Automaton Studio only when no connected runner exists.
+**Deploy** — `automaton deploy` runs `frontend.build` when configured, checks deploy readiness, uploads `frontend.deployDir` to frontend runtime, uploads `backend.deployDir` to backend runtime when present, and pushes backend runtime to the runner. Local build commands such as `npm run build`, `python -m py_compile`, or tests are not completion criteria by themselves. Do not claim the app is done until `automaton deploy` has succeeded, or you have reported the exact deploy command, the exact failure, and the required next step. If the app has Python backend controllers and no runner is assigned, `automaton deploy` should auto-select one connected runner or prompt the user to choose. If no connected runner exists, ask the user for confirmation, then prefer `automaton runner install` to create a local Docker runner. Suggest creating or deploying a runner in Automaton Studio only when the CLI runner install path is unavailable or the user prefers Studio-managed setup.
 
 **Non-interactive CLI rule** — Commands should not unexpectedly block on prompts or rich terminal redraws in AI, CI, or scripted workflows. The CLI should honor explicit `--non-interactive` and also auto-switch when `CI=true`, `AUTOMATON_CI=true`, or stdio is redirected. Use explicit intent flags instead: `automaton deploy` for deploy-only, `automaton deploy --publish --yes --non-interactive` for one-step non-interactive release, or `automaton deploy` followed by `automaton publish --yes --non-interactive` after explicit approval.
 
@@ -172,7 +172,7 @@ MCP is another tool the AI may use when helpful; it is not mandatory. Do not mak
 
 **Happy path** — The real default user flow is: install the CLI once, run `automaton setup`, then let the AI handle most of the project work locally, use `automaton new` for a new app or `automaton link` for an existing one, run `automaton deploy`, and use Automaton Studio for preview and logs. Use `automaton validate` only as an optional diagnostic check.
 
-**After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+**After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, confirmation before creating a runner, runner creation outside the CLI when needed, or publish approval.
 
 **New app default** — In a fresh folder after `automaton setup`, absence of `automaton.json` should be treated as "not linked yet". For a new app request, the default next command is `automaton new "<app-name>"`.
 
@@ -200,7 +200,7 @@ Follow this order:
 8. The AI should handle most of the remaining work after `automaton setup`.
 9. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
 10. Run `automaton deploy`; it performs the deploy preflight and handles runner selection only when Python backend controllers require it.
-11. If no connected runner is available for a backend app, tell the user to create or deploy one in Automaton Studio, then rerun `automaton deploy`.
+11. If no connected runner is available for a backend app, ask for confirmation and prefer `automaton runner install` to create a local Docker runner. Use Automaton Studio runner creation only when the CLI path is unavailable or the user explicitly prefers it. Then rerun `automaton deploy`.
 12. Run `automaton validate` only when you need a separate diagnostic preflight.
 13. Use Automaton Studio for preview and logs after deploy.
 14. Open the app in Automaton Studio, preview it there, and inspect the logs there.

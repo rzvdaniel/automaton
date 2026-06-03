@@ -8,24 +8,26 @@ import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
-import WelcomeSection from './WelcomeSection.vue'
-import { getUserAiApiKeys } from '@/shared/services/ai/ai-providers-service'
+import type { ApiKey } from '@/features/settings/types/apikeys.types'
+import { apiKeysService } from '@/features/settings/services/apikeys.service'
 import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 
 const router = useRouter()
 const toast = useToast()
 const dashboardStore = useDashboardStore()
 
-// Track whether the user has configured any AI keys
-const hasAiKeys = ref(false)
+// Track whether the user has configured any API keys
+const hasApiKeys = ref(false)
+const apiKeys = ref<ApiKey[]>([])
 
 // Fetch dashboard data on mount
 onMounted(async () => {
   await dashboardStore.fetchDashboard()
-  // Check AI keys in parallel with auto-refresh (lightweight)
+  // Check API keys in parallel with auto-refresh (lightweight)
   try {
-    const keys = await getUserAiApiKeys()
-    hasAiKeys.value = keys.length > 0
+    const keys = await apiKeysService.list()
+    apiKeys.value = keys
+    hasApiKeys.value = keys.length > 0
   } catch {
     // Non-critical — checklist just shows step as incomplete
   }
@@ -41,6 +43,10 @@ onUnmounted(() => {
 // Navigation handlers
 const handleCreateApp = () => {
   router.push('/apps')
+}
+
+const handleCreateApiKey = () => {
+  router.push('/apikeys')
 }
 
 const handleViewAllApps = () => {
@@ -99,26 +105,30 @@ const appsCountText = computed(() => {
   return `${total} total`
 })
 
+const apiKeysCountText = computed(() => {
+  const total = apiKeys.value.length
+  if (total === 0) return 'Create one to connect the CLI'
+  if (total === 1) return '1 key available'
+  return `${total} keys available`
+})
+
+const cliQuickStartCommand = computed(() =>
+  hasApiKeys.value
+    ? 'dotnet tool install -g Automaton.Cli\nautomaton setup\nautomaton deploy'
+    : 'Create an API key first\ndotnet tool install -g Automaton.Cli\nautomaton setup',
+)
+
 // Retry fetch on error
 const handleRetry = () => {
   dashboardStore.clearError()
   dashboardStore.fetchDashboard()
 }
 
-// Dismiss welcome section
-const handleDismissWelcome = () => {
-  dashboardStore.dismissWelcome()
+const primaryCtaLabel = computed(() => 'Create API Key')
+const primaryCtaIcon = computed(() => 'pi pi-key')
+const handlePrimaryCta = () => {
+  handleCreateApiKey()
 }
-
-// Show checklist when: not all 4 setup steps done AND user hasn't dismissed it
-const allSetupDone = computed(
-  () =>
-    hasAiKeys.value &&
-    dashboardStore.runnersOnline > 0 &&
-    dashboardStore.totalApps > 0 &&
-    dashboardStore.publishedApps > 0,
-)
-const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWelcomeDismissed)
 </script>
 
 <template>
@@ -129,7 +139,7 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
         <h1 class="text-3xl font-bold m-0">Dashboard</h1>
         <p class="text-color-secondary mt-1 mb-0">Build and manage your web applications</p>
       </div>
-      <Button label="Create App" icon="pi pi-plus" @click="handleCreateApp" />
+      <Button :label="primaryCtaLabel" :icon="primaryCtaIcon" @click="handlePrimaryCta" />
     </div>
 
     <!-- Error State -->
@@ -140,15 +150,42 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
       </div>
     </Message>
 
-    <!-- Setup Checklist (hidden once all 4 steps done or manually dismissed) -->
-    <WelcomeSection
-      v-if="showChecklist && !dashboardStore.isLoading"
-      :has-ai-keys="hasAiKeys"
-      :has-runners="dashboardStore.runnersOnline > 0"
-      :has-apps="dashboardStore.totalApps > 0"
-      :has-published-app="dashboardStore.publishedApps > 0"
-      @dismiss="handleDismissWelcome"
-    />
+    <section class="dashboard-hero mb-4">
+      <div class="dashboard-hero-copy">
+        <h2>Start by connecting the Automaton CLI</h2>
+        <p>
+          Create a Studio API key, install the CLI, then deploy frontend and backend apps from
+          your machine or CI.
+        </p>
+        <div class="dashboard-hero-actions">
+          <Button label="Create API Key" @click="handleCreateApiKey" />
+          <Button label="Install CLI" severity="secondary" outlined @click="router.push('/downloads')" />
+        </div>
+      </div>
+      <div class="dashboard-hero-steps">
+        <div class="hero-step">
+          <div class="hero-step-num">1</div>
+          <div>
+            <div class="hero-step-title">Create API Key</div>
+            <div class="hero-step-desc">Required for <code>automaton setup</code></div>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="hero-step-num">2</div>
+          <div>
+            <div class="hero-step-title">Install CLI</div>
+            <div class="hero-step-desc"><code>dotnet tool install -g Automaton.Cli</code></div>
+          </div>
+        </div>
+        <div class="hero-step">
+          <div class="hero-step-num">3</div>
+          <div>
+            <div class="hero-step-title">Deploy your app</div>
+            <div class="hero-step-desc"><code>automaton deploy</code></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Stats Cards -->
     <div v-if="dashboardStore.isLoading && !dashboardStore.hasData" class="grid mb-4">
@@ -205,18 +242,18 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
         </Card>
       </div>
 
-      <!-- Total Views -->
+      <!-- API Keys -->
       <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full stat-card">
+        <Card class="h-full stat-card" @click="router.push('/apikeys')">
           <template #content>
             <div class="flex align-items-center gap-3">
-              <div class="stat-icon stat-icon-teal">
-                <i class="pi pi-eye text-xl"></i>
+              <div class="stat-icon stat-icon-key">
+                <i class="pi pi-key text-xl"></i>
               </div>
               <div>
-                <div class="text-color-secondary text-sm">Total Views</div>
-                <div class="text-2xl font-bold">{{ dashboardStore.totalAppViews }}</div>
-                <div class="text-color-secondary text-xs">All time</div>
+                <div class="text-color-secondary text-sm">API Keys</div>
+                <div class="text-2xl font-bold">{{ apiKeys.length }}</div>
+                <div class="text-color-secondary text-xs">{{ apiKeysCountText }}</div>
               </div>
             </div>
           </template>
@@ -325,8 +362,27 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
         </Card>
       </div>
 
-      <!-- Published Apps -->
+      <!-- CLI Quick Start -->
       <div class="col-12 lg:col-4">
+        <Card class="quickstart-card">
+          <template #title>
+            <div class="flex align-items-center justify-content-between">
+              <span>CLI Quick Start</span>
+            </div>
+          </template>
+          <template #content>
+            <div class="quickstart-copy mb-3">
+              Connect the CLI, authenticate with a Studio API key, then deploy from your machine.
+            </div>
+            <pre class="quickstart-code">{{ cliQuickStartCommand }}</pre>
+          </template>
+        </Card>
+      </div>
+    </div>
+
+    <div class="grid mt-4">
+      <!-- Published Apps -->
+      <div class="col-12">
         <Card>
           <template #title>Published Apps</template>
           <template #content>
@@ -398,6 +454,98 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
   margin: 0 auto;
 }
 
+.dashboard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
+  gap: 1.5rem;
+  padding: 1.7rem;
+  border-radius: 18px;
+  color: white;
+  background: linear-gradient(135deg, #063b2d, #0f766e);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.dashboard-hero-copy h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+
+.dashboard-hero-copy p {
+  margin: 0;
+  color: #ccfbf1;
+  line-height: 1.65;
+  max-width: 60ch;
+}
+
+.dashboard-hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+
+.dashboard-hero-actions :deep(.p-button) {
+  font-weight: 700;
+}
+
+.dashboard-hero-actions :deep(.p-button:not(.p-button-outlined)) {
+  background: white;
+  color: #047857;
+  border-color: white;
+}
+
+.dashboard-hero-actions :deep(.p-button.p-button-outlined) {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.dashboard-hero-steps {
+  padding: 1rem 1rem 0.75rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.hero-step {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.hero-step:last-child {
+  border-bottom: none;
+}
+
+.hero-step-num {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: #047857;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.hero-step-title {
+  font-weight: 700;
+}
+
+.hero-step-desc {
+  color: #ccfbf1;
+  margin-top: 0.18rem;
+  line-height: 1.45;
+}
+
+.hero-step-desc code {
+  color: #f0fdfa;
+}
+
 .stat-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
@@ -431,6 +579,11 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
   color: var(--p-teal-600);
 }
 
+.stat-icon-key {
+  background-color: color-mix(in srgb, var(--p-green-500) 14%, white);
+  color: var(--p-green-700);
+}
+
 .stat-icon-blue {
   background-color: var(--p-blue-100);
   color: var(--p-blue-600);
@@ -443,6 +596,35 @@ const showChecklist = computed(() => !allSetupDone.value && !dashboardStore.isWe
 
 .stat-card-warning {
   border-left: 3px solid var(--p-orange-400);
+}
+
+.quickstart-card {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-green-500) 8%, white), transparent 70%),
+    var(--p-surface-0);
+}
+
+.quickstart-copy {
+  color: var(--p-text-muted-color);
+  line-height: 1.5;
+}
+
+.quickstart-code {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 14px;
+  background: #06131a;
+  color: #d1fae5;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-hero {
+    grid-template-columns: 1fr;
+  }
 }
 
 :global(.app-dark) .stat-icon-primary {

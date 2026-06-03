@@ -6,7 +6,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
 interface Props {
-  hasAiKeys: boolean
+  hasApiKeys: boolean
   hasRunners: boolean
   hasApps: boolean
   hasPublishedApp: boolean
@@ -20,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const hasCliActivation = computed(() => props.hasApps || props.hasRunners || props.hasPublishedApp)
 
 const COLLAPSED_KEY = 'setup-checklist-collapsed'
 const isCollapsed = ref(localStorage.getItem(COLLAPSED_KEY) === 'true')
@@ -35,36 +36,36 @@ function handleDismiss() {
 
 const steps = computed(() => [
   {
-    key: 'ai-key',
-    done: props.hasAiKeys,
-    title: 'Add an AI key',
-    desc: 'Required to use AI generation in the App Editor',
-    action: 'Add Key',
-    route: '/ai-keys',
+    key: 'api-key',
+    done: props.hasApiKeys,
+    title: 'Create API key',
+    desc: 'Required to connect the CLI and authenticate local deploys',
+    action: 'Create API Key',
+    route: '/apikeys',
   },
   {
-    key: 'runner',
-    done: props.hasRunners,
-    title: 'Connect a runner',
-    desc: 'Executes your backend Python controllers when deploying',
-    action: 'Set Up Runner',
-    route: '/runners',
+    key: 'cli',
+    done: hasCliActivation.value,
+    title: 'Install the CLI',
+    desc: 'Use Automaton CLI to create, deploy, and manage apps from your machine',
+    action: 'Install CLI',
+    route: '/downloads',
   },
   {
     key: 'app',
     done: props.hasApps,
     title: 'Create your first app',
-    desc: 'Describe what to build — AI generates the code',
+    desc: 'Create or link the app locally, then prepare it for deployment',
     action: 'Create App',
     route: '/apps',
   },
   {
-    key: 'publish',
-    done: props.hasPublishedApp,
-    title: 'Publish an app',
-    desc: 'Make it live with a shareable public URL',
-    action: 'Go to Apps',
-    route: '/apps',
+    key: 'runner',
+    done: props.hasRunners,
+    title: 'Connect a runner',
+    desc: 'Required for backend app execution and Python controllers',
+    action: 'Set Up Runner',
+    route: '/runners',
   },
 ])
 
@@ -82,8 +83,8 @@ const nextStep = computed(() => steps.value.find((s) => !s.done))
       <!-- Header row -->
       <div class="checklist-header">
         <div class="checklist-title-row">
-          <i class="pi pi-flag checklist-icon"></i>
-          <span class="font-semibold">Getting Started</span>
+          <i class="pi pi-terminal checklist-icon"></i>
+          <span class="font-semibold">Get Started with Automaton CLI</span>
           <span v-if="!loading" class="checklist-progress-text">
             {{ doneCount }} of {{ total }} complete
           </span>
@@ -108,6 +109,21 @@ const nextStep = computed(() => steps.value.find((s) => !s.done))
             aria-label="Dismiss"
             @click="handleDismiss"
           />
+        </div>
+      </div>
+
+      <div v-if="!isCollapsed" class="cli-callout mt-3">
+        <div class="cli-callout-copy">
+          <div class="cli-callout-title">Recommended workflow</div>
+          <div class="cli-callout-desc">
+            1. Create an API key
+            2. Install the CLI
+            3. Run <code>automaton setup</code> from your terminal
+          </div>
+        </div>
+        <div class="cli-callout-actions">
+          <Button label="Create API Key" size="small" @click="router.push('/apikeys')" />
+          <Button label="Install CLI" size="small" severity="secondary" outlined @click="router.push('/downloads')" />
         </div>
       </div>
 
@@ -226,6 +242,49 @@ const nextStep = computed(() => steps.value.find((s) => !s.done))
   background: var(--p-green-500);
 }
 
+.cli-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--p-surface-200);
+  border-radius: 0.875rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-primary-500) 8%, white), transparent 60%),
+    var(--p-surface-0);
+}
+
+:global(.app-dark) .cli-callout {
+  border-color: var(--p-surface-700);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-primary-500) 12%, transparent), transparent 60%),
+    var(--p-surface-900);
+}
+
+.cli-callout-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cli-callout-title {
+  font-weight: 700;
+}
+
+.cli-callout-desc {
+  color: var(--p-text-muted-color);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.cli-callout-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .checklist-steps {
   display: flex;
   flex-direction: column;
@@ -293,5 +352,17 @@ const nextStep = computed(() => steps.value.find((s) => !s.done))
 .step-action {
   min-width: 100px;
   text-align: center;
+}
+
+@media (max-width: 768px) {
+  .cli-callout {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cli-callout-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>
