@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -11,6 +12,7 @@ import Dropdown from 'primevue/dropdown'
 import Message from 'primevue/message'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { apiKeysService } from '../services/apikeys.service'
 import {
   ApiKeyScope,
@@ -24,6 +26,8 @@ import {
 
 const toast = useToast()
 const confirm = useConfirm()
+const router = useRouter()
+const authStore = useAuthStore()
 
 // State
 const loading = ref(true)
@@ -32,6 +36,8 @@ const showCreateDialog = ref(false)
 const showSuccessDialog = ref(false)
 const createLoading = ref(false)
 const newApiKeyData = ref<CreateApiKeyResponse | null>(null)
+const isEmailConfirmed = computed(() => authStore.user?.emailConfirmed ?? false)
+const lockedFeatureHint = 'Confirm your email to unlock API key creation.'
 
 // Form
 const createForm = ref<CreateApiKeyRequest>({
@@ -69,6 +75,16 @@ async function loadApiKeys() {
 
 // Open create dialog
 function openCreateDialog() {
+  if (!isEmailConfirmed.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Email Confirmation Required',
+      detail: lockedFeatureHint,
+      life: 4000,
+    })
+    return
+  }
+
   createForm.value = {
     name: '',
     description: '',
@@ -184,12 +200,33 @@ onMounted(() => {
       <h2 class="page-title">API Keys</h2>
       <p class="page-subtitle">Create keys for runners, workflow execution, web apps, and external integrations.</p>
     </div>
-    <Button
-      label="Generate New Key"
-      icon="pi pi-plus"
-      @click="openCreateDialog"
-    />
+    <div class="page-actions">
+      <span v-tooltip.left="!isEmailConfirmed ? lockedFeatureHint : undefined">
+        <Button
+          label="Generate New Key"
+          :icon="!isEmailConfirmed ? 'pi pi-lock' : 'pi pi-plus'"
+          :disabled="!isEmailConfirmed"
+          @click="openCreateDialog"
+        />
+      </span>
+    </div>
   </div>
+
+  <Message v-if="!isEmailConfirmed" severity="warn" :closable="false" class="mb-4">
+    <div class="confirmation-guard">
+      <div>
+        Confirm your email to create API keys for runners, published apps, and external
+        integrations.
+      </div>
+      <Button
+        label="Change Email"
+        size="small"
+        severity="secondary"
+        outlined
+        @click="router.push('/account')"
+      />
+    </div>
+  </Message>
 
   <div v-if="!loading && apiKeys.length === 0" class="api-keys-empty mb-4">
     <i class="pi pi-key api-keys-empty-icon"></i>
@@ -204,7 +241,14 @@ onMounted(() => {
       <span class="scope-chip">Web App</span>
       <span class="scope-chip">Full Access</span>
     </div>
-    <Button label="Generate Your First Key" icon="pi pi-plus" @click="openCreateDialog" />
+    <span v-tooltip.bottom="!isEmailConfirmed ? lockedFeatureHint : undefined">
+      <Button
+        label="Generate Your First Key"
+        :icon="!isEmailConfirmed ? 'pi pi-lock' : 'pi pi-plus'"
+        :disabled="!isEmailConfirmed"
+        @click="openCreateDialog"
+      />
+    </span>
   </div>
 
   <DataTable
@@ -398,6 +442,19 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+}
+
+.confirmation-guard {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .keys-table {
   width: 100%;
 }
@@ -449,5 +506,13 @@ onMounted(() => {
 :global(.app-dark) .scope-chip {
   background: var(--p-surface-800);
   border-color: var(--p-surface-700);
+}
+
+@media (max-width: 768px) {
+  .confirmation-guard,
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

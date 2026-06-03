@@ -21,8 +21,8 @@ function showEmailConfirmationFeedback() {
     toast.add({
       severity: 'success',
       summary: 'Email Confirmed',
-      detail: 'Thanks for confirming your email. Sensitive actions in Automaton are now unlocked.',
-      life: 5000,
+      detail: 'Your account is now fully activated. You can now create API keys, connect runners, and publish applications.',
+      life: 6000,
     })
   } else if (route.query.emailConfirmation === 'failed') {
     toast.add({

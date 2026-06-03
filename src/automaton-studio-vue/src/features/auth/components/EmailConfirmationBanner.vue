@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
 import Button from 'primevue/button'
@@ -7,9 +8,11 @@ import { useAuthStore } from '../stores/auth.store'
 
 const authStore = useAuthStore()
 const toast = useToast()
+const router = useRouter()
 const isSending = ref(false)
 
 const shouldShow = computed(() => authStore.isAuthenticated && !!authStore.user && !authStore.user.emailConfirmed)
+const userEmail = computed(() => authStore.user?.email ?? '')
 
 async function resendConfirmation() {
   isSending.value = true
@@ -46,17 +49,32 @@ async function resendConfirmation() {
       <div class="banner-content">
         <div>
           <div class="banner-title">Please confirm your email</div>
+          <div v-if="userEmail" class="banner-email">
+            We&apos;ve sent a confirmation email to:
+            <strong>{{ userEmail }}</strong>
+          </div>
           <div class="banner-text">
-            You can explore Studio, but publishing apps, creating API keys, registering runners, and billing actions stay locked until you confirm your email.
+            To protect your account and prevent abuse, email confirmation is required before
+            creating API keys, registering runners, publishing apps, or accessing billing
+            features.
           </div>
         </div>
-        <Button
-          label="Resend Email"
-          size="small"
-          :loading="isSending"
-          :disabled="isSending"
-          @click="resendConfirmation"
-        />
+        <div class="banner-actions">
+          <Button
+            label="Resend Email"
+            size="small"
+            :loading="isSending"
+            :disabled="isSending"
+            @click="resendConfirmation"
+          />
+          <Button
+            label="Change Email"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="router.push('/account')"
+          />
+        </div>
       </div>
     </Message>
   </div>
@@ -82,6 +100,18 @@ async function resendConfirmation() {
 
 .banner-text {
   line-height: 1.45;
+}
+
+.banner-email {
+  margin-bottom: 0.35rem;
+  line-height: 1.45;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {

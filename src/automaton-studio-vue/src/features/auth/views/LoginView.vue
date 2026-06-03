@@ -36,7 +36,7 @@ onMounted(() => {
   if (route.query.registered === 'true') {
     successMessage.value = 'Registration successful! Please sign in with your credentials.'
   } else if (route.query.emailConfirmation === 'success') {
-    successMessage.value = 'Email confirmed successfully. You can now use sensitive actions in Automaton.'
+    successMessage.value = 'Email confirmed. Sign in to continue to Studio with your account fully activated.'
   } else if (route.query.emailConfirmation === 'failed') {
     confirmationErrorMessage.value = 'Email confirmation failed or the link is no longer valid. Please sign in and resend the confirmation email.'
   }

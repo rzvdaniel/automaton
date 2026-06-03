@@ -73,10 +73,16 @@ router.beforeEach(async (to, _from, next) => {
   // Check if route requires authentication
   // If route requires auth and user is not authenticated
   if (requiresAuth && !authStore.isAuthenticated) {
+    const emailConfirmation =
+      typeof to.query.emailConfirmation === 'string' ? to.query.emailConfirmation : undefined
+
     // Redirect to login with return URL
     next({
       path: '/login',
-      query: { redirect: to.fullPath },
+      query: {
+        redirect: to.fullPath,
+        ...(emailConfirmation ? { emailConfirmation } : {}),
+      },
     })
     return
   }

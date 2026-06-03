@@ -394,8 +394,10 @@ public class AccountController : BaseController
     private string BuildEmailConfirmationRedirectUrl(bool success)
     {
         var baseUrl = configurationService.WebsiteUrl.TrimEnd('/');
+        var targetPath = success ? "/" : "/login";
+
         return QueryHelpers.AddQueryString(
-            $"{baseUrl}/login",
+            $"{baseUrl}{targetPath}",
             new Dictionary<string, string?>
             {
                 ["emailConfirmation"] = success ? "success" : "failed"

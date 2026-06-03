@@ -8,6 +8,7 @@ import Skeleton from 'primevue/skeleton'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { useDashboardStore } from '../stores/dashboard.store'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import type { ApiKey } from '@/features/settings/types/apikeys.types'
 import { apiKeysService } from '@/features/settings/services/apikeys.service'
 import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
@@ -15,6 +16,7 @@ import { getPublishedAppUrl } from '@/features/apps/utils/public-app-url'
 const router = useRouter()
 const toast = useToast()
 const dashboardStore = useDashboardStore()
+const authStore = useAuthStore()
 
 // Track whether the user has configured any API keys
 const hasApiKeys = ref(false)
@@ -116,6 +118,11 @@ const apiKeysCountText = computed(() => {
   return `${total} keys available`
 })
 
+const isEmailConfirmed = computed(() => authStore.user?.emailConfirmed ?? false)
+const confirmationEmail = computed(() => authStore.user?.email ?? '')
+const lockedFeatureHint = 'Confirm your email to unlock this feature.'
+const isSensitiveActionsLocked = computed(() => !isEmailConfirmed.value)
+
 const heroState = computed(() => {
   if (dashboardStore.publishedApps > 0) return 'published'
   if (hasApiKeys.value) return 'ready'
@@ -139,6 +146,31 @@ const primaryCtaIcon = computed(() => 'pi pi-key')
 const handlePrimaryCta = () => {
   handleCreateApiKey()
 }
+
+const resendLoading = ref(false)
+
+const resendConfirmation = async () => {
+  resendLoading.value = true
+  try {
+    await authStore.resendConfirmation()
+    toast.add({
+      severity: 'success',
+      summary: 'Confirmation Sent',
+      detail: 'Check your inbox for a new confirmation email.',
+      life: 4000,
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to resend confirmation email.'
+    toast.add({
+      severity: 'error',
+      summary: 'Resend Failed',
+      detail: message,
+      life: 4000,
+    })
+  } finally {
+    resendLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -149,7 +181,14 @@ const handlePrimaryCta = () => {
         <h1 class="text-3xl font-bold m-0">Dashboard</h1>
         <p class="text-color-secondary mt-1 mb-0">Build and manage your web applications</p>
       </div>
-      <Button :label="primaryCtaLabel" :icon="primaryCtaIcon" @click="handlePrimaryCta" />
+      <span v-tooltip.left="isSensitiveActionsLocked ? lockedFeatureHint : undefined">
+        <Button
+          :label="primaryCtaLabel"
+          :icon="isSensitiveActionsLocked ? 'pi pi-lock' : primaryCtaIcon"
+          :disabled="isSensitiveActionsLocked"
+          @click="handlePrimaryCta"
+        />
+      </span>
     </div>
 
     <!-- Error State -->
@@ -160,6 +199,39 @@ const handlePrimaryCta = () => {
       </div>
     </Message>
 
+    <Card v-if="isSensitiveActionsLocked" class="email-confirm-card mb-4">
+      <template #content>
+        <div class="email-confirm-content">
+          <div class="email-confirm-copy">
+            <div class="email-confirm-title">Please confirm your email</div>
+            <div v-if="confirmationEmail" class="email-confirm-address">
+              We&apos;ve sent a confirmation email to:
+              <strong>{{ confirmationEmail }}</strong>
+            </div>
+            <div class="email-confirm-text">
+              To protect your account and prevent abuse, email confirmation is required before
+              creating API keys, registering runners, publishing apps, or accessing billing
+              features.
+            </div>
+          </div>
+          <div class="email-confirm-actions">
+            <Button
+              label="Resend Email"
+              :loading="resendLoading"
+              :disabled="resendLoading"
+              @click="resendConfirmation"
+            />
+            <Button
+              label="Change Email"
+              severity="secondary"
+              outlined
+              @click="router.push('/account')"
+            />
+          </div>
+        </div>
+      </template>
+    </Card>
+
     <section class="dashboard-hero mb-4">
       <div class="dashboard-hero-copy">
         <template v-if="heroState === 'setup'">
@@ -169,7 +241,14 @@ const handlePrimaryCta = () => {
             your machine or CI.
           </p>
           <div class="dashboard-hero-actions">
-            <Button label="Create API Key" @click="handleCreateApiKey" />
+            <span v-tooltip.bottom="isSensitiveActionsLocked ? lockedFeatureHint : undefined">
+              <Button
+                label="Create API Key"
+                :icon="isSensitiveActionsLocked ? 'pi pi-lock' : undefined"
+                :disabled="isSensitiveActionsLocked"
+                @click="handleCreateApiKey"
+              />
+            </span>
             <Button label="Install CLI" severity="secondary" outlined @click="router.push('/downloads')" />
           </div>
         </template>
@@ -198,12 +277,16 @@ const handlePrimaryCta = () => {
               outlined
               @click="handleOpenDocumentation"
             />
-            <Button
-              label="Manage Runners"
-              severity="secondary"
-              outlined
-              @click="router.push('/runners')"
-            />
+            <span v-tooltip.bottom="isSensitiveActionsLocked ? lockedFeatureHint : undefined">
+              <Button
+                label="Manage Runners"
+                :icon="isSensitiveActionsLocked ? 'pi pi-lock' : undefined"
+                severity="secondary"
+                outlined
+                :disabled="isSensitiveActionsLocked"
+                @click="router.push('/runners')"
+              />
+            </span>
           </div>
         </template>
       </div>
@@ -329,14 +412,26 @@ const handlePrimaryCta = () => {
 
       <!-- API Keys -->
       <div class="col-12 md:col-6 lg:col-3">
-        <Card class="h-full stat-card" @click="router.push('/apikeys')">
+        <Card
+          class="h-full stat-card"
+          :class="{ 'stat-card-locked': isSensitiveActionsLocked }"
+          @click="router.push('/apikeys')"
+        >
           <template #content>
             <div class="flex align-items-center gap-3">
               <div class="stat-icon stat-icon-key">
                 <i class="pi pi-key text-xl"></i>
               </div>
               <div>
-                <div class="text-color-secondary text-sm">API Keys</div>
+                <div class="text-color-secondary text-sm">
+                  API Keys
+                  <i
+                    v-if="isSensitiveActionsLocked"
+                    v-tooltip.top="lockedFeatureHint"
+                    class="pi pi-lock ml-1"
+                    style="font-size: 0.75rem"
+                  ></i>
+                </div>
                 <div class="text-2xl font-bold">{{ apiKeys.length }}</div>
                 <div class="text-color-secondary text-xs">{{ apiKeysCountText }}</div>
               </div>
@@ -539,6 +634,44 @@ const handlePrimaryCta = () => {
   margin: 0 auto;
 }
 
+.email-confirm-card {
+  border-left: 4px solid var(--p-orange-400);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-orange-500) 8%, white), transparent 68%),
+    var(--p-surface-0);
+}
+
+.email-confirm-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.email-confirm-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.email-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.email-confirm-address,
+.email-confirm-text {
+  line-height: 1.5;
+  color: var(--p-text-muted-color);
+}
+
+.email-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .dashboard-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
@@ -726,6 +859,10 @@ const handlePrimaryCta = () => {
   border-left: 3px solid var(--p-orange-400);
 }
 
+.stat-card-locked {
+  border-left: 3px solid color-mix(in srgb, var(--p-orange-400) 72%, transparent);
+}
+
 .quickstart-card {
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--p-green-500) 8%, white), transparent 70%),
@@ -750,6 +887,11 @@ const handlePrimaryCta = () => {
 }
 
 @media (max-width: 1100px) {
+  .email-confirm-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .dashboard-hero {
     grid-template-columns: 1fr;
   }
