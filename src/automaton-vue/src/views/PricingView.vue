@@ -14,9 +14,9 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <span class="eyebrow">Preview Access</span>
           <h1>Build now. Keep AI and runtime costs under your control.</h1>
           <p>
-            Automaton Monster is currently in preview. Frontend apps can be hosted by Automaton
-            during preview. Backend apps run on Runner containers you control. Managed runners and
-            paid plans will come later.
+            Automaton Monster is currently in preview. Frontend apps can be hosted by Automaton.
+            Backend apps run on Runner containers you control. Managed runners and paid plans will
+            come later for developers and teams that want Automaton to manage backend infrastructure.
           </p>
         </div>
       </section>
@@ -26,20 +26,20 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <article class="plan-card plan-card-primary">
             <div class="plan-top">
               <div>
-                <span class="plan-badge">Preview</span>
-                <h2>Free during preview</h2>
+                <span class="plan-badge">Self-managed</span>
+                <h2>Free</h2>
               </div>
               <div class="plan-price">$0</div>
             </div>
 
             <p class="plan-copy">
-              Build, deploy, publish, fork, and share frontend apps while Automaton Monster is in
-              preview.
+              Build, deploy, publish, fork, and share apps for free when you bring your own AI tools
+              and your own backend Runner infrastructure.
             </p>
 
             <ul class="feature-list">
               <li>Build and publish frontend apps</li>
-              <li>Public frontend app hosting during preview</li>
+              <li>Public frontend app hosting</li>
               <li>Fork public apps</li>
               <li>CLI + Studio access</li>
               <li>Bring your own AI tools and providers</li>
@@ -105,7 +105,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
               today too, but they run through self-hosted Runners that you control.
             </p>
             <ul class="feature-list compact">
-              <li>Frontend apps: hosted by Automaton during preview</li>
+              <li>Frontend apps: hosted by Automaton</li>
               <li>Backend apps: run through your own Runner</li>
               <li>Good fit for developers who want runtime control</li>
             </ul>
