@@ -12,11 +12,11 @@ import { publicAppConfig } from '@/config/publicAppConfig'
       <section class="hero">
         <div class="shell hero-inner">
           <span class="eyebrow">Preview Access</span>
-          <h1>Developer-first access, with AI and runtime costs under your control.</h1>
+          <h1>Build now. Keep AI and runtime costs under your control.</h1>
           <p>
-            Automaton Monster currently uses a bring-your-own-model approach so developers can work
-            with their preferred AI providers, publish static apps freely, and run backend apps on
-            their own Runner containers.
+            Automaton Monster is currently in preview. Frontend apps can be hosted by Automaton
+            during preview. Backend apps run on Runner containers you control. Managed runners and
+            paid plans will come later.
           </p>
         </div>
       </section>
@@ -26,23 +26,25 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <article class="plan-card plan-card-primary">
             <div class="plan-top">
               <div>
-                <span class="plan-badge">Preview access</span>
-                <h2>Free</h2>
+                <span class="plan-badge">Preview</span>
+                <h2>Free during preview</h2>
               </div>
               <div class="plan-price">$0</div>
             </div>
 
             <p class="plan-copy">
-              Static apps can be built, published, forked, and shared at no cost.
+              Build, deploy, publish, fork, and share frontend apps while Automaton Monster is in
+              preview.
             </p>
 
             <ul class="feature-list">
-              <li>Build and publish static apps</li>
+              <li>Build and publish frontend apps</li>
+              <li>Public frontend app hosting during preview</li>
               <li>Fork public apps</li>
-              <li>Public app hosting</li>
               <li>CLI + Studio access</li>
-              <li>Bring your own AI provider</li>
+              <li>Bring your own AI tools and providers</li>
               <li>Use your own Runner containers for backend apps</li>
+              <li>No bundled AI credits or hidden token packages</li>
             </ul>
 
             <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">
@@ -53,26 +55,26 @@ import { publicAppConfig } from '@/config/publicAppConfig'
           <article class="plan-card">
             <div class="plan-top">
               <div>
-                <span class="plan-badge plan-badge-soon">Coming soon</span>
+                <span class="plan-badge plan-badge-soon">Coming later</span>
                 <h2>Managed Runners</h2>
               </div>
-              <div class="plan-price muted">Later</div>
+              <div class="plan-price muted">Paid</div>
             </div>
 
             <p class="plan-copy">
-              Hosted backend execution for teams that want simpler deployment and less runner
-              infrastructure to manage themselves.
+              Hosted backend execution for developers and teams that want backend apps without
+              managing Runner infrastructure themselves.
             </p>
 
             <ul class="feature-list">
-              <li>Hosted backend execution</li>
-              <li>Managed Runner provisioning</li>
-              <li>Persistent backend apps</li>
-              <li>Simplified deployment</li>
-              <li>Scalable runtime options</li>
+              <li>Managed backend execution</li>
+              <li>Hosted Runner provisioning</li>
+              <li>Simpler backend deployment</li>
+              <li>Runtime options for production apps</li>
+              <li>Less infrastructure to manage yourself</li>
             </ul>
 
-            <a href="mailto:hello@automaton.app?subject=Managed%20Runners%20waitlist" class="button">
+            <a href="mailto:hello@automaton.monster?subject=Managed%20Runners%20waitlist" class="button">
               Join waitlist
             </a>
           </article>
@@ -82,29 +84,29 @@ import { publicAppConfig } from '@/config/publicAppConfig'
       <section class="explainers">
         <div class="shell explainer-grid">
           <article class="info-card">
-            <h2>Why BYOK?</h2>
+            <h2>Why bring your own AI?</h2>
             <p>
-              Bring-your-own-model is a product choice, not a temporary compromise. It keeps AI
-              costs visible, lets developers use their preferred models, and avoids bundling hidden
-              AI subscriptions into the platform.
+              Automaton is designed to work with the AI coding tools you already use. That keeps AI
+              usage visible, lets you choose the models you trust, and avoids bundling hidden AI
+              subscriptions into the platform.
             </p>
             <ul class="feature-list compact">
+              <li>Use Cursor, Claude Code, Codex, Copilot, or another AI tool</li>
               <li>Keep control over AI usage and cost</li>
-              <li>Use existing AI tools and providers</li>
               <li>No opaque token bundles</li>
-              <li>Fits existing agentic coding workflows</li>
+              <li>Fits local agentic coding workflows</li>
             </ul>
           </article>
 
           <article class="info-card">
             <h2>Backend apps today</h2>
             <p>
-              Frontend-only apps are the simplest path and can be published immediately. Backend
-              apps work today as well, using self-hosted Runners for execution.
+              Frontend apps are the simplest path and can be published immediately. Backend apps work
+              today too, but they run through self-hosted Runners that you control.
             </p>
             <ul class="feature-list compact">
-              <li>Frontend apps: free to build and publish</li>
-              <li>Backend apps: deploy through your own Runner</li>
+              <li>Frontend apps: hosted by Automaton during preview</li>
+              <li>Backend apps: run through your own Runner</li>
               <li>Good fit for developers who want runtime control</li>
             </ul>
           </article>
