@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 const STORAGE_KEY = 'app-sidebar-pinned'
 const MOBILE_BREAKPOINT = 1024
@@ -44,9 +45,10 @@ function handleResize() {
 }
 
 const isMobile = computed(() => viewportWidth.value < MOBILE_BREAKPOINT)
-const isExpanded = computed(() => (isMobile.value ? isMobileOpen.value : isPinned.value || isHovered.value))
 
 export function useSidebarState() {
+  const route = useRoute()
+
   onMounted(() => {
     loadPinnedPreference()
     handleResize()
@@ -55,6 +57,19 @@ export function useSidebarState() {
 
   onUnmounted(() => {
     window.removeEventListener('resize', handleResize)
+  })
+
+  const prefersCollapsedWorkspace = computed(() => {
+    const routeName = route.name as string | undefined
+    return routeName === 'app-editor' || routeName === 'app-new'
+  })
+
+  const isDesktopExpanded = computed(() => {
+    if (prefersCollapsedWorkspace.value) {
+      return isHovered.value
+    }
+
+    return isPinned.value || isHovered.value
   })
 
   function setHovered(value: boolean) {
@@ -95,7 +110,8 @@ export function useSidebarState() {
     isHovered,
     isMobile,
     isMobileOpen,
-    isExpanded,
+    isExpanded: computed(() => (isMobile.value ? isMobileOpen.value : isDesktopExpanded.value)),
+    prefersCollapsedWorkspace,
     setHovered,
     togglePinned,
     openMobile,
