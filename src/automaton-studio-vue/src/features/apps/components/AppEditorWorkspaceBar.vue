@@ -25,6 +25,7 @@ const props = defineProps<{
   canDeployFrontendFromStudio: boolean
   isDeployingApp: boolean
   isDeployingBackend: boolean
+  isAssistantOpen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,6 +46,7 @@ const emit = defineEmits<{
   openPublishedApp: []
   openPublishingSettings: []
   unpublish: []
+  toggleAssistant: []
 }>()
 
 const tabs = [
@@ -167,6 +169,15 @@ function handlePrimaryAction() {
         text
         severity="secondary"
         @click="emit('preview')"
+      />
+
+      <Button
+        v-if="activeTab !== 'backend-server'"
+        :label="isAssistantOpen ? 'Hide Assistant' : 'Assistant'"
+        icon="pi pi-sparkles"
+        text
+        severity="secondary"
+        @click="emit('toggleAssistant')"
       />
 
       <div v-if="activeTab !== 'backend-server'" class="deploy-actions">

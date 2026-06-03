@@ -2,7 +2,7 @@
 /**
  * AppEditorView.vue
  * Main Visual IDE for editing apps
- * AI-first layout: Files | Editor | AI Assistant
+ * Editor-first layout with on-demand AI assistant
  * Preview opens as full-screen overlay
  */
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
@@ -117,6 +117,7 @@ watch([activeTab, activeMonitorTab], ([tab, monitorTab]) => {
 
 // Right panel mode (aiAssistant or versionHistory)
 const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
+const isRightPanelOpen = ref(false)
 
 // Ref to version history component for manual refresh
 const versionHistoryRef = ref<any>(null)
@@ -143,7 +144,7 @@ const defaultSizes = [15, 60, 25] // 15% tree, 60% editor, 25% AI
 
 // Right panel (AI/History) width - stored separately so it applies to both build modes
 const RIGHT_PANEL_SIZE_KEY = 'app-editor-right-panel-size'
-const DEFAULT_RIGHT_PANEL_SIZE = 25
+const DEFAULT_RIGHT_PANEL_SIZE = 24
 
 function loadRightPanelSize(): number {
   try {
@@ -175,6 +176,18 @@ function handleRightPanelSplitterResize(event: any) {
     rightPanelSize.value = event.sizes[1]
     saveRightPanelSize(event.sizes[1])
   }
+}
+
+function toggleAssistantPanel() {
+  if (activeTab.value === 'backend-server') {
+    return
+  }
+
+  if (!isRightPanelOpen.value) {
+    rightPanelMode.value = 'aiAssistant'
+  }
+
+  isRightPanelOpen.value = !isRightPanelOpen.value
 }
 
 // Load sizes from localStorage or use defaults
@@ -1031,6 +1044,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :can-deploy-frontend-from-studio="editorStore.canDeployFrontendFromStudio"
         :is-deploying-app="editorStore.isDeployingApp"
         :is-deploying-backend="editorStore.isDeployingBackend"
+        :is-assistant-open="isRightPanelOpen"
         @back="handleBack"
         @update:editing-name="editingName = $event"
         @start-editing="startEditingName"
@@ -1048,6 +1062,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @open-published-app="openPublishedApp"
         @open-publishing-settings="openPublishingSettings"
         @unpublish="handleUnpublish"
+        @toggle-assistant="toggleAssistantPanel"
       />
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
@@ -1111,6 +1126,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
       <div v-show="activeTab === 'build' || activeTab === 'code'" class="build-content-wrapper">
         <Splitter
+          v-if="isRightPanelOpen"
           class="build-outer-splitter"
           layout="horizontal"
           :gutter-size="8"
@@ -1261,6 +1277,121 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             </div>
           </SplitterPanel>
         </Splitter>
+
+        <div v-else class="build-main-content build-main-content--full">
+          <!-- Visual mode workspace - shown in Build tab -->
+          <div v-show="activeTab === 'build'" class="build-visual-view">
+            <BuildVisualWorkspace
+              :suspend-heavy-rendering="isVisualResizing"
+              :runner-id="selectedRunnerId"
+            />
+          </div>
+
+          <!-- Code mode: file tree + editor - shown in Code tab -->
+          <Splitter
+            v-show="activeTab === 'code'"
+            class="editor-layout"
+            layout="horizontal"
+            :gutter-size="8"
+            @resize="handleSplitterResizing"
+            @resizeend="handleSplitterResize"
+          >
+            <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
+              <div class="file-panel">
+                <FileTree
+                  title="App Files"
+                  :show-create="editorStore.currentScopeEditable"
+                  :allow-delete="editorStore.currentScopeEditable"
+                  empty-message="No app files yet"
+                  @create-file="showCreateFileDialog = true"
+                  @delete-file="handleDeleteFile"
+                  @delete-folder="handleDeleteFolder"
+                />
+              </div>
+            </SplitterPanel>
+
+            <SplitterPanel :size="panelSizes[1]" :min-size="30" class="splitter-panel">
+              <div class="editor-panel">
+                <div class="editor-tabs-container">
+                  <div
+                    v-for="file in editorStore.openFiles"
+                    :key="file.path"
+                    class="editor-tab"
+                    :class="{ active: editorStore.activeFilePath === file.path }"
+                    @click="editorStore.activeFilePath = file.path"
+                  >
+                    <span class="tab-name">
+                      <i
+                        v-if="file.isBackendStep"
+                        class="pi pi-server mr-1"
+                        style="font-size: 0.7rem;"
+                      ></i>
+                      {{ file.isBackendStep ? file.stepName : file.path }}
+                      <span v-if="file.isDirty" class="dirty-indicator">*</span>
+                    </span>
+                    <Button
+                      icon="pi pi-times"
+                      text
+                      rounded
+                      size="small"
+                      class="tab-close"
+                      @click="(e: Event) => handleCloseTab(e, file.path)"
+                    />
+                  </div>
+                </div>
+
+                <div class="editor-content">
+                  <div v-if="isEditingRuntimeFile" class="runtime-warning-banner">
+                    <strong>LIVE FILE</strong>
+                    Changes apply to the deployed app and may be overwritten by the next deploy.
+                  </div>
+                  <CodeEditor
+                    v-if="editorStore.activeFilePath"
+                    :key="editorStore.activeFilePath"
+                    :file-path="editorStore.activeFilePath"
+                    :read-only="editorStore.activeFile?.isReadOnly"
+                    @save="handleSaveFile"
+                  />
+                  <div v-else class="no-file-selected">
+                    <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
+                    <p>Select a file to edit</p>
+                    <Button
+                      v-if="editorStore.currentScopeEditable"
+                      label="Create File"
+                      icon="pi pi-plus"
+                      size="small"
+                      outlined
+                      @click="showCreateFileDialog = true"
+                    />
+                  </div>
+                </div>
+              </div>
+            </SplitterPanel>
+          </Splitter>
+
+          <div v-if="activeTab !== 'backend-server'" class="assistant-collapsed-card">
+            <div class="assistant-collapsed-copy">
+              <div class="assistant-collapsed-title">AI Assistant (Experimental)</div>
+              <div class="assistant-collapsed-text">
+                Bring your own AI provider to generate code, edit files, and help ship this app.
+              </div>
+            </div>
+            <div class="assistant-collapsed-actions">
+              <Button
+                label="Open Assistant"
+                icon="pi pi-sparkles"
+                @click="toggleAssistantPanel"
+              />
+              <Button
+                label="Configure AI"
+                icon="pi pi-cog"
+                severity="secondary"
+                outlined
+                @click="router.push('/ai-keys')"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Status Bar -->
@@ -1485,6 +1616,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   overflow: hidden;
 }
 
+.build-main-content--full {
+  width: 100%;
+}
+
 .build-visual-view {
   flex: 1;
   min-height: 0;
@@ -1599,6 +1734,42 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   flex-direction: column;
 }
 
+.assistant-collapsed-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--p-surface-200);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-cyan-500) 7%, transparent), transparent 70%),
+    var(--p-surface-0);
+  flex-shrink: 0;
+}
+
+.assistant-collapsed-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.assistant-collapsed-title {
+  font-weight: 700;
+}
+
+.assistant-collapsed-text {
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.assistant-collapsed-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 /* Dark mode */
 :global(.app-dark) .app-editor-view {
   background-color: var(--p-surface-900);
@@ -1630,6 +1801,13 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   background: color-mix(in srgb, var(--p-orange-900) 55%, transparent);
   border-color: var(--p-orange-700);
   color: var(--p-orange-100);
+}
+
+:global(.app-dark) .assistant-collapsed-card {
+  border-color: var(--p-surface-700);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--p-cyan-500) 12%, transparent), transparent 70%),
+    var(--p-surface-900);
 }
 
 :global(.app-dark) .editor-tab {
@@ -1683,6 +1861,13 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .logs-sub-tab.active {
   border-bottom-color: var(--p-primary-500);
   color: var(--p-primary-500);
+}
+
+@media (max-width: 1100px) {
+  .assistant-collapsed-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 </style>

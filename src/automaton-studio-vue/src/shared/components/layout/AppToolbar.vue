@@ -37,7 +37,7 @@ const pageTitle = computed(() => {
     'projects-list': 'Projects',
     'project-settings': 'Project Settings',
     apikeys: 'API Keys',
-    'ai-keys': 'AI Keys',
+    'ai-keys': 'AI Providers',
     settings: 'Settings',
     'admin-providers': 'Admin',
     'admin-models': 'Admin',

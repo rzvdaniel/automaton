@@ -432,7 +432,7 @@ const passwordLoading = computed(() => passwordSaving.value)
                 @click="activeSection = 'appearance'"
               />
               <Button
-                label="AI"
+                label="AI Providers"
                 icon="pi pi-sparkles"
                 text
                 :class="{ 'surface-hover': activeSection === 'ai' }"
@@ -625,12 +625,28 @@ const passwordLoading = computed(() => passwordSaving.value)
 
         <!-- AI Preferences Section -->
         <Card v-if="activeSection === 'ai'">
-          <template #title>AI Preferences</template>
+          <template #title>AI Providers</template>
           <template #content>
             <div class="flex flex-column gap-5">
               <p class="text-color-secondary m-0">
-                Set your preferred models. These override the admin defaults and apply across all AI assistants.
+                Bring your own AI provider keys and set preferred models. These override the admin
+                defaults and apply across assistants and AI-enabled app workflows.
               </p>
+
+              <div class="flex align-items-center justify-content-between p-3 surface-ground border-round">
+                <div class="pr-3">
+                  <div class="font-medium">Manage Provider Keys</div>
+                  <div class="text-color-secondary text-sm">
+                    Add or update OpenAI, Anthropic, Gemini, and other provider credentials.
+                  </div>
+                </div>
+                <Button
+                  label="Open AI Providers"
+                  icon="pi pi-external-link"
+                  outlined
+                  @click="router.push('/ai-keys')"
+                />
+              </div>
 
               <!-- Default AI Model -->
               <div class="flex flex-column gap-2">

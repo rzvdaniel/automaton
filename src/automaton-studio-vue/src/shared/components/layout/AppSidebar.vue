@@ -354,15 +354,18 @@ const isActive = (to: string) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1rem 0.75rem;
+  padding: 0.75rem 0.625rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .sidebar-logo {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
-  margin-bottom: 1.5rem;
+  padding: 0.35rem 0.45rem;
+  margin-bottom: 0.9rem;
 }
 
 .sidebar-brand {
@@ -391,14 +394,14 @@ const isActive = (to: string) => {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.32rem;
 }
 
 .nav-badge {
   margin-left: auto;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  padding: 0.18rem 0.48rem;
+  padding: 0.14rem 0.42rem;
   border-radius: 999px;
   background: var(--p-surface-200);
   color: var(--p-text-muted-color);
@@ -412,11 +415,12 @@ const isActive = (to: string) => {
 .nav-section {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .sidebar-spacer {
   flex: 1;
+  min-height: 0.5rem;
 }
 
 .nav-item-wrapper {
@@ -426,9 +430,9 @@ const isActive = (to: string) => {
 .nav-item {
   width: 100%;
   justify-content: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
+  gap: 0.6rem;
+  padding: 0.58rem 0.68rem;
+  border-radius: 0.7rem;
   transition: all 0.15s ease;
   position: relative;
 }
@@ -439,9 +443,9 @@ const isActive = (to: string) => {
 }
 
 .nav-icon-wrap {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.7rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.58rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -470,6 +474,7 @@ const isActive = (to: string) => {
 }
 
 .nav-label {
+  font-size: 0.93rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -506,7 +511,7 @@ const isActive = (to: string) => {
 .nav-divider {
   height: 1px;
   background-color: var(--p-surface-200);
-  margin: 0.65rem 0;
+  margin: 0.45rem 0;
 }
 
 .sidebar-nav-bottom {
@@ -516,7 +521,7 @@ const isActive = (to: string) => {
 /* Billing usage widget */
 .billing-widget {
   margin: 0 0 0.5rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.65rem;
   border-radius: 0.5rem;
   background: var(--p-surface-100);
   cursor: pointer;
@@ -537,7 +542,7 @@ const isActive = (to: string) => {
 }
 
 .billing-plan {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -552,7 +557,7 @@ const isActive = (to: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
 }
 
 .billing-upgrade {
@@ -589,6 +594,31 @@ const isActive = (to: string) => {
 :global(.app-dark) .nav-icon-wrap-green {
   background: rgba(255, 255, 255, 0.14);
   color: #ecfdf5;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--p-surface-400) 55%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--p-surface-500) 65%, transparent);
+  background-clip: padding-box;
+}
+
+:global(.app-dark) .sidebar-content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--p-surface-500) 55%, transparent);
+  background-clip: padding-box;
 }
 
 @media (max-width: 1023px) {
