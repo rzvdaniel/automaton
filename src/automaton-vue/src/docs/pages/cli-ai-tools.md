@@ -1,93 +1,75 @@
 # Build with AI
 
-This is the recommended local workflow for most developers.
+Automaton is designed to work with AI coding agents.
 
-Use Automaton with the AI coding tool you already like: Cursor, Claude Code, GitHub Copilot, Codex, VS Code, or another local assistant.
+Use Cursor, Claude Code, Codex, GitHub Copilot Chat, VS Code, Gemini, or another coding agent and let it drive the Automaton CLI for you.
 
-## One-time setup
+## Recommended AI-first workflow
 
-Install the CLI:
+1. Open an empty folder in your AI coding tool.
+2. Paste the starter prompt below.
+3. Let the AI install or verify the CLI.
+4. Let the AI run `automaton login`.
+5. Paste your API key into the terminal when prompted.
+6. Let the AI create the app with `automaton new`.
+7. Let the AI build and deploy the app.
+8. Approve publishing when you are ready.
 
-```bash
-dotnet tool install -g Automaton.Cli
-```
-
-Prepare the current folder:
-
-```bash
-automaton login
-```
-
-Create a new app, or link an existing one:
-
-```bash
-automaton new "My App"
-# or
-automaton link <app-id>
-```
-
-## Recommended AI-first flow
-
-1. Open the app folder in your AI coding tool.
-2. Ask the AI to build the app locally.
-3. Tell it to deploy with `automaton deploy`.
-4. Tell it to ask before publishing.
-
-## Best starter prompt
+## Recommended starter prompt
 
 ```text
-Build a task management app for Automaton Monster.
-Use React frontend and Python backend.
-Deploy with automaton deploy.
-Ask me before publish.
+Build a [describe your app] as an Automaton Monster app.
+
+Read https://automaton.monster/llms.txt first.
+
+Use the Automaton CLI as the primary path. If the CLI is missing, install it using the official instructions. Run `automaton login` and let me paste my Automaton API key when prompted.
+
+For a new app, run `automaton new "[app-name]"` before creating app files. Then follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`.
+
+Default to a frontend-only Vite app unless backend behavior is truly required. Deploy with `automaton deploy`. Do not publish publicly until I explicitly approve.
 ```
 
-## More examples
+## Security note
 
-### Frontend-only
+Do not paste your API key directly into the AI chat.
+
+Paste it into the terminal when `automaton login` asks for it.
+
+## Existing app prompt
 
 ```text
-Build a habit tracker app for Automaton Monster.
-Use a frontend-only app.
-Deploy with automaton deploy.
-Ask me before publish.
+Update my existing Automaton Monster app.
+
+Read https://automaton.monster/llms.txt first.
+
+Run `automaton login` if needed. Use `automaton link <app-id>` if this folder is not already linked.
+
+Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`.
+
+Deploy with `automaton deploy` and ask before publishing.
 ```
 
-### Vue
+## What the AI should usually do
 
-```text
-Build a poker planning app for Automaton Monster.
-Use Vue frontend and Python backend.
-Deploy with automaton deploy.
-Ask me before publish.
-```
-
-### Existing app
-
-```text
-Update my existing Automaton Monster app in this folder.
-Use automaton link <app-id> if needed.
-Deploy with automaton deploy.
-Ask me before publish.
-```
-
-## What the AI usually needs to do
-
+- install or verify the Automaton CLI
+- run `automaton login`
+- create the app with `automaton new`
+- follow local generated guidance
 - generate or edit files locally
-- keep `automaton.json` correct
-- run `automaton deploy`
-- run `automaton publish` only after approval
+- deploy with `automaton deploy`
+- publish only after approval
 
-That is the happy path.
+## What the AI should not do
+
+- manually create `automaton.json` before trying `automaton new`
+- invent an Automaton project structure
+- create FastAPI, Flask, Express, or custom HTTP servers for Automaton backends
+- publish without approval
 
 ## Next steps
 
-Read the frontend app guide if you are building a static app, Vue app, React app, or browser-only tool.
-
-Read the backend app guide if your app needs Python APIs, server-side logic, integrations, or private credentials.
-
-Read the runner guide before publishing a backend app.
-
-Read the deploy and publish guides when you want the shortest explanation of shipping an app live.
-
-Use the CLI reference only when you need advanced commands or flags.
+- Read **Build Frontend App** for frontend-only apps.
+- Read **Build Backend App** when server-side execution is required.
+- Read **Deploy Runner** before publishing backend apps.
+- Read **Deploy** and **Publish** for deployment details.
+- Use the CLI reference only when you need advanced commands or flags.
