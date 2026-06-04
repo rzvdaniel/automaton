@@ -7,7 +7,7 @@ Use this only when the AI environment already supports MCP tools or the user exp
 Keep the boundary clear:
 
 - **MCP** = inspect, understand, discover existing Automaton apps and source files
-- **CLI** = create/link local projects, build, deploy, publish
+- **CLI** = login, create/link local projects, build, deploy, publish
 
 Do not treat MCP as the main execution path for app delivery.
 
@@ -25,6 +25,7 @@ Use MCP when it helps the AI understand an existing app before making local chan
 
 Do not use MCP as the primary path for:
 
+- authentication
 - deployment
 - publishing
 - replacing the normal local CLI workflow
@@ -38,7 +39,7 @@ Do not ask the user for an MCP server URL or MCP setup by default during normal 
 The default user flow should remain:
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 automaton deploy
 ```
@@ -46,7 +47,7 @@ automaton deploy
 or, for an existing app:
 
 ```bash
-automaton setup
+automaton login
 automaton link <app-id>
 automaton deploy
 ```
@@ -71,7 +72,7 @@ Recommended sequence:
 
 Use the Automaton CLI for:
 
-- `automaton setup`
+- `automaton login`
 - `automaton new`
 - `automaton link`
 - `automaton deploy`
@@ -90,6 +91,6 @@ Only if the user explicitly wants MCP-based inspection or asks how to connect it
 - Automaton exposes an MCP server for compatible AI tools
 - MCP is optional
 - it is useful for inspecting existing Automaton apps
-- the CLI remains the primary path for deployment and publishing
+- the CLI remains the primary path for login, deployment, and publishing
 
 If MCP tools are not already available in the AI environment, continue with local files and the Automaton CLI instead of blocking on MCP setup.
