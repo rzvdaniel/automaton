@@ -11,10 +11,10 @@ For now, treat Automaton Studio as the official preview and debugging environmen
 ## Prerequisites
 
 1. The Automaton CLI is installed.
-2. The current machine or workspace has already been prepared with `automaton setup`.
+2. The current machine or workspace has already been authenticated with `automaton login`.
 3. If install or first-time setup is still needed, read `automaton-cli-install.md` first.
 
-3. The AI should create `automaton.json` in the project root automatically when it follows the local generated guidance after setup, or `llms.txt` as the fallback source of truth.
+3. The AI should create `automaton.json` in the project root automatically when it follows the local generated guidance after `automaton new` or `automaton link`, or `llms.txt` as the fallback source of truth.
 
 When the user asks to use the Automaton CLI, the AI should prefer `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing one, and should not stop before `automaton.json` exists in the project root, unless it clearly reports why that creation/link step failed.
 
@@ -24,7 +24,7 @@ The CLI also creates `.automatonignore` in the project root when the project is 
 
 Automaton separates source and runtime, with frontend/backend surfaces. The local project is source. `automaton deploy` uploads `frontend.deployDir` into `runtime/frontend/` and `backend.deployDir` into `runtime/backend/` when present. Public app serving reads only `runtime/frontend/`. Studio source editing, GitHub sync, version history, archive import/export, and fork use source.
 
-`automaton setup`, `automaton new`, and `automaton link` also sync canonical local AI guidance under `.automaton/agents/`, including references under `.automaton/agents/references/`, and write a small root `AGENTS.md` adapter. If those generated files are missing or stale, run:
+`automaton login` authenticates the CLI. `automaton new` and `automaton link` also sync canonical local AI guidance under `.automaton/agents/`, including references under `.automaton/agents/references/`, and write a small root `AGENTS.md` adapter. If those generated files are missing or stale, run:
 
 ```bash
 automaton sync-ai
@@ -51,7 +51,7 @@ If the app is being created from scratch locally, skip this step. `link` is only
 Real happy path:
 
 1. install the CLI once
-2. run `automaton setup`
+2. run `automaton login`
 3. let the AI handle most of the remaining local work
 4. run `automaton new "My App"` or `automaton link <app-id>`
 5. run `automaton deploy`
@@ -61,7 +61,7 @@ Real happy path:
 Use this canonical order:
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 automaton deploy
 # ask user before publish
@@ -81,9 +81,9 @@ The CLI should also auto-switch to non-interactive behavior when `CI=true`, `AUT
 
 Interpretation rules:
 
-1. Run `automaton setup` first so the AI can authenticate and sync local guidance in one step.
-2. After `automaton setup`, the AI should be able to handle most of the remaining workflow: create or link the app, scaffold files, keep `automaton.json` correct, and deploy.
-3. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton setup`.
+1. Run `automaton login` first so the AI can authenticate.
+2. After `automaton login`, `automaton new` and `automaton link` scaffold app configuration and sync guidance so the AI can handle most of the remaining workflow: create or link the app, scaffold files, keep `automaton.json` correct, and deploy.
+3. If testing requires a clean auth state or a different account, use `automaton logout`, `automaton logout --global`, or `automaton logout --all` before re-running `automaton login`.
 4. Use `automaton new` for new apps; reserve `automaton link` for existing remote apps.
 5. Run `automaton sync-ai` only when the generated local guidance files need a manual refresh.
 6. Run `automaton deploy`; it performs deploy preflight and handles runner selection only when backend controllers require it.

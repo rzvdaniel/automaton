@@ -2,7 +2,7 @@
 
 Use these as starter prompts for Codex, Claude Code, Copilot Chat, Cursor, and similar AI tools.
 
-Prefer the local generated Automaton guidance in the current folder after `automaton new` or `automaton link`. Each app should have its own `automaton.json` and local guidance scaffold. Use `https://automaton.monster/llms.txt` only as the fallback when local guidance is not available yet.
+Prefer the local generated Automaton guidance in the current folder after `automaton new` or `automaton link`. `automaton login` authenticates the CLI. `automaton new` creates `automaton.json` and local AI guidance. `automaton link` is only for existing apps. Use `https://automaton.monster/llms.txt` only as the fallback when local guidance is not available yet.
 
 ## Official generic starter prompt
 

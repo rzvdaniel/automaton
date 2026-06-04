@@ -4,13 +4,31 @@ If you are an AI assistant helping a user build an app for Automaton, start here
 
 `llms.txt` is the source of truth for Automaton app structure. If another prompt or doc conflicts with this file about local layout or deploy shape, follow `llms.txt`.
 
+## AI shortest path
+
+For a new Automaton app:
+
+```bash
+automaton --version
+automaton login
+automaton new "My App"
+automaton deploy
+```
+
+Rules:
+
+- `automaton login` authenticates the CLI.
+- `automaton new` creates `automaton.json` and local AI guidance.
+- `automaton link` is only for existing apps.
+- Ask before `automaton publish`.
+
 ## Minimum contract (read this even if you don't fetch the linked files)
 
 Bootstrap rule:
-- After `automaton setup`, immediately check whether `automaton.json` exists in the project root.
+- After `automaton login`, immediately check whether `automaton.json` exists in the project root.
 - If it does not exist and the user is asking for a new app in this folder, run `automaton new "<app-name>"` before file scaffolding.
 - Use `automaton link <app-id>` only for an existing remote app.
-- Do not interpret `automaton setup` by itself as meaning the folder is already linked to an app.
+- Do not interpret `automaton login` by itself as meaning the folder is already linked to an app.
 
 Automaton apps are frontend-agnostic static web apps with Python backends.
 
@@ -150,7 +168,7 @@ Only files inside `frontend.deployDir` become public runtime. Do not expect `fro
 
 **Deploy failure triage** — If `automaton validate` passes and `automaton deploy` fails during the upload or transport stage with errors like closed stream, request stream, multipart, socket, or HTTP transport failures, do not immediately restructure the app layout. First treat it as a likely CLI or server upload-path issue unless there is direct evidence that the deploy directory or archive shape is wrong.
 
-**Local AI guidance** — `automaton setup`, `automaton new`, and `automaton link` write canonical local guidance into `.automaton/agents/` and a small root `AGENTS.md` adapter that points back to it. Detailed references live under `.automaton/agents/references/`. After that, prefer the local generated guidance by default. Run `automaton sync-ai` only if those generated files need a manual refresh. Use `automaton sync-ai --adapter claude`, `--adapter copilot`, `--adapter github-skills`, or `--adapter all` only when a specific AI tool needs its own wrapper file. Use `llms.txt` as the public fallback when local guidance is not available yet.
+**Local AI guidance** — `automaton login` authenticates the CLI. `automaton new` and `automaton link` write canonical local guidance into `.automaton/agents/` and a small root `AGENTS.md` adapter that points back to it. Detailed references live under `.automaton/agents/references/`. After that, prefer the local generated guidance by default. Run `automaton sync-ai` only if those generated files need a manual refresh. Use `automaton sync-ai --adapter claude`, `--adapter copilot`, `--adapter github-skills`, or `--adapter all` only when a specific AI tool needs its own wrapper file. Use `llms.txt` as the public fallback when local guidance is not available yet.
 
 **MCP positioning** — If Automaton MCP tools are available, use them as an optional context and discovery layer, not as an alternative deployment path.
 
@@ -161,7 +179,7 @@ Use Automaton MCP tools when available to inspect existing Automaton apps:
 - `list_files`
 
 Use the Automaton CLI for deployment and publishing:
-- `automaton setup`
+- `automaton login`
 - `automaton deploy`
 - `automaton publish`
 
@@ -170,13 +188,13 @@ Workflow boundary:
 2. Modify files locally.
 3. Use the Automaton CLI to deploy or publish.
 
-MCP is another tool the AI may use when helpful; it is not mandatory. Do not make MCP feel like the main execution path. Do not replace `automaton setup`, `automaton new`, `automaton link`, `automaton deploy`, or `automaton publish` with MCP-driven equivalents unless the user explicitly asked for an MCP-specific workflow.
+MCP is another tool the AI may use when helpful; it is not mandatory. Do not make MCP feel like the main execution path. Do not replace `automaton login`, `automaton new`, `automaton link`, `automaton deploy`, or `automaton publish` with MCP-driven equivalents unless the user explicitly asked for an MCP-specific workflow.
 
-**Happy path** — The real default user flow is: install the CLI once, run `automaton setup`, then let the AI handle most of the project work locally, use `automaton new` for a new app or `automaton link` for an existing one, run `automaton deploy`, and use Automaton Studio for preview and logs. Use `automaton validate` only as an optional diagnostic check.
+**Happy path** — The real default user flow is: install the CLI once, run `automaton login`, then let the AI handle most of the project work locally, use `automaton new` for a new app or `automaton link` for an existing one, run `automaton deploy`, and use Automaton Studio for preview and logs. Use `automaton validate` only as an optional diagnostic check.
 
-**After setup** — After `automaton setup`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, confirmation before creating a runner, runner creation outside the CLI when needed, or publish approval.
+**After login** — After `automaton login`, the user's AI should be able to handle most of the remaining work by following the local generated guidance first. `automaton new` and `automaton link` scaffold app configuration and sync guidance: create or link the app, scaffold or edit files, keep `automaton.json` correct, refresh local guidance only if needed, run deploy, and handle runner selection only when backend apps require it. The user should only need to step in for interactive auth, confirmation before creating a runner, runner creation outside the CLI when needed, or publish approval.
 
-**New app default** — In a fresh folder after `automaton setup`, absence of `automaton.json` should be treated as "not linked yet". For a new app request, the default next command is `automaton new "<app-name>"`.
+**New app default** — In a fresh folder after `automaton login`, absence of `automaton.json` should be treated as "not linked yet". For a new app request, the default next command is `automaton new "<app-name>"`.
 
 **Current test loop** — Until a dedicated Automaton local runtime exists, test locally first, then deploy, then use Automaton Studio for integration testing. Build the app locally, start the local frontend dev server, use local mock data or a local mock backend when backend-like data is needed, test with a normal browser or AI browser tool, fix local UI/runtime issues, run `automaton deploy`, open the app in Automaton Studio, preview the deployed app, inspect frontend/backend logs, redeploy if needed, and publish only after explicit user approval.
 
@@ -193,13 +211,13 @@ When the AI is asked to build an Automaton app from scratch in a local project, 
 Follow this order:
 
 1. Ensure the Automaton CLI is installed. If not, read `/llms/automaton-cli-install.md`.
-2. Run `automaton setup`.
-3. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all`, then run `automaton setup` again.
+2. Run `automaton login`.
+3. If the user wants a clean auth reset for testing or account switching, run `automaton logout`, `automaton logout --global`, or `automaton logout --all`, then run `automaton login` again.
 4. Check whether `automaton.json` exists in the project root.
 5. If it does not exist and the app is new, run `automaton new "<app-name>"` immediately.
 6. If it does not exist and the app already exists remotely, run `automaton link <app-id>`.
 7. Scaffold or update the app locally using the simplest suitable frontend stack.
-8. The AI should handle most of the remaining work after `automaton setup`.
+8. The AI should handle most of the remaining work after `automaton login`.
 9. If the generated local guidance files are missing or stale, run `automaton sync-ai`.
 10. Run `automaton deploy`; it performs the deploy preflight and handles runner selection only when Python backend controllers require it.
 11. If no connected runner is available for a backend app, ask for confirmation and prefer `automaton runner install` to create a local Docker runner. Use Automaton Studio runner creation only when the CLI path is unavailable or the user explicitly prefers it. Then rerun `automaton deploy`.

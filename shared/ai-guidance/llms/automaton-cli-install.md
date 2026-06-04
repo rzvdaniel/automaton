@@ -63,11 +63,7 @@ automaton deploy
 
 Use `automaton link <app-id>` only when the folder should attach to an existing Automaton app.
 
-## Legacy setup command
-
-`automaton setup` may exist for backwards compatibility. AI tools should prefer `automaton login` for authentication and `automaton new` or `automaton link` for app configuration.
-
-Do not interpret `automaton setup` by itself as meaning the current folder is already an app.
+Do not interpret `automaton login` by itself as meaning the current folder is already an app.
 
 ## Clean auth reset
 
