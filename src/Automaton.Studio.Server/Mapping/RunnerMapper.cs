@@ -33,6 +33,8 @@ public static class RunnerMapper
 		 Version = runner.Version,
 		 MachineName = runner.MachineName,
 		 IpAddress = runner.IpAddress,
+         ApiInstanceId = runner.ApiInstanceId,
+         ApiColor = runner.ApiColor,
 		 Scope = scope,
 		 ProjectId = projectId,
 		 ProjectName = projectName,
@@ -80,7 +82,9 @@ public static class RunnerMapper
  LastDisconnectedAtUtc = details.LastDisconnectedAtUtc,
  Version = details.Version,
  MachineName = details.MachineName,
- IpAddress = details.IpAddress
+ IpAddress = details.IpAddress,
+ ApiInstanceId = details.ApiInstanceId,
+ ApiColor = details.ApiColor
  // ScriptEngineSettings and RunnerUsers are not present in RunnerDetails
  };
  }

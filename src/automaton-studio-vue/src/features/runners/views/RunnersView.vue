@@ -10,6 +10,7 @@ import Message from 'primevue/message'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '../services/runners.service'
@@ -31,6 +32,7 @@ const loading = ref(true)
 const runners = ref<Runner[]>([])
 const showDeployDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
+const showDebugDetails = ref(false)
 const restartingRunnerId = ref<string | null>(null)
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
@@ -373,17 +375,23 @@ onUnmounted(() => {
     <!-- Runners Section Header with View Toggle -->
     <div class="flex align-items-center justify-content-between mb-4">
       <h2 class="text-xl font-semibold m-0">Registered Runners</h2>
-      <SelectButton
-        v-model="viewMode"
-        :options="viewOptions"
-        option-value="value"
-        :allow-empty="false"
-        class="view-toggle"
-      >
-        <template #option="{ option }">
-          <i :class="option.icon"></i>
-        </template>
-      </SelectButton>
+      <div class="flex align-items-center gap-3">
+        <div class="flex align-items-center gap-2">
+          <label for="runner-debug-toggle" class="text-sm text-color-secondary">Debug details</label>
+          <ToggleSwitch input-id="runner-debug-toggle" v-model="showDebugDetails" />
+        </div>
+        <SelectButton
+          v-model="viewMode"
+          :options="viewOptions"
+          option-value="value"
+          :allow-empty="false"
+          class="view-toggle"
+        >
+          <template #option="{ option }">
+            <i :class="option.icon"></i>
+          </template>
+        </SelectButton>
+      </div>
     </div>
 
     <!-- Empty State -->
@@ -495,6 +503,19 @@ onUnmounted(() => {
             <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
           </div>
 
+          <div v-if="showDebugDetails" class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">API color</span>
+              <code v-if="runner.apiColor" class="connection-id">{{ runner.apiColor }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">API instance</span>
+              <code v-if="runner.apiInstanceId" class="connection-id">{{ runner.apiInstanceId }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </div>
+          </div>
+
           <div class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
             <div class="runner-telemetry__row">
               <span class="text-color-secondary text-sm">Last heartbeat</span>
@@ -571,6 +592,22 @@ onUnmounted(() => {
             <template #body="{ data }">
               <code v-if="data.connectionId" class="connection-id">
                 {{ data.connectionId.substring(0, 20) }}...
+              </code>
+              <span v-else class="text-color-secondary">-</span>
+            </template>
+          </Column>
+
+          <Column v-if="showDebugDetails" header="API Color" style="width: 140px">
+            <template #body="{ data }">
+              <code v-if="data.apiColor">{{ data.apiColor }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </template>
+          </Column>
+
+          <Column v-if="showDebugDetails" header="API Instance" style="width: 240px">
+            <template #body="{ data }">
+              <code v-if="data.apiInstanceId" class="connection-id">
+                {{ data.apiInstanceId.substring(0, 16) }}...
               </code>
               <span v-else class="text-color-secondary">-</span>
             </template>

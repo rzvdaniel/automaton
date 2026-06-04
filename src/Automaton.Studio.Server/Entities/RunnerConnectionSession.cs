@@ -10,6 +10,8 @@ public class RunnerConnectionSession
     public DateTime ConnectedAtUtc { get; set; }
     public DateTime? DisconnectedAtUtc { get; set; }
     public string DisconnectReason { get; set; }
+    public string? ApiInstanceId { get; set; }
+    public string? ApiColor { get; set; }
 
     public Runner Runner { get; set; }
 }

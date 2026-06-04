@@ -65,6 +65,7 @@ services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();
 services.AddScoped<IAppExecutionLogService, AppExecutionLogService>();
+services.AddSingleton<ApiInstanceIdentityService>();
 
 services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {

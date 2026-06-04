@@ -150,6 +150,8 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Version).HasMaxLength(50);
                 entity.Property(e => e.MachineName).HasMaxLength(120);
                 entity.Property(e => e.IpAddress).HasMaxLength(64);
+                entity.Property(e => e.ApiInstanceId).HasMaxLength(80);
+                entity.Property(e => e.ApiColor).HasMaxLength(32);
             });
 
             modelBuilder.Entity<RunnerConnectionSession>(entity =>
@@ -158,10 +160,13 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.ConnectionId).IsRequired().HasMaxLength(120);
                 entity.Property(e => e.ConnectedAtUtc).IsRequired();
                 entity.Property(e => e.DisconnectReason).HasMaxLength(80);
+                entity.Property(e => e.ApiInstanceId).HasMaxLength(80);
+                entity.Property(e => e.ApiColor).HasMaxLength(32);
 
                 entity.HasIndex(e => e.RunnerId);
                 entity.HasIndex(e => new { e.RunnerId, e.DisconnectedAtUtc });
                 entity.HasIndex(e => e.ConnectionId);
+                entity.HasIndex(e => new { e.ApiInstanceId, e.DisconnectedAtUtc });
 
                 entity.HasOne(e => e.Runner)
                     .WithMany()

@@ -1,4 +1,5 @@
 ﻿using Automaton.Core.Models;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -16,6 +17,7 @@ public class AutomatonHub : Hub
     private const string RunnerMachineNameHeader = "RunnerMachineName";
 
     private readonly RunnerService runnerService;
+    private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly FileUploadRegistry fileUploadRegistry;
     private readonly FileDownloadRegistry fileDownloadRegistry;
@@ -23,12 +25,14 @@ public class AutomatonHub : Hub
 
     public AutomatonHub(
         RunnerService runnerService,
+        ApiInstanceIdentityService apiInstanceIdentityService,
         TunnelRequestRegistry tunnelRegistry,
         FileUploadRegistry fileUploadRegistry,
         FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger)
     {
         this.runnerService = runnerService;
+        this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.tunnelRegistry = tunnelRegistry;
         this.fileUploadRegistry = fileUploadRegistry;
         this.fileDownloadRegistry = fileDownloadRegistry;
@@ -57,12 +61,19 @@ public class AutomatonHub : Hub
         }
 
         logger.LogInformation(
-            "Runner connected successfully: runner {RunnerId} ({RunnerName}) on connection {ConnectionId}",
+            "Runner connected successfully: runner {RunnerId} ({RunnerName}) on connection {ConnectionId} via API instance {ApiInstanceId} color {ApiColor}",
             runner.Id,
             runner.Name,
-            Context.ConnectionId);
+            Context.ConnectionId,
+            apiInstanceIdentityService.ApiInstanceId,
+            apiInstanceIdentityService.ApiColor ?? "(unset)");
 
-        await Clients.Caller.SendAsync("WelcomeRunner", $"Welcome {runner.Name}");
+        await Clients.Caller.SendAsync("WelcomeRunner", new WelcomeRunnerMessage
+        {
+            Message = $"Welcome {runner.Name}",
+            ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
+            ApiColor = apiInstanceIdentityService.ApiColor
+        });
 
         await base.OnConnectedAsync();
     }
@@ -162,6 +173,8 @@ public class AutomatonHub : Hub
             Version = httpContext.Request.Headers[RunnerVersionHeader].ToString(),
             MachineName = httpContext.Request.Headers[RunnerMachineNameHeader].ToString(),
             IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+            ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
+            ApiColor = apiInstanceIdentityService.ApiColor,
         };
 
         return runner;

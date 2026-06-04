@@ -39,6 +39,8 @@ export interface Runner {
   version?: string | null
   machineName?: string | null
   ipAddress?: string | null
+  apiInstanceId?: string | null
+  apiColor?: string | null
   scope: AccessScope
   projectId?: string | null
   projectName?: string | null

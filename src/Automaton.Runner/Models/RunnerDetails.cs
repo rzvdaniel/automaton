@@ -14,4 +14,6 @@ public class RunnerDetails
     public string? Version { get; set; }
     public string? MachineName { get; set; }
     public string? IpAddress { get; set; }
+    public string? ApiInstanceId { get; set; }
+    public string? ApiColor { get; set; }
 }

@@ -21,6 +21,7 @@ public class AppsControllerExecutionService
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly AppsTunnelConfig tunnelConfig;
+    private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -28,13 +29,15 @@ public class AppsControllerExecutionService
         AppFileStorageService fileStorageService,
         IHubContext<AutomatonHub> automatonHub,
         TunnelRequestRegistry tunnelRegistry,
-        IOptions<AppsTunnelConfig> tunnelConfig)
+        IOptions<AppsTunnelConfig> tunnelConfig,
+        ApiInstanceIdentityService apiInstanceIdentityService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
         this.tunnelRegistry = tunnelRegistry;
         this.tunnelConfig = tunnelConfig.Value;
+        this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -540,6 +543,18 @@ public class AppsControllerExecutionService
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
             throw new InvalidOperationException($"Runner '{runner.Name}' is not connected");
+        }
+
+        if (!string.IsNullOrWhiteSpace(runner.ApiInstanceId)
+            && !string.Equals(runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId, StringComparison.Ordinal))
+        {
+            logger.Warning(
+                "Runner {RunnerName} belongs to API instance {RunnerApiInstanceId} color {RunnerApiColor}, but current request is handled by API instance {CurrentApiInstanceId} color {CurrentApiColor}",
+                runner.Name,
+                runner.ApiInstanceId,
+                runner.ApiColor ?? "(unset)",
+                apiInstanceIdentityService.ApiInstanceId,
+                apiInstanceIdentityService.ApiColor ?? "(unset)");
         }
 
         var (requestId, responseTask) = tunnelRegistry.Register(

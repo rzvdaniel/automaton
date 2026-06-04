@@ -690,6 +690,19 @@ public class RunnerHostService
         logger.Debug("HTTP client configured with API key authentication (X-API-Key header)");
     }
 
+    public async Task<bool> ReRegisterAfterReconnectAsync()
+    {
+        await SetupHttpClientAuth();
+
+        var runnerName = configService.ApplicationName;
+        if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            runnerName = $"AutoRunner-{Environment.MachineName}";
+        }
+
+        return await RegisterRunnerAsync(runnerName);
+    }
+
     private async Task EnsureRunnerRegistrationConsistencyAsync()
     {
         if (!configService.IsRunnerRegistered())

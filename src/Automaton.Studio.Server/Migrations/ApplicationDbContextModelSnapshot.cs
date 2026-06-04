@@ -1673,6 +1673,14 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("ApiColor")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("ApiInstanceId")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
                     b.Property<string>("ConnectionId")
                         .HasColumnType("longtext");
 
@@ -1719,6 +1727,14 @@ namespace Automaton.Studio.Server.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("ApiColor")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("ApiInstanceId")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
                     b.Property<DateTime>("ConnectedAtUtc")
                         .HasColumnType("datetime(6)");
 
@@ -1742,6 +1758,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("ConnectionId");
 
                     b.HasIndex("RunnerId");
+
+                    b.HasIndex("ApiInstanceId", "DisconnectedAtUtc");
 
                     b.HasIndex("RunnerId", "DisconnectedAtUtc");
 

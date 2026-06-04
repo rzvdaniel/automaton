@@ -22,7 +22,7 @@ x-api-common: &api-common
     dockerfile: docker/Dockerfile.server
   image: automaton-prod-api:latest
   restart: unless-stopped
-  environment:
+  environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
     ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD};
@@ -135,9 +135,15 @@ services:
 
   api-blue:
     <<: *api-common
+    environment:
+      <<: *api-env
+      AUTOMATON_API_COLOR: blue
 
   api-green:
     <<: *api-common
+    environment:
+      <<: *api-env
+      AUTOMATON_API_COLOR: green
 
   studio-blue:
     <<: *studio-common

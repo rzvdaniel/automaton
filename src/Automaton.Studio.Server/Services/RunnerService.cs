@@ -19,6 +19,7 @@ public class RunnerService
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -27,12 +28,14 @@ public class RunnerService
     public RunnerService(ApplicationDbContext dbContext,
         UserContextService userContextService,
         IHubContext<AutomatonHub> automatonHub,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        ApiInstanceIdentityService apiInstanceIdentityService)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
         this.userContextService = userContextService;  // ✅ Store service reference
         this.authorizationService = authorizationService;
+        this.apiInstanceIdentityService = apiInstanceIdentityService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
@@ -239,6 +242,8 @@ public class RunnerService
         runner.Version = runnerConnection.Version;
         runner.MachineName = runnerConnection.MachineName;
         runner.IpAddress = runnerConnection.IpAddress;
+        runner.ApiInstanceId = runnerConnection.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
+        runner.ApiColor = runnerConnection.ApiColor ?? apiInstanceIdentityService.ApiColor;
 
         // Mark entity as modified
         dbContext.Entry(runner).State = EntityState.Modified;
@@ -254,7 +259,9 @@ public class RunnerService
             Id = Guid.NewGuid(),
             RunnerId = runner.Id,
             ConnectionId = runnerConnection.ConnectionId!,
-            ConnectedAtUtc = now
+            ConnectedAtUtc = now,
+            ApiInstanceId = runner.ApiInstanceId,
+            ApiColor = runner.ApiColor
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -283,6 +290,8 @@ public class RunnerService
         runner.Version = runnerHeartbeat.Version;
         runner.MachineName = runnerHeartbeat.MachineName;
         runner.IpAddress = runnerHeartbeat.IpAddress;
+        runner.ApiInstanceId = runnerHeartbeat.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
+        runner.ApiColor = runnerHeartbeat.ApiColor ?? apiInstanceIdentityService.ApiColor;
 
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -379,6 +388,7 @@ public class RunnerService
         var connectedRunners = await dbContext.Runners
             .AsNoTracking()
             .Where(x => x.ConnectionId != null)
+            .Where(x => x.ApiInstanceId == apiInstanceIdentityService.ApiInstanceId)
             .Select(x => new { x.Id, x.Name, x.ConnectionId })
             .ToListAsync(cancellationToken);
 
@@ -397,7 +407,11 @@ public class RunnerService
             }
         }
 
-        logger.Information("Requested reconnect-when-idle for {RunnerCount} connected runners", signaled);
+        logger.Information(
+            "Requested reconnect-when-idle for {RunnerCount} connected runners owned by API instance {ApiInstanceId} color {ApiColor}",
+            signaled,
+            apiInstanceIdentityService.ApiInstanceId,
+            apiInstanceIdentityService.ApiColor ?? "(unset)");
         return signaled;
     }
 

@@ -323,6 +323,16 @@ public class HubService
                 return "Pong";
             });
 
+            connection.On<WelcomeRunnerMessage>("WelcomeRunner", (message) =>
+            {
+                var apiColor = string.IsNullOrWhiteSpace(message.ApiColor) ? "(unset)" : message.ApiColor;
+                logger.Information(
+                    "Runner accepted by API instance {ApiInstanceId} color {ApiColor}",
+                    message.ApiInstanceId,
+                    apiColor);
+                WriteLine($"✅ Accepted by API instance {message.ApiInstanceId} (color: {apiColor})");
+            });
+
             connection.On<string>(ReconnectWhenIdleMethod, (reason) =>
             {
                 HandleReconnectWhenIdle(reason);
@@ -397,7 +407,27 @@ public class HubService
                 isReconnecting = false;
                 logger.Information("Reconnected to server with connection ID: {ConnectionId}", connectionId);
                 WriteLine("✅ Reconnected to server successfully");
-                _ = SendHeartbeatAsync();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = serviceProvider.CreateScope();
+                        var runnerHostService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
+                        var reRegistered = await runnerHostService.ReRegisterAfterReconnectAsync();
+                        if (!reRegistered)
+                        {
+                            logger.Warning("Runner re-registration after reconnect returned false");
+                            WriteLine("⚠️ Runner re-registration after reconnect failed");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Warning(ex, "Runner re-registration after reconnect failed");
+                        WriteLine($"⚠️ Runner re-registration after reconnect failed: {ex.Message}");
+                    }
+
+                    await SendHeartbeatAsync();
+                });
                 return Task.CompletedTask;
             };
 
