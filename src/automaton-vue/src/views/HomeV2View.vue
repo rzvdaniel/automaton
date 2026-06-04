@@ -373,6 +373,51 @@ watch(
         </div>
       </section>
 
+      <section id="ai-workflow" class="ai-workflow-section">
+        <div class="shell">
+          <div class="ai-workflow-grid">
+            <div class="ai-workflow-copy">
+              <span class="eyebrow">Prompt-first workflow</span>
+              <h2>Let your AI agent build it</h2>
+              <p class="ai-workflow-lead">
+                Paste one prompt into Cursor, Claude Code, Codex, Copilot Chat, or Gemini. The agent reads
+                Automaton&apos;s `llms.txt`, creates the app, deploys with the CLI, and asks before publishing.
+              </p>
+              <p class="ai-workflow-note">
+                You only step in to paste your API key into the terminal when `automaton login` asks.
+              </p>
+              <p class="ai-workflow-safety">
+                Never paste your API key into AI chat.
+              </p>
+
+              <div class="ai-workflow-actions">
+                <button class="button primary" type="button" @click="copyAiPrompt">
+                  {{ promptCopied ? 'Prompt Copied' : 'Copy AI Prompt' }}
+                </button>
+                <RouterLink class="ai-workflow-link" to="/docs/cli-ai-tools">Read the AI workflow</RouterLink>
+              </div>
+            </div>
+
+            <div class="ai-steps-card">
+              <span class="eyebrow">How it works</span>
+              <ol class="ai-steps-list">
+                <li>Copy the prompt.</li>
+                <li>Paste it into your coding agent.</li>
+                <li>Paste your API key into the terminal.</li>
+                <li>Let the agent build and deploy.</li>
+              </ol>
+
+              <div class="prompt-preview-card">
+                <strong>Prompt preview</strong>
+                <p>Build a [describe your app] as an Automaton Monster app.</p>
+                <p>Read https://automaton.monster/llms.txt first.</p>
+                <p>Use the Automaton CLI as the primary path...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="build">
         <div class="shell">
           <div class="install-workflow">
@@ -1065,6 +1110,99 @@ h1 span {
 
 .architecture-section {
   padding-top: 12px;
+}
+
+.ai-workflow-section {
+  padding: 12px 0 0;
+}
+
+.ai-workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 22px;
+}
+
+.ai-workflow-copy,
+.ai-steps-card {
+  padding: 24px;
+  border: 1px solid var(--v2-line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ai-workflow-copy h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.ai-workflow-lead {
+  margin: 18px 0 0;
+  color: var(--v2-muted);
+  line-height: 1.7;
+}
+
+.ai-workflow-note {
+  margin: 14px 0 0;
+  color: var(--v2-text);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.ai-workflow-safety {
+  margin: 10px 0 0;
+  color: var(--v2-muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.ai-workflow-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ai-workflow-link {
+  color: var(--v2-cyan);
+  font-weight: 700;
+}
+
+.ai-workflow-link:hover {
+  color: var(--v2-text);
+}
+
+.ai-steps-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding-left: 20px;
+  color: var(--v2-muted);
+  line-height: 1.65;
+}
+
+.prompt-preview-card {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid rgba(69, 230, 138, 0.22);
+  border-radius: 16px;
+  background: rgba(7, 8, 11, 0.72);
+}
+
+.prompt-preview-card strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--v2-text);
+}
+
+.prompt-preview-card p {
+  margin: 0;
+  color: var(--v2-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.65;
 }
 
 .architecture-intro {
@@ -2192,6 +2330,7 @@ section {
 @media (max-width: 980px) {
   .hero-grid,
   .featured-shelf,
+  .ai-workflow-grid,
   .install-workflow,
   .studio-section,
   .runners-band,
