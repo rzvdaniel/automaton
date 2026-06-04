@@ -549,11 +549,6 @@ onUnmounted(() => {
             Verify this runner's API color matches the current live API color after deploy.
           </Message>
 
-          <div v-else-if="runner.connectionId" class="mt-3 pt-3 border-top-1 surface-border">
-            <div class="text-color-secondary text-sm mb-1">Connection ID</div>
-            <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
-          </div>
-
           <div class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
             <div class="runner-telemetry__row">
               <span class="text-color-secondary text-sm">Last heartbeat</span>
