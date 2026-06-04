@@ -164,9 +164,12 @@ public class AppsStepExecutionService
         PublishedAppInfo app, 
         List<string>? runnerNames)
     {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
-            .Where(r => r.ConnectionId != null); // Only online runners
+            .Where(r => r.ConnectionId != null
+                && r.LastHeartbeatAtUtc.HasValue
+                && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
 
         if (runnerNames != null && runnerNames.Any())
         {
@@ -198,6 +201,11 @@ public class AppsStepExecutionService
             try
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Executing on runner: {runner.Name}");
+
+                if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+                {
+                    throw new InvalidOperationException($"Runner '{runner.Name}' is not connected");
+                }
 
                 var client = automatonHub.Clients.Client(runner.ConnectionId);
 

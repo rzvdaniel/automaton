@@ -317,7 +317,7 @@ public class AppFilesController : ControllerBase
         if (runner is null)
             return "The runner configured for this app no longer exists.";
 
-        if (runner.ConnectionId is null)
+        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
             return $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
 
         if (!await dataContext.Runners.AnyAsync(r => r.Id == executionRunnerId && r.RunnerUsers.Any(ru => ru.UserId == ownerId)))
@@ -328,9 +328,12 @@ public class AppFilesController : ControllerBase
 
     private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId)
     {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         return await dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.ConnectionId != null)
+            .Where(r => r.ConnectionId != null
+                && r.LastHeartbeatAtUtc.HasValue
+                && r.LastHeartbeatAtUtc.Value >= thresholdUtc)
             .Where(r => r.Id == dataContext.WebApps
                 .Where(a => a.Id == appId)
                 .Select(a => a.ExecutionRunnerId)

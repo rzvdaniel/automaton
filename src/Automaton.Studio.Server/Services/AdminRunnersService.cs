@@ -38,7 +38,7 @@ public class AdminRunnersService
 
         foreach (var runner in runners)
         {
-            runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, now);
+            runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, now);
         }
 
         return runners;

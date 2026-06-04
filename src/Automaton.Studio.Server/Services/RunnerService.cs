@@ -226,6 +226,12 @@ public class RunnerService
 
         var now = DateTime.UtcNow;
 
+        await CloseOpenSessionsAsync(
+            runner.Id,
+            now,
+            RunnerSessionDisconnectReasons.SupersededConnection,
+            cancellationToken);
+
         runner.ConnectionId = runnerConnection.ConnectionId;
         runner.LastConnectedAtUtc = now;
         runner.LastHeartbeatAtUtc = now;
@@ -241,6 +247,15 @@ public class RunnerService
         dbContext.Update(runner);
 
         // Save changes
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        dbContext.RunnerConnectionSessions.Add(new RunnerConnectionSession
+        {
+            Id = Guid.NewGuid(),
+            RunnerId = runner.Id,
+            ConnectionId = runnerConnection.ConnectionId!,
+            ConnectedAtUtc = now
+        });
         await dbContext.SaveChangesAsync(cancellationToken);
 
         LinkHostedRunnerAfterReconnect(runner, userId);
@@ -293,7 +308,70 @@ public class RunnerService
         runner.Status = RunnerConnectivityStatuses.Offline;
 
         dbContext.Entry(runner).State = EntityState.Modified;
+        await CloseMatchingOpenSessionAsync(
+            runner.Id,
+            connectionId,
+            runner.LastDisconnectedAtUtc.Value,
+            RunnerSessionDisconnectReasons.GracefulDisconnect,
+            cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> CloseStaleConnectionSessionsAsync(CancellationToken cancellationToken)
+    {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
+        var staleRunners = await dbContext.Runners
+            .Where(x => x.ConnectionId != null)
+            .Where(x => x.LastHeartbeatAtUtc == null || x.LastHeartbeatAtUtc < thresholdUtc)
+            .ToListAsync(cancellationToken);
+
+        if (staleRunners.Count == 0)
+        {
+            return 0;
+        }
+
+        var staleRunnerIds = staleRunners.Select(x => x.Id).ToList();
+        var openSessions = await dbContext.RunnerConnectionSessions
+            .Where(x => staleRunnerIds.Contains(x.RunnerId) && x.DisconnectedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        var sessionsByRunnerId = openSessions
+            .GroupBy(x => x.RunnerId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var now = DateTime.UtcNow;
+        var closedCount = 0;
+
+        foreach (var runner in staleRunners)
+        {
+            if (string.IsNullOrWhiteSpace(runner.ConnectionId))
+            {
+                continue;
+            }
+
+            if (sessionsByRunnerId.TryGetValue(runner.Id, out var sessions))
+            {
+                foreach (var session in sessions.Where(x => string.Equals(x.ConnectionId, runner.ConnectionId, StringComparison.Ordinal)))
+                {
+                    session.DisconnectedAtUtc = now;
+                    session.DisconnectReason = RunnerSessionDisconnectReasons.HeartbeatTimeout;
+                    closedCount++;
+                }
+            }
+
+            runner.ConnectionId = null;
+            runner.LastDisconnectedAtUtc = now;
+            runner.Status = RunnerConnectivityStatuses.Offline;
+            dbContext.Entry(runner).State = EntityState.Modified;
+        }
+
+        if (closedCount > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            logger.Information("Closed {SessionCount} stale runner connection session(s) after heartbeat timeout", closedCount);
+        }
+
+        return closedCount;
     }
 
     public async Task<int> RequestConnectedRunnersReconnectWhenIdleAsync(string reason, CancellationToken cancellationToken)
@@ -518,12 +596,20 @@ public class RunnerService
         var runners = RunnerMapper
             .ToRunnerDetailsList(runnerEntities, RunnerStatus.None, projectLookup, hostedRunnerLookup)
             .ToList();
+        var sessionStats = await BuildRunnerSessionStatsAsync(runners.Select(x => x.Id), cancellationToken);
 
         var now = DateTime.UtcNow;
 
         foreach (var runner in runners)
         {
-            runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, now);
+            runner.Status = RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, now);
+
+            if (sessionStats.TryGetValue(runner.Id, out var stats))
+            {
+                runner.CurrentSessionConnectedAtUtc = stats.CurrentSessionConnectedAtUtc;
+                runner.ConnectionSessionCount = stats.ConnectionSessionCount;
+                runner.TotalConnectedDurationSeconds = stats.TotalConnectedDurationSeconds;
+            }
         }
 
         return runners;
@@ -663,12 +749,14 @@ public class RunnerService
                 .Select(x => (Guid?)x.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            return RunnerMapper.ToRunnerDetails(
+            var details = RunnerMapper.ToRunnerDetails(
                 runner,
-                RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow),
+                RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow),
                 link.ProjectId,
                 link.ProjectName,
                 hostedRunnerId);
+            await PopulateRunnerSessionStatsAsync(details, cancellationToken);
+            return details;
         }
 
         var fallbackHostedRunnerId = await dbContext.HostedRunners
@@ -677,11 +765,132 @@ public class RunnerService
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return RunnerMapper.ToRunnerDetails(
+        var fallbackDetails = RunnerMapper.ToRunnerDetails(
             runner,
-            RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow),
+            RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow),
             null,
             null,
             fallbackHostedRunnerId);
+        await PopulateRunnerSessionStatsAsync(fallbackDetails, cancellationToken);
+        return fallbackDetails;
     }
+
+    private async Task PopulateRunnerSessionStatsAsync(RunnerDetails runner, CancellationToken cancellationToken)
+    {
+        var stats = await BuildRunnerSessionStatsAsync(new[] { runner.Id }, cancellationToken);
+        if (!stats.TryGetValue(runner.Id, out var value))
+        {
+            return;
+        }
+
+        runner.CurrentSessionConnectedAtUtc = value.CurrentSessionConnectedAtUtc;
+        runner.ConnectionSessionCount = value.ConnectionSessionCount;
+        runner.TotalConnectedDurationSeconds = value.TotalConnectedDurationSeconds;
+    }
+
+    private async Task<Dictionary<Guid, RunnerSessionStats>> BuildRunnerSessionStatsAsync(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
+    {
+        var ids = runnerIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, RunnerSessionStats>();
+        }
+
+        var runnerStates = await dbContext.Runners
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new RunnerSessionPresenceState(
+                x.Id,
+                x.ConnectionId,
+                x.LastHeartbeatAtUtc))
+            .ToDictionaryAsync(x => x.RunnerId, cancellationToken);
+
+        var sessions = await dbContext.RunnerConnectionSessions
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.RunnerId))
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        return sessions
+            .GroupBy(x => x.RunnerId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    runnerStates.TryGetValue(g.Key, out var runnerState);
+                    var totalSeconds = g.Sum(session =>
+                    {
+                        var sessionEnd = session.DisconnectedAtUtc ?? GetOpenSessionEffectiveEnd(session, runnerState, now);
+                        var duration = sessionEnd - session.ConnectedAtUtc;
+                        return duration > TimeSpan.Zero ? Convert.ToInt64(duration.TotalSeconds) : 0L;
+                    });
+                    var currentSession = g
+                        .Where(x => x.DisconnectedAtUtc == null)
+                        .OrderByDescending(x => x.ConnectedAtUtc)
+                        .FirstOrDefault();
+                    var currentSessionConnectedAtUtc =
+                        runnerState != null && RunnerPresenceEvaluator.IsOnline(runnerState.ConnectionId, runnerState.LastHeartbeatAtUtc, now)
+                            ? currentSession?.ConnectedAtUtc
+                            : null;
+
+                    return new RunnerSessionStats(
+                        totalSeconds,
+                        g.Count(),
+                        currentSessionConnectedAtUtc);
+                });
+    }
+
+    private static DateTime GetOpenSessionEffectiveEnd(
+        RunnerConnectionSession session,
+        RunnerSessionPresenceState? runnerState,
+        DateTime utcNow)
+    {
+        if (runnerState == null)
+        {
+            return session.ConnectedAtUtc;
+        }
+
+        return RunnerPresenceEvaluator.IsOnline(runnerState.ConnectionId, runnerState.LastHeartbeatAtUtc, utcNow)
+            ? utcNow
+            : (runnerState.LastHeartbeatAtUtc ?? session.ConnectedAtUtc);
+    }
+
+    private async Task CloseOpenSessionsAsync(Guid runnerId, DateTime disconnectedAtUtc, string disconnectReason, CancellationToken cancellationToken)
+    {
+        var openSessions = await dbContext.RunnerConnectionSessions
+            .Where(x => x.RunnerId == runnerId && x.DisconnectedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in openSessions)
+        {
+            session.DisconnectedAtUtc = disconnectedAtUtc;
+            session.DisconnectReason = disconnectReason;
+        }
+    }
+
+    private async Task CloseMatchingOpenSessionAsync(Guid runnerId, string connectionId, DateTime disconnectedAtUtc, string disconnectReason, CancellationToken cancellationToken)
+    {
+        var session = await dbContext.RunnerConnectionSessions
+            .Where(x => x.RunnerId == runnerId && x.ConnectionId == connectionId && x.DisconnectedAtUtc == null)
+            .OrderByDescending(x => x.ConnectedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (session == null)
+        {
+            return;
+        }
+
+        session.DisconnectedAtUtc = disconnectedAtUtc;
+        session.DisconnectReason = disconnectReason;
+    }
+
+    private sealed record RunnerSessionStats(
+        long TotalConnectedDurationSeconds,
+        int ConnectionSessionCount,
+        DateTime? CurrentSessionConnectedAtUtc);
+
+    private sealed record RunnerSessionPresenceState(
+        Guid RunnerId,
+        string? ConnectionId,
+        DateTime? LastHeartbeatAtUtc);
 }

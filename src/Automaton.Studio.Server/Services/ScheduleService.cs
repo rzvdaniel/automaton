@@ -153,10 +153,18 @@ public class ScheduleService
         {
             RunnerFlowResult result;
             var runner = GetRunner(runnerId, userId);
-            var client = automatonHub.Clients.Client(runner.ConnectionId);
 
             try
             {
+                if (runner == null || !RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+                {
+                    logger.Warning("Runner {RunnerId} is not connected for scheduled flow {FlowId}", runnerId, flowId);
+                    result = GetInvalidFlowResult(flowId: flowId, runnerId: runnerId);
+                    results.Add(result);
+                    continue;
+                }
+
+                var client = automatonHub.Clients.Client(runner.ConnectionId);
                 var response = await client.InvokeAsync<WorkflowExecution>(AutomatonHubMethods.RunWorkflow, flowId, cancellationToken);
 
                 result = GetSuccessfulFlowResult(flowId: flowId, runnerId: runnerId, response);
@@ -176,7 +184,7 @@ public class ScheduleService
         return results;
     }
 
-    private Runner GetRunner(Guid id, Guid userId)
+    private Runner? GetRunner(Guid id, Guid userId)
     {
         var runner = dbContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
 
@@ -191,7 +199,10 @@ public class ScheduleService
         // http://codethug.com/2016/02/19/Entity-Framework-Cache-Busting/
 
         // Solution 1. Reload the entity 
-        dbContext.Entry(runner).Reload();
+        if (runner != null)
+        {
+            dbContext.Entry(runner).Reload();
+        }
 
         // Solution 2. Detach the entity to remove it from context’s cache.
         // dbContext.Entry(entity).State = EntityState.Detached;

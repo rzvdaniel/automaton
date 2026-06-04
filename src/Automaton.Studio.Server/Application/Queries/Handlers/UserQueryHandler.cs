@@ -78,7 +78,7 @@ namespace AuthServer.Application.Queries.Handlers
                     {
                         Id = runner.Id,
                         Name = runner.Name,
-                        Status = RunnerPresenceEvaluator.DeriveStatus(runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString(),
+                        Status = RunnerPresenceEvaluator.DeriveStatus(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString(),
                         LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc,
                         LastConnectedAtUtc = runner.LastConnectedAtUtc,
                         Version = runner.Version,

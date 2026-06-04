@@ -55,6 +55,7 @@ dotnet ef migrations add <Name> --project src/Automaton.Studio.Server/Automaton.
 - updated `ApplicationDbContextModelSnapshot.cs`
 
 If a hand-written migration was created earlier, replace it with the generated migration before committing.
+If `dotnet ef` cannot run because of environment/tooling issues, treat that as a blocker to report explicitly. Do not keep a hand-written migration as the final state.
 
 ### 3. Optional: Frontend Lint
 
@@ -126,7 +127,7 @@ Optional follow-ups:
 ## Conventions for Agents
 
 - **Batching:** Run type-check and build together when possible; don't run sequentially.
-- **EF migrations:** For schema changes, generate migrations with `dotnet ef` so the `.Designer.cs` file and snapshot are created correctly; do not hand-author migration files.
+- **EF migrations:** For schema changes, generate migrations with `dotnet ef` so the `.Designer.cs` file and snapshot are created correctly; do not hand-author migration files. If EF generation is blocked, report the blocker and stop short of claiming the schema change is fully validated.
 - **Context:** Include a brief preamble explaining why these steps are important before executing.
 - **Tool usage:** Use `run_in_terminal` for build commands; batch independent commands when safe.
 - **Scope:** Keep validations focused on the changed area; avoid unrelated refactors or cleanup.

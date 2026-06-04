@@ -235,7 +235,7 @@ public class CustomStepsService
                         Finished = DateTime.UtcNow
                     };
                 }
-                else if (string.IsNullOrEmpty(runner.ConnectionId))
+                else if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
                 {
                     logger.Warning("Runner {RunnerId} ({RunnerName}) is not connected", runnerId, runner.Name);
                     result = new RunnerCustomStepResult

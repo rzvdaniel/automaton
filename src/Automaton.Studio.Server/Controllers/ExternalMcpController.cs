@@ -291,12 +291,19 @@ public class ExternalMcpController : ControllerBase
         var name   = RequireString(args, "name");
         var appId  = await _appsService.Create(new NewApp { Name = name });
         var server = $"{Request.Scheme}://{Request.Host}";
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
 
         // Also fetch available runners so the AI can prompt the user immediately.
         var runners = await _db.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
             .OrderBy(r => r.Name)
-            .Select(r => new { r.Name, Connected = r.ConnectionId != null })
+            .Select(r => new
+            {
+                r.Name,
+                Connected = r.ConnectionId != null
+                    && r.LastHeartbeatAtUtc.HasValue
+                    && r.LastHeartbeatAtUtc.Value >= thresholdUtc
+            })
             .ToListAsync();
 
         var runnerSection = runners.Count == 0
@@ -385,10 +392,17 @@ public class ExternalMcpController : ControllerBase
 
     private async Task<string> ExecListRunners(Guid userId)
     {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var runners = await _db.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
             .OrderBy(r => r.Name)
-            .Select(r => new { r.Name, Connected = r.ConnectionId != null })
+            .Select(r => new
+            {
+                r.Name,
+                Connected = r.ConnectionId != null
+                    && r.LastHeartbeatAtUtc.HasValue
+                    && r.LastHeartbeatAtUtc.Value >= thresholdUtc
+            })
             .ToListAsync();
 
         if (!runners.Any())

@@ -23,6 +23,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
         public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
         public virtual DbSet<Runner> Runners { get; set; }
+        public virtual DbSet<RunnerConnectionSession> RunnerConnectionSessions { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
@@ -149,6 +150,23 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Version).HasMaxLength(50);
                 entity.Property(e => e.MachineName).HasMaxLength(120);
                 entity.Property(e => e.IpAddress).HasMaxLength(64);
+            });
+
+            modelBuilder.Entity<RunnerConnectionSession>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ConnectionId).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.ConnectedAtUtc).IsRequired();
+                entity.Property(e => e.DisconnectReason).HasMaxLength(80);
+
+                entity.HasIndex(e => e.RunnerId);
+                entity.HasIndex(e => new { e.RunnerId, e.DisconnectedAtUtc });
+                entity.HasIndex(e => e.ConnectionId);
+
+                entity.HasOne(e => e.Runner)
+                    .WithMany()
+                    .HasForeignKey(e => e.RunnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<RunnerUser>(entity =>

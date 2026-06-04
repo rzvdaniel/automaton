@@ -12,6 +12,9 @@ public class RunnerDetails
     public DateTime? LastHeartbeatAtUtc { get; set; }
     public DateTime? LastConnectedAtUtc { get; set; }
     public DateTime? LastDisconnectedAtUtc { get; set; }
+    public DateTime? CurrentSessionConnectedAtUtc { get; set; }
+    public long TotalConnectedDurationSeconds { get; set; }
+    public int ConnectionSessionCount { get; set; }
     public string? Version { get; set; }
     public string? MachineName { get; set; }
     public string? IpAddress { get; set; }

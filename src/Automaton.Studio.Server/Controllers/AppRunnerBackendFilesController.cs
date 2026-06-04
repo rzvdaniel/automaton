@@ -277,7 +277,7 @@ public class AppRunnerBackendFilesController : ControllerBase
             }));
         }
 
-        if (string.IsNullOrWhiteSpace(runner.ConnectionId))
+        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
             return (null, BadRequest(new AppBackendFilesResponse
             {

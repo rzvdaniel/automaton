@@ -201,7 +201,7 @@ public class AdminHostedRunnersController : ControllerBase
         var deployment = runner.Deployments.OrderByDescending(x => x.StartedAt).FirstOrDefault();
         var runnerConnectivityStatus = runner.Runner == null
             ? RunnerStatus.None.ToString()
-            : RunnerPresenceEvaluator.DeriveStatus(runner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString();
+            : RunnerPresenceEvaluator.DeriveStatus(runner.Runner.ConnectionId, runner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString();
 
         return new HostedRunnerResponse
         {

@@ -395,9 +395,12 @@ public class AppsControllerExecutionService
 
     private async Task<IEnumerable<Runner>> ResolveRunnersAsync(PublishedAppInfo app, List<string>? runnerNames)
     {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
-            .Where(r => r.ConnectionId != null);
+            .Where(r => r.ConnectionId != null
+                && r.LastHeartbeatAtUtc.HasValue
+                && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
 
         if (runnerNames != null && runnerNames.Any())
             query = query.Where(r => runnerNames.Contains(r.Name));
@@ -409,9 +412,12 @@ public class AppsControllerExecutionService
 
     private async Task<IEnumerable<Runner>> ResolveRunnersByOwnerAsync(Guid ownerId, List<string>? runnerNames, Guid appId)
     {
+        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.ConnectionId != null);
+            .Where(r => r.ConnectionId != null
+                && r.LastHeartbeatAtUtc.HasValue
+                && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
 
         if (runnerNames != null && runnerNames.Any())
             query = query.Where(r => runnerNames.Contains(r.Name));
@@ -531,6 +537,11 @@ public class AppsControllerExecutionService
 
     private async Task<TunnelResponse> SendTunnelRequestAsync(Runner runner, string controllerName, string body, CancellationToken cancellationToken)
     {
+        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+        {
+            throw new InvalidOperationException($"Runner '{runner.Name}' is not connected");
+        }
+
         var (requestId, responseTask) = tunnelRegistry.Register(
             timeout: TimeSpan.FromSeconds(tunnelConfig.TimeoutSeconds),
             ct: cancellationToken);

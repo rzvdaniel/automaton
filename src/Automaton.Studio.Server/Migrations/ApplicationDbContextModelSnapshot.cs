@@ -1713,6 +1713,41 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Runners");
                 });
 
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerConnectionSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("ConnectedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ConnectionId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("DisconnectReason")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime?>("DisconnectedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("RunnerId");
+
+                    b.HasIndex("RunnerId", "DisconnectedAtUtc");
+
+                    b.ToTable("RunnerConnectionSessions");
+                });
+
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerHost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2947,6 +2982,17 @@ namespace Automaton.Studio.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerConnectionSession", b =>
+                {
+                    b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
+                        .WithMany()
+                        .HasForeignKey("RunnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Runner");
                 });
 
             modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerUser", b =>

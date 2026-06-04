@@ -70,6 +70,7 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
   dotnet ef migrations add <Name> --project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --startup-project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --output-dir Migrations
   ```
   Hand-crafted migrations silently skip the required `.Designer.cs` companion file; EF then ignores the migration and `Database.Migrate()` fails at runtime with confusing column errors.
+- If `dotnet ef` is blocked by environment issues (locked build output, temp-directory permissions, NuGet/network restrictions, missing SDK tooling), stop and report that exact blocker. Do not "temporarily" hand-author a migration as a substitute.
 - Treat the generated migration trio as one unit:
   - `<timestamp>_<Name>.cs`
   - `<timestamp>_<Name>.Designer.cs`
@@ -202,4 +203,3 @@ private static string GetContentType(string fileName) => Path.GetExtension(fileN
 ### General Rule
 
 Before writing any utility method that maps, converts, or resolves a well-known system concept (paths, MIME types, encodings, cultures, time zones, HTTP status codes), check whether the framework already provides it. It almost always does.
-
