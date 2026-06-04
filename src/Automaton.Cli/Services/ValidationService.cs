@@ -118,7 +118,7 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(resolvedServer))
         {
-            nextSteps.Add("Run automaton setup to configure the hosted server and credentials");
+            nextSteps.Add("Run automaton login to configure the hosted server and credentials");
             return new ValidationCheckResult(
                 ValidationCheckNames.AppLink,
                 false,
@@ -288,7 +288,7 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(resolvedApiKey))
         {
-            nextSteps.Add("Run automaton setup");
+            nextSteps.Add("Run automaton login");
             return new RemoteAppCheckResult(
                 new ValidationCheckResult(
                     ValidationCheckNames.RemoteAppAccess,

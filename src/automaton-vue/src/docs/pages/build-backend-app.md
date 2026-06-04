@@ -7,7 +7,7 @@ Use this page when your Automaton app needs APIs, server-side logic, database ca
 ## Create or link an app
 
 ```bash
-automaton setup
+automaton login
 automaton new "My Backend App"
 ```
 

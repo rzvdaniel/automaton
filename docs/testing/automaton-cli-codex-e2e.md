@@ -17,7 +17,7 @@ This is a manual acceptance checklist for the AI-first app-creation experience.
 Verify that a new user can become productive with:
 
 1. a fresh local folder
-2. `automaton setup`
+2. `automaton login`
 3. local generated guidance
 4. `automaton new`
 5. `automaton validate`
@@ -62,7 +62,7 @@ automaton logout --all
 2. Paste this prompt:
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build a playable Tetris app for Automaton in this folder. Use the Automaton CLI as the primary execution path. Start with automaton setup. After that, handle the rest yourself: install the CLI if needed, create automaton.json here, scaffold the app, validate, deploy, and ask before publish. Only ask me to step in for auth or publish approval.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. Build a playable Tetris app for Automaton in this folder. Use the Automaton CLI as the primary execution path. Start with automaton login. After that, handle the rest yourself: install the CLI if needed, create automaton.json here, scaffold the app, validate, deploy, and ask before publish. Only ask me to step in for auth or publish approval.
 ```
 
 3. Observe the AI workflow from setup through deploy
@@ -73,10 +73,10 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 
 - ✅ Codex checks whether `automaton` is installed
 - ✅ If missing, Codex installs the CLI or tells the user it is installing it
-- ✅ Codex starts with `automaton setup`
+- ✅ Codex starts with `automaton login`
 - ✅ Codex asks the user to step in only for auth when needed
-- ✅ `automaton setup` generates local guidance files in the current folder
-- ✅ Codex follows the local generated guidance after setup
+- ✅ `automaton login` authenticates the CLI for the current folder
+- ✅ Codex follows local generated guidance after `automaton new` or `automaton link`
 - ✅ Codex uses `automaton new` for a new app
 - ✅ `automaton.json` is created in the current folder, not inside an unexpected nested folder
 - ✅ `.automatonignore` is created when needed
@@ -88,19 +88,20 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 - ✅ Codex asks for confirmation before publish
 - ✅ If approved, Codex runs `automaton publish --yes`
 
-## Files Expected After Setup
+## Files Expected After Login And App Creation
 
-After `automaton setup`:
+After `automaton login`:
 
-- `AGENTS.md`
-- `.automaton/agents/`
-- `.automaton/agents/skills/automaton-app/SKILL.md`
-- `.automaton/agents/references/llms.txt`
+- `./.automaton/config.json` or `~/.automaton/config.json`
 
 After `automaton new`:
 
 - `automaton.json`
 - `.automatonignore`
+- `AGENTS.md`
+- `.automaton/agents/`
+- `.automaton/agents/skills/automaton-app/SKILL.md`
+- `.automaton/agents/references/llms.txt`
 - local app source files
 
 ## What to Inspect Locally
@@ -127,7 +128,7 @@ Check that:
 
 Treat these as failures:
 
-- ❌ Codex skips `automaton setup`
+- ❌ Codex skips `automaton login`
 - ❌ Codex creates an app in a nested folder without being asked
 - ❌ `automaton.json` is missing after create/link should have happened
 - ❌ Codex keeps relying on website `llms.txt` after local guidance is generated
@@ -143,7 +144,7 @@ Treat these as failures:
 **Expected Results:**
 
 - ✅ Codex detects the CLI is present
-- ✅ Codex still runs `automaton setup`
+- ✅ Codex still runs `automaton login`
 - ✅ Auth is requested only when needed
 - ✅ The rest of the flow behaves the same as Scenario 1
 
@@ -154,7 +155,7 @@ Treat these as failures:
 **Prompt Variant:**
 
 ```text
-Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. I already have an Automaton app. Use the Automaton CLI as the primary execution path. Start with automaton setup, then link this folder to app id <app-id>, scaffold a playable Tetris app here, validate, deploy, and ask before publish.
+Use the local generated Automaton guidance in this folder if it exists; otherwise read https://automaton.monster/llms.txt. I already have an Automaton app. Use the Automaton CLI as the primary execution path. Start with automaton login, then link this folder to app id <app-id>, scaffold a playable Tetris app here, validate, deploy, and ask before publish.
 ```
 
 **Expected Results:**
@@ -178,7 +179,7 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 ## Quick Smoke Test Checklist
 
 - [ ] Fresh folder used
-- [ ] Codex starts with `automaton setup`
+- [ ] Codex starts with `automaton login`
 - [ ] Local guidance files generated
 - [ ] `automaton.json` created in current folder
 - [ ] No unwanted nested app folder

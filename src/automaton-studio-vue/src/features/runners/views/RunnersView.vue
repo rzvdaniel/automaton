@@ -238,7 +238,7 @@ function confirmDelete(runner: Runner) {
 }
 
 const cliCommand = `dotnet tool install --global Automaton.Cli
-automaton setup
+automaton login
 automaton runner install`
 
 const dockerCommand = `docker run -d \\
@@ -402,7 +402,7 @@ onUnmounted(() => {
             <div class="runner-quickstart-label">Recommended setup — Automaton CLI:</div>
             <div class="runner-quickstart-code">
               <span class="code-line">dotnet tool install --global Automaton.Cli</span>
-              <span class="code-line">automaton setup</span>
+              <span class="code-line">automaton login</span>
               <span class="code-line">automaton runner install</span>
             </div>
             <p class="text-color-secondary text-sm mt-2 mb-0">
@@ -634,7 +634,7 @@ onUnmounted(() => {
 
             <div class="code-block">
               <pre class="code-content"><span class="cmd">dotnet tool install</span> --global Automaton.Cli
-<span class="cmd">automaton setup</span>
+<span class="cmd">automaton login</span>
 <span class="cmd">automaton runner install</span></pre>
               <Button
                 icon="pi pi-copy"

@@ -15,7 +15,7 @@ dotnet tool install -g Automaton.Cli
 Prepare the current folder:
 
 ```bash
-automaton setup
+automaton login
 ```
 
 Create a new app, or link an existing one:

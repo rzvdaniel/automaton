@@ -7,14 +7,16 @@ namespace Automaton.Cli.Commands;
 
 public static class LoginCommand
 {
+    private const string DefaultHostedServer = "https://api.automaton.monster";
+
     public static Command Build(ConfigService config)
     {
-        var serverOption = new Option<string?>("--server", "Automaton server URL");
+        var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {DefaultHostedServer})");
         var keyOption = new Option<string?>(["--key", "-k"], "API key for authentication");
         var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        var cmd = new Command("login", "Advanced: store CLI credentials and validate them against the server")
+        var cmd = new Command("login", "Store CLI credentials and validate them against the server")
         {
             serverOption,
             keyOption,
@@ -32,7 +34,7 @@ public static class LoginCommand
                 var cwd = Directory.GetCurrentDirectory();
                 var existing = config.ResolveExistingConfig(global, cwd);
 
-                server ??= PromptForValue("Automaton server URL", existing.Server, secret: false);
+                server ??= PromptForValue("Automaton server URL", existing.Server ?? DefaultHostedServer, secret: false);
                 key ??= PromptForValue("API key", existing.ApiKey, secret: true);
 
                 if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(key))
@@ -98,7 +100,7 @@ public static class LoginCommand
             catch (Exception ex)
             {
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
-                nextSteps.Add("Run automaton setup with a valid API key");
+                nextSteps.Add("Run automaton login with a valid API key");
                 var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
                 if (asJson)
                 {

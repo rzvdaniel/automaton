@@ -13,7 +13,7 @@ The Automaton MCP endpoint is still implemented, but it is currently:
 
 The product-facing recommendation is CLI-only:
 
-1. `automaton setup`
+1. `automaton login`
 2. `automaton new` or `automaton link`
 3. `automaton validate`
 4. `automaton deploy`

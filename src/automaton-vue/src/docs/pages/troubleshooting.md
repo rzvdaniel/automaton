@@ -59,7 +59,7 @@ Common problems and how to fix them.
 
 **Fixes:**
 
-- Run `automaton setup --server <url> --key <your-key>` again to refresh the stored credentials, or use `automaton config --server <url> --key <your-key>` if you want explicit manual configuration.
+- Run `automaton login --server <url> --key <your-key>` again to refresh the stored credentials, or use `automaton config --server <url> --key <your-key>` if you want explicit manual configuration.
 - Confirm the API key has `execute` scope (not read-only).
 - Confirm the server URL in `automaton.json` matches the server you logged into.
 

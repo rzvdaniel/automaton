@@ -233,13 +233,13 @@ public sealed class DeployService
     {
         if (string.IsNullOrWhiteSpace(server))
         {
-            nextSteps.Add("Run automaton setup to configure the hosted server and credentials");
+            nextSteps.Add("Run automaton login to configure the hosted server and credentials");
             return new DeployCheckResult(DeployCheckNames.Credentials, false, "server could not be resolved from environment, automaton.json, or CLI config");
         }
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            nextSteps.Add("Run automaton setup");
+            nextSteps.Add("Run automaton login");
             return new DeployCheckResult(DeployCheckNames.Credentials, false, "API key could not be resolved from environment or CLI config");
         }
 

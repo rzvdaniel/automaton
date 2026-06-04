@@ -7,7 +7,7 @@ Use this page when your app is static HTML/CSS/JavaScript, Vue, React, or anothe
 ## Create or link an app
 
 ```bash
-automaton setup
+automaton login
 automaton new "My Frontend App"
 ```
 

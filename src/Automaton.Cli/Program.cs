@@ -14,7 +14,6 @@ if (args.Length == 1 && (string.Equals(args[0], "--version", StringComparison.Or
 
 var root = new RootCommand("Automaton CLI — create, deploy, and publish Automaton apps")
 {
-    SetupCommand.Build(config),
     NewCommand.Build(config),
     SyncAiCommand.Build(config),
     LoginCommand.Build(config),

@@ -118,7 +118,7 @@ const nextStep = computed(() => steps.value.find((s) => !s.done))
           <div class="cli-callout-desc">
             1. Create an API key
             2. Install the CLI
-            3. Run <code>automaton setup</code> from your terminal
+            3. Run <code>automaton login</code> from your terminal
           </div>
         </div>
         <div class="cli-callout-actions">

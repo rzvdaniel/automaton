@@ -66,7 +66,7 @@ public static class RunnerCommand
                 {
                     if (asJson)
                     {
-                        throw new InvalidOperationException("Runner API key is required. Run automaton setup first or pass --key.");
+                        throw new InvalidOperationException("Runner API key is required. Run automaton login first or pass --key.");
                     }
 
                     resolvedKey = ReadSecretFromConsole("Enter runner API key");
@@ -97,7 +97,7 @@ public static class RunnerCommand
             catch (Exception ex)
             {
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerStart, false, ex.Message));
-                nextSteps.Add("Run automaton setup if server URL or API key has not been configured yet");
+                nextSteps.Add("Run automaton login if server URL or API key has not been configured yet");
                 var failure = new RunnerCommandResult { Success = false, Summary = "Runner install failed", Checks = checks, NextSteps = nextSteps };
                 WriteResult(failure, asJson);
                 Environment.ExitCode = 1;

@@ -39,7 +39,7 @@ That is usually the best fit for:
 
 ## What to tell the AI
 
-After `automaton setup`, prefer the local generated guidance first. Use these files as the canonical fallback instructions:
+After `automaton new` or `automaton link`, prefer the local generated guidance first. Use these files as the canonical fallback instructions:
 
 - [llms.txt](https://automaton.monster/llms.txt)
 - [Starter prompts](https://automaton.monster/llms/automaton-starter-prompts.md)
@@ -48,7 +48,7 @@ After `automaton setup`, prefer the local generated guidance first. Use these fi
 Manual fallback if you need to drive the CLI yourself:
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 # or
 automaton link <app-id>
@@ -62,4 +62,4 @@ Use `automaton sync-ai` only if the generated local guidance files are missing o
 - Default to plain HTML/CSS/JS.
 - For AI-generated local apps, still prefer a normal `frontend/` project with explicit deploy output unless the user explicitly wants a no-build static app.
 - Use React or Vue when the user asks for them or the app clearly needs a heavier SPA structure.
-- After `automaton setup`, prefer the local generated guidance. Treat `llms.txt` as the canonical fallback, not the default.
+- After `automaton new` or `automaton link`, prefer the local generated guidance. Treat `llms.txt` as the canonical fallback, not the default.

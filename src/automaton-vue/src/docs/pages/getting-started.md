@@ -4,7 +4,7 @@ If you want the shortest path from zero to a deployed app, use this flow:
 
 ```bash
 dotnet tool install -g Automaton.Cli
-automaton setup
+automaton login
 automaton new "My App"
 ```
 
@@ -35,7 +35,7 @@ automaton publish
 For most users, these are the only commands that matter:
 
 ```bash
-automaton setup
+automaton login
 automaton new
 automaton deploy
 automaton publish

@@ -109,22 +109,6 @@ public class CommandJsonShapeTests
     }
 
     [Test]
-    public async Task SetupCommand_WhenCredentialsAreMissing_ReturnsDiagnosticJsonShape()
-    {
-        var projectRoot = CreateProjectRoot();
-        new ConfigService().SaveProjectLocalConfig(projectRoot, new GlobalConfig
-        {
-            Server = string.Empty,
-            ApiKey = string.Empty
-        });
-        var command = SetupCommand.Build(new ConfigService());
-
-        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"], Environment.NewLine);
-
-        AssertDiagnosticFailure(output, "Setup failed", CommandDiagnosticCheckNames.Credentials, "checks", "nextSteps");
-    }
-
-    [Test]
     public async Task NewCommand_WhenNameIsMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();

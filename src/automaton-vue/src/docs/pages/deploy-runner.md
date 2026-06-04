@@ -55,7 +55,7 @@ Frontend-only apps do not require a Runner.
 ## Typical workflow
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 automaton runner install
 automaton deploy

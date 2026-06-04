@@ -16,7 +16,7 @@ automaton runner install --native
 
 ## Requirements
 
-- Automaton CLI configured with `automaton setup`
+- Automaton CLI configured with `automaton login`
 - Docker Desktop / Docker Engine for the default install path
 - Python 3.11+ only if you use `--native` and want backend Python apps to run on this machine
 

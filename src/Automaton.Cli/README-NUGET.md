@@ -11,7 +11,7 @@ dotnet tool install --global Automaton.Cli
 ## Common commands
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 automaton deploy --non-interactive
 automaton deploy --publish --yes --non-interactive

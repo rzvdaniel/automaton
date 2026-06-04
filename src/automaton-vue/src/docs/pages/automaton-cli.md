@@ -36,23 +36,23 @@ This is the supported installation path.
 
 ---
 
-## One-time setup
+## One-time login
 
-Prepare the current machine or workspace:
+Authenticate the current machine or workspace:
 
 ```bash
-automaton setup
+automaton login
 ```
 
 Get an API key from **API Keys → Generate New Key** (scope: `execute`).
 
-Explicit key setup is still available when you need it:
+Explicit key login is still available when you need it:
 ```bash
-automaton setup --key ak_execute_xxx
+automaton login --key ak_execute_xxx
 automaton config --show
 ```
 
-By default, `automaton setup` stores project-local credentials in `./.automaton/config.json` and uses the hosted Automaton server automatically. Environment variables are mainly for CI/CD and internal development; normal users do not need them for the standard flow.
+By default, `automaton login` stores project-local credentials in `./.automaton/config.json` and uses the hosted Automaton server automatically. Environment variables are mainly for CI/CD and internal development; normal users do not need them for the standard flow.
 
 ---
 
@@ -107,15 +107,15 @@ For an explicit no-build static app, use:
 
 ## Commands
 
-### `automaton setup`
+### `automaton login`
 
-Prepare this machine or workspace for Automaton development.
+Store CLI credentials and validate them against the server.
 
 ```bash
-automaton setup
+automaton login
 ```
 
-By default, `setup` uses the hosted Automaton server, saves credentials locally for the current project, and also syncs the generated local AI guidance pack.
+By default, `login` uses the hosted Automaton server and saves credentials locally for the current project.
 
 ---
 
@@ -157,7 +157,7 @@ automaton sync-ai --adapter all
 automaton sync-ai --json
 ```
 
-Use this only when the generated `.automaton/agents/`, `.automaton/agents/references/`, or `AGENTS.md` files are missing or stale, or when you want an optional adapter for another AI tool. It is not required on the normal happy path because `setup`, `new`, and `link` already sync the default guidance automatically.
+Use this only when the generated `.automaton/agents/`, `.automaton/agents/references/`, or `AGENTS.md` files are missing or stale, or when you want an optional adapter for another AI tool. It is not required on the normal happy path because `new` and `link` already sync the default guidance automatically.
 
 By default, `sync-ai` writes only `.automaton/` plus `AGENTS.md`. Optional adapters are tiny wrappers that point back to `.automaton/agents/`:
 
@@ -168,19 +168,6 @@ By default, `sync-ai` writes only `.automaton/` plus `AGENTS.md`. Optional adapt
 | `copilot` | `.github/copilot-instructions.md` |
 | `github-skills` | `.github/skills/automaton-app/SKILL.md` |
 | `all` | All optional adapters |
-
----
-
-### `automaton login` (advanced)
-
-Advanced fallback to store and validate CLI credentials directly. Most users should prefer `automaton setup` instead.
-
-```bash
-automaton login
-automaton whoami
-```
-
-By default, credentials are saved to `./.automaton/config.json` for the current project. Treat this as a lower-level fallback when you intentionally want to manage credentials outside the normal `setup` flow.
 
 ---
 
@@ -206,7 +193,7 @@ automaton whoami
 automaton whoami --json
 ```
 
-Useful after `automaton setup` or `automaton logout` to confirm which credentials are currently active.
+Useful after `automaton login` or `automaton logout` to confirm which credentials are currently active.
 
 ---
 
@@ -347,8 +334,8 @@ Set environment variables in your pipeline instead of storing credentials in the
 ## Typical workflow
 
 ```bash
-# 1. Prepare the local workspace
-automaton setup
+# 1. Authenticate the local workspace
+automaton login
 
 # 2. Create a new app (or use link <id> to connect an existing one)
 automaton new "Poker Planning"

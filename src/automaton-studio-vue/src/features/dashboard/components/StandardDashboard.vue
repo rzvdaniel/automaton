@@ -131,8 +131,8 @@ const heroState = computed(() => {
 
 const cliQuickStartCommand = computed(() =>
   hasApiKeys.value
-    ? 'dotnet tool install -g Automaton.Cli\nautomaton setup\nautomaton deploy'
-    : 'Create an API key first\ndotnet tool install -g Automaton.Cli\nautomaton setup',
+    ? 'dotnet tool install -g Automaton.Cli\nautomaton login\nautomaton deploy'
+    : 'Create an API key first\ndotnet tool install -g Automaton.Cli\nautomaton login',
 )
 
 // Retry fetch on error
@@ -295,7 +295,7 @@ const resendConfirmation = async () => {
           <div class="hero-step-num">1</div>
           <div>
             <div class="hero-step-title">Create API Key</div>
-            <div class="hero-step-desc">Required for <code>automaton setup</code></div>
+            <div class="hero-step-desc">Required for <code>automaton login</code></div>
           </div>
         </div>
         <div class="hero-step">

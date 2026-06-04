@@ -661,7 +661,7 @@ const handleRetry = async () => {
               and deploy with the CLI. Let the CLI create or link the project that it will deploy.
             </p>
             <div class="qs-code mb-2">dotnet tool install -g Automaton.Cli</div>
-            <div class="qs-code mb-2">automaton setup</div>
+            <div class="qs-code mb-2">automaton login</div>
             <div class="qs-code mb-2">automaton new "My App"</div>
             <div class="qs-code mb-2">automaton validate</div>
             <div class="qs-code mb-3">automaton deploy</div>

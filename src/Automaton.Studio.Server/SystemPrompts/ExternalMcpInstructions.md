@@ -46,7 +46,7 @@ Before doing anything, check if `automaton.json` exists in the project root usin
 
 **If it does not exist**, choose the right path based on user intent:
 
-- **The user asked for a CLI-first or normal local app workflow** — run or instruct the developer to run `automaton setup`, then `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing app. Do **not** call `create_app` by default.
+- **The user asked for a CLI-first or normal local app workflow** — run or instruct the developer to run `automaton login`, then `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing app. Do **not** call `create_app` by default.
 
 - **User provided an app ID** (e.g. "work on app `abc123`", "the app id is ...") — prefer `automaton link <app-id>` so the CLI writes `automaton.json` with the resolved server. Do **not** call `create_app`.
 
@@ -106,4 +106,4 @@ For the CLI workflow and commands, use `llms.txt` and `/llms/automaton-cli-deplo
 | `get_file_tree` | Return the app's editable source file tree as hierarchical JSON |
 | `list_runners` | List available runners (for reference only) |
 
-All write, deploy, and publish operations are handled by the **automaton CLI** (`automaton setup`, `automaton new`, `automaton link`, `automaton validate`, `automaton deploy`, `automaton publish`, etc.). Use `create_app` sparingly because it may not share credentials with the CLI.
+All write, deploy, and publish operations are handled by the **automaton CLI** (`automaton login`, `automaton new`, `automaton link`, `automaton validate`, `automaton deploy`, `automaton publish`, etc.). Use `create_app` sparingly because it may not share credentials with the CLI.

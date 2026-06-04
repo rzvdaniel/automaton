@@ -63,11 +63,11 @@ const serverBase = computed(() => {
 })
 
 const cliLoginCommand = computed(() =>
-  `automaton setup --server ${serverBase.value} --key your-api-key`
+  `automaton login --server ${serverBase.value} --key your-api-key`
 )
 
 const starterPrompt = computed(() =>
-  'Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.'
+  'Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton login, then create or link the app in this folder. Follow the local .automaton guidance after automaton new or automaton link. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.'
 )
 
 // Local form state
@@ -972,7 +972,7 @@ async function handleSaveTemplateStatus() {
               <div>
                 <div class="font-semibold mb-1">2. Deploy with the CLI</div>
                 <p class="text-color-secondary text-sm mb-2">
-                  Install once, run setup with an execute-scope API key, then create or link the
+                  Install once, run login with an execute-scope API key, then create or link the
                   app from the same project folder. This keeps the CLI account and deploy target aligned.
                 </p>
                 <div class="connect-snippet">

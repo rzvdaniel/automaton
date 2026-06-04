@@ -366,7 +366,7 @@ watch(
               <div id="install" class="terminal-body">
                 <span class="terminal-comment"># install once</span><br />
                 <span class="terminal-prompt">$</span> <span class="terminal-command">dotnet tool install -g Automaton.Cli</span><br />
-                <span class="terminal-prompt">$</span> <span class="terminal-command">automaton setup</span><br />
+                <span class="terminal-prompt">$</span> <span class="terminal-command">automaton login</span><br />
                 <br />
                 <span class="terminal-comment"># ask your AI</span><br />
                 <span class="terminal-spoken">Build an inventory dashboard with a Python backend.</span><br />

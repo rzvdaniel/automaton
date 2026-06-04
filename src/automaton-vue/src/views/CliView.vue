@@ -6,7 +6,7 @@ import { publicAppConfig } from '@/config/publicAppConfig'
 
 const installCommand = 'dotnet tool install -g Automaton.Cli'
 const loginCommand = 'automaton login'
-const setupCommand = 'automaton setup'
+const setupCommand = 'automaton sync-ai'
 const deployCommand = 'automaton deploy'
 const publishCommand = 'automaton publish'
 const setupFlow = [
@@ -15,8 +15,6 @@ const setupFlow = [
   '',
   'mkdir iss-tracker',
   'cd iss-tracker',
-  '',
-  setupCommand,
   '',
   '# Then ask your AI:',
   '# "Build a live ISS tracker with realtime orbital data."',

@@ -51,18 +51,18 @@ Keep the model simple:
 Keep this as simple as possible for the user:
 
 1. Install the CLI once.
-2. Run `automaton setup`.
+2. Run `automaton login`.
 3. Open your preferred AI tool in the app folder.
 4. Ask it to build and deploy the app to Automaton Studio.
 
-After `automaton setup`, the AI should usually handle the rest: local file generation, app creation or linking, deploy preflight, runner selection for backend apps, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+After `automaton login`, the AI should usually handle the rest: local file generation, app creation or linking, deploy preflight, runner selection for backend apps, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
 ### Fallback flow: manual CLI
 
 Use this only when you want to drive the CLI yourself:
 
 1. Install the CLI once.
-2. Run `automaton setup`.
+2. Run `automaton login`.
 3. Run `automaton new "My App"` or `automaton link <app-id>`.
 4. Build locally.
 5. Run `automaton deploy`.
@@ -78,7 +78,7 @@ Use this only when you want to drive the CLI yourself:
 
 ### Teach your AI the Automaton structure
 
-If you already ran `automaton setup`, `automaton new`, or `automaton link` in the project, prefer the local generated guidance files first. Use `llms.txt` as the canonical source of truth and as the fallback when the tool does not honor local guidance files yet:
+If you already ran `automaton new` or `automaton link` in the project, prefer the local generated guidance files first. Use `llms.txt` as the canonical source of truth and as the fallback when the tool does not honor local guidance files yet:
 
 ```
 https://automaton.monster/llms.txt
@@ -90,16 +90,16 @@ The file links to detailed instructions covering frontend structure, backend con
 Fallback prompt when the tool does not consume local guidance files:
 
 ```text
-Build a Poker Planning app for Automaton Monster using the Automaton CLI. Start by running automaton setup, then follow the generated .automaton guidance in this folder. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy. If deploy succeeds, ask whether to publish; if I approve, run automaton publish and return the public URL.
+Build a Poker Planning app for Automaton Monster using the Automaton CLI. Start by running automaton login, then create or link the app in this folder. Follow the generated .automaton guidance after automaton new or automaton link. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy. If deploy succeeds, ask whether to publish; if I approve, run automaton publish and return the public URL.
 ```
 
-If you use the CLI happy path, `automaton setup`, `automaton new`, and `automaton link` also write canonical local guidance into `.automaton/agents/` plus a small root `AGENTS.md` adapter. Detailed references live under `.automaton/agents/references/`. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
+If you use the CLI happy path, `automaton new` and `automaton link` write canonical local guidance into `.automaton/agents/` plus a small root `AGENTS.md` adapter. Detailed references live under `.automaton/agents/references/`. After that, the AI should usually follow those local files directly. If those generated files need a manual refresh later, run `automaton sync-ai`.
 
 Or paste the generic starter prompt directly if your tool does not fetch URLs:
 
 ```text
 Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton
-setup, then follow the generated .automaton guidance in this folder. If local guidance is
+login, then create or link the app in this folder and follow the generated .automaton guidance. If local guidance is
 unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy. If deploy
 succeeds, ask whether to publish; if I approve, run automaton publish and return the public URL.
 Only ask me to step in for authentication or publish approval.
@@ -156,18 +156,18 @@ If `automaton.json` already exists, the AI should add missing `frontend` or `bac
 Recommended local flow for a new app:
 
 ```bash
-automaton setup
+automaton login
 automaton new "My App"
 ```
 
 For an existing remote app:
 
 ```bash
-automaton setup
+automaton login
 automaton link <app-id>
 ```
 
-After `automaton setup`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
+After `automaton login`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
 For backend apps, `automaton deploy` selects or prompts for a connected runner when one is needed. If no connected runner exists, deploy may still succeed with warnings after uploading `live/frontend` and `live/backend`; in that case backend is uploaded but not running yet. To make it runnable later:
 
