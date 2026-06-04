@@ -237,7 +237,10 @@ function confirmDelete(runner: Runner) {
   })
 }
 
-// Copy Docker command
+const cliCommand = `dotnet tool install --global Automaton.Cli
+automaton setup
+automaton runner install`
+
 const dockerCommand = `docker run -d \\
   --name automaton-runner \\
   --restart unless-stopped \\
@@ -245,13 +248,22 @@ const dockerCommand = `docker run -d \\
   -e AUTOMATON_RUNNER_NAME=My-Runner \\
   rzvdaniel/automaton-runner:latest`
 
-async function copyDockerCommand() {
+const composeCommand = `services:
+  automaton-runner:
+    image: rzvdaniel/automaton-runner:latest
+    container_name: automaton-runner
+    restart: unless-stopped
+    environment:
+      AUTOMATON_API_KEY: ak_your_key_here
+      AUTOMATON_RUNNER_NAME: My-Runner`
+
+async function copyText(text: string, detail: string) {
   try {
-    await navigator.clipboard.writeText(dockerCommand.replace(/\\\n/g, ''))
+    await navigator.clipboard.writeText(text)
     toast.add({
       severity: 'success',
       summary: 'Copied',
-      detail: 'Docker command copied to clipboard',
+      detail,
       life: 2000,
     })
   } catch (err) {
@@ -263,6 +275,18 @@ async function copyDockerCommand() {
       life: 3000,
     })
   }
+}
+
+function copyCliCommand() {
+  void copyText(cliCommand, 'CLI commands copied to clipboard')
+}
+
+function copyDockerCommand() {
+  void copyText(dockerCommand.replace(/\\\n/g, ''), 'Docker command copied to clipboard')
+}
+
+function copyComposeCommand() {
+  void copyText(composeCommand, 'Docker Compose file copied to clipboard')
 }
 
 // React to active project changes (including initial load)
@@ -289,7 +313,7 @@ onUnmounted(() => {
         <h1 class="text-3xl font-bold m-0">Runners</h1>
         <p class="text-color-secondary mt-1 mb-0">Remote execution agents for your workflows</p>
       </div>
-      <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+      <Button label="Install Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
     </div>
 
     <Message severity="warn" :closable="false" class="mb-4">
@@ -373,31 +397,23 @@ onUnmounted(() => {
             Without one, <strong>Deploy Backend</strong> will fail in the App Editor.
           </p>
 
-          <!-- Docker quick-start -->
+          <!-- CLI quick-start -->
           <div class="runner-quickstart mt-4">
-            <div class="runner-quickstart-label">Quickest setup — Docker:</div>
+            <div class="runner-quickstart-label">Recommended setup — Automaton CLI:</div>
             <div class="runner-quickstart-code">
-              <span class="code-line">docker run -d \</span>
-              <span class="code-line pl-2">-e AUTOMATON_SERVER_URL=<em>&lt;your-server-url&gt;</em> \</span>
-              <span class="code-line pl-2">-e AUTOMATON_API_KEY=<em>&lt;runner-api-key&gt;</em> \</span>
-              <span class="code-line pl-2">rzvdaniel/automaton-runner:latest</span>
+              <span class="code-line">dotnet tool install --global Automaton.Cli</span>
+              <span class="code-line">automaton setup</span>
+              <span class="code-line">automaton runner install</span>
             </div>
             <p class="text-color-secondary text-sm mt-2 mb-0">
-              Get a runner API key from
-              <router-link to="/apikeys" class="runner-link">API Keys</router-link>
-              (scope: <em>runner</em>). See
-              <a
-                href="https://automaton.monster/docs"
-                target="_blank"
-                rel="noopener"
-                class="runner-link"
-              >full runner docs</a>
-              for Linux service, Windows service, and Docker Compose options.
+              Requires Docker to be installed and running. Get a runner API key from
+              <router-link to="/apikeys" class="runner-link">API Keys</router-link>.
+              Docker and Docker Compose options are also available from <strong>Install Runner</strong>.
             </p>
           </div>
 
           <div class="flex gap-2 mt-4 justify-content-center">
-            <Button label="Deploy Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+            <Button label="Install Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
             <Button
               label="API Keys"
               icon="pi pi-key"
@@ -593,19 +609,62 @@ onUnmounted(() => {
     <!-- Deploy Runner Dialog -->
     <Dialog
       v-model:visible="showDeployDialog"
-      header="Deploy a Runner"
+      header="Deploy a runner"
       :modal="true"
-      :style="{ width: '700px' }"
+      :style="{ width: '760px' }"
     >
+      <p class="text-color-secondary mt-0 mb-4">
+        A runner connects your machine or server to Automaton and executes backend code for your apps.
+        Use the CLI for the easiest setup, or Docker if you prefer to manage the container yourself.
+      </p>
+
       <Message severity="info" :closable="false" class="mb-4">
-        You'll need an <strong>API Key</strong> with Runner scope to deploy a runner.
-        <router-link to="/settings" class="ml-1">Go to Settings</router-link> to create one.
+        You'll need an <strong>API Key</strong> with Runner scope.
+        <router-link to="/apikeys" class="ml-1">Go to API Keys</router-link> to create one.
       </Message>
 
       <TabView>
-        <TabPanel header="Docker CLI" value="docker-cli">
+        <TabPanel header="CLI install" value="cli-install">
           <div class="py-3">
-            <p class="mt-0 mb-3"><strong>Run this command in your terminal:</strong></p>
+            <Message severity="success" :closable="false" class="mb-3">
+              <strong>Recommended.</strong> The Automaton CLI installs and configures the Docker runner container for you.
+            </Message>
+
+            <p class="mt-0 mb-3"><strong>Run these commands in your terminal:</strong></p>
+
+            <div class="code-block">
+              <pre class="code-content"><span class="cmd">dotnet tool install</span> --global Automaton.Cli
+<span class="cmd">automaton setup</span>
+<span class="cmd">automaton runner install</span></pre>
+              <Button
+                icon="pi pi-copy"
+                size="small"
+                class="copy-btn"
+                @click="copyCliCommand"
+              />
+            </div>
+
+            <h4 class="mb-2">Requirements</h4>
+            <div class="config-table">
+              <div class="config-row">
+                <code class="config-key">.NET SDK</code>
+                <span class="config-desc">Required to install the Automaton CLI global tool</span>
+              </div>
+              <div class="config-row">
+                <code class="config-key">Docker</code>
+                <span class="config-desc">Required and must be running before installing the runner</span>
+              </div>
+              <div class="config-row">
+                <code class="config-key">API Key</code>
+                <span class="config-desc">Create a Runner-scoped key from API Keys</span>
+              </div>
+            </div>
+          </div>
+        </TabPanel>
+
+        <TabPanel header="Docker install" value="docker-install">
+          <div class="py-3">
+            <p class="mt-0 mb-3"><strong>Run the runner container directly:</strong></p>
 
             <div class="code-block">
               <pre class="code-content"><span class="cmd">docker run</span> -d \
@@ -630,60 +689,66 @@ onUnmounted(() => {
               </div>
               <div class="config-row">
                 <code class="config-key">AUTOMATON_RUNNER_NAME</code>
-                <span class="config-desc">Display name shown in Studio (optional)</span>
+                <span class="config-desc">Optional display name shown in Studio</span>
               </div>
             </div>
 
-            <Message severity="success" :closable="false" class="mt-4">
-              Once the container starts, your runner will appear in the list above.
+            <Message severity="info" :closable="false" class="mt-4">
+              By default, the runner connects to <code>https://api.automaton.monster</code>.
+              Set <code>AUTOMATON_API_URL</code> only if you use a custom or self-hosted Automaton API.
             </Message>
           </div>
         </TabPanel>
 
-        <TabPanel header="Docker Desktop" value="docker-desktop">
+        <TabPanel header="Docker Compose" value="docker-compose">
           <div class="py-3">
-            <p class="mt-0 mb-3 text-color-secondary">
-              If you prefer Docker Desktop's graphical interface:
-            </p>
+            <p class="mt-0 mb-3"><strong>Create a docker-compose.yml file:</strong></p>
 
-            <ol class="deploy-steps">
-              <li>
-                <strong>Open Docker Desktop</strong>
-                <span>Make sure Docker Desktop is running</span>
-              </li>
-              <li>
-                <strong>Search for the image</strong>
-                <span>Go to Images and search for <code>rzvdaniel/automaton-runner</code></span>
-              </li>
-              <li>
-                <strong>Pull the image</strong>
-                <span>Click "Pull" to download the latest version</span>
-              </li>
-              <li>
-                <strong>Run the container</strong>
-                <span>Click "Run" and add these environment variables:</span>
-                <ul class="env-list">
-                  <li><code>AUTOMATON_API_KEY=YOUR_API_KEY</code></li>
-                  <li><code>AUTOMATON_RUNNER_NAME=My-Runner</code> (optional)</li>
-                </ul>
-              </li>
-            </ol>
+            <div class="code-block">
+              <pre class="code-content"><span class="env">services</span>:
+  automaton-runner:
+    image: rzvdaniel/automaton-runner:latest
+    container_name: automaton-runner
+    restart: unless-stopped
+    environment:
+      <span class="env">AUTOMATON_API_KEY</span>: <span class="val">ak_your_key_here</span>
+      <span class="env">AUTOMATON_RUNNER_NAME</span>: <span class="val">My-Runner</span></pre>
+              <Button
+                icon="pi pi-copy"
+                size="small"
+                class="copy-btn"
+                @click="copyComposeCommand"
+              />
+            </div>
 
-            <Message severity="info" :closable="false" class="mt-3">
-              <strong>Tip:</strong> Set restart policy to "Unless stopped" so the runner auto-starts with Docker Desktop.
+            <p class="mt-0 mb-3"><strong>Start the runner:</strong></p>
+            <div class="code-block compact-code-block">
+              <pre class="code-content"><span class="cmd">docker compose up</span> -d</pre>
+            </div>
+
+            <Message severity="info" :closable="false" class="mt-4">
+              Docker Compose is a good option for VPS or server installations because the runner restarts automatically after reboot.
             </Message>
           </div>
         </TabPanel>
 
-        <TabPanel header="Manual Download" value="manual-download">
+        <TabPanel header="Troubleshooting" value="troubleshooting">
           <div class="py-3">
-            <p class="mt-0 mb-3 text-color-secondary">
-              For advanced users who need to run the runner as a Windows service, on systems without Docker,
-              or with custom configurations.
-            </p>
-            <p class="text-color-secondary">
-              Download the standalone executable from the Downloads page.
-            </p>
+            <p class="mt-0 mb-3"><strong>Useful commands:</strong></p>
+
+            <div class="code-block compact-code-block">
+              <pre class="code-content"><span class="cmd">docker ps</span>
+<span class="cmd">docker logs</span> -f automaton-runner
+<span class="cmd">automaton --version</span></pre>
+            </div>
+
+            <h4 class="mb-2">Runner does not appear online?</h4>
+            <ul class="env-list">
+              <li>Make sure Docker is installed and running.</li>
+              <li>Make sure the API key is valid and has Runner scope.</li>
+              <li>Make sure the machine can reach <code>https://api.automaton.monster</code>.</li>
+              <li>Check the runner logs for connection or authentication errors.</li>
+            </ul>
           </div>
         </TabPanel>
       </TabView>
@@ -799,6 +864,10 @@ onUnmounted(() => {
   padding: 16px;
   padding-right: 60px;
   margin-bottom: 16px;
+}
+
+.compact-code-block {
+  margin-bottom: 0;
 }
 
 .code-content {
