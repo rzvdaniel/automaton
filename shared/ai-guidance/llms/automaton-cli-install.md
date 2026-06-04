@@ -1,6 +1,6 @@
-# Automaton CLI Install and Setup
+# Automaton CLI Install and Login
 
-Use this when the user wants to install the Automaton CLI, verify that it is available, or prepare the current machine or workspace before app work begins.
+Use this when the user wants to install the Automaton CLI, verify that it is available, or authenticate the current machine before app work begins.
 
 ## Goal
 
@@ -32,23 +32,42 @@ Install decision rule:
 4. If `dotnet` is not available, use the official platform download or installer script.
 5. Always verify with `automaton --version` before proceeding.
 
-## First-time setup
+## First-time login
 
 Preferred:
 
 ```bash
-automaton setup
+automaton login
 ```
 
-That should authenticate the current project or workspace and sync the local generated AI guidance pack.
+When prompted, the user should paste their Automaton API key. Do not ask the user to paste the key into chat unless there is no safer terminal prompt available.
 
-Advanced fallback when the user explicitly wants to manage low-level CLI settings:
+`automaton login` authenticates the CLI. It should not scaffold app files.
+
+Advanced fallback when the user explicitly wants to pass the key non-interactively:
 
 ```bash
-automaton setup --key ak_execute_xxx
+automaton login --key ak_execute_xxx
 ```
 
-That command saves project-local CLI settings in `./.automaton/config.json` by default. Use `automaton config --global ...` only when the user explicitly wants shared machine-wide settings.
+## App creation handoff
+
+After login, use the app workflow:
+
+```bash
+automaton new "My App"
+automaton deploy
+```
+
+`automaton new` is responsible for creating the local app scaffold, `automaton.json`, `.automatonignore`, and the local AI guidance pack.
+
+Use `automaton link <app-id>` only when the folder should attach to an existing Automaton app.
+
+## Legacy setup command
+
+`automaton setup` may exist for backwards compatibility. AI tools should prefer `automaton login` for authentication and `automaton new` or `automaton link` for app configuration.
+
+Do not interpret `automaton setup` by itself as meaning the current folder is already an app.
 
 ## Clean auth reset
 
@@ -58,12 +77,12 @@ For testing, account switching, or a clean auth reset:
 automaton logout
 automaton logout --global
 automaton logout --all
-automaton setup
+automaton login
 ```
 
-## What setup generates
+## What app creation generates
 
-`automaton setup`, `automaton new`, and `automaton link` sync local guidance into:
+`automaton new` and `automaton link` sync local guidance into:
 
 - `.automaton/agents/`
 - `.automaton/agents/references/`
@@ -86,7 +105,7 @@ automaton sync-ai --adapter all
 
 ## Handoff to deploy workflow
 
-After install and setup:
+After install and login:
 
 1. Keep working in the current folder.
 2. Use `automaton new "<app-name>"` for a new app or `automaton link <app-id>` for an existing one.
