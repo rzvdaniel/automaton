@@ -454,20 +454,9 @@ signal_api_color_runners_reconnect_when_idle() {
     fi
 
     for container_id in "${container_ids[@]}"; do
-        local container_ip
-        container_ip="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id")"
-
-        if [[ -z "$container_ip" ]]; then
-            echo "[WARN] Could not resolve IP for API container $container_id" >&2
-            continue
-        fi
-
-        echo "[INFO] Requesting reconnect-when-idle from API container $container_id ($container_ip)"
-        if ! curl -fsS \
-            -X POST \
-            -H 'Content-Type: application/json' \
-            --data "{\"reason\":\"${reason//\"/\\\"}\"}" \
-            "http://$container_ip:8080/internal/runners/reconnect-when-idle" \
+        echo "[INFO] Requesting reconnect-when-idle from API container $container_id via loopback"
+        if ! docker exec "$container_id" sh -lc \
+            "curl -fsS -X POST -H 'Content-Type: application/json' --data '{\"reason\":\"${reason//\"/\\\"}\"}' http://127.0.0.1:8080/internal/runners/reconnect-when-idle" \
             > /dev/null; then
             echo "[WARN] Reconnect-when-idle signal was not accepted by API container $container_id. This is expected when the previous color is still on an older API version." >&2
         fi
