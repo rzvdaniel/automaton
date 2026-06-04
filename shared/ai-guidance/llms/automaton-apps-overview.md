@@ -17,6 +17,8 @@ Use these rules:
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
 - For AI-generated local apps, default to Vite + vanilla TypeScript or JavaScript in `frontend/`.
 - AI-generated local apps should always use a frontend build step and deploy only `frontend/dist/` as public runtime.
+- For Vite apps, do not rely on the default base path. Create `frontend/vite.config.ts` or `frontend/vite.config.js` and set `base: './'` explicitly.
+- After `vite build`, verify `frontend/dist/index.html` uses relative app-local asset paths such as `./assets/...`; never ship root-relative paths such as `/assets/...` because published apps are served from `/{slug}/`.
 - Do not move Vite output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that `frontend/dist/` cannot work.
 - Root-level frontend files are an explicit exception only for no-build static apps requested by the user; set `"frontend": { "deployDir": "." }` in that mode.
 - Deploy with `automaton deploy`.

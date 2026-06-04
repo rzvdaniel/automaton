@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -89,6 +90,24 @@ public class AppRunnerBackendFilesController : ControllerBase
                 Error = $"Runner '{runner.Name}' could not list backend files. Update or reconnect the runner, then redeploy the backend."
             });
         }
+        catch (IOException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is stale while listing backend files for app {AppId}", runner!.Id, appId);
+            return BadRequest(new AppBackendFilesResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is invalid while listing backend files for app {AppId}", runner!.Id, appId);
+            return BadRequest(new AppBackendFilesResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+            });
+        }
 
         return response.Success ? Ok(response) : BadRequest(response);
     }
@@ -135,6 +154,26 @@ public class AppRunnerBackendFilesController : ControllerBase
                 Error = $"Runner '{runner.Name}' could not read this backend file. Update or reconnect the runner, then redeploy the backend."
             });
         }
+        catch (IOException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is stale while reading backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileContentResponse
+            {
+                Success = false,
+                Path = path,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is invalid while reading backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileContentResponse
+            {
+                Success = false,
+                Path = path,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+            });
+        }
 
         return response.Success ? Ok(response) : BadRequest(response);
     }
@@ -177,6 +216,24 @@ public class AppRunnerBackendFilesController : ControllerBase
             {
                 Success = false,
                 Error = $"Runner '{runner.Name}' could not delete this backend file. Update or reconnect the runner, then redeploy the backend."
+            });
+        }
+        catch (IOException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is stale while deleting backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileDeleteResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Runner {RunnerId} connection is invalid while deleting backend file {Path} for app {AppId}", runner!.Id, path, appId);
+            return BadRequest(new AppBackendFileDeleteResponse
+            {
+                Success = false,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
             });
         }
 

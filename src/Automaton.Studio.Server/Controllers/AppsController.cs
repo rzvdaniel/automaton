@@ -296,14 +296,21 @@ public class AppsController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        await appsService.Publish(
-            id,
-            request.PublicUrl,
-            request.RequiresAuthentication,
-            request.ExecutionRunnerId,
-            request.Category,
-            request.Tags,
-            request.IsForkable);
+        try
+        {
+            await appsService.Publish(
+                id,
+                request.PublicUrl,
+                request.RequiresAuthentication,
+                request.ExecutionRunnerId,
+                request.Category,
+                request.Tags,
+                request.IsForkable);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
 
         return NoContent();
     }
