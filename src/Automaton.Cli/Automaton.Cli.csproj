@@ -35,9 +35,6 @@
     <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-cli-install.md">
       <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-cli-install.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-apps-overview.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-apps-overview.md</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-backend-controllers.md">
       <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-backend-controllers.md</LogicalName>
     </EmbeddedResource>

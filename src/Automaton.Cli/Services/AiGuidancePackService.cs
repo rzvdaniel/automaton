@@ -15,7 +15,6 @@ public sealed class AiGuidancePackService
     {
         ["llms.txt"] = "llms.txt",
         ["llms.automaton-cli-install.md"] = "llms/automaton-cli-install.md",
-        ["llms.automaton-apps-overview.md"] = "llms/automaton-apps-overview.md",
         ["llms.automaton-backend-controllers.md"] = "llms/automaton-backend-controllers.md",
         ["llms.automaton-cli-deploy.md"] = "llms/automaton-cli-deploy.md",
         ["llms.automaton-frontend-structure.md"] = "llms/automaton-frontend-structure.md",
