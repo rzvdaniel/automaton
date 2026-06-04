@@ -11,7 +11,19 @@ const router = useRouter()
 const { featuredApps, loadApps } = useMarketplaceApps(12)
 const activeIndex = ref(0)
 const isCarouselPaused = ref(false)
+const promptCopied = ref(false)
 let rotationId: number | undefined
+let promptResetId: number | undefined
+
+const aiStarterPrompt = `Build a [describe your app] as an Automaton Monster app.
+
+Read https://automaton.monster/llms.txt first.
+
+Use the Automaton CLI as the primary path. If the CLI is missing, install it using the official instructions. Run \`automaton login\` and let me paste my Automaton API key when prompted.
+
+For a new app, run \`automaton new "[app-name]"\` before creating app files. Then follow the generated local guidance in \`AGENTS.md\` and \`.automaton/agents/\`.
+
+Default to a frontend-only Vite app unless backend behavior is truly required. Deploy with \`automaton deploy\`. Do not publish publicly until I explicitly approve.`
 
 const heroApps = computed<MarketplaceAppCard[]>(() => {
   const featured = featuredApps.value.slice(0, 3)
@@ -51,6 +63,22 @@ function appImageUrl(url?: string | null) {
   if (url.startsWith('http')) return url
   if (url.startsWith('/src/') || url.startsWith('/assets/')) return url
   return resolveMarketplaceAssetUrl(url)
+}
+
+async function copyAiPrompt() {
+  try {
+    await navigator.clipboard.writeText(aiStarterPrompt)
+    promptCopied.value = true
+    if (promptResetId !== undefined) {
+      window.clearTimeout(promptResetId)
+    }
+    promptResetId = window.setTimeout(() => {
+      promptCopied.value = false
+      promptResetId = undefined
+    }, 2400)
+  } catch {
+    promptCopied.value = false
+  }
 }
 
 function previousApp() {
@@ -110,7 +138,12 @@ onMounted(() => {
   startRotation()
 })
 
-onBeforeUnmount(stopRotation)
+onBeforeUnmount(() => {
+  stopRotation()
+  if (promptResetId !== undefined) {
+    window.clearTimeout(promptResetId)
+  }
+})
 
 watch(
   () => heroApps.value.length,
@@ -140,8 +173,10 @@ watch(
               Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton gives your agent the deploy path: frontend hosting is included, and your backend runs on your runner.
             </p>
             <div class="hero-actions">
-              <RouterLink class="button primary" to="/cli">Install CLI</RouterLink>
-              <RouterLink class="button" to="/apps">Browse apps</RouterLink>
+              <RouterLink class="button primary" to="/docs/getting-started">Get Started</RouterLink>
+              <button class="button" type="button" @click="copyAiPrompt">
+                {{ promptCopied ? 'Prompt Copied' : 'Copy AI Prompt' }}
+              </button>
             </div>
           </div>
 
@@ -696,6 +731,7 @@ watch(
   color: var(--v2-text);
   font-size: 0.92rem;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .button.primary {
