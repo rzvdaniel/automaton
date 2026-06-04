@@ -30,6 +30,8 @@ public static class RunnerMapper
 		 CurrentSessionConnectedAtUtc = null,
 		 TotalConnectedDurationSeconds = 0,
 		 ConnectionSessionCount = 0,
+         CurrentSessionId = null,
+         LastDisconnectReason = null,
 		 Version = runner.Version,
 		 MachineName = runner.MachineName,
 		 IpAddress = runner.IpAddress,

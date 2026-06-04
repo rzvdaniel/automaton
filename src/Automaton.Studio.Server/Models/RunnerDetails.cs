@@ -15,6 +15,8 @@ public class RunnerDetails
     public DateTime? CurrentSessionConnectedAtUtc { get; set; }
     public long TotalConnectedDurationSeconds { get; set; }
     public int ConnectionSessionCount { get; set; }
+    public Guid? CurrentSessionId { get; set; }
+    public string? LastDisconnectReason { get; set; }
     public string? Version { get; set; }
     public string? MachineName { get; set; }
     public string? IpAddress { get; set; }

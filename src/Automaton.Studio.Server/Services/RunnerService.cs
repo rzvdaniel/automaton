@@ -800,6 +800,8 @@ public class RunnerService
         runner.CurrentSessionConnectedAtUtc = value.CurrentSessionConnectedAtUtc;
         runner.ConnectionSessionCount = value.ConnectionSessionCount;
         runner.TotalConnectedDurationSeconds = value.TotalConnectedDurationSeconds;
+        runner.CurrentSessionId = value.CurrentSessionId;
+        runner.LastDisconnectReason = value.LastDisconnectReason;
     }
 
     private async Task<Dictionary<Guid, RunnerSessionStats>> BuildRunnerSessionStatsAsync(IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
@@ -850,7 +852,12 @@ public class RunnerService
                     return new RunnerSessionStats(
                         totalSeconds,
                         g.Count(),
-                        currentSessionConnectedAtUtc);
+                        currentSessionConnectedAtUtc,
+                        currentSession?.Id,
+                        g.Where(x => x.DisconnectedAtUtc.HasValue)
+                            .OrderByDescending(x => x.DisconnectedAtUtc)
+                            .Select(x => x.DisconnectReason)
+                            .FirstOrDefault());
                 });
     }
 
@@ -901,7 +908,9 @@ public class RunnerService
     private sealed record RunnerSessionStats(
         long TotalConnectedDurationSeconds,
         int ConnectionSessionCount,
-        DateTime? CurrentSessionConnectedAtUtc);
+        DateTime? CurrentSessionConnectedAtUtc,
+        Guid? CurrentSessionId,
+        string? LastDisconnectReason);
 
     private sealed record RunnerSessionPresenceState(
         Guid RunnerId,

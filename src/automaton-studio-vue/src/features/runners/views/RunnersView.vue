@@ -13,6 +13,7 @@ import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { runnersService } from '../services/runners.service'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import {
@@ -26,6 +27,7 @@ import {
 const toast = useToast()
 const confirm = useConfirm()
 const projectsStore = useProjectsStore()
+const authStore = useAuthStore()
 
 // State
 const loading = ref(true)
@@ -49,6 +51,10 @@ const viewOptions = [
 const onlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Online).length)
 const offlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Offline).length)
 const totalCount = computed(() => runners.value.length)
+const isAdminViewer = computed(() => {
+  const roles = authStore.user?.roles ?? []
+  return roles.includes('Admin') || roles.includes('SysAdmin')
+})
 
 function parseUtcDate(value?: string | null) {
   if (!value) {
@@ -96,6 +102,10 @@ function formatRelativeTime(value?: string | null) {
   }
 
   return formatDateTime(value)
+}
+
+function hasApiColorMismatch(runner: Runner) {
+  return !!runner.apiColor && viewMode.value && runner.status === RunnerStatus.Online
 }
 
 // Get status color for grid view indicator
@@ -376,7 +386,7 @@ onUnmounted(() => {
     <div class="flex align-items-center justify-content-between mb-4">
       <h2 class="text-xl font-semibold m-0">Registered Runners</h2>
       <div class="flex align-items-center gap-3">
-        <div class="flex align-items-center gap-2">
+        <div v-if="isAdminViewer" class="flex align-items-center gap-2">
           <label for="runner-debug-toggle" class="text-sm text-color-secondary">Debug details</label>
           <ToggleSwitch input-id="runner-debug-toggle" v-model="showDebugDetails" />
         </div>
@@ -498,12 +508,12 @@ onUnmounted(() => {
           </div>
 
           <!-- Connection ID -->
-          <div v-if="runner.connectionId" class="mt-3 pt-3 border-top-1 surface-border">
-            <div class="text-color-secondary text-sm mb-1">Connection ID</div>
-            <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
-          </div>
-
-          <div v-if="showDebugDetails" class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
+          <div v-if="showDebugDetails && isAdminViewer" class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Connection ID</span>
+              <code v-if="runner.connectionId" class="connection-id">{{ runner.connectionId }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </div>
             <div class="runner-telemetry__row">
               <span class="text-color-secondary text-sm">API color</span>
               <code v-if="runner.apiColor" class="connection-id">{{ runner.apiColor }}</code>
@@ -514,6 +524,34 @@ onUnmounted(() => {
               <code v-if="runner.apiInstanceId" class="connection-id">{{ runner.apiInstanceId }}</code>
               <span v-else class="text-color-secondary">-</span>
             </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Session ID</span>
+              <code v-if="runner.currentSessionId" class="connection-id">{{ runner.currentSessionId }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Last disconnect reason</span>
+              <code v-if="runner.lastDisconnectReason" class="connection-id">{{ runner.lastDisconnectReason }}</code>
+              <span v-else class="text-color-secondary">-</span>
+            </div>
+            <div class="runner-telemetry__row">
+              <span class="text-color-secondary text-sm">Current session started</span>
+              <span>{{ formatDateTime(runner.currentSessionConnectedAtUtc) }}</span>
+            </div>
+          </div>
+
+          <Message
+            v-if="showDebugDetails && isAdminViewer && runner.apiColor && runner.status === RunnerStatus.Online && runner.apiColor !== 'unknown'"
+            severity="warn"
+            :closable="false"
+            class="mt-3"
+          >
+            Verify this runner's API color matches the current live API color after deploy.
+          </Message>
+
+          <div v-else-if="runner.connectionId" class="mt-3 pt-3 border-top-1 surface-border">
+            <div class="text-color-secondary text-sm mb-1">Connection ID</div>
+            <code class="connection-id">{{ runner.connectionId.substring(0, 24) }}...</code>
           </div>
 
           <div class="runner-telemetry mt-3 pt-3 border-top-1 surface-border">
@@ -588,26 +626,44 @@ onUnmounted(() => {
             </template>
           </Column>
 
-          <Column field="connectionId" header="Connection ID" style="width: 300px">
+          <Column v-if="isAdminViewer && showDebugDetails" field="connectionId" header="Connection ID" style="width: 300px">
             <template #body="{ data }">
               <code v-if="data.connectionId" class="connection-id">
-                {{ data.connectionId.substring(0, 20) }}...
+                {{ data.connectionId }}
               </code>
               <span v-else class="text-color-secondary">-</span>
             </template>
           </Column>
 
-          <Column v-if="showDebugDetails" header="API Color" style="width: 140px">
+          <Column v-if="isAdminViewer && showDebugDetails" header="API Color" style="width: 140px">
             <template #body="{ data }">
               <code v-if="data.apiColor">{{ data.apiColor }}</code>
               <span v-else class="text-color-secondary">-</span>
             </template>
           </Column>
 
-          <Column v-if="showDebugDetails" header="API Instance" style="width: 240px">
+          <Column v-if="isAdminViewer && showDebugDetails" header="API Instance" style="width: 240px">
             <template #body="{ data }">
               <code v-if="data.apiInstanceId" class="connection-id">
-                {{ data.apiInstanceId.substring(0, 16) }}...
+                {{ data.apiInstanceId }}
+              </code>
+              <span v-else class="text-color-secondary">-</span>
+            </template>
+          </Column>
+
+          <Column v-if="isAdminViewer && showDebugDetails" header="Session ID" style="width: 240px">
+            <template #body="{ data }">
+              <code v-if="data.currentSessionId" class="connection-id">
+                {{ data.currentSessionId }}
+              </code>
+              <span v-else class="text-color-secondary">-</span>
+            </template>
+          </Column>
+
+          <Column v-if="isAdminViewer && showDebugDetails" header="Disconnect Reason" style="width: 180px">
+            <template #body="{ data }">
+              <code v-if="data.lastDisconnectReason" class="connection-id">
+                {{ data.lastDisconnectReason }}
               </code>
               <span v-else class="text-color-secondary">-</span>
             </template>

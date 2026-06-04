@@ -36,6 +36,10 @@ export interface Runner {
   lastHeartbeatAtUtc?: string | null
   lastConnectedAtUtc?: string | null
   lastDisconnectedAtUtc?: string | null
+  currentSessionConnectedAtUtc?: string | null
+  connectionSessionCount: number
+  currentSessionId?: string | null
+  lastDisconnectReason?: string | null
   version?: string | null
   machineName?: string | null
   ipAddress?: string | null
