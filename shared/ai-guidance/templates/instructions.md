@@ -30,6 +30,7 @@ The canonical Automaton rules live in `.automaton/agents/references/`. If this w
 - Do not run `automaton publish` unless the user explicitly requests publishing.
 - `automaton deploy` is allowed for build verification and testing.
 - Treat deploy and publish as separate operations.
+- Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy.
 
 ## Compatibility
 

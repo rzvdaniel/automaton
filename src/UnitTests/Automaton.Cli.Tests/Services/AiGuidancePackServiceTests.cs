@@ -68,9 +68,11 @@ public class AiGuidancePackServiceTests
         Assert.That(agentsContent, Does.Contain("Do not treat this file as the full policy"));
         Assert.That(agentsContent, Does.Contain("If `automaton.json` does not exist and the user asked to build a new app in this folder, run `automaton new"));
         Assert.That(agentsContent, Does.Contain("Do not run `automaton publish` unless the user explicitly requests publishing"));
+        Assert.That(agentsContent, Does.Contain("Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy"));
         Assert.That(instructionsContent, Does.Contain("The canonical Automaton rules live in `.automaton/agents/references/`"));
         Assert.That(instructionsContent, Does.Contain("Before making app bootstrap decisions, check whether `automaton.json` exists"));
         Assert.That(instructionsContent, Does.Contain("`automaton deploy` is allowed for build verification and testing"));
+        Assert.That(instructionsContent, Does.Contain("Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy"));
         Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
         Assert.That(skillContent, Does.Contain("Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`"));
         Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
@@ -78,6 +80,7 @@ public class AiGuidancePackServiceTests
         Assert.That(llmsContent, Does.Contain("Do not create a backend for convenience"));
         Assert.That(llmsContent, Does.Contain("Do not claim the app is done until `automaton deploy` succeeds"));
         Assert.That(llmsContent, Does.Contain("Publishing is a user decision and requires explicit approval"));
+        Assert.That(llmsContent, Does.Contain("Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy"));
     }
 
     [Test]

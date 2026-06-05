@@ -27,6 +27,7 @@ Rules:
 - Do not publish apps automatically.
 - Publishing is a user decision and requires explicit approval.
 - Deploy and publish are separate operations.
+- Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy.
 
 ## Bootstrap contract
 

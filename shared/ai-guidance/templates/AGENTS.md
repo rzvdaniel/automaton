@@ -30,6 +30,7 @@ automaton deploy
 - Do not run `automaton publish` unless the user explicitly requests publishing.
 - Deployment for testing is allowed with `automaton deploy`.
 - Deploy and publish are separate operations.
+- Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy.
 
 The canonical Automaton rules live in `.automaton/agents/references/`. Do not treat this file as the full policy.
 
