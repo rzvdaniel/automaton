@@ -13,9 +13,5 @@ export function getPublishedAppUrl(slug?: string | null): string {
 }
 
 export function getOpenAppUrl(app: { id?: string | null; isPublished?: boolean; publicUrl?: string | null }): string {
-  if (app.isPublished && app.publicUrl?.trim()) {
-    return getPublishedAppUrl(app.publicUrl)
-  }
-
   return getDeployedAppUrl(app.id)
 }

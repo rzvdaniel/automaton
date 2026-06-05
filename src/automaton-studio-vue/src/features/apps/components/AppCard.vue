@@ -13,7 +13,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
-import { getOpenAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 interface Props {
   app: App
@@ -81,17 +81,8 @@ const updatedAgo = computed(() => {
 
 const canOpenApp = computed(() => props.app.isPublished || props.app.hasDeployedFrontend)
 const openAppUrl = computed(() => getOpenAppUrl(props.app))
-const openAppLabel = computed(() => {
-  if (props.app.isPublished) {
-    return 'Open Public App'
-  }
-
-  if (props.app.hasDeployedFrontend) {
-    return 'Open Private App'
-  }
-
-  return 'Open App'
-})
+const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
+const openAppLabel = computed(() => canOpenApp.value ? 'Open App' : 'Open App')
 
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
@@ -103,6 +94,14 @@ const handleOpenApp = () => {
   }
 
   window.open(openAppUrl.value, '_blank', 'noopener')
+}
+
+const handleOpenPublicApp = () => {
+  if (!props.app.isPublished || !publicAppUrl.value) {
+    return
+  }
+
+  window.open(publicAppUrl.value, '_blank', 'noopener')
 }
 
 const handlePublish = () => {
@@ -239,6 +238,11 @@ const menuItems = computed(() => {
   ]
 
   if (props.app.isPublished) {
+    items.unshift({
+      label: 'Open Public App',
+      icon: 'pi pi-globe',
+      command: handleOpenPublicApp,
+    })
     items.push({
       label: 'Unpublish',
       icon: 'pi pi-eye-slash',

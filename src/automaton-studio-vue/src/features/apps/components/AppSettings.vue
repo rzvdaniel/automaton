@@ -20,7 +20,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
-import { getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getDeployedAppUrl, getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -169,6 +169,11 @@ const fullPublicUrl = computed(() => {
   return getPublishedAppUrl(publicUrl.value)
 })
 
+const fullPrivateUrl = computed(() => {
+  if (!app.value?.id) return ''
+  return getDeployedAppUrl(app.value.id)
+})
+
 // Initialize form from app data
 watch(
   app,
@@ -237,10 +242,36 @@ async function copyPublicUrl() {
   }
 }
 
+async function copyPrivateUrl() {
+  if (!fullPrivateUrl.value) return
+  try {
+    await navigator.clipboard.writeText(fullPrivateUrl.value)
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'Private URL copied to clipboard',
+      life: 2000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to copy URL',
+      life: 3000,
+    })
+  }
+}
+
 // Open public URL in new tab
 function openPublicUrl() {
   if (fullPublicUrl.value) {
     window.open(fullPublicUrl.value, '_blank')
+  }
+}
+
+function openPrivateUrl() {
+  if (fullPrivateUrl.value) {
+    window.open(fullPrivateUrl.value, '_blank')
   }
 }
 
@@ -690,7 +721,55 @@ async function handleSaveTemplateStatus() {
               </div>
 
               <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Full URL</label>
+                <label class="font-medium">Private URL</label>
+                <div class="p-inputgroup url-inputgroup">
+                  <InputText :model-value="fullPrivateUrl" readonly />
+                  <Button
+                    v-tooltip="'Copy URL'"
+                    icon="pi pi-copy"
+                    severity="secondary"
+                    outlined
+                    @click="copyPrivateUrl"
+                  />
+                  <Button
+                    v-tooltip="'Open in new tab'"
+                    icon="pi pi-external-link"
+                    severity="secondary"
+                    outlined
+                    @click="openPrivateUrl"
+                  />
+                </div>
+                <small class="text-color-secondary">
+                  Owner/developer endpoint for testing and operating the app from Studio.
+                </small>
+              </div>
+
+              <div v-else-if="fullPrivateUrl" class="flex flex-column gap-2">
+                <label class="font-medium">Private URL</label>
+                <div class="p-inputgroup url-inputgroup">
+                  <InputText :model-value="fullPrivateUrl" readonly />
+                  <Button
+                    v-tooltip="'Copy URL'"
+                    icon="pi pi-copy"
+                    severity="secondary"
+                    outlined
+                    @click="copyPrivateUrl"
+                  />
+                  <Button
+                    v-tooltip="'Open in new tab'"
+                    icon="pi pi-external-link"
+                    severity="secondary"
+                    outlined
+                    @click="openPrivateUrl"
+                  />
+                </div>
+                <small class="text-color-secondary">
+                  Always available to you, even before publish.
+                </small>
+              </div>
+
+              <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
+                <label class="font-medium">Public URL</label>
                 <div class="p-inputgroup url-inputgroup">
                   <InputText :model-value="fullPublicUrl" readonly />
                   <Button
@@ -708,6 +787,9 @@ async function handleSaveTemplateStatus() {
                     @click="openPublicUrl"
                   />
                 </div>
+                <small class="text-color-secondary">
+                  Public production endpoint shown to external users.
+                </small>
               </div>
 
               <div class="flex flex-column gap-2">

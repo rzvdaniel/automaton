@@ -538,6 +538,41 @@ function getOpenAppLabel(): string {
   return 'Open App'
 }
 
+function getPrivateAppUrl(): string {
+  return editorStore.currentApp ? getOpenAppUrl({
+    id: editorStore.currentApp.id,
+    isPublished: false,
+    publicUrl: null,
+  }) : ''
+}
+
+function getPublicAppUrl(): string {
+  return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
+}
+
+async function copyUrl(label: string, url: string) {
+  if (!url) {
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.add({
+      severity: 'success',
+      summary: 'Link Copied',
+      detail: `${label}: ${url}`,
+      life: 4000,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Copy Failed',
+      detail: 'Unable to copy the link to your clipboard',
+      life: 4000,
+    })
+  }
+}
+
 // Handle save all
 async function handleSaveAll() {
   try {
@@ -701,24 +736,29 @@ function openPublishingSettings() {
 }
 
 function openPublishedApp() {
-  if (!editorStore.publicUrl) {
+  const publicUrl = getPublicAppUrl()
+  if (!publicUrl) {
     return
   }
 
-  window.open(getPublishedAppUrl(editorStore.publicUrl), '_blank', 'noopener')
+  window.open(publicUrl, '_blank', 'noopener')
 }
 
-function openApp() {
-  if (!editorStore.currentApp) {
+function openPrivateApp() {
+  const privateUrl = getPrivateAppUrl()
+  if (!privateUrl) {
     return
   }
 
-  const openUrl = getOpenAppUrl(editorStore.currentApp)
-  if (!openUrl) {
-    return
-  }
+  window.open(privateUrl, '_blank', 'noopener')
+}
 
-  window.open(openUrl, '_blank', 'noopener')
+async function copyPrivateAppLink() {
+  await copyUrl('Private URL', getPrivateAppUrl())
+}
+
+async function copyPublicAppLink() {
+  await copyUrl('Public URL', getPublicAppUrl())
 }
 
 // Handle unpublish
@@ -1062,6 +1102,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :editing-name="editingName"
         :is-published="editorStore.isPublished"
         :has-deployed-frontend="editorStore.hasDeployedFrontend"
+        :can-open-private-app="editorStore.hasDeployedFrontend"
+        :can-open-public-app="editorStore.isPublished"
         :active-tab="activeTab"
         :has-runners="hasRunners"
         :selected-runner-id="selectedRunnerId"
@@ -1081,13 +1123,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
-        @open-app="openApp"
         @preview="editorStore.openPreviewOverlay()"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"
         @deploy-backend="handleDeployBackend"
         @publish="showPublishDialog = true"
-        @open-published-app="openPublishedApp"
+        @open-private-app="openPrivateApp"
+        @open-public-app="openPublishedApp"
+        @copy-private-link="copyPrivateAppLink"
+        @copy-public-link="copyPublicAppLink"
         @open-publishing-settings="openPublishingSettings"
         @unpublish="handleUnpublish"
         @toggle-assistant="toggleAssistantPanel"

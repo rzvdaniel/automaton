@@ -17,6 +17,8 @@ const props = defineProps<{
   editingName: string
   isPublished: boolean
   hasDeployedFrontend: boolean
+  canOpenPrivateApp: boolean
+  canOpenPublicApp: boolean
   activeTab: AppEditorTab
   hasRunners: boolean | null
   selectedRunnerId: string | null
@@ -40,12 +42,14 @@ const emit = defineEmits<{
   runnersLoaded: [count: number]
   saveAll: []
   preview: []
-  openApp: []
   deployApp: []
   deployFrontend: []
   deployBackend: []
   publish: []
-  openPublishedApp: []
+  openPrivateApp: []
+  openPublicApp: []
+  copyPrivateLink: []
+  copyPublicLink: []
   openPublishingSettings: []
   unpublish: []
   toggleAssistant: []
@@ -60,6 +64,7 @@ const tabs = [
 ] as const
 
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const openAppMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 const isEditorActionTab = computed(
@@ -67,15 +72,32 @@ const isEditorActionTab = computed(
 )
 
 const openAppLabel = computed(() => {
-  if (props.isPublished) {
-    return 'Open Public App'
-  }
-
-  if (props.hasDeployedFrontend) {
-    return 'Open Private App'
-  }
-
   return 'Open App'
+})
+
+const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPublicApp)
+
+const openAppMenuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = []
+
+  if (props.canOpenPrivateApp) {
+    items.push(
+      { label: 'Open Private App', command: () => emit('openPrivateApp') },
+      { label: 'Copy Private Link', command: () => emit('copyPrivateLink') },
+    )
+  }
+
+  if (props.canOpenPublicApp) {
+    if (items.length > 0) {
+      items.push({ separator: true })
+    }
+    items.push(
+      { label: 'Open Public App', command: () => emit('openPublicApp') },
+      { label: 'Copy Public Link', command: () => emit('copyPublicLink') },
+    )
+  }
+
+  return items
 })
 
 const actionMenuItems = computed<MenuItem[]>(() => {
@@ -115,6 +137,10 @@ function toggleActionMenu(event: Event) {
   actionMenu.value?.toggle(getGroupedMenuEvent(event, '.deploy-actions'))
 }
 
+function toggleOpenAppMenu(event: Event) {
+  openAppMenu.value?.toggle(getGroupedMenuEvent(event, '.open-app-actions'))
+}
+
 function togglePublishedMenu(event: Event) {
   publishedMenu.value?.toggle(getGroupedMenuEvent(event, '.published-actions'))
 }
@@ -151,6 +177,25 @@ function handlePrimaryAction() {
         />
         <Tag v-if="isPublished" value="Published" severity="success" />
         <Tag v-else value="Draft" severity="warn" />
+        <div v-if="canShowOpenApp" class="open-app-actions">
+          <Button
+            icon="pi pi-external-link"
+            :label="openAppLabel"
+            text
+            severity="secondary"
+            class="open-app-main-button"
+            @click="props.canOpenPrivateApp ? emit('openPrivateApp') : emit('openPublicApp')"
+          />
+          <Button
+            icon="pi pi-chevron-down"
+            text
+            severity="secondary"
+            class="open-app-menu-button"
+            aria-label="Open app actions"
+            @click="toggleOpenAppMenu"
+          />
+          <Menu ref="openAppMenu" class="deploy-menu" :model="openAppMenuItems" :popup="true" />
+        </div>
       </div>
 
       <div class="workspace-tabs">
@@ -175,16 +220,6 @@ function handlePrimaryAction() {
           @runners-loaded="emit('runnersLoaded', $event)"
         />
       </div>
-
-      <Button
-        v-if="activeTab !== 'backend-server'"
-        icon="pi pi-external-link"
-        :label="openAppLabel"
-        text
-        severity="secondary"
-        :disabled="!isPublished && !hasDeployedFrontend"
-        @click="emit('openApp')"
-      />
 
       <Button
         v-if="activeTab !== 'backend-server'"
@@ -236,11 +271,11 @@ function handlePrimaryAction() {
       <div v-else-if="activeTab !== 'backend-server' && isPublished" class="published-actions">
         <Button
           label="Published"
-          icon="pi pi-external-link"
+          icon="pi pi-globe"
           outlined
           severity="secondary"
           class="published-main-button"
-          @click="emit('openPublishedApp')"
+          @click="emit('openPublishingSettings')"
         />
         <Button
           icon="pi pi-chevron-down"
@@ -254,7 +289,7 @@ function handlePrimaryAction() {
           ref="publishedMenu"
           class="deploy-menu"
           :model="[
-            { label: 'Open Published App', command: () => emit('openPublishedApp') },
+            { label: 'Publishing Settings', command: () => emit('openPublishingSettings') },
             { label: 'Unpublish', command: () => emit('unpublish') },
           ]"
           :popup="true"
@@ -398,6 +433,16 @@ function handlePrimaryAction() {
   overflow: hidden;
 }
 
+.open-app-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  margin-left: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--p-surface-100) 88%, transparent);
+  overflow: hidden;
+}
+
 .published-actions {
   display: inline-flex;
   align-items: center;
@@ -405,6 +450,18 @@ function handlePrimaryAction() {
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   overflow: hidden;
+}
+
+.open-app-actions :deep(.open-app-main-button) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.open-app-actions :deep(.open-app-menu-button) {
+  min-width: 2.25rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in srgb, var(--p-surface-300) 75%, transparent);
 }
 
 .deploy-actions :deep(.deploy-main-button) {
@@ -442,6 +499,14 @@ function handlePrimaryAction() {
 
 :global(.app-dark) .deploy-actions {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+:global(.app-dark) .open-app-actions {
+  background: color-mix(in srgb, var(--p-surface-800) 88%, transparent);
+}
+
+:global(.app-dark) .open-app-actions .open-app-menu-button {
+  border-left-color: color-mix(in srgb, var(--p-surface-600) 70%, transparent);
 }
 
 :global(.app-dark) .deploy-actions .deploy-menu-button {
