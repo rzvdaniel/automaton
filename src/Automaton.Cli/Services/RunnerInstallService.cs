@@ -11,7 +11,6 @@ namespace Automaton.Cli.Services;
 
 public sealed class RunnerInstallService
 {
-    private const string DefaultHostedServer = "https://api.automaton.monster";
     private const string DefaultDockerImage = "rzvdaniel/automaton-runner:latest";
     private const string RunnerDownloadsBase = "https://studio.automaton.monster/downloads/runner/latest";
 
@@ -267,7 +266,7 @@ public sealed class RunnerInstallService
     }
 
     public string GetDefaultServer(string? resolvedServer)
-        => string.IsNullOrWhiteSpace(resolvedServer) ? DefaultHostedServer : resolvedServer.TrimEnd('/');
+        => string.IsNullOrWhiteSpace(resolvedServer) ? ConfigService.DefaultHostedServer : resolvedServer.TrimEnd('/');
 
     public string GetDefaultDockerImage()
         => Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE")?.Trim()

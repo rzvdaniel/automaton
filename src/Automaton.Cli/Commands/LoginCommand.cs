@@ -7,11 +7,9 @@ namespace Automaton.Cli.Commands;
 
 public static class LoginCommand
 {
-    private const string DefaultHostedServer = "https://api.automaton.monster";
-
     public static Command Build(ConfigService config)
     {
-        var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {DefaultHostedServer})");
+        var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {ConfigService.DefaultHostedServer})");
         var keyOption = new Option<string?>(["--key", "-k"], "API key for authentication");
         var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
@@ -28,19 +26,33 @@ public static class LoginCommand
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var nonInteractive = CliInteraction.IsNonInteractive(explicitNonInteractive: false, asJson);
 
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var existing = config.ResolveExistingConfig(global, cwd);
 
-                server ??= PromptForValue("Automaton server URL", existing.Server ?? DefaultHostedServer, secret: false);
-                key ??= PromptForValue("API key", existing.ApiKey, secret: true);
+                server = string.IsNullOrWhiteSpace(server)
+                    ? existing.Server ?? ConfigService.DefaultHostedServer
+                    : server;
+
+                if (!nonInteractive)
+                {
+                    AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
+                }
+
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    key = nonInteractive
+                        ? existing.ApiKey
+                        : PromptForValue("API key", existing.ApiKey, secret: true);
+                }
 
                 if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(key))
                 {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, "server URL and API key are required"));
-                    nextSteps.Add("Provide --server and --key, or answer both prompts");
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, "API key is required"));
+                    nextSteps.Add("Provide --key, answer the API key prompt, or override the server with --server when needed");
                     var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
                     if (asJson)
                     {

@@ -13,6 +13,8 @@ namespace Automaton.Cli.Services;
 /// </summary>
 public class ConfigService
 {
+    public const string DefaultHostedServer = "https://api.automaton.monster";
+
     private const string ResourcePrefix = "Automaton.Cli.AiGuidance.";
     private const string ProjectConfigFileName = "automaton.json";
     private const string ProjectIgnoreFileName = ".automatonignore";
