@@ -2,6 +2,7 @@ using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
+using System.CommandLine.Invocation;
 
 namespace Automaton.Cli.Commands;
 
@@ -35,6 +36,7 @@ public static class DeployCommand
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var verboseOption = new Option<bool>("--verbose", "Print skipped-file details and exclusion reasons");
         var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
+        var openOption = new Option<bool>("--open", "Open the deployed app in the browser after success");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
@@ -46,13 +48,25 @@ public static class DeployCommand
             jsonOption,
             verboseOption,
             publishOption,
+            openOption,
             nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? runner, bool clean, bool skipBackend, string? dir, bool asJson, bool verbose, bool publish, bool nonInteractiveFlag) =>
+        cmd.SetHandler(async (InvocationContext context) =>
         {
+            var runner = context.ParseResult.GetValueForOption(runnerOption);
+            var clean = context.ParseResult.GetValueForOption(cleanOption);
+            var skipBackend = context.ParseResult.GetValueForOption(skipBackendOption);
+            var dir = context.ParseResult.GetValueForOption(dirOption);
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var verbose = context.ParseResult.GetValueForOption(verboseOption);
+            var publish = context.ParseResult.GetValueForOption(publishOption);
+            var open = context.ParseResult.GetValueForOption(openOption);
+            var nonInteractiveFlag = context.ParseResult.GetValueForOption(nonInteractiveOption);
+
             var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
+            var publishService = new PublishService(config);
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
             try
             {
@@ -94,7 +108,6 @@ public static class DeployCommand
                 {
                     if (publish)
                     {
-                        var publishService = new PublishService(config);
                         var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true);
                         if (asJson)
                         {
@@ -110,11 +123,26 @@ public static class DeployCommand
                             Environment.ExitCode = 1;
                             return;
                         }
+
+                        if (open)
+                        {
+                            CliBrowserService.OpenUrl(publishResult.Url!);
+                        }
                     }
                     else
                     {
                         result = AppendDefaultSuccessNextSteps(result);
                         WriteResult(result, asJson, verbose, nonInteractive);
+
+                        if (open)
+                        {
+                            var (client, server) = CreateApiClient(config, cwd);
+                            using (client)
+                            {
+                            var launchCode = await client.CreatePrivateLaunchAsync(result.AppId!);
+                            CliBrowserService.OpenUrl(CliAppUrlBuilder.BuildPrivateLaunchUrl(server, result.AppId, launchCode));
+                            }
+                        }
                     }
                 }
                 else
@@ -129,7 +157,7 @@ public static class DeployCommand
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
                 Environment.ExitCode = 1;
             }
-        }, runnerOption, cleanOption, skipBackendOption, dirOption, jsonOption, verboseOption, publishOption, nonInteractiveOption);
+        });
 
         return cmd;
     }
@@ -149,6 +177,7 @@ public static class DeployCommand
             AppId = result.AppId,
             AppName = result.AppName,
             OpenAppUrl = result.OpenAppUrl,
+            StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
             SkipBackend = result.SkipBackend,
@@ -180,6 +209,7 @@ public static class DeployCommand
             AppId = result.AppId,
             AppName = result.AppName,
             OpenAppUrl = result.OpenAppUrl,
+            StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
             SkipBackend = result.SkipBackend,
@@ -216,6 +246,7 @@ public static class DeployCommand
                 appId = result.AppId,
                 appName = result.AppName,
                 openAppUrl = result.OpenAppUrl,
+                studioAppUrl = result.StudioAppUrl,
                 deployDirectory = result.DeployDirectory,
                 clean = result.Clean,
                 skipBackend = result.SkipBackend,
@@ -272,12 +303,23 @@ public static class DeployCommand
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[bold]Open App:[/] {Markup.Escape(result.OpenAppUrl)}");
+                AnsiConsole.MarkupLine(result.HasWarnings
+                    ? "[yellow bold]Deploy complete with warnings.[/]"
+                    : "[green bold]Deploy complete.[/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[bold]Private app:[/] {Markup.Escape(result.OpenAppUrl)}");
+                AnsiConsole.MarkupLine("[bold]Open now:[/] automaton open");
+                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
+                {
+                    AnsiConsole.MarkupLine($"[bold]Manage in Studio:[/] {Markup.Escape(result.StudioAppUrl)}");
+                }
             }
-
-            AnsiConsole.MarkupLine(result.HasWarnings
-                ? "[yellow bold]Deploy complete with warnings.[/]"
-                : "[green bold]Deploy complete.[/]");
+            else
+            {
+                AnsiConsole.MarkupLine(result.HasWarnings
+                    ? "[yellow bold]Deploy complete with warnings.[/]"
+                    : "[green bold]Deploy complete.[/]");
+            }
         }
     }
 
@@ -323,10 +365,19 @@ public static class DeployCommand
         {
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
             {
-                Console.WriteLine($"Open App: {result.OpenAppUrl}");
+                Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
+                Console.WriteLine();
+                Console.WriteLine($"Private app: {result.OpenAppUrl}");
+                Console.WriteLine("Open now: automaton open");
+                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
+                {
+                    Console.WriteLine($"Manage in Studio: {result.StudioAppUrl}");
+                }
             }
-
-            Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
+            else
+            {
+                Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
+            }
         }
     }
 
@@ -374,6 +425,7 @@ public static class DeployCommand
             appId = deployResult.AppId,
             appName = deployResult.AppName,
             openAppUrl = deployResult.OpenAppUrl,
+            studioAppUrl = deployResult.StudioAppUrl,
             deployDirectory = deployResult.DeployDirectory,
             clean = deployResult.Clean,
             skipBackend = deployResult.SkipBackend,
@@ -390,5 +442,17 @@ public static class DeployCommand
             slug = publishResult.Slug,
             publishChecks = publishResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message })
         });
+    }
+
+    private static (AutomatonApiClient Client, string Server) CreateApiClient(ConfigService config, string cwd)
+    {
+        var appConfig = config.TryLoadProjectConfig(cwd);
+        var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+        if (appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException("Could not resolve app credentials for open.");
+        }
+
+        return (new AutomatonApiClient(server!, apiKey!), server!);
     }
 }

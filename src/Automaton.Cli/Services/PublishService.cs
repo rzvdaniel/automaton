@@ -42,8 +42,9 @@ public sealed class PublishService
                     Summary = "Publish failed",
                     Checks = checks,
                     NextSteps = nextSteps.ToList(),
-                    AppId = appConfig?.AppId,
-                    AppName = appConfig?.Name
+                        AppId = appConfig?.AppId,
+                    AppName = appConfig?.Name,
+                    StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server, appConfig?.AppId)
                 };
             }
 
@@ -71,6 +72,7 @@ public sealed class PublishService
                         NextSteps = nextSteps.ToList(),
                         AppId = appConfig.AppId,
                         AppName = appConfig.Name,
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -94,6 +96,7 @@ public sealed class PublishService
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
                         Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -116,6 +119,7 @@ public sealed class PublishService
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
                         Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -145,6 +149,7 @@ public sealed class PublishService
                 AppName = appConfig.Name,
                 Slug = resolvedSlug,
                 Url = publishedUrl,
+                StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
                 RequiresAuthentication = resolvedRequiresAuthentication,
                 IsForkable = resolvedIsForkable
             };
@@ -158,7 +163,8 @@ public sealed class PublishService
                 Success = false,
                 Summary = "Publish failed",
                 Checks = checks,
-                NextSteps = nextSteps.ToList()
+                NextSteps = nextSteps.ToList(),
+                StudioAppUrl = string.Empty
             };
         }
     }

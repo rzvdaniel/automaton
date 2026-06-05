@@ -96,10 +96,15 @@ public class UserAppsController : ControllerBase
     {
         try
         {
-            var app = await GetAuthorizedPrivateAppAsync(appId);
+            var (app, shouldRedirectToCleanUrl) = await GetAuthorizedPrivateAppAsync(appId);
             if (app == null)
             {
                 return Unauthorized(GetErrorPage("Authentication Required", "This private app requires a valid launch or login."));
+            }
+
+            if (shouldRedirectToCleanUrl)
+            {
+                return Redirect(BuildCleanPrivateUrl(appId, path));
             }
 
             if (app.OwnerId == null)
@@ -120,7 +125,7 @@ public class UserAppsController : ControllerBase
         }
     }
 
-    private async Task<Models.PublishedAppInfo?> GetAuthorizedPrivateAppAsync(Guid appId)
+    private async Task<(Models.PublishedAppInfo? App, bool ShouldRedirectToCleanUrl)> GetAuthorizedPrivateAppAsync(Guid appId)
     {
         var launchCode = Request.Query["launch"].FirstOrDefault();
         if (privateAppLaunchService.TryConsumeLaunchCode(appId, launchCode, out var launchedUserId))
@@ -128,7 +133,7 @@ public class UserAppsController : ControllerBase
             var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, launchedUserId);
             if (app == null)
             {
-                return null;
+                return (null, false);
             }
 
             var runtimeToken = privateAppLaunchService.CreateRuntimeToken(appId, launchedUserId);
@@ -140,20 +145,29 @@ public class UserAppsController : ControllerBase
                     privateAppLaunchService.BuildRuntimeCookieOptions(Request));
             }
 
-            return app;
+            return (app, true);
         }
 
         if (User.Identity?.IsAuthenticated != true)
         {
-            return null;
+            return (null, false);
         }
 
         if (privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
         {
-            return await appsService.GetAccessibleAppInfoByIdAsync(appId);
+            return (await appsService.GetAccessibleAppInfoByIdAsync(appId), false);
         }
 
-        return await appsService.GetAccessibleAppInfoByIdAsync(appId);
+        return (await appsService.GetAccessibleAppInfoByIdAsync(appId), false);
+    }
+
+    private string BuildCleanPrivateUrl(Guid appId, string? path)
+    {
+        var normalizedPath = string.IsNullOrWhiteSpace(path) || string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : "/" + path.TrimStart('/');
+
+        return $"/private/{appId}{normalizedPath}";
     }
 
     [HttpGet("{slug}")]

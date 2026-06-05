@@ -19,6 +19,7 @@ public static class PublishCommand
         var publicOption = new Option<bool>("--public", "Allow public access without login");
         var forkableOption = new Option<bool>("--forkable", "Allow other users to fork this published app");
         var yesOption = new Option<bool>("--yes", "Publish without prompting for confirmation");
+        var openOption = new Option<bool>("--open", "Open the published app in the browser after success");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
 
@@ -29,11 +30,12 @@ public static class PublishCommand
             publicOption,
             forkableOption,
             yesOption,
+            openOption,
             jsonOption,
             nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool asJson, bool nonInteractiveFlag) =>
+        cmd.SetHandler(async (string? slug, bool makePrivate, bool makePublic, bool forkable, bool yes, bool open, bool asJson, bool nonInteractiveFlag) =>
         {
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
 
@@ -63,6 +65,10 @@ public static class PublishCommand
                     yes,
                     nonInteractive);
                 WriteResult(result, asJson, nonInteractive);
+                if (result.Success && open && !string.IsNullOrWhiteSpace(result.Url))
+                {
+                    CliBrowserService.OpenUrl(result.Url);
+                }
                 Environment.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
@@ -77,7 +83,7 @@ public static class PublishCommand
                 WriteResult(failure, asJson, nonInteractive);
                 Environment.ExitCode = 1;
             }
-        }, slugOption, privateOption, publicOption, forkableOption, yesOption, jsonOption, nonInteractiveOption);
+        }, slugOption, privateOption, publicOption, forkableOption, yesOption, openOption, jsonOption, nonInteractiveOption);
 
         return cmd;
     }
@@ -97,6 +103,7 @@ public static class PublishCommand
                 appName = result.AppName,
                 slug = result.Slug,
                 url = result.Url,
+                studioAppUrl = result.StudioAppUrl,
                 requiresAuthentication = result.RequiresAuthentication,
                 isForkable = result.IsForkable
             });
@@ -117,25 +124,28 @@ public static class PublishCommand
 
         if (nonInteractive)
         {
-            if (!string.IsNullOrWhiteSpace(result.AppName))
-            {
-                Console.WriteLine($"Published {result.AppName}");
-            }
-
             if (!string.IsNullOrWhiteSpace(result.Url))
             {
-                Console.WriteLine($"Published successfully: {result.Url}");
+                Console.WriteLine("Publish complete.");
+                Console.WriteLine();
+                Console.WriteLine($"Public app: {result.Url}");
+                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
+                {
+                    Console.WriteLine($"Manage in Studio: {result.StudioAppUrl}");
+                }
             }
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(result.AppName))
-        {
-            AnsiConsole.MarkupLine($"[bold]Published[/] [cyan]{result.AppName}[/]");
-        }
         if (!string.IsNullOrWhiteSpace(result.Url))
         {
-            AnsiConsole.MarkupLine($"[green]Published successfully:[/] {result.Url}");
+            AnsiConsole.MarkupLine("[green bold]Publish complete.[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[bold]Public app:[/] {result.Url}");
+            if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
+            {
+                AnsiConsole.MarkupLine($"[bold]Manage in Studio:[/] {result.StudioAppUrl}");
+            }
         }
     }
 }

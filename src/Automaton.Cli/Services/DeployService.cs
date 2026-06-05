@@ -374,6 +374,9 @@ public sealed class DeployService
             OpenAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId)
                 ? CliAppUrlBuilder.BuildDeployedUrl(server, projectConfig.AppId)
                 : null,
+            StudioAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId)
+                ? CliAppUrlBuilder.BuildStudioAppUrl(server, projectConfig.AppId)
+                : null,
             DeployDirectory = deployDirectory,
             Clean = clean,
             SkipBackend = skipBackend,

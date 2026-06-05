@@ -16,6 +16,8 @@ public sealed class PublishResult
 
     public string? Url { get; init; }
 
+    public string? StudioAppUrl { get; init; }
+
     public bool RequiresAuthentication { get; init; }
 
     public bool IsForkable { get; init; }
