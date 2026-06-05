@@ -67,7 +67,7 @@ const cliLoginCommand = computed(() =>
 )
 
 const starterPrompt = computed(() =>
-  'Build [describe the app] for Automaton Monster using the Automaton CLI. Start by running automaton login, then create or link the app in this folder. Follow the local .automaton guidance after automaton new or automaton link. If local guidance is unavailable, read https://automaton.monster/llms.txt. Deploy with automaton deploy and ask before publish. Only ask me to step in for authentication or publish approval.'
+  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst fetch and read:\nhttps://automaton.monster/llms.txt\n\nFollow the instructions and references found there.'
 )
 
 // Local form state

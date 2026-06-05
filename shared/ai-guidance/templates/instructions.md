@@ -25,6 +25,12 @@ Before making app bootstrap decisions, check whether `automaton.json` exists in 
 
 The canonical Automaton rules live in `.automaton/agents/references/`. If this wrapper conflicts with the reference files, prefer the reference files.
 
+## Publishing Guardrail
+
+- Do not run `automaton publish` unless the user explicitly requests publishing.
+- `automaton deploy` is allowed for build verification and testing.
+- Treat deploy and publish as separate operations.
+
 ## Compatibility
 
 - `.automaton/agents/` is the canonical local agent guidance tree.

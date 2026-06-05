@@ -20,7 +20,13 @@ Rules:
 - `automaton login` authenticates the CLI. It does not scaffold app files.
 - `automaton new` creates the local app scaffold, `automaton.json`, `.automatonignore`, and local AI guidance.
 - `automaton link <app-id>` is only for attaching a folder to an existing Automaton app.
-- Do not publish until the user explicitly approves.
+
+## Deployment policy
+
+- Deploy using Automaton CLI.
+- Do not publish apps automatically.
+- Publishing is a user decision and requires explicit approval.
+- Deploy and publish are separate operations.
 
 ## Bootstrap contract
 

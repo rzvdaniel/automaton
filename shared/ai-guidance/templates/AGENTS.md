@@ -24,7 +24,12 @@ automaton deploy
 - First check whether `automaton.json` exists in the project root.
 - If `automaton.json` does not exist and the user asked to build a new app in this folder, run `automaton new "<app-name>"` before scaffolding files.
 - Use `automaton link <app-id>` only when the user explicitly said this folder should connect to an existing app.
-- Do not publish without explicit user approval.
+
+## Publishing rules
+
+- Do not run `automaton publish` unless the user explicitly requests publishing.
+- Deployment for testing is allowed with `automaton deploy`.
+- Deploy and publish are separate operations.
 
 The canonical Automaton rules live in `.automaton/agents/references/`. Do not treat this file as the full policy.
 

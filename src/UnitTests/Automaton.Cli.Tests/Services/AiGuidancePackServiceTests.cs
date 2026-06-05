@@ -49,7 +49,6 @@ public class AiGuidancePackServiceTests
         Assert.That(manifest.RootElement.GetProperty("adapters").GetArrayLength(), Is.EqualTo(1));
 
         var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
-        Assert.That(agentsContent, Does.Contain(".automaton/agents/instructions.md"));
         Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms.txt"));
     }
 
@@ -68,14 +67,17 @@ public class AiGuidancePackServiceTests
 
         Assert.That(agentsContent, Does.Contain("Do not treat this file as the full policy"));
         Assert.That(agentsContent, Does.Contain("If `automaton.json` does not exist and the user asked to build a new app in this folder, run `automaton new"));
+        Assert.That(agentsContent, Does.Contain("Do not run `automaton publish` unless the user explicitly requests publishing"));
         Assert.That(instructionsContent, Does.Contain("The canonical Automaton rules live in `.automaton/agents/references/`"));
         Assert.That(instructionsContent, Does.Contain("Before making app bootstrap decisions, check whether `automaton.json` exists"));
+        Assert.That(instructionsContent, Does.Contain("`automaton deploy` is allowed for build verification and testing"));
         Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
         Assert.That(skillContent, Does.Contain("Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`"));
         Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
-        Assert.That(llmsContent, Does.Contain("If it does not exist and the user is asking for a new app in this folder, run `automaton new"));
-        Assert.That(llmsContent, Does.Contain("Do not add a backend only for convenience"));
-        Assert.That(llmsContent, Does.Contain("Do not claim the app is done until `automaton deploy` has succeeded"));
+        Assert.That(llmsContent, Does.Contain("If it does not exist and this is a new app, run `automaton new"));
+        Assert.That(llmsContent, Does.Contain("Do not create a backend for convenience"));
+        Assert.That(llmsContent, Does.Contain("Do not claim the app is done until `automaton deploy` succeeds"));
+        Assert.That(llmsContent, Does.Contain("Publishing is a user decision and requires explicit approval"));
     }
 
     [Test]

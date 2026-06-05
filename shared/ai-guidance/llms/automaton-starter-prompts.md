@@ -7,15 +7,12 @@ Prefer the local generated Automaton guidance in the current folder after `autom
 ## Official generic starter prompt
 
 ```text
-Build [describe the app] for Automaton Monster.
+Build [APP IDEA] as an Automaton Monster app.
 
-Use the Automaton CLI as the primary path. First run `automaton --version`. If the CLI is missing, install it using the official Automaton instructions. Then run `automaton login` and let me paste my Automaton API key if prompted.
+First fetch and read:
+https://automaton.monster/llms.txt
 
-For a new app, run `automaton new "[app-name]"` before creating app files. Then follow the local generated guidance in `AGENTS.md` and `.automaton/agents/`. If local guidance is unavailable, read https://automaton.monster/llms.txt.
-
-Default to frontend-only Vite unless the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access. Put frontend source in `frontend/`, build to `frontend/dist`, use `base: './'`, and deploy with `automaton deploy`.
-
-Do not publish publicly until I explicitly approve.
+Follow the instructions and references found there.
 ```
 
 ## Existing app link prompt
@@ -39,7 +36,7 @@ Use the Automaton CLI. Run `automaton --version`; if missing, install the offici
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
-Use Vite unless I ask for another framework. Put source in `frontend/`, build to `frontend/dist`, set Vite `base: './'`, deploy with `automaton deploy`, and ask before publishing.
+Use Vite unless I ask for another framework. Put source in `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`.
 ```
 
 ## React prompt
@@ -51,7 +48,7 @@ Use the Automaton CLI. Run `automaton --version`; if missing, install the offici
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
-Use Vite React under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, deploy with `automaton deploy`, and ask before publishing. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
+Use Vite React under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
 ```
 
 ## Vue prompt
@@ -63,5 +60,5 @@ Use the Automaton CLI. Run `automaton --version`; if missing, install the offici
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
-Use Vite Vue under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, deploy with `automaton deploy`, and ask before publishing. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
+Use Vite Vue under `frontend/`, build to `frontend/dist`, set Vite `base: './'`, and deploy with `automaton deploy`. Create a backend only if the requested feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
 ```

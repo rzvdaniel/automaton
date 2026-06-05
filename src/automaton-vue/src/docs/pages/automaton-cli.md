@@ -53,15 +53,12 @@ You can ask an AI coding agent to create and deploy the app for you.
 Paste this into Cursor, Claude Code, Codex, Copilot Chat, or another coding agent:
 
 ```text
-Build a [describe your app] as an Automaton Monster app.
+Build [APP IDEA] as an Automaton Monster app.
 
-Read https://automaton.monster/llms.txt first.
+First fetch and read:
+https://automaton.monster/llms.txt
 
-Use the Automaton CLI as the primary path. If the CLI is missing, install it using the official instructions. Run `automaton login` and let me paste my Automaton API key when prompted.
-
-For a new app, run `automaton new "[app-name]"` before creating app files. Then follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`.
-
-Default to a frontend-only Vite app unless backend behavior is truly required. Deploy with `automaton deploy`. Do not publish publicly until I explicitly approve.
+Follow the instructions and references found there.
 ```
 
 Do not paste your API key directly into the AI chat. Paste it into the terminal when `automaton login` asks for it.
