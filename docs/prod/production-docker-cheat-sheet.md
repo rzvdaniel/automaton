@@ -378,7 +378,7 @@ Cache expectations for Cloudflare/nginx:
 /runtime/automaton-api.js    short cache
 ```
 
-Private, unpublished, and organization-internal apps are not copied into `prod-published-apps` in the initial complete implementation. They stay behind Studio authenticated preview/routes.
+Private and unpublished apps are still not copied into `prod-published-apps`, but `apps.automaton.monster` now proxies `/private/{appId}` and `/api/web-apps/app/...` to the live API host so authenticated private runtime access works on the apps domain. Published slug apps remain static from `prod-published-apps`.
 
 ## CI/CD Deploy Flow
 
