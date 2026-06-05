@@ -210,6 +210,11 @@ class AppsService {
     return data
   }
 
+  async createPrivateLaunch(id: string): Promise<{ launchCode: string }> {
+    const { data } = await apiClient.post<{ launchCode: string }>(`/api/apps/${id}/private-launch`, {})
+    return data
+  }
+
   async listRunnerBackendFiles(id: string): Promise<RunnerBackendFilesResponse> {
     const { data } = await apiClient.get<RunnerBackendFilesResponse>(
       `/api/apps/${id}/runner-backend/files`,

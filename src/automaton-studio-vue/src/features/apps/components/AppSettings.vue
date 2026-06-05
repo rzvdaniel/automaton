@@ -21,7 +21,6 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
 import { getDeployedAppUrl, getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
-import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -270,14 +269,21 @@ function openPublicUrl() {
   }
 }
 
-function openPrivateUrl() {
+async function openPrivateUrl() {
   if (fullPrivateUrl.value) {
-    const accessToken = tokenStorage.getAccessToken()
-    const url = new URL(fullPrivateUrl.value, window.location.origin)
-    if (accessToken) {
-      url.searchParams.set('access_token', accessToken)
+    try {
+      const { launchCode } = await appsService.createPrivateLaunch(app.value!.id)
+      const url = new URL(fullPrivateUrl.value, window.location.origin)
+      url.searchParams.set('launch', launchCode)
+      window.open(url.toString(), '_blank')
+    } catch (err: unknown) {
+      toast.add({
+        severity: 'error',
+        summary: 'Open Failed',
+        detail: err instanceof Error ? err.message : 'Failed to open private app',
+        life: 5000,
+      })
     }
-    window.open(url.toString(), '_blank')
   }
 }
 

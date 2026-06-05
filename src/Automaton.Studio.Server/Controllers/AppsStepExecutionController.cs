@@ -17,14 +17,17 @@ public class AppsStepExecutionController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppsStepExecutionService stepExecutionService;
     private readonly Serilog.ILogger logger;
+    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppsStepExecutionController(
         AppsService appsService,
         CustomStepsService customStepsService,
-        AppsStepExecutionService stepExecutionService)
+        AppsStepExecutionService stepExecutionService,
+        PrivateAppLaunchService privateAppLaunchService)
     {
         this.appsService = appsService;
         this.stepExecutionService = stepExecutionService;
+        this.privateAppLaunchService = privateAppLaunchService;
         this.logger = Serilog.Log.ForContext<AppsStepExecutionController>();
     }
 
@@ -242,6 +245,13 @@ public class AppsStepExecutionController : ControllerBase
         [FromBody] AppStepExecutionRequest request,
         CancellationToken cancellationToken)
     {
+        if (User.Identity?.IsAuthenticated != true ||
+            (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
+             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+        {
+            return Task.FromResult<ActionResult<AppStepExecutionResponse>>(Unauthorized(new { error = "Authentication required" }));
+        }
+
         return ExecuteStepPreview(appId, stepIdentifier, request, cancellationToken);
     }
 
@@ -249,6 +259,13 @@ public class AppsStepExecutionController : ControllerBase
     [Authorize]
     public Task<ActionResult<IEnumerable<AppStepInfo>>> ListStepsPrivate(Guid appId)
     {
+        if (User.Identity?.IsAuthenticated != true ||
+            (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
+             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+        {
+            return Task.FromResult<ActionResult<IEnumerable<AppStepInfo>>>(Unauthorized(new { error = "Authentication required" }));
+        }
+
         return ListStepsPreview(appId);
     }
 

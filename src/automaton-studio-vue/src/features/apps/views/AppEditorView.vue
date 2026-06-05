@@ -33,6 +33,7 @@ import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
 import { useAppEditorStore } from '../stores/app-editor.store'
+import { appsService } from '../services/apps.service'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import type { PublishAppRequest } from '../types/apps.types'
@@ -546,21 +547,24 @@ function getPrivateAppUrl(): string {
   }) : ''
 }
 
-function getPrivateAppOpenUrl(): string {
-  const privateUrl = getPrivateAppUrl()
-  const accessToken = tokenStorage.getAccessToken()
-
-  if (!privateUrl || !accessToken) {
-    return privateUrl
-  }
-
-  const url = new URL(privateUrl)
-  url.searchParams.set('access_token', accessToken)
-  return url.toString()
-}
-
 function getPublicAppUrl(): string {
   return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
+}
+
+async function getPrivateAppLaunchUrl(): Promise<string> {
+  if (!editorStore.currentApp?.id) {
+    return ''
+  }
+
+  const privateUrl = getPrivateAppUrl()
+  if (!privateUrl) {
+    return ''
+  }
+
+  const { launchCode } = await appsService.createPrivateLaunch(editorStore.currentApp.id)
+  const url = new URL(privateUrl)
+  url.searchParams.set('launch', launchCode)
+  return url.toString()
 }
 
 async function copyUrl(label: string, url: string) {
@@ -758,12 +762,23 @@ function openPublishedApp() {
 }
 
 function openPrivateApp() {
-  const privateUrl = getPrivateAppOpenUrl()
-  if (!privateUrl) {
-    return
-  }
+  void (async () => {
+    try {
+      const privateUrl = await getPrivateAppLaunchUrl()
+      if (!privateUrl) {
+        return
+      }
 
-  window.open(privateUrl, '_blank', 'noopener')
+      window.open(privateUrl, '_blank', 'noopener')
+    } catch (err: unknown) {
+      toast.add({
+        severity: 'error',
+        summary: 'Open Failed',
+        detail: err instanceof Error ? err.message : 'Failed to open private app',
+        life: 5000,
+      })
+    }
+  })()
 }
 
 async function copyPrivateAppLink() {

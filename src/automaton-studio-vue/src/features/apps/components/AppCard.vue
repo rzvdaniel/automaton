@@ -14,7 +14,6 @@ import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import { getDeployedAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
-import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 interface Props {
   app: App
@@ -93,27 +92,21 @@ const openAppUrl = computed(() => {
 const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
 const privateAppUrl = computed(() => getDeployedAppUrl(props.app.id))
 
-function buildPrivateOpenUrl(url: string): string {
-  const accessToken = tokenStorage.getAccessToken()
-  if (!url || !accessToken) {
-    return url
-  }
-
-  const resolvedUrl = new URL(url, window.location.origin)
-  resolvedUrl.searchParams.set('access_token', accessToken)
-  return resolvedUrl.toString()
-}
-
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
 }
 
-const handleOpenApp = () => {
+const handleOpenApp = async () => {
   if (!canOpenApp.value || !openAppUrl.value) {
     return
   }
 
-  window.open(openAppUrl.value, '_blank', 'noopener')
+  if (canOpenPublicApp.value) {
+    window.open(openAppUrl.value, '_blank', 'noopener')
+    return
+  }
+
+  await handleOpenPrivateApp()
 }
 
 const handleOpenPublicApp = () => {
@@ -124,12 +117,25 @@ const handleOpenPublicApp = () => {
   window.open(publicAppUrl.value, '_blank', 'noopener')
 }
 
-const handleOpenPrivateApp = () => {
+const handleOpenPrivateApp = async () => {
   if (!canOpenPrivateApp.value || !privateAppUrl.value) {
     return
   }
 
-  window.open(buildPrivateOpenUrl(privateAppUrl.value), '_blank', 'noopener')
+  try {
+    const { launchCode } = await appsService.createPrivateLaunch(props.app.id)
+    const url = new URL(privateAppUrl.value, window.location.origin)
+    url.searchParams.set('launch', launchCode)
+    window.open(url.toString(), '_blank', 'noopener')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to open private app'
+    toast.add({
+      severity: 'error',
+      summary: 'Open Failed',
+      detail: message,
+      life: 5000,
+    })
+  }
 }
 
 const handlePublish = () => {

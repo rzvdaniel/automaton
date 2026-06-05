@@ -19,6 +19,7 @@ public class AppsController : BaseController
     private readonly AppArchiveService appArchiveService;
     private readonly SettingsService settingsService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
+    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppsController(
         AppsService appsService,
@@ -31,6 +32,7 @@ public class AppsController : BaseController
         AppArchiveService appArchiveService,
         SettingsService settingsService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
+        PrivateAppLaunchService privateAppLaunchService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -44,6 +46,7 @@ public class AppsController : BaseController
         this.appArchiveService = appArchiveService;
         this.settingsService = settingsService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
+        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     [HttpGet]
@@ -327,6 +330,20 @@ public class AppsController : BaseController
         await appsService.Unpublish(id);
 
         return NoContent();
+    }
+
+    [HttpPost("{id}/private-launch")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<IActionResult> CreatePrivateLaunch(Guid id)
+    {
+        var app = await appsService.GetAccessibleAppInfoByIdAsync(id);
+        if (app == null)
+        {
+            return NotFound(new { message = "App not found" });
+        }
+
+        var launchCode = privateAppLaunchService.CreateLaunchCode(id, userContextService.GetUserId());
+        return Ok(new { launchCode });
     }
 
     [HttpPut("{id}/runner")]

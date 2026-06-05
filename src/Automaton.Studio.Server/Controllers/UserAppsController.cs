@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -35,6 +36,7 @@ public class UserAppsController : ControllerBase
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
+    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public UserAppsController(
         ApplicationDbContext dbContext,
@@ -42,7 +44,8 @@ public class UserAppsController : ControllerBase
         AppFileStorageService fileStorageService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
-        IOptions<WebAppConfig> webAppConfig)
+        IOptions<WebAppConfig> webAppConfig,
+        PrivateAppLaunchService privateAppLaunchService)
     {
         this.dbContext = dbContext;
         this.appsService = appsService;
@@ -50,6 +53,7 @@ public class UserAppsController : ControllerBase
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
+        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     [HttpGet("runtime/automaton-api.js")]
@@ -79,7 +83,7 @@ public class UserAppsController : ControllerBase
     /// Example: https://apps.automaton.monster/my-cool-app
     /// </summary>
     [HttpGet("private/{appId:guid}")]
-    [Authorize]
+    [AllowAnonymous]
     [Produces("text/html")]
     public async Task<IActionResult> ServePrivateApp(Guid appId)
     {
@@ -87,15 +91,15 @@ public class UserAppsController : ControllerBase
     }
 
     [HttpGet("private/{appId:guid}/{*path}")]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<IActionResult> ServePrivateAppFile(Guid appId, string path = "index.html")
     {
         try
         {
-            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId);
+            var app = await GetAuthorizedPrivateAppAsync(appId);
             if (app == null)
             {
-                return NotFound(GetErrorPage("App Not Found", "This app does not exist or you do not have access."));
+                return Unauthorized(GetErrorPage("Authentication Required", "This private app requires a valid launch or login."));
             }
 
             if (app.OwnerId == null)
@@ -114,6 +118,42 @@ public class UserAppsController : ControllerBase
             logger.LogError(ex, "Error serving private app file: {AppId}/{Path}", appId, path);
             return StatusCode(500, GetErrorPage("Error", "An error occurred while loading this app."));
         }
+    }
+
+    private async Task<Models.PublishedAppInfo?> GetAuthorizedPrivateAppAsync(Guid appId)
+    {
+        var launchCode = Request.Query["launch"].FirstOrDefault();
+        if (privateAppLaunchService.TryConsumeLaunchCode(appId, launchCode, out var launchedUserId))
+        {
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId);
+            if (app == null)
+            {
+                return null;
+            }
+
+            var runtimeToken = privateAppLaunchService.CreateRuntimeToken(appId, launchedUserId);
+            if (!string.IsNullOrWhiteSpace(runtimeToken))
+            {
+                Response.Cookies.Append(
+                    PrivateAppAuthConstants.CookieName,
+                    runtimeToken,
+                    privateAppLaunchService.BuildRuntimeCookieOptions(Request));
+            }
+
+            return app;
+        }
+
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        if (privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
+        {
+            return await appsService.GetAccessibleAppInfoByIdAsync(appId);
+        }
+
+        return await appsService.GetAccessibleAppInfoByIdAsync(appId);
     }
 
     [HttpGet("{slug}")]

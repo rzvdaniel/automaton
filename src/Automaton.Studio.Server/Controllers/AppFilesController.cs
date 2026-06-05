@@ -45,19 +45,22 @@ public class AppFilesController : ControllerBase
     private readonly FileUploadRegistry uploadRegistry;
     private readonly FileDownloadRegistry downloadRegistry;
     private readonly ILogger<AppFilesController> logger;
+    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppFilesController(
         ApplicationDbContext dataContext,
         IHubContext<AutomatonHub> automatonHub,
         FileUploadRegistry uploadRegistry,
         FileDownloadRegistry downloadRegistry,
-        ILogger<AppFilesController> logger)
+        ILogger<AppFilesController> logger,
+        PrivateAppLaunchService privateAppLaunchService)
     {
         this.dataContext = dataContext;
         this.automatonHub = automatonHub;
         this.uploadRegistry = uploadRegistry;
         this.downloadRegistry = downloadRegistry;
         this.logger = logger;
+        this.privateAppLaunchService = privateAppLaunchService;
     }
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -84,6 +87,12 @@ public class AppFilesController : ControllerBase
     [RequestFormLimits(MultipartBodyLengthLimit = 200 * 1024 * 1024)]
     public async Task<IActionResult> UploadPrivate(Guid appId, IFormFile file, CancellationToken ct)
     {
+        if (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
+            && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
+        {
+            return Unauthorized();
+        }
+
         var userId = GetUserId();
         if (userId == Guid.Empty)
             return Unauthorized();
@@ -147,6 +156,13 @@ public class AppFilesController : ControllerBase
     [Authorize]
     public async Task DownloadPrivate(Guid appId, string sessionId, CancellationToken ct)
     {
+        if (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
+            && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
         var userId = GetUserId();
         if (userId == Guid.Empty)
         {

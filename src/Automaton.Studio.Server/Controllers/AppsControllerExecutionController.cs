@@ -21,19 +21,22 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly IAppExecutionLogService executionLogService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly Serilog.ILogger logger;
+    private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public AppsControllerExecutionController(
         AppsService appsService,
         AppsControllerExecutionService controllerExecutionService,
         UserContextService userContextService,
         IAppExecutionLogService executionLogService,
-        ConfirmedEmailGuardService confirmedEmailGuardService)
+        ConfirmedEmailGuardService confirmedEmailGuardService,
+        PrivateAppLaunchService privateAppLaunchService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
         this.userContextService = userContextService;
         this.executionLogService = executionLogService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
+        this.privateAppLaunchService = privateAppLaunchService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -378,6 +381,13 @@ public class AppsControllerExecutionController : ControllerBase
         [FromBody] AppControllerActionRequest request,
         CancellationToken cancellationToken)
     {
+        if (User.Identity?.IsAuthenticated != true ||
+            (User.HasClaim(c => c.Type == PrivateAppAuthConstants.ScopeClaim)
+             && !privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId)))
+        {
+            return Unauthorized(new { error = "Authentication required" });
+        }
+
         var sw = Stopwatch.StartNew();
 
         try

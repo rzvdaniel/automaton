@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 using System.Text;
+using Automaton.Studio.Server.Services;
 
 namespace Common.Authentication
 {
@@ -56,13 +57,11 @@ namespace Common.Authentication
                         OnMessageReceived = messageReceivedContext =>
                         {
                             var path = messageReceivedContext.HttpContext.Request.Path;
-                            if (path.StartsWithSegments("/private"))
+                            var privateAppToken = messageReceivedContext.Request.Cookies[PrivateAppAuthConstants.CookieName];
+                            if (!string.IsNullOrWhiteSpace(privateAppToken) &&
+                                (path.StartsWithSegments("/private") || path.StartsWithSegments("/api/web-apps/app")))
                             {
-                                var accessToken = messageReceivedContext.Request.Query["access_token"].FirstOrDefault();
-                                if (!string.IsNullOrWhiteSpace(accessToken))
-                                {
-                                    messageReceivedContext.Token = accessToken;
-                                }
+                                messageReceivedContext.Token = privateAppToken;
                             }
 
                             return Task.CompletedTask;
