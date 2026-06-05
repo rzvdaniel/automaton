@@ -366,6 +366,84 @@ public class AppsControllerExecutionController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Execute a controller action from a private deployed app (by app ID, requires auth).
+    /// </summary>
+    [HttpPost("api/web-apps/app/{appId:guid}/controllers/{controllerName}/actions/{actionName}/execute")]
+    [Authorize]
+    public async Task<ActionResult<AppControllerActionResponse>> ExecuteActionPrivate(
+        Guid appId,
+        string controllerName,
+        string actionName,
+        [FromBody] AppControllerActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            logger.Information(
+                "Private deployed controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
+                appId, controllerName, actionName);
+
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
+            if (app == null)
+            {
+                return NotFound(new { error = "App not found" });
+            }
+
+            if (app.OwnerId == null)
+            {
+                return StatusCode(500, new { error = "App configuration error: no owner" });
+            }
+
+            var inputs = request.Inputs != null
+                ? new Dictionary<string, JsonElement>(request.Inputs, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            ApplyTestRunIdInput(inputs, request.TestRunId);
+
+            var result = await controllerExecutionService.ExecuteActionAsync(
+                app,
+                controllerName,
+                actionName,
+                inputs,
+                request.RunnerNames,
+                useMockBackend: false,
+                cancellationToken);
+
+            sw.Stop();
+
+            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
+            {
+                AppId = appId,
+                ControllerName = controllerName,
+                ActionName = actionName,
+                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
+                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
+                Success = result.Success,
+                ErrorMessage = result.Error,
+                DurationMs = sw.ElapsedMilliseconds,
+                UserId = userContextService.GetUserId(),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            sw.Stop();
+            logger.Warning(ex, "Invalid private deployed controller action: {ControllerName}.{ActionName}", controllerName, actionName);
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            logger.Error(ex, "Private deployed controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
+                appId, controllerName, actionName);
+            return StatusCode(500, new { error = "Internal server error during controller action execution" });
+        }
+    }
+
     private async Task LogFailedPreviewAsync(
         Guid appId, string controllerName, string actionName,
         AppControllerActionRequest request, long durationMs, string errorMessage)

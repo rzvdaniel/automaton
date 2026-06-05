@@ -194,11 +194,11 @@ public class PublishedAppStorageService
     {
         var payload = new
         {
-            slug = metadata.Slug,
             appId = metadata.AppId,
             name = metadata.Name,
             version = metadata.Version,
-            apiBaseUrl = config.ApiBaseUrl.TrimEnd('/')
+            apiBaseUrl = config.ApiBaseUrl.TrimEnd('/'),
+            backendApiPath = $"/api/web-apps/{Uri.EscapeDataString(metadata.Slug)}"
         };
 
         return $"window.__AUTOMATON_APP__ = {JsonSerializer.Serialize(payload)};{Environment.NewLine}";

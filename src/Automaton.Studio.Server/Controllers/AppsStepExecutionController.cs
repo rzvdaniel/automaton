@@ -234,6 +234,24 @@ public class AppsStepExecutionController : ControllerBase
         }
     }
 
+    [HttpPost("app/{appId:guid}/steps/{stepIdentifier}/execute")]
+    [Authorize]
+    public Task<ActionResult<AppStepExecutionResponse>> ExecuteStepPrivate(
+        Guid appId,
+        string stepIdentifier,
+        [FromBody] AppStepExecutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        return ExecuteStepPreview(appId, stepIdentifier, request, cancellationToken);
+    }
+
+    [HttpGet("app/{appId:guid}/steps")]
+    [Authorize]
+    public Task<ActionResult<IEnumerable<AppStepInfo>>> ListStepsPrivate(Guid appId)
+    {
+        return ListStepsPreview(appId);
+    }
+
     private void ApplyTestRunIdInput(Dictionary<string, string> inputs, string? bodyTestRunId)
     {
         var testRunId = ResolveTestRunId(bodyTestRunId);

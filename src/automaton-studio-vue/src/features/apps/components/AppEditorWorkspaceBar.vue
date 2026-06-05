@@ -16,6 +16,7 @@ const props = defineProps<{
   isEditingName: boolean
   editingName: string
   isPublished: boolean
+  hasDeployedFrontend: boolean
   activeTab: AppEditorTab
   hasRunners: boolean | null
   selectedRunnerId: string | null
@@ -39,6 +40,7 @@ const emit = defineEmits<{
   runnersLoaded: [count: number]
   saveAll: []
   preview: []
+  openApp: []
   deployApp: []
   deployFrontend: []
   deployBackend: []
@@ -63,6 +65,18 @@ const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 const isEditorActionTab = computed(
   () => props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
 )
+
+const openAppLabel = computed(() => {
+  if (props.isPublished) {
+    return 'Open Public App'
+  }
+
+  if (props.hasDeployedFrontend) {
+    return 'Open Private App'
+  }
+
+  return 'Open App'
+})
 
 const actionMenuItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
@@ -161,6 +175,16 @@ function handlePrimaryAction() {
           @runners-loaded="emit('runnersLoaded', $event)"
         />
       </div>
+
+      <Button
+        v-if="activeTab !== 'backend-server'"
+        icon="pi pi-external-link"
+        :label="openAppLabel"
+        text
+        severity="secondary"
+        :disabled="!isPublished && !hasDeployedFrontend"
+        @click="emit('openApp')"
+      />
 
       <Button
         v-if="activeTab !== 'backend-server'"

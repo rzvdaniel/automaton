@@ -274,6 +274,24 @@ public class AppsFlowExecutionController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Execute a flow from a private deployed app (by app ID, requires auth).
+    /// </summary>
+    [HttpPost("app/{appId:guid}/flows/{flowIdentifier}/execute")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public Task<IActionResult> ExecuteFlowPrivate(
+        Guid appId,
+        string flowIdentifier,
+        [FromBody] WebAppFlowExecutionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        return ExecuteFlowPreview(appId, flowIdentifier, request, cancellationToken);
+    }
+
     // Helpers
 
     private static List<string> ApplyInputVariables(Flow flow, Dictionary<string, string> inputs)

@@ -37,6 +37,8 @@ public sealed class DeployResult
 
     public string? AppName { get; init; }
 
+    public string? OpenAppUrl { get; init; }
+
     public string? DeployDirectory { get; init; }
 
     public bool Clean { get; init; }

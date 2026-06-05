@@ -1,18 +1,27 @@
 (function () {
   const config = window.__AUTOMATON_APP__ || {};
-  const appSlug = String(config.slug || '').trim();
+  const appId = String(config.appId || '').trim();
   const apiBaseUrl = String(config.apiBaseUrl || '').replace(/\/+$/, '');
+  const backendApiPath = String(config.backendApiPath || '').trim();
 
-  if (!appSlug) {
-    console.warn('Automaton app slug is not configured.');
+  if (!backendApiPath) {
+    console.warn('Automaton app backend API path is not configured.');
   }
 
-  async function apiCall(path, method, body) {
+  function getAppApiRoot() {
     if (!apiBaseUrl) {
       throw new Error('Automaton API base URL is not configured.');
     }
 
-    const response = await fetch(`${apiBaseUrl}${path}`, {
+    if (!backendApiPath) {
+      throw new Error('Automaton app backend API path is not configured.');
+    }
+
+    return `${apiBaseUrl}${backendApiPath}`;
+  }
+
+  async function apiCall(path, method, body) {
+    const response = await fetch(`${getAppApiRoot()}${path}`, {
       method,
       credentials: 'include',
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -36,7 +45,7 @@
 
   async function executeFlow(flowIdentifier, { inputs = {}, runnerNames = null } = {}) {
     return apiCall(
-      `/api/web-apps/${encodeURIComponent(appSlug)}/flows/${encodeURIComponent(flowIdentifier)}/execute`,
+      `/flows/${encodeURIComponent(flowIdentifier)}/execute`,
       'POST',
       { inputs, runnerNames },
     );
@@ -44,7 +53,7 @@
 
   async function executeController(controllerName, actionName, { inputs = {}, runnerNames = null } = {}) {
     return apiCall(
-      `/api/web-apps/${encodeURIComponent(appSlug)}/controllers/${encodeURIComponent(controllerName)}/actions/${encodeURIComponent(actionName)}/execute`,
+      `/controllers/${encodeURIComponent(controllerName)}/actions/${encodeURIComponent(actionName)}/execute`,
       'POST',
       { inputs, runnerNames },
     );
@@ -60,17 +69,13 @@
   }
 
   async function uploadFile(file, { runnerNames = null } = {}) {
-    if (!apiBaseUrl) {
-      throw new Error('Automaton API base URL is not configured.');
-    }
-
     const formData = new FormData();
     formData.append('file', file);
     if (runnerNames) {
       formData.append('runnerNames', JSON.stringify(runnerNames));
     }
 
-    const response = await fetch(`${apiBaseUrl}/api/web-apps/${encodeURIComponent(appSlug)}/files/upload`, {
+    const response = await fetch(`${getAppApiRoot()}/files/upload`, {
       method: 'POST',
       credentials: 'include',
       body: formData,
@@ -84,11 +89,7 @@
   }
 
   function getDownloadUrl(sessionId) {
-    if (!apiBaseUrl) {
-      throw new Error('Automaton API base URL is not configured.');
-    }
-
-    return `${apiBaseUrl}/api/web-apps/${encodeURIComponent(appSlug)}/files/${encodeURIComponent(sessionId)}`;
+    return `${getAppApiRoot()}/files/${encodeURIComponent(sessionId)}`;
   }
 
   async function downloadFile(sessionId, filename) {
@@ -118,8 +119,8 @@
     uploadFile,
     downloadFile,
     getDownloadUrl,
-    getAppId: () => config.appId || null,
-    getAppSlug: () => appSlug || null,
+    getAppId: () => appId || null,
     getBaseUrl: () => apiBaseUrl,
+    getBackendApiPath: () => backendApiPath || null,
   };
 })();

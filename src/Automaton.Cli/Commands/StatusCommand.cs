@@ -61,7 +61,8 @@ public static class StatusCommand
                         : null;
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
-                var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? BuildPublishedUrl(server!, publicUrl) : null;
+                var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? CliAppUrlBuilder.BuildPublishedUrl(server!, publicUrl) : null;
+                var openAppUrl = CliAppUrlBuilder.BuildDeployedUrl(server!, appConfig.AppId);
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
                 var statusResult = new CommandDiagnosticResult { Success = true, Summary = "Status loaded", Checks = checks, NextSteps = [] };
 
@@ -90,6 +91,7 @@ public static class StatusCommand
                         {
                             isPublished,
                             publicUrl,
+                            openAppUrl,
                             liveUrl,
                             executionRunnerId,
                             version = app.TryGetProperty("version", out var versionProperty) ? versionProperty.GetInt32() : 0
@@ -108,6 +110,7 @@ public static class StatusCommand
                 table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
                 table.AddRow("backend scripts", backendScripts.ToString());
                 table.AddRow("runner", string.IsNullOrWhiteSpace(executionRunnerId) ? "-" : executionRunnerId);
+                table.AddRow("open app", string.IsNullOrWhiteSpace(openAppUrl) ? "-" : openAppUrl);
                 table.AddRow("published", isPublished ? "yes" : "no");
                 table.AddRow("public url", liveUrl ?? "-");
                 AnsiConsole.Write(table);
@@ -143,27 +146,4 @@ public static class StatusCommand
             : 0;
     }
 
-    private static string BuildPublishedUrl(string server, string slug)
-    {
-        var configuredAppsBaseUrl = Environment.GetEnvironmentVariable("AUTOMATON_APPS_BASE_URL");
-        if (!string.IsNullOrWhiteSpace(configuredAppsBaseUrl))
-        {
-            return $"{configuredAppsBaseUrl.TrimEnd('/')}/{slug}/";
-        }
-
-        if (Uri.TryCreate(server, UriKind.Absolute, out var serverUri) &&
-            serverUri.Host.StartsWith("api.", StringComparison.OrdinalIgnoreCase))
-        {
-            var builder = new UriBuilder(serverUri)
-            {
-                Host = "apps." + serverUri.Host["api.".Length..],
-                Path = slug,
-                Query = string.Empty,
-                Fragment = string.Empty
-            };
-            return builder.Uri.ToString().TrimEnd('/') + "/";
-        }
-
-        return $"{server.TrimEnd('/')}/{slug}/";
-    }
 }

@@ -311,6 +311,8 @@ Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as thei
 **Publishing & Access:**
 - Draft vs. Published states
 - Published apps get a `PublicUrl` (`/web/{publicUrl}`)
+- Deployed private app URL: `https://apps.automaton.monster/private/{appId}`
+- Published public app URL: `https://apps.automaton.monster/{slug}`
 - Public (no login) or Protected (requires Automaton login)
 - Publish/Unpublish flows with clear status badges
 - Public profile app details can render screenshot galleries sourced from `WebAppScreenshots`, and marketplace cards can fall back to the first screenshot when no thumbnail is set
@@ -383,6 +385,8 @@ If yes, immediately update the relevant document **without waiting to be asked**
 | Discovered an architectural decision, pitfall, or lesson learned | Add to `FOR-DEVELOPERS.md` under the appropriate section |
 | Added a significant feature that others will extend | Update `AGENTS.md` to describe the feature, its location, and key concepts |
 
+When an app deploy succeeds, always surface the deployed app URL in user-facing output. Do not stop at "deploy complete" without telling the user where to open the app.
+
 **When to Create or Update a Skill:**
 - After implementing a significant feature (e.g., multi-tenancy, runner scoping)
 - When you identify a repeatable development pattern (e.g., post-change validation)
@@ -429,4 +433,3 @@ If yes, immediately update the relevant document **without waiting to be asked**
 - **Focus on completeness**: Agents should build the entire feature end-to-end in one implementation pass
 - **Make plans concise**: Sacrifice grammar for brevity. Avoid fluffy timelines.
 - **End with open questions**: List unresolved decisions that need your input before implementation starts
-

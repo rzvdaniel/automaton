@@ -148,6 +148,7 @@ public static class DeployCommand
             HasWarnings = result.HasWarnings || preparation.Checks.Any(check => !check.Success && check.IsWarning),
             AppId = result.AppId,
             AppName = result.AppName,
+            OpenAppUrl = result.OpenAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
             SkipBackend = result.SkipBackend,
@@ -178,6 +179,7 @@ public static class DeployCommand
             Summary = result.Summary,
             AppId = result.AppId,
             AppName = result.AppName,
+            OpenAppUrl = result.OpenAppUrl,
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
             SkipBackend = result.SkipBackend,
@@ -213,6 +215,7 @@ public static class DeployCommand
                 hasWarnings = result.HasWarnings,
                 appId = result.AppId,
                 appName = result.AppName,
+                openAppUrl = result.OpenAppUrl,
                 deployDirectory = result.DeployDirectory,
                 clean = result.Clean,
                 skipBackend = result.SkipBackend,
@@ -266,6 +269,12 @@ public static class DeployCommand
 
         if (result.Success)
         {
+            if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[bold]Open App:[/] {Markup.Escape(result.OpenAppUrl)}");
+            }
+
             AnsiConsole.MarkupLine(result.HasWarnings
                 ? "[yellow bold]Deploy complete with warnings.[/]"
                 : "[green bold]Deploy complete.[/]");
@@ -312,6 +321,11 @@ public static class DeployCommand
 
         if (result.Success)
         {
+            if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
+            {
+                Console.WriteLine($"Open App: {result.OpenAppUrl}");
+            }
+
             Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
         }
     }
@@ -359,6 +373,7 @@ public static class DeployCommand
             hasWarnings = deployResult.HasWarnings,
             appId = deployResult.AppId,
             appName = deployResult.AppName,
+            openAppUrl = deployResult.OpenAppUrl,
             deployDirectory = deployResult.DeployDirectory,
             clean = deployResult.Clean,
             skipBackend = deployResult.SkipBackend,

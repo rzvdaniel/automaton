@@ -134,6 +134,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Public URL slug
    */
   const publicUrl = computed(() => currentApp.value?.publicUrl ?? '')
+  const hasDeployedFrontend = computed(() => currentApp.value?.hasDeployedFrontend ?? false)
 
   /**
    * Check if app has a backend/ folder (deploy button should be visible)
@@ -1178,6 +1179,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     mainHtmlFile,
     isPublished,
     publicUrl,
+    hasDeployedFrontend,
     hasBackendFolder,
     currentScopeEditable,
     defaultEditorScope,

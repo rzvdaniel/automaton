@@ -13,7 +13,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
-import { getPublishedAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl } from '../utils/public-app-url'
 
 interface Props {
   app: App
@@ -79,14 +79,30 @@ const updatedAgo = computed(() => {
   return `Updated: ${diffWeeks}w ago`
 })
 
+const canOpenApp = computed(() => props.app.isPublished || props.app.hasDeployedFrontend)
+const openAppUrl = computed(() => getOpenAppUrl(props.app))
+const openAppLabel = computed(() => {
+  if (props.app.isPublished) {
+    return 'Open Public App'
+  }
+
+  if (props.app.hasDeployedFrontend) {
+    return 'Open Private App'
+  }
+
+  return 'Open App'
+})
+
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
 }
 
-const handleView = () => {
-  if (props.app.isPublished && props.app.publicUrl) {
-    window.open(getPublishedAppUrl(props.app.publicUrl), '_blank')
+const handleOpenApp = () => {
+  if (!canOpenApp.value || !openAppUrl.value) {
+    return
   }
+
+  window.open(openAppUrl.value, '_blank', 'noopener')
 }
 
 const handlePublish = () => {
@@ -300,11 +316,19 @@ const menuItems = computed(() => {
 
         <!-- Metadata -->
         <div class="text-color-secondary text-sm mb-4">
-          {{ updatedAgo }}
+          {{ canOpenApp ? updatedAgo.replace('Updated:', 'Last deploy:') : updatedAgo }}
         </div>
 
         <!-- Actions -->
         <div class="flex gap-2 mt-auto">
+          <Button
+            :label="openAppLabel"
+            icon="pi pi-external-link"
+            size="small"
+            class="flex-1"
+            :disabled="!canOpenApp"
+            @click="handleOpenApp"
+          />
           <Button
             label="Edit"
             icon="pi pi-pencil"
@@ -312,26 +336,6 @@ const menuItems = computed(() => {
             outlined
             class="flex-1"
             @click="handleEdit"
-          />
-          <Button
-            v-if="app.isPublished"
-            label="View"
-            icon="pi pi-external-link"
-            size="small"
-            outlined
-            severity="secondary"
-            class="flex-1"
-            @click="handleView"
-          />
-          <Button
-            v-else
-            label="Publish"
-            icon="pi pi-upload"
-            size="small"
-            outlined
-            severity="secondary"
-            class="flex-1"
-            @click="handlePublish"
           />
         </div>
       </div>

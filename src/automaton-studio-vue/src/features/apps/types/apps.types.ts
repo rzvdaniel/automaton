@@ -86,6 +86,7 @@ export interface App {
   developmentMode: AppDevelopmentMode
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource
+  hasDeployedFrontend: boolean
   frontend: AppComponentOwnership
   backend: AppComponentOwnership
 }

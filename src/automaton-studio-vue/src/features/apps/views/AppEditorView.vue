@@ -45,7 +45,7 @@ import {
   UiAutomationAction,
   type UiAutomationResult,
 } from '../services/preview-automation-bridge'
-import { getPublishedAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 const route = useRoute()
 const router = useRouter()
@@ -526,6 +526,18 @@ function handleBack() {
   }
 }
 
+function getOpenAppLabel(): string {
+  if (editorStore.currentApp?.isPublished) {
+    return 'Open Public App'
+  }
+
+  if (editorStore.currentApp?.hasDeployedFrontend) {
+    return 'Open Private App'
+  }
+
+  return 'Open App'
+}
+
 // Handle save all
 async function handleSaveAll() {
   try {
@@ -641,16 +653,17 @@ async function handleDeployFrontend() {
 async function handleDeployApp() {
   try {
     const result = await editorStore.deployApp()
+    const openAppUrl = editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
     const backendMessage = result.backendDeploy.totalScripts > 0
       ? ` Backend: ${result.backendDeploy.deployedCount}/${result.backendDeploy.totalScripts} scripts to ${result.backendDeploy.runnerCount} runner(s).`
       : ' No backend scripts found.'
 
-    toast.add({
-      severity: 'success',
-      summary: 'App Deployed',
-      detail: `Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
-      life: 5000,
-    })
+      toast.add({
+        severity: 'success',
+        summary: 'App Deployed',
+        detail: `${getOpenAppLabel()}: ${openAppUrl} Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
+        life: 7000,
+      })
   } catch (err: unknown) {
     toast.add({
       severity: 'error',
@@ -693,6 +706,19 @@ function openPublishedApp() {
   }
 
   window.open(getPublishedAppUrl(editorStore.publicUrl), '_blank', 'noopener')
+}
+
+function openApp() {
+  if (!editorStore.currentApp) {
+    return
+  }
+
+  const openUrl = getOpenAppUrl(editorStore.currentApp)
+  if (!openUrl) {
+    return
+  }
+
+  window.open(openUrl, '_blank', 'noopener')
 }
 
 // Handle unpublish
@@ -1035,6 +1061,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-editing-name="isEditingName"
         :editing-name="editingName"
         :is-published="editorStore.isPublished"
+        :has-deployed-frontend="editorStore.hasDeployedFrontend"
         :active-tab="activeTab"
         :has-runners="hasRunners"
         :selected-runner-id="selectedRunnerId"
@@ -1054,6 +1081,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
+        @open-app="openApp"
         @preview="editorStore.openPreviewOverlay()"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"

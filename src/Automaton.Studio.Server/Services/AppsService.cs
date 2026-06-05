@@ -53,6 +53,9 @@ public class AppsService
                 var app = MapToModel(e, null);
                 var ownerId = e.WebAppUsers?.FirstOrDefault()?.UserId ?? UserId;
                 ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, e.Id).Result);
+                app.HasDeployedFrontend = File.Exists(Path.Combine(
+                    fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, e.Id),
+                    "index.html"));
                 return app;
             });
 
@@ -88,6 +91,9 @@ public class AppsService
 
         var app = MapToModel(appEntity, definition);
         ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, id).Result);
+        app.HasDeployedFrontend = File.Exists(Path.Combine(
+            fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id),
+            "index.html"));
 
         return app;
     }

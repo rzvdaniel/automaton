@@ -78,6 +78,28 @@ public class AppFilesController : ControllerBase
         return await UploadInternal(appId, ownerId, file, ct);
     }
 
+    [HttpPost("web-apps/app/{appId}/files/upload")]
+    [Authorize]
+    [RequestSizeLimit(200 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 200 * 1024 * 1024)]
+    public async Task<IActionResult> UploadPrivate(Guid appId, IFormFile file, CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+            return Unauthorized();
+
+        var app = await dataContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .Where(a => a.Id == appId && a.WebAppUsers.Any(x => x.UserId == userId))
+            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
+            .FirstOrDefaultAsync(ct);
+
+        if (app is null || app.OwnerId is null)
+            return NotFound(new { error = "App not found." });
+
+        return await UploadInternal(app.Id, app.OwnerId.Value, file, ct);
+    }
+
     /// <summary>
     /// Published app upload — same auth as published controller execution.
     /// </summary>
@@ -119,6 +141,33 @@ public class AppFilesController : ControllerBase
         }
 
         await DownloadInternal(appId, ownerId, sessionId, ct);
+    }
+
+    [HttpGet("web-apps/app/{appId}/files/{sessionId}")]
+    [Authorize]
+    public async Task DownloadPrivate(Guid appId, string sessionId, CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
+        var app = await dataContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .Where(a => a.Id == appId && a.WebAppUsers.Any(x => x.UserId == userId))
+            .Select(a => new { a.Id, OwnerId = a.WebAppUsers.FirstOrDefault() == null ? (Guid?)null : a.WebAppUsers.FirstOrDefault()!.UserId })
+            .FirstOrDefaultAsync(ct);
+
+        if (app is null || app.OwnerId is null)
+        {
+            Response.StatusCode = 404;
+            await Response.WriteAsJsonAsync(new { error = "App not found." }, ct);
+            return;
+        }
+
+        await DownloadInternal(app.Id, app.OwnerId.Value, sessionId, ct);
     }
 
     /// <summary>

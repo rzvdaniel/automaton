@@ -18,7 +18,9 @@ const props = defineProps<{
   isDeployingApp: boolean
   isDeployingBackend: boolean
   isPublished: boolean
+  hasDeployedFrontend: boolean
   publicUrl: string | null | undefined
+  appId: string | null | undefined
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +28,7 @@ const emit = defineEmits<{
   runnersLoaded: [count: number]
   saveAll: []
   preview: []
+  openApp: []
   deployApp: []
   deployFrontend: []
   deployBackend: []
@@ -41,8 +44,29 @@ const isEditorActionTab = computed(
   () => props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
 )
 
+const openAppLabel = computed(() => {
+  if (props.isPublished) {
+    return 'Open Public App'
+  }
+
+  if (props.hasDeployedFrontend) {
+    return 'Open Private App'
+  }
+
+  return 'Open App'
+})
+
 const actionMenuItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
+
+  if (props.isPublished || props.hasDeployedFrontend) {
+    items.push({
+      label: openAppLabel.value,
+      icon: 'pi pi-external-link',
+      command: () => emit('openApp'),
+    })
+    items.push({ separator: true })
+  }
 
   if (props.isPublished) {
     items.push({
@@ -97,15 +121,19 @@ const actionMenuItems = computed<MenuItem[]>(() => {
 })
 
 const primaryActionLabel = computed(() => {
-  if (props.isPublished) {
-    return 'Deploy'
+  if (props.isPublished || props.hasDeployedFrontend) {
+    return openAppLabel.value
   }
 
   return props.canDeployFromStudio ? 'Publish' : 'Deploy'
 })
 
 const primaryActionIcon = computed(() => {
-  if (props.isPublished || props.canDeployFromStudio) {
+  if (props.isPublished || props.hasDeployedFrontend) {
+    return 'pi pi-external-link'
+  }
+
+  if (props.canDeployFromStudio) {
     return 'pi pi-cloud-upload'
   }
 
@@ -113,16 +141,16 @@ const primaryActionIcon = computed(() => {
 })
 
 const isPrimaryActionDisabled = computed(() => {
-  if (props.isPublished) {
-    return props.isDeployingApp
+  if (props.isPublished || props.hasDeployedFrontend) {
+    return false
   }
 
   return !props.canDeployFromStudio || props.isDeployingApp
 })
 
 const isPrimaryActionLoading = computed(() => {
-  if (props.isPublished) {
-    return props.isDeployingApp
+  if (props.isPublished || props.hasDeployedFrontend) {
+    return false
   }
 
   return props.canDeployFromStudio && props.isDeployingApp
@@ -133,8 +161,8 @@ function toggleActionMenu(event: Event) {
 }
 
 function handlePrimaryAction() {
-  if (props.isPublished) {
-    emit('deployApp')
+  if (props.isPublished || props.hasDeployedFrontend) {
+    emit('openApp')
     return
   }
 

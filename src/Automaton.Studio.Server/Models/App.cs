@@ -49,6 +49,7 @@ public class AppModel
     public string DevelopmentMode { get; set; } = Constants.AppDevelopmentModes.Studio;
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
+    public bool HasDeployedFrontend { get; set; }
     public AppComponentOwnershipModel Frontend { get; set; } = new();
     public AppComponentOwnershipModel Backend { get; set; } = new();
 

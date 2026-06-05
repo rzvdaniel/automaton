@@ -36,6 +36,11 @@ export function getPublishedAppUrl(slug?: string | null): string {
   return normalizedSlug ? `${publicAppsBaseUrl}/${encodeURIComponent(normalizedSlug)}/` : ''
 }
 
+export function getDeployedAppUrl(appId?: string | null): string {
+  const normalizedAppId = appId?.trim()
+  return normalizedAppId ? `${publicAppsBaseUrl}/private/${encodeURIComponent(normalizedAppId)}/` : ''
+}
+
 export const publicAppConfig = {
   publicSiteUrl,
   studioUrl,

@@ -93,13 +93,13 @@ public sealed class PublishService
                         AppId = appConfig.AppId,
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
-                        Url = BuildPublishedUrl(server!, resolvedSlug),
+                        Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
                 }
 
-                Console.Write($"Publish '{appConfig.Name}' at {BuildPublishedUrl(server!, resolvedSlug)}? [y/N]: ");
+                Console.Write($"Publish '{appConfig.Name}' at {CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug)}? [y/N]: ");
                 var confirmation = Console.ReadLine()?.Trim();
                 if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
@@ -115,7 +115,7 @@ public sealed class PublishService
                         AppId = appConfig.AppId,
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
-                        Url = BuildPublishedUrl(server!, resolvedSlug),
+                        Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -132,7 +132,7 @@ public sealed class PublishService
                 resolvedIsForkable,
                 cancellationToken);
 
-            var publishedUrl = BuildPublishedUrl(server!, resolvedSlug);
+            var publishedUrl = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Publish, true, $"published at {publishedUrl}"));
 
             return new PublishResult
@@ -175,34 +175,6 @@ public sealed class PublishService
                 : Spectre.Console.ValidationResult.Error("[red]Use lowercase letters, numbers, and hyphens only[/]"));
 
         return AnsiConsole.Prompt(prompt).Trim();
-    }
-
-    private static string BuildPublishedUrl(string server, string slug)
-    {
-        var configuredAppsBaseUrl = Environment.GetEnvironmentVariable("AUTOMATON_APPS_BASE_URL");
-        if (!string.IsNullOrWhiteSpace(configuredAppsBaseUrl))
-        {
-            return $"{configuredAppsBaseUrl.TrimEnd('/')}/{slug}/";
-        }
-
-        if (Uri.TryCreate(server, UriKind.Absolute, out var serverUri))
-        {
-            var host = serverUri.Host;
-            if (host.StartsWith("api.", StringComparison.OrdinalIgnoreCase))
-            {
-                var appsHost = "apps." + host["api.".Length..];
-                var builder = new UriBuilder(serverUri)
-                {
-                    Host = appsHost,
-                    Path = slug,
-                    Query = string.Empty,
-                    Fragment = string.Empty
-                };
-                return builder.Uri.ToString().TrimEnd('/') + "/";
-            }
-        }
-
-        return $"{server.TrimEnd('/')}/{slug}/";
     }
 
     private static string Slugify(string? value)

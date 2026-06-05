@@ -56,7 +56,7 @@ public sealed class DeployService
 
         if (!appLinkCheck.Success || !credentialsCheck.Success || projectConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         var buildCheck = await RunBuildIfNeededAsync(projectConfig.Frontend?.Build, directory, nextSteps, cancellationToken);
@@ -64,7 +64,7 @@ public sealed class DeployService
 
         if (!buildCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         var packageCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, nextSteps, out var deployDirectory);
@@ -72,7 +72,7 @@ public sealed class DeployService
 
         if (!packageCheck.Success || deployDirectory == null)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
@@ -88,7 +88,7 @@ public sealed class DeployService
         {
             nextSteps.Add("Verify local source files and retry deploy so Studio source stays in sync");
             checks.Add(new DeployCheckResult(DeployCheckNames.SourceUpload, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
@@ -113,7 +113,7 @@ public sealed class DeployService
         {
             nextSteps.Add("Run automaton whoami to confirm the current server and identity");
             checks.Add(new DeployCheckResult(DeployCheckNames.Upload, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         var backendPackageCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
@@ -123,19 +123,19 @@ public sealed class DeployService
         {
             backendResult = new DeployBackendResult(false, 0, "backend deploy skipped by flag");
             checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, true, backendResult.Message ?? "backend deploy skipped by flag"));
-            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         if (!backendPackageCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         if (backendControllers == 0 || backendDirectory == null)
         {
             backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
             checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, true, backendResult.Message ?? "no backend controllers found"));
-            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
@@ -158,7 +158,7 @@ public sealed class DeployService
                     DeployCheckNames.BackendPackage,
                     false,
                     $"backend upload wrote 0 files from {Path.GetRelativePath(directory, backendDirectory)}"));
-                return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+                return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
             }
 
             checks.Add(new DeployCheckResult(
@@ -170,7 +170,7 @@ public sealed class DeployService
         {
             nextSteps.Add("Verify backend.deployDir in automaton.json and rerun automaton deploy");
             checks.Add(new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
@@ -183,7 +183,7 @@ public sealed class DeployService
             nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
             checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, false, ex.Message, IsWarning: true));
             backendResult = new DeployBackendResult(false, 0, ex.Message);
-            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         if (!backendResult.Success || backendResult.RunnerCount <= 0)
@@ -195,7 +195,7 @@ public sealed class DeployService
                 false,
                 backendResult.Message ?? "backend deploy did not reach any runner",
                 IsWarning: true));
-            return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         checks.Add(new DeployCheckResult(
@@ -203,7 +203,7 @@ public sealed class DeployService
             true,
             backendResult.Message ?? $"backend deployed to {backendResult.RunnerCount} runner(s)"));
 
-        return CreateResult(true, checks, nextSteps, projectConfig, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+        return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
     }
 
     private static DeployCheckResult ValidateAppLink(bool configFileExists, Models.AutomatonConfig? projectConfig, ISet<string> nextSteps)
@@ -354,6 +354,7 @@ public sealed class DeployService
         IReadOnlyList<DeployCheckResult> checks,
         IEnumerable<string> nextSteps,
         Models.AutomatonConfig? projectConfig,
+        string? server,
         bool clean,
         bool skipBackend,
         string? deployDirectory,
@@ -370,6 +371,9 @@ public sealed class DeployService
                 : "Deploy failed",
             AppId = projectConfig?.AppId,
             AppName = projectConfig?.Name,
+            OpenAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId)
+                ? CliAppUrlBuilder.BuildDeployedUrl(server, projectConfig.AppId)
+                : null,
             DeployDirectory = deployDirectory,
             Clean = clean,
             SkipBackend = skipBackend,
