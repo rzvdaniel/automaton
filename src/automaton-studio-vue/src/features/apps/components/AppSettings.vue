@@ -21,6 +21,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
 import { getDeployedAppUrl, getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -271,7 +272,12 @@ function openPublicUrl() {
 
 function openPrivateUrl() {
   if (fullPrivateUrl.value) {
-    window.open(fullPrivateUrl.value, '_blank')
+    const accessToken = tokenStorage.getAccessToken()
+    const url = new URL(fullPrivateUrl.value, window.location.origin)
+    if (accessToken) {
+      url.searchParams.set('access_token', accessToken)
+    }
+    window.open(url.toString(), '_blank')
   }
 }
 

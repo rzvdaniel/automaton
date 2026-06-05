@@ -14,6 +14,7 @@ import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import { getDeployedAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { tokenStorage } from '@/shared/services/api/axios-instance'
 
 interface Props {
   app: App
@@ -92,6 +93,17 @@ const openAppUrl = computed(() => {
 const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
 const privateAppUrl = computed(() => getDeployedAppUrl(props.app.id))
 
+function buildPrivateOpenUrl(url: string): string {
+  const accessToken = tokenStorage.getAccessToken()
+  if (!url || !accessToken) {
+    return url
+  }
+
+  const resolvedUrl = new URL(url, window.location.origin)
+  resolvedUrl.searchParams.set('access_token', accessToken)
+  return resolvedUrl.toString()
+}
+
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
 }
@@ -117,7 +129,7 @@ const handleOpenPrivateApp = () => {
     return
   }
 
-  window.open(privateAppUrl.value, '_blank', 'noopener')
+  window.open(buildPrivateOpenUrl(privateAppUrl.value), '_blank', 'noopener')
 }
 
 const handlePublish = () => {

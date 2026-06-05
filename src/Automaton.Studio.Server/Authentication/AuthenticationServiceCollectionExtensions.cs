@@ -53,7 +53,20 @@ namespace Common.Authentication
                     configurationOptions.Events = new JwtBearerEvents()
                     {
                         OnTokenValidated = tokenValidationContext => { return Task.CompletedTask; },
-                        OnMessageReceived = messageReceivedContext => { return Task.CompletedTask; },
+                        OnMessageReceived = messageReceivedContext =>
+                        {
+                            var path = messageReceivedContext.HttpContext.Request.Path;
+                            if (path.StartsWithSegments("/private"))
+                            {
+                                var accessToken = messageReceivedContext.Request.Query["access_token"].FirstOrDefault();
+                                if (!string.IsNullOrWhiteSpace(accessToken))
+                                {
+                                    messageReceivedContext.Token = accessToken;
+                                }
+                            }
+
+                            return Task.CompletedTask;
+                        },
                         OnAuthenticationFailed = authenticationFailedContext =>
                         {
                             if (authenticationFailedContext.Exception.GetType() ==

@@ -546,6 +546,19 @@ function getPrivateAppUrl(): string {
   }) : ''
 }
 
+function getPrivateAppOpenUrl(): string {
+  const privateUrl = getPrivateAppUrl()
+  const accessToken = tokenStorage.getAccessToken()
+
+  if (!privateUrl || !accessToken) {
+    return privateUrl
+  }
+
+  const url = new URL(privateUrl)
+  url.searchParams.set('access_token', accessToken)
+  return url.toString()
+}
+
 function getPublicAppUrl(): string {
   return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
 }
@@ -745,7 +758,7 @@ function openPublishedApp() {
 }
 
 function openPrivateApp() {
-  const privateUrl = getPrivateAppUrl()
+  const privateUrl = getPrivateAppOpenUrl()
   if (!privateUrl) {
     return
   }

@@ -675,7 +675,7 @@ class AppsService {
     useMockBackend = true,
   ): Promise<string> {
     const app = await this.get(id)
-    let html = rawHtml || app.definition?.htmlContent || this.getDefaultHtml()
+    let html = rawHtml || app.definition?.htmlContent || '<!DOCTYPE html><html lang="en"><head></head><body></body></html>'
 
     // Get current auth token and base URL for injection
     const token = tokenStorage.getAccessToken() || ''
@@ -730,61 +730,6 @@ class AppsService {
     }
 
     return baseTag + previewScript + html
-  }
-
-  /**
-   * Get default HTML template for new apps
-   */
-  getDefaultHtml(): string {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My App</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-width: 600px;
-            width: 100%;
-        }
-        h1 { color: #333; margin-top: 0; }
-        p { color: #666; line-height: 1.6; }
-        .button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 20px;
-        }
-        .button:hover { background: #5568d3; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Welcome to Your App!</h1>
-        <p>This is your app's starting template. Use the editor to customize it.</p>
-        <button class="button" onclick="alert('Hello!')">Click Me</button>
-    </div>
-    <script>console.log('App loaded!');</script>
-</body>
-</html>`
   }
 
   /**

@@ -1,6 +1,7 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Automaton.Studio.Server.Enums;
 using Serilog;
@@ -17,6 +18,7 @@ public class AppsService
     private readonly ResourceAuthorizationService authorizationService;
     private readonly AppFileStorageService fileStorageService;
     private readonly PublishedAppStorageService publishedAppStorageService;
+    private readonly IWebHostEnvironment webHostEnvironment;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -28,7 +30,8 @@ public class AppsService
         RecentActivityService recentActivityService,
         ResourceAuthorizationService authorizationService,
         AppFileStorageService fileStorageService,
-        PublishedAppStorageService publishedAppStorageService
+        PublishedAppStorageService publishedAppStorageService,
+        IWebHostEnvironment webHostEnvironment
     )
     {
         this.dataContext = dataContext;
@@ -37,6 +40,7 @@ public class AppsService
         this.authorizationService = authorizationService;
         this.fileStorageService = fileStorageService;
         this.publishedAppStorageService = publishedAppStorageService;
+        this.webHostEnvironment = webHostEnvironment;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -217,6 +221,12 @@ public class AppsService
             metadata.Backend.SourceAvailable = true;
             metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
         });
+
+        await fileStorageService.WriteSourceFileAsync(
+            UserId,
+            entity.Id,
+            "frontend/index.html",
+            await LoadDefaultFrontendTemplateAsync());
 
         // Write automaton.json so external AI tools (Copilot, Cursor, Claude) can discover the app ID.
         var automatonConfig = JsonSerializer.Serialize(
@@ -978,5 +988,16 @@ public class AppsService
         app.RuntimeSource = app.Frontend.RuntimeSource == app.Backend.RuntimeSource
             ? app.Frontend.RuntimeSource
             : $"{app.Frontend.RuntimeSource}|{app.Backend.RuntimeSource}";
+    }
+
+    private async Task<string> LoadDefaultFrontendTemplateAsync()
+    {
+        var templatePath = Path.Combine(
+            webHostEnvironment.ContentRootPath,
+            "Resources",
+            "AppTemplates",
+            "default-frontend-index.html");
+
+        return await File.ReadAllTextAsync(templatePath);
     }
 }

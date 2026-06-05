@@ -1,5 +1,15 @@
 export function getPublicAppsBaseUrl(): string {
-  return (import.meta.env.VITE_PUBLIC_APPS_BASE_URL || window.location.origin).replace(/\/+$/, '')
+  const configuredBaseUrl = import.meta.env.VITE_PUBLIC_APPS_BASE_URL?.trim()
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/+$/, '')
+  }
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (apiBaseUrl) {
+    return new URL(apiBaseUrl, window.location.origin).origin.replace(/\/+$/, '')
+  }
+
+  return window.location.origin.replace(/\/+$/, '')
 }
 
 export function getDeployedAppUrl(appId?: string | null): string {
