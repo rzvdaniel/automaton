@@ -163,11 +163,12 @@ public class UserAppsController : ControllerBase
 
     private string BuildCleanPrivateUrl(Guid appId, string? path)
     {
-        var normalizedPath = string.IsNullOrWhiteSpace(path) || string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase)
-            ? string.Empty
-            : "/" + path.TrimStart('/');
+        if (string.IsNullOrWhiteSpace(path) || string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/private/{appId}/";
+        }
 
-        return $"/private/{appId}{normalizedPath}";
+        return $"/private/{appId}/{path.TrimStart('/')}";
     }
 
     [HttpGet("{slug}")]
