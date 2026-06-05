@@ -191,9 +191,14 @@ For MCP details, use `/llms/automaton-mcp.md`.
 
 ## Linked files
 
-Use these focused references only when needed:
+If Automaton CLI is not installed:
+https://automaton.monster/llms/automaton-cli-install.md
 
-- `/llms/automaton-cli-install.md` — install, verify, login, logout/reset.
-- `/llms/automaton-cli-deploy.md` — deploy, runner handling, publish, troubleshooting.
-- `/llms/automaton-starter-prompts.md` — copy-paste prompts for Cursor, Codex, Claude Code, Copilot Chat, and similar tools.
-- `/llms/automaton-mcp.md` — optional MCP boundaries and inspection flow.
+If deployment is required:
+https://automaton.monster/llms/automaton-cli-deploy.md
+
+If generating a new application:
+https://automaton.monster/llms/automaton-starter-prompts.md
+
+If MCP integration is required:
+https://automaton.monster/llms/automaton-mcp.md
