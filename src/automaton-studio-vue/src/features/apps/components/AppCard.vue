@@ -13,7 +13,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
-import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getDeployedAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 interface Props {
   app: App
@@ -79,10 +79,18 @@ const updatedAgo = computed(() => {
   return `Updated: ${diffWeeks}w ago`
 })
 
-const canOpenApp = computed(() => props.app.isPublished || props.app.hasDeployedFrontend)
-const openAppUrl = computed(() => getOpenAppUrl(props.app))
+const canOpenPrivateApp = computed(() => props.app.hasDeployedFrontend)
+const canOpenPublicApp = computed(() => props.app.isPublished && !!props.app.publicUrl)
+const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
+const openAppUrl = computed(() => {
+  if (canOpenPublicApp.value) {
+    return getPublishedAppUrl(props.app.publicUrl)
+  }
+
+  return getDeployedAppUrl(props.app.id)
+})
 const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
-const openAppLabel = computed(() => canOpenApp.value ? 'Open App' : 'Open App')
+const privateAppUrl = computed(() => getDeployedAppUrl(props.app.id))
 
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
@@ -97,11 +105,19 @@ const handleOpenApp = () => {
 }
 
 const handleOpenPublicApp = () => {
-  if (!props.app.isPublished || !publicAppUrl.value) {
+  if (!canOpenPublicApp.value || !publicAppUrl.value) {
     return
   }
 
   window.open(publicAppUrl.value, '_blank', 'noopener')
+}
+
+const handleOpenPrivateApp = () => {
+  if (!canOpenPrivateApp.value || !privateAppUrl.value) {
+    return
+  }
+
+  window.open(privateAppUrl.value, '_blank', 'noopener')
 }
 
 const handlePublish = () => {
@@ -237,7 +253,15 @@ const menuItems = computed(() => {
     },
   ]
 
-  if (props.app.isPublished) {
+  if (canOpenPrivateApp.value) {
+    items.unshift({
+      label: canOpenPublicApp.value ? 'Open Private App' : 'Open App',
+      icon: 'pi pi-lock',
+      command: handleOpenPrivateApp,
+    })
+  }
+
+  if (canOpenPublicApp.value) {
     items.unshift({
       label: 'Open Public App',
       icon: 'pi pi-globe',
@@ -326,7 +350,7 @@ const menuItems = computed(() => {
         <!-- Actions -->
         <div class="flex gap-2 mt-auto">
           <Button
-            :label="openAppLabel"
+            label="Open"
             icon="pi pi-external-link"
             size="small"
             class="flex-1"

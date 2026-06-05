@@ -78,6 +78,13 @@ const openAppLabel = computed(() => {
 const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPublicApp)
 
 const openAppMenuItems = computed<MenuItem[]>(() => {
+  if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
+    return [
+      { label: 'Open App', command: () => emit('openPrivateApp') },
+      { label: 'Copy Link', command: () => emit('copyPrivateLink') },
+    ]
+  }
+
   const items: MenuItem[] = []
 
   if (props.canOpenPrivateApp) {
