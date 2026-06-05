@@ -143,7 +143,12 @@ public class AppsService
     /// </summary>
     public async Task<Models.PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
     {
-        var appEntity = await authorizationService.GetAccessibleAppsQuery()
+        return await GetAccessibleAppInfoByIdAsync(appId, UserId, cancellationToken);
+    }
+
+    public async Task<Models.PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var appEntity = await authorizationService.GetAccessibleAppsQuery(userId)
             .Include(x => x.WebAppUsers)
             .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken);
 

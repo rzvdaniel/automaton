@@ -125,7 +125,7 @@ public class UserAppsController : ControllerBase
         var launchCode = Request.Query["launch"].FirstOrDefault();
         if (privateAppLaunchService.TryConsumeLaunchCode(appId, launchCode, out var launchedUserId))
         {
-            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId);
+            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, launchedUserId);
             if (app == null)
             {
                 return null;
