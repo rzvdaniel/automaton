@@ -24,6 +24,10 @@ server {
     root /var/www/automaton-apps;
     index index.html;
 
+    location ~ /\.(?!well-known(?:/|$)) {
+        return 404;
+    }
+
     location = / {
         return 404;
     }
