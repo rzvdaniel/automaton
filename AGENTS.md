@@ -54,6 +54,7 @@ The Vue.js frontend implements feature-based routes (see `src/automaton-studio-v
 
 **Automaton Presentation Frontend (`src/automaton-vue/`):**
  – Static marketing site
+ - Standard website assets live in `src/automaton-vue/public/`; shared AI guidance lives in `shared/ai-guidance/` and is exposed by website hosting, not by Vite `publicDir`
 
 **Automaton Studio Frontend (`src/automaton-studio-vue/`):**
 - `src/features/` – Feature modules (auth, dashboard, flows, apps, steps, runners, projects, settings)

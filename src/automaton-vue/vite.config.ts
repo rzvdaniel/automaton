@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 import fs from 'fs'
 
-const logoSourcePath = path.resolve(__dirname, './src/assets/logo.svg')
+const sharedAiGuidanceRoot = path.resolve(__dirname, '../../shared/ai-guidance')
 const faviconAssets = [
   { url: '/logo.svg', file: path.resolve(__dirname, './src/assets/logo.svg'), type: 'image/svg+xml' },
   { url: '/favicon.svg', file: path.resolve(__dirname, './src/assets/logo.svg'), type: 'image/svg+xml' },
@@ -104,9 +104,57 @@ function stableLogoPlugin() {
   }
 }
 
+function sharedAiGuidanceDevPlugin() {
+  const sharedRoutes = [
+    { url: '/llms.txt', file: path.join(sharedAiGuidanceRoot, 'llms.txt'), type: 'text/plain; charset=utf-8' },
+  ]
+
+  return {
+    name: 'shared-ai-guidance-dev-plugin',
+    configureServer(server: any) {
+      for (const route of sharedRoutes) {
+        server.middlewares.use(route.url, (_req: any, res: any) => {
+          res.setHeader('Content-Type', route.type)
+          res.end(fs.readFileSync(route.file))
+        })
+      }
+
+      server.middlewares.use((req: any, res: any, next: any) => {
+        const requestPath = req.url?.split('?')[0] ?? ''
+
+        if (!requestPath.startsWith('/llms/') && !requestPath.startsWith('/templates/')) {
+          next()
+          return
+        }
+
+        const relativePath = requestPath.replace(/^\//, '')
+        const absolutePath = path.resolve(sharedAiGuidanceRoot, relativePath)
+        const allowedRoot = requestPath.startsWith('/llms/')
+          ? path.join(sharedAiGuidanceRoot, 'llms')
+          : path.join(sharedAiGuidanceRoot, 'templates')
+
+        if (!absolutePath.startsWith(allowedRoot) || !fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+          next()
+          return
+        }
+
+        const extension = path.extname(absolutePath).toLowerCase()
+        const contentType =
+          extension === '.md'
+            ? 'text/markdown; charset=utf-8'
+            : extension === '.txt'
+              ? 'text/plain; charset=utf-8'
+              : 'application/octet-stream'
+
+        res.setHeader('Content-Type', contentType)
+        res.end(fs.readFileSync(absolutePath))
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [vue(), stableLogoPlugin()],
-  publicDir: path.resolve(__dirname, '../../shared/ai-guidance'),
+  plugins: [vue(), stableLogoPlugin(), sharedAiGuidanceDevPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
