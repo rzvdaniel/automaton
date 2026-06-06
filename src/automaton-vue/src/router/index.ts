@@ -172,12 +172,12 @@ const router = createRouter({
       },
     },
     {
-      path: '/:publicUsername/apps/:appId',
+      path: '/creators/:publicUsername/apps/:appId',
       name: 'creator-app-detail',
       component: () => import('@/views/CreatorAppDetailView.vue'),
     },
     {
-      path: '/:publicUsername',
+      path: '/creators/:publicUsername',
       name: 'creator-store',
       component: () => import('@/views/CreatorStoreView.vue'),
     },

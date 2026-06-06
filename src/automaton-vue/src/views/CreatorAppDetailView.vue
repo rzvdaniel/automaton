@@ -114,7 +114,7 @@ onMounted(loadPage)
     <AppsDiscoveryStrip />
     <main class="creator-detail-page">
       <div class="container">
-        <RouterLink :to="`/${publicUsername}`" class="back-link">
+        <RouterLink :to="`/creators/${publicUsername}`" class="back-link">
           <i class="pi pi-arrow-left"></i>
           Back to {{ creatorName }}
         </RouterLink>
@@ -127,7 +127,7 @@ onMounted(loadPage)
         <section v-else-if="errorMessage" class="detail-state">
           <div class="state-orb"></div>
           <p>{{ errorMessage }}</p>
-          <RouterLink :to="`/${publicUsername}`" class="btn btn-secondary">Back to creator store</RouterLink>
+          <RouterLink :to="`/creators/${publicUsername}`" class="btn btn-secondary">Back to creator store</RouterLink>
         </section>
 
         <template v-else-if="app">
@@ -150,7 +150,7 @@ onMounted(loadPage)
             <aside class="hero-copy">
               <div>
                 <div class="creator-label">Built by</div>
-                <RouterLink :to="`/${publicUsername}`" class="creator-link">{{ creatorName }}</RouterLink>
+                <RouterLink :to="`/creators/${publicUsername}`" class="creator-link">{{ creatorName }}</RouterLink>
               </div>
 
               <div class="meta-row">
@@ -172,7 +172,7 @@ onMounted(loadPage)
                   Open app
                   <i class="pi pi-external-link"></i>
                 </a>
-                <RouterLink :to="`/${publicUsername}`" class="btn btn-secondary">More by {{ creatorName }}</RouterLink>
+                <RouterLink :to="`/creators/${publicUsername}`" class="btn btn-secondary">More by {{ creatorName }}</RouterLink>
               </div>
             </aside>
           </section>

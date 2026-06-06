@@ -122,7 +122,7 @@ function applyRouteFilters() {
 }
 
 function openCreator(publicUsername: string) {
-  void router.push(`/${publicUsername}`)
+  void router.push(`/creators/${publicUsername}`)
 }
 
 onMounted(async () => {

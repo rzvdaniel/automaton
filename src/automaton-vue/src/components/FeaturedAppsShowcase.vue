@@ -97,7 +97,7 @@ function viewApp(app?: MarketplaceAppCard) {
 function openCreator(app?: MarketplaceAppCard) {
   const publicUsername = app?.creatorPublicUsername
   if (!publicUsername) return
-  void router.push(`/${publicUsername}`)
+  void router.push(`/creators/${publicUsername}`)
 }
 
 function startRotation() {

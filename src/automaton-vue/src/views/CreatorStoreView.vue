@@ -38,7 +38,7 @@ function resolveAssetUrl(url?: string | null): string {
 }
 
 function openDetails(appId: string) {
-  void router.push(`/${publicUsername.value}/apps/${appId}`)
+  void router.push(`/creators/${publicUsername.value}/apps/${appId}`)
 }
 
 async function loadCreatorApps() {

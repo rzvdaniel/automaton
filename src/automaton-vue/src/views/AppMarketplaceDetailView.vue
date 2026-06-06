@@ -284,7 +284,7 @@ onMounted(loadApp)
               <div class="summary-main">
                 <h1 class="hero-title">{{ app.name }}</h1>
                 <div v-if="app.creatorPublicUsername" class="developer-row">
-                  <RouterLink :to="`/${app.creatorPublicUsername}`" class="developer-link">
+                  <RouterLink :to="`/creators/${app.creatorPublicUsername}`" class="developer-link">
                     <span class="creator-avatar">{{ creatorInitials }}</span>
                     <span>by {{ creatorName }}</span>
                   </RouterLink>
