@@ -2,8 +2,10 @@ using System.Security.Claims;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 namespace Automaton.Studio.Server.Tests;
 
@@ -128,7 +130,8 @@ public class AppAuthorizationRegressionTests
             null!,
             authorizationService,
             null!,
-            null!);
+            null!,
+            new StubWebHostEnvironment());
     }
 
     private static void SeedApp(ApplicationDbContext dbContext, Guid appId, Guid ownerId, string slug)
@@ -167,5 +170,15 @@ public class AppAuthorizationRegressionTests
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow
         };
+    }
+
+    private sealed class StubWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "Automaton.Tests";
+        public IFileProvider WebRootFileProvider { get; set; } = null!;
+        public string WebRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = "Production";
+        public string ContentRootPath { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = null!;
     }
 }
