@@ -44,12 +44,13 @@ interface NavSection {
 const mainNavItems: NavItem[] = [
   { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
   { label: 'Apps', icon: 'pi pi-globe', to: '/apps', hideForAppUser: true },
+  { label: 'API Keys', icon: 'pi pi-key', to: '/apikeys', hideForAppUser: true, accent: 'green' },
   { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
+  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
+  { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
 ]
 
 const collaborationNavItems: NavItem[] = [
-  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
-  { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
   { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
 ]
 
@@ -113,10 +114,7 @@ const apiKeysBadge = computed(() => {
 })
 
 const apiKeysNavItem = computed<NavItem>(() => ({
-  label: 'API Keys',
-  icon: 'pi pi-key',
-  to: '/apikeys',
-  hideForAppUser: true,
+  ...mainNavItems[2],
   accent: 'green',
   badge: apiKeysBadge.value,
 }))
@@ -124,8 +122,10 @@ const apiKeysNavItem = computed<NavItem>(() => ({
 const primaryNavItems = computed<NavItem[]>(() => [
   mainNavItems[0],
   mainNavItems[1],
-  mainNavItems[2],
   apiKeysNavItem.value,
+  mainNavItems[3],
+  mainNavItems[4],
+  mainNavItems[5],
 ])
 
 function filterItems(items: NavItem[]) {
@@ -148,13 +148,13 @@ const visibleSections = computed<NavSection[]>(() => {
   const sections: NavSection[] = [
     { key: 'main', items: filterItems(primaryNavItems.value) },
     { key: 'collaboration', items: filterItems(collaborationNavItems) },
-    { key: 'admin', items: filterItems(adminNavItems) },
   ]
 
   return sections.filter((section) => section.items.length > 0)
 })
 
 const visibleBottomNavItems = computed(() => filterItems(utilityNavItems))
+const visibleAdminNavItems = computed(() => filterItems(adminNavItems))
 
 const hasTopDividerAfter = (index: number) => {
   return index < visibleSections.value.length - 1
@@ -285,6 +285,42 @@ const isActive = (to: string) => {
       <nav class="sidebar-nav sidebar-nav-bottom">
         <div class="nav-divider"></div>
         <div v-for="item in visibleBottomNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
+          <Button
+            v-tooltip.right="tooltipOptions(item.label)"
+            :class="[
+              'nav-item',
+              {
+                active: isActive(item.to),
+                'nav-item-accent-green': item.accent === 'green' && !isActive(item.to),
+                'nav-item-accent-green-active': item.accent === 'green' && isActive(item.to),
+              },
+            ]"
+            :severity="isActive(item.to) ? 'primary' : 'secondary'"
+            :text="!isActive(item.to)"
+            rounded
+            @click="navigate(item)"
+          >
+            <span
+              class="nav-icon-wrap"
+              :class="{
+                'nav-icon-wrap-green': item.accent === 'green',
+                'nav-icon-wrap-green-active': item.accent === 'green' && isActive(item.to),
+              }"
+            >
+              <i :class="item.icon"></i>
+            </span>
+            <span v-if="isExpanded" class="nav-label">{{ item.label }}</span>
+            <span
+              v-if="isExpanded && item.badge"
+              class="nav-badge"
+              :class="{ 'nav-badge-green': item.accent === 'green' }"
+            >
+              {{ item.badge }}
+            </span>
+          </Button>
+        </div>
+        <div v-if="visibleAdminNavItems.length > 0" class="nav-divider"></div>
+        <div v-for="item in visibleAdminNavItems" v-if="!loading" :key="item.to" class="nav-item-wrapper">
           <Button
             v-tooltip.right="tooltipOptions(item.label)"
             :class="[
