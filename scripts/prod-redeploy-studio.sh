@@ -58,6 +58,7 @@ switch_live_color studio "$TARGET_COLOR"
 echo "[INFO] Switched $STUDIO_DOMAIN traffic to studio-$TARGET_COLOR via nginx reload"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    wait_before_stopping_previous_color studio
     stop_color studio "$CURRENT_COLOR"
 fi
 

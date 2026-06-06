@@ -58,6 +58,7 @@ switch_live_color website "$TARGET_COLOR"
 echo "[INFO] Switched $WEBSITE_DOMAIN and www.$WEBSITE_DOMAIN traffic to website-$TARGET_COLOR via nginx reload"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    wait_before_stopping_previous_color website
     stop_color website "$CURRENT_COLOR"
 fi
 

@@ -51,6 +51,8 @@ load_prod_env() {
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
     RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-180}"
+    CUTOVER_WARMUP_SECONDS="${CUTOVER_WARMUP_SECONDS:-10}"
+    PREVIOUS_COLOR_OVERLAP_SECONDS="${PREVIOUS_COLOR_OVERLAP_SECONDS:-20}"
 }
 
 write_default_state() {
@@ -373,8 +375,53 @@ verify_live_origin() {
     esac
 }
 
+verify_public_origin() {
+    local service="$1"
+
+    case "$service" in
+        api)
+            curl -fsS "https://$API_DOMAIN/healthz" > /dev/null
+            ;;
+        studio)
+            curl -IfsS "https://$STUDIO_DOMAIN/" > /dev/null
+            ;;
+        website)
+            curl -IfsS "https://$WEBSITE_DOMAIN/" > /dev/null
+            curl -IfsS "https://www.$WEBSITE_DOMAIN/" > /dev/null
+            ;;
+        *)
+            echo "[ERROR] Unknown service: $service" >&2
+            exit 1
+            ;;
+    esac
+}
+
 verify_app_host_origin() {
     curl -kIfsS --resolve "$APPS_DOMAIN:443:127.0.0.1" "https://$APPS_DOMAIN/runtime/automaton-api.js" > /dev/null
+}
+
+wait_for_public_origin() {
+    local service="$1"
+    local timeout_seconds="${2:-180}"
+    local retry_interval_seconds="${3:-5}"
+    local started_at
+    started_at="$(date +%s)"
+
+    echo "[INFO] Waiting for public $service hostname(s) to respond"
+
+    while true; do
+        if verify_public_origin "$service"; then
+            echo "[INFO] Public $service hostname(s) are responding"
+            return 0
+        fi
+
+        if (( "$(date +%s)" - started_at >= timeout_seconds )); then
+            echo "[ERROR] Timed out waiting for public $service hostname(s) to respond" >&2
+            exit 1
+        fi
+
+        sleep "$retry_interval_seconds"
+    done
 }
 
 switch_live_color() {
@@ -394,6 +441,7 @@ switch_live_color() {
     fi
 
     verify_live_origin "$service"
+    wait_for_public_origin "$service"
     set_live_color_record "$service" "$color"
 }
 
@@ -421,6 +469,11 @@ deploy_color() {
     echo "[INFO] Deploying $compose_service"
     docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans "$compose_service"
     wait_for_service_healthy "$compose_service"
+
+    if (( CUTOVER_WARMUP_SECONDS > 0 )); then
+        echo "[INFO] Warming up $compose_service for ${CUTOVER_WARMUP_SECONDS}s before cutover"
+        sleep "$CUTOVER_WARMUP_SECONDS"
+    fi
 }
 
 stop_color() {
@@ -433,6 +486,15 @@ stop_color() {
         echo "[INFO] Stopping previous color $compose_service"
         docker compose -f "$COMPOSE_FILE" stop "$compose_service"
         docker compose -f "$COMPOSE_FILE" rm -f "$compose_service"
+    fi
+}
+
+wait_before_stopping_previous_color() {
+    local service="$1"
+
+    if (( PREVIOUS_COLOR_OVERLAP_SECONDS > 0 )); then
+        echo "[INFO] Keeping previous $service color running for ${PREVIOUS_COLOR_OVERLAP_SECONDS}s after cutover"
+        sleep "$PREVIOUS_COLOR_OVERLAP_SECONDS"
     fi
 }
 

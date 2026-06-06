@@ -101,12 +101,15 @@ if [[ "$KEEP_PREVIOUS" != "true" ]]; then
     if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
         echo "[INFO] Waiting ${DRAIN_WAIT_SECONDS}s for runners on api-$CURRENT_API_COLOR to reconnect"
         sleep "$DRAIN_WAIT_SECONDS"
+        wait_before_stopping_previous_color api
         stop_color api "$CURRENT_API_COLOR"
     fi
     if [[ "$CURRENT_STUDIO_COLOR" != "$TARGET_STUDIO_COLOR" ]]; then
+        wait_before_stopping_previous_color studio
         stop_color studio "$CURRENT_STUDIO_COLOR"
     fi
     if [[ "$CURRENT_WEBSITE_COLOR" != "$TARGET_WEBSITE_COLOR" ]]; then
+        wait_before_stopping_previous_color website
         stop_color website "$CURRENT_WEBSITE_COLOR"
     fi
 fi
