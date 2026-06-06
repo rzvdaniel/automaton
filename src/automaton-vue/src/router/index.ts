@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
-import { applySeo } from '@/seo/useSeo'
+import { applySeo, type SeoMeta } from '@/seo/useSeo'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -191,9 +191,7 @@ const router = createRouter({
 })
 
 router.afterEach((to) => {
-  const seo = to.meta?.seo as
-    | { title?: string; description?: string; noindex?: boolean }
-    | undefined
+  const seo = to.meta?.seo as Partial<SeoMeta> | undefined
 
   applySeo({
     title: seo?.title ?? 'Build and Deploy AI-Generated Apps',
