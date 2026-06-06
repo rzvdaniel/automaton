@@ -33,6 +33,14 @@ server {
         return 404;
     }
 
+    location ~* ^/(?:docker-compose(?:\.[^.]+)?\.ya?ml|package(?:-lock)?\.json|tsconfig(?:\.[^.]+)?\.json|vite\.config\.[^.]+|web\.config|appsettings(?:\.[^.]+)?\.json|composer\.(?:json|lock)|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|requirements(?:\.[^.]+)?\.txt|pipfile(?:\.lock)?|poetry\.lock|cargo\.(?:toml|lock)|go\.(?:mod|sum)|makefile|dockerfile|\.env(?:\..*)?|id_[^/]+)$ {
+        return 404;
+    }
+
+    location ~* \.(?:bak|sql|log|ya?ml|toml|ini|env|pem|key|crt|pfx|p12|ps1|sh|cmd|bat|config|lock)$ {
+        return 404;
+    }
+
     location / {
         proxy_pass http://website_live;
         proxy_http_version 1.1;
