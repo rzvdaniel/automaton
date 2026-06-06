@@ -115,6 +115,21 @@ public class PublishedAppStorageService
         return BuildPublicAppUrl(config.PublicBaseUrl, slug);
     }
 
+    public Task<byte[]?> ReadPublishedFileBytesAsync(string slug, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            return Task.FromResult<byte[]?>(null);
+        }
+
+        var rootPath = GetRootPath();
+        var appPath = ResolveSafePath(rootPath, slug.Trim());
+        var filePath = ResolveSafePath(appPath, relativePath);
+        return File.Exists(filePath)
+            ? File.ReadAllBytesAsync(filePath)
+            : Task.FromResult<byte[]?>(null);
+    }
+
     internal static string BuildPublicAppUrl(string? publicBaseUrl, string slug)
     {
         var normalizedBaseUrl = publicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty;

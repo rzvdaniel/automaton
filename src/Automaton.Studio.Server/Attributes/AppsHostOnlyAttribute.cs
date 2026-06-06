@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 
 namespace Automaton.Studio.Server.Attributes;
 

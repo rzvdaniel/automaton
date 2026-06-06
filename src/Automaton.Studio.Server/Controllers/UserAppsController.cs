@@ -36,6 +36,7 @@ public class UserAppsController : ControllerBase
     private readonly ApplicationDbContext dbContext;
     private readonly AppsService appsService;
     private readonly AppFileStorageService fileStorageService;
+    private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
@@ -45,6 +46,7 @@ public class UserAppsController : ControllerBase
         ApplicationDbContext dbContext,
         AppsService appsService,
         AppFileStorageService fileStorageService,
+        PublishedAppStorageService publishedAppStorageService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
         IOptions<WebAppConfig> webAppConfig,
@@ -53,6 +55,7 @@ public class UserAppsController : ControllerBase
         this.dbContext = dbContext;
         this.appsService = appsService;
         this.fileStorageService = fileStorageService;
+        this.publishedAppStorageService = publishedAppStorageService;
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
@@ -174,26 +177,26 @@ public class UserAppsController : ControllerBase
         return $"/private/{appId}/{path.TrimStart('/')}";
     }
 
-    [HttpGet("{slug}")]
-    [AppsHostOnly]
-    [HttpGet("apps/{slug}")]
-    [AllowAnonymous]
-    [Produces("text/html")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> ServeApp(string slug)
-    {
-        return await ServeAppFile(slug, "index.html");
-    }
-
     /// <summary>
     /// Serve any file from a user app.
     /// Example: https://apps.automaton.monster/my-cool-app/styles.css
     /// </summary>
-    [HttpGet("{slug}/{*path}")]
-    [AppsHostOnly]
     [HttpGet("apps/{slug}/{*path}")]
     [AllowAnonymous]
-    public async Task<IActionResult> ServeAppFile(string slug, string path = "index.html")
+    public async Task<IActionResult> ServeStudioHostedAppFile(string slug, string path = "index.html")
+    {
+        return await ServePublishedAppFile(slug, path);
+    }
+
+    [HttpGet("{slug}/{*path}")]
+    [AppsHostOnly]
+    [AllowAnonymous]
+    public async Task<IActionResult> ServeDedicatedAppsHostAppFile(string slug, string path = "index.html")
+    {
+        return await ServePublishedAppFile(slug, path);
+    }
+
+    private async Task<IActionResult> ServePublishedAppFile(string slug, string path = "index.html")
     {
         try
         {
@@ -226,9 +229,8 @@ public class UserAppsController : ControllerBase
                 return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
             }
 
-            return await ServeRuntimeFileAsync(
-                app.Id,
-                ownerId.Value,
+            return await ServePublishedStaticFileAsync(
+                slug,
                 path,
                 backendApiPath: $"/api/web-apps/{Uri.EscapeDataString(slug)}");
         }
@@ -263,6 +265,36 @@ public class UserAppsController : ControllerBase
         var contentType = WebAppRuntimeFilePolicy.GetContentType(runtimePath);
         WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
         WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, runtimePath, webAppConfig);
+
+        if (contentType == "text/html")
+        {
+            var html = Encoding.UTF8.GetString(content);
+            var injectedHtml = InjectRuntimeScripts(html, backendApiPath);
+            return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
+        }
+
+        return File(content, contentType);
+    }
+
+    private async Task<IActionResult> ServePublishedStaticFileAsync(string slug, string? path, string backendApiPath)
+    {
+        path = string.IsNullOrEmpty(path) ? "index.html" : path;
+
+        var publishedPath = Path.GetExtension(path).Length == 0 ? "index.html" : path;
+        if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(publishedPath))
+        {
+            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+        }
+
+        var content = await publishedAppStorageService.ReadPublishedFileBytesAsync(slug, publishedPath);
+        if (content == null)
+        {
+            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+        }
+
+        var contentType = WebAppRuntimeFilePolicy.GetContentType(publishedPath);
+        WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
+        WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, publishedPath, webAppConfig);
 
         if (contentType == "text/html")
         {
