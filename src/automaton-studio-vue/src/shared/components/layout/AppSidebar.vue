@@ -45,10 +45,10 @@ const mainNavItems: NavItem[] = [
   { label: 'Dashboard', icon: 'pi pi-home', to: '/' },
   { label: 'Apps', icon: 'pi pi-globe', to: '/apps', hideForAppUser: true },
   { label: 'Runners', icon: 'pi pi-desktop', to: '/runners', hideForAppUser: true },
-  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
 ]
 
 const collaborationNavItems: NavItem[] = [
+  { label: 'Projects', icon: 'pi pi-building', to: '/projects', hideForAppUser: true },
   { label: 'Organizations', icon: 'pi pi-users', to: '/organizations' },
   { label: 'My Apps', icon: 'pi pi-th-large', to: '/my-apps', hideForAppUser: false },
 ]
@@ -126,7 +126,6 @@ const primaryNavItems = computed<NavItem[]>(() => [
   mainNavItems[1],
   mainNavItems[2],
   apiKeysNavItem.value,
-  mainNavItems[3],
 ])
 
 function filterItems(items: NavItem[]) {
@@ -394,7 +393,7 @@ const isActive = (to: string) => {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.32rem;
+  gap: 0.24rem;
 }
 
 .nav-badge {
@@ -415,7 +414,7 @@ const isActive = (to: string) => {
 .nav-section {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.12rem;
 }
 
 .sidebar-spacer {
@@ -431,7 +430,7 @@ const isActive = (to: string) => {
   width: 100%;
   justify-content: flex-start;
   gap: 0.6rem;
-  padding: 0.58rem 0.68rem;
+  padding: 0.46rem 0.62rem;
   border-radius: 0.7rem;
   transition: all 0.15s ease;
   position: relative;
@@ -443,8 +442,8 @@ const isActive = (to: string) => {
 }
 
 .nav-icon-wrap {
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.55rem;
+  height: 1.55rem;
   border-radius: 0.58rem;
   display: inline-flex;
   align-items: center;
@@ -471,6 +470,31 @@ const isActive = (to: string) => {
   width: 3px;
   border-radius: 999px;
   background: var(--p-primary-500);
+}
+
+.app-sidebar:not(.expanded) .sidebar-content {
+  padding-inline: 0.5rem;
+}
+
+.app-sidebar:not(.expanded) .sidebar-logo {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.app-sidebar:not(.expanded) .nav-item {
+  justify-content: center;
+  padding: 0.22rem 0.35rem;
+  min-height: 2.2rem;
+}
+
+.app-sidebar:not(.expanded) .nav-item.active::before {
+  display: none;
+}
+
+.app-sidebar:not(.expanded) .nav-icon-wrap {
+  width: 1.95rem;
+  height: 1.95rem;
+  border-radius: 0.68rem;
 }
 
 .nav-label {
@@ -511,7 +535,7 @@ const isActive = (to: string) => {
 .nav-divider {
   height: 1px;
   background-color: var(--p-surface-200);
-  margin: 0.45rem 0;
+  margin: 0.28rem 0;
 }
 
 .sidebar-nav-bottom {

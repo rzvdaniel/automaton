@@ -7,7 +7,7 @@ Serve public published Automaton apps as real top-level static websites on a ded
 ```text
 studio.automaton.monster  -> Vue Studio, editor, authenticated preview
 api.automaton.monster     -> ASP.NET API control plane and runtime calls
-apps.automaton.monster    -> public static published app files
+apps.automaton.monster    -> static published apps + authenticated private app runtime entry
 ```
 
 This fixes PWA installation behavior because browser install metadata belongs to the published app document, not the Studio shell. It also moves normal visitor traffic away from ASP.NET controllers and into nginx/static serving, where Cloudflare can cache assets.
@@ -97,7 +97,8 @@ https://apps.automaton.monster/{slug}/assets/...
 Studio preview and private app access:
 
 ```text
-https://studio.automaton.monster/apps/{appId}
+https://studio.automaton.monster/apps/{appId}/editor
+https://apps.automaton.monster/private/{appId}/
 ```
 
 The Studio `/web/{slug}` viewer should be removed or redirected once `apps.automaton.monster` is live. Public marketplace cards, dashboards, publish dialogs, and app settings should link to `apps.automaton.monster/{slug}/`.
@@ -192,6 +193,8 @@ Add an nginx vhost for `apps.automaton.monster`.
 Required behavior:
 
 - Serve files from `/var/www/automaton-apps`.
+- Proxy `/private/{appId}` and `/private/{appId}/...` to the live API upstream.
+- Proxy `/api/web-apps/app/...` to the live API upstream for private runtime backend calls.
 - Redirect `/{slug}` to `/{slug}/`.
 - Serve `/{slug}/` as `/{slug}/index.html`.
 - Serve `/{slug}/assets/*` directly.
@@ -242,14 +245,16 @@ POST https://api.automaton.monster/api/web-apps/{slug}/flows/{flow}/execute
 
 Do not publish private/org-only apps to `published-apps/` in V1.
 
-V1 behavior:
+Current behavior:
 
-- Unpublished workspace apps: Studio authenticated preview.
-- Personal private apps: Studio authenticated preview.
-- Organization internal apps: Studio authenticated route.
+- Unpublished workspace apps: `apps.automaton.monster/private/{appId}/` after authenticated launch from Studio or CLI.
+- Personal private apps: `apps.automaton.monster/private/{appId}/` with short-lived launch exchange and private app cookie.
+- Organization internal apps: still use authenticated app-specific routes; org-scoped vanity private URLs are not introduced here.
 - Public published apps: `apps.automaton.monster/{slug}/`.
 
-An authenticated private runtime on `apps.automaton.monster/o/{orgSlug}/{appSlug}/` is a future feature. It needs an auth gateway before file serving and should not be mixed into the public static host implementation.
+Future feature:
+
+- An organization vanity private runtime such as `apps.automaton.monster/o/{orgSlug}/{appSlug}/` still needs a separate routing and auth model. That is different from the current app-id private runtime and should be treated as a future extension.
 
 ## Backend Changes
 
@@ -342,11 +347,12 @@ Keep API endpoints that return metadata or execute app runtime actions.
 
 - Unpublished app is not reachable on `apps.automaton.monster`.
 - Published app loads from `apps.automaton.monster/{slug}/`.
+- Private app loads from `apps.automaton.monster/private/{appId}/` after launch exchange.
 - Deep links under a slug load the app through SPA fallback.
 - `manifest.webmanifest` is served from the app host.
 - icons referenced by the manifest load from the app host.
 - `automaton-config.js` has the right slug, app id, and API base URL.
 - app backend calls still go to `api.automaton.monster`.
 - unpublish removes or disables public app files.
-- private/org apps remain accessible only through Studio authenticated routes.
+- private runtime API calls under `/api/web-apps/app/...` are authenticated and proxied through the apps host.
 - Cloudflare caches hashed assets but revalidates `index.html` and config.
