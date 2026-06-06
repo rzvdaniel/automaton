@@ -5,6 +5,7 @@ import PublicSiteHeader from '@/components/PublicSiteHeader.vue'
 import { publicAppConfig } from '@/config/publicAppConfig'
 import { resolveMarketplaceAssetUrl, useMarketplaceApps } from '@/composables/useMarketplaceApps'
 import type { MarketplaceAppCard } from '@/types/marketplace'
+import logoUrl from '@/assets/logo.svg'
 import studioScreenshotUrl from '@/assets/studio-apps-screenshot.jpg'
 
 const router = useRouter()
@@ -610,7 +611,7 @@ watch(
         <div class="footer-grid">
           <div class="brand-column">
             <div class="brand-row">
-              <span class="footer-logo">am</span>
+              <img :src="logoUrl" alt="" class="footer-logo" aria-hidden="true" />
               <span class="brand-name">Automaton Monster</span>
             </div>
             <p class="brand-copy">
@@ -2256,17 +2257,9 @@ section {
 }
 
 .footer-logo {
-  display: grid;
+  display: block;
   width: 38px;
   height: 38px;
-  place-items: center;
-  border: 1px solid rgba(69, 230, 138, 0.48);
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(69, 230, 138, 0.18), rgba(80, 215, 255, 0.1));
-  box-shadow: 0 0 30px rgba(69, 230, 138, 0.12);
-  color: var(--v2-green);
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-weight: 900;
 }
 
 .brand-name {

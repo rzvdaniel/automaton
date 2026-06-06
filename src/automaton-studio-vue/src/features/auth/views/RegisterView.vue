@@ -220,8 +220,8 @@ function handleTurnstileError() {
   <div class="register-view flex align-items-center justify-content-center min-h-screen">
     <Card class="register-card w-full" style="max-width: 400px">
       <template #header>
-        <div class="text-center pt-4">
-          <i class="pi pi-bolt text-4xl mb-3" style="color: var(--p-primary-500)"></i>
+        <div class="auth-card-header text-center pt-4">
+          <img src="/logo.svg" alt="Automaton logo" class="auth-logo mb-3" />
           <h1 class="text-2xl font-bold m-0">Create Account</h1>
           <p class="text-color-secondary mt-2">Get started with Automaton Studio</p>
         </div>
@@ -425,5 +425,17 @@ function handleTurnstileError() {
 
 .register-card {
   margin: 1rem;
+}
+
+.auth-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-logo {
+  width: 4rem;
+  height: 4rem;
+  display: block;
 }
 </style>

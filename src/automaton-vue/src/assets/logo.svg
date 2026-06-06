@@ -1,40 +1,36 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-<defs>
-  <linearGradient id="bg" x1="6" y1="6" x2="506" y2="506">
-    <stop stop-color="#0F201A"/>
-    <stop offset="1" stop-color="#05070A"/>
-  </linearGradient>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Automaton Monster Logo</title>
+  <desc id="desc">A green rounded square icon with white chevron eyes and a small flat mouth.</desc>
 
-  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-    <feGaussianBlur stdDeviation="12" result="blur"/>
-    <feColorMatrix in="blur" type="matrix"
-      values="0 0 0 0 0.262
-              0 0 0 0 0.925
-              0 0 0 0 0.553
-              0 0 0 0.45 0"/>
-    <feBlend in="SourceGraphic"/>
-  </filter>
-</defs>
+  <defs>
+    <linearGradient id="green" x1="180" y1="70" x2="860" y2="950" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06C46F"/>
+      <stop offset="1" stop-color="#05A85F"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000000" flood-opacity="0.14"/>
+    </filter>
+  </defs>
 
-<rect x="6" y="6" width="500" height="500" rx="118"
-      fill="url(#bg)"
-      stroke="#43EC8D"
-      stroke-width="6"/>
+  <rect x="72" y="72" width="880" height="880" rx="145" fill="url(#green)" filter="url(#softShadow)"/>
 
-<rect x="24" y="24" width="464" height="464" rx="108"
-      stroke="#43EC8D"
-      stroke-opacity="0.18"
-      stroke-width="2"/>
+  <path d="M252 391 L350 456 L252 521"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
 
-<g filter="url(#glow)">
-  <text x="255"
-        y="250"
-        fill="#43EC8D"
-        font-family="Inter, Arial, sans-serif"
-        font-size="260"
-        font-weight="800"
-        text-anchor="middle"
-        dominant-baseline="middle">am</text>
- 
-</g>
+  <path d="M772 391 L674 456 L772 521"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="60"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M444 658 H580"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="44"
+        stroke-linecap="round"/>
 </svg>
