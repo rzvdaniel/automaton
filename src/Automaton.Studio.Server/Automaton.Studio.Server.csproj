@@ -75,4 +75,7 @@
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
   </ItemGroup>
+  <ItemGroup>
+    <Watch Remove="AppData\media\**\*" />
+  </ItemGroup>
 </Project>

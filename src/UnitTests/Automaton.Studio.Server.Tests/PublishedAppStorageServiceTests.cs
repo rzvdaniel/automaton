@@ -1,4 +1,9 @@
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Config;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using System.Reflection;
 
 namespace Automaton.Studio.Server.Tests;
@@ -105,6 +110,45 @@ public class PublishedAppStorageServiceTests
         }
     }
 
+    [Test]
+    public void BuildPublicUrl_PrefixesAppsNamespace()
+    {
+        var service = CreateService(new PublishedAppsConfig
+        {
+            PublicBaseUrl = "https://studio.automaton.monster"
+        });
+
+        var result = service.BuildPublicUrl("my-cool-app");
+
+        Assert.That(result, Is.EqualTo("https://studio.automaton.monster/apps/my-cool-app/"));
+    }
+
+    [Test]
+    public void BuildPublicUrl_UsesRootSlugOnDedicatedAppsHost()
+    {
+        var service = CreateService(new PublishedAppsConfig
+        {
+            PublicBaseUrl = "https://apps.automaton.monster"
+        });
+
+        var result = service.BuildPublicUrl("my-cool-app");
+
+        Assert.That(result, Is.EqualTo("https://apps.automaton.monster/my-cool-app/"));
+    }
+
+    [Test]
+    public void BuildPublicUrl_PrefixesAppsNamespaceOnLocalhost()
+    {
+        var service = CreateService(new PublishedAppsConfig
+        {
+            PublicBaseUrl = "https://localhost:7091"
+        });
+
+        var result = service.BuildPublicUrl("my-cool-app");
+
+        Assert.That(result, Is.EqualTo("https://localhost:7091/apps/my-cool-app/"));
+    }
+
     private static void InvokeValidateIndexHtml(string html)
     {
         try
@@ -121,5 +165,24 @@ public class PublishedAppStorageServiceTests
     {
         var task = (Task)ValidateManifestMethod.Invoke(null, [manifestPath, CancellationToken.None])!;
         await task;
+    }
+
+    private static PublishedAppStorageService CreateService(PublishedAppsConfig? config = null)
+    {
+        return new PublishedAppStorageService(
+            new StubWebHostEnvironment(),
+            null!,
+            Options.Create(config ?? new PublishedAppsConfig()),
+            NullLogger<PublishedAppStorageService>.Instance);
+    }
+
+    private sealed class StubWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "Automaton.Tests";
+        public IFileProvider WebRootFileProvider { get; set; } = null!;
+        public string WebRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = "Production";
+        public string ContentRootPath { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = null!;
     }
 }

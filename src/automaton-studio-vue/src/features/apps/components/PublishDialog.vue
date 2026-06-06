@@ -9,7 +9,7 @@ import Select from 'primevue/select'
 import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
 import type { PublishAppRequest } from '../types/apps.types'
-import { getPublicAppsBaseUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishedAppUrl, getPublishedAppsUrlPrefix } from '../utils/public-app-url'
 
 const props = defineProps<{
   visible: boolean
@@ -133,7 +133,7 @@ function close() {
       <div class="field mb-4">
         <label for="slug" class="block font-semibold mb-2">Public URL</label>
         <div class="p-inputgroup">
-          <span class="p-inputgroup-addon">{{ getPublicAppsBaseUrl() }}/</span>
+          <span class="p-inputgroup-addon">{{ getPublishedAppsUrlPrefix() }}</span>
           <InputText
             id="slug"
             v-model="slug"

@@ -112,7 +112,15 @@ public class PublishedAppStorageService
             return string.Empty;
         }
 
-        return $"{config.PublicBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(slug.Trim())}/";
+        return BuildPublicAppUrl(config.PublicBaseUrl, slug);
+    }
+
+    internal static string BuildPublicAppUrl(string? publicBaseUrl, string slug)
+    {
+        var normalizedBaseUrl = publicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty;
+        var normalizedSlug = Uri.EscapeDataString(slug.Trim());
+        var pathPrefix = ShouldNamespaceAppsUnderPath(normalizedBaseUrl) ? "/apps" : string.Empty;
+        return $"{normalizedBaseUrl}{pathPrefix}/{normalizedSlug}/";
     }
 
     private string GetRootPath()
@@ -243,7 +251,7 @@ public class PublishedAppStorageService
         {
             throw new InvalidOperationException(
                 "Published app index.html contains root-relative local URLs. " +
-                "Published apps are hosted under /{slug}/, so app-local assets and navigation must use relative URLs. " +
+                "Published apps are hosted under a slug path such as apps.automaton.monster/{slug}/ or /apps/{slug}/, so app-local assets and navigation must use relative URLs. " +
                 "For Vite, set base: './' in vite.config.ts. Offending references: " +
                 string.Join(", ", invalidReferences));
         }
@@ -431,4 +439,19 @@ public class PublishedAppStorageService
     }
 
     private readonly record struct HtmlReference(string Attribute, string Value);
+
+    private static bool ShouldNamespaceAppsUnderPath(string publicBaseUrl)
+    {
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var uri))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(uri.AbsolutePath) && uri.AbsolutePath != "/")
+        {
+            return true;
+        }
+
+        return !uri.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase);
+    }
 }

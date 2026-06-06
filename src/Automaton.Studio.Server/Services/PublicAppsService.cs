@@ -235,7 +235,7 @@ public class PublicAppsService
     {
         return string.IsNullOrWhiteSpace(slug)
             ? string.Empty
-            : $"{publishedAppsConfig.PublicBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(slug.Trim())}/";
+            : PublishedAppStorageService.BuildPublicAppUrl(publishedAppsConfig.PublicBaseUrl, slug);
     }
 }
 

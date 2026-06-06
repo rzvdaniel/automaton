@@ -1,13 +1,14 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Services;
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Attributes;
 using Automaton.Studio.Server.Enums;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Security.Claims;
 
 namespace Automaton.Studio.Server.Controllers;
 
@@ -17,8 +18,10 @@ namespace Automaton.Studio.Server.Controllers;
 /// for security isolation from the main application.
 ///
 /// Routes:
-/// - GET /{slug}           → Serves index.html for the app
-/// - GET /{slug}/{*path}   → Serves any file from the app
+/// - GET /{slug}               → Serves index.html for the dedicated apps host
+/// - GET /{slug}/{*path}       → Serves any file from the dedicated apps host
+/// - GET /apps/{slug}          → Serves index.html for Studio/local hosts
+/// - GET /apps/{slug}/{*path}  → Serves any file for Studio/local hosts
 ///
 /// Security:
 /// - Served from separate domain to prevent XSS access to main app cookies
@@ -172,6 +175,8 @@ public class UserAppsController : ControllerBase
     }
 
     [HttpGet("{slug}")]
+    [AppsHostOnly]
+    [HttpGet("apps/{slug}")]
     [AllowAnonymous]
     [Produces("text/html")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -185,6 +190,8 @@ public class UserAppsController : ControllerBase
     /// Example: https://apps.automaton.monster/my-cool-app/styles.css
     /// </summary>
     [HttpGet("{slug}/{*path}")]
+    [AppsHostOnly]
+    [HttpGet("apps/{slug}/{*path}")]
     [AllowAnonymous]
     public async Task<IActionResult> ServeAppFile(string slug, string path = "index.html")
     {
