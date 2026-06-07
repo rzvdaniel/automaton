@@ -93,3 +93,9 @@ __pycache__/
 .artifacts/
 .agents/
 .vitepress/
+!src/automaton-vue/docs/.vitepress/
+src/automaton-vue/docs/.vitepress/cache/
+src/automaton-vue/docs/.vitepress/dist/
+!src/automaton-vue/docs/.vitepress/config.ts
+!src/automaton-vue/docs/.vitepress/theme/
+!src/automaton-vue/docs/.vitepress/theme/index.ts
