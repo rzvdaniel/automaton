@@ -71,6 +71,9 @@
 	  <None Include="Logs\README.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
+	  <None Include="Resources\AppTemplates\default-frontend-index.html">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
 	  <None Include="SystemPrompts\ExternalMcpInstructions.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
