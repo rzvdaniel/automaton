@@ -1,6 +1,5 @@
 upstream studio_live {
     include /etc/nginx/upstreams/studio-live.conf;
-    keepalive 16;
 }
 
 server {

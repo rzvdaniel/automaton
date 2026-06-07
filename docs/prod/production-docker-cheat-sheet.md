@@ -278,6 +278,8 @@ The deploy scripts build the inactive color, wait for health checks to pass, ver
 
 For `prod-redeploy-all.sh`, the three public selectors are now switched together and nginx reloads once. This reduces Cloudflare origin churn during full-stack deploys.
 
+`website` and `studio` upstreams intentionally do not use nginx upstream keepalive. They are static frontend containers, and removing backend connection reuse keeps blue/green cutover behavior simpler. The API upstream still keeps its own connection reuse settings.
+
 `apps.automaton.monster` is different. It is a static host backed by the shared published-apps volume, so it does not have `apps-blue` or `apps-green` containers. Platform deploys update its nginx vhost and runtime SDK; user app publishes update files in the shared volume at runtime.
 
 For API deploys, there is an extra runner-drain step:

@@ -1,6 +1,5 @@
 upstream website_live {
     include /etc/nginx/upstreams/website-live.conf;
-    keepalive 16;
 }
 
 server {
