@@ -5,8 +5,6 @@ description: Automaton Monster documentation. Learn how to build, deploy and pub
 
 # Documentation
 
-Build, deploy, and publish apps with Automaton Monster using real static docs pages under `/docs`.
-
 ## Start here
 
 - [Getting Started](/getting-started)
