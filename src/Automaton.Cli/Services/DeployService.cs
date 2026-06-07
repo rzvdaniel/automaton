@@ -222,8 +222,8 @@ public sealed class DeployService
 
         if (string.IsNullOrWhiteSpace(projectConfig.AppId))
         {
-            nextSteps.Add("Add appId to automaton.json or relink the app with automaton link <app-id>");
-            return new DeployCheckResult(DeployCheckNames.AppLink, false, "automaton.json is missing appId");
+            nextSteps.Add("Run automaton create to create and link a remote app, or automaton link <app-id> to link an existing app");
+            return new DeployCheckResult(DeployCheckNames.AppLink, false, "automaton.json is missing appId; local scaffold exists but is not linked yet");
         }
 
         return new DeployCheckResult(DeployCheckNames.AppLink, true, $"linked app {projectConfig.AppId}");

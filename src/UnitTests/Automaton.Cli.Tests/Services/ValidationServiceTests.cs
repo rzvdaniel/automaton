@@ -53,6 +53,38 @@ public class ValidationServiceTests
         AssertCheck(result, ValidationCheckNames.AppLink, false, "automaton.json not found");
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, false, "skipped because app linkage failed");
         Assert.That(result.NextSteps, Has.Some.Contains("automaton new"));
+        Assert.That(result.NextSteps.Any(step => step.Contains("\"frontend\"")), Is.True);
+    }
+
+    [Test]
+    public async Task ValidateAsync_WhenAutomatonJsonIsPresentButUnlinked_SuggestsCreateOrLink()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        WriteFrontendIndexHtml(projectRoot);
+
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Unlinked App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
+        });
+
+        var service = new ValidationService(configService, (_, _, _, _) =>
+            Task.FromResult(new RemoteAppValidationInfo("runner-1")));
+
+        var result = await service.ValidateAsync(projectRoot);
+
+        Assert.That(result.Success, Is.False);
+        AssertCheck(result, ValidationCheckNames.AppLink, false, "not linked yet");
+        Assert.That(result.NextSteps, Has.Some.Contains("automaton create"));
     }
 
     [Test]

@@ -56,7 +56,7 @@ public class ConfigService
         var config = TryLoadProjectConfig(directory);
         if (config == null || string.IsNullOrWhiteSpace(config.AppId))
             throw new InvalidOperationException(
-                "automaton.json not found or missing appId. Run 'automaton init' or 'automaton link <app-id>' first.");
+                "automaton.json not found or missing appId. Run 'automaton new', 'automaton create', or 'automaton link <app-id>' first.");
         return config;
     }
 

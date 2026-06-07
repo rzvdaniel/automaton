@@ -3,6 +3,7 @@ namespace Automaton.Cli.Models;
 public static class CommandDiagnosticCheckNames
 {
     public const string AppLink = "appLink";
+    public const string LocalScaffold = "localScaffold";
     public const string AiGuidance = "aiGuidance";
     public const string Credentials = "credentials";
     public const string RemoteAccess = "remoteAccess";

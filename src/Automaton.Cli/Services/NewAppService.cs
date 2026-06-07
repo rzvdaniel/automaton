@@ -4,6 +4,10 @@ namespace Automaton.Cli.Services;
 
 public sealed class NewAppService
 {
+    private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
+    private const string FrontendDeployDirectory = "frontend/dist";
+    private const string BackendDeployDirectory = "backend";
+
     private readonly ConfigService _config;
     private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, string, CancellationToken, Task<(string appId, string name)>> _createAppAsync;
@@ -58,27 +62,19 @@ public sealed class NewAppService
 
         try
         {
-            var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
-
-            _config.SaveProjectConfig(directory, new AutomatonConfig
-            {
-                AppId = appId,
-                Name = appName,
-                Server = server,
-                Frontend = new FrontendConfig
-                {
-                    Build = "cd frontend && npm install && npm run build",
-                    DeployDir = "frontend/dist"
-                },
-                Backend = new BackendConfig
-                {
-                    DeployDir = "backend"
-                }
-            });
+            _config.SaveProjectConfig(directory, BuildProjectConfig(name.Trim(), server, appId: null));
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.LocalScaffold,
+                true,
+                $"local scaffold created at {Path.Combine(directory, "automaton.json")}"));
 
             var guidance = _aiGuidancePackService.Sync(directory);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+
+            var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
+
+            _config.SaveProjectConfig(directory, BuildProjectConfig(appName, server, appId));
 
             nextSteps.Add("Run automaton deploy");
 
@@ -96,22 +92,55 @@ public sealed class NewAppService
         }
         catch (Exception ex)
         {
-            var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp)
-                ? CommandDiagnosticCheckNames.AiGuidance
-                : CommandDiagnosticCheckNames.CreateApp;
+            var checkName = checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold)
+                ? CommandDiagnosticCheckNames.CreateApp
+                : CommandDiagnosticCheckNames.LocalScaffold;
             checks.Add(new CommandDiagnosticCheck(checkName, false, ex.Message));
-            nextSteps.Add(checkName == CommandDiagnosticCheckNames.AiGuidance
-                ? "Fix local file permissions or rerun automaton new"
-                : "Run automaton whoami to confirm the current server and identity");
+
+            if (checkName == CommandDiagnosticCheckNames.LocalScaffold)
+            {
+                nextSteps.Add("Fix local file permissions or rerun automaton new");
+            }
+            else
+            {
+                nextSteps.Add("Retry remote app creation with automaton create");
+                nextSteps.Add("Or link an existing app with automaton link <app-id>");
+                nextSteps.Add("Run automaton validate to confirm the local scaffold");
+                nextSteps.Add("Run automaton whoami to confirm the current server and identity");
+            }
+
             return new NewAppResult
             {
                 Success = false,
                 Summary = "New failed",
                 Checks = checks,
                 NextSteps = nextSteps.ToList(),
-                Server = server
+                Name = name?.Trim(),
+                Server = server,
+                ConfigPath = checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success)
+                    ? Path.Combine(directory, "automaton.json")
+                    : null
             };
         }
+    }
+
+    private static AutomatonConfig BuildProjectConfig(string name, string server, string? appId)
+    {
+        return new AutomatonConfig
+        {
+            AppId = appId ?? string.Empty,
+            Name = name,
+            Server = server,
+            Frontend = new FrontendConfig
+            {
+                Build = FrontendBuildCommand,
+                DeployDir = FrontendDeployDirectory
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = BackendDeployDirectory
+            }
+        };
     }
 
     private static async Task<(string appId, string name)> CreateAppAsync(string server, string apiKey, string name, CancellationToken cancellationToken)

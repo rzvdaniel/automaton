@@ -23,8 +23,8 @@ public static class CliCommandChecks
 
         if (string.IsNullOrWhiteSpace(projectConfig.AppId))
         {
-            nextSteps.Add("Add appId to automaton.json or relink the app with automaton link <app-id>");
-            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "automaton.json is missing appId");
+            nextSteps.Add("Run automaton create to create and link a remote app, or automaton link <app-id> to link an existing app");
+            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "automaton.json is missing appId; local scaffold exists but is not linked yet");
         }
 
         return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, true, $"linked app {projectConfig.AppId}");

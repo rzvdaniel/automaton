@@ -5,6 +5,18 @@ namespace Automaton.Cli.Services;
 public sealed class ValidationService
 {
     private const string AutomatonConfigFileName = "automaton.json";
+    private const string MinimalConfigExample = """
+{
+  "name": "My App",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+""";
 
     private readonly ConfigService _config;
     private readonly Func<string, string, string, CancellationToken, Task<RemoteAppValidationInfo>> _loadRemoteAppAsync;
@@ -101,6 +113,7 @@ public sealed class ValidationService
         if (!configFileExists)
         {
             nextSteps.Add("Run automaton new \"My App\" or automaton link <app-id>");
+            nextSteps.Add($"Minimal automaton.json example:{Environment.NewLine}{MinimalConfigExample}");
             return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json not found in the project root");
         }
 
@@ -112,8 +125,9 @@ public sealed class ValidationService
 
         if (string.IsNullOrWhiteSpace(projectConfig.AppId))
         {
-            nextSteps.Add("Add appId to automaton.json or relink the app with automaton link <app-id>");
-            return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json is missing appId");
+            nextSteps.Add("Run automaton create to create and link a remote app, or automaton link <app-id> to link an existing app");
+            nextSteps.Add($"Minimal automaton.json example:{Environment.NewLine}{MinimalConfigExample}");
+            return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json is missing appId; local scaffold exists but is not linked yet");
         }
 
         if (string.IsNullOrWhiteSpace(resolvedServer))

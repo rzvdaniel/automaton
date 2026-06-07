@@ -1,3 +1,4 @@
+using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using NUnit.Framework;
 
@@ -50,6 +51,31 @@ public class NewAppServiceTests
         Assert.That(config.Frontend?.Build, Is.EqualTo("cd frontend && npm install && npm run build"));
         Assert.That(config.Frontend?.DeployDir, Is.EqualTo("frontend/dist"));
         Assert.That(config.Backend?.DeployDir, Is.EqualTo("backend"));
+    }
+
+    [Test]
+    public async Task CreateAsync_WhenRemoteCreationFails_LeavesLocalScaffoldForLaterLinking()
+    {
+        var projectRoot = CreateProjectRoot();
+        var service = new NewAppService(
+            new ConfigService(),
+            (_, _, _, _) => throw new HttpRequestException("API error 500 Internal Server Error"));
+
+        var result = await service.CreateAsync(projectRoot, "My App", "https://automaton.monster", "ak_test");
+
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.ConfigPath, Is.EqualTo(Path.Combine(projectRoot, "automaton.json")));
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success), Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.AiGuidance && check.Success), Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success), Is.True);
+        Assert.That(result.NextSteps, Has.Some.EqualTo("Retry remote app creation with automaton create"));
+
+        var config = new ConfigService().TryLoadProjectConfig(projectRoot);
+        Assert.That(config, Is.Not.Null);
+        Assert.That(config!.AppId, Is.Empty);
+        Assert.That(config.Name, Is.EqualTo("My App"));
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".automatonignore")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
     }
 
     [Test]
