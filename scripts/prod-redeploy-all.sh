@@ -87,9 +87,7 @@ deploy_color studio "$TARGET_STUDIO_COLOR"
 echo "[INFO] Redeploying website to $TARGET_WEBSITE_COLOR (current live color: $CURRENT_WEBSITE_COLOR)"
 deploy_color website "$TARGET_WEBSITE_COLOR"
 
-switch_live_color api "$TARGET_API_COLOR"
-switch_live_color studio "$TARGET_STUDIO_COLOR"
-switch_live_color website "$TARGET_WEBSITE_COLOR"
+switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSITE_COLOR"
 
 echo "[INFO] nginx is now routing api, studio, and website to the freshly deployed colors"
 

@@ -274,7 +274,9 @@ Each public service has two Compose services:
 - `studio-blue` / `studio-green`
 - `website-blue` / `website-green`
 
-The deploy scripts build the inactive color, wait for health checks to pass, rewrite the nginx selector for that hostname, reload nginx, and then stop the old color unless you pass `--keep-previous`.
+The deploy scripts build the inactive color, wait for health checks to pass, verify nginx can reach that new color over the Docker network, rewrite the nginx selector for that hostname, reload nginx, and then stop the old color unless you pass `--keep-previous`.
+
+For `prod-redeploy-all.sh`, the three public selectors are now switched together and nginx reloads once. This reduces Cloudflare origin churn during full-stack deploys.
 
 `apps.automaton.monster` is different. It is a static host backed by the shared published-apps volume, so it does not have `apps-blue` or `apps-green` containers. Platform deploys update its nginx vhost and runtime SDK; user app publishes update files in the shared volume at runtime.
 
@@ -393,6 +395,12 @@ chmod +x ./scripts/prod-*.sh
 ```
 
 Use `--keep-previous` by default in CI/CD. It leaves the previous color running, so rollback remains a route switch while you watch the new deployment.
+
+Deploy verification behavior:
+
+- local origin checks with `curl --resolve ... 127.0.0.1` are the authoritative cutover gate
+- public hostname checks through Cloudflare are advisory warnings after local origin already passed
+- if Cloudflare is briefly unhealthy while the local origin is healthy, the deploy should warn instead of treating the app cutover itself as failed
 
 For a website-only deploy:
 
@@ -806,7 +814,7 @@ sudo apt install htop -y
 ## Notes
 
 - This is safer than `docker compose up -d --build website` because nginx keeps serving the currently live color until the new color passes health checks and the selector file is switched.
-- Cloudflare should no longer need the DNS proxy off/on workaround in normal deploys, because the hostname never points at a half-restarted backend.
+- Cloudflare should no longer need the DNS proxy off/on workaround in normal deploys, because the hostname never points at a half-restarted backend and full-stack cutover now performs a single nginx reload.
 - API blue/green assumes database changes are backward-compatible for the duration of the cutover. Avoid schema changes where the old API crashes immediately after the migration is applied.
 - The blue/green scripts run `docker compose ... --remove-orphans`, so old pre-migration containers like `automaton-prod-website-1` / `-2` get cleaned up automatically on the next deploy.
 - `apps.automaton.monster` is not blue/green. It is static nginx serving backed by `prod-published-apps`, so platform rollback and individual app rollback are separate operations.

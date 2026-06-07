@@ -396,6 +396,19 @@ verify_public_origin() {
     esac
 }
 
+soft_wait_for_public_origin() {
+    local service="$1"
+    local timeout_seconds="${2:-45}"
+    local retry_interval_seconds="${3:-5}"
+
+    if ! wait_for_public_origin "$service" "$timeout_seconds" "$retry_interval_seconds"; then
+        echo "[WARN] Public $service hostname(s) did not recover through Cloudflare within ${timeout_seconds}s, but local origin verification passed." >&2
+        return 1
+    fi
+
+    return 0
+}
+
 verify_app_host_origin() {
     curl -kIfsS --resolve "$APPS_DOMAIN:443:127.0.0.1" "https://$APPS_DOMAIN/runtime/automaton-api.js" > /dev/null
 }
@@ -441,8 +454,47 @@ switch_live_color() {
     fi
 
     verify_live_origin "$service"
-    wait_for_public_origin "$service"
+    soft_wait_for_public_origin "$service" || true
     set_live_color_record "$service" "$color"
+}
+
+switch_all_live_colors() {
+    local api_color="$1"
+    local studio_color="$2"
+    local website_color="$3"
+    local previous_api_color
+    local previous_studio_color
+    local previous_website_color
+
+    previous_api_color="$(get_live_color api)"
+    previous_studio_color="$(get_live_color studio)"
+    previous_website_color="$(get_live_color website)"
+
+    render_service_upstream api "$api_color"
+    render_service_upstream studio "$studio_color"
+    render_service_upstream website "$website_color"
+
+    if ! nginx_reload; then
+        echo "[ERROR] nginx reload failed while switching all public services. Reverting selectors." >&2
+        render_service_upstream api "$previous_api_color"
+        render_service_upstream studio "$previous_studio_color"
+        render_service_upstream website "$previous_website_color"
+        nginx_reload || true
+        exit 1
+    fi
+
+    verify_live_origin api
+    verify_live_origin studio
+    verify_live_origin website
+
+    LIVE_API_COLOR="$api_color"
+    LIVE_STUDIO_COLOR="$studio_color"
+    LIVE_WEBSITE_COLOR="$website_color"
+    save_state
+
+    soft_wait_for_public_origin api || true
+    soft_wait_for_public_origin studio || true
+    soft_wait_for_public_origin website || true
 }
 
 ensure_infrastructure() {
@@ -460,6 +512,46 @@ reset_blue_green_to_blue() {
     render_all_upstreams
 }
 
+verify_target_from_nginx() {
+    local service="$1"
+    local color="$2"
+    local timeout_seconds="${3:-60}"
+    local started_at
+    started_at="$(date +%s)"
+
+    echo "[INFO] Verifying nginx can reach $service-$color before cutover"
+
+    while true; do
+        if docker compose -f "$COMPOSE_FILE" exec -T nginx sh -lc "$(nginx_target_probe_command "$service" "$color")" > /dev/null 2>&1; then
+            echo "[INFO] nginx reachability check passed for $service-$color"
+            return 0
+        fi
+
+        if (( "$(date +%s)" - started_at >= timeout_seconds )); then
+            echo "[ERROR] Timed out waiting for nginx to reach $service-$color" >&2
+            docker compose -f "$COMPOSE_FILE" logs --tail 100 nginx >&2 || true
+            exit 1
+        fi
+
+        sleep 2
+    done
+}
+
+nginx_target_probe_command() {
+    local service="$1"
+    local color="$2"
+
+    case "$service" in
+        api) echo "curl -fsS http://api-$color:8080/healthz > /dev/null" ;;
+        studio) echo "wget -q --spider http://studio-$color/" ;;
+        website) echo "wget -q --spider http://website-$color/" ;;
+        *)
+            echo "[ERROR] Unknown service: $service" >&2
+            exit 1
+            ;;
+    esac
+}
+
 deploy_color() {
     local service="$1"
     local color="$2"
@@ -469,6 +561,7 @@ deploy_color() {
     echo "[INFO] Deploying $compose_service"
     docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans "$compose_service"
     wait_for_service_healthy "$compose_service"
+    verify_target_from_nginx "$service" "$color"
 
     if (( CUTOVER_WARMUP_SECONDS > 0 )); then
         echo "[INFO] Warming up $compose_service for ${CUTOVER_WARMUP_SECONDS}s before cutover"
