@@ -49,7 +49,7 @@ async function copyInstallCommand() {
               <i class="pi pi-box" />
               Download binaries
             </RouterLink>
-            <a href="/docs" class="btn btn-secondary btn-lg">
+            <a href="/docs/" class="btn btn-secondary btn-lg">
               <i class="pi pi-book" />
               Read the docs
             </a>

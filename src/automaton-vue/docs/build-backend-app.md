@@ -1,3 +1,8 @@
+---
+title: Build a Backend App
+description: Build a Python backend app with Automaton. Deploy controllers to a self-hosted Runner and call them from your frontend.
+---
+
 # Build a Backend App
 
 Backend apps run on a Runner.

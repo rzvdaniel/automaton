@@ -1,3 +1,8 @@
+---
+title: Deploy an App
+description: Deploy your Automaton app with the CLI. Ship frontend and backend apps in seconds using automaton deploy.
+---
+
 # Deploy
 
 `automaton deploy` uploads your app runtime to Automaton.

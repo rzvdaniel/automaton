@@ -153,8 +153,28 @@ function sharedAiGuidanceDevPlugin() {
   }
 }
 
+function docsRedirectDevPlugin() {
+  return {
+    name: 'docs-redirect-dev-plugin',
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        const requestPath = req.url?.split('?')[0] ?? ''
+
+        if (requestPath !== '/docs') {
+          next()
+          return
+        }
+
+        res.statusCode = 302
+        res.setHeader('Location', '/docs/')
+        res.end()
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [vue(), stableLogoPlugin(), sharedAiGuidanceDevPlugin()],
+  plugins: [vue(), stableLogoPlugin(), sharedAiGuidanceDevPlugin(), docsRedirectDevPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -162,6 +182,12 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    proxy: {
+      '/docs': {
+        target: 'http://127.0.0.1:5175',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

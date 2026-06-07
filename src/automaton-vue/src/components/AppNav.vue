@@ -10,7 +10,7 @@ const route = useRoute()
 const navLinks = [
   { label: 'Apps', href: '/apps' },
   { label: 'CLI', href: '/cli' },
-  { label: 'Docs', href: '/docs' },
+  { label: 'Docs', href: '/docs/', external: true },
   { label: 'GitHub', href: 'https://github.com', external: true },
 ]
 

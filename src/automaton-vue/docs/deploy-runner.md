@@ -1,3 +1,8 @@
+---
+title: Deploy a Runner
+description: Set up a self-hosted Automaton Runner to execute backend apps locally or on your own infrastructure using Docker.
+---
+
 # Deploy a Runner
 
 A Runner executes backend code for your Automaton apps.

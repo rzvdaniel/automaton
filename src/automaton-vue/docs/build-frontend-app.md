@@ -1,3 +1,8 @@
+---
+title: Build a Frontend App
+description: Build and host a static frontend app with AI using Automaton. Supports Vite, React, Vue, and vanilla JavaScript.
+---
+
 # Build a Frontend App
 
 Frontend apps are hosted by Automaton.

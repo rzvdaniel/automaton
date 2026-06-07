@@ -171,7 +171,7 @@ watch(
               Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton gives your agent the deploy path: frontend hosting is included, and your backend runs on your runner.
             </p>
             <div class="hero-actions">
-              <RouterLink class="button primary" to="/docs/getting-started">Get Started</RouterLink>
+              <a class="button primary" href="/docs/getting-started">Get Started</a>
               <button class="button" type="button" @click="copyAiPrompt">
                 {{ promptCopied ? 'Prompt Copied' : 'Copy AI Prompt' }}
               </button>
@@ -392,7 +392,7 @@ watch(
                 <button class="button primary" type="button" @click="copyAiPrompt">
                   {{ promptCopied ? 'Prompt Copied' : 'Copy AI Prompt' }}
                 </button>
-                <RouterLink class="ai-workflow-link" to="/docs/cli-ai-tools">Read the AI workflow</RouterLink>
+                <a class="ai-workflow-link" href="/docs/cli-ai-tools">Read the AI workflow</a>
               </div>
             </div>
 
@@ -493,7 +493,7 @@ watch(
 
               <div class="studio-actions">
                 <a :href="publicAppConfig.studioUrl" target="_blank" rel="noopener" class="button primary">Open Studio</a>
-                <a href="/docs" class="button">Read docs</a>
+                <a href="/docs/" class="button">Read docs</a>
               </div>
             </div>
 
@@ -632,7 +632,7 @@ watch(
           <div class="footer-column">
             <h3>Resources</h3>
             <div class="link-list">
-              <a href="/docs">Docs</a>
+              <a href="/docs/">Docs</a>
               <a href="/cli">CLI setup</a>
               <a href="/#runners">Runners</a>
               <a href="/apps">Publishing</a>

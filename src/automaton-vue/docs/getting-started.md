@@ -1,3 +1,8 @@
+---
+title: Getting Started
+description: Get started with Automaton Monster in 5 minutes. Install the CLI, create your first app and deploy it.
+---
+
 # 5-Minute Quickstart
 
 If you want the shortest path from zero to a deployed app, choose one of these flows.

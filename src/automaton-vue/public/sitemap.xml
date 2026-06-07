@@ -16,51 +16,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://automaton.monster/docs</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/getting-started</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/cli-ai-tools</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/build-frontend-app</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/build-backend-app</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/deploy-runner</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/deploy</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/publish</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://automaton.monster/docs/automaton-cli</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://automaton.monster/cli</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

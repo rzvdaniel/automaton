@@ -1,3 +1,8 @@
+---
+title: Publish an App
+description: Make your Automaton app public. Publish a deployed app to share it with anyone using automaton publish.
+---
+
 # Publish
 
 `automaton publish` makes the latest deployed version publicly accessible.

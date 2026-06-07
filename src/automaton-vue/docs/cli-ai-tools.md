@@ -1,3 +1,8 @@
+---
+title: Build with AI Tools
+description: Use Automaton CLI with AI coding tools like Copilot, Claude or Cursor to build and deploy apps faster.
+---
+
 # Build with AI
 
 Automaton is designed to work with AI coding agents.
