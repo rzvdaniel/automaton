@@ -107,6 +107,7 @@ function stableLogoPlugin() {
 function sharedAiGuidanceDevPlugin() {
   const sharedRoutes = [
     { url: '/llms.txt', file: path.join(sharedAiGuidanceRoot, 'llms.txt'), type: 'text/plain; charset=utf-8' },
+    { url: '/llms-full.txt', file: path.join(sharedAiGuidanceRoot, 'llms-full.txt'), type: 'text/plain; charset=utf-8' },
   ]
 
   return {
@@ -153,6 +154,47 @@ function sharedAiGuidanceDevPlugin() {
   }
 }
 
+function emitSharedAiGuidanceAssetsPlugin() {
+  const emitDirectory = (context: any, absoluteRoot: string, relativeRoot: string) => {
+    const entries = fs.readdirSync(absoluteRoot, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const absolutePath = path.join(absoluteRoot, entry.name)
+      const relativePath = path.posix.join(relativeRoot, entry.name)
+
+      if (entry.isDirectory()) {
+        emitDirectory(context, absolutePath, relativePath)
+        continue
+      }
+
+      context.emitFile({
+        type: 'asset',
+        fileName: relativePath,
+        source: fs.readFileSync(absolutePath),
+      })
+    }
+  }
+
+  return {
+    name: 'emit-shared-ai-guidance-assets-plugin',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'llms.txt',
+        source: fs.readFileSync(path.join(sharedAiGuidanceRoot, 'llms.txt')),
+      })
+
+      this.emitFile({
+        type: 'asset',
+        fileName: 'llms-full.txt',
+        source: fs.readFileSync(path.join(sharedAiGuidanceRoot, 'llms-full.txt')),
+      })
+
+      emitDirectory(this, path.join(sharedAiGuidanceRoot, 'llms'), 'llms')
+    },
+  }
+}
+
 function docsRedirectDevPlugin() {
   return {
     name: 'docs-redirect-dev-plugin',
@@ -174,7 +216,7 @@ function docsRedirectDevPlugin() {
 }
 
 export default defineConfig({
-  plugins: [vue(), stableLogoPlugin(), sharedAiGuidanceDevPlugin(), docsRedirectDevPlugin()],
+  plugins: [vue(), stableLogoPlugin(), sharedAiGuidanceDevPlugin(), emitSharedAiGuidanceAssetsPlugin(), docsRedirectDevPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

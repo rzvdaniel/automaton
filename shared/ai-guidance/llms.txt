@@ -4,6 +4,10 @@ If you are an AI assistant helping a user build an Automaton app, start here.
 
 `llms.txt` is the source of truth for the core Automaton app contract. Linked files provide focused help for install/login, deploy, starter prompts, and optional MCP usage.
 
+If you need a fuller machine-readable contract with concrete examples, use:
+
+https://automaton.monster/llms-full.txt
+
 ## AI shortest path
 
 For a new Automaton app:
@@ -197,6 +201,27 @@ Automaton MCP is optional. Use it only when available or when the user explicitl
 For MCP details, use `/llms/automaton-mcp.md`.
 
 ## Linked files
+
+Full contract and examples:
+https://automaton.monster/llms-full.txt
+
+Frontend structure contract:
+https://automaton.monster/llms/automaton-frontend-structure.md
+
+Backend controller contract:
+https://automaton.monster/llms/automaton-backend-controllers.md
+
+Starter examples:
+https://automaton.monster/llms/automaton-examples.md
+
+Frontend docs page:
+https://automaton.monster/docs/build-frontend-app
+
+Backend docs page:
+https://automaton.monster/docs/build-backend-app
+
+CLI docs page:
+https://automaton.monster/docs/automaton-cli
 
 If Automaton CLI is not installed:
 https://automaton.monster/llms/automaton-cli-install.md

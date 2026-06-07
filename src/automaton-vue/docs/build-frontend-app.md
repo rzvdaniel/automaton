@@ -55,6 +55,8 @@ For a normal Vite app, `automaton.json` should include:
 
 `frontend.deployDir` is the folder Automaton serves publicly after deploy.
 
+For Vite apps, set `base: './'` and keep app-local asset URLs relative so the published app works correctly under its slug path.
+
 ## Deploy
 
 ```bash
@@ -70,3 +72,8 @@ automaton publish
 ## Frontend-only apps do not need a Runner
 
 A Runner is only needed when your app has backend code.
+
+For a fuller frontend contract and starter examples, see:
+
+- [Automaton frontend structure](https://automaton.monster/llms/automaton-frontend-structure.md)
+- [Automaton examples](https://automaton.monster/llms/automaton-examples.md)

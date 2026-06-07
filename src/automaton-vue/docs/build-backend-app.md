@@ -36,25 +36,55 @@ my-app/
     main.py
 ```
 
-## Simple Python backend
+## Backend contract
 
-Automaton backend apps use Python. A simple FastAPI backend can look like this:
+Automaton backend apps use Python controllers in `backend/`.
+
+Do not create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners.
+
+Each controller file must export `handle(action_name, inputs)` and return the standard envelope `{ success, data, error }`.
+
+Example:
 
 ```python
-from fastapi import FastAPI
+class TodosController:
+    def list(self, inputs: dict) -> dict:
+        return {
+            "success": True,
+            "data": {"items": [{"id": 1, "title": "Ship app", "done": False}]},
+            "error": ""
+        }
 
-app = FastAPI()
+    def create(self, inputs: dict) -> dict:
+        title = str(inputs.get("title", "")).strip()
+        if not title:
+            return {"success": False, "data": None, "error": "title is required"}
 
-@app.get("/api/hello")
-def hello():
-    return { "message": "Hello from Automaton backend" }
+        return {
+            "success": True,
+            "data": {"id": 2, "title": title, "done": False},
+            "error": ""
+        }
+
+_controller = TodosController()
+
+def handle(action_name: str, inputs: dict) -> dict:
+    method = getattr(_controller, action_name, None)
+    if method is None:
+        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+
+    return method(inputs)
 ```
 
-Your frontend can call it with a relative path:
+Your frontend should call backend actions with `window.automatonApi.callController(...)`:
 
 ```js
-const response = await fetch('/api/hello')
-const data = await response.json()
+try {
+  const data = await window.automatonApi.callController('todos', 'list', {})
+  console.log(data.items)
+} catch (err) {
+  console.error(err.message)
+}
 ```
 
 ## Configure backend deploy
@@ -90,3 +120,8 @@ If no Runner is connected yet, deploy can still upload the backend, but the back
 ## Next step
 
 Install a Runner before publishing backend apps you want people to use.
+
+For a fuller controller contract and starter examples, see:
+
+- [Automaton backend controllers](https://automaton.monster/llms/automaton-backend-controllers.md)
+- [Automaton examples](https://automaton.monster/llms/automaton-examples.md)

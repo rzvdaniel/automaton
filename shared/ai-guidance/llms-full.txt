@@ -1,0 +1,257 @@
+# Automaton AI full contract
+
+Use this file when you need the complete public machine-facing contract for building Automaton apps.
+
+Prefer local generated guidance after `automaton new` or `automaton link`:
+
+- `AGENTS.md`
+- `.automaton/agents/references/llms.txt`
+- `.automaton/agents/references/llms/*.md`
+
+Use `https://automaton.monster/llms.txt` as the short canonical fallback.
+Use `https://automaton.monster/llms-full.txt` when you need fuller examples and exact structure.
+
+## Shortest path
+
+```bash
+automaton --version
+automaton login
+automaton new "My App"
+automaton deploy
+```
+
+Rules:
+
+- `automaton login` authenticates the CLI. It does not create app files.
+- `automaton new` creates the remote app, writes `automaton.json`, creates `.automatonignore`, and syncs local AI guidance.
+- `automaton link <app-id>` is only for attaching an existing Automaton app to the current folder.
+- Do not publish automatically. Publishing requires explicit user approval.
+
+## Bootstrap decision
+
+After login, inspect the project root:
+
+- If `automaton.json` is missing and this is a new app, run `automaton new "<app-name>"`.
+- If `automaton.json` is missing and this is an existing app, run `automaton link <app-id>`.
+- If `automaton.json` exists, update it rather than recreating the app.
+
+## App model
+
+Automaton apps are static frontend apps with optional Python backend controllers.
+
+- Frontend source normally lives in `frontend/`.
+- Backend source, when required, lives in `backend/`.
+- `automaton deploy` uploads `frontend.deployDir` as public frontend runtime.
+- `automaton deploy` uploads `backend.deployDir` as runner-side backend runtime.
+- Backend runtime files are not publicly served.
+- Source files are not publicly served.
+
+## Canonical `automaton.json` examples
+
+Minimal frontend app:
+
+```json
+{
+  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  }
+}
+```
+
+Frontend plus backend controllers:
+
+```json
+{
+  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
+
+Explicit no-build static app:
+
+```json
+{
+  "appId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "deployDir": "."
+  }
+}
+```
+
+## Frontend defaults
+
+For AI-generated local apps:
+
+- Default to frontend-only unless the requested feature truly requires backend behavior.
+- Default to Vite plus vanilla TypeScript or JavaScript unless the user explicitly asked for another framework.
+- Build to `frontend/dist`.
+- Set `base: './'` in Vite.
+- Keep app-local URLs relative.
+- Do not hardcode Automaton runtime script tags such as `automaton-config.js` or `automaton-api.js`.
+
+## Backend contract
+
+Automaton backends are Python controllers, not web servers.
+
+Never create these under `backend/`:
+
+- FastAPI
+- Flask
+- Express
+- aiohttp
+- uvicorn entrypoints
+- custom HTTP listeners
+
+Each controller file must export:
+
+```python
+def handle(action_name: str, inputs: dict) -> dict:
+    ...
+```
+
+Each action must return the standard envelope:
+
+```python
+{"success": True,  "data": <payload>, "error": ""}
+{"success": False, "data": None,      "error": "..."}
+```
+
+Frontend code must call controllers with:
+
+```javascript
+try {
+  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
+  console.log(data.items)
+} catch (err) {
+  console.error(err.message)
+}
+```
+
+## Full-stack todo example
+
+`backend/todos.py`
+
+```python
+class TodosController:
+    def list(self, inputs: dict) -> dict:
+        return {
+            "success": True,
+            "data": {
+                "items": [
+                    {"id": 1, "title": "Ship app", "done": False},
+                    {"id": 2, "title": "Verify deploy", "done": True}
+                ]
+            },
+            "error": ""
+        }
+
+    def create(self, inputs: dict) -> dict:
+        title = str(inputs.get("title", "")).strip()
+        if not title:
+            return {"success": False, "data": None, "error": "title is required"}
+
+        return {
+            "success": True,
+            "data": {"id": 3, "title": title, "done": False},
+            "error": ""
+        }
+
+_controller = TodosController()
+
+def handle(action_name: str, inputs: dict) -> dict:
+    method = getattr(_controller, action_name, None)
+    if method is None:
+        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
+
+    return method(inputs)
+```
+
+`frontend/src/api.ts`
+
+```ts
+export async function listTodos() {
+  return window.automatonApi.callController('todos', 'list', {})
+}
+
+export async function createTodo(title: string) {
+  return window.automatonApi.callController('todos', 'create', { title })
+}
+```
+
+## Deploy completion rule
+
+Do not claim the app is done until `automaton deploy` succeeds.
+
+Useful validation before deploy:
+
+- frontend build
+- frontend type-check
+- `python -m py_compile` for backend files
+- browser verification
+
+But deployment completion means a successful `automaton deploy`.
+
+If deploy fails, report:
+
+1. exact command
+2. exact error
+3. next required step
+
+## Publish rule
+
+Ask before public publish.
+
+After explicit approval:
+
+```bash
+automaton publish --yes
+```
+
+Published apps run from:
+
+```text
+https://apps.automaton.monster/{slug}/
+```
+
+## Public references
+
+Short contract:
+https://automaton.monster/llms.txt
+
+Frontend structure:
+https://automaton.monster/llms/automaton-frontend-structure.md
+
+Backend controllers:
+https://automaton.monster/llms/automaton-backend-controllers.md
+
+CLI install:
+https://automaton.monster/llms/automaton-cli-install.md
+
+Deploy guide:
+https://automaton.monster/llms/automaton-cli-deploy.md
+
+Starter prompts:
+https://automaton.monster/llms/automaton-starter-prompts.md
+
+Frontend docs page:
+https://automaton.monster/docs/build-frontend-app
+
+Backend docs page:
+https://automaton.monster/docs/build-backend-app
+
+CLI docs page:
+https://automaton.monster/docs/automaton-cli

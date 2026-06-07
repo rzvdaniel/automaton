@@ -16,6 +16,12 @@ If you are new to Automaton, start with:
 
 Then come back here only when you need the full command surface.
 
+Machine-readable references:
+
+- `https://automaton.monster/llms.txt`
+- `https://automaton.monster/llms-full.txt`
+- `https://automaton.monster/llms/automaton-examples.md`
+
 ---
 
 ## Requirements
