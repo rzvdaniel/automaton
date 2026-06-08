@@ -34,6 +34,7 @@ export default defineConfig({
       {
         text: 'Start Here',
         items: [
+          { text: 'Build an Automaton App', link: '/build-an-automaton-app' },
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Build with AI Tools', link: '/cli-ai-tools' },
           { text: 'Build a Frontend App', link: '/build-frontend-app' },

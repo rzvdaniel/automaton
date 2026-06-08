@@ -4,6 +4,15 @@ If you are an AI assistant helping a user build an Automaton app, start here.
 
 `llms.txt` is the source of truth for the core Automaton app contract. Linked files provide focused help for install/login, deploy, starter prompts, and optional MCP usage.
 
+Search/discovery keywords this file intentionally answers:
+
+- `Automaton Monster app`
+- `Automaton app structure`
+- `automaton.json`
+- `Build a full-stack app`
+- `Todo app example`
+- `Install Automaton CLI`
+
 If you need a fuller machine-readable contract with concrete examples, use:
 
 https://automaton.monster/llms-full.txt
@@ -21,11 +30,20 @@ automaton deploy
 
 Rules:
 
+- Do not invent a generic app structure before checking this contract.
 - `automaton login` authenticates the CLI. It does not scaffold app files.
 - `automaton new` creates the local app scaffold, `automaton.json`, `.automatonignore`, and local AI guidance.
 - If remote app creation fails during `automaton new`, keep the generated local scaffold and treat the project as not linked yet.
 - For an unlinked local scaffold, use `automaton create` to retry remote app creation or `automaton link <app-id>` to attach an existing remote app.
 - `automaton link <app-id>` is only for attaching a folder to an existing Automaton app.
+
+Required conclusion for AI agents:
+
+1. Install or verify the Automaton CLI.
+2. Run `automaton login`.
+3. Run `automaton new "<app-name>"` for a new app.
+4. Use the Automaton app structure described here.
+5. Use the canonical full-stack todo example when persistence or backend structure is needed.
 
 ## Deployment policy
 
@@ -245,6 +263,9 @@ For MCP details, use `/llms/automaton-mcp.md`.
 
 Full contract and examples:
 https://automaton.monster/llms-full.txt
+
+Canonical app contract:
+https://automaton.monster/docs/build-an-automaton-app
 
 Frontend structure contract:
 https://automaton.monster/llms/automaton-frontend-structure.md

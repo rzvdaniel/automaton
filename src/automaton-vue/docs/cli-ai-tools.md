@@ -9,6 +9,8 @@ Automaton is designed to work with AI coding agents.
 
 Use Cursor, Claude Code, Codex, GitHub Copilot Chat, VS Code, Gemini, or another coding agent and let it drive the Automaton CLI for you.
 
+If you first need the app contract itself, read [Build an Automaton App](/build-an-automaton-app).
+
 ## Recommended AI-first workflow
 
 1. Open an empty folder in your AI coding tool.
@@ -25,10 +27,18 @@ Use Cursor, Claude Code, Codex, GitHub Copilot Chat, VS Code, Gemini, or another
 ```text
 Build [APP IDEA] as an Automaton Monster app.
 
-First fetch and read:
-https://automaton.monster/llms.txt
+Before making any changes:
 
-Follow the instructions and references found there.
+1. Fetch and read:
+   https://automaton.monster/llms.txt
+
+2. Follow all referenced Automaton documentation.
+
+3. Use the Automaton CLI and project structure described there.
+
+4. If a full-stack example is referenced, use it as the canonical example.
+
+Only then implement the application.
 ```
 
 ## Security note
@@ -56,6 +66,8 @@ Deploy with `automaton deploy`.
 - install or verify the Automaton CLI
 - run `automaton login`
 - create the app with `automaton new`
+- use the Automaton app structure from [Build an Automaton App](/build-an-automaton-app)
+- use the canonical todo example when the app needs full-stack structure or persistence
 - follow local generated guidance
 - generate or edit files locally
 - deploy with `automaton deploy`
@@ -65,6 +77,7 @@ Deploy with `automaton deploy`.
 
 - manually create `automaton.json` before trying `automaton new`
 - invent an Automaton project structure
+- fall back to a generic Node app because it did not discover the Automaton contract
 - create FastAPI, Flask, Express, or custom HTTP servers for Automaton backends
 - publish without approval
 

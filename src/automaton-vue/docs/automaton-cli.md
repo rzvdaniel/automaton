@@ -9,6 +9,7 @@ This page is the full CLI reference.
 
 If you are new to Automaton, start with:
 
+- **Build an Automaton App**
 - **Getting Started**
 - **Build with AI**
 - **Deploy**
@@ -68,11 +69,30 @@ Paste this into Cursor, Claude Code, Codex, Copilot Chat, or another coding agen
 ```text
 Build [APP IDEA] as an Automaton Monster app.
 
-First fetch and read:
-https://automaton.monster/llms.txt
+Before making any changes:
 
-Follow the instructions and references found there.
+1. Fetch and read:
+   https://automaton.monster/llms.txt
+
+2. Follow all referenced Automaton documentation.
+
+3. Use the Automaton CLI and project structure described there.
+
+4. If a full-stack example is referenced, use it as the canonical example.
+
+Only then implement the application.
 ```
+
+The desired agent conclusion is:
+
+- install or verify the Automaton CLI
+- run `automaton login`
+- create the scaffold with `automaton new`
+- follow `automaton.json` and the generated local guidance
+
+The wrong conclusion is:
+
+- "I do not know this framework, so I will build a generic app"
 
 Do not paste your API key directly into the AI chat. Paste it into the terminal when `automaton login` asks for it.
 

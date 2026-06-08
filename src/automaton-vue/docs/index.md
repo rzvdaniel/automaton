@@ -7,10 +7,22 @@ description: Automaton Monster documentation. Learn how to build, deploy and pub
 
 ## Start here
 
+- [Build an Automaton App](/build-an-automaton-app)
 - [Getting Started](/getting-started)
 - [Build with AI Tools](/cli-ai-tools)
 - [Build a Frontend App](/build-frontend-app)
 - [Build a Backend App](/build-backend-app)
+
+## Exact discovery targets
+
+If you searched for one of these, you are in the right place:
+
+- `Automaton Monster app`
+- `Automaton app structure`
+- `Build a full-stack app`
+- `Todo app example`
+- `Install Automaton CLI`
+- `automaton.json`
 
 ## Core workflow
 
@@ -25,9 +37,11 @@ description: Automaton Monster documentation. Learn how to build, deploy and pub
 - Frontend-only apps: no runner required
 - Backend apps: deploy a runner first
 - AI-assisted workflow: start with the prompt in [Build with AI Tools](/cli-ai-tools)
+- App contract and structure: start with [Build an Automaton App](/build-an-automaton-app)
 
 ## Reference
 
+- [Build an Automaton App](/build-an-automaton-app)
 - [Deploy a Runner](/deploy-runner)
 - [Deploy](/deploy)
 - [Publish](/publish)
