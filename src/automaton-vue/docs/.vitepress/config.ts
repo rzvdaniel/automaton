@@ -45,7 +45,11 @@ export default defineConfig({
       },
       {
         text: 'Reference',
-        items: [{ text: 'Automaton CLI', link: '/automaton-cli' }],
+        items: [
+          { text: 'Automaton CLI', link: '/automaton-cli' },
+          { text: 'automaton.json Reference', link: '/automaton-json' },
+          { text: 'Full-Stack Todo Example', link: '/example-todo-fullstack' },
+        ],
       },
     ],
     footer: {

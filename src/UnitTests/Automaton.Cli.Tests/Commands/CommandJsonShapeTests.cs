@@ -155,6 +155,34 @@ public class CommandJsonShapeTests
     }
 
     [Test]
+    public async Task CreateCommand_WhenUnlinkedProjectExists_UsesExistingProjectNameInJsonMode()
+    {
+        var projectRoot = CreateProjectRoot();
+        var config = new ConfigService();
+        config.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Recovered App",
+            Server = "https://automaton.monster",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        config.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://automaton.monster",
+            ApiKey = "ak_test"
+        });
+
+        var command = CreateCommand.Build(config);
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+
+        using var doc = JsonDocument.Parse(output);
+        var root = doc.RootElement;
+        Assert.That(root.GetProperty("name").GetString(), Is.EqualTo("Recovered App"));
+    }
+
+    [Test]
     public async Task LinkCommand_WhenAppIdIsMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();

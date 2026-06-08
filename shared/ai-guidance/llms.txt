@@ -255,6 +255,12 @@ https://automaton.monster/llms/automaton-backend-controllers.md
 Starter examples:
 https://automaton.monster/llms/automaton-examples.md
 
+Canonical full-stack todo example:
+https://automaton.monster/docs/example-todo-fullstack
+
+Canonical full-stack todo GitHub repo:
+https://github.com/automaton-monster/automaton-example-todo-fullstack
+
 Frontend docs page:
 https://automaton.monster/docs/build-frontend-app
 
@@ -263,6 +269,9 @@ https://automaton.monster/docs/build-backend-app
 
 CLI docs page:
 https://automaton.monster/docs/automaton-cli
+
+automaton.json reference:
+https://automaton.monster/docs/automaton-json
 
 If Automaton CLI is not installed:
 https://automaton.monster/llms/automaton-cli-install.md

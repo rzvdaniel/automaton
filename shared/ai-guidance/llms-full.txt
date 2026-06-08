@@ -23,7 +23,9 @@ automaton deploy
 Rules:
 
 - `automaton login` authenticates the CLI. It does not create app files.
-- `automaton new` creates the remote app, writes `automaton.json`, creates `.automatonignore`, and syncs local AI guidance.
+- `automaton new` creates the local scaffold, writes `automaton.json`, creates `.automatonignore`, and syncs local AI guidance.
+- `automaton new` also attempts remote app creation. If remote creation fails, keep the generated local scaffold and treat the project as not linked yet.
+- Use `automaton create` to create and link a remote app later for an existing local scaffold.
 - `automaton link <app-id>` is only for attaching an existing Automaton app to the current folder.
 - Do not publish automatically. Publishing requires explicit user approval.
 
@@ -34,6 +36,7 @@ After login, inspect the project root:
 - If `automaton.json` is missing and this is a new app, run `automaton new "<app-name>"`.
 - If `automaton.json` is missing and this is an existing app, run `automaton link <app-id>`.
 - If `automaton.json` exists, update it rather than recreating the app.
+- If `automaton.json` exists without `appId`, treat it as a valid local scaffold that is not linked yet. Use `automaton create` or `automaton link <app-id>`.
 
 ## App model
 
@@ -47,6 +50,22 @@ Automaton apps are static frontend apps with optional Python backend controllers
 - Source files are not publicly served.
 
 ## Canonical `automaton.json` examples
+
+Unlinked local scaffold:
+
+```json
+{
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
 
 Minimal frontend app:
 
@@ -247,6 +266,12 @@ https://automaton.monster/llms/automaton-cli-deploy.md
 Starter prompts:
 https://automaton.monster/llms/automaton-starter-prompts.md
 
+Canonical full-stack todo example:
+https://automaton.monster/docs/example-todo-fullstack
+
+Canonical full-stack todo GitHub repo:
+https://github.com/automaton-monster/automaton-example-todo-fullstack
+
 Frontend docs page:
 https://automaton.monster/docs/build-frontend-app
 
@@ -255,3 +280,6 @@ https://automaton.monster/docs/build-backend-app
 
 CLI docs page:
 https://automaton.monster/docs/automaton-cli
+
+automaton.json reference:
+https://automaton.monster/docs/automaton-json

@@ -79,6 +79,40 @@ public class NewAppServiceTests
     }
 
     [Test]
+    public async Task CreateAsync_WhenRecoveringExistingUnlinkedScaffold_PreservesExistingDeploySettings()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Recovered App",
+            Server = "https://automaton.monster",
+            Frontend = new FrontendConfig
+            {
+                Build = "npm run custom-build",
+                DeployDir = "custom-dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "api"
+            }
+        });
+
+        var service = new NewAppService(
+            configService,
+            (_, _, name, _) => Task.FromResult(((string)"app-123", name)));
+
+        var result = await service.CreateAsync(projectRoot, "Recovered App", "https://automaton.monster", "ak_test");
+
+        Assert.That(result.Success, Is.True);
+        var config = configService.LoadProjectConfig(projectRoot);
+        Assert.That(config.AppId, Is.EqualTo("app-123"));
+        Assert.That(config.Frontend?.Build, Is.EqualTo("npm run custom-build"));
+        Assert.That(config.Frontend?.DeployDir, Is.EqualTo("custom-dist"));
+        Assert.That(config.Backend?.DeployDir, Is.EqualTo("api"));
+    }
+
+    [Test]
     public async Task CreateAsync_WhenCredentialsAreMissing_ReturnsFailure()
     {
         var projectRoot = CreateProjectRoot();

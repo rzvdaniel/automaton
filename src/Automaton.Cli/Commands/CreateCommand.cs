@@ -12,7 +12,7 @@ public static class CreateCommand
         var nameOption = new Option<string?>(["--name", "-n"], "App name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        var cmd = new Command("create", "Create a new Automaton app and write automaton.json")
+        var cmd = new Command("create", "Create a remote Automaton app for the current folder and write appId into automaton.json")
         {
             nameOption,
             jsonOption
@@ -22,6 +22,12 @@ public static class CreateCommand
         {
             var cwd = Directory.GetCurrentDirectory();
             var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+            var existingConfig = config.TryLoadProjectConfig(cwd);
+
+            if (string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(existingConfig?.Name))
+            {
+                name = existingConfig.Name;
+            }
 
             if (!asJson && string.IsNullOrWhiteSpace(name))
             {

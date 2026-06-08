@@ -62,7 +62,8 @@ public sealed class NewAppService
 
         try
         {
-            _config.SaveProjectConfig(directory, BuildProjectConfig(name.Trim(), server, appId: null));
+            var existingConfig = _config.TryLoadProjectConfig(directory);
+            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, name.Trim(), server, appId: null));
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.LocalScaffold,
                 true,
@@ -74,7 +75,7 @@ public sealed class NewAppService
             var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
 
-            _config.SaveProjectConfig(directory, BuildProjectConfig(appName, server, appId));
+            _config.SaveProjectConfig(directory, BuildProjectConfig(_config.TryLoadProjectConfig(directory), appName, server, appId));
 
             nextSteps.Add("Run automaton deploy");
 
@@ -124,22 +125,23 @@ public sealed class NewAppService
         }
     }
 
-    private static AutomatonConfig BuildProjectConfig(string name, string server, string? appId)
+    private static AutomatonConfig BuildProjectConfig(AutomatonConfig? existingConfig, string name, string server, string? appId)
     {
         return new AutomatonConfig
         {
             AppId = appId ?? string.Empty,
             Name = name,
             Server = server,
-            Frontend = new FrontendConfig
+            Frontend = existingConfig?.Frontend ?? new FrontendConfig
             {
                 Build = FrontendBuildCommand,
                 DeployDir = FrontendDeployDirectory
             },
-            Backend = new BackendConfig
+            Backend = existingConfig?.Backend ?? new BackendConfig
             {
                 DeployDir = BackendDeployDirectory
-            }
+            },
+            Source = existingConfig?.Source
         };
     }
 

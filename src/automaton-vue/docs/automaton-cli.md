@@ -21,6 +21,7 @@ Machine-readable references:
 - `https://automaton.monster/llms.txt`
 - `https://automaton.monster/llms-full.txt`
 - `https://automaton.monster/llms/automaton-examples.md`
+- `https://automaton.monster/docs/automaton-json`
 
 ---
 
@@ -101,6 +102,10 @@ By default, `automaton login` stores project-local credentials in `./.automaton/
 ## `automaton.json`
 
 Every project has an `automaton.json` at the root. Commit it to Git.
+
+Canonical docs page:
+
+- `https://automaton.monster/docs/automaton-json`
 
 ```json
 {

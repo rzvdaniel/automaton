@@ -31,4 +31,6 @@ description: Automaton Monster documentation. Learn how to build, deploy and pub
 - [Deploy a Runner](/deploy-runner)
 - [Deploy](/deploy)
 - [Publish](/publish)
+- [automaton.json Reference](/automaton-json)
+- [Full-Stack Todo Example](/example-todo-fullstack)
 - [Automaton CLI Reference](/automaton-cli)

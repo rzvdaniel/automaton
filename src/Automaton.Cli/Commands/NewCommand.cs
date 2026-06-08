@@ -60,6 +60,16 @@ public static class NewCommand
 
             if (!result.Success)
             {
+                if (result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.LocalScaffold && check.Success)
+                    && result.Checks.Any(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success))
+                {
+                    var remoteFailure = result.Checks.Last(check => check.Name == CommandDiagnosticCheckNames.CreateApp && !check.Success);
+                    AnsiConsole.MarkupLine("[yellow]Local scaffold created successfully.[/]");
+                    AnsiConsole.MarkupLine($"[red]Remote app creation failed:[/] {remoteFailure.Message}");
+                    AnsiConsole.MarkupLine("[grey]Your project is still usable locally.[/]");
+                    AnsiConsole.WriteLine();
+                }
+
                 CliDiagnosticsWriter.Write(new CommandDiagnosticResult
                 {
                     Success = result.Success,
