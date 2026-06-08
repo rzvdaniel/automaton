@@ -153,8 +153,7 @@ onMounted(loadForkSource)
 
           <section class="info-panel">
             <h2>What gets copied</h2>
-            <p>Source files and public frontend assets are copied into your editable remix.</p>
-            <p>Secrets, runner data, private uploads, and owner-specific settings are not copied.</p>
+            <p>Remix creates an editable copy of this app’s source. Runtime backend files and secrets are not copied.</p>
           </section>
 
           <section class="info-panel">

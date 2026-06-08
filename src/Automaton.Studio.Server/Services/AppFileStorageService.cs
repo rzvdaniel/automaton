@@ -430,13 +430,21 @@ public class AppFileStorageService
     /// </summary>
     public async Task CopySourceFilesAsync(Guid srcUserId, Guid srcAppId, Guid dstUserId, Guid dstAppId)
     {
-        var srcPath = GetSourcePath(srcUserId, srcAppId);
-        var dstPath = GetSourcePath(dstUserId, dstAppId);
         var rules = await settingsService.GetEffectiveAppDeployRulesAsync();
-        await CopyDirectoryFilesAsync(
-            srcPath,
-            dstPath,
-            "source files",
+        await CopyAppSubdirectoryFilesAsync(
+            GetSourceFrontendPath(srcUserId, srcAppId),
+            GetSourceFrontendPath(dstUserId, dstAppId),
+            "source frontend files",
+            srcAppId,
+            srcUserId,
+            dstAppId,
+            dstUserId,
+            relativePath => MatchesExcludeRule(relativePath, rules.RemixSourceExclude));
+
+        await CopyAppSubdirectoryFilesAsync(
+            GetSourceBackendPath(srcUserId, srcAppId),
+            GetSourceBackendPath(dstUserId, dstAppId),
+            "source backend files",
             srcAppId,
             srcUserId,
             dstAppId,
@@ -1104,6 +1112,27 @@ public class AppFileStorageService
             copyKind, srcAppId, srcUserId, dstAppId, dstUserId);
 
         return Task.CompletedTask;
+    }
+
+    private Task CopyAppSubdirectoryFilesAsync(
+        string srcPath,
+        string dstPath,
+        string copyKind,
+        Guid srcAppId,
+        Guid srcUserId,
+        Guid dstAppId,
+        Guid dstUserId,
+        Func<string, bool>? shouldSkip = null)
+    {
+        return CopyDirectoryFilesAsync(
+            srcPath,
+            dstPath,
+            copyKind,
+            srcAppId,
+            srcUserId,
+            dstAppId,
+            dstUserId,
+            shouldSkip);
     }
 
     private static Task<IEnumerable<string>> GetFilesAsync(string rootPath)
