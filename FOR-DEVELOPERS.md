@@ -175,6 +175,36 @@ But the value is massive: users can prototype entire applications (forms, dashbo
 
 ## Common Pitfalls & How We Fixed Them
 
+### Website Docs Need Static Route Handling Before SPA Fallback
+
+The public website is two things packaged into one nginx container:
+
+- the marketing Vue SPA at `/`
+- the VitePress docs output under `/docs/`
+
+That matters because VitePress with `cleanUrls: true` emits files like `dist/docs/getting-started.html`, while the Vue site expects unknown routes to fall back to `/index.html`.
+
+If nginx applies the SPA fallback first, a hard load of `/docs/getting-started` returns the marketing app shell instead of the docs HTML. In practice that looks like a blank or black page on direct load, while in-site navigation may appear to work. It also hurts indexing because crawlers fetch the broken deep link directly.
+
+The fix is explicit nginx routing for docs before the generic SPA rule:
+
+```nginx
+location = /docs {
+    return 301 /docs/;
+}
+
+location /docs/ {
+    try_files $uri $uri.html $uri/ =404;
+    error_page 404 /docs/404.html;
+}
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+Lesson: when one static host serves both an SPA and clean-URL static docs, `/docs/*` is not an SPA route. Treat it as a real file tree first, then let the SPA fallback handle everything else.
+
 ### Bind Mounts Replace Carefully Prepared Container Directories
 
 The Runner image pre-creates `/app/data/apps` and `/app/logs` with the right ownership for its non-root `automaton` user. That ownership disappears the moment Docker bind-mounts fresh host directories over `/app/data` or `/app/logs`. If the provisioning script creates those host folders as root or another host user and does not hand them to the container UID, the runner crash-loops before it can register, usually with `mkdir: cannot create directory '/app/data/apps': Permission denied`.
