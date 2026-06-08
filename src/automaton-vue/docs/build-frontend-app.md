@@ -18,6 +18,8 @@ automaton new "My Frontend App"
 
 This creates the Automaton app and writes the local `automaton.json` file.
 
+If remote app creation fails, keep the generated local scaffold and continue building in the same folder. Link it later with `automaton create` or `automaton link <app-id>`.
+
 ## Frontend folder
 
 For AI-generated apps and framework apps, keep frontend code in:
@@ -31,6 +33,7 @@ Typical structure:
 ```txt
 my-app/
   automaton.json
+  .automatonignore
   frontend/
     package.json
     src/
@@ -54,6 +57,8 @@ For a normal Vite app, `automaton.json` should include:
 `frontend.build` runs before upload.
 
 `frontend.deployDir` is the folder Automaton serves publicly after deploy.
+
+If you only have a local scaffold and no remote link yet, the same structure still applies. Add the `appId` later after `automaton create` or `automaton link`.
 
 For Vite apps, set `base: './'` and keep app-local asset URLs relative so the published app works correctly under its slug path.
 

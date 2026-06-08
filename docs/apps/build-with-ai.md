@@ -57,6 +57,8 @@ Keep this as simple as possible for the user:
 
 After `automaton login`, the AI should usually handle the rest: local file generation, app creation or linking, deploy preflight, runner selection for backend apps, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.
 
+If `automaton new` cannot create the remote app, the AI should keep the generated local scaffold, treat the project as unlinked, continue building locally, and then use `automaton create` or `automaton link <app-id>` before deploy.
+
 ### Fallback flow: manual CLI
 
 Use this only when you want to drive the CLI yourself:
@@ -150,6 +152,24 @@ For the default AI-generated local app, use nested frontend/backend config:
 ```
 
 If `automaton.json` already exists, the AI should add missing `frontend` or `backend` deploy fields instead of leaving deploy behavior implicit.
+
+If the app is only scaffolded locally and not linked yet, this temporary file shape is valid:
+
+```json
+{
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
+
+Add `appId` after `automaton create` or `automaton link <app-id>`.
 
 ### Deploy
 

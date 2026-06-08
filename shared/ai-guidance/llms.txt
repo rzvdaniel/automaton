@@ -23,6 +23,8 @@ Rules:
 
 - `automaton login` authenticates the CLI. It does not scaffold app files.
 - `automaton new` creates the local app scaffold, `automaton.json`, `.automatonignore`, and local AI guidance.
+- If remote app creation fails during `automaton new`, keep the generated local scaffold and treat the project as not linked yet.
+- For an unlinked local scaffold, use `automaton create` to retry remote app creation or `automaton link <app-id>` to attach an existing remote app.
 - `automaton link <app-id>` is only for attaching a folder to an existing Automaton app.
 
 ## Deployment policy
@@ -42,6 +44,13 @@ After `automaton login`, check whether `automaton.json` exists in the project ro
 - Do not treat login by itself as meaning the folder is already linked to an app.
 - Prefer the generated local guidance in `AGENTS.md` and `.automaton/agents/` after `automaton new` or `automaton link`.
 
+If `automaton new` fails after writing local files:
+
+- Keep working in the generated project.
+- Run `automaton validate` to inspect the local contract.
+- Run `automaton create` to create and link a remote app later.
+- Or run `automaton link <app-id>` if the remote app already exists.
+
 ## App structure
 
 Automaton apps are frontend-agnostic static web apps with optional Python backends.
@@ -53,6 +62,38 @@ Automaton apps are frontend-agnostic static web apps with optional Python backen
 - `automaton deploy` uploads `backend.deployDir` to backend runtime when present.
 - Only frontend runtime is public.
 - Source files and backend runtime files are never publicly served.
+
+Minimal expected local structure:
+
+```text
+my-app/
+  automaton.json
+  .automatonignore
+  AGENTS.md
+  frontend/
+    package.json
+    src/
+    dist/
+  backend/
+    *.py
+```
+
+If `automaton.json` is missing and the CLI is unavailable, the minimal default file shape is:
+
+```json
+{
+  "name": "My App",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
+
+Add `appId` after `automaton create` or `automaton link <app-id>` succeeds.
 
 Default frontend config for AI-generated apps:
 

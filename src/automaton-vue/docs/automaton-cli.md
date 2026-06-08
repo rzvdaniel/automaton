@@ -125,6 +125,29 @@ For AI-generated local apps and most framework apps, use nested frontend/backend
 }
 ```
 
+If `automaton new` wrote a local scaffold but remote creation failed, `automaton.json` may temporarily exist without `appId`. In that state, keep the local files, then run one of:
+
+```bash
+automaton create
+automaton link <app-id>
+```
+
+Minimal unlinked local scaffold:
+
+```json
+{
+  "name": "My App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
+
 | Field | Required | Description |
 |---|---|---|
 | `appId` | Yes | App ID from Automaton Studio |
@@ -169,6 +192,17 @@ automaton new "My App"
 ```
 
 This creates the remote app, writes `automaton.json`, creates `.automatonignore` if missing, and syncs the local AI guidance pack.
+
+If the remote create step fails, `automaton new` should still keep the local scaffold and AI guidance. In that case, continue working locally and then run `automaton create` or `automaton link <app-id>`.
+
+### `automaton create`
+
+Create a remote app for the current local scaffold and write the linked `appId`.
+
+```bash
+automaton create
+automaton create --name "My App"
+```
 
 ### `automaton link`
 
@@ -219,4 +253,14 @@ automaton login
 automaton new "Poker Planning"
 automaton deploy
 automaton publish
+```
+
+If remote creation is temporarily unavailable:
+
+```bash
+automaton login
+automaton new "Poker Planning"
+automaton validate
+automaton create
+automaton deploy
 ```

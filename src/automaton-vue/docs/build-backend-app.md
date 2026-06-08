@@ -18,6 +18,8 @@ automaton new "My Backend App"
 
 This creates the Automaton app and writes the local `automaton.json` file.
 
+If remote app creation fails, keep the generated local scaffold and continue building in the same folder. Link it later with `automaton create` or `automaton link <app-id>`.
+
 ## Backend folder
 
 Keep backend code in:
@@ -31,6 +33,7 @@ Typical structure:
 ```txt
 my-app/
   automaton.json
+  .automatonignore
   frontend/
   backend/
     main.py
@@ -104,6 +107,8 @@ In `automaton.json`, point Automaton to the backend folder:
   }
 }
 ```
+
+If the local scaffold exists but is not linked yet, the same config shape is valid without `appId` until you run `automaton create` or `automaton link`.
 
 ## Deploy
 

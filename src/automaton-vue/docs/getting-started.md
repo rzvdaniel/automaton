@@ -18,6 +18,14 @@ automaton deploy
 
 Use `automaton publish` only when you are ready to make the app public.
 
+If remote app creation fails during `automaton new`, keep the generated local scaffold, then run:
+
+```bash
+automaton validate
+automaton create
+automaton deploy
+```
+
 ## AI-agent path
 
 You can also let an AI coding agent create and deploy the app for you.

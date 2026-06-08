@@ -2,6 +2,21 @@
 
 Use these examples when an agent needs concrete starter files instead of prose.
 
+## Full-stack todo file tree
+
+```text
+todo-app/
+  automaton.json
+  .automatonignore
+  frontend/
+    package.json
+    src/
+      api.ts
+      main.ts
+  backend/
+    todos.py
+```
+
 ## Minimal frontend `automaton.json`
 
 ```json
@@ -59,3 +74,21 @@ export async function listTodos() {
   return window.automatonApi.callController('todos', 'list', {})
 }
 ```
+
+If the project is scaffolded locally but not linked yet, the temporary local `automaton.json` can omit `appId`:
+
+```json
+{
+  "name": "Todo App",
+  "server": "https://api.automaton.monster",
+  "frontend": {
+    "build": "cd frontend && npm install && npm run build",
+    "deployDir": "frontend/dist"
+  },
+  "backend": {
+    "deployDir": "backend"
+  }
+}
+```
+
+After remote creation succeeds, update that file to include `appId`.
