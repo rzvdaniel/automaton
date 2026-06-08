@@ -692,9 +692,7 @@ public class AppsService
             })
             .FirstOrDefaultAsync();
 
-        var sourceFiles = await fileStorageService.GetSourceFilesAsync(sourceOwner, sourceAppId);
-        var hasBackendExecution = source.ExecutionRunnerId.HasValue ||
-            sourceFiles.Any(file => file.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
+        var hasBackendExecution = fileStorageService.HasBackendSourceEntries(sourceOwner, sourceAppId);
 
         return new Models.ForkAppSourceModel
         {

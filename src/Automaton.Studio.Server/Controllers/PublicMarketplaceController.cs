@@ -91,7 +91,6 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -107,6 +106,8 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
+
+        await PopulateBackendExecutionFlagsAsync(apps);
 
         return Ok(apps);
     }
@@ -157,7 +158,6 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured
             })
             .FirstOrDefaultAsync();
@@ -190,6 +190,8 @@ public class PublicMarketplaceController : ControllerBase
                 SortOrder = s.SortOrder
             })
             .ToListAsync();
+
+        await PopulateBackendExecutionFlagsAsync([app]);
 
         app.RelatedApps = await _dbContext.WebApps
             .AsNoTracking()
@@ -239,7 +241,6 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -255,6 +256,8 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
+
+        await PopulateBackendExecutionFlagsAsync(app.RelatedApps);
 
         app.ForksAndRemixes = await _dbContext.WebApps
             .AsNoTracking()
@@ -299,7 +302,6 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -315,6 +317,8 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
+
+        await PopulateBackendExecutionFlagsAsync(app.ForksAndRemixes);
 
         return Ok(app);
     }
@@ -383,7 +387,6 @@ public class PublicMarketplaceController : ControllerBase
                 PublicUrl = a.PublicUrl,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
-                HasBackendExecution = a.ExecutionRunnerId.HasValue,
                 IsFeatured = a.IsFeatured,
                 Screenshots = _dbContext.WebAppScreenshots
                     .Where(s => s.WebAppId == a.Id)
@@ -399,6 +402,8 @@ public class PublicMarketplaceController : ControllerBase
                     .ToList()
             })
             .ToListAsync();
+
+        await PopulateBackendExecutionFlagsAsync(apps);
 
         return Ok(apps);
     }
@@ -421,6 +426,33 @@ public class PublicMarketplaceController : ControllerBase
     {
         var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         return Guid.TryParse(userIdString, out var userId) ? userId : null;
+    }
+
+    private async Task PopulateBackendExecutionFlagsAsync(IEnumerable<MarketplaceAppCardDto> apps)
+    {
+        var appList = apps.ToList();
+        if (appList.Count == 0)
+        {
+            return;
+        }
+
+        var ownerIdsByAppId = await _dbContext.WebAppUsers
+            .AsNoTracking()
+            .Where(wu => appList.Select(app => app.Id).Contains(wu.WebAppId))
+            .GroupBy(wu => wu.WebAppId)
+            .Select(group => new
+            {
+                AppId = group.Key,
+                OwnerUserId = group.Select(wu => wu.UserId).FirstOrDefault()
+            })
+            .ToDictionaryAsync(x => x.AppId, x => x.OwnerUserId);
+
+        foreach (var app in appList)
+        {
+            app.HasBackendExecution = ownerIdsByAppId.TryGetValue(app.Id, out var ownerUserId) &&
+                ownerUserId != Guid.Empty &&
+                _appFileStorageService.HasBackendSourceEntries(ownerUserId, app.Id);
+        }
     }
 }
 
