@@ -34,13 +34,14 @@ const emit = defineEmits<{
   openFile: [path: string]
   deleteFile: [path: string]
   deleteFolder: [path: string]
+  deleteSelection: [nodes: Array<{ path: string; type: FileNode['type'] }>]
   renameFile: [path: string]
 }>()
 
 const editorStore = useAppEditorStore()
 
 // Tree selection
-const selectedKey = ref<Record<string, boolean>>({})
+const selectedKeys = ref<Record<string, boolean>>({})
 
 // Convert FileNode[] to PrimeVue Tree format
 const treeNodes = computed(() => {
@@ -58,6 +59,53 @@ function convertToTreeNodes(nodes: FileNode[]): any[] {
     children: node.children ? convertToTreeNodes(node.children) : undefined,
     leaf: node.type === 'file',
   }))
+}
+
+const selectedEntries = computed(() => {
+  const selected = new Set(Object.keys(selectedKeys.value).filter((key) => selectedKeys.value[key]))
+  if (selected.size === 0) {
+    return []
+  }
+
+  const matches: Array<{ path: string; type: FileNode['type'] }> = []
+
+  function walk(nodes: FileNode[]) {
+    for (const node of nodes) {
+      if (selected.has(node.key)) {
+        matches.push({
+          path: node.path,
+          type: node.type,
+        })
+      }
+
+      if (node.children?.length) {
+        walk(node.children)
+      }
+    }
+  }
+
+  walk(fileTree.value)
+  return matches
+})
+
+const deletableSelectedEntries = computed(() =>
+  selectedEntries.value.filter((entry) =>
+    entry.type === 'folder' ? canDeleteFolder(entry.path) : canDeleteFile(entry.path),
+  ),
+)
+
+const selectedDeleteLabel = computed(() => {
+  const count = deletableSelectedEntries.value.length
+  return count > 1 ? `Delete ${count} Selected` : 'Delete Selected'
+})
+
+function handleDeleteSelection() {
+  if (deletableSelectedEntries.value.length === 0) {
+    return
+  }
+
+  emit('deleteSelection', deletableSelectedEntries.value)
+  selectedKeys.value = {}
 }
 
 function getFileIcon(extension: string): string {
@@ -173,15 +221,27 @@ function canDeleteFolder(path: string | undefined): boolean {
           severity="secondary"
           @click="emit('createFile')"
         />
+        <Button
+          v-if="allowDelete"
+          :disabled="deletableSelectedEntries.length === 0"
+          :label="deletableSelectedEntries.length > 1 ? selectedDeleteLabel : undefined"
+          v-tooltip.bottom="deletableSelectedEntries.length <= 1 ? 'Delete selected items' : undefined"
+          icon="pi pi-trash"
+          text
+          rounded
+          size="small"
+          severity="secondary"
+          @click="handleDeleteSelection"
+        />
       </div>
     </div>
 
     <!-- Tree -->
     <div class="file-tree-content">
       <Tree
-        v-model:selection-keys="selectedKey"
+        v-model:selection-keys="selectedKeys"
         :value="treeNodes"
-        selection-mode="single"
+        selection-mode="multiple"
         class="w-full border-none p-0 file-tree-component"
         @node-select="onNodeSelect"
       >

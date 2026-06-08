@@ -231,7 +231,7 @@ Cache policy:
 
 ## Forking
 
-Fork copies `source/` only.
+Fork copies portable `source/` files only.
 
 Fork is allowed only when:
 
@@ -246,6 +246,12 @@ Fork never copies:
 - logs
 - runner deployment artifacts
 - app root metadata that should not belong to the fork
+
+Current implementation detail:
+
+- Remix copies `source/frontend` and `source/backend` only.
+- Remix may copy a sanitized `live/frontend` runtime baseline for immediate preview.
+- Remix never copies `live/backend`.
 
 Forked apps should start as private drafts and require their own deploy before public runtime exists.
 
@@ -311,10 +317,14 @@ Backend editor writes to `source/backend/`. Deploy Backend packages to `live/bac
 3. Run `frontend.build` before frontend runtime packaging.
 4. Zip `frontend.deployDir` into a frontend runtime archive.
 5. Zip `backend.deployDir` into a backend runtime archive when present.
-6. Upload source separately only for explicit source publishing or forkable templates.
-7. Default generated apps to Vite + vanilla TypeScript or JavaScript in `frontend/`.
-8. Require frontend build output in `frontend/dist/` for AI-generated local apps.
-9. Allow no-build static root apps only when the user explicitly asks for that mode or chooses a static template.
+6. Support `automaton pull` in two modes:
+   - `automaton pull` refreshes the current linked local folder from remote `source/`
+   - `automaton pull <app-id-or-slug>` creates a new linked local folder and downloads remote `source/`
+7. Pull only `source/frontend` and `source/backend` by default. Do not pull `live/backend`. Do not fall back to `live/frontend` unless explicitly requested by a dedicated flag.
+8. Upload source separately only for explicit source publishing or forkable templates.
+9. Default generated apps to Vite + vanilla TypeScript or JavaScript in `frontend/`.
+10. Require frontend build output in `frontend/dist/` for AI-generated local apps.
+11. Allow no-build static root apps only when the user explicitly asks for that mode or chooses a static template.
 
 ## AI Guidance Update
 

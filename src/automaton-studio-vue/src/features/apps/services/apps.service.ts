@@ -25,6 +25,24 @@ import { getFileIcon } from '../types/apps.types'
 import { buildPreviewApiScript } from '../utils/preview-api-script'
 
 class AppsService {
+  private sortFileNodes(nodes: FileNode[]): FileNode[] {
+    return [...nodes]
+      .map((node) => ({
+        ...node,
+        children: node.children ? this.sortFileNodes(node.children) : node.children,
+      }))
+      .sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1
+        }
+
+        return a.name.localeCompare(b.name, undefined, {
+          sensitivity: 'base',
+          numeric: true,
+        })
+      })
+  }
+
   private sanitizeArchiveFileName(name: string | undefined, extension: string): string {
     const fallbackBaseName = 'app-export'
     const baseName = (name || '')
@@ -558,7 +576,7 @@ class AppsService {
       }
     }
 
-    return root
+    return this.sortFileNodes(root)
   }
 
   /**

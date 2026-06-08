@@ -58,6 +58,13 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> ListAppsAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/apps", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { executionRunnerId = runnerId }, JsonOptions);

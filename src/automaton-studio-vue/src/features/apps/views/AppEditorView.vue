@@ -906,6 +906,71 @@ async function handleDeleteFolder(path: string) {
   })
 }
 
+async function handleDeleteSelection(entries: Array<{ path: string; type: 'file' | 'folder' }>) {
+  const normalizedEntries = entries
+    .map((entry) => ({
+      ...entry,
+      normalizedPath: entry.path.replace(/\\/g, '/').replace(/\/+$/, ''),
+    }))
+    .sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1
+      }
+
+      return b.normalizedPath.length - a.normalizedPath.length
+    })
+    .filter((entry, index, list) => {
+      return !list.some((candidate, candidateIndex) => {
+        if (candidateIndex === index || candidate.type !== 'folder') {
+          return false
+        }
+
+        return entry.normalizedPath === candidate.normalizedPath ||
+          entry.normalizedPath.startsWith(`${candidate.normalizedPath}/`)
+      })
+    })
+
+  if (normalizedEntries.length === 0) {
+    return
+  }
+
+  const itemLabel = normalizedEntries.length === 1 ? 'item' : 'items'
+
+  confirm.require({
+    message: `Are you sure you want to delete ${normalizedEntries.length} selected ${itemLabel}? Any selected folders will be deleted with all of their contents. This action cannot be undone.`,
+    header: 'Confirm Bulk Delete',
+    icon: 'pi pi-exclamation-triangle',
+    acceptClass: 'p-button-danger',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    accept: async () => {
+      try {
+        for (const entry of normalizedEntries) {
+          if (entry.type === 'folder') {
+            await editorStore.deleteFolder(entry.path)
+          } else {
+            await editorStore.deleteFile(entry.path)
+          }
+        }
+
+        toast.add({
+          severity: 'success',
+          summary: 'Deleted',
+          detail: `${normalizedEntries.length} selected ${itemLabel} deleted`,
+          life: 3000,
+        })
+      } catch (err: unknown) {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: err instanceof Error ? err.message : 'Failed to delete selected items',
+          life: 5000,
+        })
+      }
+    },
+  })
+}
+
 // Handle version created - refresh the history list
 async function handleVersionCreated() {
   if (versionHistoryRef.value?.loadVersions) {
@@ -1261,6 +1326,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       @create-file="showCreateFileDialog = true"
                       @delete-file="handleDeleteFile"
                       @delete-folder="handleDeleteFolder"
+                      @delete-selection="handleDeleteSelection"
                     />
                   </div>
                 </SplitterPanel>
@@ -1406,6 +1472,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                   @create-file="showCreateFileDialog = true"
                   @delete-file="handleDeleteFile"
                   @delete-folder="handleDeleteFolder"
+                  @delete-selection="handleDeleteSelection"
                 />
               </div>
             </SplitterPanel>

@@ -698,6 +698,7 @@ public class AppsService
         {
             Id = source.Id,
             Name = source.Name,
+            PublicUrl = source.PublicUrl,
             Summary = source.Summary,
             Description = source.Description,
             ThumbnailUrl = source.ThumbnailUrl,

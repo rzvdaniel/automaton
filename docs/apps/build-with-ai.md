@@ -65,11 +65,38 @@ Use this only when you want to drive the CLI yourself:
 
 1. Install the CLI once.
 2. Run `automaton login`.
-3. Run `automaton new "My App"` or `automaton link <app-id>`.
+3. Run `automaton new "My App"`, `automaton link <app-id>`, or `automaton pull <app-id-or-slug>`.
 4. Build locally.
 5. Run `automaton deploy`.
 6. Run `automaton publish` only when you want the app publicly accessible.
 7. Run `automaton validate` only when you need a separate diagnostic check.
+
+### Pull an existing Studio app locally
+
+Use this when you already have an app in Studio, including a remixed app, and want to keep working locally:
+
+```bash
+cd C:\Work\automaton-apps
+automaton login
+automaton pull my-remixed-app
+```
+
+This creates a linked local folder:
+
+```text
+my-remixed-app/
+  automaton.json
+  frontend/
+  backend/   # only when source/backend exists
+```
+
+The rules are intentionally strict:
+
+- `automaton pull` refreshes the current linked local folder.
+- `automaton pull <app-id-or-slug>` creates a new linked local folder from an existing Studio app.
+- Pull downloads `source/frontend` and `source/backend` only.
+- Pull never downloads `live/backend`.
+- Pull does not fall back to `live/frontend` unless an explicit future flag enables it.
 
 ### Prerequisites
 
@@ -185,6 +212,13 @@ For an existing remote app:
 ```bash
 automaton login
 automaton link <app-id>
+```
+
+For an existing remixed app that you want to bring down locally in one step:
+
+```bash
+automaton login
+automaton pull <app-id-or-slug>
 ```
 
 After `automaton login`, the AI should be able to handle most of the remaining work in the local folder: scaffold or edit files, create or link the app, keep `automaton.json` correct, refresh generated guidance only if needed, deploy, and ask before publish. The user should usually only need to step in for interactive auth, runner creation outside the CLI, or publish approval.

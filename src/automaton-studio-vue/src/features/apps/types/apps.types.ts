@@ -140,6 +140,7 @@ export interface ForkAppRequest {
 export interface ForkAppSource {
   id: string
   name: string
+  publicUrl?: string | null
   summary?: string | null
   description?: string | null
   thumbnailUrl?: string | null

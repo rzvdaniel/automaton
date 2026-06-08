@@ -23,6 +23,7 @@ const submitting = ref(false)
 const error = ref('')
 
 const sourceAppId = computed(() => String(route.params.sourceAppId || ''))
+const localPullReference = computed(() => source.value?.publicUrl || source.value?.id || '')
 
 const lineageLabel = computed(() => {
   if (!source.value) return ''
@@ -154,6 +155,11 @@ onMounted(loadForkSource)
           <section class="info-panel">
             <h2>What gets copied</h2>
             <p>Remix creates an editable copy of this app’s source. Runtime backend files and secrets are not copied.</p>
+          </section>
+
+          <section class="info-panel">
+            <h2>Work locally</h2>
+            <p>After creating the remix, you can pull its source to your computer with <code>automaton pull {{ localPullReference }}</code>.</p>
           </section>
 
           <section class="info-panel">

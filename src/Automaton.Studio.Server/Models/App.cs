@@ -72,6 +72,7 @@ public class ForkAppSourceModel
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? PublicUrl { get; set; }
     public string? Summary { get; set; }
     public string? Description { get; set; }
     public string? ThumbnailUrl { get; set; }
