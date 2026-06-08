@@ -22,10 +22,19 @@ Read these files before making structure, backend, or deploy decisions:
 1. `.automaton/agents/references/llms.txt`
 2. `.automaton/agents/references/llms/*.md`
 
+## First local check
+
+- Check whether `automaton.json` exists in the project root.
+- If it does not exist and the user wants a new app here, run `automaton new "<app-name>"`.
+- If it does not exist and the user wants to connect an existing app, run `automaton link <app-id>`.
+
 ## Important Defaults
 
 - Default to frontend-only unless backend is explicitly needed for the user-requested core feature.
+- Frontend source normally lives in `frontend/`.
+- Backend source normally lives in `backend/` when needed.
 - Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`; use Automaton controllers that export `handle(action_name, inputs)`.
 - Use a build step for generated frontend apps.
+- Use `automaton validate` when the local contract or deploy shape is unclear.
 - Run `automaton deploy` before saying the app is done.
 - Ask before public publish.
