@@ -64,13 +64,18 @@ public static class DeployCommand
             var open = context.ParseResult.GetValueForOption(openOption);
             var nonInteractiveFlag = context.ParseResult.GetValueForOption(nonInteractiveOption);
 
-            var deployService = new DeployService(config);
             var preparationService = new DeployPreparationService(config);
             var publishService = new PublishService(config);
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
+            var headingWritten = false;
+            var deployService = new DeployService(
+                config,
+                message => WriteProgress(message, asJson, nonInteractive),
+                check => WriteCheck(check, asJson, nonInteractive));
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
+                var projectConfig = config.TryLoadProjectConfig(cwd);
                 var preparation = skipBackend
                     ? new DeployPreparationResult { Success = true }
                     : await preparationService.PrepareAsync(cwd, runner);
@@ -101,6 +106,7 @@ public static class DeployCommand
                     return;
                 }
 
+                WriteDeployHeading(projectConfig?.Name, projectConfig?.AppId, asJson, nonInteractive, ref headingWritten);
                 var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir);
                 result = MergePreparation(result, preparation);
 
@@ -236,7 +242,7 @@ public static class DeployCommand
 
     private static void WriteResult(DeployResult result, bool asJson, bool verbose, bool nonInteractive)
     {
-                if (asJson)
+        if (asJson)
         {
             CliJson.Write(new
             {
@@ -267,25 +273,6 @@ public static class DeployCommand
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(result.AppName) && !string.IsNullOrWhiteSpace(result.AppId))
-        {
-            AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{result.AppName}[/] ({result.AppId})");
-        }
-
-        var table = new Table();
-        table.AddColumn("Stage");
-        table.AddColumn("Result");
-        table.AddColumn("Details");
-
-        foreach (var check in result.Checks)
-        {
-            var status = check.Success
-                ? "[green]pass[/]"
-                : check.IsWarning ? "[yellow]warn[/]" : "[red]fail[/]";
-            table.AddRow(check.Name, status, check.Message);
-        }
-
-        AnsiConsole.Write(table);
         WriteVerboseSkippedEntries(result, verbose);
 
         if (result.NextSteps.Count > 0)
@@ -323,6 +310,64 @@ public static class DeployCommand
         }
     }
 
+    private static void WriteProgress(string message, bool asJson, bool nonInteractive)
+    {
+        if (asJson || string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        if (nonInteractive)
+        {
+            Console.WriteLine(message);
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[grey]{Markup.Escape(message)}[/]");
+    }
+
+    private static void WriteCheck(DeployCheckResult check, bool asJson, bool nonInteractive)
+    {
+        if (asJson)
+        {
+            return;
+        }
+
+        var status = check.Success
+            ? "pass"
+            : check.IsWarning ? "warn" : "fail";
+
+        if (nonInteractive)
+        {
+            Console.WriteLine($"Stage: {check.Name} | {status} | {check.Message}");
+            return;
+        }
+
+        var markupStatus = check.Success
+            ? "[green]pass[/]"
+            : check.IsWarning ? "[yellow]warn[/]" : "[red]fail[/]";
+        AnsiConsole.MarkupLine($"[bold]{Markup.Escape(check.Name)}[/] {markupStatus} {Markup.Escape(check.Message)}");
+    }
+
+    private static void WriteDeployHeading(string? appName, string? appId, bool asJson, bool nonInteractive, ref bool headingWritten)
+    {
+        if (asJson || headingWritten || string.IsNullOrWhiteSpace(appName) || string.IsNullOrWhiteSpace(appId))
+        {
+            return;
+        }
+
+        if (nonInteractive)
+        {
+            Console.WriteLine($"Deploying {appName} ({appId})");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
+        }
+
+        headingWritten = true;
+    }
+
     private static void WriteVerboseSkippedEntries(DeployResult result, bool verbose)
     {
         if (!verbose)
@@ -337,17 +382,6 @@ public static class DeployCommand
 
     private static void WritePlainResult(DeployResult result, bool verbose)
     {
-        if (!string.IsNullOrWhiteSpace(result.AppName) && !string.IsNullOrWhiteSpace(result.AppId))
-        {
-            Console.WriteLine($"Deploying {result.AppName} ({result.AppId})");
-        }
-
-        foreach (var check in result.Checks)
-        {
-            var status = check.Success ? "pass" : check.IsWarning ? "warn" : "fail";
-            Console.WriteLine($"Stage: {check.Name} | {status} | {check.Message}");
-        }
-
         WritePlainSkippedSection("Source skipped files", result.SourceUploaded, verbose);
         WritePlainSkippedSection("Frontend skipped files", result.Uploaded, verbose);
         WritePlainSkippedSection("Backend skipped files", result.BackendUploaded, verbose);

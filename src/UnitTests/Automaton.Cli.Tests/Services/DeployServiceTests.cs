@@ -117,16 +117,10 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
-        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
-        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -160,10 +154,16 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -238,10 +238,16 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -260,6 +266,98 @@ public class DeployServiceTests
         Assert.That(result.Success, Is.True);
         Assert.That(result.Uploaded?.Written, Is.EqualTo(2));
         AssertCheck(result, DeployCheckNames.Upload, true, "uploaded 2 file(s)");
+    }
+
+    [Test]
+    public async Task DeployAsync_ReportsProgressDuringLongRunningStages()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
+
+        var progress = new List<string>();
+        var service = new DeployService(
+            configService,
+            progress.Add,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 1, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 1, "backend deployed")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(progress, Has.Some.EqualTo("Uploading source files..."));
+        Assert.That(progress, Has.Some.EqualTo("Source upload complete 3 source file(s), 0 skipped."));
+        Assert.That(progress, Has.Some.StartWith("Uploading frontend files from frontend"));
+        Assert.That(progress, Has.Some.EqualTo("Frontend upload complete 2 file(s), 1 skipped."));
+        Assert.That(progress, Has.Some.StartWith("Uploading backend files from backend..."));
+        Assert.That(progress, Has.Some.EqualTo("Backend upload complete 1 backend file(s), 0 skipped."));
+        Assert.That(progress, Has.Some.EqualTo("Requesting backend deploy on the assigned runner..."));
+        Assert.That(progress, Has.Some.EqualTo("backend deployed"));
+    }
+
+    [Test]
+    public async Task DeployAsync_ReportsChecksAsEachStageCompletes()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+
+        var reportedChecks = new List<DeployCheckResult>();
+        var service = new DeployService(
+            configService,
+            (Action<string>?)null,
+            (Action<DeployCheckResult>)reportedChecks.Add,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(1, 0, 0.1)),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 1, "backend deployed")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(reportedChecks.Select(check => check.Name).ToArray(), Is.EqualTo(new[]
+        {
+            DeployCheckNames.AppLink,
+            DeployCheckNames.Credentials,
+            DeployCheckNames.Build,
+            DeployCheckNames.FrontendPackage,
+            DeployCheckNames.SourceUpload,
+            DeployCheckNames.Upload,
+            DeployCheckNames.BackendPackage,
+            DeployCheckNames.BackendDeploy
+        }));
     }
 
     [Test]

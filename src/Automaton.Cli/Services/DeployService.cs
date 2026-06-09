@@ -7,6 +7,8 @@ public sealed class DeployService
     private const string AutomatonConfigFileName = "automaton.json";
 
     private readonly ConfigService _config;
+    private readonly Action<string>? _progress;
+    private readonly Action<DeployCheckResult>? _checkReported;
     private readonly Func<string, string, CancellationToken, Task<int>> _runBuildAsync;
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadSourceAsync;
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadAsync;
@@ -20,8 +22,35 @@ public sealed class DeployService
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
         Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
+        : this(config, null, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync)
+    {
+    }
+
+    public DeployService(
+        ConfigService config,
+        Action<string>? progress,
+        Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadSourceAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
+        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
+        : this(config, progress, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync)
+    {
+    }
+
+    public DeployService(
+        ConfigService config,
+        Action<string>? progress = null,
+        Action<DeployCheckResult>? checkReported = null,
+        Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadSourceAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
+        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
     {
         _config = config;
+        _progress = progress;
+        _checkReported = checkReported;
         _runBuildAsync = runBuildAsync ?? RunBuildAsync;
         _uploadSourceAsync = uploadSourceAsync ?? UploadSourceAsync;
         _uploadAsync = uploadAsync ?? UploadAsync;
@@ -49,10 +78,10 @@ public sealed class DeployService
         var (server, apiKey) = _config.ResolveCredentials(projectConfig, directory);
 
         var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, nextSteps);
-        checks.Add(appLinkCheck);
+        AddCheck(checks, appLinkCheck);
 
         var credentialsCheck = ValidateCredentials(server, apiKey, nextSteps);
-        checks.Add(credentialsCheck);
+        AddCheck(checks, credentialsCheck);
 
         if (!appLinkCheck.Success || !credentialsCheck.Success || projectConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
         {
@@ -60,7 +89,7 @@ public sealed class DeployService
         }
 
         var buildCheck = await RunBuildIfNeededAsync(projectConfig.Frontend?.Build, directory, nextSteps, cancellationToken);
-        checks.Add(buildCheck);
+        AddCheck(checks, buildCheck);
 
         if (!buildCheck.Success)
         {
@@ -68,7 +97,7 @@ public sealed class DeployService
         }
 
         var packageCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, nextSteps, out var deployDirectory);
-        checks.Add(packageCheck);
+        AddCheck(checks, packageCheck);
 
         if (!packageCheck.Success || deployDirectory == null)
         {
@@ -77,9 +106,11 @@ public sealed class DeployService
 
         try
         {
+            ReportProgress("Uploading source files...");
             using var sourceZip = ZipService.CreateSourceZip(directory, projectConfig.Source);
             sourceUploadResult = await _uploadSourceAsync(server, apiKey, projectConfig.AppId, sourceZip, true, cancellationToken);
-            checks.Add(new DeployCheckResult(
+            ReportProgress(FormatProgressMessage("Source upload complete", sourceUploadResult, "source file(s)"));
+            AddCheck(checks, new DeployCheckResult(
                 DeployCheckNames.SourceUpload,
                 true,
                 FormatUploadMessage("uploaded", "source file(s)", sourceUploadResult)));
@@ -87,12 +118,13 @@ public sealed class DeployService
         catch (Exception ex)
         {
             nextSteps.Add("Verify local source files and retry deploy so Studio source stays in sync");
-            checks.Add(new DeployCheckResult(DeployCheckNames.SourceUpload, false, ex.Message));
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.SourceUpload, false, ex.Message));
             return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
         {
+            ReportProgress($"Uploading frontend files from {Path.GetRelativePath(directory, deployDirectory)}...");
             using var zip = ZipService.CreateZip(
                 directory,
                 deployDirectory,
@@ -104,7 +136,8 @@ public sealed class DeployService
                         Exclude = projectConfig.Frontend.Exclude
                     });
             uploadResult = await _uploadAsync(server, apiKey, projectConfig.AppId, zip, clean, cancellationToken);
-            checks.Add(new DeployCheckResult(
+            ReportProgress(FormatProgressMessage("Frontend upload complete", uploadResult, "file(s)"));
+            AddCheck(checks, new DeployCheckResult(
                 DeployCheckNames.Upload,
                 true,
                 FormatUploadMessage("uploaded", "file(s)", uploadResult)));
@@ -112,17 +145,17 @@ public sealed class DeployService
         catch (Exception ex)
         {
             nextSteps.Add("Run automaton whoami to confirm the current server and identity");
-            checks.Add(new DeployCheckResult(DeployCheckNames.Upload, false, ex.Message));
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.Upload, false, ex.Message));
             return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         var backendPackageCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
-        checks.Add(backendPackageCheck);
+        AddCheck(checks, backendPackageCheck);
 
         if (skipBackend)
         {
             backendResult = new DeployBackendResult(false, 0, "backend deploy skipped by flag");
-            checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, true, backendResult.Message ?? "backend deploy skipped by flag"));
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.BackendDeploy, true, backendResult.Message ?? "backend deploy skipped by flag"));
             return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
@@ -140,6 +173,7 @@ public sealed class DeployService
 
         try
         {
+            ReportProgress($"Uploading backend files from {Path.GetRelativePath(directory, backendDirectory)}...");
             using var backendZip = ZipService.CreateZip(
                 directory,
                 backendDirectory,
@@ -154,14 +188,15 @@ public sealed class DeployService
             if (backendUploadResult.Written <= 0)
             {
                 nextSteps.Add("Verify backend.deployDir files are not excluded and retry deploy");
-                checks.Add(new DeployCheckResult(
+                AddCheck(checks, new DeployCheckResult(
                     DeployCheckNames.BackendPackage,
                     false,
                     $"backend upload wrote 0 files from {Path.GetRelativePath(directory, backendDirectory)}"));
                 return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
             }
 
-            checks.Add(new DeployCheckResult(
+            ReportProgress(FormatProgressMessage("Backend upload complete", backendUploadResult, "backend file(s)"));
+            AddCheck(checks, new DeployCheckResult(
                 DeployCheckNames.BackendPackage,
                 true,
                 FormatUploadMessage("uploaded", "backend file(s)", backendUploadResult)));
@@ -169,19 +204,20 @@ public sealed class DeployService
         catch (Exception ex)
         {
             nextSteps.Add("Verify backend.deployDir in automaton.json and rerun automaton deploy");
-            checks.Add(new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message));
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.BackendPackage, false, ex.Message));
             return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
         try
         {
+            ReportProgress("Requesting backend deploy on the assigned runner...");
             backendResult = await _deployBackendAsync(server, apiKey, projectConfig.AppId, cancellationToken);
         }
         catch (Exception ex)
         {
             nextSteps.Add("Inspect backend deploy logs in Automaton Studio");
             nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
-            checks.Add(new DeployCheckResult(DeployCheckNames.BackendDeploy, false, ex.Message, IsWarning: true));
+            AddCheck(checks, new DeployCheckResult(DeployCheckNames.BackendDeploy, false, ex.Message, IsWarning: true));
             backendResult = new DeployBackendResult(false, 0, ex.Message);
             return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
@@ -190,15 +226,17 @@ public sealed class DeployService
         {
             nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
             nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
-            checks.Add(new DeployCheckResult(
+            AddCheck(checks, new DeployCheckResult(
                 DeployCheckNames.BackendDeploy,
                 false,
                 backendResult.Message ?? "backend deploy did not reach any runner",
                 IsWarning: true));
+            ReportProgress("Backend deploy did not reach a connected runner.");
             return CreateResult(true, checks, nextSteps, projectConfig, server, clean, skipBackend, deployDirectory, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
         }
 
-        checks.Add(new DeployCheckResult(
+        ReportProgress(backendResult.Message ?? $"Backend deploy reached {backendResult.RunnerCount} runner(s).");
+        AddCheck(checks, new DeployCheckResult(
             DeployCheckNames.BackendDeploy,
             true,
             backendResult.Message ?? $"backend deployed to {backendResult.RunnerCount} runner(s)"));
@@ -502,6 +540,22 @@ public sealed class DeployService
             .ToArray();
 
         return $"{message}; reasons: {string.Join(", ", byRuleSource)}";
+    }
+
+    private static string FormatProgressMessage(string prefix, DeployUploadResult result, string subject)
+    {
+        return $"{prefix} {result.Written} {subject}, {result.Skipped} skipped.";
+    }
+
+    private void ReportProgress(string message)
+    {
+        _progress?.Invoke(message);
+    }
+
+    private void AddCheck(ICollection<DeployCheckResult> checks, DeployCheckResult check)
+    {
+        checks.Add(check);
+        _checkReported?.Invoke(check);
     }
 
     private static async Task<DeployBackendResult> DeployBackendAsync(
