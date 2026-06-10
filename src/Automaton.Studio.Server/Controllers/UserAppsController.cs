@@ -229,6 +229,11 @@ public class UserAppsController : ControllerBase
                 return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
             }
 
+            if (isHtmlEntryPoint)
+            {
+                await appsService.IncrementViewCountAsync(app.Id);
+            }
+            
             return await ServePublishedStaticFileAsync(
                 slug,
                 path,

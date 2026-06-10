@@ -589,13 +589,17 @@ public class AppsService
     /// </summary>
     public async Task IncrementViewCountAsync(Guid appId)
     {
-        var entity = await dataContext.WebApps.FindAsync(appId);
-        if (entity != null)
+        try
         {
-            entity.ViewCount++;
-            entity.LastViewedAt = DateTime.UtcNow;
-            await dataContext.SaveChangesAsync();
-            logger.Debug("Incremented view count for app {AppId} to {ViewCount}", appId, entity.ViewCount);
+            await dataContext.WebApps
+                .Where(x => x.Id == appId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.ViewCount, x => x.ViewCount + 1)
+                    .SetProperty(x => x.LastViewedAt, DateTime.UtcNow));
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to increment view count for app {AppId}", appId);
         }
     }
 
