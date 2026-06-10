@@ -1,14 +1,19 @@
 ﻿using Automaton.Core.Scripting;
+using Automaton.Mcp.Client.Extensions;
 using Automaton.Studio.Server.Areas.Identity;
 using Automaton.Studio.Server.Authentication;
 using Automaton.Studio.Server.Authentication.GitHub;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Extensions;
 using Automaton.Studio.Server.Hubs;
+using Automaton.Studio.Server.Logging;
 using Automaton.Studio.Server.Middleware;
+using Automaton.Studio.Server.Security;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Common.Authentication;
 using Destructurama;
 using FluentValidation.AspNetCore;
@@ -25,12 +30,8 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
-using System.Transactions;
-using Automaton.Studio.Server.Services.Interfaces;
-using Automaton.Studio.Server.Enums;
-using Automaton.Mcp.Client.Extensions;
 using System.Text.Json.Serialization;
-using Automaton.Studio.Server.Security;
+using System.Transactions;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -472,18 +473,23 @@ app.UseForwardedHeaders();
 app.UseRateLimiter();
 app.UseRouting();
 
-app.UseSerilogRequestLogging(
-    options =>
+app.UseWhen(
+    ctx => !LoggingRequestFilter.ShouldSkipRequestLogging(ctx),
+    builder =>
     {
-        options.MessageTemplate = "{ClientIP} {RequestScheme} {RequestHost} {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
-        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        builder.UseSerilogRequestLogging(options =>
         {
-            diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
-            diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-            diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress);
-            // TODO! Need to send UserAgent from Blazor application with each HttpClient request
-            diagnosticContext.Set("UserAgent", httpContext.Request.Headers["User-Agent"].FirstOrDefault());
-        };
+            options.MessageTemplate =
+                "{ClientIP} {RequestScheme} {RequestHost} {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+                diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+                diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress);
+                diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.FirstOrDefault());
+            };
+        });
     });
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();

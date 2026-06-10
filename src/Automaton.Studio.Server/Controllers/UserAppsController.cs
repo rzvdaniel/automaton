@@ -214,8 +214,12 @@ public class UserAppsController : ControllerBase
                 return NotFound(GetErrorPage("App Not Found", "This app does not exist or is not published."));
             }
 
-            var isHtmlEntryPoint = string.IsNullOrEmpty(path) || path == "index.html" ||
-                                   Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
+            var isHtmlEntryPoint =
+                string.IsNullOrWhiteSpace(path) ||
+                string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(path, "/", StringComparison.OrdinalIgnoreCase) ||
+                Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
+
             if (app.RequiresAuthentication && isHtmlEntryPoint && User.Identity?.IsAuthenticated != true)
             {
                 logger.LogWarning("Unauthenticated access to protected app: {Slug}", slug);
@@ -229,11 +233,15 @@ public class UserAppsController : ControllerBase
                 return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
             }
 
+            logger.LogInformation(
+                    "Published app launch tracked: slug={Slug}, path={Path}, appId={AppId}, htmlEntry={HtmlEntry}",
+                    slug, path, app.Id, isHtmlEntryPoint);
+
             if (isHtmlEntryPoint)
             {
                 await appsService.IncrementViewCountAsync(app.Id);
             }
-            
+
             return await ServePublishedStaticFileAsync(
                 slug,
                 path,
