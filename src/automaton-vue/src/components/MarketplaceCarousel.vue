@@ -395,10 +395,11 @@ function openCreator(publicUsername: string) {
 }
 
 .screenshot-tile img {
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+width: 100%;
+  aspect-ratio: 16 / 9;
   object-fit: contain;
-  background: rgba(10, 17, 24, 0.96);
+  background: #0e141b;
+  display: block;
 }
 
 .carousel-arrow {
