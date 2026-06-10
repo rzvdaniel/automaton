@@ -239,6 +239,35 @@ async function loadApp() {
   }
 }
 
+async function trackLaunch() {
+  if (!app.value) {
+    return
+  }
+
+  try {
+    await fetch(`${marketplaceApiBaseUrl}/apps/${app.value.id}/launch`, {
+      method: 'POST',
+      keepalive: true,
+    })
+
+    if (app.value) {
+      app.value.viewCount += 1
+    }
+  } catch {
+    // Do not block launching the app because analytics failed.
+  }
+}
+
+async function launchApp() {
+  const url = launchUrl.value
+  if (!url) {
+    return
+  }
+
+  window.open(url, '_blank', 'noopener')
+  await trackLaunch()
+}
+
 watch(
   () => route.params.appId,
   async () => {
@@ -308,10 +337,15 @@ onMounted(loadApp)
                 </div>
 
                 <div class="hero-actions">
-                  <a v-if="launchUrl" :href="launchUrl" target="_blank" rel="noopener" class="detail-button primary">
-                    Open app
-                    <i class="pi pi-external-link" />
-                  </a>
+                  <button
+                      v-if="launchUrl"
+                      type="button"
+                      class="detail-button primary"
+                      @click="launchApp"
+                    >
+                      Open app
+                      <i class="pi pi-external-link" />
+                  </button>
                   <a v-if="app.canRemix" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                       <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />

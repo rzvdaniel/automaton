@@ -237,11 +237,6 @@ public class UserAppsController : ControllerBase
                     "Published app launch tracked: slug={Slug}, path={Path}, appId={AppId}, htmlEntry={HtmlEntry}",
                     slug, path, app.Id, isHtmlEntryPoint);
 
-            if (isHtmlEntryPoint)
-            {
-                await appsService.IncrementViewCountAsync(app.Id);
-            }
-
             return await ServePublishedStaticFileAsync(
                 slug,
                 path,

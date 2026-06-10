@@ -1,8 +1,10 @@
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Studio.Server.Controllers;
@@ -14,13 +16,16 @@ public class PublicMarketplaceController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly AppFileStorageService _appFileStorageService;
+    private readonly AppsService _appsService;
 
     public PublicMarketplaceController(
         ApplicationDbContext dbContext,
-        AppFileStorageService appFileStorageService)
+        AppFileStorageService appFileStorageService,
+        AppsService appsService)
     {
         _dbContext = dbContext;
         _appFileStorageService = appFileStorageService;
+        _appsService = appsService;
     }
 
     [HttpGet("apps")]
@@ -420,6 +425,37 @@ public class PublicMarketplaceController : ControllerBase
             .ToListAsync();
 
         return Ok(categories);
+    }
+
+    [HttpPost("apps/{appId:guid}/launch")]
+    [EnableRateLimiting(RateLimitPolicyNames.PublicMarketplaceAppLaunch)]
+    public async Task<IActionResult> TrackAppLaunch(Guid appId)
+    {
+        var appExists = await _dbContext.WebApps
+            .AsNoTracking()
+            .AnyAsync(a =>
+                a.Id == appId &&
+                a.IsPublished &&
+                a.ReviewStatus == AppReviewStatuses.Approved &&
+                a.AccessStatus == AppAccessStatuses.Active);
+
+        if (!appExists)
+        {
+            return NotFound(new { message = "App not found or not published" });
+        }
+
+        try
+        {
+            await _appsService.IncrementViewCountAsync(appId);
+        }
+        catch (Exception ex)
+        {
+            // Analytics should not break launching.
+            // If controller already has ILogger, use logger instead.
+            Serilog.Log.Warning(ex, "Failed to track app launch for {AppId}", appId);
+        }
+
+        return NoContent();
     }
 
     private Guid? TryGetCurrentUserId()

@@ -16,6 +16,7 @@ public class RateLimitingOptions
     public RateLimitPolicyOptions PublicAppControllerExecution { get; set; } = new(10, 60);
     public RateLimitPolicyOptions PublicAppFlowExecution { get; set; } = new(10, 60);
     public RateLimitPolicyOptions PublicAppStepExecution { get; set; } = new(10, 60);
+    public RateLimitPolicyOptions PublicMarketplaceAppLaunch { get; set; } = new(1, 600);
 }
 
 public class RateLimitPolicyOptions

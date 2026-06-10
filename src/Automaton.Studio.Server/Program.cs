@@ -470,7 +470,7 @@ var app = applicationBuilder.Build();
 app.ApplyMigrations();
 
 app.UseForwardedHeaders();
-app.UseRateLimiter();
+
 app.UseRouting();
 
 app.UseWhen(
@@ -491,6 +491,8 @@ app.UseWhen(
             };
         });
     });
+
+app.UseRateLimiter();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

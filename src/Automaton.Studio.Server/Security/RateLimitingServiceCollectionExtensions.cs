@@ -11,92 +11,108 @@ public static class RateLimitingServiceCollectionExtensions
     public static IServiceCollection AddAutomatonRateLimiting(this IServiceCollection services)
     {
         services.AddMemoryCache();
+
         services
             .AddOptions<RateLimitingOptions>()
             .BindConfiguration(RateLimitingOptions.SectionName)
             .ValidateOnStart();
+
         services.AddSingleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidation>();
 
-        services.AddRateLimiter(options =>
-        {
-            var rateLimitingOptions = services
-                .BuildServiceProvider()
-                .GetRequiredService<IOptions<RateLimitingOptions>>()
-                .Value;
-
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        services.AddOptions<RateLimiterOptions>()
+            .Configure<IOptions<RateLimitingOptions>>((options, configuredOptions) =>
             {
-                var identity = httpContext.User.Identity;
-                if (identity?.IsAuthenticated == true)
+                var rateLimitingOptions = configuredOptions.Value;
+
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
                 {
+                    var identity = httpContext.User.Identity;
+                    if (identity?.IsAuthenticated == true)
+                    {
+                        return RateLimitPartition.GetFixedWindowLimiter(
+                            GetAuthenticatedPartitionKey(httpContext),
+                            _ => CreatePolicyOptions(rateLimitingOptions.GlobalAuthenticated));
+                    }
+
                     return RateLimitPartition.GetFixedWindowLimiter(
-                        GetAuthenticatedPartitionKey(httpContext),
-                        _ => CreatePolicyOptions(rateLimitingOptions.GlobalAuthenticated));
-                }
+                        GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
+                        _ => CreatePolicyOptions(rateLimitingOptions.GlobalAnonymous));
+                });
 
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, "global:anonymous"),
-                    _ => CreatePolicyOptions(rateLimitingOptions.GlobalAnonymous));
+                options.OnRejected = (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.Headers.RetryAfter = "60";
+                    return new ValueTask(context.HttpContext.Response.WriteAsJsonAsync(
+                        new { message = "Too many requests. Please try again later." },
+                        cancellationToken));
+                };
+
+                options.AddPolicy(RateLimitPolicyNames.AuthLogin, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthLogin),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthLogin)));
+
+                options.AddPolicy(RateLimitPolicyNames.AuthRegistration, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthRegistration),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthRegistration)));
+
+                options.AddPolicy(RateLimitPolicyNames.AuthForgotPassword, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthForgotPassword),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthForgotPassword)));
+
+                options.AddPolicy(RateLimitPolicyNames.AuthResendConfirmation, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResendConfirmation),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthResendConfirmation)));
+
+                options.AddPolicy(RateLimitPolicyNames.AuthResetPassword, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResetPassword),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthResetPassword)));
+
+                options.AddPolicy(RateLimitPolicyNames.AuthRefreshToken, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthRefreshToken),
+                        _ => CreatePolicyOptions(rateLimitingOptions.AuthRefreshToken)));
+
+                options.AddPolicy(RateLimitPolicyNames.ApiKeyValidation, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.ApiKeyValidation),
+                        _ => CreatePolicyOptions(rateLimitingOptions.ApiKeyValidation)));
+
+                options.AddPolicy(RateLimitPolicyNames.PublicAppControllerExecution, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppControllerExecution),
+                        _ => CreatePolicyOptions(rateLimitingOptions.PublicAppControllerExecution)));
+
+                options.AddPolicy(RateLimitPolicyNames.PublicAppFlowExecution, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppFlowExecution),
+                        _ => CreatePolicyOptions(rateLimitingOptions.PublicAppFlowExecution)));
+
+                options.AddPolicy(RateLimitPolicyNames.PublicAppStepExecution, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppStepExecution),
+                        _ => CreatePolicyOptions(rateLimitingOptions.PublicAppStepExecution)));
+
+                options.AddPolicy(RateLimitPolicyNames.PublicMarketplaceAppLaunch, httpContext =>
+                {
+                    var appId = httpContext.Request.RouteValues["appId"]?.ToString() ?? "unknown";
+
+                    var partitionKey = GetRemoteIpPartitionKey(httpContext,
+                        $"{RateLimitPolicyNames.PublicMarketplaceAppLaunch}:{appId}");
+
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey,
+                        _ => CreatePolicyOptions(rateLimitingOptions.PublicMarketplaceAppLaunch));
+                });
             });
-            options.OnRejected = (context, cancellationToken) =>
-            {
-                context.HttpContext.Response.Headers.RetryAfter = "60";
-                return new ValueTask(context.HttpContext.Response.WriteAsJsonAsync(
-                    new { message = "Too many requests. Please try again later." },
-                    cancellationToken));
-            };
 
-            options.AddPolicy(RateLimitPolicyNames.AuthLogin, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthLogin),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthLogin)));
-
-            options.AddPolicy(RateLimitPolicyNames.AuthRegistration, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthRegistration),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthRegistration)));
-
-            options.AddPolicy(RateLimitPolicyNames.AuthForgotPassword, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthForgotPassword),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthForgotPassword)));
-
-            options.AddPolicy(RateLimitPolicyNames.AuthResendConfirmation, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResendConfirmation),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthResendConfirmation)));
-
-            options.AddPolicy(RateLimitPolicyNames.AuthResetPassword, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthResetPassword),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthResetPassword)));
-
-            options.AddPolicy(RateLimitPolicyNames.AuthRefreshToken, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.AuthRefreshToken),
-                    _ => CreatePolicyOptions(rateLimitingOptions.AuthRefreshToken)));
-
-            options.AddPolicy(RateLimitPolicyNames.ApiKeyValidation, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.ApiKeyValidation),
-                    _ => CreatePolicyOptions(rateLimitingOptions.ApiKeyValidation)));
-
-            options.AddPolicy(RateLimitPolicyNames.PublicAppControllerExecution, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppControllerExecution),
-                    _ => CreatePolicyOptions(rateLimitingOptions.PublicAppControllerExecution)));
-
-            options.AddPolicy(RateLimitPolicyNames.PublicAppFlowExecution, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppFlowExecution),
-                    _ => CreatePolicyOptions(rateLimitingOptions.PublicAppFlowExecution)));
-
-            options.AddPolicy(RateLimitPolicyNames.PublicAppStepExecution, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext, RateLimitPolicyNames.PublicAppStepExecution),
-                    _ => CreatePolicyOptions(rateLimitingOptions.PublicAppStepExecution)));
-        });
+        services.AddRateLimiter();
 
         return services;
     }
