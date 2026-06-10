@@ -798,14 +798,9 @@ onMounted(loadApp)
 
 .gallery-stage {
   position: relative;
-  overflow: hidden;
-  display: grid;
   aspect-ratio: 16 / 9;
-  place-items: center;
-  padding: 18px;
-  background:
-    radial-gradient(circle at 50% 36%, rgba(80, 215, 255, 0.08), transparent 28rem),
-    #080b10;
+  overflow: hidden;
+  background: #0e141b;
 }
 
 .stage-image {
@@ -838,13 +833,12 @@ onMounted(loadApp)
 
 .gallery-thumb {
   overflow: hidden;
-  aspect-ratio: 16 / 9;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: #0b0f15;
+  border: 1px solid rgba(103, 193, 245, 0.12);
+  background: rgba(32, 50, 70, 0.72);
+  color: #ffffff;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  text-align: left;
 }
 
 .gallery-thumb:hover {
@@ -860,9 +854,9 @@ onMounted(loadApp)
 .gallery-thumb img {
   width: 100%;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
+  object-fit: contain;
+  background: #0e141b;
   display: block;
-  background: #0b0f15;
 }
 
 .gallery-arrow {
