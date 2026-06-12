@@ -97,6 +97,9 @@ The rules are intentionally strict:
 - Pull downloads `source/frontend` and `source/backend` only.
 - Pull never downloads `live/backend`.
 - Pull does not fall back to `live/frontend` unless an explicit future flag enables it.
+- In interactive mode, `automaton pull` warns before overwriting matching local files and asks for confirmation.
+- In non-interactive mode, `automaton pull` requires `--force` before it will overwrite matching local files.
+- Pull keeps local-only files. It updates matching files but does not delete extra local files.
 
 ### Prerequisites
 

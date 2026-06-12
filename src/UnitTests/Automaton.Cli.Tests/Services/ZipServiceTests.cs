@@ -128,6 +128,52 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateSourceZip_WhenProjectContainsNestedNodeModules_ExcludesDependencyTree()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "src"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "node_modules", "vite"));
+
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('source');");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "node_modules", "vite", "index.js"), "console.log('dep');");
+
+        using var zipStream = ZipService.CreateSourceZip(projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("automaton.json"));
+        Assert.That(entries, Does.Contain("frontend/src/main.js"));
+        Assert.That(entries, Does.Not.Contain("frontend/node_modules/vite/index.js"));
+    }
+
+    [Test]
+    public void CreateSourceZip_WhenProjectContainsNestedBuildAndVirtualEnvArtifacts_ExcludesThem()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "src"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", ".venv", "lib"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "__pycache__"));
+
+        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.ts"), "console.log('source');");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "index.js"), "console.log('build');");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", ".venv", "lib", "x.py"), "print('venv')");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "__pycache__", "main.cpython-312.pyc"), "compiled");
+
+        using var zipStream = ZipService.CreateSourceZip(projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("automaton.json"));
+        Assert.That(entries, Does.Contain("frontend/src/main.ts"));
+        Assert.That(entries, Does.Not.Contain("frontend/dist/index.js"));
+        Assert.That(entries, Does.Not.Contain("backend/.venv/lib/x.py"));
+        Assert.That(entries, Does.Not.Contain("backend/__pycache__/main.cpython-312.pyc"));
+    }
+
+    [Test]
     public void CreateZip_WhenAutomatonIgnoreContainsCustomPatterns_ExcludesMatchingFilesFromDeployDir()
     {
         // Arrange

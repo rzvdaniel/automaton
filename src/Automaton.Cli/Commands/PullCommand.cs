@@ -18,6 +18,7 @@ namespace Automaton.Cli.Commands;
 public static class PullCommand
 {
     private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
+    private const int OverwritePreviewCount = 10;
 
     public static Command Build(ConfigService config)
     {
@@ -25,16 +26,18 @@ public static class PullCommand
         var dirOption = new Option<string?>(
             ["--dir", "-d"],
             "Target directory (defaults to current directory for refresh mode, or a new subfolder in the current directory for app mode)");
+        var forceOption = new Option<bool>("--force", "Overwrite matching local files without prompting");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable progress rendering and use plain output");
 
         var cmd = new Command("pull", "Download editable app source files from the server")
         {
             appArgument,
             dirOption,
+            forceOption,
             nonInteractiveOption
         };
 
-        cmd.SetHandler(async (string? app, string? dir, bool nonInteractiveFlag) =>
+        cmd.SetHandler(async (string? app, string? dir, bool force, bool nonInteractiveFlag) =>
         {
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag);
 
@@ -44,7 +47,7 @@ public static class PullCommand
 
                 if (string.IsNullOrWhiteSpace(app))
                 {
-                    await PullIntoLinkedProjectAsync(config, cwd, dir, nonInteractive);
+                    await PullIntoLinkedProjectAsync(config, cwd, dir, force, nonInteractive);
                     return;
                 }
 
@@ -63,12 +66,12 @@ public static class PullCommand
 
                 Environment.Exit(1);
             }
-        }, appArgument, dirOption, nonInteractiveOption);
+        }, appArgument, dirOption, forceOption, nonInteractiveOption);
 
         return cmd;
     }
 
-    private static async Task PullIntoLinkedProjectAsync(ConfigService config, string cwd, string? dir, bool nonInteractive)
+    private static async Task PullIntoLinkedProjectAsync(ConfigService config, string cwd, string? dir, bool force, bool nonInteractive)
     {
         var appConfig = config.LoadProjectConfig(cwd);
         var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
@@ -85,6 +88,9 @@ public static class PullCommand
             WriteNoFiles(nonInteractive);
             return;
         }
+
+        var overwritePaths = GetOverwritePaths(sourceFiles, targetDir);
+        EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
 
         await DownloadFilesAsync(client, appConfig.AppId, sourceFiles, targetDir, nonInteractive);
     }
@@ -232,6 +238,96 @@ public static class PullCommand
         var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
         await File.WriteAllTextAsync(localPath, content, Encoding.UTF8);
+    }
+
+    private static List<string> GetOverwritePaths(IEnumerable<string> files, string targetDir)
+    {
+        var overwritePaths = new List<string>();
+
+        foreach (var filePath in files)
+        {
+            var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(localPath))
+            {
+                overwritePaths.Add(filePath);
+            }
+        }
+
+        return overwritePaths;
+    }
+
+    private static void EnsureOverwriteApproved(IReadOnlyList<string> overwritePaths, bool force, bool nonInteractive)
+    {
+        if (overwritePaths.Count == 0)
+        {
+            return;
+        }
+
+        if (force)
+        {
+            WriteOverwriteNotice(overwritePaths, nonInteractive, forced: true);
+            return;
+        }
+
+        if (nonInteractive)
+        {
+            throw new InvalidOperationException(BuildNonInteractiveOverwriteError(overwritePaths));
+        }
+
+        WriteOverwriteNotice(overwritePaths, nonInteractive, forced: false);
+        Console.Write("Continue? [y/N] ");
+        var confirmation = Console.ReadLine()?.Trim();
+        if (!string.Equals(confirmation, "y", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(confirmation, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new OperationCanceledException("Pull cancelled.");
+        }
+    }
+
+    private static void WriteOverwriteNotice(IReadOnlyList<string> overwritePaths, bool nonInteractive, bool forced)
+    {
+        var message = BuildOverwriteMessage(overwritePaths, forced);
+
+        if (nonInteractive)
+        {
+            Console.WriteLine(message);
+            return;
+        }
+
+        foreach (var line in message.Split(Environment.NewLine))
+        {
+            AnsiConsole.MarkupLine(Markup.Escape(line));
+        }
+    }
+
+    private static string BuildNonInteractiveOverwriteError(IReadOnlyList<string> overwritePaths)
+    {
+        var preview = BuildOverwritePreview(overwritePaths);
+        return $"Pull would overwrite {overwritePaths.Count} existing local file(s). Re-run with --force to continue.{Environment.NewLine}{preview}";
+    }
+
+    private static string BuildOverwriteMessage(IReadOnlyList<string> overwritePaths, bool forced)
+    {
+        var intro = forced
+            ? $"Warning: --force enabled. Pull will overwrite {overwritePaths.Count} existing local file(s) from the remote app."
+            : $"Warning: pull will overwrite {overwritePaths.Count} existing local file(s) from the remote app.";
+
+        return $"{intro}{Environment.NewLine}{BuildOverwritePreview(overwritePaths)}{Environment.NewLine}Local-only files will be kept.";
+    }
+
+    private static string BuildOverwritePreview(IReadOnlyList<string> overwritePaths)
+    {
+        var lines = overwritePaths
+            .Take(OverwritePreviewCount)
+            .Select(path => $"  {path}")
+            .ToList();
+
+        if (overwritePaths.Count > OverwritePreviewCount)
+        {
+            lines.Add($"  ... and {overwritePaths.Count - OverwritePreviewCount} more");
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     private static async Task<JsonElement> ResolveAppAsync(AutomatonApiClient client, string appIdentifier)

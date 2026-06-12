@@ -320,6 +320,8 @@ Backend editor writes to `source/backend/`. Deploy Backend packages to `live/bac
 6. Support `automaton pull` in two modes:
    - `automaton pull` refreshes the current linked local folder from remote `source/`
    - `automaton pull <app-id-or-slug>` creates a new linked local folder and downloads remote `source/`
+   - refresh mode warns before overwriting matching local files and requires `--force` in non-interactive mode
+   - refresh mode keeps local-only files unless a future explicit clean/mirror flag is added
 7. Pull only `source/frontend` and `source/backend` by default. Do not pull `live/backend`. Do not fall back to `live/frontend` unless explicitly requested by a dedicated flag.
 8. Upload source separately only for explicit source publishing or forkable templates.
 9. Default generated apps to Vite + vanilla TypeScript or JavaScript in `frontend/`.

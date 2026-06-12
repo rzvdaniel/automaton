@@ -18,6 +18,8 @@ public static class ZipService
         ".automaton/",
         ".github/",
         ".git/",
+        ".venv/",
+        "__pycache__/",
         "node_modules/",
         "obj/",
         "bin/",
@@ -198,6 +200,8 @@ public static class ZipService
             normalized = normalized.TrimEnd('/');
             matcher.AddInclude(normalized);
             matcher.AddInclude($"{normalized}/**");
+            matcher.AddInclude($"**/{normalized}");
+            matcher.AddInclude($"**/{normalized}/**");
             return;
         }
 

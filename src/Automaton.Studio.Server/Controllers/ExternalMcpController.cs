@@ -37,7 +37,7 @@ namespace Automaton.Studio.Server.Controllers;
 ///
 /// For file writes and deployment use the automaton CLI:
 ///   automaton deploy   — build, upload, deploy backend
-///   automaton pull     — sync server files locally
+///   automaton pull     — sync server files locally, with overwrite confirmation for matching local files
 ///   automaton publish  — save a version snapshot
 ///   automaton runners  — list runners
 ///

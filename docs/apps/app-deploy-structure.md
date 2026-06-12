@@ -48,6 +48,10 @@ Deploy behavior:
 3. Upload `backend.deployDir` into `live/backend/` when configured.
 4. Trigger backend runner deployment from `live/backend/`.
 
+Packaging rules:
+- CLI deploy uploads archives, not one HTTP request per file.
+- Source packaging must exclude nested dependency and build folders such as `frontend/node_modules/`, `node_modules/`, `frontend/dist/`, and other nested `dist/` outputs. If those leak into the source archive, deploy size and server-side extraction cost spike for no product value.
+
 There is no automatic fallback to `dist/`, `frontend/`, or project root. `frontend.deployDir` must be explicit unless the caller intentionally overrides it with `automaton deploy --dir ...`.
 
 ## Recommended local project layout
