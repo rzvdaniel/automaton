@@ -1,8 +1,7 @@
 using Anthropic.SDK;
 using Anthropic.SDK.Common;
 using Anthropic.SDK.Messaging;
-using Automaton.Mcp.Models;
-using Automaton.Mcp.SystemPrompts;
+using Automaton.Ai.Models;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -12,7 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tool = Anthropic.SDK.Common.Tool;
 
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// Anthropic Claude provider implementation using the Anthropic.SDK package
@@ -103,7 +102,7 @@ public class AnthropicProvider : IAiProvider
         var responseBuilder = new StringBuilder();
 
         // Safety limits to prevent infinite loops (from user settings or defaults)
-        var maxIterations = IterationLimits.Resolve(null, request.MaxIterations);
+        var maxIterations = ProviderIterationLimits.Resolve(request.MaxIterations);
         var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(); // Track failures per tool

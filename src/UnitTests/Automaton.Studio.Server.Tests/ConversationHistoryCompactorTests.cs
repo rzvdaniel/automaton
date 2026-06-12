@@ -1,4 +1,4 @@
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Services;
 

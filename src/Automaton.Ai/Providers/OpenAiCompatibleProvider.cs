@@ -1,5 +1,4 @@
-using Automaton.Mcp.Models;
-using Automaton.Mcp.SystemPrompts;
+using Automaton.Ai.Models;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
@@ -10,7 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// Provider for any OpenAI Chat Completions-compatible API (Moonshot, Groq, Together, Mistral, etc.).
@@ -100,7 +99,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
 
         var messages = BuildMessages(request);
 
-        var maxIterations = IterationLimits.Resolve(null, request.MaxIterations);
+        var maxIterations = ProviderIterationLimits.Resolve(request.MaxIterations);
         var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

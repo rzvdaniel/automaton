@@ -1,4 +1,4 @@
-﻿namespace Automaton.Mcp.Models;
+namespace Automaton.Ai.Models;
 
 /// <summary>
 /// Result of a tool execution

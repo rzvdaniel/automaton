@@ -1,6 +1,6 @@
-using Automaton.Mcp.Client;
-using Automaton.Mcp.Client.Providers;
-using Automaton.Mcp.Models;
+using Automaton.Ai;
+using Automaton.Ai.Models;
+using Automaton.Ai.Providers;
 using Automaton.Studio.Server.Services.Interfaces;
 
 namespace Automaton.Studio.Server.Services;

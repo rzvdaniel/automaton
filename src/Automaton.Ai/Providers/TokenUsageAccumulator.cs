@@ -1,4 +1,4 @@
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// Shared additive token accumulator for multi-iteration provider calls.

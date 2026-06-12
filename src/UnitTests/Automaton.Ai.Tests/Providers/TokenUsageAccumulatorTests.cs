@@ -1,6 +1,6 @@
-using Automaton.Mcp.Client.Providers;
+using Automaton.Ai.Providers;
 
-namespace Automaton.Mcp.Tests.Providers;
+namespace Automaton.Ai.Tests.Providers;
 
 [TestFixture]
 public class TokenUsageAccumulatorTests

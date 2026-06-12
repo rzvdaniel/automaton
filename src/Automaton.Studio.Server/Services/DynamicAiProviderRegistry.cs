@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Automaton.Mcp.Client;
-using Automaton.Mcp.Client.Providers;
+using Automaton.Ai;
+using Automaton.Ai.Providers;
 using Automaton.Studio.Server.Config;
 using Automaton.Studio.Server.Data;
 using Microsoft.Extensions.Options;

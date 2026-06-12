@@ -1,6 +1,6 @@
-using Automaton.Mcp.Client.Providers;
+using Automaton.Ai.Providers;
 
-namespace Automaton.Mcp.Client;
+namespace Automaton.Ai;
 
 /// <summary>
 /// Interface for the AI provider registry that manages available provider implementations

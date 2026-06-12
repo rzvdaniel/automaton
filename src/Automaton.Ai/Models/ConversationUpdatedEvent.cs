@@ -1,4 +1,4 @@
-﻿namespace Automaton.Mcp.Models;
+namespace Automaton.Ai.Models;
 
 /// <summary>
 /// Event fired when conversation is updated
@@ -10,5 +10,4 @@ public class ConversationUpdatedEvent
     public List<ToolCall> ToolCalls { get; set; } = new();
     public List<ToolResult> ToolResults { get; set; } = new();
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
 }

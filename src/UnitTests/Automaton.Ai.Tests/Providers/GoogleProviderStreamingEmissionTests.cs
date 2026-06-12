@@ -1,17 +1,17 @@
 using System.Reflection;
-using Automaton.Mcp.Client.Providers;
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
+using Automaton.Ai.Providers;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Automaton.Mcp.Tests.Providers;
+namespace Automaton.Ai.Tests.Providers;
 
 [TestFixture]
-public class OpenAiProviderStreamingEmissionTests
+public class GoogleProviderStreamingEmissionTests
 {
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithTokens_ShouldEmitTokenOnlyMessage()
     {
-        var provider = new OpenAiProvider(NullLogger.Instance);
+        var provider = new GoogleProvider(NullLogger.Instance);
         ConversationUpdatedEvent? captured = null;
         provider.ConversationUpdated += (_, e) => captured = e;
 
@@ -19,9 +19,9 @@ public class OpenAiProviderStreamingEmissionTests
             conversationId: "conv-1",
             text: string.Empty,
             isComplete: true,
-            inputTokens: 123,
-            outputTokens: 45,
-            model: "gpt-4o");
+            inputTokens: 120,
+            outputTokens: 30,
+            model: "gemini-2.0-flash");
 
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Messages.Count, Is.EqualTo(1));
@@ -29,15 +29,15 @@ public class OpenAiProviderStreamingEmissionTests
         var message = captured.Messages[0];
         Assert.That(message.Content, Is.EqualTo(string.Empty));
         Assert.That(message.IsStreaming, Is.False);
-        Assert.That(message.InputTokens, Is.EqualTo(123));
-        Assert.That(message.OutputTokens, Is.EqualTo(45));
-        Assert.That(message.Model, Is.EqualTo("gpt-4o"));
+        Assert.That(message.InputTokens, Is.EqualTo(120));
+        Assert.That(message.OutputTokens, Is.EqualTo(30));
+        Assert.That(message.Model, Is.EqualTo("gemini-2.0-flash"));
     }
 
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithoutTokens_ShouldSkipEmission()
     {
-        var provider = new OpenAiProvider(NullLogger.Instance);
+        var provider = new GoogleProvider(NullLogger.Instance);
         var eventRaised = false;
         provider.ConversationUpdated += (_, _) => eventRaised = true;
 
@@ -47,13 +47,13 @@ public class OpenAiProviderStreamingEmissionTests
             isComplete: true,
             inputTokens: null,
             outputTokens: null,
-            model: "gpt-4o");
+            model: "gemini-2.0-flash");
 
         Assert.That(eventRaised, Is.False);
     }
 
     private static void InvokeEmitStreamingTextUpdate(
-        OpenAiProvider provider,
+        GoogleProvider provider,
         string conversationId,
         string text,
         bool isComplete,
@@ -61,7 +61,7 @@ public class OpenAiProviderStreamingEmissionTests
         int? outputTokens,
         string? model)
     {
-        var method = typeof(OpenAiProvider).GetMethod(
+        var method = typeof(GoogleProvider).GetMethod(
             "EmitStreamingTextUpdate",
             BindingFlags.Instance | BindingFlags.NonPublic);
 

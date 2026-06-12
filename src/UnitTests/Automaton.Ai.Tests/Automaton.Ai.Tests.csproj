@@ -20,6 +20,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Automaton.Mcp\Automaton.Mcp.csproj" />
+    <ProjectReference Include="..\..\Automaton.Ai\Automaton.Ai.csproj" />
   </ItemGroup>
 </Project>

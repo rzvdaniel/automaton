@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Automaton.Ai\Automaton.Ai.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Anthropic.SDK" Version="5.8.0" />
     <PackageReference Include="OpenAI" Version="2.1.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.10" />

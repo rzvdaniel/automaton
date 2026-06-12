@@ -1,4 +1,5 @@
 ﻿using Automaton.Core.Scripting;
+using Automaton.Ai.Extensions;
 using Automaton.Mcp.Client.Extensions;
 using Automaton.Studio.Server.Areas.Identity;
 using Automaton.Studio.Server.Authentication;
@@ -400,11 +401,12 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
 services.AddScoped<Automaton.Studio.Server.Services.AppInstructionInjector>();
 services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();
 
-// MCP Client
-services.AddAutomatonMcpClient();
+// AI providers + MCP client
+services.AddAutomatonAi();
+services.AddAutomatonMcp();
 // Replace the default IAiProviderRegistry with the dynamic decorator that lazy-loads
 // OpenAI-compatible providers from the database on first use — no restart needed.
-services.AddSingleton<Automaton.Mcp.Client.IAiProviderRegistry, Automaton.Studio.Server.Services.DynamicAiProviderRegistry>();
+services.AddSingleton<Automaton.Ai.IAiProviderRegistry, Automaton.Studio.Server.Services.DynamicAiProviderRegistry>();
 
 // AI Chat History Service
 services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();

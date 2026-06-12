@@ -1,5 +1,5 @@
+using Automaton.Ai.Models;
 using Automaton.Mcp.Client;
-using Automaton.Mcp.Models;
 using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;

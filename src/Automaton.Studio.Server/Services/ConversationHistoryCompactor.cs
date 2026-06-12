@@ -1,5 +1,5 @@
 using System.Text;
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
 using Automaton.Studio.Server.Config;
 
 namespace Automaton.Studio.Server.Services;

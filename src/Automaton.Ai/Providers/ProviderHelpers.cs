@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// Shared helpers used across all AI provider implementations.

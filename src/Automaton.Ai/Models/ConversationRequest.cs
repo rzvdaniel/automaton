@@ -1,6 +1,4 @@
-using Automaton.Mcp.Modes;
-
-namespace Automaton.Mcp.Models;
+namespace Automaton.Ai.Models;
 
 /// <summary>
 /// Carries the system prompt split into stable and dynamic parts for provider-level caching.
@@ -50,7 +48,7 @@ public class ConversationRequest
 
     /// <summary>
     /// Maximum number of LLM round-trips before stopping.
-    /// 0 = use <see cref="IterationLimits"/> tier-based defaults.
+    /// 0 = use provider default iteration limits.
     /// </summary>
     public int MaxIterations { get; set; } = 0;
 
@@ -86,10 +84,9 @@ public class ConversationRequest
     public int StreamingTimeoutMinutes { get; set; } = 5;
 
     /// <summary>
-    /// Interaction mode: <see cref="ConversationModes.Autonomous"/> (default)
-    /// or <see cref="ConversationModes.HumanInTheMiddle"/> (plan then implement).
+    /// Interaction mode: autonomous (default) or human-in-the-middle (plan then implement).
     /// </summary>
-    public string Mode { get; set; } = ConversationModes.Autonomous;
+    public string Mode { get; set; } = "autonomous";
 
     /// <summary>
     /// Optional temperature override (0.0–2.0). Null means use the provider's default.

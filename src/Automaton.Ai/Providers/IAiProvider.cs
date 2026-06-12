@@ -1,6 +1,6 @@
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
 
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// The result returned by every provider after a full conversation turn.

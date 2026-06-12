@@ -1,17 +1,17 @@
 using System.Reflection;
-using Automaton.Mcp.Client.Providers;
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
+using Automaton.Ai.Providers;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Automaton.Mcp.Tests.Providers;
+namespace Automaton.Ai.Tests.Providers;
 
 [TestFixture]
-public class GoogleProviderStreamingEmissionTests
+public class AnthropicProviderStreamingEmissionTests
 {
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithTokens_ShouldEmitTokenOnlyMessage()
     {
-        var provider = new GoogleProvider(NullLogger.Instance);
+        var provider = new AnthropicProvider(NullLogger.Instance);
         ConversationUpdatedEvent? captured = null;
         provider.ConversationUpdated += (_, e) => captured = e;
 
@@ -19,9 +19,11 @@ public class GoogleProviderStreamingEmissionTests
             conversationId: "conv-1",
             text: string.Empty,
             isComplete: true,
-            inputTokens: 120,
-            outputTokens: 30,
-            model: "gemini-2.0-flash");
+            inputTokens: 110,
+            outputTokens: 35,
+            model: "claude-3-5-sonnet",
+            cacheReadTokens: 90,
+            cacheCreationTokens: 20);
 
         Assert.That(captured, Is.Not.Null);
         Assert.That(captured!.Messages.Count, Is.EqualTo(1));
@@ -29,15 +31,17 @@ public class GoogleProviderStreamingEmissionTests
         var message = captured.Messages[0];
         Assert.That(message.Content, Is.EqualTo(string.Empty));
         Assert.That(message.IsStreaming, Is.False);
-        Assert.That(message.InputTokens, Is.EqualTo(120));
-        Assert.That(message.OutputTokens, Is.EqualTo(30));
-        Assert.That(message.Model, Is.EqualTo("gemini-2.0-flash"));
+        Assert.That(message.InputTokens, Is.EqualTo(110));
+        Assert.That(message.OutputTokens, Is.EqualTo(35));
+        Assert.That(message.Model, Is.EqualTo("claude-3-5-sonnet"));
+        Assert.That(message.CacheReadTokens, Is.EqualTo(90));
+        Assert.That(message.CacheCreationTokens, Is.EqualTo(20));
     }
 
     [Test]
     public void EmitStreamingTextUpdate_FinalEmptyTextWithoutTokens_ShouldSkipEmission()
     {
-        var provider = new GoogleProvider(NullLogger.Instance);
+        var provider = new AnthropicProvider(NullLogger.Instance);
         var eventRaised = false;
         provider.ConversationUpdated += (_, _) => eventRaised = true;
 
@@ -47,26 +51,30 @@ public class GoogleProviderStreamingEmissionTests
             isComplete: true,
             inputTokens: null,
             outputTokens: null,
-            model: "gemini-2.0-flash");
+            model: "claude-3-5-sonnet",
+            cacheReadTokens: null,
+            cacheCreationTokens: null);
 
         Assert.That(eventRaised, Is.False);
     }
 
     private static void InvokeEmitStreamingTextUpdate(
-        GoogleProvider provider,
+        AnthropicProvider provider,
         string conversationId,
         string text,
         bool isComplete,
         int? inputTokens,
         int? outputTokens,
-        string? model)
+        string? model,
+        int? cacheReadTokens,
+        int? cacheCreationTokens)
     {
-        var method = typeof(GoogleProvider).GetMethod(
+        var method = typeof(AnthropicProvider).GetMethod(
             "EmitStreamingTextUpdate",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
         Assert.That(method, Is.Not.Null, "Could not find EmitStreamingTextUpdate via reflection");
 
-        method!.Invoke(provider, [conversationId, text, isComplete, inputTokens, outputTokens, model]);
+        method!.Invoke(provider, [conversationId, text, isComplete, inputTokens, outputTokens, model, cacheReadTokens, cacheCreationTokens]);
     }
 }

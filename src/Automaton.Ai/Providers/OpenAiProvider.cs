@@ -1,5 +1,4 @@
-using Automaton.Mcp.Models;
-using Automaton.Mcp.SystemPrompts;
+using Automaton.Ai.Models;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -9,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Automaton.Mcp.Client.Providers;
+namespace Automaton.Ai.Providers;
 
 /// <summary>
 /// OpenAI provider implementation using the official OpenAI .NET SDK
@@ -242,7 +241,7 @@ public class OpenAiProvider : IAiProvider
         }).ToList();
 
         var responseBuilder = new StringBuilder();
-        var maxIterations = IterationLimits.Resolve(null, request.MaxIterations);
+        var maxIterations = ProviderIterationLimits.Resolve(request.MaxIterations);
         var maxConsecutiveFailures = request.MaxConsecutiveFailures > 0 ? request.MaxConsecutiveFailures : 3;
         var iterationCount = 0;
         var consecutiveFailures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

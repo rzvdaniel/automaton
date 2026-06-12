@@ -1,4 +1,4 @@
-using Automaton.Mcp.Models;
+using Automaton.Ai.Models;
 using Automaton.Mcp.Services;
 
 namespace Automaton.Mcp.Client;
