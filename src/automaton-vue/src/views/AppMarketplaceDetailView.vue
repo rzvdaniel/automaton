@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
 import AppsDiscoveryStrip from '@/components/AppsDiscoveryStrip.vue'
@@ -16,6 +16,7 @@ const loading = ref(true)
 const selectedImageUrl = ref('')
 const errorMessage = ref('')
 const shareMessage = ref('')
+const isLightboxOpen = ref(false)
 
 function resolveAssetUrl(url?: string | null): string {
   if (!url) {
@@ -175,6 +176,26 @@ function selectImage(imageUrl: string) {
   selectedImageUrl.value = imageUrl
 }
 
+function openLightbox(imageUrl?: string) {
+  if (!selectedImageUrl.value && galleryImages.value.length > 0) {
+    selectedImageUrl.value = galleryImages.value[0]?.imageUrl || ''
+  }
+
+  if (imageUrl) {
+    selectedImageUrl.value = imageUrl
+  }
+
+  if (!selectedImageUrl.value) {
+    return
+  }
+
+  isLightboxOpen.value = true
+}
+
+function closeLightbox() {
+  isLightboxOpen.value = false
+}
+
 function previousImage() {
   if (galleryImages.value.length === 0) return
 
@@ -193,6 +214,28 @@ function nextImage() {
   const image = galleryImages.value[nextIndex]
   if (!image) return
   selectedImageUrl.value = image.imageUrl
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!isLightboxOpen.value) {
+    return
+  }
+
+  if (event.key === 'Escape') {
+    closeLightbox()
+    return
+  }
+
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    previousImage()
+    return
+  }
+
+  if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    nextImage()
+  }
 }
 
 async function loadCreatorApps(appId: string) {
@@ -271,11 +314,24 @@ async function launchApp() {
 watch(
   () => route.params.appId,
   async () => {
+    closeLightbox()
     await loadApp()
   },
 )
 
-onMounted(loadApp)
+watch(isLightboxOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  void loadApp()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  document.body.style.overflow = ''
+})
 </script>
 
 <template>
@@ -386,6 +442,7 @@ onMounted(loadApp)
                   :src="resolveAssetUrl(selectedImageUrl)"
                   :alt="app.name"
                   class="stage-image"
+                  @click="openLightbox()"
                 />
                 <div v-else class="stage-image stage-fallback">
                   <span>{{ app.name.charAt(0) }}</span>
@@ -416,6 +473,54 @@ onMounted(loadApp)
               </div>
             </article>
           </section>
+
+          <div
+            v-if="isLightboxOpen && selectedImageUrl"
+            class="lightbox-overlay"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="`${app.name} screenshots`"
+            @click.self="closeLightbox"
+          >
+            <div class="lightbox-shell">
+              <span v-if="galleryImages.length > 1" class="lightbox-counter">
+                {{ selectedImageIndex + 1 }} / {{ galleryImages.length }}
+              </span>
+
+              <button
+                v-if="galleryImages.length > 1"
+                type="button"
+                class="lightbox-arrow lightbox-arrow-left"
+                aria-label="Previous screenshot"
+                @click="previousImage"
+              >
+                <i class="pi pi-chevron-left" />
+              </button>
+
+              <figure class="lightbox-figure">
+                <img :src="resolveAssetUrl(selectedImageUrl)" :alt="app.name" class="lightbox-image" />
+                <figcaption class="lightbox-caption">
+                  <span class="lightbox-caption-text">
+                    {{ galleryImages[selectedImageIndex]?.caption || app.name }}
+                  </span>
+                  <button type="button" class="lightbox-close" aria-label="Close screenshot viewer" @click="closeLightbox">
+                    <i class="pi pi-times" />
+                    <span>Close</span>
+                  </button>
+                </figcaption>
+              </figure>
+
+              <button
+                v-if="galleryImages.length > 1"
+                type="button"
+                class="lightbox-arrow lightbox-arrow-right"
+                aria-label="Next screenshot"
+                @click="nextImage"
+              >
+                <i class="pi pi-chevron-right" />
+              </button>
+            </div>
+          </div>
 
           <nav class="detail-tabs" aria-label="App detail sections">
             <a href="#overview" class="detail-tab detail-tab-active">Overview</a>
@@ -844,6 +949,7 @@ onMounted(loadApp)
   display: block;
   border-radius: 8px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+  cursor: zoom-in;
 }
 
 .stage-fallback,
@@ -857,22 +963,29 @@ onMounted(loadApp)
 }
 
 .gallery-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: 10px;
   padding: 14px;
+  overflow-x: auto;
+  scrollbar-width: thin;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   background: #172231;
 }
 
 .gallery-thumb {
   overflow: hidden;
+  flex: 0 0 140px;
   padding: 0;
   border: 1px solid rgba(103, 193, 245, 0.12);
+  border-radius: 8px;
   background: rgba(32, 50, 70, 0.72);
   color: #ffffff;
   cursor: pointer;
   text-align: left;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .gallery-thumb:hover {
@@ -887,7 +1000,7 @@ onMounted(loadApp)
 
 .gallery-thumb img {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 84px;
   object-fit: contain;
   background: #0e141b;
   display: block;
@@ -919,6 +1032,136 @@ onMounted(loadApp)
 
 .gallery-arrow:hover {
   color: #50d7ff;
+}
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(4, 8, 13, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.lightbox-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(1280px, 100%);
+  height: min(92vh, 1040px);
+  padding: 74px 22px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(16, 24, 34, 0.96), rgba(9, 14, 20, 0.96));
+  box-shadow: 0 36px 120px rgba(0, 0, 0, 0.52);
+  overflow: hidden;
+}
+
+.lightbox-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 96px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(16, 24, 34, 0.82);
+  color: #f5f7fb;
+  cursor: pointer;
+  font-size: 1.35rem;
+}
+
+.lightbox-arrow-left {
+  left: 22px;
+}
+
+.lightbox-arrow-right {
+  right: 22px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(9, 14, 20, 0.74);
+  color: rgba(245, 247, 251, 0.88);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.lightbox-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(9, 14, 20, 0.82);
+  color: #f5f7fb;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.lightbox-close:hover,
+.lightbox-arrow:hover {
+  color: #50d7ff;
+  border-color: rgba(80, 215, 255, 0.42);
+}
+
+.lightbox-figure {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+}
+
+.lightbox-image {
+  display: block;
+  width: auto;
+  max-width: min(100%, 1080px);
+  max-height: 100%;
+  margin: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #081018;
+  box-shadow: 0 28px 100px rgba(0, 0, 0, 0.46);
+}
+
+.lightbox-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1080px);
+  margin-top: 14px;
+  color: rgba(245, 247, 251, 0.88);
+  font-size: 0.95rem;
+}
+
+.lightbox-caption-text {
+  min-width: 0;
+  text-align: center;
+  flex: 1;
 }
 
 .detail-body-grid {
@@ -1242,18 +1485,66 @@ onMounted(loadApp)
     grid-template-columns: 1fr;
   }
 
-  .gallery-strip,
   .remix-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .gallery-stage {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
   }
 
   .gallery-arrow {
     width: 38px;
     height: 72px;
+  }
+
+  .gallery-strip {
+    display: none;
+  }
+
+  .lightbox-overlay {
+    padding: 12px;
+  }
+
+  .lightbox-shell {
+    padding: 62px 12px 16px;
+    border-radius: 18px;
+    height: min(92vh, 1040px);
+  }
+
+  .lightbox-arrow {
+    width: 42px;
+    height: 72px;
+  }
+
+  .lightbox-arrow-left {
+    left: 8px;
+  }
+
+  .lightbox-arrow-right {
+    right: 8px;
+  }
+
+  .lightbox-close {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+  }
+
+  .lightbox-counter {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.86rem;
+  }
+
+  .lightbox-caption {
+    flex-direction: column;
+    align-items: stretch;
+    font-size: 0.88rem;
+  }
+
+  .lightbox-caption-text {
+    text-align: center;
   }
 }
 </style>
