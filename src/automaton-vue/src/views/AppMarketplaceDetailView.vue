@@ -17,6 +17,7 @@ const selectedImageUrl = ref('')
 const errorMessage = ref('')
 const shareMessage = ref('')
 const isLightboxOpen = ref(false)
+const desktopLightboxQuery = '(min-width: 1024px)'
 
 function resolveAssetUrl(url?: string | null): string {
   if (!url) {
@@ -177,6 +178,10 @@ function selectImage(imageUrl: string) {
 }
 
 function openLightbox(imageUrl?: string) {
+  if (!window.matchMedia(desktopLightboxQuery).matches) {
+    return
+  }
+
   if (!selectedImageUrl.value && galleryImages.value.length > 0) {
     selectedImageUrl.value = galleryImages.value[0]?.imageUrl || ''
   }
@@ -498,7 +503,9 @@ onBeforeUnmount(() => {
               </button>
 
               <figure class="lightbox-figure">
-                <img :src="resolveAssetUrl(selectedImageUrl)" :alt="app.name" class="lightbox-image" />
+                <div class="lightbox-media">
+                  <img :src="resolveAssetUrl(selectedImageUrl)" :alt="app.name" class="lightbox-image" />
+                </div>
                 <figcaption class="lightbox-caption">
                   <span class="lightbox-caption-text">
                     {{ galleryImages[selectedImageIndex]?.caption || app.name }}
@@ -1135,12 +1142,24 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.lightbox-media {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .lightbox-image {
   display: block;
-  width: auto;
+  width: 100%;
+  height: 100%;
   max-width: min(100%, 1080px);
   max-height: 100%;
-  margin: auto;
+  object-fit: contain;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #081018;
@@ -1545,6 +1564,11 @@ onBeforeUnmount(() => {
 
   .lightbox-caption-text {
     text-align: center;
+  }
+
+  .lightbox-image {
+    max-width: 100%;
+    max-height: 100%;
   }
 }
 </style>
