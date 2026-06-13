@@ -117,10 +117,16 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -154,16 +160,10 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
-        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
-        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -238,16 +238,10 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
-            },
-            Backend = new BackendConfig
-            {
-                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
-        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
-        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var service = new DeployService(
             configService,
@@ -306,11 +300,11 @@ public class DeployServiceTests
 
         Assert.That(result.Success, Is.True);
         Assert.That(progress, Has.Some.EqualTo("Uploading source files..."));
-        Assert.That(progress, Has.Some.EqualTo("Source upload complete 3 source file(s), 0 skipped."));
+        Assert.That(progress, Has.Some.EqualTo("Source upload complete 3 source file(s), 0 ignored."));
         Assert.That(progress, Has.Some.StartWith("Uploading frontend files from frontend"));
-        Assert.That(progress, Has.Some.EqualTo("Frontend upload complete 2 file(s), 1 skipped."));
+        Assert.That(progress, Has.Some.EqualTo("Frontend upload complete 2 file(s), 1 ignored."));
         Assert.That(progress, Has.Some.StartWith("Uploading backend files from backend..."));
-        Assert.That(progress, Has.Some.EqualTo("Backend upload complete 1 backend file(s), 0 skipped."));
+        Assert.That(progress, Has.Some.EqualTo("Backend upload complete 1 backend file(s), 0 ignored."));
         Assert.That(progress, Has.Some.EqualTo("Requesting backend deploy on the assigned runner..."));
         Assert.That(progress, Has.Some.EqualTo("backend deployed"));
     }
@@ -328,10 +322,16 @@ public class DeployServiceTests
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
             }
         });
         configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
         WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
 
         var reportedChecks = new List<DeployCheckResult>();
         var service = new DeployService(
@@ -355,6 +355,7 @@ public class DeployServiceTests
             DeployCheckNames.FrontendPackage,
             DeployCheckNames.SourceUpload,
             DeployCheckNames.Upload,
+            DeployCheckNames.BackendPackage,
             DeployCheckNames.BackendPackage,
             DeployCheckNames.BackendDeploy
         }));

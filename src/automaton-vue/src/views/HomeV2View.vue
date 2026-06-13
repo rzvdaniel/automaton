@@ -172,11 +172,10 @@ watch(
             <span class="eyebrow">Use any AI. Keep your backend.</span>
             <h1>
               <span>Build with AI.</span>
-              <span>Run your backend</span>
-              <span>anywhere.</span>
+              <span>Put it online.</span>
             </h1>
             <p class="hero-copy">
-              Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton gives your agent the deploy path: frontend hosting is included, and your backend runs on your runner.
+              Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton hosts your frontend and lets your backend run on infrastructure you control.
             </p>
             <div class="hero-actions">
               <a class="button primary" href="/docs/getting-started">Get Started</a>
@@ -279,11 +278,6 @@ watch(
             </div>
 
             <div>
-              <p class="architecture-summary">
-                <span><strong>Frontend apps</strong> are hosted by Automaton.</span>
-                <span><strong>Backend apps</strong> run on runners you control.</span>
-              </p>
-
               <div class="path-cards">
                 <div class="path-card frontend">
                   <span>Frontend</span>
@@ -291,7 +285,7 @@ watch(
                 </div>
                 <div class="path-card backend">
                   <span>Backend</span>
-                  <strong>Runs on your runner</strong>
+                  <strong>Runs where you choose</strong>
                 </div>
               </div>
             </div>
@@ -342,7 +336,7 @@ watch(
 
                 <div class="architecture-box architecture-box-backend">
                   <h4>Your Backend</h4>
-                  <p class="architecture-subcopy">Runs on your runner</p>
+                  <p class="architecture-subcopy">Backend runs where you choose</p>
                   <div class="architecture-item-list architecture-backend-list">
                     <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▭</span> Laptop</div>
                     <div class="architecture-item"><span class="architecture-icon architecture-icon-purple">▤</span> Home Server / NAS</div>

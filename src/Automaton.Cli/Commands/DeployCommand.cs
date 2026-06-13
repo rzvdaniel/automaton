@@ -34,7 +34,7 @@ public static class DeployCommand
             "Frontend directory to upload (overrides frontend.deployDir in automaton.json)");
 
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
-        var verboseOption = new Option<bool>("--verbose", "Print skipped-file details and exclusion reasons");
+        var verboseOption = new Option<bool>("--verbose", "Print ignored-file details and exclusion reasons");
         var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
         var openOption = new Option<bool>("--open", "Open the deployed app in the browser after success");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
@@ -375,16 +375,16 @@ public static class DeployCommand
             return;
         }
 
-        WriteSkippedSection("Source skipped files", result.SourceUploaded);
-        WriteSkippedSection("Frontend skipped files", result.Uploaded);
-        WriteSkippedSection("Backend skipped files", result.BackendUploaded);
+        WriteSkippedSection("Source ignored files", result.SourceUploaded);
+        WriteSkippedSection("Frontend ignored files", result.Uploaded);
+        WriteSkippedSection("Backend ignored files", result.BackendUploaded);
     }
 
     private static void WritePlainResult(DeployResult result, bool verbose)
     {
-        WritePlainSkippedSection("Source skipped files", result.SourceUploaded, verbose);
-        WritePlainSkippedSection("Frontend skipped files", result.Uploaded, verbose);
-        WritePlainSkippedSection("Backend skipped files", result.BackendUploaded, verbose);
+        WritePlainSkippedSection("Source ignored files", result.SourceUploaded, verbose);
+        WritePlainSkippedSection("Frontend ignored files", result.Uploaded, verbose);
+        WritePlainSkippedSection("Backend ignored files", result.BackendUploaded, verbose);
 
         if (result.NextSteps.Count > 0)
         {

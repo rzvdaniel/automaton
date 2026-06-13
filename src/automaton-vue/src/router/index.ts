@@ -56,7 +56,7 @@ router.afterEach((to) => {
     title: seo?.title ?? 'Build and Deploy AI-Generated Apps',
     description:
       seo?.description ??
-      'Automaton Monster lets you build frontend apps, backend apps and automation workflows with AI, then deploy them using runners you control.',
+      'Automaton Monster helps you build apps with AI. Frontend hosting is included, and your backend runs where you choose.',
     path: to.path,
     noindex: seo?.noindex,
   })

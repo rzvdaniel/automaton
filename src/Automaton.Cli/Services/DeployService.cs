@@ -504,7 +504,7 @@ public sealed class DeployService
                     var stringPath = item.GetString();
                     if (!string.IsNullOrWhiteSpace(stringPath))
                     {
-                        skippedEntries.Add(new DeploySkippedEntry(stringPath!, "skipped", "unknown"));
+                        skippedEntries.Add(new DeploySkippedEntry(stringPath!, "ignored", "unknown"));
                     }
 
                     continue;
@@ -516,7 +516,7 @@ public sealed class DeployService
                 }
 
                 var skippedPath = item.TryGetProperty("path", out var pathProperty) ? pathProperty.GetString() ?? string.Empty : string.Empty;
-                var reason = item.TryGetProperty("reason", out var reasonProperty) ? reasonProperty.GetString() ?? "skipped" : "skipped";
+                var reason = item.TryGetProperty("reason", out var reasonProperty) ? reasonProperty.GetString() ?? "ignored" : "ignored";
                 var ruleSource = item.TryGetProperty("ruleSource", out var sourceProperty) ? sourceProperty.GetString() ?? "unknown" : "unknown";
                 skippedEntries.Add(new DeploySkippedEntry(skippedPath, reason, ruleSource));
             }
@@ -527,7 +527,7 @@ public sealed class DeployService
 
     private static string FormatUploadMessage(string verb, string subject, DeployUploadResult result)
     {
-        var message = $"{verb} {result.Written} {subject}, {result.Skipped} skipped ({result.SizeMb:F1} MB)";
+        var message = $"{verb} {result.Written} {subject}, {result.Skipped} ignored ({result.SizeMb:F1} MB)";
         if (result.SkippedEntries == null || result.SkippedEntries.Count == 0)
         {
             return message;
@@ -544,7 +544,7 @@ public sealed class DeployService
 
     private static string FormatProgressMessage(string prefix, DeployUploadResult result, string subject)
     {
-        return $"{prefix} {result.Written} {subject}, {result.Skipped} skipped.";
+        return $"{prefix} {result.Written} {subject}, {result.Skipped} ignored.";
     }
 
     private void ReportProgress(string message)
