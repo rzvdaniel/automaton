@@ -1,5 +1,5 @@
 ---
-name: Vue List Management Patterns
+name: vue-list-management-patterns
 description: Best practices for managing lists in Vue components. Learn when to reload lists from the server vs. updating them dynamically on the client side for better UX and reliability.
 tags: ["vue", "patterns", "lists", "ui-updates", "performance"]
 ---

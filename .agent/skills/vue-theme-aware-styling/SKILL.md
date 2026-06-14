@@ -1,3 +1,8 @@
+---
+name: vue-theme-aware-styling
+description: Guide for applying UI changes according to the light and dark themes.
+---
+
 # Theme-Aware Styling
 
 Apply PrimeVue theme-aware CSS patterns to ensure components work in both light and dark modes.

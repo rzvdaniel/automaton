@@ -1,9 +1,6 @@
 ---
-title: Vue Component Splitting Pattern
+name: vue-component-splitting
 description: Refactor Vue components with heavy conditional logic into separate, focused components.
-category: vue
-tags: [vue, architecture, refactoring, components, best-practices]
-complexity: intermediate
 ---
 
 # Vue Component Splitting Pattern

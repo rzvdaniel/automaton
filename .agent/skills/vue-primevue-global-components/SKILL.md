@@ -1,5 +1,5 @@
 ---
-name: primevue-global-components
+name: vue-primevue-global-components
 description: Guide for avoiding duplicate PrimeVue service component instances in Vue.js feature components. Use this when working with PrimeVue components in the Automaton Vue.js frontend, especially when dealing with ConfirmDialog, Toast, or similar service-based components.
 ---
 

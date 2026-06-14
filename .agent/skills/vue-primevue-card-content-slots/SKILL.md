@@ -1,5 +1,5 @@
 ---
-name: primevue-card-content-slots
+name: vue-primevue-card-content-slots
 description: Guide for building PrimeVue Card-based UI blocks so content and actions render correctly using header/content/footer slots.
 ---
 
