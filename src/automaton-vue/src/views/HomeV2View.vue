@@ -169,7 +169,7 @@ watch(
               <span>Put it online.</span>
             </h1>
             <p class="hero-copy">
-              Use Claude Code, Codex, Cursor, Copilot, or Gemini. Automaton hosts your frontend and lets your backend run on infrastructure you control.
+              Use Claude Code, Codex, Cursor, Copilot, or Gemini. Frontend hosting included. Backend runs where you choose.
             </p>
             <div class="hero-actions">
               <a class="button primary" href="/docs/getting-started">Get Started</a>
@@ -531,7 +531,7 @@ watch(
           <div class="runners-copy">
             <h2>Your backend. Your infrastructure.</h2>
             <p>
-              Automaton hosts the frontend, but your backend stays under your control. Run Python and backend services on infrastructure you already trust instead of moving everything into a closed platform.
+              Frontend hosting included. Backend runs where you choose. Run Python and backend services on infrastructure you already trust instead of moving everything into a closed platform.
             </p>
             <div class="runner-chip-grid">
               <span class="runner-chip">Laptop</span>
