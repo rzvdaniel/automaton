@@ -1,436 +1,535 @@
 # AGENTS.md
 
-This document is a practical guide for developers and agents working on the Automaton codebase. It follows industry-standard conventions and reflects the current architecture: Vue.js + TypeScript frontend, ASP.NET Core backend, and cross-platform runners.
+This file is the entry point for AI coding agents working on Automaton.
 
-## Project Overview
+Automaton is an AI-first platform for building, deploying, publishing, and running web apps. Users can create apps locally with an AI coding agent, deploy them with the Automaton CLI, publish them through Automaton Studio, and connect optional Python backends to runners they control.
 
-Automaton is an AI-first workflow automation platform. Users describe automations in natural language, design web apps, author custom steps, and execute flows securely via distributed runners.
+Use this file as the operational contract. For detailed patterns, read the relevant skill or harness document before changing code.
 
-**Core Architecture:**
-- **Frontend**: Vue 3 + TypeScript + Vite + PrimeVue (located in `src/automaton-studio-vue/`)
-- **Backend**: ASP.NET Core 9.0 REST API + SignalR (located in `src/Automaton.Studio.Server/`)
-- **Runners**: Cross-platform console app for distributed execution (located in `src/Automaton.Runner/`)
-- **Core Libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`, `Automaton.Mcp`
+---
 
-**Primary Capabilities:**
-- **AI Flow Generation**: Natural language → generated flow with reusable/custom steps
-- **Web Apps Platform**: Author, preview, publish frontend apps that call flows via helper APIs
-- **Custom Steps**: Python/PowerShell/Batch steps with inline code editing and testing
-- **Projects**: Group flows, apps, steps under shared settings and access control
-- **Distributed Execution**: Secure runner nodes with real-time telemetry via SignalR
+## 1. Core rules
 
-## Application Routes
+- Prefer small, focused changes over broad refactors.
+- Do not edit unrelated code while solving a task.
+- Do not rename projects, concepts, routes, or public APIs unless the task explicitly asks for it.
+- Do not modify generated/runtime output manually.
+- Do not commit secrets, API keys, tokens, `.env` values, local database files, runner state, or build artifacts.
+- When fixing a bug, add or update a regression test when practical.
+- After changing code, run the smallest useful verification command.
+- If verification cannot be run, say exactly why.
+- If the task reveals a missing rule, repeated mistake, or unclear workflow, update the relevant skill or harness document.
 
-The Vue.js frontend implements feature-based routes (see `src/automaton-studio-vue/src/features/`):
+---
 
-- `/` – Dashboard / Home
-- `/flows` – Flows list and management
-  - `/flows/generate` – AI-powered generation (natural language)
-  - `/flows/:id/view` – Flow timeline and details
-  - `/flows/:id/logs` – Execution logs
-  - `/flows/:id/history` – Execution history
-- `/apps` – Apps gallery
-  - `/apps/:id/editor` – Visual IDE (Monaco) + live preview
-  - `/apps/:id/settings` – PWA and deployment settings
-- `/steps` – Custom steps library
-  - `/steps/:id/editor` – Step designer (code + IO + tests)
-- `/runners` – Runner management
-- `/projects` – Project organization
-  - `/projects/:id/settings` – Membership, shared variables, permissions
-- `/organizations` – Organization management
-  - `/organizations/:id` – Organization dashboard
-  - `/organizations/:id/members` – Member management and invitations
-  - `/organizations/:id/apps` – App assignments to users
-  - `/organizations/:id/projects` – Projects in organization
-  - `/organizations/:id/settings` – Organization settings
-- `/my-apps` – Apps assigned to current user (AppUser portal)
-- `/apikeys` – API keys management
-- `/ai-keys` – AI provider keys
-- `/settings` – Application settings
-- `/account` – User profile
-- `/auth/login`, `/auth/register` – Authentication
+## 2. Agent knowledge layout
 
-## Project Structure
+Canonical agent material lives under `.agent/`.
 
-**Automaton Presentation Frontend (`src/automaton-vue/`):**
- – Static marketing site
- - Standard website assets live in `src/automaton-vue/public/`; shared AI guidance lives in `shared/ai-guidance/` and is exposed by website hosting, not by Vite `publicDir`
+- Skills: `.agent/skills/<skill-name>/SKILL.md`
+- Harness docs: `.agent/harness/`
+- Reusable prompts: `.agent/prompts/`, if present
 
-**Automaton Studio Frontend (`src/automaton-studio-vue/`):**
-- `src/features/` – Feature modules (auth, dashboard, flows, apps, steps, runners, projects, settings)
-- `src/shared/` – Shared components, services (Axios, SignalR), composables, utils, types
-- `src/router/` – Vue Router aggregation across features
-- `src/assets/` – Styles, images, themes
-- `App.vue` and `main.ts` – App entry
-- `package.json`, `vite.config.ts`, `tsconfig.json` – Tooling and configuration
+Before changing code:
 
-**Backend (`src/Automaton.Studio.Server/`):**
-- `Controllers/` – 25+ REST endpoints (Flows, Apps, Runners, Steps, Projects, etc.)
-- `Services/` – Business logic (FlowExecution, FlowGeneration, Apps, Steps)
-- `Data/`, `Entities/`, `Migrations/` – EF Core data layer
-- `Hubs/` – SignalR hubs for runners and flow execution
-- `Program.cs` – Startup and DI configuration
+1. Identify the affected area.
+2. Read the matching skill from `.agent/skills/`.
+3. Follow the verification matrix in this file or `.agent/harness/verification.md`, if present.
+4. If the task exposes a missing rule or recurring mistake, update the relevant `.agent/` file.
 
-**Execution & Core:**
-- `src/Automaton.Runner/` – Console runner (SignalR client, resilient execution)
-- `src/Automaton.Core/` – Workflow engine (MediatR, variable mapping, orchestration)
-- `src/Automaton.Steps/` – Built-in steps
-- `src/Automaton.Core.Scripting/` – Python interop (pythonnet)
-- `src/Automaton.Mcp/` – AI integration and MCP tools
+Recommended skills:
 
-**Tests (`src/UnitTests/`):**
-- `Automaton.Core.Tests/`, `Automaton.Studio.Server.Tests/`, `Automaton.Runner.Tests/`
+- CLI: `.agent/skills/automaton-cli/SKILL.md`
+- App source/runtime model: `.agent/skills/app-source-runtime/SKILL.md`
+- Production deployment: `.agent/skills/deployment-prod/SKILL.md`
+- Scaffolded/generated apps: `.agent/skills/scaffolded-apps/SKILL.md`
+- Studio frontend: `.agent/skills/studio-frontend/SKILL.md`
+- Studio backend: `.agent/skills/studio-backend/SKILL.md`
+- Runner debugging: `.agent/skills/runner-debugging/SKILL.md`
 
-## Development Environment Setup
+Do not duplicate full skill content into tool-specific files such as `CLAUDE.md`, `.cursor/rules`, or `.github` files. Those files, if present, should point back to `AGENTS.md` and `.agent/`.
 
-**Frontend:**
-- Node.js 18+ and npm/pnpm
-- VS Code with Volar (Vue) recommended
+---
 
-**Backend:**
-- .NET 9.0 SDK
-- MySQL 5.7+ or MariaDB 10.2+
-- IDE: VS Code, Visual Studio, or JetBrains Rider
+## 3. Product model
 
-**Entity Framework CLI (migrations):**
+Automaton has four main surfaces:
+
+1. **Website**
+   - Public marketing and documentation site.
+   - Located in `src/automaton-vue/`.
+
+2. **Studio**
+   - Authenticated web UI for apps, publishing, runners, API keys, AI keys, admin features, and account/project/organization management.
+   - Frontend located in `src/automaton-studio-vue/`.
+   - Backend located in `src/Automaton.Studio.Server/`.
+
+3. **CLI**
+   - Local developer tool for creating, pulling, deploying, and publishing Automaton apps.
+   - Located in `src/Automaton.Cli/`.
+
+4. **Runner**
+   - Executes backend workloads outside the hosted frontend.
+   - Located in `src/Automaton.Runner/`.
+
+Automaton apps have an important source/runtime split:
+
+- `source/frontend/` is editable frontend source.
+- `source/backend/` is editable backend source.
+- `live/frontend/` is deployed public frontend output.
+- `live/backend/` is runner-side backend output.
+- Studio, CLI pull, remix/fork, snapshots, and marketplace flows should prefer `source/`.
+- Public app serving must never expose backend files, secrets, logs, runner state, or unsafe file types.
+
+---
+
+## 4. Repository map
+
+### Website
+
+- `src/automaton-vue/`
+- Public marketing site.
+- Includes landing pages, pricing, app gallery/public pages, documentation links, and `llms.txt` exposure.
+
+### Studio frontend
+
+- `src/automaton-studio-vue/`
+- Vue 3 + TypeScript + Vite + PrimeVue.
+- Feature-first structure under `src/features/`.
+- Shared components, services, types, and utilities under `src/shared/`.
+
+### Studio backend
+
+- `src/Automaton.Studio.Server/`
+- ASP.NET Core 9 REST API + SignalR.
+- Controllers, services, EF Core entities/migrations, authentication, runners, apps, publishing, admin.
+
+### CLI
+
+- `src/Automaton.Cli/`
+- Commands such as `setup`, `new`, `pull`, `deploy`, and `publish`.
+- Must stay friendly to AI-generated local app projects.
+
+### Runner
+
+- `src/Automaton.Runner/`
+- Connects to Studio/API and executes backend workloads.
+- Runner registration and API keys must avoid leaking secrets.
+
+### Core libraries
+
+- `src/Automaton.Core/`
+- `src/Automaton.Steps/`
+- `src/Automaton.Core.Scripting/`
+- AI provider implementation currently lives under `src/Automaton.Mcp/`; check current project naming and intent before extending it.
+
+### Tests
+
+- `src/UnitTests/`
+- Prefer adding tests near the area being changed.
+
+---
+
+## 5. Source/runtime rules for apps
+
+These rules are critical.
+
+### Do
+
+- Use `source/` for editable app content.
+- Use `live/` only for deployed/runtime output.
+- Keep frontend and backend surfaces separate.
+- Preserve `automaton.json` link metadata.
+- Default generated local frontend apps to `frontend/` with a build pipeline that outputs to `frontend/dist/`.
+- Default generated backend apps to `backend/` when a backend is requested.
+- Keep plain root HTML/CSS/JS support only for explicit no-build static apps.
+
+### Do not
+
+- Do not edit `live/frontend/` or `live/backend/` manually.
+- Do not copy `live/backend/` during fork/remix.
+- Do not include `node_modules`, `dist`, `.vite`, `.venv`, `__pycache__`, `.git`, `.env`, logs, or secrets in source archives.
+- Do not expose backend files or unsafe extensions through public app serving.
+- Do not assume a backend exists just because a frontend exists.
+- Do not pre-create duplicate runner records during hosted runner provisioning.
+
+---
+
+## 6. Verification matrix
+
+Run the smallest relevant verification for the files you changed.
+
+If `.agent/harness/verification.md` exists and is more specific, follow it.
+
+### CLI changes
+
+Affected paths:
+
+- `src/Automaton.Cli/**`
+- CLI-related tests under `src/UnitTests/**`
+
+Run:
+
 ```bash
-dotnet tool install --global dotnet-ef
+dotnet test src/UnitTests/Automaton.Cli.Tests/Automaton.Cli.Tests.csproj
 ```
 
-## Building and Running the Project
+If changing archive/deploy/pull behavior, add or update targeted tests for:
 
-### Frontend (Vue.js)
+- source archive includes expected files
+- source archive excludes generated/dependency/secret files
+- `automaton.json` link behavior
+- clean-folder vs existing-folder pull behavior
+- source/runtime separation
+
+---
+
+### Studio backend changes
+
+Affected paths:
+
+- `src/Automaton.Studio.Server/**`
+- shared backend models/libraries
+- EF Core entities/migrations
+- API key, runner, app, publish, auth, admin behavior
+
+Run the relevant backend test project. If unsure, run:
+
+```bash
+dotnet test
+```
+
+For EF changes:
+
+```bash
+dotnet ef migrations list --project src/Automaton.Studio.Server
+```
+
+Only add migrations intentionally.
+
+---
+
+### Studio frontend changes
+
+Affected paths:
+
+- `src/automaton-studio-vue/**`
+
+Run:
 
 ```bash
 cd src/automaton-studio-vue
+npm run type-check
+npm run build
+```
+
+If package dependencies changed, run install first:
+
+```bash
 npm install
-npm run dev        # http://localhost:5173 with HMR
-
-npm run build      # Production build to dist/
-npm run preview    # Preview production build locally
-
-npm run type-check # TypeScript checks
-npm run lint       # ESLint
-npm run format     # Prettier
 ```
 
-### Backend (ASP.NET Core)
+For UI changes, consider desktop and mobile. Check loading, empty, error, and unauthorized states.
+
+---
+
+### Website changes
+
+Affected paths:
+
+- `src/automaton-vue/**`
+
+Run:
 
 ```bash
-cd src/Automaton.Studio.Server
-dotnet run                    # https://localhost:7091
-
-dotnet publish -c Release     # Production build
-
-dotnet ef database update     # Apply EF Core migrations
+cd src/automaton-vue
+npm run build
 ```
 
-### Runner (Docker Compose – Preferred)
+For public pages, check desktop and mobile layout. Avoid changing messaging accidentally.
 
-Use Docker Compose for streamlined runner deployment and management.
+---
+
+### Runner changes
+
+Affected paths:
+
+- `src/Automaton.Runner/**`
+- runner connection, registration, execution, logging, Docker runner config
+
+Run:
 
 ```bash
-# From repo root
-cp .env.example .env
-
-# Set required vars in .env
-# AUTOMATON_SERVER_URL=https://your-server-url
-# AUTOMATON_API_KEY=ak_runner_xxx
-
-# Start the runner
-docker compose -f docker-compose.runner.yml up -d
-
-# View logs
-docker compose -f docker-compose.runner.yml logs -f runner
-
-# Stop/remove
-docker compose -f docker-compose.runner.yml down
+dotnet test
 ```
 
-Manual runner (fallback for local debugging):
+Also reason about:
+
+- reconnect behavior
+- API key handling
+- secret redaction
+- runner name matching
+- hosted runner compatibility
+
+---
+
+### Production deployment changes
+
+Affected paths:
+
+- `scripts/prod-*.sh`
+- `docker-compose.prod.yml`
+- nginx/proxy/certbot configuration
+- `.prod-runtime` behavior
+
+Run syntax checks where possible:
 
 ```bash
-cd src/Automaton.Runner
-dotnet build -c Release
-dotnet publish -c Release --self-contained false
-AUTOMATON_API_KEY=ak_runner_xxx automaton-runner
+bash -n scripts/prod-redeploy-all.sh
+bash -n scripts/prod-redeploy-api.sh
+bash -n scripts/prod-redeploy-studio.sh
+bash -n scripts/prod-redeploy-website.sh
 ```
 
-See `docs/runners/docker-runner.md` for advanced options.
+Before changing production deployment logic, identify:
 
-### Production Deployment
+- current live color
+- target color
+- warmup endpoint
+- health check behavior
+- proxy reload/cutover step
+- rollback path
+- what happens when Cloudflare proxy is enabled
 
-The production public stack uses `docker-compose.prod.yml` with:
+Do not remove the previous color before the new color is healthy.
 
-- `nginx` as the only public reverse proxy on ports `80/443`
-- static blue/green upstream switching for `api`, `studio`, and `website`
-- Docker Compose services `api-blue/api-green`, `studio-blue/studio-green`, `website-blue/website-green`
+---
 
-The live color is tracked in `.prod-runtime/nginx/state/blue-green-state.env`, and deploy scripts rewrite selector files under `.prod-runtime/nginx/upstreams/` before reloading nginx. Production deploy entrypoints are:
+## 7. Frontend rules
 
-- `./scripts/prod-issue-certs.sh`
-- `./scripts/prod-renew-certs.sh`
-- `./scripts/prod-reset-blue-green.sh`
-- `./scripts/prod-verify.sh`
-- `./scripts/prod-redeploy-api.sh`
-- `./scripts/prod-redeploy-studio.sh`
-- `./scripts/prod-redeploy-website.sh`
-- `./scripts/prod-redeploy-all.sh`
+### Architecture
 
-Use `docs/prod/production-docker-cheat-sheet.md` and `docs/prod/nginx-static-blue-green-layout.md` as the source of truth for the current production model.
+- Use feature-based structure under `src/features/`.
+- Keep shared reusable code under `src/shared/`.
+- Keep stores lean.
+- Keep API access inside service modules.
+- Use generated API types when available.
 
-## Backend API
+### Components
 
-**Swagger / OpenAPI:**
-- Swagger UI: `https://localhost:7091/swagger/index.html`
-- OpenAPI JSON: `https://localhost:7091/swagger/v1/swagger.json`
+- Split large conditional blocks into focused components.
+- Avoid huge page components with multiple unrelated responsibilities.
+- Keep mobile behavior explicit.
+- Do not add duplicate global providers such as duplicate toast hosts.
+- Prefer accessible labels, semantic buttons, and clear empty states.
 
-The frontend generates TypeScript types from the OpenAPI spec via `openapi-typescript`.
+### TypeScript
 
-## Important Developer Notes
+- Prefer typed request/response models.
+- Match backend DTO names and shapes.
+- Prefer const objects over TypeScript enums when values must match serialized backend strings.
+- Do not suppress type errors unless there is a clear reason.
 
-### Frontend (Vue.js)
+---
 
-**Feature-Based Architecture:**
-```
-src/features/flows/
-├─ components/       # Vue components
-├─ composables/      # Composition API hooks (e.g., useFlows)
-├─ services/         # API calls (flowsService.ts)
-├─ stores/           # Pinia state (flowsStore.ts)
-├─ types/            # TypeScript interfaces
-├─ views/            # Page-level components
-└─ routes.ts         # Feature routes
-```
+## 8. Backend rules
 
-**State Management:** Pinia stores accessed via `useXxxStore()`. Keep stores lean; colocate logic per feature.
+### C# and API
 
-**HTTP Client:** Axios instance (`src/shared/services/api/axios-instance.ts`) injects JWT automatically via interceptors.
+- Use async APIs consistently.
+- Respect cancellation tokens where the surrounding code already uses them.
+- Keep controllers thin; put business logic in services.
+- Return actionable errors.
+- Avoid leaking secrets in responses, logs, telemetry, or exceptions.
 
-**Type Generation:**
-```bash
-npm run generate:types  # Generates src/shared/types/api/ from OpenAPI
-```
+### Well-known string values
 
-**Component Testing:** Vitest + Vue Test Utils with colocated `*.spec.ts` files.
+Do not scatter magic strings for fixed modes, states, roles, providers, event types, or action names.
 
-**Component Design:**
-- **Split heavy conditionals**: When a component has large `v-if/v-else` blocks (>50 lines each) with diverging logic, extract each path into separate components. Use a thin orchestrator view for conditional rendering.
-- **Example**: `DashboardView.vue` renders `StandardDashboard.vue` or `AppUserDashboard.vue` based on user role, keeping each dashboard focused and testable.
-- **See**: [.github/skills/vue/component-splitting-pattern/SKILL.md](.github/skills/vue/component-splitting-pattern/SKILL.md) for detailed refactoring guidance.
-
-### Implementing a New Feature
-
-When adding a new feature, use the feature-based structure with components, services, types, and views. Match C# DTOs exactly in TypeScript, use `const` objects instead of enums, and implement loading states with toast notifications.
-
-**For complete step-by-step guide with code examples, see:** [docs/skills/implementing-features/SKILL.md](docs/skills/implementing-features/SKILL.md)
-
-**Reference Implementation:** API Keys feature in `src/automaton-studio-vue/src/features/settings/`
-
-### Backend (ASP.NET Core)
-
-**No magic strings for well-known values.** Whenever code uses string literals to identify a mode, state, role, or category that has a fixed set of known values — replace them with a `static class` of `const string` properties (not a C# `enum`, because enums need `.ToString()` when serialized over the wire or compared to JSON strings).
+Use `static class` plus `const string` values.
 
 ```csharp
-// ✅ DO — static class with const string values
 public static class ConversationModes
 {
-    public const string Plan  = "plan";
+    public const string Plan = "plan";
     public const string Agent = "agent";
 }
-
-// ❌ DON'T — scattered magic strings
-if (request.Mode == "plan") { ... }
-public string Mode { get; set; } = "agent";
 ```
 
-Apply this pattern to: mode names, provider names, role names, status values, event type identifiers, action names, and any other string that appears in more than one place.
+Avoid C# enums when the value must be serialized as a stable string and compared to JSON/client values.
 
-### API Key Scopes
+### Database
 
-API keys authenticate runners, web apps, and integrations. Format: `ak_<scope>_<random>`.
+- Do not add columns for every new plan entitlement unless there is a strong query/indexing reason.
+- Subscription entitlements should generally extend `PlanCapabilities`.
+- Add migrations intentionally.
+- Avoid destructive migrations unless explicitly requested.
 
-| Example Format | Description | Use Case |
-|----------------|-------------|----------|
-| ak_runner_xxx  | Runner keys | Console runners, automation agents |
-| ak_execute_xxx | Execution keys | CI/CD pipelines, external integrations |
-| ak_readonly_xxx| Read-only keys | Monitoring, reporting tools |
-| ak_xxxxxxxxx   | Flexible format | Any scope (configured on server) |
+---
 
-### Subscription Plans
+## 9. Authentication, API keys, and secrets
 
-Subscription plans are runner-focused and intentionally extensible. Store plan entitlements in `SubscriptionPlan.CapabilitiesJson`, serialized as `PlanCapabilities` from `src/Automaton.Studio.Server/Models/PlanCapabilities.cs`.
+- API keys authenticate runners, web apps, and integrations.
+- Expected format: `ak_<scope>_<random>`.
+- Never display raw generated API keys after creation unless the current flow is explicitly the one-time reveal.
+- Never persist raw API keys when a hash/redacted value is intended.
+- Never log raw API keys, access tokens, refresh tokens, provider keys, connection strings, or `.env` values.
+- For hosted runner provisioning, store redacted Docker command previews only.
 
-Current capabilities:
-- `HostedRunner.Enabled` — whether the plan includes an Automaton-hosted runner.
-- `HostedRunner.CpuCores`, `MemoryMb`, `DiskMb`, `MaxApps` — resource limits for the hosted runner container.
-- `HostedRunner.Visibility` — admin-controlled visibility (`disabled`, `testUsersOnly`, `public`).
+Common scopes:
 
-Do not add subscription-specific columns for new entitlements unless there is a strong query/indexing reason. Extend `PlanCapabilities` instead, add serializer normalization/tests, and update the Admin Subscription Plans screen.
-
-`testUsersOnly` runner plans are visible in the public pricing catalog and checkout flow only when `ApplicationUser.CanAccessHostedRunnerTestPlans` is enabled. Admins toggle that flag from `Admin -> Subscription Plans -> User Plans`; Admin plan assignment and hosted-runner provisioning can still use the plan directly for controlled smoke tests.
-
-AI budget is currently not part of subscriptions. Users bring/manage AI provider keys separately, and token usage is recorded only as telemetry.
-
-### Hosted Runner Provisioning
-
-Hosted runners are one managed runner container per paid user. The first provisioning slice lives in:
-- Backend entities: `RunnerHost`, `HostedRunner`, `HostedRunnerDeployment`.
-- Provisioning service: `src/Automaton.Studio.Server/Services/HostedRunnerProvisioningService.cs`.
-- Admin API: `src/Automaton.Studio.Server/Controllers/Admin/AdminHostedRunnersController.cs`.
-- Admin UI: `src/automaton-studio-vue/src/features/admin/views/AdminHostedRunnersView.vue`.
-
-Plan assignment is the trigger. Stripe webhook assignment and Admin → Subscription Plans user assignment both call `EnsureHostedRunnerForUserPlanAsync`, so production testing with Stripe test mode uses the same path as real paid users. Runner registration links back automatically by `AUTOMATON_RUNNER_NAME`; do not pre-create duplicate `Runner` rows.
-
-Provisioning is intentionally config-gated by `HostedRunners:Enabled` and starts in `dryRun` mode. It creates the hosted-runner record, allocates host capacity, creates a runner-scoped API key, and stores a redacted Docker command preview. Never persist or display the raw generated API key.
-
-Real remote provisioning uses `HostedRunners:DeploymentMode = sshDocker`. The API mounts a private SSH key at `/run/secrets/hosted_runner_ssh_key`, connects to the selected host's `PublicIp`, prepares the hosted-runner data folders/network, and runs the runner Docker container. A successful SSH command means the container was launched; the hosted runner only becomes `running` after the runner registers back with Automaton.
-
-Provisioning intentionally lives in the API control plane rather than a separate app. It works for both same-server testing and separate Hetzner runner hosts because the API provisions whichever `RunnerHost` record has available capacity. Keep the execution boundary behind `IHostedRunnerRemoteCommandExecutor` so we can extract it into a queue/worker service later if scale or isolation demands it. See `docs/prod/hosted-runner-ssh-provisioning.md`.
-
-## Apps (Web App Platform)
-
-Create, preview, and publish frontend apps (HTML/CSS/JS) that call Flows as their backend via REST.
-
-**Key Concepts:**
-- Source and live files are separate, and each has frontend/backend surfaces: `source/frontend/` is editable frontend source, `source/backend/` is editable Python backend source, `live/frontend/` is public static output, and `live/backend/` is runner-only deployed backend output.
-- `automaton deploy` writes frontend deploy output to `live/frontend/` and backend deploy output to `live/backend/`; public serving never reads source files or backend live files.
-- Studio editing, GitHub sync, version snapshots, MCP app tools, archive import/export, and marketplace fork use `source/`.
-- Remix/fork copies portable `source/` and may copy a sanitized `live/frontend/` runtime snapshot for an immediate working preview; it never copies `live/backend/`, secrets, runner state, or user data.
-- AI-generated local apps should default to Vite + vanilla TypeScript or JavaScript in `frontend/`, with a required frontend build pipeline that outputs to `frontend/dist/`.
-- Remix is available only when source exists and the app is explicitly remixable/forkable; runtime backend files, secrets, logs, and deployment artifacts are never copied, and frontend runtime copies are sanitized by configured remix exclusion rules.
-- Public runtime serving uses a safe web-file allowlist and returns `404` for unknown or sensitive extensions.
-- Visual app editor (Monaco) with live preview and sandboxed iframe
-- Runner selection for executions triggered from the app
-- PWA settings (manifest, theme colors, icons)
-- AI-assisted frontend editing
-- Marketplace media metadata: thumbnail plus developer-managed screenshot gallery
-- Uploaded marketplace media must live under `AppData/media/...` so Docker volume mounts preserve thumbnails and screenshots across API redeploys; do not write runtime uploads into `wwwroot`
-- Backend Server tab in the app editor proxies to the selected connected runner and shows the runner's deployed `{RUNNER_SCRIPTS_DIR}/{appId}/backend` files. It supports read-only text preview and deletion of runner-side files without touching Studio source files.
-- Plain root HTML/CSS/JS remains supported only when the user explicitly requests a no-build static app, for example a static template or direct plain-HTML request. It is not the default for generated apps.
-
-**Publishing & Access:**
-- Draft vs. Published states
-- Published apps get a `PublicUrl` (`/web/{publicUrl}`)
-- Deployed private app URL: `https://apps.automaton.monster/private/{appId}`
-- Published public app URL: `https://apps.automaton.monster/{slug}`
-- Public (no login) or Protected (requires Automaton login)
-- Publish/Unpublish flows with clear status badges
-- Public profile app details can render screenshot galleries sourced from `WebAppScreenshots`, and marketplace cards can fall back to the first screenshot when no thumbnail is set
-
-**Forking / Remixing:**
-- Marketplace fork is a guided Studio flow at `/apps/fork/:sourceAppId`, not a silent clone.
-- Forks default to private draft, copy editable app files, clear runner assignment, skip sensitive local files, inherit screenshot references, and preserve lineage via `ForkedFromAppId`, original app name, and original author attribution.
-- Backend app forks must warn users that execution requires their own Runner or a future managed Runner. After creation, redirect to the Studio editor; publishing is a separate intentional action.
-
-**For complete API reference, request/response formats, and examples, see:** [docs/skills/web-app-integration/SKILL.md](docs/skills/web-app-integration/SKILL.md)
-
-## Projects
-
-Projects organize related Flows, Apps, and Custom Steps with shared settings and access control.
-
-**Key Features:**
-- Containers for assets (one project per asset)
-- Shared variables available to member flows
-- Project-level permissions and roles
-- Assets remain (orphaned) if a project is deleted
-
-**UI Implementation (Vue):**
-- `src/features/projects/views/ProjectsListView.vue` – list, create/delete, quick actions
-- `src/features/projects/views/ProjectSettingsView.vue` – manage assets, shared variables, permissions
-
-**Scopes (UI semantics):**
-- **Personal**: Shows resources you own (via `WebAppUsers`/`FlowUsers`/etc.), even if they’re also linked to a project. It means “mine,” not “unassigned.”
-- **Project**: Shows resources in the selected project that you can access via membership (includes items owned by others).
-
-**Personal list badges:**
-- Personal views display a small badge `Project: {name}` on items linked to a project. These items cannot be deleted from Personal; manage them under the project.
-
-## Feature Modules
-
-The frontend is composed of self-contained feature modules:
-
-- **auth/** – Login/Register, token management
-- **dashboard/** – Overview, quick actions, charts
-- **flows/** – Flow list, AI generation, timeline, logs/history
-- **apps/** – App gallery, editor (Monaco), preview, PWA, publish
-- **steps/** – Step library, editor (code, IO, tests), AI assist
-- **runners/** – Runner list, status, logs, actions
-- **projects/** – Organization, shared settings, permissions
-- **organizations/** – Multi-tenant structure, member management, app assignments, role-based access
-- **settings/** – User/app settings, API keys, AI keys
-
-Shared modules (`src/shared/`): components, services (Axios, SignalR), composables, utils, types.
-
-## Documentation & Resources
-
-- **Swagger UI**: `https://localhost:7091/swagger/index.html` (source of truth for API)
-- **Vue.js Redesign**: [src/automaton-studio-vue/REDESIGN_PLAN.md](src/automaton-studio-vue/REDESIGN_PLAN.md)
-- **Feature Docs**: `docs/` folder (flows, apps, runners, projects, etc.)
-- **Agent Skills**: `docs/skills/` for concrete patterns and code examples
-- **Teaching & Learning**: [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md) explains decisions and lessons learned
-
-## AI Skills
-
-**Agent skills** codify reusable workflows and best practices for consistent, high-quality development. Store project-specific skills in `.github/skills/`.
-
-**Proactive self-improvement (IMPORTANT):** After fixing a bug, applying a pattern, or performing a repeated action, the AI **must** ask itself:
-> *"Would future me — or another agent — make the same mistake or repeat the same manual steps?"*
-
-If yes, immediately update the relevant document **without waiting to be asked**:
-
-| What happened | Where to document it |
+| Format | Purpose |
 |---|---|
-| Fixed a recurring bug caused by a wrong pattern (e.g. duplicate `<Toast />`) | Add a ❌/✅ rule to the relevant `.github/instructions/*.md` file |
-| Implemented a multi-step feature pattern used across the codebase | Create or update a `.github/skills/<name>/SKILL.md` |
-| Discovered an architectural decision, pitfall, or lesson learned | Add to `FOR-DEVELOPERS.md` under the appropriate section |
-| Added a significant feature that others will extend | Update `AGENTS.md` to describe the feature, its location, and key concepts |
+| `ak_runner_xxx` | Runner keys |
+| `ak_execute_xxx` | External execution/integration keys |
+| `ak_readonly_xxx` | Read-only integrations |
+| `ak_xxxxxxxxx` | Flexible legacy/general format |
 
-When an app deploy succeeds, always surface the deployed app URL in user-facing output. Do not stop at "deploy complete" without telling the user where to open the app.
+---
 
-**When to Create or Update a Skill:**
-- After implementing a significant feature (e.g., multi-tenancy, runner scoping)
-- When you identify a repeatable development pattern (e.g., post-change validation)
-- When you document best practices for a specific task (e.g., debugging, testing)
-- After completing a task that involved multiple steps and could benefit future agents
+## 10. Hosted runners
 
-**Example Skills:**
-- `post-change-validation` – Run frontend type-check and backend build after edits
-- `debugging-runner-issues` – Troubleshooting runner registration and connection problems
-- `adding-a-feature` – Step-by-step guide for implementing a new feature end-to-end
+Hosted runners are managed runner containers, generally one per paid user.
 
-**Skill File Format:**
-- Directory: `.github/skills/skill-name/` (lowercase, hyphens for spaces)
-- File: `SKILL.md` (exact filename required)
-- Content: YAML frontmatter + Markdown instructions
-- See `.github/skills/post-change-validation/SKILL.md` for reference
+Important areas:
 
-## Teaching & Learning: FOR-DEVELOPERS.md
+- Entities:
+  - `RunnerHost`
+  - `HostedRunner`
+  - `HostedRunnerDeployment`
 
-**Philosophy:** Every project is a lesson. Automaton is a vehicle for learning architecture, design patterns, real-world tradeoffs, and engineering wisdom.
+- Provisioning service:
+  - `src/Automaton.Studio.Server/Services/HostedRunnerProvisioningService.cs`
 
-**Purpose:** [FOR-DEVELOPERS.md](FOR-DEVELOPERS.md) explains the *entire* project in engaging, plain language—not as dry technical docs, but as a narrative of decisions, lessons, pitfalls, and how good engineers think.
+- Admin API:
+  - `src/Automaton.Studio.Server/Controllers/Admin/AdminHostedRunnersController.cs`
 
-**What It Covers:**
-- **Architecture Overview** – Why this design? (Use analogies to make it memorable)
-- **Key Technical Decisions** – Vue vs. Blazor, distributed runners, project-based multi-tenancy; the *why*, not just the *how*
-- **Common Pitfalls & Solutions** – Real bugs we hit, how we fixed them, how to avoid them
-- **Lessons Learned** – Testing strategies, performance gotchas, migration challenges, surprises
-- **How We Think** – Philosophy behind best practices (theme-aware styling, feature-based architecture, post-change validation)
+- Admin UI:
+  - `src/automaton-studio-vue/src/features/admin/views/AdminHostedRunnersView.vue`
 
-**Style:** Engage, don't bore. Use anecdotes, analogies, and context. Make it memorable enough that future developers internalize *why* decisions were made, not just *what* was built.
+Rules:
 
-**When to Update:**
-- After resolving a tricky bug or discovering a pitfall
-- After completing a major architectural feature
-- When adding a new technology or pattern
-- When you realize "I wish I'd known this earlier"—that's a lesson worth documenting
+- Provisioning is config-gated by `HostedRunners:Enabled`.
+- Dry-run mode is intentional.
+- Plan assignment triggers provisioning.
+- Runner registration links back by `AUTOMATON_RUNNER_NAME`.
+- Do not pre-create duplicate `Runner` rows.
+- Never persist or display raw generated runner API keys.
 
-## Plan Mode
+---
 
-- **Design for AI agents, not human timelines**: Plans should describe *what* to build and implementation *order*, not human work estimates ("7 weeks")
-- **Parallelize work**: Identify independent tasks that can be executed concurrently (database migrations + service layer + UI components can happen in parallel)
-- **Eliminate unnecessary ceremony**: No feature flags, no phased rollouts, no production best practices unless the project is deployed to external users
-- **Focus on completeness**: Agents should build the entire feature end-to-end in one implementation pass
-- **Make plans concise**: Sacrifice grammar for brevity. Avoid fluffy timelines.
-- **End with open questions**: List unresolved decisions that need your input before implementation starts
+## 11. Publishing, marketplace, and media
+
+- Published apps use public slugs.
+- Private deployed app URL:
+  - `https://apps.automaton.monster/private/{appId}`
+- Published public app URL:
+  - `https://apps.automaton.monster/{slug}`
+
+Rules:
+
+- App deploy success should surface the deployed app URL in user-facing output.
+- Marketplace media must live under `AppData/media/...`.
+- Do not write runtime uploads into `wwwroot`.
+- Screenshot galleries can use `WebAppScreenshots`.
+- Marketplace cards may fall back to the first screenshot when no thumbnail is set.
+- Forks/remixes must preserve attribution and lineage.
+- Forked backend apps must warn that execution requires the user’s own runner or a managed runner.
+
+---
+
+## 12. Production deployment rules
+
+The production stack currently uses `docker-compose.prod.yml` and blue/green services for API, Studio, and Website.
+
+Current production model:
+
+- nginx is the public reverse proxy on ports `80/443`.
+- Services use blue/green variants:
+  - `api-blue` / `api-green`
+  - `studio-blue` / `studio-green`
+  - `website-blue` / `website-green`
+- Live color is tracked under:
+  - `.prod-runtime/nginx/state/blue-green-state.env`
+- Upstream selectors live under:
+  - `.prod-runtime/nginx/upstreams/`
+
+Production docs:
+
+- `docs/prod/production-docker-cheat-sheet.md`
+- `docs/prod/nginx-static-blue-green-layout.md`
+
+Rules:
+
+- Keep old containers running until the new color is healthy.
+- Warm up new containers before switching traffic.
+- Make rollback obvious.
+- Do not hide failed warmups.
+- Consider Cloudflare proxied mode when debugging.
+- Prefer read-only diagnostics before changing production scripts.
+
+---
+
+## 13. Planning rules
+
+When asked for a plan:
+
+- Focus on implementation order, not human time estimates.
+- Avoid fake timelines such as “week 1, week 2.”
+- Identify independent tasks that can be done in parallel.
+- Include verification.
+- Include migration/backward-compatibility concerns when relevant.
+- End with open questions only when they block implementation.
+- Do not add feature flags, phased rollouts, or heavy ceremonies unless the product is already exposed to real users and the risk justifies them.
+
+---
+
+## 14. Feedback loop
+
+Automaton’s harness must improve when mistakes happen.
+
+After fixing a bug, completing a repeated workflow, or discovering a pitfall, ask:
+
+> Would another agent likely make this same mistake?
+
+If yes, update one of these:
+
+| Situation | Update |
+|---|---|
+| Missing operational rule | `AGENTS.md` |
+| Reusable task workflow | `.agent/skills/<skill-name>/SKILL.md` |
+| Detailed implementation guide | `.agent/skills/<skill-name>/SKILL.md` or project docs |
+| Architectural decision | `docs/architecture/decisions/` |
+| Debugging lesson or pitfall | `.agent/harness/lessons.md` or `FOR-DEVELOPERS.md` |
+| Missing verification command | `.agent/harness/verification.md` or this file |
+
+When adding a lesson, keep it short:
+
+```md
+## YYYY-MM-DD - Short title
+
+Problem:
+What went wrong.
+
+Cause:
+Why it happened.
+
+Rule:
+What future agents should do differently.
+
+Verification:
+Test, command, or manual check that catches it.
+```
+
+---
+
+## 15. Final response expectations
+
+When reporting back after code changes:
+
+- Summarize what changed.
+- Mention files changed.
+- Mention verification run and result.
+- If verification was not run, explain why.
+- Mention any harness/docs update made.
+- Surface deployed app URLs after successful app deploys.
