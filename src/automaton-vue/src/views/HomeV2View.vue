@@ -421,7 +421,7 @@ watch(
               <span class="eyebrow">Deployment</span>
               <h2>Deploy with one command.</h2>
               <p class="install-lead">
-                Automaton gives your AI a deployment target. Build apps with any coding agent, then publish them without learning cloud infrastructure.
+                Your AI writes the code. Automaton gets it online. Build apps with any coding agent, then publish them without learning cloud infrastructure.
               </p>
 
               <div class="install-points">
@@ -472,9 +472,9 @@ watch(
           <div class="studio-section">
             <div>
               <span class="eyebrow">Automaton Studio</span>
-              <h2>Everything around your apps. One place.</h2>
+              <h2>Manage everything around your apps.</h2>
               <p class="studio-lead">
-                The CLI builds and deploys. Automaton Studio gives you the control room for apps, runners, publishing, API keys, screenshots, metadata, and runtime status.
+                The CLI builds and deploys. Automaton Studio gives you the dashboard for apps, runners, publishing, API keys, screenshots, metadata, and runtime status.
               </p>
 
               <div class="studio-feature-list">
@@ -529,8 +529,7 @@ watch(
       <section id="runners">
         <div class="shell runners-band">
           <div class="runners-copy">
-            <span class="eyebrow">Why runners</span>
-            <h2>Keep your backend where your data already lives.</h2>
+            <h2>Your backend. Your infrastructure.</h2>
             <p>
               Automaton hosts the frontend, but your backend stays under your control. Run Python and backend services on infrastructure you already trust instead of moving everything into a closed platform.
             </p>
@@ -610,7 +609,7 @@ watch(
               <span class="brand-name">Automaton Monster</span>
             </div>
             <p class="brand-copy">
-              Build with AI. Run your backend anywhere. Automaton connects AI-generated apps to frontend hosting and runners you control.
+              Build with AI. Put it online. Automaton connects AI-generated apps to frontend hosting and runners you control.
             </p>
           </div>
 
