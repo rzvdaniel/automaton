@@ -1,126 +1,273 @@
 ---
 name: retro
-description: End-of-session retrospective. Reviews the conversation for corrections, friction, and wasted effort, then proposes durable improvements to skills and rules. Use at end of sessions or when user says "retro", "what did we learn", "session retro", "end of session". PROACTIVE - if the conversation has repeated corrections or mounting friction, suggest running /retro and restarting the session.
+description: End-of-session retrospective. Reviews the conversation for corrections, friction, wasted effort, and tool errors, then proposes durable improvements to Automaton's agent harness. Use at the end of substantial sessions or when the user says "retro", "what did we learn", "session retro", or "end of session".
 ---
 
 # Session Retrospective
 
-Review the full conversation to find moments where the user corrected or redirected the AI. Turn correction signals into durable system improvements.
+Use this skill to turn collaboration friction into durable improvements for future AI agents working on Automaton.
 
-The goal: **make AI collaboration compound over time**. Every retro should leave the system better for the next session. We are not just building software — we are building the machine that builds the software.
+The goal is to improve the harness over time: `AGENTS.md`, `.agent/skills/`, `.agent/harness/`, and related project documentation should get better when mistakes reveal missing rules.
 
-## Threshold Check
+Do not run a retro for every small exchange. Use it when there was enough substance to learn from.
 
-Before starting, assess the session. If it was a quick task (under ~5 substantive exchanges), say so and skip the retro unless the user insists. Not every session has lessons worth extracting.
+---
 
-## Phase 1: Detect Correction Signals
+## Threshold check
 
-Read the entire conversation. Look for these signal types, ordered by value:
+Before starting, assess whether a retro is useful.
 
-**HIGH confidence** — explicit corrections:
-- "No", "that's wrong", "I said...", "don't do that", "not like that"
-- User repeating an instruction the AI missed or ignored
-- User undoing or reverting something the AI did
-- "Use X not Y", "always do X", "never do Y"
+Skip the retro unless the user insists when:
 
-**MEDIUM confidence** — approved approaches:
-- "Perfect", "exactly", "that's right", "yes, like that"
-- Approaches the user explicitly validated (worth noting if they contradict a current rule or reveal an undocumented preference)
+- the task had fewer than about five substantive exchanges
+- there were no corrections, reversals, repeated misunderstandings, or tool errors
+- the conversation only involved a simple answer or one-off file generation
 
-**LOW confidence** — observed patterns:
-- Workarounds (user doing something manually the AI should have done)
-- Wasted effort (AI went down a wrong path before being corrected)
-- Friction points (things that took more back-and-forth than necessary)
+Proceed when:
 
-**TOOL ERRORS** — failed tool calls:
-- CLI commands with wrong subcommands, flags, or argument names
-- API/MCP tool calls with wrong parameter names or shapes
-- Tools called in the wrong order (missing required predecessor)
-- Repeated failures where the AI retried the same broken call instead of fixing it
-- For each error: note the wrong invocation AND the correct one
+- the user explicitly asks for a retro
+- the user corrected or redirected the agent multiple times
+- the agent used the wrong files, commands, paths, tools, or assumptions
+- a bug or workflow gap revealed a missing durable rule
+- the session produced a reusable workflow that should become a skill or checklist
 
-Skip one-off misunderstandings, simple typos, and things that are already documented in existing rules.
+---
 
-## Phase 2: Classify Improvements
+## Phase 1: Detect correction signals
 
-For each signal worth capturing, determine the category (from Robert Sahlin's AI Retrospective framework):
+Review the conversation and look for signals worth capturing.
 
-| Category | Description | Example |
-|----------|-------------|---------|
-| **Behavioural** | How the AI should work differently | "Ask one question at a time, don't batch" |
-| **Guardrail** | Hard rule to prevent a specific failure | "Never use `gog drive list` — the command is `ls`" |
-| **Tech debt** | Shortcut taken that should be fixed later | "Hardcoded path needs extracting to config" |
-| **Backlog** | Good idea that emerged but wasn't the current task | "Could automate X workflow as a skill" |
+### High-confidence signals
 
-Tool errors are almost always **Guardrail** items — they produce a concrete "use X not Y" rule. Only Behavioural and Guardrail items get written to rules/skills. Tech debt and Backlog items are reported for the user to action separately.
+Capture these when they reveal a reusable lesson:
 
-## Phase 3: Map to Destinations
+- “No”, “that’s wrong”, “I said...”, “don’t do that”, “not like that”
+- the user repeats an instruction the agent missed
+- the user undoes or reverts agent work
+- the user says “use X, not Y”
+- the user says “always do X” or “never do Y”
+- the user points out stale architecture, stale docs, or obsolete tooling
 
-For each Behavioural or Guardrail item, determine where it belongs. Load `/rules` for the full memory hierarchy. Summary:
+### Medium-confidence signals
+
+Capture only if they reveal an undocumented preference or rule:
+
+- “Perfect”, “exactly”, “that’s right”, “yes, like that”
+- the user validates an approach that should become the default
+- the user confirms a naming/location convention
+
+### Low-confidence signals
+
+Capture only if repeated or clearly useful:
+
+- the user manually performs work the agent should have done
+- the agent wastes effort by looking in the wrong place
+- the agent asks for information that was already available
+- too much back-and-forth was needed for a predictable task
+
+### Tool-error signals
+
+Capture concrete tool mistakes:
+
+- wrong CLI subcommand, flag, or argument
+- wrong file path or stale folder structure
+- wrong GitHub/API/tool parameter shape
+- wrong order of tool calls
+- repeated retries of the same failing invocation
+- failure to verify a file exists before referencing it
+
+For each tool error, record the wrong invocation and the correct one if known.
+
+Skip:
+
+- simple typos
+- one-off misunderstandings
+- preferences already documented in `AGENTS.md`, `.agent/skills/`, or `.agent/harness/`
+- generic best practices that do not need Automaton-specific rules
+
+---
+
+## Phase 2: Classify improvements
+
+Classify each useful signal.
+
+| Category | Meaning | Example |
+|---|---|---|
+| Behavioural | How the agent should behave differently | “Read the current file before proposing a replacement.” |
+| Guardrail | A hard rule to prevent a repeated failure | “Never edit `live/backend/` manually.” |
+| Verification | A test, command, or checklist that should catch the issue | “Run CLI archive tests after changing deploy packaging.” |
+| Skill | A reusable task workflow should become or update a skill | “Production deploy debugging needs a dedicated skill.” |
+| Architecture decision | A durable product/technical decision should be captured | “Production uses nginx blue/green upstream switching.” |
+| Tech debt | A code or docs cleanup that should happen later | “Rename misleading project once dependent references are mapped.” |
+| Backlog | A useful idea outside the current task | “Add `automaton doctor app`.” |
+
+Only Behavioural, Guardrail, Verification, Skill, and Architecture decision items should usually update harness files.
+
+Tech debt and Backlog items should be reported separately unless the user explicitly asks to create issues or update docs.
+
+---
+
+## Phase 3: Map to destinations
+
+Store lessons in the most specific durable place.
 
 | Pattern | Destination |
-|---------|-------------|
-| Applies to a specific skill | That skill's SKILL.md (load `/skill` for format reference) |
-| Applies to certain file types only | `.claude/rules/*.md` with `paths:` frontmatter |
-| Applies to one project | Project CLAUDE.md |
-| Applies universally | Global `~/.claude/CLAUDE.md` |
-| Personal override for shared project | `CLAUDE.local.md` |
+|---|---|
+| Applies to one existing skill | `.agent/skills/<skill-name>/SKILL.md` |
+| Defines a new reusable workflow | new `.agent/skills/<skill-name>/SKILL.md` |
+| Applies to verification commands/checklists | `.agent/harness/verification.md` |
+| Applies to repeated mistakes or pitfalls | `.agent/harness/lessons.md` |
+| Applies to final response/review behavior | `.agent/harness/review-checklist.md` |
+| Applies to the whole repository | `AGENTS.md` |
+| Explains a durable architecture/product decision | `docs/architecture/decisions/` |
+| Explains project background for humans | `FOR-DEVELOPERS.md` or normal project docs |
+| Applies only to a specific tool integration | that tool’s thin pointer file, only if present |
 
-**Specificity rule**: always store in the most specific location that applies. A lesson about the capture skill goes in `capture/SKILL.md`, not in global CLAUDE.md.
+Specificity rule: write the lesson to the narrowest place that future agents will actually read.
 
-## Phase 4: Present Findings
+Examples:
 
-Present all findings in a single table for review:
+- A CLI packaging rule belongs in `.agent/skills/automaton-cli/SKILL.md`, not in `AGENTS.md`.
+- A source/runtime rule used across Studio, CLI, and fork/remix belongs in `.agent/skills/app-source-runtime/SKILL.md` or `AGENTS.md` if truly universal.
+- A command to run after frontend changes belongs in `.agent/harness/verification.md`.
+- A one-time bug story belongs in `.agent/harness/lessons.md`, not in every skill.
 
-| # | Signal | Category | Proposed rule | Destination |
-|---|--------|----------|--------------|-------------|
-| 1 | AI used `list` instead of `ls` for gog drive | Guardrail | `gog drive` subcommand is `ls` not `list` | Global CLAUDE.md |
-| 2 | Capture skill added unwanted analysis | Behavioural | Don't expand on ideas unless explicitly asked | capture/SKILL.md |
-| 3 | Should extract auth helper to shared util | Tech debt | _(report only)_ | — |
+Avoid adding full instruction content to `CLAUDE.md`, `.cursor/rules`, `.github`, or other tool-specific files. Those files should usually remain thin pointers to `AGENTS.md` and `.agent/`.
 
-**Golden rule: NEVER store user input verbatim. ALWAYS synthesise into an actionable, reusable rule.** Write the instruction the AI needs to follow, not a narrative of what happened.
+---
 
-**Depth rule: describe the underlying construct, not just surface examples.** Surface-level examples (e.g. "don't write 'Not X, but Y'") are easy to pattern-match around with minor rephrasing. Name the deeper grammatical or structural construct (e.g. "appositive negation: defining something by what it is not before stating what it is"). This makes the rule robust against novel phrasings of the same anti-pattern.
+## Phase 4: Present findings for approval
 
-Bad: "User said to use gpt-5.1 for reasoning"
-Good: "For reasoning tasks, use gpt-5.1 model"
+Before editing files, present findings in a compact table.
 
-Bad: "Chris got frustrated when I batched questions"
-Good: "Ask questions ONE AT A TIME — wait for each response before asking the next"
+| # | Signal | Category | Proposed durable rule/change | Destination |
+|---|---|---|---|---|
+| 1 | Agent looked for old nested skill paths | Guardrail | Skills live directly under `.agent/skills/<skill-name>/SKILL.md`; do not assume category subfolders. | `AGENTS.md` or `.agent/harness/lessons.md` |
+| 2 | Deploy script change needed shell syntax validation | Verification | Run `bash -n scripts/prod-*.sh` after production script edits. | `.agent/harness/verification.md` |
+| 3 | A reusable CLI archive workflow emerged | Skill | Create/update an `automaton-cli` skill with archive exclusions and test commands. | `.agent/skills/automaton-cli/SKILL.md` |
 
-Bad: "Don't write 'Not a curated demo, but the full picture'"
-Good: "Avoid appositive negation — defining something by what it is not before stating what it is. Just state what it IS."
+Ask for approval before applying changes when the retro would modify files.
 
-Wait for user approval before proceeding. The user may reject, modify, or re-categorise items.
+The user may reject, modify, or re-categorize items.
 
-## Phase 5: Apply Approved Changes
+---
 
-For each approved item:
+## Phase 5: Write durable rules
 
-1. Read the target file
-2. Check the proposed rule doesn't already exist (in this file or a higher-priority location)
-3. Find the right section or create one
-4. Write the rule — concise, imperative, no narrative
-5. Check file size: CLAUDE.md under 300 lines (500 ceiling), skills under 500 lines
-6. If a file would exceed limits, flag it and suggest reorganisation (extract to rules/, split to skill, etc.)
+When applying approved changes:
 
-## Phase 6: Verify
+1. Read the target file first.
+2. Check that the rule does not already exist in the target or a higher-priority location.
+3. Add the rule to the most relevant section.
+4. Write concise imperative guidance.
+5. Avoid narrative session history in rule files.
+6. Keep files focused. If a file is getting too large, suggest splitting details into `.agent/skills/`, `.agent/harness/`, or project docs.
+7. Prefer updating existing skills/checklists over creating new ones unless the workflow is clearly distinct.
 
-After all changes:
-- Read each modified file to confirm no duplication or contradiction was introduced
-- Report a summary of what was updated and where
+Golden rule: do not store user input verbatim. Synthesize it into a reusable instruction.
 
-## What NOT to Capture
+Bad:
 
-- Things that already worked (no rule needed for correct behaviour)
-- Session-specific facts ("user was working on newsletter today")
-- Speculative improvements not backed by actual friction in THIS conversation
-- Anything that duplicates existing instructions
-- One-time fixes or typo corrections
-- Generic best practices the AI should already know
+```md
+User said there are no Traefik mentions anymore.
+```
+
+Good:
+
+```md
+Production deployment docs should describe the current nginx blue/green model only. Do not reintroduce obsolete infrastructure references.
+```
+
+Bad:
+
+```md
+The agent failed because it searched `.github/skills`.
+```
+
+Good:
+
+```md
+Canonical skills live in `.agent/skills/<skill-name>/SKILL.md`; do not use `.github/skills` as the default skill location.
+```
+
+---
+
+## Phase 6: Verify harness edits
+
+After modifying harness files:
+
+- Re-read each changed file.
+- Confirm paths are accurate.
+- Confirm there are no stale references to old skill locations.
+- Confirm tool-specific files remain pointers rather than duplicated sources of truth.
+- Confirm the new rule does not contradict `AGENTS.md`.
+- If verification commands changed, make sure they are copy-pasteable from the documented working directory.
+
+For Markdown-only harness edits, no build is usually required unless those docs are rendered by the website.
+
+If docs are rendered by the website, run the website build command from `.agent/harness/verification.md`.
+
+---
+
+## What not to capture
+
+Do not capture:
+
+- things that already worked
+- session-specific facts that will not help future agents
+- private user details unrelated to the repository workflow
+- speculative improvements not backed by friction
+- one-time typo fixes
+- generic software advice
+- duplicate rules already covered elsewhere
+- raw secrets, tokens, API keys, personal data, or private operational details
+
+---
+
+## Output format
+
+When presenting a retro, use:
+
+```md
+## Retro findings
+
+| # | Signal | Category | Proposed durable rule/change | Destination |
+|---|---|---|---|---|
+| 1 | ... | ... | ... | ... |
+
+## Suggested file updates
+
+- `path/to/file`: short description
+
+## Items not written to harness
+
+- Tech debt or backlog items, if any.
+```
+
+When updates are approved and applied, finish with:
+
+```md
+## Updated
+
+- `path/to/file`: what changed
+
+## Verification
+
+- Re-read changed harness files.
+- No duplicate or contradictory rules found.
+```
+
+---
 
 ## Integration
 
-This skill references:
-- **`/rules`** — for the memory hierarchy, size guidelines, audit process, and anti-patterns
-- **`/skill`** — for skill file format, frontmatter fields, and editing conventions
+This skill is part of the neutral Automaton agent harness.
+
+Related files:
+
+- `AGENTS.md` — repository-level agent contract
+- `.agent/skills/<skill-name>/SKILL.md` — task-specific skills
+- `.agent/harness/verification.md` — verification loop
+- `.agent/harness/lessons.md` — durable lessons and pitfalls, if present
+- `.agent/harness/review-checklist.md` — final self-review checklist, if present
+- `.agent/prompts/` — reusable prompts, if present
