@@ -37,6 +37,30 @@ Before changing code:
 3. Follow the verification matrix in this file or `.agent/harness/verification.md`, if present.
 4. If the task exposes a missing rule or recurring mistake, update the relevant `.agent/` file.
 
+### Skill format
+
+Each skill lives in:
+
+```txt
+.agent/skills/<skill-name>/SKILL.md
+```
+
+Rules:
+
+- Skill folders use kebab-case.
+- The main file must be named exactly `SKILL.md`.
+- Do not use `README.md` inside a skill folder.
+- Put extra documentation in `references/`.
+- Put helper scripts in `scripts/`.
+- Put reusable templates or assets in `assets/`.
+- Do not create empty optional folders unless they add value.
+
+When creating, renaming, restructuring, or reviewing skills, read:
+
+```txt
+.agent/skills/create-agent-skill/SKILL.md
+```
+
 Recommended skills:
 
 - CLI: `.agent/skills/automaton-cli/SKILL.md`
@@ -46,6 +70,9 @@ Recommended skills:
 - Studio frontend: `.agent/skills/studio-frontend/SKILL.md`
 - Studio backend: `.agent/skills/studio-backend/SKILL.md`
 - Runner debugging: `.agent/skills/runner-debugging/SKILL.md`
+- Retrospective: `.agent/skills/retro/SKILL.md`
+- Vue component splitting: `.agent/skills/vue-component-splitting/SKILL.md`
+- Skill creation: `.agent/skills/create-agent-skill/SKILL.md`
 
 Do not duplicate full skill content into tool-specific files such as `CLAUDE.md`, `.cursor/rules`, or `.github` files. Those files, if present, should point back to `AGENTS.md` and `.agent/`.
 
@@ -474,7 +501,6 @@ Rules:
 - Do not hide failed warmups.
 - Consider Cloudflare proxied mode when debugging.
 - Prefer read-only diagnostics before changing production scripts.
-- Do not assume a successful local `.sln` build proves the production Dockerfiles still copy the full project graph.
 
 ---
 
