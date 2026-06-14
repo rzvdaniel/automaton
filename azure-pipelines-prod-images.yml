@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - docker-compose.prod.yml
+      - docker/**
+      - shared/ai-guidance/**
+      - src/Automaton.Studio.Server/**
+      - src/Automaton.Core/**
+      - src/Automaton.Core.Scripting/**
+      - src/Automaton.Steps/**
+      - src/Automaton.Ai/**
+      - src/Automaton.Mcp/**
+      - src/automaton-studio-vue/**
+      - src/automaton-vue/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - docker-compose.prod.yml
+      - docker/**
+      - shared/ai-guidance/**
+      - src/Automaton.Studio.Server/**
+      - src/Automaton.Core/**
+      - src/Automaton.Core.Scripting/**
+      - src/Automaton.Steps/**
+      - src/Automaton.Ai/**
+      - src/Automaton.Mcp/**
+      - src/automaton-studio-vue/**
+      - src/automaton-vue/**
+
+jobs:
+  - job: ValidateProductionImages
+    displayName: Validate production Docker images
+    pool:
+      vmImage: ubuntu-latest
+
+    steps:
+      - checkout: self
+        displayName: Checkout repository
+
+      - script: |
+          docker --version
+          docker compose version
+        displayName: Show Docker versions
+
+      - script: docker build -f docker/Dockerfile.server .
+        displayName: Build API production image
+
+      - script: docker build -f docker/Dockerfile.studio .
+        displayName: Build Studio production image
+
+      - script: docker build -f docker/Dockerfile.website .
+        displayName: Build Website production image
+
+      - script: docker compose -f docker-compose.prod.yml config > /tmp/automaton-prod-compose.yaml
+        displayName: Validate production compose config
+        env:
+          API_DOMAIN: example.com
+          APPS_DOMAIN: apps.example.com
+          MYSQL_ROOT_PASSWORD: placeholder-root-password
+          MYSQL_PASSWORD: placeholder-user-password
