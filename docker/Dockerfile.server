@@ -8,6 +8,7 @@ COPY src/Automaton.Studio.Server/*.csproj ./Automaton.Studio.Server/
 COPY src/Automaton.Core/*.csproj ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
+COPY src/Automaton.Ai/*.csproj ./Automaton.Ai/
 COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
 
 RUN dotnet restore Automaton.Studio.Server/Automaton.Studio.Server.csproj
@@ -16,6 +17,7 @@ COPY src/Automaton.Studio.Server/ ./Automaton.Studio.Server/
 COPY src/Automaton.Core/ ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/ ./Automaton.Steps/
+COPY src/Automaton.Ai/ ./Automaton.Ai/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
 
 RUN dotnet publish Automaton.Studio.Server/Automaton.Studio.Server.csproj \
