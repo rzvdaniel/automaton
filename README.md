@@ -1,71 +1,109 @@
 # Automaton
 
-Automaton is an AI-first, cross-platform workflow automation platform. Describe what you want to automate in natural language, generate flows with reusable/custom steps, build web apps that call those flows, and execute them securely via distributed runners.
+Automaton is an AI-first platform for building, deploying, publishing, and running web apps.
 
-## Overview
+Build apps locally with your preferred AI coding agent, deploy them with the Automaton CLI, publish them through Automaton Studio, and connect optional Python backends to runners you control.
 
-**Architecture**
-- **Frontend**: Vue 3 + TypeScript + Vite + PrimeVue (src/automaton-studio-vue)
-- **Backend**: ASP.NET Core 9.0 REST API + SignalR (src/Automaton.Studio.Server)
-- **Runners**: Cross-platform console app for distributed execution (src/Automaton.Runner)
-- **Core Libraries**: Automaton.Core, Automaton.Steps, Automaton.Core.Scripting, Automaton.Mcp
+> AI can code. Automaton helps it ship.
 
-**Key Capabilities**
-- AI Flow Generation (natural language → flow + steps)
-- Web Apps Platform (Monaco editor, live preview, PWA, publish)
-- Custom Steps (Python/PowerShell/Batch) with inline testing
-- Projects (organize flows/apps/steps with shared settings and roles)
-- Secure, distributed execution via runner nodes with real-time telemetry
-- API Keys and role-based access
+## What Automaton provides
 
-See the detailed guide in [AGENTS.md](AGENTS.md) and the frontend redesign spec in [src/automaton-studio-vue/REDESIGN_PLAN.md](src/automaton-studio-vue/REDESIGN_PLAN.md).
+- **CLI-first app workflow** — create, pull, deploy, and publish Automaton apps from a local folder.
+- **Studio** — authenticated UI for apps, publishing, runners, API keys, AI keys, admin features, projects, and account management.
+- **Published app hosting** — serve frontend apps from public Automaton app URLs.
+- **Optional backend execution** — connect backend apps to a runner for Python/FastAPI-style workloads.
+- **Runner model** — run backend code on your own infrastructure or managed runner infrastructure.
+- **AI-agent harness** — repository instructions, skills, and verification guidance for tools like Claude Code, Codex, Cursor, and Copilot.
+
+## Core architecture
+
+- **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)
+- **Studio frontend**: Vue 3 + TypeScript + Vite + PrimeVue (`src/automaton-studio-vue/`)
+- **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Studio.Server/`)
+- **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
+- **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)
+- **Core libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`
+
+AI provider implementation currently lives under `src/Automaton.Mcp/`; check current project naming and intent before extending it.
+
+## App model
+
+Automaton apps use a source/runtime split:
+
+- `source/frontend/` — editable frontend source
+- `source/backend/` — editable backend source
+- `live/frontend/` — deployed public frontend output
+- `live/backend/` — runner-side backend output
+
+Studio editing, CLI pull, remix/fork, snapshots, and import/export should prefer `source/`.
+
+Public app serving must never expose backend files, secrets, logs, runner state, or unsafe file types.
 
 ## Requirements
 
-- Node.js 18+ and npm/pnpm (Frontend)
-- .NET 9.0 SDK (Backend & Runner)
-- MySQL 5.7+ or MariaDB 10.2+ (Database)
+- .NET 9 SDK
+- Node.js 18+ and npm/pnpm
+- MySQL 5.7+ or MariaDB 10.2+
+- Docker, for local database/runner workflows
 
-## Quickstart
+## Quickstart for repository development
 
-### Frontend (Vue.js)
-
-```bash
-cd src/automaton-studio-vue
-npm install
-npm run dev        # http://localhost:5173 with HMR
-
-# Optional
-npm run type-check # TypeScript checks
-npm run lint       # ESLint
-npm run format     # Prettier
-```
-
-### Backend (ASP.NET Core)
-
-```bash
-cd src/Automaton.Studio.Server
-dotnet run                    # https://localhost:7091
-```
-
-### Database (Docker Compose)
-
-Use the provided compose for local MySQL:
+### 1. Start local database
 
 ```bash
 # From repo root
 docker compose -f docker-compose.dev.yml up -d mysql
+```
 
-# Configure connection string (example)
+Configure the backend connection string:
+
+```bash
 cd src/Automaton.Studio.Server
 dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+```
 
-# Apply EF Core migrations
+Apply migrations:
+
+```bash
 dotnet tool install --global dotnet-ef
 dotnet ef database update
 ```
 
-### Type Generation (Frontend)
+### 2. Run Studio backend
+
+```bash
+cd src/Automaton.Studio.Server
+dotnet run
+```
+
+Swagger:
+
+- `https://localhost:7091/swagger/index.html`
+- `https://localhost:7091/swagger/v1/swagger.json`
+
+### 3. Run Studio frontend
+
+```bash
+cd src/automaton-studio-vue
+npm install
+npm run dev
+```
+
+Default Vite dev URL:
+
+```txt
+http://localhost:5173
+```
+
+### 4. Run website
+
+```bash
+cd src/automaton-vue
+npm install
+npm run dev
+```
+
+## Type generation
 
 Generate TypeScript types from the backend OpenAPI spec:
 
@@ -74,7 +112,14 @@ cd src/automaton-studio-vue
 npm run generate:types
 ```
 
-### Runner (Docker Compose – preferred)
+Then verify:
+
+```bash
+npm run type-check
+npm run build
+```
+
+## Runner
 
 Use the provided Compose file for production-like runner deployment:
 
@@ -96,7 +141,7 @@ docker compose -f docker-compose.runner.yml logs -f runner
 docker compose -f docker-compose.runner.yml down
 ```
 
-Alternative (manual, for local debugging only):
+Alternative manual runner for local debugging:
 
 ```bash
 cd src/Automaton.Runner
@@ -105,33 +150,77 @@ dotnet publish -c Release --self-contained false
 AUTOMATON_API_KEY=ak_runner_xxx automaton-runner
 ```
 
-See detailed guidance in docs/runners/docker-runner.md.
+See detailed guidance in `docs/runners/docker-runner.md`.
 
-## Build & Production
+## Build and verification
 
-### Frontend
+### Backend and tests
+
+```bash
+dotnet test
+```
+
+### Studio frontend
 
 ```bash
 cd src/automaton-studio-vue
-npm run build      # Outputs to dist/
-npm run preview    # Preview production build locally
+npm run type-check
+npm run build
 ```
 
-### Backend
+### Website
 
 ```bash
-cd src/Automaton.Studio.Server
-dotnet publish -c Release
+cd src/automaton-vue
+npm run build
 ```
 
-## API Documentation
+### Production scripts
 
-- Swagger UI: https://localhost:7091/swagger/index.html
-- OpenAPI JSON: https://localhost:7091/swagger/v1/swagger.json
+```bash
+bash -n scripts/prod-redeploy-all.sh
+bash -n scripts/prod-redeploy-api.sh
+bash -n scripts/prod-redeploy-studio.sh
+bash -n scripts/prod-redeploy-website.sh
+bash -n scripts/prod-verify.sh
+bash -n scripts/prod-reset-blue-green.sh
+```
 
-## Screenshots
+Run only the commands relevant to the files you changed.
 
-![Studio Flow](screenshots/Screenshot-2024-01-22-231011.png?raw=true "Studio Flow")
+For the full agent verification loop, see `.agent/harness/verification.md`.
+
+## Agent harness
+
+Automaton includes a neutral agent harness under `.agent/`:
+
+```txt
+.agent/
+  skills/
+  harness/
+```
+
+Agents should start with `AGENTS.md`, then read the relevant skill from `.agent/skills/<skill-name>/SKILL.md`, then follow `.agent/harness/verification.md`.
+
+Current skills include:
+
+- `automaton-cli`
+- `app-source-runtime`
+- `scaffolded-apps`
+- `studio-frontend`
+- `studio-backend`
+- `deployment-prod`
+- `runner-debugging`
+- `retro`
+- `vue-component-splitting`
+
+## Documentation
+
+- `AGENTS.md` — repository-level agent/developer contract
+- `.agent/harness/verification.md` — verification matrix
+- `.agent/skills/` — task-specific AI agent skills
+- `docs/runners/docker-runner.md` — runner deployment details
+- `src/automaton-studio-vue/REDESIGN_PLAN.md` — frontend redesign notes, if still relevant
 
 ## License
 
