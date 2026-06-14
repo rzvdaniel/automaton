@@ -281,6 +281,8 @@ Affected paths:
 - `docker-compose.prod.yml`
 - nginx/proxy/certbot configuration
 - `.prod-runtime` behavior
+- production Dockerfiles
+- project references or shared source used by production images
 
 Run syntax checks where possible:
 
@@ -302,6 +304,11 @@ Before changing production deployment logic, identify:
 - what happens when Cloudflare proxy is enabled
 
 Do not remove the previous color before the new color is healthy.
+
+Important:
+
+- A local `.sln` build does not validate Docker build contexts.
+- When changing production Dockerfiles, project references, or files copied into production images, ensure the relevant production image validation pipeline covers the change.
 
 ---
 
@@ -467,6 +474,7 @@ Rules:
 - Do not hide failed warmups.
 - Consider Cloudflare proxied mode when debugging.
 - Prefer read-only diagnostics before changing production scripts.
+- Do not assume a successful local `.sln` build proves the production Dockerfiles still copy the full project graph.
 
 ---
 

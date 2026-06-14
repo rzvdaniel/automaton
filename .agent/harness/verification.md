@@ -379,6 +379,8 @@ Use this when touching:
 - certbot scripts
 - blue/green deployment state
 - `.prod-runtime/**` behavior
+- production Dockerfiles
+- project references or shared source used by production images
 
 ### Syntax checks
 
@@ -416,6 +418,8 @@ Before changing production deployment logic, identify:
 - Do not reload proxy config before upstream files are valid.
 - Do not make rollback harder.
 - Prefer read-only diagnostics before production changes.
+- A local `.sln` build does not validate Docker build contexts or `COPY` coverage.
+- When changing production Dockerfiles, project references, or files copied into production images, validate the relevant production image build path in CI.
 
 ---
 
