@@ -101,9 +101,6 @@ public class OrganizationsController : BaseController
 
             var organization = await organizationService.CreateOrganizationAsync(request);
             
-            logger.LogInformation("Organization created: {OrganizationId} by user {UserId}", 
-                organization.Id, GetUserId());
-
             return CreatedAtAction(nameof(GetOrganization), new { id = organization.Id }, organization);
         }
         catch (InvalidOperationException ex)
@@ -143,9 +140,6 @@ public class OrganizationsController : BaseController
                 return NotFound(new { message = "Organization not found or access denied" });
             }
 
-            logger.LogInformation("Organization updated: {OrganizationId} by user {UserId}", 
-                id, GetUserId());
-
             return Ok(organization);
         }
         catch (UnauthorizedAccessException)
@@ -179,9 +173,6 @@ public class OrganizationsController : BaseController
             {
                 return NotFound(new { message = "Organization not found or access denied" });
             }
-
-            logger.LogInformation("Organization deleted: {OrganizationId} by user {UserId}", 
-                id, GetUserId());
 
             return NoContent();
         }
@@ -243,9 +234,6 @@ public class OrganizationsController : BaseController
 
             var invitation = await organizationService.InviteMemberAsync(id, request);
 
-            logger.LogInformation("User invited to organization {OrganizationId}: {Email} as {Role}", 
-                id, request.Email, request.Role);
-
             return Ok(new { 
                 message = "Invitation sent successfully",
                 expiresAt = invitation.ExpiresAt
@@ -288,8 +276,6 @@ public class OrganizationsController : BaseController
             {
                 return BadRequest(new { message = "Invalid or expired invitation token" });
             }
-
-            logger.LogInformation("User {UserId} accepted organization invitation", GetUserId());
 
             return Ok(new { message = "Invitation accepted successfully" });
         }
@@ -334,8 +320,6 @@ public class OrganizationsController : BaseController
                 return BadRequest(new { message = "Invalid or already consumed invitation" });
             }
 
-            logger.LogInformation("User {UserId} declined organization invitation {InvitationId}", GetUserId(), invitationId);
-
             return Ok(new { message = "Invitation declined" });
         }
         catch (Exception ex)
@@ -366,9 +350,6 @@ public class OrganizationsController : BaseController
                 return NotFound(new { message = "Member not found or access denied" });
             }
 
-            logger.LogInformation("User {RemovedUserId} removed from organization {OrganizationId} by {UserId}", 
-                userId, id, GetUserId());
-
             return NoContent();
         }
         catch (UnauthorizedAccessException)
@@ -398,8 +379,6 @@ public class OrganizationsController : BaseController
             {
                 return NotFound(new { message = "Organization not found or you are not a member" });
             }
-
-            logger.LogInformation("User {UserId} left organization {OrganizationId}", GetUserId(), id);
 
             return Ok(new { message = "Successfully left the organization" });
         }
@@ -439,9 +418,6 @@ public class OrganizationsController : BaseController
             {
                 return NotFound(new { message = "Member not found" });
             }
-
-            logger.LogInformation("User {MemberUserId} role updated to {NewRole} in organization {OrganizationId} by {UserId}", 
-                userId, request.Role, id, GetUserId());
 
             return Ok(member);
         }
@@ -557,9 +533,6 @@ public class OrganizationsController : BaseController
 
             var assignment = await organizationService.AssignAppToUserAsync(id, appId, request.UserId);
 
-            logger.LogInformation("App {AppId} assigned to user {UserId} in organization {OrganizationId}", 
-                appId, request.UserId, id);
-
             return Ok(new { message = "App assigned successfully", assignmentId = assignment.Id });
         }
         catch (UnauthorizedAccessException ex)
@@ -598,9 +571,6 @@ public class OrganizationsController : BaseController
             {
                 return NotFound(new { message = "Assignment not found or access denied" });
             }
-
-            logger.LogInformation("App {AppId} unassigned from user {UserId} in organization {OrganizationId}", 
-                appId, userId, id);
 
             return NoContent();
         }
@@ -658,8 +628,6 @@ public class OrganizationsController : BaseController
                 return NotFound(new { message = "Project not found" });
             }
             
-            logger.LogInformation("Project {ProjectId} linked to organization {OrganizationId}", projectId, id);
-            
             return Ok(new { message = "Project linked successfully" });
         }
         catch (UnauthorizedAccessException ex)
@@ -698,8 +666,6 @@ public class OrganizationsController : BaseController
             {
                 return NotFound(new { message = "Project not found in organization" });
             }
-            
-            logger.LogInformation("Project {ProjectId} unlinked from organization {OrganizationId}", projectId, id);
             
             return NoContent();
         }

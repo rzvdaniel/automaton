@@ -88,9 +88,6 @@ public class ProjectsController : BaseController
 
             var project = await projectService.CreateProjectAsync(request);
             
-            logger.LogInformation("Project created: {ProjectId} by user {UserId}", 
-                project.Id, GetUserId());
-
             return CreatedAtAction(nameof(GetProject), new { id = project.Id }, project);
         }
         catch (InvalidOperationException ex)
@@ -125,9 +122,6 @@ public class ProjectsController : BaseController
             {
                 return NotFound(new { message = "Project not found" });
             }
-
-            logger.LogInformation("Project updated: {ProjectId} by user {UserId}", 
-                id, GetUserId());
 
             return Ok(project);
         }
@@ -164,9 +158,6 @@ public class ProjectsController : BaseController
                 return NotFound(new { message = "Project not found" });
             }
 
-            logger.LogInformation("Project deleted: {ProjectId} by user {UserId}", 
-                id, GetUserId());
-
             return NoContent();
         }
         catch (UnauthorizedAccessException ex)
@@ -200,9 +191,6 @@ public class ProjectsController : BaseController
             {
                 return NotFound(new { message = "Project not found" });
             }
-
-            logger.LogInformation("Project reactivated: {ProjectId} by user {UserId}", 
-                id, GetUserId());
 
             return NoContent();
         }

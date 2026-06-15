@@ -63,10 +63,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectApp = await resourceService.AddAppToProjectAsync(projectId, appId);
             
-            logger.LogInformation(
-                "App linked to project: ProjectId={ProjectId}, AppId={AppId}, AddedBy={AddedBy}",
-                projectId, appId, GetUserId());
-
             return Ok(projectApp);
         }
         catch (UnauthorizedAccessException)
@@ -102,10 +98,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "App not found in project" });
             }
-
-            logger.LogInformation(
-                "App unlinked from project: ProjectId={ProjectId}, AppId={AppId}, RemovedBy={RemovedBy}",
-                projectId, appId, GetUserId());
 
             return NoContent();
         }
@@ -161,10 +153,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectFlow = await resourceService.AddFlowToProjectAsync(projectId, flowId);
             
-            logger.LogInformation(
-                "Flow linked to project: ProjectId={ProjectId}, FlowId={FlowId}, AddedBy={AddedBy}",
-                projectId, flowId, GetUserId());
-
             return Ok(projectFlow);
         }
         catch (UnauthorizedAccessException)
@@ -199,10 +187,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "Flow not found in project" });
             }
-
-            logger.LogInformation(
-                "Flow unlinked from project: ProjectId={ProjectId}, FlowId={FlowId}, RemovedBy={RemovedBy}",
-                projectId, flowId, GetUserId());
 
             return NoContent();
         }
@@ -258,10 +242,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectRunner = await resourceService.AddRunnerToProjectAsync(projectId, runnerId);
             
-            logger.LogInformation(
-                "Runner linked to project: ProjectId={ProjectId}, RunnerId={RunnerId}, AddedBy={AddedBy}",
-                projectId, runnerId, GetUserId());
-
             return Ok(projectRunner);
         }
         catch (UnauthorizedAccessException)
@@ -296,10 +276,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "Runner not found in project" });
             }
-
-            logger.LogInformation(
-                "Runner unlinked from project: ProjectId={ProjectId}, RunnerId={RunnerId}, RemovedBy={RemovedBy}",
-                projectId, runnerId, GetUserId());
 
             return NoContent();
         }
@@ -355,10 +331,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectStep = await resourceService.AddCustomStepToProjectAsync(projectId, stepId);
             
-            logger.LogInformation(
-                "Custom step linked to project: ProjectId={ProjectId}, StepId={StepId}, AddedBy={AddedBy}",
-                projectId, stepId, GetUserId());
-
             return Ok(projectStep);
         }
         catch (UnauthorizedAccessException)
@@ -393,10 +365,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "Custom step not found in project" });
             }
-
-            logger.LogInformation(
-                "Custom step unlinked from project: ProjectId={ProjectId}, StepId={StepId}, RemovedBy={RemovedBy}",
-                projectId, stepId, GetUserId());
 
             return NoContent();
         }
@@ -452,10 +420,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectApiKey = await resourceService.AddApiKeyToProjectAsync(projectId, apiKeyId);
             
-            logger.LogInformation(
-                "API key linked to project: ProjectId={ProjectId}, ApiKeyId={ApiKeyId}, AddedBy={AddedBy}",
-                projectId, apiKeyId, GetUserId());
-
             return Ok(projectApiKey);
         }
         catch (UnauthorizedAccessException)
@@ -490,10 +454,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "API key not found in project" });
             }
-
-            logger.LogInformation(
-                "API key unlinked from project: ProjectId={ProjectId}, ApiKeyId={ApiKeyId}, RemovedBy={RemovedBy}",
-                projectId, apiKeyId, GetUserId());
 
             return NoContent();
         }
@@ -549,10 +509,6 @@ public class ProjectResourcesController : BaseController
         {
             var projectAiApiKey = await resourceService.AddAiApiKeyToProjectAsync(projectId, aiApiKeyId);
             
-            logger.LogInformation(
-                "AI API key linked to project: ProjectId={ProjectId}, AiApiKeyId={AiApiKeyId}, AddedBy={AddedBy}",
-                projectId, aiApiKeyId, GetUserId());
-
             return Ok(projectAiApiKey);
         }
         catch (UnauthorizedAccessException)
@@ -587,10 +543,6 @@ public class ProjectResourcesController : BaseController
             {
                 return NotFound(new { message = "AI API key not found in project" });
             }
-
-            logger.LogInformation(
-                "AI API key unlinked from project: ProjectId={ProjectId}, AiApiKeyId={AiApiKeyId}, RemovedBy={RemovedBy}",
-                projectId, aiApiKeyId, GetUserId());
 
             return NoContent();
         }

@@ -108,12 +108,6 @@ public class ProjectMembersController : BaseController
 
             var member = await memberService.AddMemberAsync(projectId, request);
             
-            logger.LogInformation(
-                "Member added to project: ProjectId={ProjectId}, Email={Email}, Role={Role}, " +
-                "CreatedAccount={Created}, AddedBy={AddedBy}",
-                projectId, request.Email, request.Role, 
-                request.CreateAccountIfNotExists, GetUserId());
-
             return CreatedAtAction(
                 nameof(GetMember), 
                 new { projectId, userId = member.UserId }, 
@@ -165,10 +159,6 @@ public class ProjectMembersController : BaseController
                 return NotFound(new { message = "Member not found" });
             }
 
-            logger.LogInformation(
-                "Member role updated: ProjectId={ProjectId}, UserId={UserId}, NewRole={Role}, UpdatedBy={UpdatedBy}",
-                projectId, userId, request.Role, GetUserId());
-
             return Ok(member);
         }
         catch (UnauthorizedAccessException)
@@ -210,10 +200,6 @@ public class ProjectMembersController : BaseController
             {
                 return NotFound(new { message = "Member not found" });
             }
-
-            logger.LogInformation(
-                "Member removed from project: ProjectId={ProjectId}, UserId={UserId}, RemovedBy={RemovedBy}",
-                projectId, userId, GetUserId());
 
             return NoContent();
         }

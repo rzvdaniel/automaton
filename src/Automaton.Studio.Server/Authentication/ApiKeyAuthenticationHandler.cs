@@ -91,7 +91,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             return AuthenticateResult.Fail("Invalid API key - user not found");
         }
 
-        Logger.LogInformation("API key authentication successful for user {UserId} with scope {Scope} on request {Method} {Path}", 
+        Logger.LogDebug("API key authentication successful for user {UserId} with scope {Scope} on request {Method} {Path}",
             userId, apiKeyEntity.Scope, Request.Method, Request.Path);
 
         var claims = new List<Claim>

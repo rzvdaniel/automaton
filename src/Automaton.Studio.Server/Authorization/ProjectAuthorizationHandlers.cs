@@ -71,7 +71,7 @@ public class ProjectMemberHandler : AuthorizationHandler<ProjectMemberRequiremen
         // Check if user has one of the allowed roles
         if (requirement.AllowedRoles.Contains(membership.Role))
         {
-            _logger.LogInformation("Authorization succeeded: User {UserId} has role {Role} in project {ProjectId}", 
+            _logger.LogDebug("Authorization succeeded: User {UserId} has role {Role} in project {ProjectId}",
                 userId, membership.Role, projectId);
             context.Succeed(requirement);
         }
@@ -135,7 +135,7 @@ public class ProjectAdminHandler : AuthorizationHandler<ProjectAdminRequirement>
 
         if (membership != null)
         {
-            _logger.LogInformation("Authorization succeeded: User {UserId} is ProjectAdmin of project {ProjectId}", 
+            _logger.LogDebug("Authorization succeeded: User {UserId} is ProjectAdmin of project {ProjectId}",
                 userId, projectId);
             context.Succeed(requirement);
         }
@@ -200,7 +200,7 @@ public class ProjectResourceManagerHandler : AuthorizationHandler<ProjectResourc
 
         if (membership != null)
         {
-            _logger.LogInformation("Authorization succeeded: User {UserId} can manage resources in project {ProjectId} (Role: {Role})", 
+            _logger.LogDebug("Authorization succeeded: User {UserId} can manage resources in project {ProjectId} (Role: {Role})",
                 userId, projectId, membership.Role);
             context.Succeed(requirement);
         }
@@ -265,7 +265,7 @@ public class ProjectAppExecutorHandler : AuthorizationHandler<ProjectAppExecutor
 
         if (membership != null)
         {
-            _logger.LogInformation("Authorization succeeded: User {UserId} can execute apps in project {ProjectId} (Role: {Role})", 
+            _logger.LogDebug("Authorization succeeded: User {UserId} can execute apps in project {ProjectId} (Role: {Role})",
                 userId, projectId, membership.Role);
             context.Succeed(requirement);
         }
