@@ -1,8 +1,10 @@
 using Automaton.Core.Enums;
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -21,6 +23,7 @@ public class HostedRunnerProvisioningService
     private readonly ApiKeyService apiKeyService;
     private readonly IHostedRunnerRemoteCommandExecutor remoteCommandExecutor;
     private readonly HostedRunnerOptions options;
+    private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
 
     public HostedRunnerProvisioningService(
@@ -28,12 +31,14 @@ public class HostedRunnerProvisioningService
         ApiKeyService apiKeyService,
         IHostedRunnerRemoteCommandExecutor remoteCommandExecutor,
         IOptionsSnapshot<HostedRunnerOptions> options,
+        IAuditEventService auditEventService,
         ILogger<HostedRunnerProvisioningService> logger)
     {
         this.db = db;
         this.apiKeyService = apiKeyService;
         this.remoteCommandExecutor = remoteCommandExecutor;
         this.options = options.Value;
+        this.auditEventService = auditEventService;
         this.logger = logger;
     }
 
@@ -102,6 +107,32 @@ public class HostedRunnerProvisioningService
             ? HostedRunnerStatuses.Provisioning
             : HostedRunnerStatuses.Pending;
 
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Requested,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = AuditEventTypes.HostedRunnerProvisioningRequested,
+                Message = $"Hosted runner '{hostedRunner.Name}' provisioning was requested",
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new
+                {
+                    hostedRunner.Name,
+                    hostedRunner.Status,
+                    hostedRunner.RunnerHostId,
+                    RunnerHostName = host.Name,
+                    hostedRunner.SubscriptionPlanId,
+                    hostedRunner.CpuCores,
+                    hostedRunner.MemoryMb,
+                    hostedRunner.DiskMb,
+                    hostedRunner.MaxApps,
+                    DeploymentMode = options.DeploymentMode,
+                    IsProvisioningEnabled = options.Enabled
+                }
+            },
+            cancellationToken);
+
         var commandPreview = HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, options);
         var deployment = AddDeployment(
             hostedRunner,
@@ -125,6 +156,14 @@ public class HostedRunnerProvisioningService
             hostedRunner.LastError = $"Unsupported hosted runner deployment mode '{options.DeploymentMode}'.";
             CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
+            await WriteProvisioningCompletionAuditAsync(
+                hostedRunner,
+                host.Name,
+                AuditEventTypes.HostedRunnerProvisioningFailed,
+                "Failed",
+                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
+                $"Unsupported hosted runner deployment mode '{options.DeploymentMode}'.",
+                cancellationToken);
             return hostedRunner;
         }
 
@@ -136,6 +175,14 @@ public class HostedRunnerProvisioningService
             hostedRunner.LastError = BuildRemoteFailureMessage(executionResult);
             CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, executionResult.StandardOutput, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
+            await WriteProvisioningCompletionAuditAsync(
+                hostedRunner,
+                host.Name,
+                AuditEventTypes.HostedRunnerProvisioningFailed,
+                "Failed",
+                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
+                $"Hosted runner provisioning failed with exit status {executionResult.ExitStatus}.",
+                cancellationToken);
             return hostedRunner;
         }
 
@@ -149,6 +196,14 @@ public class HostedRunnerProvisioningService
             string.IsNullOrWhiteSpace(executionResult.StandardError) ? null : executionResult.StandardError);
 
         await db.SaveChangesAsync(cancellationToken);
+        await WriteProvisioningCompletionAuditAsync(
+            hostedRunner,
+            host.Name,
+            AuditEventTypes.HostedRunnerProvisioningSucceeded,
+            "Success",
+            $"Hosted runner '{hostedRunner.Name}' provisioning succeeded",
+            null,
+            cancellationToken);
         logger.LogInformation("Hosted runner {HostedRunnerId} prepared for user {UserId} on host {HostId}", hostedRunner.Id, userId, host.Id);
         return hostedRunner;
     }
@@ -292,5 +347,41 @@ public class HostedRunnerProvisioningService
 
             throw;
         }
+    }
+
+    private async Task WriteProvisioningCompletionAuditAsync(
+        HostedRunner hostedRunner,
+        string? runnerHostName,
+        string eventType,
+        string outcome,
+        string message,
+        string? failureSummary,
+        CancellationToken cancellationToken)
+    {
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Requested,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = eventType,
+                Outcome = outcome,
+                Action = outcome == AuditOutcomes.Success ? AuditActions.Succeeded : AuditActions.Failed,
+                Message = message,
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new
+                {
+                    hostedRunner.Name,
+                    hostedRunner.Status,
+                    hostedRunner.RunnerId,
+                    hostedRunner.RunnerHostId,
+                    RunnerHostName = runnerHostName,
+                    hostedRunner.SubscriptionPlanId,
+                    hostedRunner.ContainerName,
+                    hostedRunner.ContainerId,
+                    FailureSummary = failureSummary
+                }
+            },
+            cancellationToken);
     }
 }

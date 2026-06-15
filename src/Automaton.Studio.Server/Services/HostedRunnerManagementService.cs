@@ -119,6 +119,7 @@ public class HostedRunnerManagementService
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
             hostedRunner.LastError = BuildRemoteFailureMessage(executionResult);
+            var failureSummary = $"Hosted runner restart failed with exit status {executionResult.ExitStatus}.";
             hostedRunner.UpdatedAt = DateTime.UtcNow;
             CompleteDeployment(
                 deployment,
@@ -126,6 +127,27 @@ public class HostedRunnerManagementService
                 executionResult.StandardOutput,
                 hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
+            await auditEventService.WriteAsync(
+                new AuditEventWriteRequest
+                {
+                    Action = AuditActions.Failed,
+                    EntityType = AuditEntityTypes.HostedRunner,
+                    EntityId = hostedRunner.Id,
+                    EventType = AuditEventTypes.RunnerRestartFailed,
+                    Outcome = AuditOutcomes.Failed,
+                    Message = $"Hosted runner '{hostedRunner.Name}' restart failed",
+                    TargetUserId = hostedRunner.UserId,
+                    Metadata = new
+                    {
+                        hostedRunner.Name,
+                        hostedRunner.RunnerId,
+                        hostedRunner.RunnerHostId,
+                        RunnerHostName = host.Name,
+                        hostedRunner.ContainerName,
+                        FailureSummary = failureSummary
+                    }
+                },
+                cancellationToken);
             throw new InvalidOperationException(hostedRunner.LastError);
         }
 
@@ -137,6 +159,26 @@ public class HostedRunnerManagementService
             executionResult.StandardOutput,
             string.IsNullOrWhiteSpace(executionResult.StandardError) ? null : executionResult.StandardError);
         await db.SaveChangesAsync(cancellationToken);
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Succeeded,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = AuditEventTypes.RunnerRestartSucceeded,
+                Outcome = AuditOutcomes.Success,
+                Message = $"Hosted runner '{hostedRunner.Name}' restart succeeded",
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new
+                {
+                    hostedRunner.Name,
+                    hostedRunner.RunnerId,
+                    hostedRunner.RunnerHostId,
+                    RunnerHostName = host.Name,
+                    hostedRunner.ContainerName
+                }
+            },
+            cancellationToken);
 
         logger.LogInformation("Hosted runner {HostedRunnerId} restarted on host {HostId}", hostedRunner.Id, host.Id);
         return hostedRunner;
@@ -152,10 +194,10 @@ public class HostedRunnerManagementService
         await auditEventService.WriteAsync(
             new AuditEventWriteRequest
             {
-                Action = AuditActions.Reprovisioned,
+                Action = AuditActions.Requested,
                 EntityType = AuditEntityTypes.HostedRunner,
                 EntityId = hostedRunner.Id,
-                EventType = AuditEventTypes.RunnerReprovisioned,
+                EventType = AuditEventTypes.RunnerReprovisionRequested,
                 Message = $"Hosted runner '{hostedRunner.Name}' reprovision was requested",
                 TargetUserId = hostedRunner.UserId,
                 Metadata = new
@@ -196,8 +238,48 @@ public class HostedRunnerManagementService
 
         if (reprovisioned == null)
         {
+            await auditEventService.WriteAsync(
+                new AuditEventWriteRequest
+                {
+                    Action = AuditActions.Failed,
+                    EntityType = AuditEntityTypes.HostedRunner,
+                    EntityId = hostedRunner.Id,
+                    EventType = AuditEventTypes.RunnerReprovisionFailed,
+                    Outcome = AuditOutcomes.Failed,
+                    Message = $"Hosted runner '{hostedRunner.Name}' reprovision could not start",
+                    TargetUserId = hostedRunner.UserId,
+                    Metadata = new
+                    {
+                        hostedRunner.Name,
+                        hostedRunner.RunnerId,
+                        hostedRunner.RunnerHostId,
+                        hostedRunner.SubscriptionPlanId
+                    }
+                },
+                cancellationToken);
             throw new InvalidOperationException("Hosted runner reprovisioning could not start.");
         }
+
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Succeeded,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = reprovisioned.Id,
+                EventType = AuditEventTypes.RunnerReprovisionSucceeded,
+                Outcome = AuditOutcomes.Success,
+                Message = $"Hosted runner '{reprovisioned.Name}' reprovision started",
+                TargetUserId = reprovisioned.UserId,
+                Metadata = new
+                {
+                    reprovisioned.Name,
+                    reprovisioned.RunnerId,
+                    reprovisioned.RunnerHostId,
+                    reprovisioned.SubscriptionPlanId,
+                    reprovisioned.Status
+                }
+            },
+            cancellationToken);
 
         return reprovisioned;
     }
