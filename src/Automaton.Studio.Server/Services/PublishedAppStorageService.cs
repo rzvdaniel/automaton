@@ -20,18 +20,15 @@ public class PublishedAppStorageService
     private readonly IWebHostEnvironment environment;
     private readonly AppFileStorageService fileStorageService;
     private readonly PublishedAppsConfig config;
-    private readonly ILogger<PublishedAppStorageService> logger;
 
     public PublishedAppStorageService(
         IWebHostEnvironment environment,
         AppFileStorageService fileStorageService,
-        IOptions<PublishedAppsConfig> config,
-        ILogger<PublishedAppStorageService> logger)
+        IOptions<PublishedAppsConfig> config)
     {
         this.environment = environment;
         this.fileStorageService = fileStorageService;
         this.config = config.Value;
-        this.logger = logger;
     }
 
     public async Task PublishAsync(
@@ -69,7 +66,6 @@ public class PublishedAppStorageService
             }
 
             Directory.Move(stagingPath, finalPath);
-            logger.LogInformation("Published app {AppId} to static app host slug {Slug}", appId, metadata.Slug);
         }
         catch
         {
@@ -100,8 +96,6 @@ public class PublishedAppStorageService
         Directory.CreateDirectory(disabledRoot);
         var disabledPath = Path.Combine(disabledRoot, $"{slug}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}");
         Directory.Move(finalPath, disabledPath);
-
-        logger.LogInformation("Unpublished app slug {Slug} from static app host", slug);
         return Task.CompletedTask;
     }
 
