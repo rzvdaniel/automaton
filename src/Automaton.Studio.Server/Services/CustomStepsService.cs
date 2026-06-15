@@ -252,7 +252,7 @@ public class CustomStepsService
                 {
                     var client = automatonHub.Clients.Client(runner.ConnectionId);
                     
-                    logger.Information("Executing custom step {CustomStepId} ({CustomStepName}) on runner {RunnerId} ({RunnerName})", 
+                    logger.Debug("Executing custom step {CustomStepId} ({CustomStepName}) on runner {RunnerId} ({RunnerName})", 
                         customStepId, customStep.Name, runnerId, runner.Name);
 
                     // Map to runner payload format
@@ -283,8 +283,21 @@ public class CustomStepsService
                         OutputVariables = response.OutputVariables
                     };
 
-                    logger.Information("Custom step {CustomStepId} completed on runner {RunnerId} with status: {Success}", 
-                        customStepId, runnerId, response.Success ? "Success" : "Failed");
+                    if (response.Success)
+                    {
+                        logger.Debug(
+                            "Custom step {CustomStepId} completed successfully on runner {RunnerId}",
+                            customStepId,
+                            runnerId);
+                    }
+                    else
+                    {
+                        logger.Warning(
+                            "Custom step {CustomStepId} failed on runner {RunnerId}: {Error}",
+                            customStepId,
+                            runnerId,
+                            response.Error);
+                    }
                 }
             }
             catch (Exception ex)
@@ -430,7 +443,7 @@ public class CustomStepsService
                         // Replace value with reference
                         variable.Value = $"${{sensitive:{sensitiveVar.Id}}}";
 
-                        logger.Information("Encrypted sensitive variable '{Name}' for custom step {CustomStepId}", 
+                        logger.Debug("Encrypted sensitive variable '{Name}' for custom step {CustomStepId}", 
                             variable.Name, customStepId);
                     }
                     catch (Exception ex)
@@ -467,7 +480,7 @@ public class CustomStepsService
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
-                    logger.Information("Decrypted sensitive variable '{Name}' for execution", variable.Name);
+                    logger.Debug("Decrypted sensitive variable '{Name}' for execution", variable.Name);
                 }
                 else
                 {
@@ -518,7 +531,7 @@ public class CustomStepsService
                 await sensitiveVariableService.DeleteSensitiveVariableAsync(sensitiveVar.Id, userId);
             }
 
-            logger.Information("Deleted {Count} sensitive variables for custom step {CustomStepId}", 
+            logger.Debug("Deleted {Count} sensitive variables for custom step {CustomStepId}", 
                 sensitiveVars.Count, customStepId);
         }
         catch (Exception ex)

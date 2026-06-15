@@ -502,8 +502,19 @@ public class HubService
             
             var result = task.GetAwaiter().GetResult();
             
-            logger.Information("Custom step {CustomStepId} completed with status: {Success}", 
-                customStep.Id, result.Success ? "Success" : "Failed");
+                if (result.Success)
+                {
+                    logger.Debug(
+                        "Custom step {CustomStepId} completed successfully",
+                        customStep.Id);
+                }
+                else
+                {
+                    logger.Warning(
+                        "Custom step {CustomStepId} failed: {Error}",
+                        customStep.Id,
+                        result.Error);
+                }
             
             return result;
         }

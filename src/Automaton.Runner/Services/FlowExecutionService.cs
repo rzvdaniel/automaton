@@ -96,7 +96,7 @@ public class FlowExecutionService
                 
                 if (flow != null)
                 {
-                    logger.Information("Successfully loaded flow {FlowId} from server", workflowId);
+                    logger.Debug("Successfully loaded flow {FlowId} from server", workflowId);
                     return flow;
                 }
             }

@@ -115,7 +115,7 @@ public class ApiKeyAuthenticationService
                 }
                 
                 WriteLine();
-                logger.Information("API key validated, cached, and persisted successfully");
+                logger.Debug("API key validated, cached, and persisted successfully");
                 return true;
             }
 
@@ -228,7 +228,7 @@ public class ApiKeyAuthenticationService
         }
         
         WriteLine();
-        logger.Information("API key logout instructions displayed and memory cache cleared");
+        logger.Debug("API key logout instructions displayed and memory cache cleared");
         return Task.CompletedTask;
     }
 

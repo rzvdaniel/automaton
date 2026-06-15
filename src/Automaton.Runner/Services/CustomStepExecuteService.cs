@@ -25,7 +25,7 @@ public class CustomStepExecuteService
     /// </summary>
     public async Task<CustomStepExecutionResponse> RunCustomStep(CustomStepPayload customStep)
     {
-        logger.Information("Executing custom step {CustomStepId} ({CustomStepName})",
+        logger.Debug("Executing custom step {CustomStepId} ({CustomStepName})",
             customStep.Id, customStep.Name);
 
         System.Console.WriteLine($"▶️  Executing custom step: {customStep.Name}");
@@ -62,7 +62,7 @@ public class CustomStepExecuteService
                 };
             }
 
-            logger.Information("Custom step {CustomStepId} completed successfully in {ElapsedMs}ms",
+            logger.Debug("Custom step {CustomStepId} completed successfully in {ElapsedMs}ms",
                 customStep.Id, result.ExecutionTimeMs);
 
             System.Console.WriteLine($"✅ Custom step completed: {customStep.Name} ({result.ExecutionTimeMs}ms)");
