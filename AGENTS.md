@@ -69,6 +69,7 @@ Recommended skills:
 - Scaffolded/generated apps: `.agent/skills/scaffolded-apps/SKILL.md`
 - Studio frontend: `.agent/skills/studio-frontend/SKILL.md`
 - Studio backend: `.agent/skills/studio-backend/SKILL.md`
+- Audit and logging: `.agent/skills/audit-logging/SKILL.md`
 - Runner debugging: `.agent/skills/runner-debugging/SKILL.md`
 - Retrospective: `.agent/skills/retro/SKILL.md`
 - Vue component splitting: `.agent/skills/vue-component-splitting/SKILL.md`
@@ -375,6 +376,9 @@ Important:
 - Keep controllers thin; put business logic in services.
 - Return actionable errors.
 - Avoid leaking secrets in responses, logs, telemetry, or exceptions.
+- Audit and diagnostic logging are governed by `.agent/skills/audit-logging/SKILL.md`.
+- Business/application services are responsible for audit events.
+- Infrastructure services should generally emit diagnostic logs (`Debug`/`Warning`/`Error`) rather than audit events.
 
 ### Well-known string values
 

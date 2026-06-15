@@ -118,7 +118,7 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
                     logger: _loggerFactory.CreateLogger($"{customKey.ProviderName}Provider"),
                     maxConversationHistoryMessages: _maxConversationHistoryMessages);
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "Dynamically loaded user-defined OpenAI-compatible provider '{Provider}' → {BaseUrl} (default model: {Model}).",
                     customKey.ProviderName, customKey.BaseUrl, customKey.DefaultModel);
 
@@ -147,7 +147,7 @@ public sealed class DynamicAiProviderRegistry : IAiProviderRegistry
                 logger: _loggerFactory.CreateLogger($"{entity.Name}Provider"),
                 maxConversationHistoryMessages: _maxConversationHistoryMessages);
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Dynamically loaded OpenAI-compatible provider '{Provider}' → {BaseUrl} (default model: {Model}).",
                 entity.Name, entity.BaseUrl, defaultModel);
 

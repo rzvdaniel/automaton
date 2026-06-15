@@ -233,9 +233,9 @@ public class UserAppsController : ControllerBase
                 return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
             }
 
-            logger.LogInformation(
-                    "Published app launch tracked: slug={Slug}, path={Path}, appId={AppId}, htmlEntry={HtmlEntry}",
-                    slug, path, app.Id, isHtmlEntryPoint);
+            logger.LogDebug(
+                "Published app launch tracked: slug={Slug}, path={Path}, appId={AppId}, htmlEntry={HtmlEntry}",
+                slug, path, app.Id, isHtmlEntryPoint);
 
             return await ServePublishedStaticFileAsync(
                 slug,

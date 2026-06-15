@@ -129,7 +129,7 @@ public class SystemAiService : ISystemAiService
 
         try
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "System AI request: Provider={Provider}, Model={Model}, UserId={UserId}",
                 providerName, model, userId ?? "anonymous");
 
@@ -170,12 +170,12 @@ public class SystemAiService : ISystemAiService
                 await _tokenBudgetService.RecordUsageAsync(
                     resolvedUserId.Value, providerName, model, capturedInput, capturedOutput);
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "System AI usage recorded: UserId={UserId}, Input={Input}, Output={Output}",
                     userId, capturedInput, capturedOutput);
             }
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "System AI response completed: UserId={UserId}, ResponseLength={Length}",
                 userId ?? "anonymous", result.ResponseText.Length);
 

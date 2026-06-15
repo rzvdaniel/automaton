@@ -51,7 +51,7 @@ public class UserSettingsController : BaseController
 
         var userId = GetUserId();
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Updating user settings for {UserId}: Theme={Theme}, FontSize={FontSize}",
             userId, request.Theme, request.FontSize);
 

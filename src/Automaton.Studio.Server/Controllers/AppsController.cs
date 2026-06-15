@@ -1654,7 +1654,7 @@ public class AppsController : BaseController
                 }
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
 
@@ -1770,7 +1770,7 @@ public class AppsController : BaseController
                 }
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Source zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
 
@@ -1880,7 +1880,7 @@ public class AppsController : BaseController
                 }
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Backend zip upload for app {AppId}: {Written} written, {Skipped} skipped, {Errors} errors (clean={Clean})",
                 id, written.Count, skipped.Count, errors.Count, clean);
 

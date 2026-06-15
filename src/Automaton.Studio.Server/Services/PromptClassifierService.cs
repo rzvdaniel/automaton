@@ -36,7 +36,7 @@ public class PromptClassifierService : IPromptClassifierService
     {
         if (!_systemAiService.IsAvailable)
         {
-            _logger.LogInformation("System AI not available, defaulting to Simple tier");
+            _logger.LogDebug("System AI not available, defaulting to Simple tier");
             return new ClassificationResult(ComplexityTier.Simple, 1.0, "System AI unavailable — defaulted to Simple");
         }
 
@@ -78,11 +78,11 @@ public class PromptClassifierService : IPromptClassifierService
             // Fall back to Simple on low confidence
             if (confidence < LowConfidenceThreshold)
             {
-                _logger.LogInformation("Low confidence {Confidence} for tier {Tier}, falling back to Simple", confidence, tier);
+                _logger.LogDebug("Low confidence {Confidence} for tier {Tier}, falling back to Simple", confidence, tier);
                 return new ClassificationResult(ComplexityTier.Simple, confidence, $"Low confidence fallback from {tier}: {rationale}");
             }
 
-            _logger.LogInformation("Classified as {Tier} (confidence={Confidence}): {Rationale}", tier, confidence, rationale);
+            _logger.LogDebug("Classified as {Tier} (confidence={Confidence}): {Rationale}", tier, confidence, rationale);
             return new ClassificationResult(tier, confidence, rationale);
         }
         catch (Exception ex)

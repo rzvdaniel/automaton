@@ -231,7 +231,7 @@ public class StepMcpToolProvider : IMcpToolProvider
 
         try
         {
-            _logger.LogInformation("Executing {Language} code", language);
+            _logger.LogDebug("Executing {Language} code", language);
 
             // Prepare input variables
             var inputVariables = new Dictionary<string, string>();

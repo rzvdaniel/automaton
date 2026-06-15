@@ -40,7 +40,7 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
             await client.SendAsync(message, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
             
-            logger.LogInformation("Email sent successfully to {ToCount} recipient(s)", emailDetails.To?.Count() ?? 0);
+            logger.LogDebug("Email sent successfully to {ToCount} recipient(s)", emailDetails.To?.Count() ?? 0);
             return true;
         }
         catch (Exception ex)

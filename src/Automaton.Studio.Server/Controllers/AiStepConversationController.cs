@@ -66,7 +66,7 @@ public class AiStepConversationController : AiConversationControllerBase
 
         if (history?.Count > 0)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Adding continuation context for step session {SessionId} ({Count} messages)", sessionId, history.Count);
             var withContinuation = basePrompt + "\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
             return Task.FromResult(new SystemPromptParts(withContinuation));

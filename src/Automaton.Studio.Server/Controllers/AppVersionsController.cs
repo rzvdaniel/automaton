@@ -87,7 +87,7 @@ public class AppVersionsController : BaseController
                 AiModel = version.AiModel
             };
 
-            logger.LogInformation("[AppVersionsController] Created snapshot for app {AppId}, version {Version}", appId, version.VersionNumber);
+            logger.LogDebug("[AppVersionsController] Created snapshot for app {AppId}, version {Version}", appId, version.VersionNumber);
             return CreatedAtAction(nameof(GetVersionDetail), new { appId, versionNumber = version.VersionNumber }, dto);
         }
         catch (Exception ex)
@@ -233,7 +233,7 @@ public class AppVersionsController : BaseController
                 Message = $"App restored to version {versionNumber}"
             };
 
-            logger.LogInformation("[AppVersionsController] Restored app {AppId} to version {Version} by user {UserId}", appId, versionNumber, userId);
+            logger.LogDebug("[AppVersionsController] Restored app {AppId} to version {Version} by user {UserId}", appId, versionNumber, userId);
             return Ok(response);
         }
         catch (InvalidOperationException ex)

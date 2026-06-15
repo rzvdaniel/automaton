@@ -60,6 +60,10 @@ Avoid C# enums when JSON/client comparisons depend on stable string values.
 - Store hashes or redacted values where expected.
 - Hosted runner command previews must stay redacted.
 
+## Audit and logging
+
+- For audit event design, metadata sanitization, event naming, and diagnostic logging decisions, load `.agent/skills/audit-logging/SKILL.md`.
+
 ## Verification
 
 Run the most specific backend test project if known. If unsure:
