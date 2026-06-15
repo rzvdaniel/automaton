@@ -2,9 +2,9 @@ using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using Serilog.Events;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -15,7 +15,7 @@ public class ProjectResourceService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
-    private readonly AuditEventService auditEventService;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     private Guid UserId => userContextService.GetUserId();
@@ -23,7 +23,7 @@ public class ProjectResourceService
     public ProjectResourceService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        AuditEventService auditEventService)
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
@@ -87,7 +87,7 @@ public class ProjectResourceService
             entityType: "App",
             entityId: appId,
             message: "App linked to project",
-            properties: new { ProjectId = projectId, ResourceId = appId, ResourceType = "App", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = appId, ResourceType = "App", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectAppDto
@@ -141,7 +141,7 @@ public class ProjectResourceService
             entityType: "App",
             entityId: appId,
             message: "App removed from project",
-            properties: new { ProjectId = projectId, ResourceId = appId, ResourceType = "App", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = appId, ResourceType = "App", UserId },
             cancellationToken: cancellationToken);
 
         return true;
@@ -231,7 +231,7 @@ public class ProjectResourceService
             entityType: "Flow",
             entityId: flowId,
             message: "Flow linked to project",
-            properties: new { ProjectId = projectId, ResourceId = flowId, ResourceType = "Flow", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = flowId, ResourceType = "Flow", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectFlowDto
@@ -275,7 +275,7 @@ public class ProjectResourceService
             entityType: "Flow",
             entityId: flowId,
             message: "Flow removed from project",
-            properties: new { ProjectId = projectId, ResourceId = flowId, ResourceType = "Flow", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = flowId, ResourceType = "Flow", UserId },
             cancellationToken: cancellationToken);
         return true;
     }
@@ -363,7 +363,7 @@ public class ProjectResourceService
             entityType: "Runner",
             entityId: runnerId,
             message: "Runner linked to project",
-            properties: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectRunnerDto
@@ -407,7 +407,7 @@ public class ProjectResourceService
             entityType: "Runner",
             entityId: runnerId,
             message: "Runner removed from project",
-            properties: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
             cancellationToken: cancellationToken);
         return true;
     }
@@ -495,7 +495,7 @@ public class ProjectResourceService
             entityType: "CustomStep",
             entityId: customStepId,
             message: "Custom step linked to project",
-            properties: new { ProjectId = projectId, ResourceId = customStepId, ResourceType = "CustomStep", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = customStepId, ResourceType = "CustomStep", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectCustomStepDto
@@ -539,7 +539,7 @@ public class ProjectResourceService
             entityType: "CustomStep",
             entityId: customStepId,
             message: "Custom step removed from project",
-            properties: new { ProjectId = projectId, ResourceId = customStepId, ResourceType = "CustomStep", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = customStepId, ResourceType = "CustomStep", UserId },
             cancellationToken: cancellationToken);
 
         return true;
@@ -628,7 +628,7 @@ public class ProjectResourceService
             entityType: "ApiKey",
             entityId: apiKeyId,
             message: "API key linked to project",
-            properties: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectApiKeyDto
@@ -672,7 +672,7 @@ public class ProjectResourceService
             entityType: "ApiKey",
             entityId: apiKeyId,
             message: "API key removed from project",
-            properties: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = apiKeyId, ResourceType = "ApiKey", UserId },
             cancellationToken: cancellationToken);
         return true;
     }
@@ -760,7 +760,7 @@ public class ProjectResourceService
             entityType: "AiApiKey",
             entityId: aiApiKeyId,
             message: "AI API key linked to project",
-            properties: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
             cancellationToken: cancellationToken);
 
         return new ProjectAiApiKeyDto
@@ -804,7 +804,7 @@ public class ProjectResourceService
             entityType: "AiApiKey",
             entityId: aiApiKeyId,
             message: "AI API key removed from project",
-            properties: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
+            metadata: new { ProjectId = projectId, ResourceId = aiApiKeyId, ResourceType = "AiApiKey", UserId },
             cancellationToken: cancellationToken);
         return true;
     }
@@ -870,8 +870,8 @@ public class ProjectResourceService
             entityType: "ProjectResource",
             entityId: resourceId,
             message: "Project resource access denied",
-            properties: new { ProjectId = projectId, ResourceId = resourceId, UserId },
-            level: LogEventLevel.Warning,
+            metadata: new { ProjectId = projectId, ResourceId = resourceId, UserId },
+            outcome: "Denied",
             cancellationToken: cancellationToken);
     }
 

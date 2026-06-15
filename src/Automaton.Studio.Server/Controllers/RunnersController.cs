@@ -43,7 +43,7 @@ public class RunnersController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        return Ok(runnersService.Add(runner));
+        return Ok(await runnersService.Add(runner, cancellationToken));
     }
 
     [HttpPut("{id}")]

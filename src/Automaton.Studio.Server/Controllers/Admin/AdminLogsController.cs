@@ -26,7 +26,7 @@ public class AdminLogsController : ControllerBase
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<AdminLogEntryDto>>> GetLogs(
-        [FromQuery] string? level = null,
+        [FromQuery] string? outcome = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
         [FromQuery] string? search = null,
@@ -35,8 +35,8 @@ public class AdminLogsController : ControllerBase
     {
         var q = dbContext.AuditEvents.AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(level))
-            q = q.Where(l => l.Level == level);
+        if (!string.IsNullOrWhiteSpace(outcome))
+            q = q.Where(l => l.Outcome == outcome);
 
         if (from.HasValue)
             q = q.Where(l => l.CreatedAtUtc >= from.Value);
@@ -64,10 +64,10 @@ public class AdminLogsController : ControllerBase
             {
                 Id = l.Id.ToString(),
                 Message = l.Message,
-                Level = l.Level,
+                Level = l.Outcome,
                 Timestamp = l.CreatedAtUtc,
                 Exception = null,
-                Properties = l.PropertiesJson,
+                Properties = l.MetadataJson,
                 UserName = l.UserName,
             })
             .ToListAsync();
@@ -88,7 +88,7 @@ public class AdminLogsController : ControllerBase
     public async Task<ActionResult<List<string>>> GetLogLevels()
     {
         var levels = await dbContext.AuditEvents
-            .Select(l => l.Level)
+            .Select(l => l.Outcome)
             .Distinct()
             .OrderBy(l => l)
             .ToListAsync();

@@ -1,16 +1,16 @@
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Logging;
-using Microsoft.EntityFrameworkCore;
+using Automaton.Studio.Server.Services.Interfaces;
 using Serilog;
-using Serilog.Context;
-using Serilog.Events;
+using System.Text;
 using System.Text.Json;
 
 namespace Automaton.Studio.Server.Services;
 
-public class AuditEventService
+public class AuditEventService : IAuditEventService
 {
+    private static readonly JsonSerializerOptions MetadataJsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ApplicationDbContext _dbContext;
     private readonly UserContextService _userContextService;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -32,62 +32,88 @@ public class AuditEventService
         string entityType,
         Guid? entityId,
         string message,
-        object? properties = null,
-        LogEventLevel level = LogEventLevel.Information,
+        object? metadata = null,
+        string outcome = "Success",
+        bool failOnError = false,
         CancellationToken cancellationToken = default)
     {
-        var userId = _userContextService.GetUserId();
-        var ipAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
-        var propertiesJson = properties is null ? null : JsonSerializer.Serialize(properties);
-        var eventType = BuildEventType(action, entityType);
-
-        var auditEvent = new AuditEvent
+        try
         {
-            Id = Guid.NewGuid(),
-            Category = LogCategories.Audit,
-            Action = action,
-            EntityType = entityType,
-            EntityId = entityId,
-            UserId = userId == Guid.Empty ? null : userId,
-            UserName = _userContextService.GetUserName(),
-            Level = level.ToString(),
-            EventType = eventType,
-            Message = message,
-            PropertiesJson = propertiesJson,
-            IpAddress = ipAddress,
-            CreatedAtUtc = DateTime.UtcNow
-        };
+            var userId = _userContextService.GetUserId();
+            var ipAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+            var metadataJson = metadata is null ? null : JsonSerializer.Serialize(metadata, MetadataJsonOptions);
+            var eventType = BuildEventType(action, entityType);
 
-        _dbContext.AuditEvents.Add(auditEvent);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            var auditEvent = new AuditEvent
+            {
+                Id = Guid.NewGuid(),
+                Category = LogCategories.Audit,
+                Action = action,
+                EntityType = entityType,
+                EntityId = entityId,
+                UserId = userId == Guid.Empty ? null : userId,
+                UserName = _userContextService.GetUserName(),
+                Outcome = outcome,
+                EventType = eventType,
+                Message = message,
+                MetadataJson = metadataJson,
+                IpAddress = ipAddress,
+                CreatedAtUtc = DateTime.UtcNow
+            };
 
-        using (LogContext.PushProperty("LogCategory", LogCategories.Audit))
-        using (LogContext.PushProperty("AuditAction", action))
-        using (LogContext.PushProperty("AuditEntityType", entityType))
-        using (LogContext.PushProperty("AuditEntityId", entityId))
-        {
-            _logger.Write(level, "{AuditMessage}", message);
+            _dbContext.AuditEvents.Add(auditEvent);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.Debug(
+                "Audit event written: {EventType} {EntityType} {EntityId}",
+                auditEvent.EventType,
+                entityType,
+                entityId);
         }
-    }
-
-    public async Task CleanupExpiredAsync(TimeSpan retention, CancellationToken cancellationToken = default)
-    {
-        var cutoff = DateTime.UtcNow.Subtract(retention);
-        var expiredEvents = await _dbContext.AuditEvents
-            .Where(a => a.CreatedAtUtc < cutoff)
-            .ToListAsync(cancellationToken);
-
-        if (expiredEvents.Count == 0)
+        catch (Exception ex)
         {
-            return;
-        }
+            _logger.Warning(
+                ex,
+                "Failed to write audit event {EntityType} {Action} {EntityId}",
+                entityType,
+                action,
+                entityId);
 
-        _dbContext.AuditEvents.RemoveRange(expiredEvents);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            if (failOnError)
+            {
+                throw;
+            }
+        }
     }
 
     private static string BuildEventType(string action, string entityType)
     {
-        return $"{entityType}.{action}".ToLowerInvariant();
+        return $"{NormalizeEventPart(entityType)}{NormalizeEventPart(action)}";
+    }
+
+    private static string NormalizeEventPart(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+        var capitalizeNext = true;
+
+        foreach (var ch in value)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(capitalizeNext ? char.ToUpperInvariant(ch) : ch);
+                capitalizeNext = false;
+            }
+            else
+            {
+                capitalizeNext = true;
+            }
+        }
+
+        return builder.ToString();
     }
 }

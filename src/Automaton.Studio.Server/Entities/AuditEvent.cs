@@ -23,7 +23,7 @@ public class AuditEvent
     public string? UserName { get; set; }
 
     [MaxLength(32)]
-    public string Level { get; set; } = "Information";
+    public string Outcome { get; set; } = "Success";
 
     [MaxLength(128)]
     public string EventType { get; set; } = string.Empty;
@@ -31,7 +31,7 @@ public class AuditEvent
     [MaxLength(2000)]
     public string Message { get; set; } = string.Empty;
 
-    public string? PropertiesJson { get; set; }
+    public string? MetadataJson { get; set; }
 
     [MaxLength(128)]
     public string? IpAddress { get; set; }

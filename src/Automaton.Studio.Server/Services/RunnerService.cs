@@ -7,6 +7,7 @@ using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Hubs;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Mapping;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -20,6 +21,7 @@ public class RunnerService
     private readonly UserContextService userContextService;  // ✅ Store service, not userId
     private readonly ResourceAuthorizationService authorizationService;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -29,13 +31,15 @@ public class RunnerService
         UserContextService userContextService,
         IHubContext<AutomatonHub> automatonHub,
         ResourceAuthorizationService authorizationService,
-        ApiInstanceIdentityService apiInstanceIdentityService)
+        ApiInstanceIdentityService apiInstanceIdentityService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
         this.userContextService = userContextService;  // ✅ Store service reference
         this.authorizationService = authorizationService;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
+        this.auditEventService = auditEventService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
@@ -86,12 +90,9 @@ public class RunnerService
         return runner;
     }
 
-    public int Add(RunnerDetails runnerModel)
+    public async Task<int> Add(RunnerDetails runnerModel, CancellationToken cancellationToken = default)
     {
-        logger.Information("=== ADD RUNNER DEBUG ===");
-        logger.Information("Runner model: ID={Id}, Name={Name}", runnerModel.Id, runnerModel.Name);
-        logger.Information("UserId from context: {UserId}", UserId);
-        logger.Information("UserId is empty: {IsEmpty}", UserId == Guid.Empty);
+        logger.Debug("Adding runner {RunnerId} ({RunnerName}) for user {UserId}", runnerModel.Id, runnerModel.Name, UserId);
 
         if (UserId == Guid.Empty)
         {
@@ -120,14 +121,25 @@ public class RunnerService
 
         dbContext.RunnerUsers.Add(runnerUser);
 
-        var result = dbContext.SaveChanges();
+        var result = await dbContext.SaveChangesAsync(cancellationToken);
 
         LinkHostedRunnerAfterRegistration(runner);
-        result += dbContext.SaveChanges();
+        result += await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Runner created successfully: ID={RunnerId}, Name={Name}, UserId={UserId}, Changes={Changes}",
-            runner.Id, runner.Name, UserId, result);
-        logger.Information("=== END ADD RUNNER DEBUG ===");
+        await auditEventService.WriteAsync(
+            action: "Created",
+            entityType: "Runner",
+            entityId: runner.Id,
+            message: $"Runner '{runner.Name}' was created",
+            metadata: new
+            {
+                runner.Name,
+                UserId,
+                Changes = result
+            },
+            cancellationToken: cancellationToken);
+
+        logger.Debug("Runner created successfully: ID={RunnerId}", runner.Id);
 
         return result;
     }
@@ -735,7 +747,19 @@ public class RunnerService
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Updated script engine settings for runner {RunnerId}", id);
+        await auditEventService.WriteAsync(
+            action: "Updated",
+            entityType: "RunnerScriptSettings",
+            entityId: id,
+            message: $"Script engine settings updated for runner '{runner.Name}'",
+            metadata: new
+            {
+                RunnerId = id,
+                runner.Name
+            },
+            cancellationToken: cancellationToken);
+
+        logger.Debug("Updated script engine settings for runner {RunnerId}", id);
     }
 
     public async Task<RunnerDetails?> GetByNameAsync(string name, CancellationToken cancellationToken)

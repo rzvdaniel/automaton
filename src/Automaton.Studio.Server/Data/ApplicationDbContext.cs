@@ -143,10 +143,10 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.Action).IsRequired().HasMaxLength(80);
                 entity.Property(e => e.EntityType).IsRequired().HasMaxLength(80);
                 entity.Property(e => e.UserName).HasMaxLength(256);
-                entity.Property(e => e.Level).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.Outcome).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.EventType).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
-                entity.Property(e => e.PropertiesJson).HasColumnType("longtext");
+                entity.Property(e => e.MetadataJson).HasColumnType("longtext");
                 entity.Property(e => e.IpAddress).HasMaxLength(128);
                 entity.Property(e => e.CreatedAtUtc).IsRequired();
 

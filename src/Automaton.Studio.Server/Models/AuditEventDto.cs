@@ -9,10 +9,10 @@ public class AuditEventDto
     public Guid? EntityId { get; set; }
     public Guid? UserId { get; set; }
     public string? UserName { get; set; }
-    public string Level { get; set; } = string.Empty;
+    public string Outcome { get; set; } = string.Empty;
     public string EventType { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
-    public string? PropertiesJson { get; set; }
+    public string? MetadataJson { get; set; }
     public string? IpAddress { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }
