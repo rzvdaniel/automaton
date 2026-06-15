@@ -41,7 +41,7 @@ public class CloudflareTurnstileService : ICloudflareTurnstileService
         {
             if (environment.IsDevelopment() && options.AllowBypassWhenNotConfiguredInDevelopment)
             {
-                logger.LogInformation("Cloudflare Turnstile secret key is not configured. Bypassing verification in development.");
+                logger.LogDebug("Cloudflare Turnstile secret key is not configured. Bypassing verification in development.");
                 return true;
             }
 

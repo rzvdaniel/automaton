@@ -97,7 +97,7 @@ public class HostedRunnerProvisioningService
         if (hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
         {
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Hosted runner {HostedRunnerId} is already registered; plan metadata was refreshed without redeploying.", hostedRunner.Id);
+            logger.LogDebug("Hosted runner {HostedRunnerId} is already registered; plan metadata was refreshed without redeploying.", hostedRunner.Id);
             return hostedRunner;
         }
 
