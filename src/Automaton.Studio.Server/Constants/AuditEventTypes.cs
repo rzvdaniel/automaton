@@ -15,6 +15,8 @@ public static class AuditEventTypes
     public const string RunnerDeleted = "RunnerDeleted";
     public const string RunnerAssignedToProject = "RunnerAssignedToProject";
     public const string RunnerUnassignedFromProject = "RunnerUnassignedFromProject";
+    public const string RunnerRestartRequested = "RunnerRestartRequested";
+    public const string RunnerReprovisioned = "RunnerReprovisioned";
     public const string UserDisabled = "UserDisabled";
     public const string UserEnabled = "UserEnabled";
     public const string UserDeleted = "UserDeleted";

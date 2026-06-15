@@ -1,7 +1,9 @@
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +15,7 @@ public class HostedRunnerManagementService
     private readonly HostedRunnerProvisioningService provisioningService;
     private readonly IHostedRunnerRemoteCommandExecutor remoteCommandExecutor;
     private readonly HostedRunnerOptions options;
+    private readonly IAuditEventService auditEventService;
     private readonly UserContextService userContextService;
     private readonly ILogger<HostedRunnerManagementService> logger;
 
@@ -23,6 +26,7 @@ public class HostedRunnerManagementService
         HostedRunnerProvisioningService provisioningService,
         IHostedRunnerRemoteCommandExecutor remoteCommandExecutor,
         IOptionsSnapshot<HostedRunnerOptions> options,
+        IAuditEventService auditEventService,
         UserContextService userContextService,
         ILogger<HostedRunnerManagementService> logger)
     {
@@ -30,6 +34,7 @@ public class HostedRunnerManagementService
         this.provisioningService = provisioningService;
         this.remoteCommandExecutor = remoteCommandExecutor;
         this.options = options.Value;
+        this.auditEventService = auditEventService;
         this.userContextService = userContextService;
         this.logger = logger;
     }
@@ -72,6 +77,27 @@ public class HostedRunnerManagementService
         {
             throw new InvalidOperationException("Hosted runner has no assigned host.");
         }
+
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Requested,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = AuditEventTypes.RunnerRestartRequested,
+                Message = $"Hosted runner '{hostedRunner.Name}' restart was requested",
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new
+                {
+                    hostedRunner.Name,
+                    hostedRunner.Status,
+                    hostedRunner.RunnerId,
+                    hostedRunner.RunnerHostId,
+                    RunnerHostName = host.Name,
+                    hostedRunner.ContainerName
+                }
+            },
+            cancellationToken);
 
         var deployment = AddDeployment(
             hostedRunner,
@@ -122,6 +148,27 @@ public class HostedRunnerManagementService
         {
             throw new InvalidOperationException("Hosted runner has no subscription plan.");
         }
+
+        await auditEventService.WriteAsync(
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Reprovisioned,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = AuditEventTypes.RunnerReprovisioned,
+                Message = $"Hosted runner '{hostedRunner.Name}' reprovision was requested",
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new
+                {
+                    hostedRunner.Name,
+                    hostedRunner.Status,
+                    hostedRunner.RunnerId,
+                    hostedRunner.RunnerHostId,
+                    hostedRunner.SubscriptionPlanId,
+                    hostedRunner.ContainerName
+                }
+            },
+            cancellationToken);
 
         if (hostedRunner.Runner != null)
         {
