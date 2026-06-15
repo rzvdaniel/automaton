@@ -22,6 +22,11 @@ x-api-common: &api-common
     dockerfile: docker/Dockerfile.server
   image: automaton-prod-api:latest
   restart: unless-stopped
+  logging: &default-json-logging
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
   environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
@@ -29,7 +34,7 @@ x-api-common: &api-common
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
-    - prod-api-logs:/app/Logs
+    - prod-api-logs:/app/logs
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
     - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
   networks:
@@ -56,6 +61,7 @@ x-studio-common: &studio-common
       VITE_PUBLIC_APPS_BASE_URL: https://${APPS_DOMAIN:?APPS_DOMAIN is required in .env}
   image: automaton-prod-studio:latest
   restart: unless-stopped
+  logging: *default-json-logging
   networks:
     - automaton-prod
   healthcheck:
@@ -71,6 +77,7 @@ x-website-common: &website-common
     dockerfile: docker/Dockerfile.website
   image: automaton-prod-website:latest
   restart: unless-stopped
+  logging: *default-json-logging
   networks:
     - automaton-prod
   healthcheck:
@@ -85,6 +92,7 @@ services:
     image: nginx:1.27-alpine
     container_name: automaton-nginx
     restart: unless-stopped
+    logging: *default-json-logging
     ports:
       - "80:80"
       - "443:443"
@@ -107,6 +115,7 @@ services:
 
   certbot:
     image: certbot/certbot:latest
+    logging: *default-json-logging
     volumes:
       - ./.prod-runtime/certbot-www:/var/www/certbot
       - ./.prod-runtime/letsencrypt:/etc/letsencrypt
@@ -115,6 +124,7 @@ services:
     image: mysql:8.0
     container_name: automaton-prod-mysql
     restart: unless-stopped
+    logging: *default-json-logging
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-automaton}

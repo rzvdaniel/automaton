@@ -71,6 +71,8 @@ App_Data/
 
 # AppSettings files
 appsettings*.json
+!appsettings.Development.example.json
+!appsettings.Production.example.json
 
 .vscode/
 

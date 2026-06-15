@@ -700,6 +700,19 @@ See [`docs/runners/runner-download-publishing.md`](/C:/Work/automaton/docs/runne
 
 ## Logs
 
+Phase 1 production logging on the single Hetzner VPS is intentionally split:
+
+- audit events go to MySQL in `AuditEvents`
+- diagnostic application logs go to rolling files under `/app/logs`
+- container stdout/stderr stays enabled with Docker `json-file` rotation
+- retention is bounded in both app config and Docker logging
+
+Current defaults:
+
+- audit event retention: `90` days via `Logging:Audit:RetentionDays`
+- API rolling files: `14` daily files via `Logging:File:RetainedFileCountLimit`
+- Docker container logs: `10m x 5` per container in `docker-compose.prod.yml`
+
 Follow one color:
 
 ```bash

@@ -235,6 +235,10 @@ Serilog.Debugging.SelfLog.Enable(Console.Out);
 
 applicationBuilder.Host.UseSerilog((context, services, config) =>
 {
+    var logDirectory = context.Configuration["Logging:File:Path"] ?? "/app/logs";
+    var retainedFileCountLimit = context.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14;
+    var auditRetentionDays = context.Configuration.GetValue<int?>("Logging:Audit:RetentionDays") ?? 90;
+
     var logConfig = config
         .Destructure.UsingAttributes()
         .Destructure.JsonNetTypes()
@@ -259,34 +263,45 @@ applicationBuilder.Host.UseSerilog((context, services, config) =>
             restrictedToMinimumLevel: LogEventLevel.Information);
     }
 
-    // Database sink (same for both environments)
-    logConfig.WriteTo.MariaDB(
-        connectionString: configurationManager.GetConnectionString("MySqlConnection"),
-        tableName: "Logs",
-        autoCreateTable: false,
-        useBulkInsert: true,
+    logConfig.WriteTo.File(
+        path: Path.Combine(logDirectory, "diagnostic-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: retainedFileCountLimit,
         restrictedToMinimumLevel: LogEventLevel.Information,
-        batchPostingLimit: 1000,
-        period: TimeSpan.FromSeconds(30),
-        options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
-        {
-            PropertiesToColumnsMapping = new Dictionary<string, string>
+        shared: true,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");
+
+    logConfig.WriteTo.Logger(auditLogger => auditLogger
+        .Filter.ByIncludingOnly(logEvent =>
+            logEvent.Properties.TryGetValue("LogCategory", out var category) &&
+            category.ToString().Trim('"') == LogCategories.Audit)
+        .WriteTo.MariaDB(
+            connectionString: configurationManager.GetConnectionString("MySqlConnection"),
+            tableName: "Logs",
+            autoCreateTable: false,
+            useBulkInsert: true,
+            restrictedToMinimumLevel: LogEventLevel.Information,
+            batchPostingLimit: 1000,
+            period: TimeSpan.FromSeconds(30),
+            options: new Serilog.Sinks.MariaDB.MariaDBSinkOptions
             {
-                { "Exception", "Exception" },
-                { "Level", "Level" },
-                { "Message", "Message" },
-                { "MessageTemplate", "MessageTemplate" },
-                { "Properties", "Properties" },
-                { "Timestamp", "Timestamp" },
-                { "EventType", "EventType" },
-                { "UserName", "UserName" }
-            },
-            TimestampInUtc = true,
-            ExcludePropertiesWithDedicatedColumn = false,
-            EnumsAsInts = false,
-            LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
-            LogRecordsExpiration = TimeSpan.FromDays(31)
-        });
+                PropertiesToColumnsMapping = new Dictionary<string, string>
+                {
+                    { "Exception", "Exception" },
+                    { "Level", "Level" },
+                    { "Message", "Message" },
+                    { "MessageTemplate", "MessageTemplate" },
+                    { "Properties", "Properties" },
+                    { "Timestamp", "Timestamp" },
+                    { "EventType", "EventType" },
+                    { "UserName", "UserName" }
+                },
+                TimestampInUtc = true,
+                ExcludePropertiesWithDedicatedColumn = false,
+                EnumsAsInts = false,
+                LogRecordsCleanupFrequency = TimeSpan.FromHours(2),
+                LogRecordsExpiration = TimeSpan.FromDays(auditRetentionDays)
+            }));
 });
 
 services.AddHangfire(x =>
@@ -331,6 +346,7 @@ services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
+services.AddScoped<AuditEventService>();
 services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<AdminAuthorizationService>();
@@ -420,7 +436,6 @@ services.AddScoped<ProjectService>();
 services.AddScoped<ProjectMemberService>();
 services.AddScoped<ProjectResourceService>();
 services.AddScoped<InvitationTokenService>();
-services.AddScoped<ProjectAuditService>();
 services.AddScoped<ResourceAuthorizationService>();
 services.AddScoped<SensitiveVariableService>();
 services.AddScoped<UserSettingsService>();

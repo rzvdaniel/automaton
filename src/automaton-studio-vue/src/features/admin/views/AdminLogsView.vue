@@ -14,7 +14,7 @@ import DatePicker from 'primevue/datepicker'
 import apiClient from '@/shared/services/api/axios-instance'
 
 interface LogEntry {
-  id: number
+  id: string
   message: string
   level: string
   timestamp?: string
@@ -36,7 +36,7 @@ const logs = ref<LogEntry[]>([])
 const totalCount = ref(0)
 const totalPages = ref(0)
 const isLoading = ref(false)
-const expandedLogId = ref<number | null>(null)
+const expandedLogId = ref<string | null>(null)
 const availableLevels = ref<string[]>([])
 const autoRefresh = ref(false)
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -115,7 +115,7 @@ function nextPage() {
   }
 }
 
-function toggleLog(id: number) {
+function toggleLog(id: string) {
   expandedLogId.value = expandedLogId.value === id ? null : id
 }
 
@@ -194,7 +194,7 @@ watch(
   <div class="admin-logs-view">
     <div class="logs-header">
       <h2 class="logs-title">
-        <i class="pi pi-list mr-2"></i>Server Logs
+        <i class="pi pi-list mr-2"></i>Audit Events
       </h2>
       <div class="logs-actions">
         <Button
@@ -267,7 +267,7 @@ watch(
     <!-- Empty -->
     <div v-else-if="logs.length === 0" class="empty-state">
       <i class="pi pi-list text-4xl text-color-secondary mb-2"></i>
-      <p class="text-color-secondary">No log entries found.</p>
+      <p class="text-color-secondary">No audit events found.</p>
     </div>
 
     <!-- Log table -->

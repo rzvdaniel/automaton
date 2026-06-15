@@ -22,6 +22,7 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<FlowExecution> FlowExecutions { get; set; }
         public virtual DbSet<FlowExecutionUser> FlowExecutionUsers { get; set; }
         public virtual DbSet<FlowExecutionLog> FlowExecutionLogs { get; set; }
+        public virtual DbSet<AuditEvent> AuditEvents { get; set; }
         public virtual DbSet<Runner> Runners { get; set; }
         public virtual DbSet<RunnerConnectionSession> RunnerConnectionSessions { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
@@ -133,6 +134,27 @@ namespace Automaton.Studio.Server.Data
             modelBuilder.Entity<FlowExecution>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
+            });
+
+            modelBuilder.Entity<AuditEvent>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Category).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.Action).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.EntityType).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.UserName).HasMaxLength(256);
+                entity.Property(e => e.Level).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.PropertiesJson).HasColumnType("longtext");
+                entity.Property(e => e.IpAddress).HasMaxLength(128);
+                entity.Property(e => e.CreatedAtUtc).IsRequired();
+
+                entity.HasIndex(e => e.CreatedAtUtc);
+                entity.HasIndex(e => new { e.Category, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.EntityType, e.EntityId });
+                entity.HasIndex(e => new { e.UserId, e.CreatedAtUtc });
+                entity.HasIndex(e => e.EventType);
             });
 
             modelBuilder.Entity<FlowExecutionUser>(entity =>

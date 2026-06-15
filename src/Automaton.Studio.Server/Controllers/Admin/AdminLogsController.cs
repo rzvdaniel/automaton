@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Automaton.Studio.Server.Controllers.Admin;
 
 /// <summary>
-/// Admin endpoint to query the Serilog structured log table.
+/// Admin endpoint to query persisted audit events.
 /// </summary>
 [ApiController]
 [Route("api/admin/logs")]
@@ -33,20 +33,23 @@ public class AdminLogsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 100)
     {
-        var q = dbContext.Logs.AsQueryable();
+        var q = dbContext.AuditEvents.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(level))
             q = q.Where(l => l.Level == level);
 
         if (from.HasValue)
-            q = q.Where(l => l.Timestamp >= from.Value);
+            q = q.Where(l => l.CreatedAtUtc >= from.Value);
 
         if (to.HasValue)
-            q = q.Where(l => l.Timestamp <= to.Value);
+            q = q.Where(l => l.CreatedAtUtc <= to.Value);
 
         if (!string.IsNullOrWhiteSpace(search))
-            q = q.Where(l => (l.Message != null && l.Message.Contains(search)) ||
-                             (l.Exception != null && l.Exception.Contains(search)));
+            q = q.Where(l =>
+                l.Message.Contains(search) ||
+                l.Action.Contains(search) ||
+                l.EntityType.Contains(search) ||
+                (l.UserName != null && l.UserName.Contains(search)));
 
         var total = await q.CountAsync();
 
@@ -54,17 +57,17 @@ public class AdminLogsController : ControllerBase
         var safePage = Math.Max(1, page);
 
         var items = await q
-            .OrderByDescending(l => l.Timestamp)
+            .OrderByDescending(l => l.CreatedAtUtc)
             .Skip((safePage - 1) * safePageSize)
             .Take(safePageSize)
             .Select(l => new AdminLogEntryDto
             {
-                Id = l.Id,
+                Id = l.Id.ToString(),
                 Message = l.Message,
                 Level = l.Level,
-                Timestamp = l.Timestamp,
-                Exception = l.Exception,
-                Properties = l.Properties,
+                Timestamp = l.CreatedAtUtc,
+                Exception = null,
+                Properties = l.PropertiesJson,
                 UserName = l.UserName,
             })
             .ToListAsync();
@@ -84,8 +87,7 @@ public class AdminLogsController : ControllerBase
     [HttpGet("levels")]
     public async Task<ActionResult<List<string>>> GetLogLevels()
     {
-        var levels = await dbContext.Logs
-            .Where(l => l.Level != null)
+        var levels = await dbContext.AuditEvents
             .Select(l => l.Level)
             .Distinct()
             .OrderBy(l => l)
