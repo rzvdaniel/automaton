@@ -104,7 +104,7 @@ public class AppArchiveService
             var createdApp = appsService.Get(createdAppId.Value)
                 ?? throw new InvalidOperationException("Imported app could not be loaded after update.");
 
-            logger.Information(
+            logger.Debug(
                 "Imported app archive into app {AppId}: {Written} files written",
                 createdAppId.Value,
                 written.Count);

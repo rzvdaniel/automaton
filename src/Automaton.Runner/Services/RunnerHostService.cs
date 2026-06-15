@@ -726,7 +726,7 @@ public class RunnerHostService
                 if (runnerDetails != null && !string.Equals(configService.RunnerId, runnerDetails.Id.ToString(), StringComparison.OrdinalIgnoreCase))
                 {
                     await storageService.SaveRunnerConfigAsync(runnerDetails.Id.ToString(), runnerName);
-                    logger.Information("Recovered runner identity for {RunnerName}. Replaced stale local runner ID {OldRunnerId} with server runner ID {RunnerId}", runnerName, configService.RunnerId, runnerDetails.Id);
+                    logger.Warning("Recovered runner identity for {RunnerName}. Replaced stale local runner ID {OldRunnerId} with server runner ID {RunnerId}", runnerName, configService.RunnerId, runnerDetails.Id);
                     WriteLine($"?? Recovered runner identity from server: {runnerDetails.Id}");
                 }
 
@@ -735,7 +735,7 @@ public class RunnerHostService
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                logger.Information("Runner {RunnerName} is registered locally but not found on server. Re-registering before hub connect.", runnerName);
+                logger.Warning("Runner {RunnerName} is registered locally but not found on server. Re-registering before hub connect.", runnerName);
                 WriteLine($"?? Runner '{runnerName}' was not found on the server. Re-registering...");
 
                 var registerSuccess = await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
@@ -791,7 +791,7 @@ public class RunnerHostService
 
                             // Save to local storage for next time
                             await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                            logger.Information("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
+                            logger.Warning("Runner recovery successful: {RunnerName} (ID: {RunnerId})", runnerName, runnerId);
                             WriteLine($"? Runner '{runnerName}' recovered successfully!");
                             return true;
                         }
@@ -865,7 +865,7 @@ public class RunnerHostService
                 || response.StatusCode == System.Net.HttpStatusCode.Forbidden
                 || response.StatusCode == System.Net.HttpStatusCode.Unauthorized))
             {
-                logger.Information("Stored runner ID {RunnerId} for {RunnerName} was rejected with status {StatusCode}. Retrying registration without the stale local ID.", runnerId, runnerName, response.StatusCode);
+                logger.Warning("Stored runner ID {RunnerId} for {RunnerName} was rejected with status {StatusCode}. Retrying registration without the stale local ID.", runnerId, runnerName, response.StatusCode);
                 WriteLine($"?? Stored runner ID was rejected by the server ({response.StatusCode}). Recovering runner identity...");
                 return await RegisterRunnerAsync(runnerName, ignoreStoredRunnerId: true);
             }
@@ -1047,7 +1047,7 @@ public class RunnerHostService
 
             // Clear cached server URL so it won't be used on next run
             configService.ClearCachedServerUrl();
-            logger.Information("Cleared cached server URL from memory");
+            logger.Debug("Cleared cached server URL from memory");
 
             if (!runnerConfigCleared && !serverConfigCleared)
             {
@@ -1286,10 +1286,10 @@ public class RunnerHostService
 
         try
         {
-            logger.Information("Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir}", scriptsDir);
+            logger.Debug("Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir}", scriptsDir);
             WriteLine($"🔧 FastAPI scripts dir: {scriptsDir}");
             var proc = System.Diagnostics.Process.Start(psi);
-            logger.Information("FastAPI backend launched (PID {Pid})", proc?.Id);
+            logger.Debug("FastAPI backend launched (PID {Pid})", proc?.Id);
         }
         catch (Exception ex)
         {
@@ -1317,7 +1317,7 @@ public class RunnerHostService
                 if (response.IsSuccessStatusCode)
                 {
                     if (attempt > 0) WriteLine(); // newline after the dots
-                    logger.Information("FastAPI backend ready");
+                    logger.Debug("FastAPI backend ready");
                     return;
                 }
             }

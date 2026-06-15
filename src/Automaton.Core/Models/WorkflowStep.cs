@@ -58,7 +58,7 @@ public abstract class WorkflowStep
 
     public virtual async Task<ExecutionResult> ExecuteAsync(StepExecutionContext context)
     {
-        logger.Information("Execute step: {0}", Name);
+        logger.Debug("Execute step: {0}", Name);
 
         SetupProperties(context);
 
@@ -101,7 +101,7 @@ public abstract class WorkflowStep
                 {
                     value = runtimeVar.Value;
 
-                    logger.Information(
+                    logger.Debug(
                         "Auto-populated step input '{Name}' from workflow Variables",
                         variable.Name);
                 }

@@ -39,7 +39,7 @@ public class ResilientPolicy : IConnectionPolicy
                 onRetry: (exception, retry, timespan) =>
                 {
                     // Log technical details to file logs only
-                    logger.Information(exception, "Connection retry attempt {RetryAttempt} after {Delay}s. Error: {ErrorType}", 
+                    logger.Warning(exception, "Connection retry attempt {RetryAttempt} after {Delay}s. Error: {ErrorType}",
                         retry, timespan.TotalSeconds, exception.GetType().Name);
                     
                     // Show friendly message to user
@@ -64,12 +64,12 @@ public class ResilientPolicy : IConnectionPolicy
                 },
                 onReset: () =>
                 {
-                    logger.Information("Connection circuit breaker reset - connection attempts will resume");
+                    logger.Debug("Connection circuit breaker reset - connection attempts will resume");
                     WriteLine("?? Connection circuit breaker reset - attempting connection...");
                 },
                 onHalfOpen: () =>
                 {
-                    logger.Information("Connection circuit breaker half-open - testing connection stability");
+                    logger.Debug("Connection circuit breaker half-open - testing connection stability");
                     WriteLine("?? Connection circuit breaker half-open - testing connection...");
                 });
 

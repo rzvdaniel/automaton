@@ -392,11 +392,11 @@ public class HubService
                 if (error != null)
                 {
                     // Log technical details to file logs only
-                    logger.Information(error, "Connection reconnecting due to error");
+                    logger.Warning(error, "Connection reconnecting due to error");
                 }
                 else
                 {
-                    logger.Information("Connection reconnecting");
+                    logger.Debug("Connection reconnecting");
                 }
                 WriteLine($"🔄 Reconnecting to server: {GetFriendlyErrorMessage(error)}");
                 return Task.CompletedTask;
@@ -586,7 +586,7 @@ public class HubService
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
             File.WriteAllBytes(filePath, payload.Content);
 
-            logger.Information("Deployed backend file {RelativePath} for app {AppId}",
+            logger.Debug("Deployed backend file {RelativePath} for app {AppId}",
                 relativePath, payload.AppId);
             WriteLine($"📦 Deployed backend file: {relativePath} (app {payload.AppId})");
 
@@ -831,7 +831,7 @@ public class HubService
 
             logs.Add($"📦 Installing packages ({installMode})...");
             WriteLine($"📦 Installing packages for app {appId} ({installMode})...");
-            logger.Information("Installing packages for app {AppId} from {ReqPath} into {VenvDir}",
+            logger.Debug("Installing packages for app {AppId} from {ReqPath} into {VenvDir}",
                 appId, requirementsPath, venvDir);
 
             var (_, stdout, stderr) = RunProcessCapture(
@@ -843,7 +843,7 @@ public class HubService
 
             logs.Add("✅ Packages installed successfully");
             logs.Add($"🐍 App virtual environment ready: {pythonPath}");
-            logger.Information("Packages installed for app {AppId} into {VenvDir}", appId, venvDir);
+            logger.Debug("Packages installed for app {AppId} into {VenvDir}", appId, venvDir);
             WriteLine($"✅ Packages installed for app {appId}");
             return new AppControllerUploadResult { Success = true, Logs = logs };
         }
@@ -879,7 +879,7 @@ public class HubService
 
         logs.Add($"🐍 Creating app virtual environment: {venvDir}");
         WriteLine($"🐍 Creating app virtual environment for app {appId}...");
-        logger.Information("Creating app virtual environment for app {AppId} at {VenvDir}", appId, venvDir);
+        logger.Debug("Creating app virtual environment for app {AppId} at {VenvDir}", appId, venvDir);
 
         var (_, stdout, stderr) = RunProcessCapture(
             "python",
@@ -995,7 +995,7 @@ public class HubService
         var packageList = string.Join(" ", packages);
         logs.Add($"🔧 Installing system packages: {packageList}");
         WriteLine($"🔧 Installing system packages for app {appId}: {packageList}");
-        logger.Information("Installing system packages for app {AppId}: {Packages}", appId, packageList);
+        logger.Debug("Installing system packages for app {AppId}: {Packages}", appId, packageList);
 
         try
         {
@@ -1046,7 +1046,7 @@ public class HubService
             if (process.ExitCode == 0)
             {
                 logs.Add("✅ System packages installed successfully");
-                logger.Information("System packages installed for app {AppId}", appId);
+                logger.Debug("System packages installed for app {AppId}", appId);
                 WriteLine($"✅ System packages installed for app {appId}");
             }
             else
@@ -1220,7 +1220,7 @@ public class HubService
             ? "Server requested reconnect to the new API instance."
             : reason.Trim();
 
-        logger.Information(
+        logger.Warning(
             "Received reconnect-when-idle request from server. ActiveOperations={ActiveOperations} Reason={Reason}",
             activeOperations,
             message);
@@ -1363,7 +1363,7 @@ public class HubService
 
             if (chunk.IsLast)
             {
-                logger.Information("Upload complete: SessionId={SessionId} Path={Path}", chunk.SessionId, filePath);
+                logger.Debug("Upload complete: SessionId={SessionId} Path={Path}", chunk.SessionId, filePath);
                 await connection!.SendAsync(FileUploadCompleteMethod, new FileUploadCompleteMessage
                 {
                     SessionId = chunk.SessionId,

@@ -41,7 +41,7 @@ public class ExecuteFlow : WorkflowStep
                 return ExecutionResult.Stop();
             }
 
-            logger.Information("Executing child flow '{FlowName}' (ID: {FlowId})", childFlow.Name, FlowId);
+            logger.Debug("Executing child flow '{FlowName}' (ID: {FlowId})", childFlow.Name, FlowId);
 
             // ✅ Map parent workflow variables → child flow InputVariables
             MapParentToChildInputs(context.Workflow, childFlow);
@@ -49,7 +49,7 @@ public class ExecuteFlow : WorkflowStep
             // ✅ Execute child flow
             var childExecution = await flowExecuteService.Execute(childFlow, CancellationToken.None);
 
-            logger.Information(
+            logger.Debug(
                 "Child flow '{FlowName}' completed with status: {Status}", 
                 childFlow.Name, 
                 childExecution.Status);
@@ -86,7 +86,7 @@ public class ExecuteFlow : WorkflowStep
             return;
         }
 
-        logger.Information("Mapping {Count} input variables from parent to child flow", InputVariables.Count);
+        logger.Debug("Mapping {Count} input variables from parent to child flow", InputVariables.Count);
 
         foreach (var inputMapping in InputVariables)
         {
@@ -103,7 +103,7 @@ public class ExecuteFlow : WorkflowStep
                 {
                     childInputVar.Value = resolvedValue;
 
-                    logger.Information(
+                    logger.Debug(
                         "Mapped input variable '{Name}': {ParentValue} → child flow",
                         inputMapping.Name,
                         inputMapping.Value);
@@ -134,7 +134,7 @@ public class ExecuteFlow : WorkflowStep
             return;
         }
 
-        logger.Information("Mapping {Count} output variables from child to parent flow", OutputVariables.Count);
+        logger.Debug("Mapping {Count} output variables from child to parent flow", OutputVariables.Count);
 
         foreach (var outputMapping in OutputVariables)
         {
@@ -151,7 +151,7 @@ public class ExecuteFlow : WorkflowStep
      
                     parentWorkflow.SetVariable(outputMapping);
 
-                    logger.Information(
+                    logger.Debug(
                         "Mapped output variable '{Name}': child flow → parent Variables",
                         outputMapping.Name);
                 }

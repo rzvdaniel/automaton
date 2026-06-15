@@ -72,7 +72,7 @@ namespace Automaton.Core.Services
             try
             {
                 await SaveWorkflowExecution(workflowExecution);
-                logger.Information("Successfully saved workflow execution {ExecutionId}", workflowExecution.Id);
+                logger.Debug("Successfully saved workflow execution {ExecutionId}", workflowExecution.Id);
             }
             catch (Exception saveEx)
             {
@@ -84,7 +84,7 @@ namespace Automaton.Core.Services
             try
             {
                 await OnExecutionCompleted(workflowExecution);
-                logger.Information("Successfully completed post-execution processing for execution {ExecutionId}", workflowExecution.Id);
+                logger.Debug("Successfully completed post-execution processing for execution {ExecutionId}", workflowExecution.Id);
             }
             catch (Exception postEx)
             {
@@ -128,7 +128,7 @@ namespace Automaton.Core.Services
             LogContext.PushProperty(LogContextProperties.WorkflowName, workflow.Name);
 
             var startMessage = $"Start workflow: {workflow.Name}";
-            await AddLogWithNotification(workflowExecution, "Information", startMessage, cancellationToken: cancellationToken);
+            await AddLogWithNotification(workflowExecution, "Debug", startMessage, cancellationToken: cancellationToken);
 
             while (step != null && !cancellationToken.IsCancellationRequested)
             {
@@ -151,7 +151,7 @@ namespace Automaton.Core.Services
                     await notificationService.SendStepExecution(step.Id);
 
                     var stepStartMessage = $"Executing step: {step.Name} (ID: {step.Id})";
-                    await AddLogWithNotification(workflowExecution, "Information", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
+                    await AddLogWithNotification(workflowExecution, "Debug", stepStartMessage, step.Id, step.Name, cancellationToken: cancellationToken);
 
                     var stepResult = await step.ExecuteAsync(context);
 
@@ -164,7 +164,7 @@ namespace Automaton.Core.Services
                     }
 
                     var stepCompleteMessage = $"Completed step: {step.Name}";
-                    await AddLogWithNotification(workflowExecution, "Information", stepCompleteMessage, step.Id, step.Name, cancellationToken: cancellationToken);
+                    await AddLogWithNotification(workflowExecution, "Debug", stepCompleteMessage, step.Id, step.Name, cancellationToken: cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -183,7 +183,7 @@ namespace Automaton.Core.Services
             }
 
             var endMessage = $"End workflow: {workflow.Name}";
-            await AddLogWithNotification(workflowExecution, "Information", endMessage, cancellationToken: cancellationToken);
+            await AddLogWithNotification(workflowExecution, "Debug", endMessage, cancellationToken: cancellationToken);
 
             // Populate OutputVariables from Variables before returning
             PopulateOutputVariables(workflow);
@@ -228,7 +228,7 @@ namespace Automaton.Core.Services
                         var resolvedValue = variableResolver.Parse(outputVar, workflow);
                         outputVar.Value = resolvedValue;
 
-                        logger.Information(
+                        logger.Debug(
                             "Resolved output variable '{Name}' from reference '{Original}' to value", 
                             outputVar.Name, 
                             valueStr);
@@ -243,7 +243,7 @@ namespace Automaton.Core.Services
                         {
                             outputVar.Value = runtimeVar.Value;
 
-                            logger.Information(
+                            logger.Debug(
                                 "Populated output variable '{Name}' with value from runtime variable", 
                                 outputVar.Name);
                         }

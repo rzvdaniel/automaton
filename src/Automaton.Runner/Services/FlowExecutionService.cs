@@ -34,7 +34,7 @@ public class FlowExecutionService
     {        
         try
         {
-            logger.Information("Starting execution of workflow {WorkflowId}", workflowId);
+            logger.Debug("Starting execution of workflow {WorkflowId}", workflowId);
             
             var flow = await LoadFlowAsync(workflowId);
 
@@ -45,7 +45,7 @@ public class FlowExecutionService
 
             var workflowExecution = await ExecuteAsync(flow);
             
-            logger.Information("Completed execution of workflow {WorkflowId} with status {Status}", 
+            logger.Debug("Completed execution of workflow {WorkflowId} with status {Status}",
                 workflowId, workflowExecution.Status);
 
             // Note: SaveWorkflowExecutionAsync is now handled automatically by the base FlowExecuteService
