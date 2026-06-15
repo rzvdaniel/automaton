@@ -1,6 +1,6 @@
 ---
 name: retro
-description: End-of-session retrospective. Reviews the conversation for corrections, friction, wasted effort, and tool errors, then proposes durable improvements to Automaton's agent harness. Use at the end of substantial sessions or when the user says "retro", "what did we learn", "session retro", or "end of session".
+description: Retrospective skill for durable harness improvements. Use at the end of substantial sessions, and automatically consider it when a session creates a reusable rule, new skill, architecture decision, or safety guardrail.
 ---
 
 # Session Retrospective
@@ -10,6 +10,7 @@ Use this skill to turn collaboration friction into durable improvements for futu
 The goal is to improve the harness over time: `AGENTS.md`, `.agent/skills/`, `.agent/harness/`, and related project documentation should get better when mistakes reveal missing rules.
 
 Do not run a retro for every small exchange. Use it when there was enough substance to learn from.
+Do not interrupt active implementation just to run a retro. If a retro is useful, mention it near the end of the task or when the user asks about documentation, lessons, or what remains.
 
 ---
 
@@ -30,6 +31,33 @@ Proceed when:
 - the agent used the wrong files, commands, paths, tools, or assumptions
 - a bug or workflow gap revealed a missing durable rule
 - the session produced a reusable workflow that should become a skill or checklist
+
+## Auto-trigger signals
+
+Automatically consider this skill when:
+
+- a new skill is proposed or created
+- the user asks where a rule should live
+- the user asks where a rule, convention, or decision should be documented
+- the user asks whether something should be documented
+- the session establishes a reusable coding convention
+- the session creates or clarifies an architecture pattern
+- a refactoring touches several services or files and reveals a reusable rule
+- a safety rule emerges, especially around secrets, auth, deploys, logging, or data loss
+
+Use these as prompts to consider a retro, not as a requirement to stop implementation immediately.
+If the work is still active, defer the retro until a natural pause or the end of the task.
+
+## End-of-session prompt
+
+When a retro appears useful but has not been explicitly requested, briefly ask:
+
+```txt
+Would you like a quick retro to capture the lessons from this session?
+```
+
+Use this near the end of the task or at a natural pause.
+Do not interrupt active implementation just to ask.
 
 ---
 

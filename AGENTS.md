@@ -19,6 +19,7 @@ Use this file as the operational contract. For detailed patterns, read the relev
 - After changing code, run the smallest useful verification command.
 - If verification cannot be run, say exactly why.
 - If the task reveals a missing rule, repeated mistake, or unclear workflow, update the relevant skill or harness document.
+- When a session creates a reusable rule, new skill, architecture decision, safety guardrail, or durable coding convention, automatically consider the retro skill before finishing.
 
 ---
 
