@@ -100,7 +100,7 @@ public class AppVersionService
 
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
+        logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
 
         return appVersion;
     }
@@ -117,7 +117,7 @@ public class AppVersionService
         version.Summary = summary;
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Updated summary for app version {AppVersionId}", appVersionId);
+        logger.Debug("Updated summary for app version {AppVersionId}", appVersionId);
     }
 
     /// <summary>
@@ -180,7 +180,7 @@ public class AppVersionService
         // Restore files from version snapshot to current working directory
         await fileStorageService.RestoreVersionAsync(ownerId, appId, versionNumber);
 
-        logger.Information("Restored app {AppId} to version {VersionNumber}", appId, versionNumber);
+        logger.Debug("Restored app {AppId} to version {VersionNumber}", appId, versionNumber);
     }
 
     /// <summary>

@@ -21,7 +21,7 @@ public class AppPreviewStorageService
         // Run cleanup every 5 minutes
         cleanupTimer = new Timer(CleanupExpiredContent, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         
-        logger.Information("App preview storage service initialized");
+        logger.Debug("App preview storage service initialized");
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public class AppPreviewStorageService
 
             if (expiredKeys.Count > 0)
             {
-                logger.Information("Cleaned up {Count} expired preview content entries", expiredKeys.Count);
+                logger.Debug("Cleaned up {Count} expired preview content entries", expiredKeys.Count);
             }
         }
         catch (Exception ex)

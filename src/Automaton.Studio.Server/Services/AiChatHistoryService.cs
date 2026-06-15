@@ -340,7 +340,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Created new chat session {SessionId} for {ResourceType} {ResourceId}",
+            logger.Debug("Created new chat session {SessionId} for {ResourceType} {ResourceId}",
                 sessionEntity.Id, request.ResourceType, request.ResourceId);
 
 
@@ -409,7 +409,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Set session {SessionId} as active", sessionId);
+            logger.Debug("Set session {SessionId} as active", sessionId);
 
             return true;
         }
@@ -440,7 +440,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Updated session {SessionId} title to {Title}", sessionId, title);
+            logger.Debug("Updated session {SessionId} title to {Title}", sessionId, title);
 
             return true;
         }
@@ -469,7 +469,7 @@ public class AiChatHistoryService : IAiChatHistoryService
             dataContext.AiChatSessions.Remove(session);
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Deleted session {SessionId}", sessionId);
+            logger.Debug("Deleted session {SessionId}", sessionId);
 
             return true;
         }
@@ -667,7 +667,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Saved {Count} messages to session {SessionId}", request.Messages.Count, request.SessionId);
+            logger.Debug("Saved {Count} messages to session {SessionId}", request.Messages.Count, request.SessionId);
 
             return savedMessages;
         }
@@ -703,7 +703,7 @@ public class AiChatHistoryService : IAiChatHistoryService
 
             await dataContext.SaveChangesAsync();
 
-            logger.Information("Cleared {Count} messages from session {SessionId}", messages.Count, sessionId);
+            logger.Debug("Cleared {Count} messages from session {SessionId}", messages.Count, sessionId);
 
             return true;
         }

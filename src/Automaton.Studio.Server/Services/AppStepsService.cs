@@ -37,7 +37,7 @@ public class AppStepsService
     /// </summary>
     public async Task<LinkedStepInfo> CreateStepForAppAsync(Guid appId, string stepName)
     {
-        logger.Information("Creating step '{StepName}' for app {AppId}", stepName, appId);
+        logger.Debug("Creating step '{StepName}' for app {AppId}", stepName, appId);
 
         // Verify user has access to this app
         var hasAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -87,7 +87,7 @@ public class AppStepsService
 
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Successfully created step {StepId} '{StepName}' and linked to app {AppId}", 
+        logger.Debug("Successfully created step {StepId} '{StepName}' and linked to app {AppId}",
             stepEntity.Id, stepName, appId);
 
         return MapToLinkedStepInfo(stepEntity);
@@ -170,7 +170,7 @@ public class AppStepsService
     /// </summary>
     public async Task LinkStepAsync(Guid appId, Guid stepId)
     {
-        logger.Information("Linking step {StepId} to app {AppId}", stepId, appId);
+        logger.Debug("Linking step {StepId} to app {AppId}", stepId, appId);
 
         // Verify user has access to both app and step
         var hasAppAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -212,7 +212,7 @@ public class AppStepsService
         dataContext.WebAppSteps.Add(link);
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Successfully linked step {StepId} to app {AppId}", stepId, appId);
+        logger.Debug("Successfully linked step {StepId} to app {AppId}", stepId, appId);
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public class AppStepsService
     public async Task LinkStepsAsync(Guid appId, IEnumerable<Guid> stepIds)
     {
         var stepIdList = stepIds.ToList();
-        logger.Information("Linking {Count} steps to app {AppId}", stepIdList.Count, appId);
+        logger.Debug("Linking {Count} steps to app {AppId}", stepIdList.Count, appId);
 
         // Verify user has access to the app
         var hasAppAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -274,7 +274,7 @@ public class AppStepsService
         dataContext.WebAppSteps.AddRange(links);
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Successfully linked {NewCount} new steps to app {AppId} ({SkippedCount} already linked)", 
+        logger.Debug("Successfully linked {NewCount} new steps to app {AppId} ({SkippedCount} already linked)",
             newStepIds.Count, appId, alreadyLinkedIds.Count);
     }
 
@@ -283,7 +283,7 @@ public class AppStepsService
     /// </summary>
     public async Task UnlinkStepAsync(Guid appId, Guid stepId)
     {
-        logger.Information("Unlinking step {StepId} from app {AppId}", stepId, appId);
+        logger.Debug("Unlinking step {StepId} from app {AppId}", stepId, appId);
 
         // Verify user has access to the app
         var hasAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -307,7 +307,7 @@ public class AppStepsService
         dataContext.WebAppSteps.Remove(link);
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Successfully unlinked step {StepId} from app {AppId}", stepId, appId);
+        logger.Debug("Successfully unlinked step {StepId} from app {AppId}", stepId, appId);
     }
 
     /// <summary>

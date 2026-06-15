@@ -469,7 +469,7 @@ public class AppsControllerExecutionService
                 if (tunnelResponse.StatusCode == 404)
                 {
                     logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Controller not found on runner — auto-deploying scripts...");
-                    logger.Information("Auto-deploying scripts for AppId={AppId} to runner {RunnerName} (scripts not found on runner)", appId, runner.Name);
+                    logger.Warning("Auto-deploying scripts for AppId={AppId} to runner {RunnerName} (scripts not found on runner)", appId, runner.Name);
 
                     await DeployScriptsToRunnerAsync(appId, ownerId, runner, cancellationToken);
 
@@ -490,7 +490,7 @@ public class AppsControllerExecutionService
                     }
 
                     if (payload?.Success == true)
-                        logger.Information("Tunnel success: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
+                        logger.Debug("Tunnel success: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
                             appId, controllerName, actionName, runner.Name);
                     else
                         logger.Warning("Controller returned failure: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName} Error={Error}",

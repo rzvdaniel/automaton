@@ -53,7 +53,7 @@ public class AppFileStorageService
         // Ensure base directory exists
         Directory.CreateDirectory(baseStoragePath);
         
-        logger.Information("App file storage initialized at: {Path}", baseStoragePath);
+        logger.Debug("App file storage initialized at: {Path}", baseStoragePath);
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public class AppFileStorageService
             metadata.LastModified = DateTime.UtcNow;
             await SaveStorageMetadataAsync(userId, appId, metadata);
 
-            logger.Information("Saved app {AppId} for user {UserId} to file system", appId, userId);
+            logger.Debug("Saved app {AppId} for user {UserId} to file system", appId, userId);
         }
         catch (Exception ex)
         {
@@ -173,7 +173,7 @@ public class AppFileStorageService
                 File.Copy(sourceFile, targetFilePath, overwrite: true);
             }
 
-            logger.Information("Created app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
+            logger.Debug("Created app version snapshot v{VersionNumber} for app {AppId}", versionNumber, appId);
 
             return Task.FromResult(Path.Combine("versions", versionFolder));
         }
@@ -233,7 +233,7 @@ public class AppFileStorageService
                 File.Copy(sourceFile, targetFilePath, overwrite: true);
             }
 
-            logger.Information("Restored app {AppId} from version v{VersionNumber}", appId, versionNumber);
+            logger.Debug("Restored app {AppId} from version v{VersionNumber}", appId, versionNumber);
 
             await Task.CompletedTask;
         }
@@ -284,7 +284,7 @@ public class AppFileStorageService
                 definition.HtmlContent = await File.ReadAllTextAsync(sourceIndexPath);
             }
 
-            logger.Information("Loaded app {AppId} for user {UserId} from file system", appId, userId);
+            logger.Debug("Loaded app {AppId} for user {UserId} from file system", appId, userId);
             return definition;
         }
         catch (Exception ex)
@@ -306,7 +306,7 @@ public class AppFileStorageService
             if (Directory.Exists(appPath))
             {
                 Directory.Delete(appPath, recursive: true);
-                logger.Information("Deleted app {AppId} for user {UserId} from file system", appId, userId);
+                logger.Debug("Deleted app {AppId} for user {UserId} from file system", appId, userId);
             }
 
             await Task.CompletedTask;
@@ -669,7 +669,7 @@ public class AppFileStorageService
 
         if (!HasAnyEntries(sourceBackendPath))
         {
-            logger.Information("No source/backend files found for app {AppId}; preserving existing live/backend", appId);
+            logger.Debug("No source/backend files found for app {AppId}; preserving existing live/backend", appId);
             return (0, false);
         }
 
@@ -696,7 +696,7 @@ public class AppFileStorageService
             copied++;
         }
 
-        logger.Information("Synced source/backend to live/backend for app {AppId}", appId);
+        logger.Debug("Synced source/backend to live/backend for app {AppId}", appId);
         return (copied, true);
     }
 
@@ -707,13 +707,13 @@ public class AppFileStorageService
 
         if (!HasAnyEntries(sourceFrontendPath))
         {
-            logger.Information("No source/frontend files found for app {AppId}; preserving existing live/frontend", appId);
+            logger.Debug("No source/frontend files found for app {AppId}; preserving existing live/frontend", appId);
             return (0, false);
         }
 
         if (IsBuildBasedFrontendSourcePath(sourceFrontendPath))
         {
-            logger.Information(
+            logger.Debug(
                 "Detected build-based frontend source for app {AppId}; preserving existing live/frontend instead of copying source/frontend directly",
                 appId);
             return (0, false);
@@ -744,7 +744,7 @@ public class AppFileStorageService
             copied++;
         }
 
-        logger.Information("Synced source/frontend to live/frontend for app {AppId}", appId);
+        logger.Debug("Synced source/frontend to live/frontend for app {AppId}", appId);
         return (copied, true);
     }
 
@@ -905,7 +905,7 @@ public class AppFileStorageService
             throw new UnauthorizedAccessException("Access to files outside app directory is not allowed");
 
         await File.WriteAllTextAsync(filePath, code);
-        logger.Information("Wrote controller {Name} for app {AppId}", controllerName, appId);
+        logger.Debug("Wrote controller {Name} for app {AppId}", controllerName, appId);
     }
 
     /// <summary>
@@ -1108,7 +1108,7 @@ public class AppFileStorageService
             File.Copy(sourceFile, targetFilePath, overwrite: true);
         }
 
-        logger.Information("Copied app {CopyKind} from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
+        logger.Debug("Copied app {CopyKind} from {SrcAppId} ({SrcUser}) to {DstAppId} ({DstUser})",
             copyKind, srcAppId, srcUserId, dstAppId, dstUserId);
 
         return Task.CompletedTask;
