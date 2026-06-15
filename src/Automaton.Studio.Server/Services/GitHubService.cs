@@ -115,7 +115,7 @@ public class GitHubService
             // Update reference
             await client.Git.Reference.Update(owner, repoName, $"heads/{branch}", new ReferenceUpdate(commit.Sha));
 
-            logger.Information("Pushed app {AppName} to GitHub: {Owner}/{Repo} (commit: {Sha})",
+            logger.Debug("Pushed app {AppName} to GitHub: {Owner}/{Repo} (commit: {Sha})",
                 app.Name, owner, repoName, commit.Sha);
 
             return commit.Sha;
@@ -176,7 +176,7 @@ public class GitHubService
             definition.GitHub.LastSyncedAt = DateTime.UtcNow;
             definition.GitHub.SyncStatus = GitHubSyncStatus.Synced;
 
-            logger.Information("Pulled app from GitHub: {Owner}/{Repo} at {Path}",
+            logger.Debug("Pulled app from GitHub: {Owner}/{Repo} at {Path}",
                 owner, repoName, basePath);
 
             return definition;
@@ -267,7 +267,7 @@ public class GitHubService
         try
         {
             var repo = await client.Repository.Create(newRepo);
-            logger.Information("Created GitHub repository: {Owner}/{Repo}", user.Login, repoName);
+            logger.Debug("Created GitHub repository: {Owner}/{Repo}", user.Login, repoName);
             return $"{user.Login}/{repoName}";
         }
         catch (Exception ex)

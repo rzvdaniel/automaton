@@ -177,7 +177,7 @@ public class RunnerService
             deployment.Logs = "Runner registered successfully and is linked to this hosted runner.";
         }
 
-        logger.Information("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
+        logger.Debug("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
     }
 
     private void LinkHostedRunnerAfterReconnect(Runner runner, Guid userId)
@@ -219,7 +219,7 @@ public class RunnerService
             deployment.Error = null;
         }
 
-        logger.Information("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
+        logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
     }
 
     public async Task UpdateConnection(Guid runnerId, Guid userId, RunnerDetails runnerConnection, CancellationToken cancellationToken)
@@ -389,7 +389,7 @@ public class RunnerService
         if (closedCount > 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.Information("Closed {SessionCount} stale runner connection session(s) after heartbeat timeout", closedCount);
+            logger.Warning("Closed {SessionCount} stale runner connection session(s) after heartbeat timeout", closedCount);
         }
 
         return closedCount;
@@ -419,7 +419,7 @@ public class RunnerService
             }
         }
 
-        logger.Information(
+        logger.Debug(
             "Requested reconnect-when-idle for {RunnerCount} connected runners owned by API instance {ApiInstanceId} color {ApiColor}",
             signaled,
             apiInstanceIdentityService.ApiInstanceId,

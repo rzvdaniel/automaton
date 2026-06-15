@@ -49,7 +49,7 @@ public class AppsStepExecutionController : ControllerBase
     {
         try
         {
-            logger.Information(
+            logger.Debug(
                 "Step execution request: App={AppSlug}, Step={StepIdentifier}", 
                 appSlug, stepIdentifier);
 
@@ -126,7 +126,7 @@ public class AppsStepExecutionController : ControllerBase
     {
         try
         {
-            logger.Information(
+            logger.Debug(
                 "Preview step execution request: AppId={AppId}, Step={StepIdentifier}", 
                 appId, stepIdentifier);
 

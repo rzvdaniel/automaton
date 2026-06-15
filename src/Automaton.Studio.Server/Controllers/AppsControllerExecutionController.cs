@@ -74,7 +74,7 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            logger.Information("Deploy backend request: AppId={AppId}, UserId={UserId}", appId, userId);
+            logger.Debug("Deploy backend request: AppId={AppId}, UserId={UserId}", appId, userId);
 
             var result = await controllerExecutionService.DeployBackendToRunnersAsync(
                 appId, userId, request?.RunnerNames, cancellationToken);
@@ -102,7 +102,7 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            logger.Information("Deploy app request: AppId={AppId}, UserId={UserId}", appId, userId);
+            logger.Debug("Deploy app request: AppId={AppId}, UserId={UserId}", appId, userId);
 
             var result = await controllerExecutionService.DeployStudioAppAsync(appId, userId, cancellationToken);
             return Ok(result);
@@ -126,7 +126,7 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            logger.Information("Deploy frontend request: AppId={AppId}, UserId={UserId}", appId, userId);
+            logger.Debug("Deploy frontend request: AppId={AppId}, UserId={UserId}", appId, userId);
 
             var result = await controllerExecutionService.DeployFrontendAsync(appId, userId);
             return Ok(result);
@@ -152,7 +152,7 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            logger.Information("Deploy backend component request: AppId={AppId}, UserId={UserId}", appId, userId);
+            logger.Debug("Deploy backend component request: AppId={AppId}, UserId={UserId}", appId, userId);
 
             var result = await controllerExecutionService.DeployBackendComponentAsync(appId, userId, cancellationToken);
             return Ok(result);
@@ -181,7 +181,7 @@ public class AppsControllerExecutionController : ControllerBase
 
         try
         {
-            logger.Information(
+            logger.Debug(
                 "Controller action request: App={AppSlug}, Controller={ControllerName}, Action={ActionName}",
                 appSlug, controllerName, actionName);
 
@@ -299,7 +299,7 @@ public class AppsControllerExecutionController : ControllerBase
 
         try
         {
-            logger.Information(
+            logger.Debug(
                 "Preview controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
 
@@ -392,7 +392,7 @@ public class AppsControllerExecutionController : ControllerBase
 
         try
         {
-            logger.Information(
+            logger.Debug(
                 "Private deployed controller action request: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
 
