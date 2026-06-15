@@ -126,18 +126,24 @@ public class RunnerService
         LinkHostedRunnerAfterRegistration(runner);
         result += await dbContext.SaveChangesAsync(cancellationToken);
 
-        await auditEventService.WriteAsync(
-            action: "Created",
-            entityType: "Runner",
-            entityId: runner.Id,
-            message: $"Runner '{runner.Name}' was created",
-            metadata: new
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.Runner,
+            EntityId = runner.Id,
+            EventType = AuditEventTypes.RunnerCreated,
+            Message = $"Runner '{runner.Name}' was created",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
             {
                 runner.Name,
-                UserId,
+                runner.Version,
+                runner.MachineName,
+                runner.IpAddress,
                 Changes = result
-            },
-            cancellationToken: cancellationToken);
+            }
+        }, cancellationToken);
 
         logger.Debug("Runner created successfully: ID={RunnerId}", runner.Id);
 
@@ -500,6 +506,14 @@ public class RunnerService
 
         if (entity != null)
         {
+            var auditMetadata = new
+            {
+                entity.Name,
+                entity.Version,
+                entity.MachineName,
+                entity.IpAddress
+            };
+
             var isHostedRunner = await dbContext.HostedRunners
                 .AnyAsync(x => x.RunnerId == id && x.DeletedAt == null, cancellationToken);
 
@@ -510,6 +524,18 @@ public class RunnerService
 
             dbContext.Runners.Remove(entity);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditEventService.WriteAsync(new AuditEventWriteRequest
+            {
+                Action = AuditActions.Deleted,
+                EntityType = AuditEntityTypes.Runner,
+                EntityId = id,
+                EventType = AuditEventTypes.RunnerDeleted,
+                Message = $"Runner '{entity.Name}' was deleted",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = auditMetadata
+            }, cancellationToken);
         }
     }
 

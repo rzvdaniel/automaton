@@ -1,3 +1,4 @@
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
@@ -354,12 +355,18 @@ public class ProjectResourceService
 
 
         await auditEventService.WriteAsync(
-            action: "Linked",
-            entityType: "Runner",
-            entityId: runnerId,
-            message: "Runner linked to project",
-            metadata: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
-            cancellationToken: cancellationToken);
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Assigned,
+                EntityType = AuditEntityTypes.Runner,
+                EntityId = runnerId,
+                EventType = AuditEventTypes.RunnerAssignedToProject,
+                Message = "Runner linked to project",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner" }
+            },
+            cancellationToken);
 
         return new ProjectRunnerDto
         {
@@ -397,12 +404,18 @@ public class ProjectResourceService
 
         // Audit
         await auditEventService.WriteAsync(
-            action: "Removed",
-            entityType: "Runner",
-            entityId: runnerId,
-            message: "Runner removed from project",
-            metadata: new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner", UserId },
-            cancellationToken: cancellationToken);
+            new AuditEventWriteRequest
+            {
+                Action = AuditActions.Unassigned,
+                EntityType = AuditEntityTypes.Runner,
+                EntityId = runnerId,
+                EventType = AuditEventTypes.RunnerUnassignedFromProject,
+                Message = "Runner removed from project",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new { ProjectId = projectId, ResourceId = runnerId, ResourceType = "Runner" }
+            },
+            cancellationToken);
         return true;
     }
 

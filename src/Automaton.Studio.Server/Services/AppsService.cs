@@ -244,12 +244,21 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
 
-        await auditEventService.WriteAsync(
-            action: "Created",
-            entityType: "App",
-            entityId: entity.Id,
-            message: $"App '{entity.Name}' was created",
-            metadata: new { entity.Name, UserId, entity.ExecutionRunnerId });
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.App,
+            EntityId = entity.Id,
+            EventType = AuditEventTypes.AppCreated,
+            Message = $"App '{entity.Name}' was created",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                entity.Name,
+                entity.ExecutionRunnerId
+            }
+        });
 
 
         return entity.Id;
@@ -359,12 +368,24 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
         
-        await auditEventService.WriteAsync(
-            action: "Deleted",
-            entityType: "App",
-            entityId: id,
-            message: $"App '{appName}' was deleted",
-            metadata: new { AppId = id, UserId = ownerId });
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.App,
+            EntityId = id,
+            EventType = AuditEventTypes.AppDeleted,
+            Message = $"App '{appName}' was deleted",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                AppId = id,
+                Name = appName,
+                app.PublicUrl,
+                app.ExecutionRunnerId,
+                OwnerUserId = ownerId
+            }
+        });
 
     }
 
@@ -449,20 +470,25 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        await auditEventService.WriteAsync(
-            action: "Published",
-            entityType: "App",
-            entityId: id,
-            message: $"App '{entity.Name}' was published",
-            metadata: new
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Published,
+            EntityType = AuditEntityTypes.App,
+            EntityId = id,
+            EventType = AuditEventTypes.AppPublished,
+            Message = $"App '{entity.Name}' was published",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
             {
                 Slug = publicUrl,
                 entity.Version,
                 RequiresAuthentication = requiresAuthentication,
                 RunnerId = entity.ExecutionRunnerId,
                 IsForkable = isForkable,
-                UserId = ownerId
-            });
+                OwnerUserId = ownerId
+            }
+        });
 
 
         // Log activity
@@ -493,12 +519,21 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        await auditEventService.WriteAsync(
-            action: "Unpublished",
-            entityType: "App",
-            entityId: id,
-            message: $"App '{entity.Name}' was unpublished",
-            metadata: new { entity.PublicUrl, entity.Version, UserId });
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Unpublished,
+            EntityType = AuditEntityTypes.App,
+            EntityId = id,
+            EventType = AuditEventTypes.AppUnpublished,
+            Message = $"App '{entity.Name}' was unpublished",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                entity.PublicUrl,
+                entity.Version
+            }
+        });
 
 
         // Log activity
@@ -523,17 +558,32 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
+        var previousRunnerId = entity.ExecutionRunnerId;
         entity.ExecutionRunnerId = executionRunnerId;
         entity.Updated = DateTime.UtcNow;
 
         dataContext.SaveChanges();
 
-        await auditEventService.WriteAsync(
-            action: "UpdatedRunner",
-            entityType: "App",
-            entityId: id,
-            message: "App execution runner was updated",
-            metadata: new { AppId = id, RunnerId = executionRunnerId, UserId });
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = executionRunnerId.HasValue ? AuditActions.Assigned : AuditActions.Unassigned,
+            EntityType = AuditEntityTypes.App,
+            EntityId = id,
+            EventType = executionRunnerId.HasValue
+                ? AuditEventTypes.RunnerAssignedToApp
+                : AuditEventTypes.RunnerUnassignedFromApp,
+            Message = executionRunnerId.HasValue
+                ? "Runner was assigned to app execution"
+                : "Runner was unassigned from app execution",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                AppId = id,
+                PreviousRunnerId = previousRunnerId,
+                RunnerId = executionRunnerId
+            }
+        });
 
     }
 
@@ -866,12 +916,24 @@ public class AppsService
         await fileStorageService.CopyRuntimeFrontendFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        await auditEventService.WriteAsync(
-            action: "Forked",
-            entityType: "App",
-            entityId: newId,
-            message: $"App '{entity.Name}' was forked",
-            metadata: new { SourceAppId = sourceAppId, NewAppId = newId, UserId, request.PublishImmediately });
+        await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+        {
+            Action = AuditActions.Forked,
+            EntityType = AuditEntityTypes.App,
+            EntityId = newId,
+            EventType = AuditEventTypes.AppForked,
+            Message = $"App '{entity.Name}' was forked",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                SourceAppId = sourceAppId,
+                SourceAppName = source.Name,
+                NewAppId = newId,
+                NewAppName = entity.Name,
+                request.PublishImmediately
+            }
+        });
 
 
         var newEntity = await dataContext.WebApps
