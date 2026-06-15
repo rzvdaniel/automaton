@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -131,7 +132,8 @@ public class AppAuthorizationRegressionTests
             authorizationService,
             null!,
             null!,
-            new StubWebHostEnvironment());
+            new StubWebHostEnvironment(),
+            new NoOpAuditEventService());
     }
 
     private static void SeedApp(ApplicationDbContext dbContext, Guid appId, Guid ownerId, string slug)
@@ -180,5 +182,21 @@ public class AppAuthorizationRegressionTests
         public string EnvironmentName { get; set; } = "Production";
         public string ContentRootPath { get; set; } = string.Empty;
         public IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

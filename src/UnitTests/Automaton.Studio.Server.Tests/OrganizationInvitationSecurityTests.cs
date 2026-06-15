@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -109,7 +110,8 @@ public class OrganizationInvitationSecurityTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            new NoOpAuditEventService());
     }
 
     private static void SeedUsersAndOrganization(
@@ -147,5 +149,21 @@ public class OrganizationInvitationSecurityTests
             Name = publicUsername,
             PublicUsername = publicUsername
         };
+    }
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }
