@@ -361,12 +361,11 @@ public class HostedRunnerProvisioningService
         await auditEventService.WriteAsync(
             new AuditEventWriteRequest
             {
-                Action = AuditActions.Requested,
+                Action = outcome == AuditOutcomes.Success ? AuditActions.Succeeded : AuditActions.Failed,
                 EntityType = AuditEntityTypes.HostedRunner,
                 EntityId = hostedRunner.Id,
                 EventType = eventType,
                 Outcome = outcome,
-                Action = outcome == AuditOutcomes.Success ? AuditActions.Succeeded : AuditActions.Failed,
                 Message = message,
                 TargetUserId = hostedRunner.UserId,
                 Metadata = new
