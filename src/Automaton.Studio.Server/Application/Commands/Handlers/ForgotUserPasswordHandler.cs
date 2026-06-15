@@ -35,7 +35,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
 
             if (user is null || user.IsDeleted)
             {
-                Logger.LogInformation("Forgot password requested for non-existent email {Email}", command.Email);
+                Logger.LogDebug("Forgot password requested for a non-existent or deleted account");
                 return;
             }
             
@@ -64,7 +64,7 @@ namespace Automaton.Studio.Server.Application.Commands.Handlers
             };
 
             await EmailService.Send(userDetails, CancellationToken.None);
-            Logger.LogInformation("Password reset email sent to {Email}", command.Email);
+            Logger.LogDebug("Password reset email sent");
         }
     }
 }

@@ -67,7 +67,7 @@ public class AiApiKeyService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key created by user {UserId} for provider {ProviderName}", userId, providerName);
+        logger.LogDebug("AI API key created by user {UserId} for provider {ProviderName}", userId, providerName);
         return entity;
     }
 
@@ -131,7 +131,7 @@ public class AiApiKeyService
     /// </summary>
     public async Task<(string? Key, bool IsSystemKey)> GetDecryptedApiKeyWithSourceAsync(Guid userId, string providerName)
     {
-        logger.LogInformation("Looking up API key for provider '{ProviderName}' for user {UserId}", providerName, userId);
+        logger.LogDebug("Looking up AI API key for provider '{ProviderName}' for user {UserId}", providerName, userId);
 
         // 1. Prefer user's own key
         var key = await dbContext.AiApiKeys
@@ -163,9 +163,9 @@ public class AiApiKeyService
             await dbContext.SaveChangesAsync();
 
             var decryptedKey = DecryptApiKey(key.EncryptedApiKey);
-            logger.LogInformation(
-                "Selected API key {KeyId} ('{KeyName}') for provider '{ProviderName}' (systemKey={IsSystemKey}, keyLength={KeyLen})",
-                key.Id, key.Name, providerName, isSystemKey, decryptedKey?.Length ?? 0);
+            logger.LogDebug(
+                "Selected AI API key {KeyId} for provider '{ProviderName}' (systemKey={IsSystemKey})",
+                key.Id, providerName, isSystemKey);
             return (decryptedKey, isSystemKey);
         }
         catch (Exception ex)
@@ -188,7 +188,7 @@ public class AiApiKeyService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {AiApiKeyId} updated", id);
+        logger.LogDebug("AI API key {AiApiKeyId} updated", id);
         return true;
     }
 
@@ -202,7 +202,7 @@ public class AiApiKeyService
         aiApiKey.IsActive = false;
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {AiApiKeyId} deactivated by user {UserId}", id, userId);
+        logger.LogDebug("AI API key {AiApiKeyId} deactivated by user {UserId}", id, userId);
         return true;
     }
 

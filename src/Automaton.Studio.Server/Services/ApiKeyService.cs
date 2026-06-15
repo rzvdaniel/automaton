@@ -114,7 +114,7 @@ public class ApiKeyService
             });
         }
 
-        logger.LogInformation("API key created for user {UserId} with scope {Scope}", userId, scope);
+        logger.LogDebug("API key created for user {UserId} with scope {Scope}", userId, scope);
 
         return (fullApiKey, entity);
     }
@@ -203,7 +203,7 @@ public class ApiKeyService
             Metadata = auditMetadata
         });
 
-        logger.LogInformation("API key deleted: {KeyPrefix} for user {UserId}", apiKey.KeyPrefix, userId);
+        logger.LogDebug("API key deleted for user {UserId}", userId);
         return true;
     }
 

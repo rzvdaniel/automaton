@@ -105,12 +105,12 @@ namespace Common.Authentication
             }
             catch (SecurityTokenException ex)
             {
-                _logger.LogError($"Token validation failed: {ex.Message}");
+                _logger.LogWarning(ex, "JWT token validation failed");
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.Message);
+                _logger.LogError(ex, "Unexpected error while validating JWT token");
                 return null;
             }
         }
@@ -132,7 +132,7 @@ namespace Common.Authentication
             }
             catch (Exception e)
             {
-                _logger.LogError($"Token validation failed: {e.Message}");
+                _logger.LogWarning(e, "JWT token validation failed");
                 return null;
             }
         }
