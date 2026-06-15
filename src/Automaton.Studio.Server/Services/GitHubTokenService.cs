@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Services.Interfaces;
 
 namespace Automaton.Studio.Server.Services;
 
@@ -12,14 +13,17 @@ public class GitHubTokenService
 {
     private readonly ApplicationDbContext dataContext;
     private readonly IDataProtector dataProtector;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     public GitHubTokenService(
         ApplicationDbContext dataContext,
-        IDataProtectionProvider dataProtectionProvider)
+        IDataProtectionProvider dataProtectionProvider,
+        IAuditEventService auditEventService)
     {
         this.dataContext = dataContext;
         this.dataProtector = dataProtectionProvider.CreateProtector("GitHubTokens");
+        this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<GitHubTokenService>();
     }
 
@@ -56,7 +60,14 @@ public class GitHubTokenService
         }
 
         await dataContext.SaveChangesAsync();
-        logger.Information("GitHub token set for user {UserId}", userId);
+        await auditEventService.WriteAsync(
+            action: "Set",
+            entityType: "GitHubToken",
+            entityId: userId,
+            message: "GitHub token was configured",
+            metadata: new { UserId = userId, GitHubUsername = username },
+            failOnError: true);
+
     }
 
     /// <summary>
@@ -115,7 +126,14 @@ public class GitHubTokenService
         {
             dataContext.UserGitHubTokens.Remove(token);
             await dataContext.SaveChangesAsync();
-            logger.Information("GitHub token removed for user {UserId}", userId);
+            await auditEventService.WriteAsync(
+                action: "Removed",
+                entityType: "GitHubToken",
+                entityId: userId,
+                message: "GitHub token was removed",
+                metadata: new { UserId = userId },
+                failOnError: true);
+
         }
     }
 
@@ -166,7 +184,7 @@ public class GitHubTokenService
                 await dataContext.SaveChangesAsync();
             }
 
-            logger.Information("GitHub token validated for user {UserId} (GitHub: {GitHubUser})", userId, user.Login);
+            logger.Debug("GitHub token validated for user {UserId} (GitHub: {GitHubUser})", userId, user.Login);
             return true;
         }
         catch (Exception ex)

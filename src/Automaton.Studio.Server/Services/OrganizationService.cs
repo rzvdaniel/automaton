@@ -40,6 +40,7 @@ public class OrganizationService : IOrganizationService
     private readonly ConfigurationService configurationService;
     private readonly UserManager<ApplicationUser> userManager;
     private readonly UsersService usersService;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     private Guid UserId => userContextService.GetUserId();
@@ -50,7 +51,8 @@ public class OrganizationService : IOrganizationService
         IEmailService emailService,
         ConfigurationService configurationService,
         UserManager<ApplicationUser> userManager,
-        UsersService usersService)
+        UsersService usersService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
@@ -58,6 +60,7 @@ public class OrganizationService : IOrganizationService
         this.configurationService = configurationService;
         this.userManager = userManager;
         this.usersService = usersService;
+        this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<OrganizationService>();
     }
 
@@ -85,7 +88,7 @@ public class OrganizationService : IOrganizationService
             .OrderByDescending(o => o.UpdatedAt)
             .ToListAsync(cancellationToken);
 
-        logger.Information("Listed {Count} organizations for user {UserId}", organizations.Count, UserId);
+        logger.Debug("Listed {Count} organizations for user {UserId}", organizations.Count, UserId);
         return organizations;
     }
 
@@ -189,7 +192,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} created organization {OrganizationId} ({Name})", UserId, organization.Id, organization.Name);
+        await auditEventService.WriteAsync(
+            action: "Created",
+            entityType: "Organization",
+            entityId: organization.Id,
+            message: $"Organization '{organization.Name}' was created",
+            metadata: new { organization.Name, organization.Slug, UserId },
+            cancellationToken: cancellationToken);
+
 
         return new OrganizationDto
         {
@@ -261,7 +271,21 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} updated organization {OrganizationId}", UserId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "Updated",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: $"Organization '{organization.Name}' was updated",
+            metadata: new
+            {
+                organization.Name,
+                organization.Slug,
+                organization.AllowPublicSignup,
+                organization.RequireEmailDomain,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
 
         return await GetOrganizationAsync(organizationId, cancellationToken);
     }
@@ -394,7 +418,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} deleted organization {OrganizationId}", UserId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "Deleted",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: $"Organization '{organization.Name}' was deleted",
+            metadata: new { organization.Name, organization.Slug, UserId },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 
@@ -507,8 +538,14 @@ public class OrganizationService : IOrganizationService
         dbContext.OrganizationInvitations.Add(invitation);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} invited {Email} to organization {OrganizationId} as {Role}", 
-            UserId, request.Email, organizationId, request.Role);
+        await auditEventService.WriteAsync(
+            action: "InvitedMember",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: $"User '{request.Email}' was invited to organization",
+            metadata: new { organizationId, request.Email, request.Role, UserId },
+            cancellationToken: cancellationToken);
+
 
         // Send invitation email
         try
@@ -545,7 +582,7 @@ public class OrganizationService : IOrganizationService
                 else
                 {
                     createdNewUser = true;
-                    logger.Information("Created new user account for organization invitation: {Email}", request.Email);
+                    logger.Debug("Created new user account for organization invitation: {Email}", request.Email);
                 }
             }
 
@@ -606,7 +643,7 @@ public class OrganizationService : IOrganizationService
             };
 
             await emailService.Send(emailDetails, cancellationToken);
-            logger.Information("Invitation email sent to {Email} for organization {OrganizationId}", request.Email, organizationId);
+            logger.Debug("Invitation email sent to {Email} for organization {OrganizationId}", request.Email, organizationId);
         }
         catch (Exception ex)
         {
@@ -692,7 +729,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} accepted invitation to organization {OrganizationId}", user.Id, invitation.OrganizationId);
+        await auditEventService.WriteAsync(
+            action: "AcceptedInvitation",
+            entityType: "Organization",
+            entityId: invitation.OrganizationId,
+            message: "Organization invitation was accepted",
+            metadata: new { invitation.Id, MemberUserId = user.Id, UserId = user.Id },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 
@@ -728,7 +772,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} removed user {RemovedUserId} from organization {OrganizationId}", UserId, userId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "RemovedMember",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "Organization member was removed",
+            metadata: new { organizationId, RemovedUserId = userId, UserId },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 
@@ -783,7 +834,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} left organization {OrganizationId}", UserId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "Left",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "User left organization",
+            metadata: new { organizationId, UserId },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 
@@ -827,8 +885,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} updated role of user {MemberUserId} to {NewRole} in organization {OrganizationId}", 
-            UserId, userId, request.Role, organizationId);
+        await auditEventService.WriteAsync(
+            action: "UpdatedMemberRole",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: $"Organization member role was updated to {request.Role}",
+            metadata: new { organizationId, MemberUserId = userId, request.Role, UserId },
+            cancellationToken: cancellationToken);
+
 
         // Return updated member DTO
         var invitedByUser = member.InvitedBy.HasValue 
@@ -918,8 +982,14 @@ public class OrganizationService : IOrganizationService
         dbContext.OrganizationAppAssignments.Add(assignment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} assigned app {AppId} to user {TargetUserId} in organization {OrganizationId}", 
-            UserId, appId, userId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "AssignedApp",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "App was assigned to organization member",
+            metadata: new { organizationId, AppId = appId, TargetUserId = userId, UserId },
+            cancellationToken: cancellationToken);
+
 
         return assignment;
     }
@@ -946,8 +1016,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} unassigned app {AppId} from user {TargetUserId} in organization {OrganizationId}", 
-            UserId, appId, userId, organizationId);
+        await auditEventService.WriteAsync(
+            action: "UnassignedApp",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "App was unassigned from organization member",
+            metadata: new { organizationId, AppId = appId, TargetUserId = userId, UserId },
+            cancellationToken: cancellationToken);
+
 
         return true;
     }
@@ -1052,8 +1128,14 @@ public class OrganizationService : IOrganizationService
         
         await dbContext.SaveChangesAsync(cancellationToken);
         
-        logger.Information("Project {ProjectId} linked to organization {OrganizationId} by user {UserId}", 
-            projectId, organizationId, UserId);
+        await auditEventService.WriteAsync(
+            action: "LinkedProject",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "Project was linked to organization",
+            metadata: new { organizationId, ProjectId = projectId, UserId },
+            cancellationToken: cancellationToken);
+
         
         return true;
     }
@@ -1083,8 +1165,14 @@ public class OrganizationService : IOrganizationService
         
         await dbContext.SaveChangesAsync(cancellationToken);
         
-        logger.Information("Project {ProjectId} unlinked from organization {OrganizationId} by user {UserId}", 
-            projectId, organizationId, UserId);
+        await auditEventService.WriteAsync(
+            action: "UnlinkedProject",
+            entityType: "Organization",
+            entityId: organizationId,
+            message: "Project was unlinked from organization",
+            metadata: new { organizationId, ProjectId = projectId, UserId },
+            cancellationToken: cancellationToken);
+
         
         return true;
     }
@@ -1213,7 +1301,7 @@ public class OrganizationService : IOrganizationService
             .OrderByDescending(i => i.InvitedAt)
             .ToList();
 
-        logger.Information("Retrieved {Count} pending invitations for user {UserId}", 
+        logger.Debug("Retrieved {Count} pending invitations for user {UserId}",
             pendingInvitations.Count, UserId);
         return pendingInvitations;
     }
@@ -1245,7 +1333,14 @@ public class OrganizationService : IOrganizationService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("User {UserId} declined organization invitation {InvitationId}", UserId, invitationId);
+        await auditEventService.WriteAsync(
+            action: "DeclinedInvitation",
+            entityType: "Organization",
+            entityId: invitation.OrganizationId,
+            message: "Organization invitation was declined",
+            metadata: new { invitationId, invitation.OrganizationId, UserId },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 

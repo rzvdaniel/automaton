@@ -80,7 +80,6 @@ public class ProjectResourceService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added app {AppId} to project {ProjectId} by user {UserId}", appId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -133,7 +132,6 @@ public class ProjectResourceService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed app {AppId} from project {ProjectId} by user {UserId}", appId, projectId, UserId);
 
         // Audit
         await auditEventService.WriteAsync(
@@ -224,7 +222,6 @@ public class ProjectResourceService
         dbContext.ProjectFlows.Add(projectFlow);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added flow {FlowId} to project {ProjectId} by user {UserId}", flowId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -268,7 +265,6 @@ public class ProjectResourceService
         dbContext.ProjectFlows.Remove(projectFlow);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed flow {FlowId} from project {ProjectId} by user {UserId}", flowId, projectId, UserId);
         // Audit
         await auditEventService.WriteAsync(
             action: "Removed",
@@ -356,7 +352,6 @@ public class ProjectResourceService
         dbContext.ProjectRunners.Add(projectRunner);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added runner {RunnerId} to project {ProjectId} by user {UserId}", runnerId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -400,7 +395,6 @@ public class ProjectResourceService
         dbContext.ProjectRunners.Remove(projectRunner);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed runner {RunnerId} from project {ProjectId} by user {UserId}", runnerId, projectId, UserId);
         // Audit
         await auditEventService.WriteAsync(
             action: "Removed",
@@ -488,7 +482,6 @@ public class ProjectResourceService
         dbContext.ProjectCustomSteps.Add(projectCustomStep);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added custom step {CustomStepId} to project {ProjectId} by user {UserId}", customStepId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -532,7 +525,6 @@ public class ProjectResourceService
         dbContext.ProjectCustomSteps.Remove(projectCustomStep);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed custom step {CustomStepId} from project {ProjectId} by user {UserId}", customStepId, projectId, UserId);
         // Audit
         await auditEventService.WriteAsync(
             action: "Removed",
@@ -621,7 +613,6 @@ public class ProjectResourceService
         dbContext.ProjectApiKeys.Add(projectApiKey);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added API key {ApiKeyId} to project {ProjectId} by user {UserId}", apiKeyId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -665,7 +656,6 @@ public class ProjectResourceService
         dbContext.ProjectApiKeys.Remove(projectApiKey);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed API key {ApiKeyId} from project {ProjectId} by user {UserId}", apiKeyId, projectId, UserId);
         // Audit
         await auditEventService.WriteAsync(
             action: "Removed",
@@ -753,7 +743,6 @@ public class ProjectResourceService
         dbContext.ProjectAiApiKeys.Add(projectAiApiKey);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added AI API key {AiApiKeyId} to project {ProjectId} by user {UserId}", aiApiKeyId, projectId, UserId);
 
         await auditEventService.WriteAsync(
             action: "Linked",
@@ -797,7 +786,6 @@ public class ProjectResourceService
         dbContext.ProjectAiApiKeys.Remove(projectAiApiKey);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed AI API key {AiApiKeyId} from project {ProjectId} by user {UserId}", aiApiKeyId, projectId, UserId);
         // Audit
         await auditEventService.WriteAsync(
             action: "Removed",

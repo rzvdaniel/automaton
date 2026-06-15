@@ -24,6 +24,7 @@ public class ProjectMemberService
     private readonly InvitationTokenService invitationService;
     private readonly ConfigurationService configurationService;
     private readonly UsersService usersService;
+    private readonly IAuditEventService auditEventService;
 
     private Guid UserId => userContextService.GetUserId();
 
@@ -34,7 +35,8 @@ public class ProjectMemberService
         IEmailService emailService,
         InvitationTokenService invitationService,
         ConfigurationService configurationService,
-        UsersService usersService)
+        UsersService usersService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
@@ -43,6 +45,7 @@ public class ProjectMemberService
         this.invitationService = invitationService;
         this.configurationService = configurationService;
         this.usersService = usersService;
+        this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<ProjectMemberService>();
     }
 
@@ -84,7 +87,7 @@ public class ProjectMemberService
             .OrderBy(m => m.JoinedAt)
             .ToListAsync(cancellationToken);
 
-        logger.Information("Listed {Count} members for project {ProjectId}", members.Count, projectId);
+        logger.Debug("Listed {Count} members for project {ProjectId}", members.Count, projectId);
         return members;
     }
 
@@ -138,7 +141,7 @@ public class ProjectMemberService
             }
 
             createdNewUser = true;
-            logger.Information("Created new user {UserId} ({Email}) for project invitation", user.Id, user.Email);
+            logger.Debug("Created new user {UserId} ({Email}) for project invitation", user.Id, user.Email);
         }
 
         // Generate invitation token and send email (for both new and existing users)
@@ -235,8 +238,22 @@ public class ProjectMemberService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Added user {UserId} ({Email}) to project {ProjectId} with role {Role}", 
-            user.Id, user.Email, projectId, request.Role);
+        await auditEventService.WriteAsync(
+            action: createdNewUser ? "Invited" : "AddedMember",
+            entityType: "ProjectMember",
+            entityId: user.Id,
+            message: $"User '{user.Email}' was added to project",
+            metadata: new
+            {
+                ProjectId = projectId,
+                MemberUserId = user.Id,
+                user.Email,
+                request.Role,
+                CreatedNewUser = createdNewUser,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
 
         return new ProjectMemberDto
         {
@@ -296,7 +313,20 @@ public class ProjectMemberService
         membership.Role = request.Role;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Updated user {UserId} role to {Role} in project {ProjectId}", userId, request.Role, projectId);
+        await auditEventService.WriteAsync(
+            action: "UpdatedRole",
+            entityType: "ProjectMember",
+            entityId: userId,
+            message: $"Project member role was updated to {request.Role}",
+            metadata: new
+            {
+                ProjectId = projectId,
+                MemberUserId = userId,
+                request.Role,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
 
         return new ProjectMemberDto
         {
@@ -355,7 +385,19 @@ public class ProjectMemberService
         membership.IsActive = false;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Removed user {UserId} from project {ProjectId}", userId, projectId);
+        await auditEventService.WriteAsync(
+            action: "RemovedMember",
+            entityType: "ProjectMember",
+            entityId: userId,
+            message: "User was removed from project",
+            metadata: new
+            {
+                ProjectId = projectId,
+                MemberUserId = userId,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 

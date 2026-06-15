@@ -2,6 +2,7 @@ using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -15,6 +16,7 @@ public class ProjectService
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     private Guid UserId => userContextService.GetUserId();
@@ -22,11 +24,13 @@ public class ProjectService
     public ProjectService(
         ApplicationDbContext dbContext,
         UserContextService userContextService,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
         this.authorizationService = authorizationService;
+        this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<ProjectService>();
     }
 
@@ -55,7 +59,7 @@ public class ProjectService
             .OrderByDescending(p => p.UpdatedAt)
             .ToListAsync(cancellationToken);
 
-        logger.Information("Listed {Count} projects for user {UserId}", projects.Count, UserId);
+        logger.Debug("Listed {Count} projects for user {UserId}", projects.Count, UserId);
         return projects;
     }
 
@@ -164,7 +168,20 @@ public class ProjectService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Created project {ProjectId} ({ProjectName}) by user {UserId}", project.Id, project.Name, UserId);
+        await auditEventService.WriteAsync(
+            action: "Created",
+            entityType: "Project",
+            entityId: project.Id,
+            message: $"Project '{project.DisplayName}' was created",
+            metadata: new
+            {
+                project.Name,
+                project.DisplayName,
+                project.OrganizationId,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
 
         return new ProjectDto
         {
@@ -217,7 +234,21 @@ public class ProjectService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Updated project {ProjectId} by user {UserId}", projectId, UserId);
+        await auditEventService.WriteAsync(
+            action: "Updated",
+            entityType: "Project",
+            entityId: projectId,
+            message: $"Project '{project.DisplayName}' was updated",
+            metadata: new
+            {
+                project.Name,
+                project.DisplayName,
+                project.Description,
+                project.IsActive,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
 
         // Get user's role in the project
         var userRole = await authorizationService.GetUserRoleInProjectAsync(projectId, UserId, cancellationToken);
@@ -265,7 +296,19 @@ public class ProjectService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Deleted project {ProjectId} by user {UserId}", projectId, UserId);
+        await auditEventService.WriteAsync(
+            action: "Deleted",
+            entityType: "Project",
+            entityId: projectId,
+            message: $"Project '{project.DisplayName}' was deleted",
+            metadata: new
+            {
+                project.Name,
+                project.DisplayName,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 
@@ -296,7 +339,19 @@ public class ProjectService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.Information("Reactivated project {ProjectId} by user {UserId}", projectId, UserId);
+        await auditEventService.WriteAsync(
+            action: "Reactivated",
+            entityType: "Project",
+            entityId: projectId,
+            message: $"Project '{project.DisplayName}' was reactivated",
+            metadata: new
+            {
+                project.Name,
+                project.DisplayName,
+                UserId
+            },
+            cancellationToken: cancellationToken);
+
         return true;
     }
 

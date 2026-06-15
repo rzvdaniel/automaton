@@ -1,10 +1,9 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
-using Microsoft.AspNetCore.Hosting;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Automaton.Studio.Server.Enums;
-using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -19,6 +18,7 @@ public class AppsService
     private readonly AppFileStorageService fileStorageService;
     private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly IWebHostEnvironment webHostEnvironment;
+    private readonly IAuditEventService auditEventService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -31,7 +31,8 @@ public class AppsService
         ResourceAuthorizationService authorizationService,
         AppFileStorageService fileStorageService,
         PublishedAppStorageService publishedAppStorageService,
-        IWebHostEnvironment webHostEnvironment
+        IWebHostEnvironment webHostEnvironment,
+        IAuditEventService auditEventService
     )
     {
         this.dataContext = dataContext;
@@ -41,6 +42,7 @@ public class AppsService
         this.fileStorageService = fileStorageService;
         this.publishedAppStorageService = publishedAppStorageService;
         this.webHostEnvironment = webHostEnvironment;
+        this.auditEventService = auditEventService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -90,7 +92,7 @@ public class AppsService
             
             // Migrate to file system
             fileStorageService.SaveAppAsync(ownerId, id, definition).Wait();
-            logger.Information("Migrated app {AppId} from database to file system", id);
+            logger.Debug("Migrated app {AppId} from database to file system", id);
         }
 
         var app = MapToModel(appEntity, definition);
@@ -242,7 +244,13 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, app.Name, entity.Id);
 
-        logger.Information("Created app {AppId} with file system storage for user {UserId}", entity.Id, UserId);
+        await auditEventService.WriteAsync(
+            action: "Created",
+            entityType: "App",
+            entityId: entity.Id,
+            message: $"App '{entity.Name}' was created",
+            metadata: new { entity.Name, UserId, entity.ExecutionRunnerId });
+
 
         return entity.Id;
     }
@@ -294,7 +302,22 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUpdated, app.Name, id);
         
-        logger.Information("Updated app {AppId} in file system for user {UserId}", id, ownerId);
+        await auditEventService.WriteAsync(
+            action: "Updated",
+            entityType: "App",
+            entityId: id,
+            message: $"App '{entity.Name}' was updated",
+            metadata: new
+            {
+                entity.Name,
+                entity.PublicUrl,
+                entity.IsPublished,
+                entity.ExecutionRunnerId,
+                entity.IsForkable,
+                entity.RequiresAuthentication,
+                UserId = ownerId
+            });
+
     }
 
     public async Task Remove(Guid id)
@@ -336,7 +359,13 @@ public class AppsService
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);
         
-        logger.Information("Deleted app {AppId} from file system and database for user {UserId}", id, ownerId);
+        await auditEventService.WriteAsync(
+            action: "Deleted",
+            entityType: "App",
+            entityId: id,
+            message: $"App '{appName}' was deleted",
+            metadata: new { AppId = id, UserId = ownerId });
+
     }
 
     public async Task Publish(
@@ -420,8 +449,21 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} published with slug {Slug} (v{Version}, Auth: {RequiresAuth}, Runner: {Runner}, Forkable: {Forkable})",
-            id, publicUrl, entity.Version, requiresAuthentication, executionRunnerId, isForkable);
+        await auditEventService.WriteAsync(
+            action: "Published",
+            entityType: "App",
+            entityId: id,
+            message: $"App '{entity.Name}' was published",
+            metadata: new
+            {
+                Slug = publicUrl,
+                entity.Version,
+                RequiresAuthentication = requiresAuthentication,
+                RunnerId = entity.ExecutionRunnerId,
+                IsForkable = isForkable,
+                UserId = ownerId
+            });
+
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
@@ -451,7 +493,13 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} unpublished (v{Version})", id, entity.Version);
+        await auditEventService.WriteAsync(
+            action: "Unpublished",
+            entityType: "App",
+            entityId: id,
+            message: $"App '{entity.Name}' was unpublished",
+            metadata: new { entity.PublicUrl, entity.Version, UserId });
+
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, id);
@@ -480,7 +528,13 @@ public class AppsService
 
         dataContext.SaveChanges();
 
-        logger.Information("App {AppId} runner updated to {RunnerId}", id, executionRunnerId);
+        await auditEventService.WriteAsync(
+            action: "UpdatedRunner",
+            entityType: "App",
+            entityId: id,
+            message: "App execution runner was updated",
+            metadata: new { AppId = id, RunnerId = executionRunnerId, UserId });
+
     }
 
     /// <summary>
@@ -650,7 +704,13 @@ public class AppsService
         await fileStorageService.CopySourceFilesAsync(UserId, appId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        logger.Information("Duplicated app {SrcAppId} → {NewAppId} for user {UserId}", appId, newId, UserId);
+        await auditEventService.WriteAsync(
+            action: "Duplicated",
+            entityType: "App",
+            entityId: newId,
+            message: $"App '{entity.Name}' was duplicated",
+            metadata: new { SourceAppId = appId, NewAppId = newId, UserId });
+
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -806,7 +866,13 @@ public class AppsService
         await fileStorageService.CopyRuntimeFrontendFilesAsync(sourceOwner, sourceAppId, UserId, newId);
 
         await recentActivityService.LogAppActivityAsync(ActivityType.AppCreated, entity.Name, newId);
-        logger.Information("Forked app {SourceAppId} → {NewAppId} for user {UserId}", sourceAppId, newId, UserId);
+        await auditEventService.WriteAsync(
+            action: "Forked",
+            entityType: "App",
+            entityId: newId,
+            message: $"App '{entity.Name}' was forked",
+            metadata: new { SourceAppId = sourceAppId, NewAppId = newId, UserId, request.PublishImmediately });
+
 
         var newEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -890,7 +956,13 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync();
-        logger.Information("Set sample status for app {AppId}: IsSample={IsSample}, IsFeatured={IsFeatured}", appId, isSample, isFeatured);
+        await auditEventService.WriteAsync(
+            action: "UpdatedSampleStatus",
+            entityType: "App",
+            entityId: appId,
+            message: "App sample status was updated",
+            metadata: new { AppId = appId, IsSample = isSample, IsFeatured = isFeatured, UserId });
+
     }
 
     /// <summary>
@@ -908,7 +980,13 @@ public class AppsService
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync();
-        logger.Information("Updated thumbnail URL for app {AppId}: {ThumbnailUrl}", appId, thumbnailUrl);
+        await auditEventService.WriteAsync(
+            action: "UpdatedThumbnail",
+            entityType: "App",
+            entityId: appId,
+            message: "App thumbnail was updated",
+            metadata: new { AppId = appId, ThumbnailUrl = thumbnailUrl, UserId });
+
     }
 
     public async Task<Models.AppScreenshotModel> AddScreenshotAsync(Guid appId, string imageUrl, string? caption = null)
@@ -938,7 +1016,13 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Added screenshot {ScreenshotId} for app {AppId}", screenshot.Id, appId);
+        await auditEventService.WriteAsync(
+            action: "AddedScreenshot",
+            entityType: "App",
+            entityId: appId,
+            message: "App screenshot was added",
+            metadata: new { AppId = appId, ScreenshotId = screenshot.Id, Caption = caption, UserId });
+
 
         return new Models.AppScreenshotModel
         {
@@ -970,7 +1054,13 @@ public class AppsService
 
         await dataContext.SaveChangesAsync();
 
-        logger.Information("Deleted screenshot {ScreenshotId} for app {AppId}", screenshotId, appId);
+        await auditEventService.WriteAsync(
+            action: "DeletedScreenshot",
+            entityType: "App",
+            entityId: appId,
+            message: "App screenshot was deleted",
+            metadata: new { AppId = appId, ScreenshotId = screenshotId, UserId });
+
         return imageUrl;
     }
 
