@@ -154,6 +154,13 @@ public class OrganizationInvitationSecurityTests
     private sealed class NoOpAuditEventService : IAuditEventService
     {
         public Task WriteAsync(
+            Automaton.Studio.Server.Models.AuditEventWriteRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task WriteAsync(
             string action,
             string entityType,
             Guid? entityId,

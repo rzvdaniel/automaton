@@ -19,6 +19,8 @@ public class AuditEvent
 
     public Guid? UserId { get; set; }
 
+    public Guid? TargetUserId { get; set; }
+
     [MaxLength(256)]
     public string? UserName { get; set; }
 

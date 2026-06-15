@@ -131,6 +131,12 @@ Check migrations intentionally:
 dotnet ef migrations list --project src/Automaton.Studio.Server
 ```
 
+When a schema change is needed, create the migration with EF tooling rather than hand-writing files:
+
+```bash
+dotnet ef migrations add <MigrationName> --project src/Automaton.Studio.Server
+```
+
 When adding a migration, verify:
 
 - the migration contains only intended schema changes

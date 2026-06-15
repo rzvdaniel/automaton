@@ -397,6 +397,7 @@ Avoid C# enums when the value must be serialized as a stable string and compared
 - Do not add columns for every new plan entitlement unless there is a strong query/indexing reason.
 - Subscription entitlements should generally extend `PlanCapabilities`.
 - Add migrations intentionally.
+- Create EF Core migrations with the `dotnet ef migrations add <Name> --project src/Automaton.Studio.Server` workflow. Do not hand-write migration files.
 - Avoid destructive migrations unless explicitly requested.
 
 ---

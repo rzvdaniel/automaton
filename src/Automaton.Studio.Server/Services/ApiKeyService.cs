@@ -1,6 +1,9 @@
 using Automaton.Core.Enums;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,15 +16,18 @@ public class ApiKeyService
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<ApiKeyService> logger;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly IAuditEventService auditEventService;
 
     public ApiKeyService(
         ApplicationDbContext dbContext, 
         ILogger<ApiKeyService> logger,
-        ResourceAuthorizationService authorizationService)
+        ResourceAuthorizationService authorizationService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.authorizationService = authorizationService;
+        this.auditEventService = auditEventService;
     }
 
     public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(
@@ -87,6 +93,25 @@ public class ApiKeyService
         if (saveChanges)
         {
             await dbContext.SaveChangesAsync();
+
+            await auditEventService.WriteAsync(new AuditEventWriteRequest
+            {
+                Action = AuditActions.Created,
+                EntityType = AuditEntityTypes.ApiKey,
+                EntityId = entity.Id,
+                EventType = AuditEventTypes.ApiKeyCreated,
+                Message = $"API key '{entity.Name}' was created",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = userId,
+                Metadata = new
+                {
+                    entity.Name,
+                    entity.Scope,
+                    entity.ExpiresAt,
+                    entity.KeyPrefix,
+                    ProjectId = projectId
+                }
+            });
         }
 
         logger.LogInformation("API key created for user {UserId} with scope {Scope}", userId, scope);
@@ -148,13 +173,35 @@ public class ApiKeyService
         }
 
         var apiKey = await authorizationService.GetAccessibleApiKeysQuery(userId)
+            .Include(ak => ak.ProjectApiKeys)
             .FirstOrDefaultAsync(ak => ak.Id == apiKeyId);
 
         if (apiKey == null)
             return false;
 
+        var auditMetadata = new
+        {
+            apiKey.Name,
+            apiKey.Scope,
+            apiKey.ExpiresAt,
+            apiKey.KeyPrefix,
+            ProjectIds = apiKey.ProjectApiKeys.Select(x => x.ProjectId).ToList()
+        };
+
         dbContext.ApiKeys.Remove(apiKey);
         await dbContext.SaveChangesAsync();
+
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.ApiKey,
+            EntityId = apiKey.Id,
+            EventType = AuditEventTypes.ApiKeyDeleted,
+            Message = $"API key '{apiKey.Name}' was deleted",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = userId,
+            Metadata = auditMetadata
+        });
 
         logger.LogInformation("API key deleted: {KeyPrefix} for user {UserId}", apiKey.KeyPrefix, userId);
         return true;

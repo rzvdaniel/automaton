@@ -1,7 +1,13 @@
+using Automaton.Studio.Server.Models;
+
 namespace Automaton.Studio.Server.Services.Interfaces;
 
 public interface IAuditEventService
 {
+    Task WriteAsync(
+        AuditEventWriteRequest request,
+        CancellationToken cancellationToken = default);
+
     Task WriteAsync(
         string action,
         string entityType,

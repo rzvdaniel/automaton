@@ -809,6 +809,9 @@ namespace Automaton.Studio.Server.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("varchar(32)");
 
+                    b.Property<Guid?>("TargetUserId")
+                        .HasColumnType("char(36)");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("char(36)");
 
@@ -825,6 +828,8 @@ namespace Automaton.Studio.Server.Migrations
                     b.HasIndex("Category", "CreatedAtUtc");
 
                     b.HasIndex("EntityType", "EntityId");
+
+                    b.HasIndex("TargetUserId", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 

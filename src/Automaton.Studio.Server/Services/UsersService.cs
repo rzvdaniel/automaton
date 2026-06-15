@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Enums;
 using Automaton.Studio.Server.Models;
+using Automaton.Studio.Server.Services.Interfaces;
 using Common.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,15 +16,23 @@ public class UsersService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ApplicationDbContext _db;
+    private readonly UserContextService _userContextService;
+    private readonly IAuditEventService _auditEventService;
+
+    private Guid ActorUserId => _userContextService.GetUserId();
 
     public UsersService(
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
-        ApplicationDbContext db)
+        ApplicationDbContext db,
+        UserContextService userContextService,
+        IAuditEventService auditEventService)
     {
         _userManager         = userManager;
         _roleManager         = roleManager;
         _db                  = db;
+        _userContextService  = userContextService;
+        _auditEventService   = auditEventService;
     }
 
     public async Task CreateUser(ApplicationUser user, string password)
@@ -480,6 +489,26 @@ public class UsersService
         }
 
         await RevokeAllRefreshTokensAsync(userId, cancellationToken);
+
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = disabled ? AuditActions.Disabled : AuditActions.Enabled,
+            EntityType = AuditEntityTypes.User,
+            EntityId = userId,
+            EventType = disabled ? AuditEventTypes.UserDisabled : AuditEventTypes.UserEnabled,
+            Message = disabled
+                ? $"User '{user.Email ?? user.UserName ?? userId.ToString()}' was disabled"
+                : $"User '{user.Email ?? user.UserName ?? userId.ToString()}' was enabled",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = ActorUserId,
+            TargetUserId = userId,
+            Metadata = new
+            {
+                user.Email,
+                user.UserName,
+                LockoutEnd = lockoutEnd
+            }
+        }, cancellationToken);
     }
 
     public async Task EnsureCanManageUserLockStateAsync(
@@ -595,6 +624,15 @@ public class UsersService
             throw new Exception($"User with userId {userId} not found!");
         }
 
+        var auditMetadata = new
+        {
+            user.Email,
+            user.UserName,
+            user.Name,
+            user.PublicUsername,
+            user.RegisteredAtUtc
+        };
+
         var blockers = await GetHardDeleteBlockersAsync(userId, cancellationToken);
         if (blockers.Count > 0)
         {
@@ -643,6 +681,19 @@ public class UsersService
             throw new InvalidOperationException(
                 $"Hard delete failed for user {user.Email ?? user.Id.ToString()}: {errorMessage}");
         }
+
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.User,
+            EntityId = userId,
+            EventType = AuditEventTypes.UserDeleted,
+            Message = $"User '{user.Email ?? user.UserName ?? userId.ToString()}' was deleted",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = ActorUserId,
+            TargetUserId = userId,
+            Metadata = auditMetadata
+        }, cancellationToken);
     }
 
     private async Task<List<(string Label, int Count)>> GetHardDeleteBlockersAsync(Guid userId, CancellationToken cancellationToken)
@@ -713,11 +764,31 @@ public class UsersService
 
     public async Task AddRole(Guid userId, string roleName)
     {
-        var result = await _userManager.AddToRoleAsync(await GetUserById(userId), roleName);
+        var user = await GetUserById(userId);
+        var result = await _userManager.AddToRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
             throw new Exception("Error in Adding Role!");
         }
+
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Added,
+            EntityType = AuditEntityTypes.UserRole,
+            EntityId = userId,
+            EventType = AuditEventTypes.UserRoleChanged,
+            Message = $"Role '{roleName}' was added to user '{user.Email ?? user.UserName ?? userId.ToString()}'",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = ActorUserId,
+            TargetUserId = userId,
+            Metadata = new
+            {
+                RoleName = roleName,
+                ChangeType = AuditActions.Added,
+                user.Email,
+                user.UserName
+            }
+        });
     }
 
     public async Task AddRole(Guid userId, Guid roleId)
@@ -732,11 +803,31 @@ public class UsersService
 
     public async Task RemoveRole(Guid userId, string roleName)
     {
-        var result = await _userManager.RemoveFromRoleAsync(await GetUserById(userId), roleName);
+        var user = await GetUserById(userId);
+        var result = await _userManager.RemoveFromRoleAsync(user, roleName);
         if (!result.Succeeded)
         {
             throw new Exception("Error in Removing Role!");
         }
+
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Removed,
+            EntityType = AuditEntityTypes.UserRole,
+            EntityId = userId,
+            EventType = AuditEventTypes.UserRoleChanged,
+            Message = $"Role '{roleName}' was removed from user '{user.Email ?? user.UserName ?? userId.ToString()}'",
+            Outcome = AuditOutcomes.Success,
+            ActorUserId = ActorUserId,
+            TargetUserId = userId,
+            Metadata = new
+            {
+                RoleName = roleName,
+                ChangeType = AuditActions.Removed,
+                user.Email,
+                user.UserName
+            }
+        });
     }
 
     public async Task RemoveRole(Guid userId, Guid roleId)

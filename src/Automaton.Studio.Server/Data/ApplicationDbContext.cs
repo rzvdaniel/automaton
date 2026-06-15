@@ -154,6 +154,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.Category, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.EntityType, e.EntityId });
                 entity.HasIndex(e => new { e.UserId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.TargetUserId, e.CreatedAtUtc });
                 entity.HasIndex(e => e.EventType);
             });
 
