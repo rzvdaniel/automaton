@@ -37,4 +37,9 @@ public static class AuditEventTypes
     public const string UserEnabled = "UserEnabled";
     public const string UserDeleted = "UserDeleted";
     public const string UserRoleChanged = "UserRoleChanged";
+    public const string AiProviderCreated = "AiProviderCreated";
+    public const string AiProviderUpdated = "AiProviderUpdated";
+    public const string AiProviderEnabled = "AiProviderEnabled";
+    public const string AiProviderDisabled = "AiProviderDisabled";
+    public const string AiProviderDeleted = "AiProviderDeleted";
 }

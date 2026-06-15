@@ -1,7 +1,10 @@
 using Automaton.Studio.Server.Config;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Data;
 using Automaton.Studio.Server.Entities;
+using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Mcp.SystemPrompts;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
@@ -21,17 +24,20 @@ public class AdminAiProvidersController : ControllerBase
     private readonly ILogger<AdminAiProvidersController> logger;
     private readonly AiApiKeyService aiApiKeyService;
     private readonly IAiProvidersSettingsService settingsService;
+    private readonly IAuditEventService auditEventService;
 
     public AdminAiProvidersController(
         ApplicationDbContext dbContext,
         ILogger<AdminAiProvidersController> logger,
         AiApiKeyService aiApiKeyService,
-        IAiProvidersSettingsService settingsService)
+        IAiProvidersSettingsService settingsService,
+        IAuditEventService auditEventService)
     {
         this.dbContext = dbContext;
         this.logger = logger;
         this.aiApiKeyService = aiApiKeyService;
         this.settingsService = settingsService;
+        this.auditEventService = auditEventService;
     }
 
     #region Providers
@@ -143,7 +149,28 @@ public class AdminAiProvidersController : ControllerBase
         dbContext.AiProviders.Add(provider);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI provider {ProviderName} created by admin", provider.Name);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiProviderCreated,
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.AiProvider,
+            EntityId = provider.Id,
+            Message = $"AI provider '{provider.Name}' was created",
+            Outcome = AuditOutcomes.Success,
+            Metadata = new
+            {
+                provider.Name,
+                provider.DisplayName,
+                HasBaseUrl = !string.IsNullOrWhiteSpace(provider.BaseUrl),
+                provider.IsActive,
+                provider.RequiresApiKey,
+                provider.EnvironmentKeyName,
+                provider.ApiKeyHelpUrl,
+                provider.IconName,
+                provider.SortOrder,
+                HasExtraBodyJson = !string.IsNullOrWhiteSpace(provider.ExtraBodyJson)
+            }
+        });
 
         return CreatedAtAction(nameof(GetProvider), new { id = provider.Id }, new AiProviderAdminResponse
         {
@@ -191,6 +218,7 @@ public class AdminAiProvidersController : ControllerBase
             provider.Name = request.Name;
         }
 
+        var previousIsActive = provider.IsActive;
         if (request.DisplayName != null) provider.DisplayName = request.DisplayName;
         if (request.Description != null) provider.Description = request.Description;
         if (request.BaseUrl != null) provider.BaseUrl = request.BaseUrl;
@@ -207,7 +235,41 @@ public class AdminAiProvidersController : ControllerBase
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI provider {ProviderName} updated by admin", provider.Name);
+        var isStatusChange = request.IsActive.HasValue && previousIsActive != provider.IsActive;
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = isStatusChange
+                ? provider.IsActive
+                    ? AuditEventTypes.AiProviderEnabled
+                    : AuditEventTypes.AiProviderDisabled
+                : AuditEventTypes.AiProviderUpdated,
+            Action = isStatusChange
+                ? provider.IsActive
+                    ? AuditActions.Enabled
+                    : AuditActions.Disabled
+                : AuditActions.Updated,
+            EntityType = AuditEntityTypes.AiProvider,
+            EntityId = provider.Id,
+            Message = isStatusChange
+                ? provider.IsActive
+                    ? $"AI provider '{provider.Name}' was enabled"
+                    : $"AI provider '{provider.Name}' was disabled"
+                : $"AI provider '{provider.Name}' was updated",
+            Outcome = AuditOutcomes.Success,
+            Metadata = new
+            {
+                provider.Name,
+                provider.DisplayName,
+                HasBaseUrl = !string.IsNullOrWhiteSpace(provider.BaseUrl),
+                provider.IsActive,
+                provider.RequiresApiKey,
+                provider.EnvironmentKeyName,
+                provider.ApiKeyHelpUrl,
+                provider.IconName,
+                provider.SortOrder,
+                HasExtraBodyJson = !string.IsNullOrWhiteSpace(provider.ExtraBodyJson)
+            }
+        });
 
         return NoContent();
     }
@@ -235,7 +297,29 @@ public class AdminAiProvidersController : ControllerBase
         dbContext.AiProviders.Remove(provider);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI provider {ProviderName} deleted by admin", provider.Name);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiProviderDeleted,
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.AiProvider,
+            EntityId = provider.Id,
+            Message = $"AI provider '{provider.Name}' was deleted",
+            Outcome = AuditOutcomes.Success,
+            Metadata = new
+            {
+                provider.Name,
+                provider.DisplayName,
+                HasBaseUrl = !string.IsNullOrWhiteSpace(provider.BaseUrl),
+                provider.IsActive,
+                provider.RequiresApiKey,
+                provider.EnvironmentKeyName,
+                provider.ApiKeyHelpUrl,
+                provider.IconName,
+                provider.SortOrder,
+                HasExtraBodyJson = !string.IsNullOrWhiteSpace(provider.ExtraBodyJson),
+                ModelCount = provider.Models.Count
+            }
+        });
 
         return NoContent();
     }

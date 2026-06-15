@@ -8,4 +8,5 @@ public static class AuditEntityTypes
     public const string HostedRunner = "HostedRunner";
     public const string User = "User";
     public const string UserRole = "UserRole";
+    public const string AiProvider = "AiProvider";
 }
