@@ -483,6 +483,7 @@ if (corsOrigins != null && corsOrigins.Length > 0)
 }
 
 var app = applicationBuilder.Build();
+var logSuccessfulRequests = configurationManager.GetValue<bool>("RequestLogging:LogSuccessfulRequests");
 
 app.ApplyMigrations();
 
@@ -499,12 +500,35 @@ app.UseWhen(
             options.MessageTemplate =
                 "{ClientIP} {RequestScheme} {RequestHost} {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
 
+            options.GetLevel = (httpContext, elapsed, exception) =>
+            {
+                if (exception != null || httpContext.Response.StatusCode >= 500)
+                {
+                    return LogEventLevel.Error;
+                }
+
+                if (httpContext.Response.StatusCode >= 400 || elapsed > 1000)
+                {
+                    return LogEventLevel.Warning;
+                }
+
+                if (applicationBuilder.Environment.IsDevelopment())
+                {
+                    return LogEventLevel.Information;
+                }
+
+                return logSuccessfulRequests
+                    ? LogEventLevel.Information
+                    : LogEventLevel.Debug;
+            };
+
             options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
             {
                 diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
                 diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-                diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress);
+                diagnosticContext.Set("ClientIP", httpContext.Connection.RemoteIpAddress?.ToString());
                 diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.FirstOrDefault());
+                diagnosticContext.Set("UserName", httpContext.User.Identity?.Name);
             };
         });
     });
