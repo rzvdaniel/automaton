@@ -9,4 +9,7 @@ public static class AuditEntityTypes
     public const string User = "User";
     public const string UserRole = "UserRole";
     public const string AiProvider = "AiProvider";
+    public const string AiModel = "AiModel";
+    public const string AiApiKey = "AiApiKey";
+    public const string AiSettings = "AiSettings";
 }

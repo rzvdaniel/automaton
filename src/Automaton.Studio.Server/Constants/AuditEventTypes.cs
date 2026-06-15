@@ -42,4 +42,11 @@ public static class AuditEventTypes
     public const string AiProviderEnabled = "AiProviderEnabled";
     public const string AiProviderDisabled = "AiProviderDisabled";
     public const string AiProviderDeleted = "AiProviderDeleted";
+    public const string AiModelCreated = "AiModelCreated";
+    public const string AiModelUpdated = "AiModelUpdated";
+    public const string AiModelDeleted = "AiModelDeleted";
+    public const string AiApiKeyCreated = "AiApiKeyCreated";
+    public const string AiApiKeyUpdated = "AiApiKeyUpdated";
+    public const string AiApiKeyDeleted = "AiApiKeyDeleted";
+    public const string AiOperationalSettingsUpdated = "AiOperationalSettingsUpdated";
 }

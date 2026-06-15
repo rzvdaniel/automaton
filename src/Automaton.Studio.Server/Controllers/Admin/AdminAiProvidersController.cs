@@ -576,7 +576,30 @@ public class AdminAiProvidersController : ControllerBase
         dbContext.AiModels.Add(newModel);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI model {ModelId} created for provider {ProviderName} by admin", newModel.ModelId, provider.Name);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiModelCreated,
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.AiModel,
+            EntityId = newModel.Id,
+            Message = $"AI model '{newModel.ModelId}' was created for provider '{provider.Name}'",
+            Metadata = new
+            {
+                ProviderId = provider.Id,
+                ProviderName = provider.Name,
+                newModel.ModelId,
+                newModel.DisplayName,
+                newModel.IsActive,
+                newModel.IsDefault,
+                newModel.IsPlanningModel,
+                newModel.MaxTokens,
+                newModel.SupportsStreaming,
+                newModel.SupportsTools,
+                newModel.SupportsVision,
+                HasExtraBodyJson = !string.IsNullOrWhiteSpace(newModel.ExtraBodyJson),
+                newModel.SortOrder
+            }
+        });
 
         return CreatedAtAction(nameof(GetModels), new { providerId }, new AiModelAdminResponse
         {
@@ -678,7 +701,35 @@ public class AdminAiProvidersController : ControllerBase
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI model {ModelId} updated by admin", model.ModelId);
+        var providerName = await dbContext.AiProviders
+            .Where(p => p.Id == model.AiProviderId)
+            .Select(p => p.Name)
+            .FirstOrDefaultAsync() ?? string.Empty;
+
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiModelUpdated,
+            Action = AuditActions.Updated,
+            EntityType = AuditEntityTypes.AiModel,
+            EntityId = model.Id,
+            Message = $"AI model '{model.ModelId}' was updated",
+            Metadata = new
+            {
+                model.AiProviderId,
+                ProviderName = providerName,
+                model.ModelId,
+                model.DisplayName,
+                model.IsActive,
+                model.IsDefault,
+                model.IsPlanningModel,
+                model.MaxTokens,
+                model.SupportsStreaming,
+                model.SupportsTools,
+                model.SupportsVision,
+                HasExtraBodyJson = !string.IsNullOrWhiteSpace(model.ExtraBodyJson),
+                model.SortOrder
+            }
+        });
 
         return NoContent();
     }
@@ -697,7 +748,22 @@ public class AdminAiProvidersController : ControllerBase
         dbContext.AiModels.Remove(model);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI model {ModelId} deleted by admin", model.ModelId);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiModelDeleted,
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.AiModel,
+            EntityId = model.Id,
+            Message = $"AI model '{model.ModelId}' was deleted",
+            Metadata = new
+            {
+                model.AiProviderId,
+                model.ModelId,
+                model.DisplayName,
+                model.IsDefault,
+                model.IsPlanningModel
+            }
+        });
 
         return NoContent();
     }
@@ -784,11 +850,28 @@ public class AdminAiProvidersController : ControllerBase
                 preferredModel.IsDefault = true;
                 await dbContext.SaveChangesAsync();
 
-                logger.LogInformation(
+                logger.LogDebug(
                     "Auto-promoted model '{ModelId}' of provider '{ProviderName}' as global default (first system key)",
                     preferredModel.ModelId, provider.Name);
             }
         }
+
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiApiKeyCreated,
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.AiApiKey,
+            EntityId = entity.Id,
+            Message = $"AI API key '{entity.Name}' was created for provider '{provider.Name}'",
+            Metadata = new
+            {
+                entity.Name,
+                entity.ProviderName,
+                entity.Description,
+                entity.IsActive,
+                entity.IsSystemKey
+            }
+        });
 
         return CreatedAtAction(nameof(GetProviderKeys), new { providerId }, new AiApiKeyAdminResponse
         {
@@ -826,7 +909,22 @@ public class AdminAiProvidersController : ControllerBase
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {KeyId} updated by admin", id);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiApiKeyUpdated,
+            Action = AuditActions.Updated,
+            EntityType = AuditEntityTypes.AiApiKey,
+            EntityId = key.Id,
+            Message = $"AI API key '{key.Name}' was updated",
+            Metadata = new
+            {
+                key.Name,
+                key.ProviderName,
+                key.Description,
+                key.IsActive,
+                RotatedSecret = !string.IsNullOrWhiteSpace(request.ApiKey)
+            }
+        });
 
         return NoContent();
     }
@@ -845,7 +943,21 @@ public class AdminAiProvidersController : ControllerBase
         dbContext.AiApiKeys.Remove(key);
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("AI API key {KeyId} deleted by admin", id);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiApiKeyDeleted,
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.AiApiKey,
+            EntityId = key.Id,
+            Message = $"AI API key '{key.Name}' was deleted",
+            Metadata = new
+            {
+                key.Name,
+                key.ProviderName,
+                key.Description,
+                key.IsActive
+            }
+        });
 
         return NoContent();
     }
@@ -904,7 +1016,33 @@ public class AdminAiProvidersController : ControllerBase
 
         await settingsService.SaveOperationalSettingsAsync(settings);
 
-        logger.LogInformation("AI operational settings updated by admin");
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.AiOperationalSettingsUpdated,
+            Action = AuditActions.Updated,
+            EntityType = AuditEntityTypes.AiSettings,
+            Message = "AI operational settings were updated",
+            Metadata = new
+            {
+                settings.MaxConversationHistoryMessages,
+                settings.MaxIterations,
+                settings.MaxConsecutiveFailures,
+                settings.DefaultMaxOutputTokens,
+                settings.AppVerificationDefaultStrategy,
+                settings.AppVerificationAllowUserOverride,
+                settings.AppExecutionDefaultPolicy,
+                settings.AppExecutionAllowUserOverride,
+                settings.IterationLimits.Simple,
+                settings.IterationLimits.Medium,
+                settings.IterationLimits.Large,
+                settings.IterationLimits.Enterprise,
+                settings.IterationLimits.Autonomous,
+                settings.HistoryCompaction.RecentMessages,
+                settings.HistoryCompaction.MaxSummaryEntries,
+                settings.HistoryCompaction.MaxSummaryChars,
+                settings.HistoryCompaction.MaxEntryChars
+            }
+        });
 
         return Ok(MapToResponse(settings));
     }
