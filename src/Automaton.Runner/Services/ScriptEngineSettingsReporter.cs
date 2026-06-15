@@ -1,6 +1,7 @@
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Scripting.Engines.Python;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace Automaton.Runner.Console.Services;
@@ -46,6 +47,7 @@ public class ScriptEngineSettingsReporter
 
             using var scope = _serviceProvider.CreateScope();
             var configService = scope.ServiceProvider.GetRequiredService<ConfigurationService>();
+            var apiKeyAuthenticationService = scope.ServiceProvider.GetRequiredService<ApiKeyAuthenticationService>();
             var runnerId = configService.RunnerId;
             var runnersUrl = configService.RunnersUrl;
             var baseUrl = configService.BaseUrl;
@@ -56,7 +58,19 @@ public class ScriptEngineSettingsReporter
                 var url = $"{baseUrl}/{runnersUrl}/{runnerId}/script-settings";
                 var json = JsonSerializer.Serialize(runnerSettings);
                 using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PutAsync(url, content, cancellationToken);
+                using var request = new HttpRequestMessage(HttpMethod.Put, url)
+                {
+                    Content = content
+                };
+
+                var apiKey = await apiKeyAuthenticationService.GetValidApiKeyAsync();
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    request.Headers.Add("X-API-Key", apiKey);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                }
+
+                var response = await _httpClient.SendAsync(request, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.Debug("Python environment autodetection saved to server for runner {RunnerId}", runnerId);
