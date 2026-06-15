@@ -773,18 +773,6 @@ public class RunnerService
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await auditEventService.WriteAsync(
-            action: "Updated",
-            entityType: "RunnerScriptSettings",
-            entityId: id,
-            message: $"Script engine settings updated for runner '{runner.Name}'",
-            metadata: new
-            {
-                RunnerId = id,
-                runner.Name
-            },
-            cancellationToken: cancellationToken);
-
         logger.Debug("Updated script engine settings for runner {RunnerId}", id);
     }
 

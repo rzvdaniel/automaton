@@ -284,6 +284,17 @@ public class AppsService
 
         // Get owner ID for file storage
         var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var previousName = entity.Name;
+        var previousSummary = entity.Summary;
+        var previousDescription = entity.Description;
+        var previousIsForkable = entity.IsForkable;
+        var previousPublicUrl = entity.PublicUrl;
+        var previousRequiresAuthentication = entity.RequiresAuthentication;
+        var previousThumbnailUrl = entity.ThumbnailUrl;
+        var previousCategory = entity.Category;
+        var previousTags = entity.Tags;
+        var previousIsProfileFeatured = entity.IsProfileFeatured;
+        var previousExecutionRunnerId = entity.ExecutionRunnerId;
 
         entity.Name = app.Name;
         entity.Summary = app.Summary;
@@ -310,22 +321,84 @@ public class AppsService
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUpdated, app.Name, id);
-        
-        await auditEventService.WriteAsync(
-            action: "Updated",
-            entityType: "App",
-            entityId: id,
-            message: $"App '{entity.Name}' was updated",
-            metadata: new
+
+        if (!string.Equals(previousName, entity.Name, StringComparison.Ordinal))
+        {
+            await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
             {
-                entity.Name,
-                entity.PublicUrl,
-                entity.IsPublished,
-                entity.ExecutionRunnerId,
-                entity.IsForkable,
-                entity.RequiresAuthentication,
-                UserId = ownerId
+                Action = AuditActions.Renamed,
+                EntityType = AuditEntityTypes.App,
+                EntityId = id,
+                EventType = AuditEventTypes.AppRenamed,
+                Message = $"App was renamed from '{previousName}' to '{entity.Name}'",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new
+                {
+                    PreviousName = previousName,
+                    entity.Name,
+                    OwnerUserId = ownerId
+                }
             });
+        }
+
+        if (!string.Equals(previousPublicUrl, entity.PublicUrl, StringComparison.Ordinal))
+        {
+            await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+            {
+                Action = AuditActions.Changed,
+                EntityType = AuditEntityTypes.App,
+                EntityId = id,
+                EventType = AuditEventTypes.AppSlugChanged,
+                Message = $"App slug changed for '{entity.Name}'",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new
+                {
+                    PreviousSlug = previousPublicUrl,
+                    NewSlug = entity.PublicUrl,
+                    OwnerUserId = ownerId
+                }
+            });
+        }
+
+        var metadataChanged =
+            !string.Equals(previousSummary, entity.Summary, StringComparison.Ordinal) ||
+            !string.Equals(previousDescription, entity.Description, StringComparison.Ordinal) ||
+            previousIsForkable != entity.IsForkable ||
+            previousRequiresAuthentication != entity.RequiresAuthentication ||
+            !string.Equals(previousThumbnailUrl, entity.ThumbnailUrl, StringComparison.Ordinal) ||
+            !string.Equals(previousCategory, entity.Category, StringComparison.Ordinal) ||
+            !string.Equals(previousTags, entity.Tags, StringComparison.Ordinal) ||
+            previousIsProfileFeatured != entity.IsProfileFeatured ||
+            previousExecutionRunnerId != entity.ExecutionRunnerId;
+
+        if (metadataChanged)
+        {
+            await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
+            {
+                Action = AuditActions.Updated,
+                EntityType = AuditEntityTypes.App,
+                EntityId = id,
+                EventType = AuditEventTypes.AppMetadataUpdated,
+                Message = $"App metadata was updated for '{entity.Name}'",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = UserId,
+                Metadata = new
+                {
+                    entity.Name,
+                    entity.PublicUrl,
+                    entity.IsForkable,
+                    entity.RequiresAuthentication,
+                    entity.ThumbnailUrl,
+                    entity.Category,
+                    entity.Tags,
+                    entity.IsProfileFeatured,
+                    entity.ExecutionRunnerId,
+                    OwnerUserId = ownerId
+                }
+            });
+        }
 
     }
 

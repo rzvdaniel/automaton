@@ -39,6 +39,39 @@ public class ApiKeyServiceTests
     }
 
     [Test]
+    public void SanitizeMetadataJson_RedactsAllProtectedSecretFields()
+    {
+        var json = AuditEventService.SanitizeMetadataJson(new
+        {
+            apiKey = "api-key-secret",
+            key = "plain-key-secret",
+            token = "token-secret",
+            secret = "secret-value",
+            password = "password-value",
+            authorization = "Bearer secret-token",
+            connectionString = "Server=db;User Id=app;Password=topsecret;",
+            nested = new
+            {
+                rawKey = "raw-key-secret",
+                hash = "hash-secret"
+            },
+            safe = "visible"
+        });
+
+        Assert.That(json, Does.Not.Contain("api-key-secret"));
+        Assert.That(json, Does.Not.Contain("plain-key-secret"));
+        Assert.That(json, Does.Not.Contain("token-secret"));
+        Assert.That(json, Does.Not.Contain("secret-value"));
+        Assert.That(json, Does.Not.Contain("password-value"));
+        Assert.That(json, Does.Not.Contain("Bearer secret-token"));
+        Assert.That(json, Does.Not.Contain("Server=db"));
+        Assert.That(json, Does.Not.Contain("raw-key-secret"));
+        Assert.That(json, Does.Not.Contain("hash-secret"));
+        Assert.That(json, Does.Contain("[REDACTED]"));
+        Assert.That(json, Does.Contain("visible"));
+    }
+
+    [Test]
     public void GenerateRawKey_ReturnsFixedLengthLowercaseHex()
     {
         var rawKey = ApiKeyService.GenerateRawKey();
@@ -80,9 +113,10 @@ public class ApiKeyServiceTests
         Assert.That(auditEvent.EventType, Is.EqualTo("ApiKeyCreated"));
         Assert.That(auditEvent.EntityId, Is.EqualTo(entity.Id));
         Assert.That(auditEvent.UserId, Is.EqualTo(userId));
-        Assert.That(auditEvent.MetadataJson, Does.Contain(entity.KeyPrefix));
+        Assert.That(auditEvent.MetadataJson, Does.Not.Contain(entity.KeyPrefix));
         Assert.That(auditEvent.MetadataJson, Does.Not.Contain(apiKey));
         Assert.That(auditEvent.MetadataJson, Does.Not.Contain(entity.HashedKey));
+        Assert.That(auditEvent.MetadataJson, Does.Contain("[REDACTED]"));
     }
 
     private static ApplicationDbContext CreateDbContext()

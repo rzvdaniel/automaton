@@ -7,6 +7,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
+import Dialog from 'primevue/dialog'
 import apiClient from '@/shared/services/api/axios-instance'
 
 interface AuditEventEntry {
@@ -14,6 +15,7 @@ interface AuditEventEntry {
   action: string
   entityType: string
   entityId?: string | null
+  entityDisplay?: string | null
   userId?: string | null
   targetUserId?: string | null
   userName?: string | null
@@ -38,13 +40,18 @@ const logs = ref<AuditEventEntry[]>([])
 const totalCount = ref(0)
 const totalPages = ref(0)
 const isLoading = ref(false)
-const expandedLogId = ref<string | null>(null)
 const availableLevels = ref<string[]>([])
+const availableEventTypes = ref<string[]>([])
+const availableEntityTypes = ref<string[]>([])
+const selectedLog = ref<AuditEventEntry | null>(null)
+const detailsVisible = ref(false)
 const autoRefresh = ref(false)
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 const filter = ref({
   level: null as string | null,
+  eventType: null as string | null,
+  entityType: null as string | null,
   from: null as Date | null,
   to: null as Date | null,
   search: '',
@@ -62,6 +69,8 @@ function getQueryValue(value: unknown): string | null {
 
 function syncFilterFromRoute() {
   filter.value.level = getQueryValue(route.query.outcome)
+  filter.value.eventType = getQueryValue(route.query.eventType)
+  filter.value.entityType = getQueryValue(route.query.entityType)
   filter.value.search = getQueryValue(route.query.search) ?? ''
   filter.value.page = 1
 }
@@ -75,6 +84,24 @@ async function loadLevels() {
   }
 }
 
+async function loadEventTypes() {
+  try {
+    const { data } = await apiClient.get<string[]>('/api/admin/logs/event-types')
+    availableEventTypes.value = data
+  } catch (err) {
+    console.warn('Failed to load event types', err)
+  }
+}
+
+async function loadEntityTypes() {
+  try {
+    const { data } = await apiClient.get<string[]>('/api/admin/logs/entity-types')
+    availableEntityTypes.value = data
+  } catch (err) {
+    console.warn('Failed to load entity types', err)
+  }
+}
+
 async function loadLogs() {
   isLoading.value = true
   try {
@@ -83,6 +110,8 @@ async function loadLogs() {
       pageSize: filter.value.pageSize,
     }
     if (filter.value.level) params.outcome = filter.value.level
+    if (filter.value.eventType) params.eventType = filter.value.eventType
+    if (filter.value.entityType) params.entityType = filter.value.entityType
     if (filter.value.from) params.fromUtc = filter.value.from.toISOString()
     if (filter.value.to) params.toUtc = filter.value.to.toISOString()
     if (filter.value.search) params.search = filter.value.search
@@ -117,13 +146,15 @@ function nextPage() {
   }
 }
 
-function toggleLog(id: string) {
-  expandedLogId.value = expandedLogId.value === id ? null : id
+function openDetails(log: AuditEventEntry) {
+  selectedLog.value = log
+  detailsVisible.value = true
 }
 
 function getOutcomeSeverity(outcome?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
   switch (outcome?.toLowerCase()) {
     case 'success': return 'success'
+    case 'requested': return 'info'
     case 'failed': return 'danger'
     case 'denied': return 'warn'
     default: return 'secondary'
@@ -132,6 +163,21 @@ function getOutcomeSeverity(outcome?: string): 'success' | 'info' | 'warn' | 'da
 
 function getOutcomeLabel(outcome?: string) {
   return outcome?.toUpperCase() ?? '?'
+}
+
+function getEntityLabel(log: AuditEventEntry) {
+  return log.entityDisplay || log.entityId || '—'
+}
+
+function getEntitySummary(log: AuditEventEntry) {
+  const label = getEntityLabel(log)
+  if (!log.entityType) {
+    return label
+  }
+
+  return label === '—'
+    ? log.entityType
+    : `${log.entityType} / ${label}`
 }
 
 function formatDate(dateStr?: string) {
@@ -161,6 +207,8 @@ function toggleAutoRefresh() {
 onMounted(() => {
   syncFilterFromRoute()
   void loadLevels()
+  void loadEventTypes()
+  void loadEntityTypes()
   void loadLogs()
 })
 
@@ -169,9 +217,12 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [route.query.outcome, route.query.search],
-  ([outcome, search], [previousOutcome, previousSearch]) => {
-    if (outcome === previousOutcome && search === previousSearch) {
+  () => [route.query.outcome, route.query.eventType, route.query.entityType, route.query.search],
+  ([outcome, eventType, entityType, search], [previousOutcome, previousEventType, previousEntityType, previousSearch]) => {
+    if (outcome === previousOutcome
+      && eventType === previousEventType
+      && entityType === previousEntityType
+      && search === previousSearch) {
       return
     }
 
@@ -213,12 +264,32 @@ watch(
     <div class="filter-bar">
       <Select
         v-model="filter.level"
-        :options="[{ label: 'All levels', value: null }, ...availableLevels.map(l => ({ label: l, value: l }))]"
+        :options="[{ label: 'All outcomes', value: null }, ...availableLevels.map(l => ({ label: l, value: l }))]"
         option-label="label"
         option-value="value"
         placeholder="Outcome"
         size="small"
         class="filter-level"
+        @change="applyFilter"
+      />
+      <Select
+        v-model="filter.eventType"
+        :options="[{ label: 'All events', value: null }, ...availableEventTypes.map(eventType => ({ label: eventType, value: eventType }))]"
+        option-label="label"
+        option-value="value"
+        placeholder="Event Type"
+        size="small"
+        class="filter-event"
+        @change="applyFilter"
+      />
+      <Select
+        v-model="filter.entityType"
+        :options="[{ label: 'All entities', value: null }, ...availableEntityTypes.map(entityType => ({ label: entityType, value: entityType }))]"
+        option-label="label"
+        option-value="value"
+        placeholder="Entity Type"
+        size="small"
+        class="filter-entity"
         @change="applyFilter"
       />
       <DatePicker
@@ -269,6 +340,7 @@ watch(
             <th class="col-level">Outcome</th>
             <th class="col-time">Timestamp</th>
             <th class="col-type">Event</th>
+            <th class="col-entity">Entity</th>
             <th class="col-user">User</th>
             <th class="col-message">Message</th>
           </tr>
@@ -277,8 +349,8 @@ watch(
           <template v-for="log in logs" :key="log.id">
             <tr
               class="log-row"
-              :class="{ 'log-error': log.outcome === 'Failed', expanded: expandedLogId === log.id }"
-              @click="toggleLog(log.id)"
+              :class="{ 'log-error': log.outcome === 'Failed' }"
+              @click="openDetails(log)"
             >
               <td class="col-level">
                 <Tag
@@ -289,30 +361,13 @@ watch(
               </td>
               <td class="col-time text-sm text-color-secondary">{{ formatDate(log.createdAtUtc) }}</td>
               <td class="col-type text-sm text-color-secondary">{{ log.eventType }}</td>
+              <td class="col-entity text-sm">
+                <div>{{ log.entityType }}</div>
+                <div class="text-color-secondary text-xs">{{ getEntityLabel(log) }}</div>
+              </td>
               <td class="col-user text-sm text-color-secondary">{{ log.userName || '—' }}</td>
               <td class="col-message text-sm">
                 {{ log.message?.slice(0, 150) }}{{ (log.message?.length ?? 0) > 150 ? '…' : '' }}
-              </td>
-            </tr>
-            <tr v-if="expandedLogId === log.id" class="log-detail-row">
-              <td colspan="5">
-                <div class="log-detail">
-                  <div class="detail-grid">
-                    <div><span class="detail-label-inline">Action:</span> {{ log.action }}</div>
-                    <div><span class="detail-label-inline">Entity:</span> {{ log.entityType }}<span v-if="log.entityId"> · {{ log.entityId }}</span></div>
-                    <div><span class="detail-label-inline">Actor:</span> {{ log.userId || '—' }}</div>
-                    <div><span class="detail-label-inline">Target:</span> {{ log.targetUserId || '—' }}</div>
-                    <div><span class="detail-label-inline">IP:</span> {{ log.ipAddress || '—' }}</div>
-                  </div>
-                  <div v-if="log.message" class="detail-section">
-                    <div class="detail-label">Message</div>
-                    <pre class="detail-code">{{ log.message }}</pre>
-                  </div>
-                  <div v-if="log.metadataJson" class="detail-section">
-                    <div class="detail-label">Metadata</div>
-                    <pre class="detail-code">{{ tryFormatJson(log.metadataJson) }}</pre>
-                  </div>
-                </div>
               </td>
             </tr>
           </template>
@@ -326,6 +381,38 @@ watch(
       <span class="text-sm text-color-secondary">Page {{ filter.page }} of {{ totalPages }}</span>
       <Button icon="pi pi-chevron-right" text size="small" :disabled="filter.page >= totalPages" @click="nextPage" />
     </div>
+
+    <Dialog v-model:visible="detailsVisible" header="Audit Event Details" modal :style="{ width: '52rem' }">
+      <div v-if="selectedLog" class="log-detail">
+        <div class="detail-grid">
+          <div><span class="detail-label-inline">Timestamp:</span> {{ formatDate(selectedLog.createdAtUtc) }}</div>
+          <div><span class="detail-label-inline">User:</span> {{ selectedLog.userName || '—' }}</div>
+          <div><span class="detail-label-inline">Target User:</span> {{ selectedLog.targetUserId || '—' }}</div>
+          <div><span class="detail-label-inline">Event Type:</span> {{ selectedLog.eventType }}</div>
+          <div><span class="detail-label-inline">Action:</span> {{ selectedLog.action }}</div>
+          <div><span class="detail-label-inline">Entity:</span> {{ getEntitySummary(selectedLog) }}</div>
+          <div><span class="detail-label-inline">Entity Type:</span> {{ selectedLog.entityType }}</div>
+          <div><span class="detail-label-inline">Entity Id:</span> {{ selectedLog.entityId || '—' }}</div>
+          <div>
+            <span class="detail-label-inline">Outcome:</span>
+            <Tag
+              :value="getOutcomeLabel(selectedLog.outcome)"
+              :severity="getOutcomeSeverity(selectedLog.outcome)"
+              style="font-size: 0.65rem; margin-left: 0.35rem"
+            />
+          </div>
+          <div><span class="detail-label-inline">IP Address:</span> {{ selectedLog.ipAddress || '—' }}</div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-label">Message</div>
+          <pre class="detail-code">{{ selectedLog.message }}</pre>
+        </div>
+        <div v-if="selectedLog.metadataJson" class="detail-section">
+          <div class="detail-label">Metadata JSON</div>
+          <pre class="detail-code">{{ tryFormatJson(selectedLog.metadataJson) }}</pre>
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -359,7 +446,8 @@ watch(
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
@@ -368,13 +456,21 @@ watch(
   width: 140px;
 }
 
+.filter-event {
+  width: 240px;
+}
+
+.filter-entity {
+  width: 180px;
+}
+
 .filter-date {
-  width: 170px;
+  width: 180px;
 }
 
 .filter-search {
   flex: 1;
-  min-width: 200px;
+  min-width: 220px;
 }
 
 .empty-state {
@@ -440,6 +536,7 @@ watch(
 .col-level { width: 70px; }
 .col-time { width: 160px; white-space: nowrap; }
 .col-type { width: 220px; }
+.col-entity { width: 180px; }
 .col-user { width: 120px; }
 .col-message { min-width: 0; }
 

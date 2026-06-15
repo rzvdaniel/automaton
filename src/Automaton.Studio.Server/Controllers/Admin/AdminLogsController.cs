@@ -3,6 +3,7 @@ using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Automaton.Studio.Server.Controllers.Admin;
 
@@ -14,6 +15,16 @@ namespace Automaton.Studio.Server.Controllers.Admin;
 [Authorize(Policy = "Administrators")]
 public class AdminLogsController : ControllerBase
 {
+    private static readonly string[] EntityDisplayMetadataKeys =
+    [
+        "name",
+        "appName",
+        "runnerName",
+        "userName",
+        "email",
+        "keyPrefix"
+    ];
+
     private readonly ApplicationDbContext dbContext;
 
     public AdminLogsController(ApplicationDbContext dbContext)
@@ -95,6 +106,7 @@ public class AdminLogsController : ControllerBase
                 Action = x.Action,
                 EntityType = x.EntityType,
                 EntityId = x.EntityId,
+                EntityDisplay = GetEntityDisplay(x.EntityType, x.EntityId, x.MetadataJson),
                 UserId = x.UserId,
                 TargetUserId = x.TargetUserId,
                 UserName = x.UserName,
@@ -116,6 +128,34 @@ public class AdminLogsController : ControllerBase
         });
     }
 
+    [HttpGet("event-types")]
+    public async Task<ActionResult<List<string>>> GetEventTypes(CancellationToken cancellationToken)
+    {
+        var eventTypes = await dbContext.AuditEvents
+            .AsNoTracking()
+            .Where(x => x.EventType != null && x.EventType != string.Empty)
+            .Select(x => x.EventType)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+
+        return Ok(eventTypes);
+    }
+
+    [HttpGet("entity-types")]
+    public async Task<ActionResult<List<string>>> GetEntityTypes(CancellationToken cancellationToken)
+    {
+        var entityTypes = await dbContext.AuditEvents
+            .AsNoTracking()
+            .Where(x => x.EntityType != null && x.EntityType != string.Empty)
+            .Select(x => x.EntityType)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+
+        return Ok(entityTypes);
+    }
+
     /// <summary>
     /// Get distinct log levels present in the database (for filter dropdown).
     /// </summary>
@@ -129,5 +169,56 @@ public class AdminLogsController : ControllerBase
             .ToListAsync();
 
         return Ok(levels);
+    }
+
+    private static string? GetEntityDisplay(string entityType, Guid? entityId, string? metadataJson)
+    {
+        var metadataName = TryReadMetadataDisplayName(metadataJson);
+        if (!string.IsNullOrWhiteSpace(metadataName))
+        {
+            return metadataName;
+        }
+
+        return entityId?.ToString();
+    }
+
+    private static string? TryReadMetadataDisplayName(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+        {
+            return null;
+        }
+
+        var trimmed = metadataJson.TrimStart();
+        if (!trimmed.StartsWith('{'))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            var root = doc.RootElement;
+
+            foreach (var propertyName in EntityDisplayMetadataKeys)
+            {
+                if (root.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String)
+                {
+                    var value = property.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // MetadataJson is user-facing display context here, not a strict contract.
+            // If it is malformed, fall back to the entity id instead of failing the page.
+            return null;
+        }
+
+        return null;
     }
 }
