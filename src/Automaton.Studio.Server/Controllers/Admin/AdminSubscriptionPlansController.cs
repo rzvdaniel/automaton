@@ -1,7 +1,9 @@
 using Automaton.Studio.Server.Data;
+using Automaton.Studio.Server.Constants;
 using Automaton.Studio.Server.Entities;
 using Automaton.Studio.Server.Models;
 using Automaton.Studio.Server.Services;
+using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -20,18 +22,18 @@ public class AdminSubscriptionPlansController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
-    private readonly ILogger<AdminSubscriptionPlansController> _logger;
+    private readonly IAuditEventService _auditEventService;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         HostedRunnerProvisioningService hostedRunnerProvisioningService,
-        ILogger<AdminSubscriptionPlansController> logger)
+        IAuditEventService auditEventService)
     {
         _db = db;
         _userManager = userManager;
         _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
-        _logger = logger;
+        _auditEventService = auditEventService;
     }
 
     #region Plans CRUD
@@ -86,7 +88,25 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         _db.SubscriptionPlans.Add(plan);
         await _db.SaveChangesAsync();
-        _logger.LogInformation("Subscription plan '{Name}' created (id={Id})", plan.Name, plan.Id);
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.SubscriptionPlanCreated,
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.SubscriptionPlan,
+            EntityId = plan.Id,
+            Message = $"Subscription plan '{plan.Name}' was created",
+            Metadata = new
+            {
+                plan.Name,
+                plan.Description,
+                plan.PriceUsd,
+                plan.IsDefault,
+                plan.IsActive,
+                plan.SortOrder,
+                HasStripeProductId = !string.IsNullOrWhiteSpace(plan.StripeProductId),
+                HasStripePriceId = !string.IsNullOrWhiteSpace(plan.StripePriceId)
+            }
+        });
 
         return CreatedAtAction(nameof(GetPlan), new { id = plan.Id }, ToResponse(plan));
     }
@@ -161,9 +181,10 @@ public class AdminSubscriptionPlansController : ControllerBase
         var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
         if (user == null) return NotFound("User not found.");
 
+        SubscriptionPlan? plan = null;
         if (req.PlanId.HasValue)
         {
-            var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == req.PlanId.Value);
+            plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == req.PlanId.Value);
             if (plan == null) return NotFound("Subscription plan not found.");
         }
 
@@ -179,9 +200,24 @@ public class AdminSubscriptionPlansController : ControllerBase
             await _hostedRunnerProvisioningService.DisableHostedRunnersForUserAsync(userId, "Admin removed subscription plan.");
         }
 
-        _logger.LogInformation(
-            "Plan {PlanId} assigned to user {UserId}",
-            req.PlanId, userId);
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.SubscriptionPlanAssignedToUser,
+            Action = AuditActions.Assigned,
+            EntityType = AuditEntityTypes.User,
+            EntityId = user.Id,
+            TargetUserId = user.Id,
+            Message = req.PlanId.HasValue
+                ? $"Subscription plan '{plan!.Name}' was assigned to user '{user.Email ?? user.Id.ToString()}'"
+                : $"Subscription plan was removed from user '{user.Email ?? user.Id.ToString()}'",
+            Metadata = new
+            {
+                user.Email,
+                PlanId = req.PlanId,
+                PlanName = plan?.Name,
+                HostedRunnerProvisioningTriggered = req.PlanId.HasValue
+            }
+        });
 
         return NoContent();
     }
@@ -195,10 +231,20 @@ public class AdminSubscriptionPlansController : ControllerBase
         user.CanAccessHostedRunnerTestPlans = req.Enabled;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "Hosted runner test-plan access for user {UserId} set to {Enabled}",
-            userId,
-            req.Enabled);
+        await _auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            EventType = AuditEventTypes.HostedRunnerTestPlanAccessChanged,
+            Action = AuditActions.Changed,
+            EntityType = AuditEntityTypes.User,
+            EntityId = user.Id,
+            TargetUserId = user.Id,
+            Message = $"Hosted runner test-plan access for user '{user.Email ?? user.Id.ToString()}' was set to {req.Enabled}",
+            Metadata = new
+            {
+                user.Email,
+                req.Enabled
+            }
+        });
 
         return NoContent();
     }
