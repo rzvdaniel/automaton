@@ -63,29 +63,3 @@ public class PagedResult<T>
     public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }
 
-/// <summary>
-/// DTO for admin Serilog log entries.
-/// </summary>
-public class AdminLogEntryDto
-{
-    public string Id { get; set; }
-    public string Message { get; set; }
-    public string Level { get; set; }
-    public DateTime? Timestamp { get; set; }
-    public string Exception { get; set; }
-    public string Properties { get; set; }
-    public string UserName { get; set; }
-}
-
-/// <summary>
-/// Query parameters for admin log viewer.
-/// </summary>
-public class AdminLogQuery
-{
-    public string Level { get; set; }
-    public DateTime? From { get; set; }
-    public DateTime? To { get; set; }
-    public string Search { get; set; }
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 100;
-}

@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * AdminLogsView.vue
- * Structured Serilog log viewer for administrators.
- */
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
@@ -13,18 +9,24 @@ import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
 import apiClient from '@/shared/services/api/axios-instance'
 
-interface LogEntry {
+interface AuditEventEntry {
   id: string
+  action: string
+  entityType: string
+  entityId?: string | null
+  userId?: string | null
+  targetUserId?: string | null
+  userName?: string | null
+  outcome: string
+  eventType: string
   message: string
-  level: string
-  timestamp?: string
-  exception?: string
-  properties?: string
-  userName?: string
+  metadataJson?: string | null
+  ipAddress?: string | null
+  createdAtUtc: string
 }
 
-interface LogPage {
-  items: LogEntry[]
+interface AuditEventPage {
+  items: AuditEventEntry[]
   totalCount: number
   page: number
   pageSize: number
@@ -32,7 +34,7 @@ interface LogPage {
 }
 
 const route = useRoute()
-const logs = ref<LogEntry[]>([])
+const logs = ref<AuditEventEntry[]>([])
 const totalCount = ref(0)
 const totalPages = ref(0)
 const isLoading = ref(false)
@@ -59,7 +61,7 @@ function getQueryValue(value: unknown): string | null {
 }
 
 function syncFilterFromRoute() {
-  filter.value.level = getQueryValue(route.query.level)
+  filter.value.level = getQueryValue(route.query.outcome)
   filter.value.search = getQueryValue(route.query.search) ?? ''
   filter.value.page = 1
 }
@@ -80,12 +82,12 @@ async function loadLogs() {
       page: filter.value.page,
       pageSize: filter.value.pageSize,
     }
-    if (filter.value.level) params.level = filter.value.level
-    if (filter.value.from) params.from = filter.value.from.toISOString()
-    if (filter.value.to) params.to = filter.value.to.toISOString()
+    if (filter.value.level) params.outcome = filter.value.level
+    if (filter.value.from) params.fromUtc = filter.value.from.toISOString()
+    if (filter.value.to) params.toUtc = filter.value.to.toISOString()
     if (filter.value.search) params.search = filter.value.search
 
-    const { data } = await apiClient.get<LogPage>('/api/admin/logs', { params })
+    const { data } = await apiClient.get<AuditEventPage>('/api/admin/logs/audit-events', { params })
     logs.value = data.items
     totalCount.value = data.totalCount
     totalPages.value = data.totalPages
@@ -119,28 +121,17 @@ function toggleLog(id: string) {
   expandedLogId.value = expandedLogId.value === id ? null : id
 }
 
-function getLevelSeverity(level?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-  switch (level?.toLowerCase()) {
-    case 'verbose':
-    case 'debug': return 'secondary'
-    case 'information': return 'info'
-    case 'warning': return 'warn'
-    case 'error': return 'danger'
-    case 'fatal': return 'danger'
+function getOutcomeSeverity(outcome?: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+  switch (outcome?.toLowerCase()) {
+    case 'success': return 'success'
+    case 'failed': return 'danger'
+    case 'denied': return 'warn'
     default: return 'secondary'
   }
 }
 
-function getLevelLabel(level?: string) {
-  switch (level?.toLowerCase()) {
-    case 'information': return 'INFO'
-    case 'warning': return 'WARN'
-    case 'error': return 'ERR'
-    case 'fatal': return 'FATAL'
-    case 'debug': return 'DBG'
-    case 'verbose': return 'VRB'
-    default: return level?.slice(0, 4).toUpperCase() ?? '?'
-  }
+function getOutcomeLabel(outcome?: string) {
+  return outcome?.toUpperCase() ?? '?'
 }
 
 function formatDate(dateStr?: string) {
@@ -178,9 +169,9 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [route.query.level, route.query.search],
-  ([level, search], [previousLevel, previousSearch]) => {
-    if (level === previousLevel && search === previousSearch) {
+  () => [route.query.outcome, route.query.search],
+  ([outcome, search], [previousOutcome, previousSearch]) => {
+    if (outcome === previousOutcome && search === previousSearch) {
       return
     }
 
@@ -225,7 +216,7 @@ watch(
         :options="[{ label: 'All levels', value: null }, ...availableLevels.map(l => ({ label: l, value: l }))]"
         option-label="label"
         option-value="value"
-        placeholder="Level"
+        placeholder="Outcome"
         size="small"
         class="filter-level"
         @change="applyFilter"
@@ -250,7 +241,7 @@ watch(
       />
       <InputText
         v-model="filter.search"
-        placeholder="Search messages…"
+        placeholder="Search events, entities, users…"
         size="small"
         class="filter-search"
         @keyup.enter="applyFilter"
@@ -275,50 +266,51 @@ watch(
       <table class="logs-table">
         <thead>
           <tr>
-            <th class="col-level">Level</th>
+            <th class="col-level">Outcome</th>
             <th class="col-time">Timestamp</th>
+            <th class="col-type">Event</th>
             <th class="col-user">User</th>
             <th class="col-message">Message</th>
-            <th class="col-exc">Exc</th>
           </tr>
         </thead>
         <tbody>
           <template v-for="log in logs" :key="log.id">
             <tr
               class="log-row"
-              :class="{ 'log-error': log.level === 'Error' || log.level === 'Fatal', expanded: expandedLogId === log.id }"
+              :class="{ 'log-error': log.outcome === 'Failed', expanded: expandedLogId === log.id }"
               @click="toggleLog(log.id)"
             >
               <td class="col-level">
                 <Tag
-                  :value="getLevelLabel(log.level)"
-                  :severity="getLevelSeverity(log.level)"
+                  :value="getOutcomeLabel(log.outcome)"
+                  :severity="getOutcomeSeverity(log.outcome)"
                   style="font-size: 0.65rem"
                 />
               </td>
-              <td class="col-time text-sm text-color-secondary">{{ formatDate(log.timestamp) }}</td>
+              <td class="col-time text-sm text-color-secondary">{{ formatDate(log.createdAtUtc) }}</td>
+              <td class="col-type text-sm text-color-secondary">{{ log.eventType }}</td>
               <td class="col-user text-sm text-color-secondary">{{ log.userName || '—' }}</td>
               <td class="col-message text-sm">
                 {{ log.message?.slice(0, 150) }}{{ (log.message?.length ?? 0) > 150 ? '…' : '' }}
-              </td>
-              <td class="col-exc">
-                <i v-if="log.exception" class="pi pi-exclamation-circle" style="color: var(--p-red-400)"></i>
               </td>
             </tr>
             <tr v-if="expandedLogId === log.id" class="log-detail-row">
               <td colspan="5">
                 <div class="log-detail">
+                  <div class="detail-grid">
+                    <div><span class="detail-label-inline">Action:</span> {{ log.action }}</div>
+                    <div><span class="detail-label-inline">Entity:</span> {{ log.entityType }}<span v-if="log.entityId"> · {{ log.entityId }}</span></div>
+                    <div><span class="detail-label-inline">Actor:</span> {{ log.userId || '—' }}</div>
+                    <div><span class="detail-label-inline">Target:</span> {{ log.targetUserId || '—' }}</div>
+                    <div><span class="detail-label-inline">IP:</span> {{ log.ipAddress || '—' }}</div>
+                  </div>
                   <div v-if="log.message" class="detail-section">
                     <div class="detail-label">Message</div>
                     <pre class="detail-code">{{ log.message }}</pre>
                   </div>
-                  <div v-if="log.exception" class="detail-section">
-                    <div class="detail-label error-label">Exception</div>
-                    <pre class="detail-code error-code">{{ log.exception }}</pre>
-                  </div>
-                  <div v-if="log.properties" class="detail-section">
-                    <div class="detail-label">Properties</div>
-                    <pre class="detail-code">{{ tryFormatJson(log.properties) }}</pre>
+                  <div v-if="log.metadataJson" class="detail-section">
+                    <div class="detail-label">Metadata</div>
+                    <pre class="detail-code">{{ tryFormatJson(log.metadataJson) }}</pre>
                   </div>
                 </div>
               </td>
@@ -447,12 +439,26 @@ watch(
 
 .col-level { width: 70px; }
 .col-time { width: 160px; white-space: nowrap; }
+.col-type { width: 220px; }
 .col-user { width: 120px; }
-.col-exc { width: 30px; text-align: center; }
 .col-message { min-width: 0; }
 
 .log-detail {
   padding: 0.5rem 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+
+.detail-label-inline {
+  font-weight: 600;
+  color: var(--p-text-color);
 }
 
 .detail-section {
