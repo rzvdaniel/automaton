@@ -59,7 +59,7 @@ public class ScriptEngineSettingsReporter
                 var response = await _httpClient.PutAsync(url, content, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.Information("Python environment autodetection saved to server for runner {RunnerId}", runnerId);
+                    _logger.Debug("Python environment autodetection saved to server for runner {RunnerId}", runnerId);
                 }
                 else
                 {

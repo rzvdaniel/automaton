@@ -322,7 +322,7 @@ public class FlowsService
                         // Replace value with reference in the flow
                         variable.Value = $"${{sensitive:{sensitiveVar.Id}}}";
 
-                        logger.Information("Encrypted sensitive variable '{Name}' for flow {FlowId}", variable.Name, flowId);
+                        logger.Debug("Encrypted sensitive variable '{Name}' for flow {FlowId}", variable.Name, flowId);
                     }
                     catch (Exception ex)
                     {
@@ -357,7 +357,7 @@ public class FlowsService
                 if (decryptedValue != null)
                 {
                     variable.Value = decryptedValue;
-                    logger.Information("Decrypted sensitive variable '{Name}' for execution", variable.Name);
+                    logger.Debug("Decrypted sensitive variable '{Name}' for execution", variable.Name);
                 }
                 else
                 {
@@ -409,7 +409,7 @@ public class FlowsService
                 await sensitiveVariableService.DeleteSensitiveVariableAsync(sensitiveVar.Id, userId);
             }
 
-            logger.Information("Deleted {Count} sensitive variables for flow {FlowId}", sensitiveVars.Count, flowId);
+            logger.Debug("Deleted {Count} sensitive variables for flow {FlowId}", sensitiveVars.Count, flowId);
         }
         catch (Exception ex)
         {

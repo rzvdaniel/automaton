@@ -59,7 +59,7 @@ public class RunnerWorkflowExecutionPersistenceService : IWorkflowExecutionPersi
             
             if (response.IsSuccessStatusCode)
             {
-                logger.Information("Successfully saved workflow execution {ExecutionId} via HTTP API with {LogCount} log entries", 
+                logger.Debug("Successfully saved workflow execution {ExecutionId} via HTTP API with {LogCount} log entries", 
                     workflowExecution.Id, workflowExecution.Logs.Count);
             }
             else

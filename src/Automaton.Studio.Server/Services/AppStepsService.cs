@@ -98,7 +98,7 @@ public class AppStepsService
     /// </summary>
     public async Task<List<LinkedStepInfo>> GetLinkedStepsAsync(Guid appId)
     {
-        logger.Information("Getting linked steps for app {AppId}", appId);
+        logger.Debug("Getting linked steps for app {AppId}", appId);
 
         // Verify user has access to this app
         var hasAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -124,7 +124,7 @@ public class AppStepsService
             result.Add(stepInfo);
         }
 
-        logger.Information("Found {Count} linked steps for app {AppId}", result.Count, appId);
+        logger.Debug("Found {Count} linked steps for app {AppId}", result.Count, appId);
         return result;
     }
 
@@ -133,7 +133,7 @@ public class AppStepsService
     /// </summary>
     public async Task<List<LinkedStepInfo>> GetAvailableStepsAsync(Guid appId)
     {
-        logger.Information("Getting available steps for app {AppId}", appId);
+        logger.Debug("Getting available steps for app {AppId}", appId);
 
         // Verify user has access to this app
         var hasAccess = await authorizationService.GetAccessibleAppsQuery()
@@ -161,7 +161,7 @@ public class AppStepsService
             result.Add(stepInfo);
         }
 
-        logger.Information("Found {Count} available steps for app {AppId}", result.Count, appId);
+        logger.Debug("Found {Count} available steps for app {AppId}", result.Count, appId);
         return result;
     }
 
@@ -196,7 +196,7 @@ public class AppStepsService
 
         if (existingLink != null)
         {
-            logger.Information("Step {StepId} is already linked to app {AppId}", stepId, appId);
+            logger.Debug("Step {StepId} is already linked to app {AppId}", stepId, appId);
             return; // Already linked, nothing to do
         }
 
@@ -258,7 +258,7 @@ public class AppStepsService
 
         if (!newStepIds.Any())
         {
-            logger.Information("All {Count} steps are already linked to app {AppId}", stepIdList.Count, appId);
+            logger.Debug("All {Count} steps are already linked to app {AppId}", stepIdList.Count, appId);
             return;
         }
 
@@ -300,7 +300,7 @@ public class AppStepsService
 
         if (link == null)
         {
-            logger.Information("Step {StepId} was not linked to app {AppId}", stepId, appId);
+            logger.Debug("Step {StepId} was not linked to app {AppId}", stepId, appId);
             return; // Not linked, nothing to do
         }
 

@@ -110,7 +110,7 @@ public class SensitiveVariableService
 
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Sensitive variable {Id} created/updated for {ResourceType} {ResourceId}",
+        logger.LogDebug("Sensitive variable {Id} created/updated for {ResourceType} {ResourceId}",
             sensitiveVar.Id, resourceType, resourceId);
 
         return sensitiveVar;
@@ -227,7 +227,7 @@ public class SensitiveVariableService
         sensitiveVar.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
 
-        logger.LogInformation("Sensitive variable {Id} deleted", id);
+        logger.LogDebug("Sensitive variable {Id} deleted", id);
         return true;
     }
 

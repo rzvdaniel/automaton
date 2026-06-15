@@ -60,7 +60,7 @@ public class RunnerSettingsService
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.Information("No script engine settings configured for runner {RunnerId}", runnerId);
+                    _logger.Debug("No script engine settings configured for runner {RunnerId}", runnerId);
                     _cachedSettings = null;
                     _lastLoadTime = DateTime.UtcNow;
                     return null;
@@ -77,11 +77,11 @@ public class RunnerSettingsService
 
             if (settings?.Python != null)
             {
-                _logger.Information("Loaded script engine settings for runner {RunnerId}", runnerId);
+                _logger.Debug("Loaded script engine settings for runner {RunnerId}", runnerId);
                                 
                 if (settings.Python.PythonPaths?.Any() == true)
                 {
-                    _logger.Information("Python paths configured: {Count} paths", settings.Python.PythonPaths.Count);
+                    _logger.Debug("Python paths configured: {Count} paths", settings.Python.PythonPaths.Count);
                 }
             }
 
