@@ -237,7 +237,7 @@ public class AppFilesController : ControllerBase
         var fileName = SanitizeFileName(file.FileName);
         var contentType = file.ContentType ?? "application/octet-stream";
 
-        logger.LogInformation(
+        logger.LogDebug(
             "[AppFilesController] Upload started: SessionId={SessionId} AppId={AppId} Runner={Runner} File={File} Size={Size}",
             sessionId, appId, runner.Name, fileName, file.Length);
 
@@ -270,7 +270,7 @@ public class AppFilesController : ControllerBase
             // Wait for runner to ACK that all chunks are written to disk
             await completionTask;
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "[AppFilesController] Upload complete: SessionId={SessionId} Chunks={ChunkCount}",
                 sessionId, chunkIndex);
 
@@ -296,7 +296,7 @@ public class AppFilesController : ControllerBase
 
         var channel = downloadRegistry.Register(sessionId);
 
-        logger.LogInformation(
+        logger.LogDebug(
             "[AppFilesController] Download started: SessionId={SessionId} AppId={AppId} Runner={Runner}",
             sessionId, appId, runner.Name);
 
@@ -348,7 +348,7 @@ public class AppFilesController : ControllerBase
                 offset += chunk.Data.Length;
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "[AppFilesController] Download complete: SessionId={SessionId}", sessionId);
         }
         catch (Exception ex)

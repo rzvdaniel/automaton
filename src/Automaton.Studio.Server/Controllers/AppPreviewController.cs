@@ -68,7 +68,7 @@ public class AppPreviewController : ControllerBase
 
             if (ownerId != Guid.Empty && ownerId != userId)
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Preview content stored under owner {OwnerId} for app {AppId} (requested by {UserId})",
                     ownerId,
                     appId,
@@ -78,7 +78,7 @@ public class AppPreviewController : ControllerBase
             // Store the HTML content in memory
             previewStorage.StorePreviewContent(effectiveUserId, appId, request.Html, request.Files);
 
-            logger.LogInformation("Stored preview content for app {AppId} (user {UserId})", appId, effectiveUserId);
+            logger.LogDebug("Stored preview content for app {AppId} (user {UserId})", appId, effectiveUserId);
 
             return Ok(new { success = true });
         }

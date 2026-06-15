@@ -129,7 +129,7 @@ public class UserSettingsService
             var cacheKey = GetCacheKey(userId, key);
             _cache.Set(cacheKey, value, CacheDuration);
 
-            _logger.LogInformation("Saved setting {Key} for user {UserId}", key, userId);
+            _logger.LogDebug("Saved setting {Key} for user {UserId}", key, userId);
         }
         catch (Exception ex)
         {

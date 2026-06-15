@@ -78,12 +78,12 @@ public class FlowExecutionsController : BaseController
 
             // Log the incoming request for debugging
             var logger = HttpContext.RequestServices.GetService<ILogger<FlowExecutionsController>>();
-            logger?.LogInformation("Received flow execution save request for {ExecutionId} of flow {FlowId} with {LogCount} logs", 
+            logger?.LogDebug("Received flow execution save request for {ExecutionId} of flow {FlowId} with {LogCount} logs", 
                 flowExecution.Id, flowExecution.FlowId, flowExecution.Logs?.Count ?? 0);
 
             var result = await Task.Run(() => flowExecutionService.Add(flowExecution), cancellationToken);
             
-            logger?.LogInformation("Successfully saved flow execution {ExecutionId}", flowExecution.Id);
+            logger?.LogDebug("Successfully saved flow execution {ExecutionId}", flowExecution.Id);
             return Ok(new { Success = true, Message = "Flow execution saved successfully", ExecutionId = flowExecution.Id });
         }
         catch (Exception ex)

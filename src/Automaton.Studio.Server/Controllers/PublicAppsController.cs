@@ -33,7 +33,7 @@ public class PublicAppsController : ControllerBase
     {
         try
         {
-            logger.LogInformation("[PublicAppsController] Fetching public apps for user: {PublicUsername}", publicUsername);
+            logger.LogDebug("[PublicAppsController] Fetching public apps for user: {PublicUsername}", publicUsername);
 
             // Validate username format (prevent injection)
             if (string.IsNullOrWhiteSpace(publicUsername) || publicUsername.Length > 50 || !IsValidUsername(publicUsername))
@@ -58,7 +58,7 @@ public class PublicAppsController : ControllerBase
                 Apps = apps
             };
 
-            logger.LogInformation("[PublicAppsController] Returning {AppCount} public apps for user: {PublicUsername}",
+            logger.LogDebug("[PublicAppsController] Returning {AppCount} public apps for user: {PublicUsername}",
                 apps.Count, publicUsername);
 
             return Ok(response);

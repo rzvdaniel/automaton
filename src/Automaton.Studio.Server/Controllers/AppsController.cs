@@ -457,7 +457,7 @@ public class AppsController : BaseController
             var imageUrl = $"/app-thumbnails/{id}/{fileName}";
             await appsService.UpdateThumbnailUrlAsync(id, imageUrl);
 
-            logger.LogInformation("[AppsController] Thumbnail uploaded for app {AppId}: {FileName} by user {User}",
+            logger.LogDebug("[AppsController] Thumbnail uploaded for app {AppId}: {FileName} by user {User}",
                 id, fileName, User.Identity?.Name);
 
             return Ok(new { imageUrl = imageUrl });
@@ -553,7 +553,7 @@ public class AppsController : BaseController
             var imageUrl = $"/app-screenshots/{id}/{fileName}";
             var screenshot = await appsService.AddScreenshotAsync(id, imageUrl);
 
-            logger.LogInformation("[AppsController] Screenshot uploaded for app {AppId}: {FileName} by user {User}",
+            logger.LogDebug("[AppsController] Screenshot uploaded for app {AppId}: {FileName} by user {User}",
                 id, fileName, User.Identity?.Name);
 
             return Ok(screenshot);
@@ -639,7 +639,7 @@ public class AppsController : BaseController
                 try
                 {
                     file.Delete();
-                    logger.LogInformation("[AppsController] Deleted old image: {FilePath}", file.FullName);
+                    logger.LogDebug("[AppsController] Deleted old image: {FilePath}", file.FullName);
                 }
                 catch (Exception ex)
                 {

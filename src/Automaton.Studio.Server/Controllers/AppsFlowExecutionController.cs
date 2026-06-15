@@ -63,7 +63,7 @@ public class AppsFlowExecutionController : ControllerBase
     {
         request ??= new WebAppFlowExecutionRequest();
 
-        logger.LogInformation("Flow execution request for app '{AppSlug}', identifier '{FlowIdentifier}'",
+        logger.LogDebug("Flow execution request for app '{AppSlug}', identifier '{FlowIdentifier}'",
             appSlug, flowIdentifier);
 
         // 1. Load published app metadata and check auth
@@ -103,7 +103,7 @@ public class AppsFlowExecutionController : ControllerBase
             flowId = resolved.Value;
         }
 
-        logger.LogInformation("Executing flow {FlowId} for app {AppSlug} as owner {OwnerId}", flowId, appSlug, ownerId);
+        logger.LogDebug("Executing flow {FlowId} for app {AppSlug} as owner {OwnerId}", flowId, appSlug, ownerId);
 
         // 4. Load flow and apply inputs
         var flowToExecute = ownerFlowsService.Get(flowId);
@@ -162,7 +162,7 @@ public class AppsFlowExecutionController : ControllerBase
         var firstResult = results.FirstOrDefault();
         var success = firstResult?.Status == WorkflowStatus.Success;
 
-        logger.LogInformation("Flow execution complete: FlowId={FlowId}, Success={Success}, AppSlug={AppSlug}, OwnerId={OwnerId}",
+        logger.LogDebug("Flow execution complete: FlowId={FlowId}, Success={Success}, AppSlug={AppSlug}, OwnerId={OwnerId}",
             flowId, success, appSlug, ownerId);
 
         return Ok(new WebAppFlowExecutionResponse
@@ -195,7 +195,7 @@ public class AppsFlowExecutionController : ControllerBase
     {
         request ??= new WebAppFlowExecutionRequest();
 
-        logger.LogInformation("Preview flow execution request for app '{AppId}', identifier '{FlowIdentifier}'",
+        logger.LogDebug("Preview flow execution request for app '{AppId}', identifier '{FlowIdentifier}'",
             appId, flowIdentifier);
 
         var webApp = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);

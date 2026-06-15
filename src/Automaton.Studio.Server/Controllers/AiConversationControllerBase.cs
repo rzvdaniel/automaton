@@ -144,7 +144,7 @@ public abstract class AiConversationControllerBase : BaseController
                 return;
             }
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Starting AI conversation for user {UserId}, provider {Provider}, model {Model}, systemKey={IsSystemKey}",
                 userId, provider, model, isSystemKey);
 
@@ -264,7 +264,7 @@ public abstract class AiConversationControllerBase : BaseController
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("AI conversation stream cancelled");
+            _logger.LogDebug("AI conversation stream cancelled");
 
             // Client cancelled/closed stream — still persist consumed token usage.
             await FlushPendingTokenUsageIfPossibleAsync(sessionId, userId, pendingUpdates);
@@ -317,7 +317,7 @@ public abstract class AiConversationControllerBase : BaseController
         {
             var session = await _chatHistoryService.GetOrCreateActiveSessionAsync(
                 ResourceType, request.ResourceId.Value, userId, provider, model);
-            _logger.LogInformation("Auto-created session {SessionId} for resource {ResourceId}",
+            _logger.LogDebug("Auto-created session {SessionId} for resource {ResourceId}",
                 session.Id, request.ResourceId);
             return session.Id;
         }

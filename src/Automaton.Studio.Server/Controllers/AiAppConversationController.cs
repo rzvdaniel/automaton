@@ -103,7 +103,7 @@ public class AiAppConversationController : AiConversationControllerBase
                 AppVersionTrigger.NewGeneration,
                 aiSessionId: sessionId);
 
-            _logger.LogInformation("Created post-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, resourceId);
+            _logger.LogDebug("Created post-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, resourceId);
 
             if (!_systemAiService.IsAvailable) return;
 
@@ -118,7 +118,7 @@ public class AiAppConversationController : AiConversationControllerBase
                 userId.ToString());
 
             await _appVersionService.UpdateSummaryAsync(snapshot.Id, summary);
-            _logger.LogInformation("Updated version summary for snapshot {SnapshotId}", snapshot.Id);
+            _logger.LogDebug("Updated version summary for snapshot {SnapshotId}", snapshot.Id);
         }
         catch (Exception ex)
         {
@@ -231,7 +231,7 @@ public class AiAppConversationController : AiConversationControllerBase
 
         if (history?.Count > 0)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Adding continuation context for session {SessionId} ({Count} messages)", sessionId, history.Count);
             const string continuationSuffix = "\n\nIMPORTANT: This is a continuation of a previous conversation. Review the conversation history provided above and continue naturally from where we left off. Do not restart, regenerate, or repeat work that has already been completed unless explicitly asked to do so.";
             // Continuation context goes into instructionBlock slot — it's per-session, not cached
@@ -248,7 +248,7 @@ public class AiAppConversationController : AiConversationControllerBase
 
                 if (memoryBlock is not null)
                 {
-                    _logger.LogInformation(
+                    _logger.LogDebug(
                         "Injecting app memory block for new session on existing app {AppId}", request.ResourceId.Value);
                     return new SystemPromptParts(basePrompt, instructionBlock, memoryBlock);
                 }
@@ -290,7 +290,7 @@ public class AiAppConversationController : AiConversationControllerBase
         {
             var result = await _promptClassifier.ClassifyAsync(userMessage, userId.ToString());
             newTier = result.Tier;
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Classified as {Tier} (confidence={Confidence}) for session {SessionId}",
                 result.Tier, result.Confidence, sessionId);
         }
@@ -306,7 +306,7 @@ public class AiAppConversationController : AiConversationControllerBase
 
         if (resolved != storedTier)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Tier upgraded from {StoredTier} to {NewTier} for session {SessionId}",
                 storedTier?.ToString() ?? "none", resolved, sessionId);
             await _chatHistoryService.UpdateSessionComplexityTierAsync(sessionId, resolved.ToString()!, userId);
