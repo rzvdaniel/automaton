@@ -32,7 +32,6 @@ public class CustomStep : WorkflowStep
 
         void OnScriptTextWrittenLocal(object sender, string text)
         {
-            logger.Information("{Text}", text);
             logs.Add(text);
         }
 

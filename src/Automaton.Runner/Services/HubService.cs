@@ -153,7 +153,7 @@ public class HubService
                 var attempts = await BuildAndConnectWithRetry(apiKey, hubUrl);
                 
                 // If we get here, connection succeeded
-                logger.Information("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
+                logger.Debug("Successfully connected via continuous retry loop (attempts: {Attempts})", attempts);
 
                 // Conditional console output based on attempts
                 if (attempts <= 1)
@@ -197,7 +197,7 @@ public class HubService
             }
         }
         
-        logger.Information("Continuous retry loop terminated");
+        logger.Debug("Continuous retry loop terminated");
     }
 
     private async Task<int> BuildAndConnectWithRetry(string apiKey, string hubUrl)
@@ -326,7 +326,7 @@ public class HubService
             connection.On<WelcomeRunnerMessage>("WelcomeRunner", (message) =>
             {
                 var apiColor = string.IsNullOrWhiteSpace(message.ApiColor) ? "(unset)" : message.ApiColor;
-                logger.Information(
+                logger.Debug(
                     "Runner accepted by API instance {ApiInstanceId} color {ApiColor}",
                     message.ApiInstanceId,
                     apiColor);
@@ -381,7 +381,7 @@ public class HubService
                 }
                 else
                 {
-                    logger.Information("Connection closed gracefully");
+                    logger.Debug("Connection closed gracefully");
                     WriteLine("✅ Connection closed");
                 }
             };
@@ -436,7 +436,7 @@ public class HubService
             await SendHeartbeatAsync();
 
             // Use logger for success and avoid duplicate console messages — the retry loop will report higher-level status
-            logger.Information("Connected to hub at {HubUrl}", hubUrl);
+            logger.Debug("Connected to hub at {HubUrl}", hubUrl);
         }
         catch (Exception ex)
         {

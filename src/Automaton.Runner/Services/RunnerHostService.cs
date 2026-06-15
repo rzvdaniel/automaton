@@ -60,7 +60,7 @@ public class RunnerHostService
                 throw new InvalidOperationException("API key not configured. Set AUTOMATON_API_KEY environment variable.");
             }
 
-            logger.Information("Service configuration valid - Server: {Server}", configService.BaseUrl);
+            logger.Debug("Service configuration valid - Server: {Server}", configService.BaseUrl);
 
             // Set up HTTP client authentication
             await SetupHttpClientAuth();
@@ -77,7 +77,7 @@ public class RunnerHostService
                     runnerName = $"Service-{Environment.MachineName}";
                 }
                 
-                logger.Information("Registering runner with name: {RunnerName}", runnerName);
+                logger.Debug("Registering runner with name: {RunnerName}", runnerName);
                 var registerSuccess = await RegisterRunnerAsync(runnerName);
 
                 if (!registerSuccess)
@@ -855,7 +855,7 @@ public class RunnerHostService
             if (response.IsSuccessStatusCode)
             {
                 await storageService.SaveRunnerConfigAsync(runnerId.ToString(), runnerName);
-                logger.Information("Runner {RunnerName} {Action} with ID {RunnerId}", runnerName, isUpdate ? "updated" : "registered", runnerId);
+                logger.Debug("Runner {RunnerName} {Action} with ID {RunnerId}", runnerName, isUpdate ? "updated" : "registered", runnerId);
                 WriteLine($"? Runner {(isUpdate ? "updated" : "registered")} successfully!");
                 return true;
             }
