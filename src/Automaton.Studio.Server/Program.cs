@@ -29,7 +29,6 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
-using Serilog.Sinks.MariaDB.Extensions;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Transactions;

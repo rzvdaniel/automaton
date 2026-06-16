@@ -121,7 +121,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         name: 'admin-logs',
         component: AdminLogsView,
         meta: {
-          title: 'Server Logs',
+          title: 'Audit Events',
         },
       },
       {

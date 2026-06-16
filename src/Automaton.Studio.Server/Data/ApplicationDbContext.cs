@@ -33,7 +33,6 @@ namespace Automaton.Studio.Server.Data
         public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
         public virtual DbSet<Schedule> Schedules { get; set; }
         public virtual DbSet<ScheduleUser> ScheduleUsers { get; set; }
-        public virtual DbSet<Log> Logs { get; set; }
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }

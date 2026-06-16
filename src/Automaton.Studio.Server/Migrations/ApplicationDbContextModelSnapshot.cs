@@ -1178,44 +1178,6 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("InvitationTokens");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Log", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Exception")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Level")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Message")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("MessageTemplate")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Properties")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime?>("Timestamp")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UserName")
-                        .HasColumnType("longtext");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Logs");
-                });
-
             modelBuilder.Entity("Automaton.Studio.Server.Entities.MarketplaceCategory", b =>
                 {
                     b.Property<Guid>("Id")

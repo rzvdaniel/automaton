@@ -58,7 +58,7 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/app-deploy-rules',
   },
   {
-    label: 'Server Logs',
+    label: 'Audit Events',
     icon: 'pi pi-list',
     to: '/admin/logs',
     routePrefix: '/admin/logs',
