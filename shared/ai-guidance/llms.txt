@@ -196,6 +196,44 @@ For persistent backend files:
 - `AUTOMATON_APP_DATA_DIR` is private runner storage and is not publicly served by default.
 - Controller subprocesses also receive `AUTOMATON_APP_ID`, `AUTOMATON_APP_HOME`, and `AUTOMATON_APP_BACKEND_DIR`.
 
+Canonical SQLite pattern:
+
+```python
+import os
+import sqlite3
+from pathlib import Path
+
+DATA_DIR = Path(os.environ["AUTOMATON_APP_DATA_DIR"])
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA_DIR / "app.sqlite3"
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+```
+
+Do not do this:
+
+```python
+from pathlib import Path
+
+DB_PATH = Path(__file__).with_name("app.sqlite3")
+```
+
+Backend/controller files are replaceable deploy output. SQLite databases, uploads, generated exports, session stores, and private app state must be placed under `AUTOMATON_APP_DATA_DIR`.
+
 Frontend code calls backend actions with:
 
 ```javascript
