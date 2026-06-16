@@ -372,7 +372,7 @@ watch(
           <div class="ai-workflow-grid">
             <div class="ai-workflow-copy">
               <span class="eyebrow">AI workflow</span>
-              <h2>Describe the app. Let AI build it.</h2>
+              <h2>Describe the app. <br /> Let AI build it.</h2>
               <p class="ai-workflow-lead">
                 Paste one starter prompt into Cursor, Claude Code, Codex, Copilot Chat, or Gemini. Your AI agent reads
                 Automaton&apos;s app instructions, creates the project with the CLI, and prepares it for deployment.
