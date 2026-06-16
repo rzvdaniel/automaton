@@ -163,7 +163,7 @@ public class InstructionsTool : IMcpTool
             var fs       = _fileSystemFactory.Create(arguments, context);
 
             await fs.WriteFileAsync(path, content);
-            _logger.LogInformation("Wrote instruction file {Path}", path);
+            _logger.LogDebug("Wrote instruction file {Path}", path);
 
             // Update _index.md
             await UpdateIndexAsync(fs, filename, content, reason);
@@ -211,7 +211,7 @@ public class InstructionsTool : IMcpTool
 
             var updated = existing.Replace(oldText, newText, StringComparison.Ordinal);
             await fs.WriteFileAsync(path, updated);
-            _logger.LogInformation("Updated instruction file {Path}", path);
+            _logger.LogDebug("Updated instruction file {Path}", path);
 
             await UpdateIndexAsync(fs, filename, updated, reason);
 

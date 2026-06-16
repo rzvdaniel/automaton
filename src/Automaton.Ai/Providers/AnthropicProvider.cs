@@ -71,7 +71,7 @@ public class AnthropicProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Anthropic conversation cancelled by client");
+            _logger.LogDebug("Anthropic conversation cancelled by client");
             throw;
         }
         catch (Exception ex)
@@ -346,7 +346,7 @@ public class AnthropicProvider : IAiProvider
                 var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
                 historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
                     request.ConversationHistory.Count,
                     historyToInclude.Count);
@@ -545,7 +545,7 @@ public class AnthropicProvider : IAiProvider
         // Log Anthropic prompt cache stats
         if (result.CacheReadTokens > 0 || result.CacheCreationTokens > 0)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "Anthropic cache stats — read: {CacheRead} tokens, creation: {CacheCreation} tokens (saved ~{Saved} tokens from billing)",
                 result.CacheReadTokens ?? 0,
                 result.CacheCreationTokens ?? 0,

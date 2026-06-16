@@ -57,7 +57,7 @@ public sealed class OpenAiCompatibleProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("{Provider} conversation cancelled by client", ProviderName);
+            _logger.LogDebug("{Provider} conversation cancelled by client", ProviderName);
             throw;
         }
         catch (ClientResultException crex)

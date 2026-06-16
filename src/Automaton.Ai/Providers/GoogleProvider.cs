@@ -59,7 +59,7 @@ public class GoogleProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Google Gemini conversation cancelled by client");
+            _logger.LogDebug("Google Gemini conversation cancelled by client");
             throw;
         }
         catch (Exception ex)
@@ -468,7 +468,7 @@ public class GoogleProvider : IAiProvider
                 var skip = history.Count - MaxConversationHistoryMessages;
                 history = history.Skip(skip).ToList();
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "Conversation history truncated: {Total} -> {Kept} messages (sliding window)",
                     request.ConversationHistory.Count, history.Count);
             }

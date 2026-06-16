@@ -53,7 +53,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     public void SetToolProvider(IMcpToolProvider? toolProvider)
     {
         _toolProvider = toolProvider;
-        _logger.LogInformation("Tool provider set: {ToolProviderType}", 
+        _logger.LogDebug("Tool provider set: {ToolProviderType}", 
             toolProvider?.GetType().Name ?? "null");
     }
 
@@ -61,7 +61,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     {
         try
         {
-            _logger.LogInformation("Starting conversation {ConversationId} with provider {Provider}", 
+            _logger.LogDebug("Starting conversation {ConversationId} with provider {Provider}", 
                 request.ConversationId, request.Provider);
 
             // Store conversation context with request context
@@ -89,7 +89,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
 
     public Task<ConversationResult> ContinueConversationAsync(string conversationId, string message, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Continuing conversation {ConversationId}", conversationId);
+        _logger.LogDebug("Continuing conversation {ConversationId}", conversationId);
         
         if (!_conversations.ContainsKey(conversationId))
         {
@@ -114,7 +114,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
     {
         try
         {
-            _logger.LogInformation("Ending conversation {ConversationId}", conversationId);
+            _logger.LogDebug("Ending conversation {ConversationId}", conversationId);
             _conversations.TryRemove(conversationId, out _);
             return Task.FromResult(true);
         }
@@ -135,7 +135,7 @@ public class AutomatonMcpClient : IAutomatonMcpClient, IDisposable
         
         try
         {
-            _logger.LogInformation("Calling AI provider {Provider} with model {Model}", request.Provider, request.Model);
+            _logger.LogDebug("Calling AI provider {Provider} with model {Model}", request.Provider, request.Model);
             
             string responseText;
             var apiCallCount = 0;

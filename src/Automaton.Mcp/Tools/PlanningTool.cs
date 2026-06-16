@@ -90,7 +90,7 @@ public class PlanningTool : IMcpTool
 
             var markdown = $"# Plan: {title}\n\n> {summary}\n\n_Created by AI on {DateTime.UtcNow:yyyy-MM-dd}_\n";
             await fs.WriteFileAsync(planFilePath, markdown);
-            _logger.LogInformation("Wrote implementation plan to {Path}", planFilePath);
+            _logger.LogDebug("Wrote implementation plan to {Path}", planFilePath);
 
             return new McpToolResult
             {

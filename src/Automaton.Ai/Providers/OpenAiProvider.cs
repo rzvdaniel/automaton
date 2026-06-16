@@ -49,7 +49,7 @@ public class OpenAiProvider : IAiProvider
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("OpenAI conversation cancelled by client");
+            _logger.LogDebug("OpenAI conversation cancelled by client");
             throw;
         }
         catch (Exception ex)
@@ -203,7 +203,7 @@ public class OpenAiProvider : IAiProvider
                 var skipCount = request.ConversationHistory.Count - MaxConversationHistoryMessages;
                 historyToInclude = request.ConversationHistory.Skip(skipCount).ToList();
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "Conversation history truncated: {TotalMessages} messages -> {KeptMessages} messages (sliding window)",
                     request.ConversationHistory.Count,
                     historyToInclude.Count);
