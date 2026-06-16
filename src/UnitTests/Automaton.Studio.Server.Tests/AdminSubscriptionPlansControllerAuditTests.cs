@@ -47,7 +47,7 @@ public class AdminSubscriptionPlansControllerAuditTests
             Assert.That(auditEvent.UserId, Is.EqualTo(actorUserId));
             Assert.That(auditEvent.TargetUserId, Is.Null);
             Assert.That(auditEvent.Message, Does.Contain("Pro"));
-            Assert.That(auditEvent.MetadataJson, Does.Contain("HasStripePriceId"));
+            Assert.That(auditEvent.MetadataJson, Does.Contain("hasStripePriceId"));
         });
     }
 
