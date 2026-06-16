@@ -539,7 +539,6 @@ public class HubService
     {
         try
         {
-            var appRootDir = GetAppRootDirectory(payload.AppId);
             var backendDir = GetAppBackendDirectory(payload.AppId);
             var dataDir = GetAppDataDirectory(payload.AppId);
 
