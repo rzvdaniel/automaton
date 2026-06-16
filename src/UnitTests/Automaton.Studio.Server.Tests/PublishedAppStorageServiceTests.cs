@@ -172,8 +172,7 @@ public class PublishedAppStorageServiceTests
         return new PublishedAppStorageService(
             new StubWebHostEnvironment(),
             null!,
-            Options.Create(config ?? new PublishedAppsConfig()),
-            NullLogger<PublishedAppStorageService>.Instance);
+            Options.Create(config ?? new PublishedAppsConfig()));
     }
 
     private sealed class StubWebHostEnvironment : IWebHostEnvironment

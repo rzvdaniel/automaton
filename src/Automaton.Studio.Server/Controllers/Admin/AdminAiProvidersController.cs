@@ -701,7 +701,7 @@ public class AdminAiProvidersController : ControllerBase
 
         await dbContext.SaveChangesAsync();
 
-        var providerName = await dbContext.AiProviders
+        var auditProviderName = await dbContext.AiProviders
             .Where(p => p.Id == model.AiProviderId)
             .Select(p => p.Name)
             .FirstOrDefaultAsync() ?? string.Empty;
@@ -716,7 +716,7 @@ public class AdminAiProvidersController : ControllerBase
             Metadata = new
             {
                 model.AiProviderId,
-                ProviderName = providerName,
+                ProviderName = auditProviderName,
                 model.ModelId,
                 model.DisplayName,
                 model.IsActive,
