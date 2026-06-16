@@ -14,6 +14,7 @@ public static class HostedRunnerDockerCommandBuilder
         var cpu = runner.CpuCores.ToString("0.##", CultureInfo.InvariantCulture);
         var dataRoot = TrimTrailingSlash(options.DataRoot);
         var runnerRoot = $"{dataRoot}/{runner.Id}";
+        var dataVolumeName = BuildDataVolumeName(runner);
 
         var dockerRun = string.Join(" \\\n  ", new[]
         {
@@ -28,7 +29,7 @@ public static class HostedRunnerDockerCommandBuilder
             $"-e AUTOMATON_RUNNER_NAME={ShellQuote(runner.Name)}",
             $"-e AUTOMATON_HOSTED_RUNNER_ID={ShellQuote(runner.Id.ToString())}",
             $"-v {ShellQuote($"{runnerRoot}/config:/home/automaton/.config/AutomatonRunner")}",
-            $"-v {ShellQuote($"{runnerRoot}/data:/app/data")}",
+            $"-v {ShellQuote($"{dataVolumeName}:/app/data")}",
             $"-v {ShellQuote($"{runnerRoot}/logs:/app/logs")}",
             ShellQuote(options.DockerImage)
         });
@@ -36,13 +37,17 @@ public static class HostedRunnerDockerCommandBuilder
         return string.Join("\n", new[]
         {
             "set -eu",
-            $"mkdir -p {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/data")} {ShellQuote($"{runnerRoot}/logs")}",
-            $"chown -R 1000:1000 {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/data")} {ShellQuote($"{runnerRoot}/logs")}",
+            $"mkdir -p {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/logs")}",
+            $"chown -R 1000:1000 {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/logs")}",
+            $"docker volume create {ShellQuote(dataVolumeName)} >/dev/null",
             $"docker network inspect {ShellQuote(options.DockerNetwork)} >/dev/null 2>&1 || docker network create {ShellQuote(options.DockerNetwork)} >/dev/null",
             $"docker rm -f {ShellQuote(runner.ContainerName)} >/dev/null 2>&1 || true",
             dockerRun
         });
     }
+
+    private static string BuildDataVolumeName(HostedRunner runner)
+        => $"automaton-runner-{runner.Id:N}-data";
 
     private static string TrimTrailingSlash(string value) => value.TrimEnd('/', '\\');
 

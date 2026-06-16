@@ -20,8 +20,24 @@ Rules:
 - `source/frontend/` is editable frontend project source.
 - `source/backend/` is editable backend Python source.
 - `live/frontend/` is the only public static output.
-- `live/backend/` is runner-only backend output and is never publicly served.
+- Studio/API `live/backend/` is deploy output used to send backend files to a runner. It is not editable source and is never publicly served.
 - Fork copies `source/` only, never `live/`.
+
+Runner runtime keeps its own private per-app layout:
+
+```text
+RUNNER_SCRIPTS_DIR/{appId}/
+├─ backend/
+├─ venv/
+└─ data/
+```
+
+Rules:
+- `backend/` contains the deployed controller files from `backend.deployDir`.
+- `venv/` contains the app-specific Python virtual environment.
+- `data/` is private persistent app storage and is not publicly served by default.
+- Persistent app files, including SQLite databases and uploads, must be stored under the `AUTOMATON_APP_DATA_DIR` environment variable.
+- Do not store persistent files next to controller files in `backend/`; backend deploys can replace controller files.
 
 ## CLI deploy contract
 
@@ -47,6 +63,7 @@ Deploy behavior:
 2. Upload `frontend.deployDir` into `live/frontend/`.
 3. Upload `backend.deployDir` into `live/backend/` when configured.
 4. Trigger backend runner deployment from `live/backend/`.
+5. Keep runner-side `RUNNER_SCRIPTS_DIR/{appId}/data/` intact across backend deploys.
 
 Packaging rules:
 - CLI deploy uploads archives, not one HTTP request per file.
@@ -79,6 +96,7 @@ Why this is the default:
 - Vite can emit relative app-local URLs with `base: './'`, which is required for slug-hosted published apps.
 - Public runtime is a clean build artifact from `frontend/dist/`.
 - Backend runtime is packaged separately, so frontend output does not need to contain backend files.
+- Backend persistence uses `AUTOMATON_APP_DATA_DIR`, not files written beside controllers.
 
 ## Asset versioning rule
 
@@ -122,5 +140,6 @@ Avoid these assumptions:
 
 - Public runtime comes only from `frontend.deployDir`.
 - Runner backend runtime comes only from `backend.deployDir`.
+- Persistent runner app data lives under `AUTOMATON_APP_DATA_DIR` and survives backend redeploys.
 - Default AI-generated local apps should use `frontend/` + Vite and deploy only `frontend/dist/`.
 - Root static apps remain supported, but only as an explicit no-build exception.

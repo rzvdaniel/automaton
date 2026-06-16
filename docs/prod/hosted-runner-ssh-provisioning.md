@@ -102,6 +102,21 @@ Use the full checklist in [Administrator Step-by-Step](#administrator-step-by-st
 
 Failed or pending hosted runners can be retried from `Admin -> Hosted Runners`.
 
+Hosted runner data uses a stable Docker volume name derived from the hosted-runner row ID:
+
+```text
+automaton-runner-{hostedRunnerIdWithoutDashes}-data
+```
+
+Operational semantics:
+
+- Restart hosted runner: preserves the data volume.
+- Retry/Reprovision hosted runner: removes and recreates the container, then reuses the same data volume.
+- Generic runner delete: hosted runners are blocked from that delete path.
+- Destroy hosted runner data: must be an explicit destructive operation that removes the Docker volume, for example `docker volume rm automaton-runner-{hostedRunnerIdWithoutDashes}-data`.
+
+Do not use container IDs, container names, or random suffixes for the data volume name. Those values can change during reprovision and would create a new empty volume.
+
 If Docker starts the hosted runner container but the hosted runner stays in `provisioning`, inspect that container's logs on the selected runner host. The most common first-launch failure is a permissions error on the bind-mounted data folders, for example:
 
 ```text
@@ -401,8 +416,8 @@ then the host bind mounts were created without ownership for the non-root `autom
 
 ```bash
 sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/config
-sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/data
 sudo chown -R 1000:1000 /opt/automaton/hosted-runners/<hosted-runner-id>/logs
+docker run --rm -v automaton-runner-<hosted-runner-id-without-dashes>-data:/app/data alpine sh -c 'mkdir -p /app/data/apps && chown -R 1000:1000 /app/data'
 docker restart automaton-hosted-runner-...
 ```
 

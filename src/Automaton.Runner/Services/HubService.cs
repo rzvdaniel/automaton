@@ -540,9 +540,11 @@ public class HubService
         try
         {
             var appRootDir = GetAppRootDirectory(payload.AppId);
-            var backendDir = Path.Combine(appRootDir, "backend");
+            var backendDir = GetAppBackendDirectory(payload.AppId);
+            var dataDir = GetAppDataDirectory(payload.AppId);
 
             Directory.CreateDirectory(backendDir);
+            Directory.CreateDirectory(dataDir);
 
             var relativePath = string.IsNullOrWhiteSpace(payload.RelativePath)
                 ? BuildLegacyRelativePath(payload)
@@ -738,6 +740,11 @@ public class HubService
     private static string GetAppBackendDirectory(Guid appId)
     {
         return Path.GetFullPath(Path.Combine(GetAppRootDirectory(appId), "backend"));
+    }
+
+    private static string GetAppDataDirectory(Guid appId)
+    {
+        return Path.GetFullPath(Path.Combine(GetAppRootDirectory(appId), "data"));
     }
 
     private static string GetAppRootDirectory(Guid appId)

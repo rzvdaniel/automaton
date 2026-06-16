@@ -24,12 +24,18 @@ ASP.NET Server  --[SignalR TunnelRequest]--> Runner (C#)
                                      calls handle(action, inputs) -> {success, data, error}
 ```
 
-## Script Storage
+## Runner App Storage
 
 Controller scripts are stored at:
 
 ```
 {RUNNER_SCRIPTS_DIR}/{appId}/backend/{controllerName}.py
+```
+
+Persistent private app data is stored at:
+
+```
+{RUNNER_SCRIPTS_DIR}/{appId}/data
 ```
 
 The path is configured via the `RUNNER_SCRIPTS_DIR` environment variable:
@@ -41,13 +47,17 @@ The path is configured via the `RUNNER_SCRIPTS_DIR` environment variable:
 
 Both the C# runner (`HubService.UploadControllerScriptHandler`) and FastAPI read from this same path.
 
-Each app also gets its own virtual environment:
+Each app uses this runtime layout:
 
 ```
+{RUNNER_SCRIPTS_DIR}/{appId}/backend
 {RUNNER_SCRIPTS_DIR}/{appId}/venv
+{RUNNER_SCRIPTS_DIR}/{appId}/data
 ```
 
 FastAPI stays as the shared request router, but controller code executes in a subprocess using that app's venv interpreter. This isolates app-specific Python dependencies without needing one FastAPI server per app.
+
+`{RUNNER_SCRIPTS_DIR}/{appId}/data` is private persistent storage for SQLite databases, uploads, generated files, and other durable app-owned files. Controllers should use `AUTOMATON_APP_DATA_DIR` instead of writing persistent files next to controller source files in `backend/`.
 
 ## Controller Script Contract
 
@@ -120,6 +130,23 @@ GET http://localhost:8001/health
 ```
 
 The runner waits up to 30 seconds for FastAPI to become ready. If it does not respond in time, a warning is printed to the console and the runner connects anyway (Deploy Backend works, but tunnel execution will fail until FastAPI is available).
+
+## Controller Environment
+
+FastAPI runs each controller subprocess with `cwd` set to:
+
+```
+{RUNNER_SCRIPTS_DIR}/{appId}/backend
+```
+
+It also sets:
+
+| Variable | Value |
+|---|---|
+| `AUTOMATON_APP_ID` | Current app ID |
+| `AUTOMATON_APP_HOME` | `{RUNNER_SCRIPTS_DIR}/{appId}` |
+| `AUTOMATON_APP_BACKEND_DIR` | `{RUNNER_SCRIPTS_DIR}/{appId}/backend` |
+| `AUTOMATON_APP_DATA_DIR` | `{RUNNER_SCRIPTS_DIR}/{appId}/data` |
 
 ## Logging
 

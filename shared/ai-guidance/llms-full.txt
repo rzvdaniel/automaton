@@ -48,6 +48,7 @@ Automaton apps are static frontend apps with optional Python backend controllers
 - `automaton deploy` uploads `backend.deployDir` as runner-side backend runtime.
 - Backend runtime files are not publicly served.
 - Source files are not publicly served.
+- Runner backends also get private persistent per-app storage at `AUTOMATON_APP_DATA_DIR`.
 
 ## Canonical `automaton.json` examples
 
@@ -148,6 +149,13 @@ Each action must return the standard envelope:
 {"success": True,  "data": <payload>, "error": ""}
 {"success": False, "data": None,      "error": "..."}
 ```
+
+For persistent backend files:
+
+- Store SQLite databases, uploads, generated documents, and other durable files under `os.environ["AUTOMATON_APP_DATA_DIR"]`.
+- Never store persistent files next to controller files in `backend/`; backend deploys can replace controller files.
+- `AUTOMATON_APP_DATA_DIR` is private runner storage and is not publicly served by default.
+- Controller subprocesses also receive `AUTOMATON_APP_ID`, `AUTOMATON_APP_HOME`, and `AUTOMATON_APP_BACKEND_DIR`.
 
 Frontend code must call controllers with:
 

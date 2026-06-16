@@ -264,6 +264,7 @@ services:
       - AUTOMATON_SERVER_URL=https://api.automaton.monster
       - AUTOMATON_API_KEY=ak_your_key_here
       - AUTOMATON_RUNNER_NAME=My-Runner
+      - RUNNER_SCRIPTS_DIR=/app/data/apps
     volumes:
       - runner-config:/home/automaton/.config/AutomatonRunner
       - runner-logs:/app/logs
@@ -329,7 +330,15 @@ docker run -d \
 
 ### Volume Mounting (For Persistent Data)
 
-The runner requires three named volumes for data persistence. If your workflows also need to read files from the host, mount an additional path alongside the required volumes:
+The runner requires three named volumes for data persistence. The `runner-data:/app/data` mount stores deployed app backend files, app virtual environments, and private app data. Inside the container, persistent app files live under:
+
+```text
+/app/data/apps/{appId}/data
+```
+
+Backend controllers should use `AUTOMATON_APP_DATA_DIR` for SQLite databases, uploads, generated documents, and other durable files. Do not store persistent files next to controller files under `/app/data/apps/{appId}/backend`.
+
+If your workflows also need to read files from the host, mount an additional path alongside the required volumes:
 
 ```bash
 docker run -d \
@@ -343,6 +352,29 @@ docker run -d \
   -v /host/shared:/app/shared \
   rzvdaniel/automaton-runner:latest
 ```
+
+For self-hosted users who prefer visible local files instead of a named data volume, bind mount a host directory to `/app/data`:
+
+```yaml
+services:
+  runner:
+    image: rzvdaniel/automaton-runner:latest
+    environment:
+      AUTOMATON_SERVER_URL: https://api.automaton.monster
+      AUTOMATON_API_KEY: ak_your_key_here
+      AUTOMATON_RUNNER_NAME: My-Runner
+      RUNNER_SCRIPTS_DIR: /app/data/apps
+    volumes:
+      - runner-config:/home/automaton/.config/AutomatonRunner
+      - runner-logs:/app/logs
+      - ./automaton-runner-data:/app/data
+
+volumes:
+  runner-config:
+  runner-logs:
+```
+
+If `/app/data` is not mounted, app data is stored only in the container writable layer. It can survive ordinary app redeploys, but it can be lost when the container is recreated.
 
 ### Resource Limits
 
