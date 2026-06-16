@@ -9,7 +9,7 @@ Build **Automaton Blog** as a normal Automaton app and use it as both:
 
 The blog should not be implemented as a special feature in the Automaton website codebase.
 
-It should be a complete Automaton app with frontend, backend, database, authentication, admin UI, public pages, and deployment behavior.
+It should be a complete Automaton app with frontend, Automaton backend controllers, database, authentication, admin UI, public pages, and deployment behavior.
 
 ---
 
@@ -20,7 +20,7 @@ The blog should prove that Automaton can host real business applications, not on
 It should demonstrate:
 
 - public hosting
-- backend APIs
+- backend actions
 - SQLite persistence
 - authentication
 - CRUD operations
@@ -90,7 +90,9 @@ docs/design/forkable-app-templates.md
 
 ### Backend
 
-- Python FastAPI
+- Automaton Python backend controllers
+- Controller entrypoint contract: `handle(action_name, inputs)`
+- No standalone FastAPI service inside the app
 
 ### Database
 
@@ -99,7 +101,86 @@ docs/design/forkable-app-templates.md
 ### Storage
 
 - SQLite database for structured content
-- Local `/uploads` folder for uploaded images
+- Local `/uploads` folder for uploaded images, if supported by the Automaton backend/runtime storage model
+
+---
+
+## Automaton Backend Contract
+
+The blog backend must follow the Automaton app backend contract.
+
+Do **not** implement the blog backend as a standalone FastAPI application.
+
+Backend behavior should be exposed through Python controller modules that implement:
+
+```python
+def handle(action_name, inputs):
+    ...
+```
+
+The frontend should call backend actions through the normal Automaton backend/action mechanism, not directly through custom FastAPI routes.
+
+### Suggested Controller Structure
+
+```text
+backend/
+  controllers/
+    public_blog.py
+    admin_blog.py
+    auth.py
+    setup.py
+  lib/
+    db.py
+    auth_sessions.py
+    password_hashing.py
+    slugify.py
+    seo.py
+  data/
+    .gitkeep
+```
+
+### Suggested Public Actions
+
+```text
+public_blog.handle("get_settings", inputs)
+public_blog.handle("list_posts", inputs)
+public_blog.handle("get_post_by_slug", inputs)
+public_blog.handle("list_categories", inputs)
+public_blog.handle("list_posts_by_category", inputs)
+public_blog.handle("get_rss", inputs)
+public_blog.handle("get_sitemap", inputs)
+```
+
+### Suggested Setup/Auth Actions
+
+```text
+setup.handle("get_setup_status", inputs)
+setup.handle("complete_setup", inputs)
+
+auth.handle("login", inputs)
+auth.handle("logout", inputs)
+auth.handle("get_current_user", inputs)
+```
+
+### Suggested Admin Actions
+
+```text
+admin_blog.handle("list_posts", inputs)
+admin_blog.handle("get_post", inputs)
+admin_blog.handle("create_post", inputs)
+admin_blog.handle("update_post", inputs)
+admin_blog.handle("delete_post", inputs)
+admin_blog.handle("publish_post", inputs)
+admin_blog.handle("unpublish_post", inputs)
+admin_blog.handle("list_categories", inputs)
+admin_blog.handle("create_category", inputs)
+admin_blog.handle("update_category", inputs)
+admin_blog.handle("delete_category", inputs)
+admin_blog.handle("get_settings", inputs)
+admin_blog.handle("update_settings", inputs)
+```
+
+The exact controller filenames and action names can change during implementation, but the backend must remain compatible with Automaton's controller/action runtime.
 
 ---
 
@@ -123,8 +204,8 @@ Do not require an external identity provider.
 - no magic links in V1
 - SQLite users table
 - SQLite sessions table
-- HttpOnly cookies
-- Secure cookies in production
+- HttpOnly cookies where the Automaton backend/runtime supports cookie handling
+- Secure cookies in production when available
 - password hashes only
 
 This keeps the starter simple and immediately usable after deployment.
@@ -142,7 +223,7 @@ When the user opens `/admin`:
 ```text
 /admin
   ↓
-Check admin user count
+Check admin user count through setup/get_setup_status action
   ↓
 No admin exists
   ↓
@@ -193,13 +274,15 @@ When an admin already exists:
 ```text
 Admin email + password
   ↓
+auth.handle("login", inputs)
+  ↓
 Validate credentials
   ↓
 Create random session id
   ↓
 Store session in SQLite
   ↓
-Send session id in HttpOnly cookie
+Return/set session cookie depending on Automaton runtime support
 ```
 
 ### Logout Flow
@@ -207,9 +290,11 @@ Send session id in HttpOnly cookie
 ```text
 Logout
   ↓
+auth.handle("logout", inputs)
+  ↓
 Delete session from SQLite
   ↓
-Clear cookie
+Clear session cookie / client session reference
 ```
 
 ### Users Table
@@ -239,10 +324,11 @@ LastSeenAt
 
 ### Password Hashing
 
-Use a strong password hashing algorithm:
+Use a strong password hashing algorithm available in the Automaton Python runtime:
 
-- Argon2 preferred
+- Argon2 preferred if dependency/runtime support is available
 - BCrypt acceptable
+- PBKDF2 acceptable as a no-extra-dependency fallback
 
 Passwords must never be stored in plain text.
 
@@ -539,6 +625,7 @@ Goal: a working blog that can publish articles.
 
 Features:
 
+- Automaton Python controllers using `handle(action_name, inputs)`
 - SQLite database
 - setup wizard
 - session authentication
@@ -552,6 +639,7 @@ Features:
 
 Acceptance criteria:
 
+- backend deploys as an Automaton app backend, not as standalone FastAPI
 - first visit to `/admin` redirects to `/setup`
 - setup creates the first admin
 - admin can log in
@@ -578,8 +666,8 @@ Features:
 Acceptance criteria:
 
 - articles can be categorized
-- RSS feed returns published posts
-- sitemap includes public article URLs
+- RSS feed returns published posts through an Automaton backend action
+- sitemap includes public article URLs through an Automaton backend action
 - article pages expose useful metadata
 
 ---
@@ -653,6 +741,7 @@ Possible future features:
 
 Do not include in V1:
 
+- standalone FastAPI service
 - multi-author permissions
 - comments
 - email login
@@ -672,6 +761,10 @@ Keep the first version small, useful, and demo-ready.
 This app must behave like any other Automaton app.
 
 It should not require special handling in the platform.
+
+It should use the standard Automaton frontend/backend app structure.
+
+The backend must use Automaton Python controllers with `handle(action_name, inputs)`.
 
 It should be deployable and publishable through the normal app workflow.
 
@@ -698,9 +791,10 @@ The Blog starter is successful when:
 2. Users can fork it as a complete working app.
 3. Forked blogs can be set up without environment variables.
 4. The admin UI supports normal article publishing.
-5. The public site looks polished enough for real use.
-6. The code is simple enough for AI agents to customize.
-7. The template demonstrates the value of Automaton better than another toy demo.
+5. The backend deploys through Automaton's controller/action runtime.
+6. The public site looks polished enough for real use.
+7. The code is simple enough for AI agents to customize.
+8. The template demonstrates the value of Automaton better than another toy demo.
 
 ---
 
@@ -709,8 +803,10 @@ The Blog starter is successful when:
 Build the first official Blog starter as:
 
 ```text
-Vue 3 + FastAPI + SQLite
-Session auth with secure cookies
+Vue 3 frontend
+Automaton Python controllers with handle(action_name, inputs)
+SQLite persistence
+Session auth with secure cookies/session records
 First-run /setup wizard
 Config-driven settings
 CSS theme system
@@ -721,6 +817,7 @@ Forkable Automaton app template
 Do not start with:
 
 ```text
+Standalone FastAPI app
 JWT auth
 email auth
 SMTP setup
