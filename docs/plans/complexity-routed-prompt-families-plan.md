@@ -25,13 +25,13 @@ Adopt a complexity-routed prompt architecture with 4 tiers (Simple, Medium, Larg
    - *Enterprise*: CRM module with complex state and multiple controller steps.
 
 ### Relevant Files
-- `src/Automaton.Studio.Server/Controllers/AiConversationController.cs` — Orchestrate classifier call and prompt routing in `BuildSystemPromptAsync`.
+- `src/Automaton.Api/Controllers/AiConversationController.cs` — Orchestrate classifier call and prompt routing in `BuildSystemPromptAsync`.
 - `src/Automaton.Mcp/SystemPrompts/AppSystemPromptBuilder.cs` — Add prompt family/tier selection API and embedded resource loading strategy.
 - `src/Automaton.Mcp/SystemPrompts/StepSystemPromptBuilder.cs` — Add tier-based templates and retain language augmentation.
 - `src/Automaton.Mcp/SystemPrompts/AppSystemPrompt.md` — Split into tiered family files and keep common shared rules in reusable sections.
 - `src/Automaton.Mcp/Automaton.Mcp.csproj` — Register new embedded prompt resources.
 - `src/automaton-studio-vue/src/shared/composables/useAiChat.ts` — Verify/align request payload fields for routing metadata if needed.
-- `src/Automaton.Studio.Server/Services/Mcp/AppMcpToolProvider.cs` — Ensure prompt/tool conventions map to available tools and legacy compatibility.
+- `src/Automaton.Api/Services/Mcp/AppMcpToolProvider.cs` — Ensure prompt/tool conventions map to available tools and legacy compatibility.
 
 ### Verification
 1. **Unit test classifier service**: Deterministic parsing of classifier output JSON, low-confidence fallback, and error fallback.

@@ -22,7 +22,7 @@ Use this skill when touching:
 
 Primary areas:
 
-- `src/Automaton.Studio.Server/**`
+- `src/Automaton.Api/**`
 - `src/Automaton.Runner/**`
 - `src/UnitTests/**` for audit/logging tests
 
@@ -198,5 +198,5 @@ Focused areas to cover when practical:
 Useful grep checks:
 
 ```bash
-rg -n -i "apiKey|rawKey|\\bkey\\b|secret|token|password|hash|connectionString|authorization" src/Automaton.Studio.Server src/Automaton.Runner
+rg -n -i "apiKey|rawKey|\\bkey\\b|secret|token|password|hash|connectionString|authorization" src/Automaton.Api src/Automaton.Runner
 ```

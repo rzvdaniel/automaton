@@ -31,7 +31,7 @@ Then open:
 
 ## Development Configuration
 
-In [appsettings.Development.json](/C:/Work/automaton/src/Automaton.Studio.Server/appsettings.Development.json), configure:
+In [appsettings.Development.json](/C:/Work/automaton/src/Automaton.Api/appsettings.Development.json), configure:
 
 ```json
 "EmailConfig": {

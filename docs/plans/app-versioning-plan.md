@@ -194,7 +194,7 @@ public async Task<ChatSessionDto> CreateSessionAsync(
 
 ### Phase 1: Database & Storage Foundation
 
-1. **Create EF Core entities** in `src/Automaton.Studio.Server/Entities/`:
+1. **Create EF Core entities** in `src/Automaton.Api/Entities/`:
    - `AppVersion.cs`
    - `AppVersionStep.cs`
    - `AppVersionTrigger.cs` (enum)
@@ -218,7 +218,7 @@ public async Task<ChatSessionDto> CreateSessionAsync(
 
 ### Phase 2: Version Service
 
-5. **Create `AppVersionService`** in `src/Automaton.Studio.Server/Services/`:
+5. **Create `AppVersionService`** in `src/Automaton.Api/Services/`:
    ```csharp
    public interface IAppVersionService
    {
@@ -240,7 +240,7 @@ public async Task<ChatSessionDto> CreateSessionAsync(
 
 ### Phase 3: API Endpoints
 
-7. **Create `AppVersionsController`** in `src/Automaton.Studio.Server/Controllers/`:
+7. **Create `AppVersionsController`** in `src/Automaton.Api/Controllers/`:
 
    | Method | Route | Description |
    |--------|-------|-------------|

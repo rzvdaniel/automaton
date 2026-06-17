@@ -24,11 +24,11 @@ Related implementation notes:
 
 Useful building blocks already exist:
 
-- Refresh token rotation exists in `src/Automaton.Studio.Server/Application/Queries/Handlers/RefreshAccessTokenQueryHandler.cs`.
-- Project-scoped authorization handlers exist in `src/Automaton.Studio.Server/Authorization/ProjectAuthorizationHandlers.cs`.
+- Refresh token rotation exists in `src/Automaton.Api/Application/Queries/Handlers/RefreshAccessTokenQueryHandler.cs`.
+- Project-scoped authorization handlers exist in `src/Automaton.Api/Authorization/ProjectAuthorizationHandlers.cs`.
 - User API keys are hashed and raw values are only returned at creation in:
-  - `src/Automaton.Studio.Server/Services/ApiKeyService.cs`
-  - `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
+  - `src/Automaton.Api/Services/ApiKeyService.cs`
+  - `src/Automaton.Api/Controllers/ApiKeysController.cs`
 
 Visible gaps from the current implementation:
 
@@ -47,18 +47,18 @@ Make brute force, credential stuffing, spam registration, password reset abuse, 
 
 Add ASP.NET Core rate limiting in:
 
-- `src/Automaton.Studio.Server/Program.cs`
+- `src/Automaton.Api/Program.cs`
 
 Apply named policies to:
 
-- `src/Automaton.Studio.Server/Controllers/AccountController.cs`
+- `src/Automaton.Api/Controllers/AccountController.cs`
   - `RegisterUser`
   - `LoginUser`
   - `ForgotUserPassword`
   - `ResetUserPassword`
-- `src/Automaton.Studio.Server/Controllers/TokenController.cs`
+- `src/Automaton.Api/Controllers/TokenController.cs`
   - `RefreshAccessToken`
-- `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
+- `src/Automaton.Api/Controllers/ApiKeysController.cs`
   - `ValidateApiKey`
 
 ### Suggested starting limits
@@ -204,7 +204,7 @@ Vue placement:
 
 ASP.NET placement:
 
-- verify the Turnstile token in `src/Automaton.Studio.Server/Controllers/AccountController.cs`
+- verify the Turnstile token in `src/Automaton.Api/Controllers/AccountController.cs`
 - enforce verification on:
   - `RegisterUser`
   - `ForgotUserPassword`
@@ -262,7 +262,7 @@ Stop repeated login guessing against the same account.
 
 Update auth flow in:
 
-- `src/Automaton.Studio.Server/Application/Queries/Handlers/SignInUserQueryHandler.cs`
+- `src/Automaton.Api/Application/Queries/Handlers/SignInUserQueryHandler.cs`
 
 Replace plain password validation with Identity sign-in flow that:
 
@@ -272,7 +272,7 @@ Replace plain password validation with Identity sign-in flow that:
 
 Configure lockout options in:
 
-- `src/Automaton.Studio.Server/Program.cs`
+- `src/Automaton.Api/Program.cs`
 
 ### Suggested defaults
 
@@ -295,7 +295,7 @@ Reduce fake-account churn and prevent unverified accounts from using sensitive p
 
 Add confirmation-token generation and email flow in:
 
-- `src/Automaton.Studio.Server/Controllers/AccountController.cs`
+- `src/Automaton.Api/Controllers/AccountController.cs`
 
 Add endpoints:
 
@@ -350,11 +350,11 @@ Reduce the blast radius of XSS or browser-side token theft.
 ### Implemented so far
 
 - refresh token moved out of browser `localStorage`
-- refresh token now uses a secure `HttpOnly` cookie via `src/Automaton.Studio.Server/Security/RefreshTokenCookieService.cs`
+- refresh token now uses a secure `HttpOnly` cookie via `src/Automaton.Api/Security/RefreshTokenCookieService.cs`
 - Studio auth now keeps the access token in memory instead of persistent browser storage in `src/automaton-studio-vue/src/shared/services/api/axios-instance.ts`
-- refresh endpoint rotates the refresh token and rewrites the cookie in `src/Automaton.Studio.Server/Controllers/TokenController.cs`
-- logout clears the refresh-token cookie and revokes the server-side refresh token in `src/Automaton.Studio.Server/Controllers/TokenController.cs`
-- GitHub callback no longer sends the refresh token through the frontend callback flow in `src/Automaton.Studio.Server/Controllers/GitHubAuthController.cs`
+- refresh endpoint rotates the refresh token and rewrites the cookie in `src/Automaton.Api/Controllers/TokenController.cs`
+- logout clears the refresh-token cookie and revokes the server-side refresh token in `src/Automaton.Api/Controllers/TokenController.cs`
+- GitHub callback no longer sends the refresh token through the frontend callback flow in `src/Automaton.Api/Controllers/GitHubAuthController.cs`
 
 ### Remaining checks
 
@@ -371,21 +371,21 @@ Find and close cross-user, cross-project, and cross-organization data access bug
 
 ### Controllers to audit first
 
-- `src/Automaton.Studio.Server/Controllers/AppsController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppsControllerExecutionController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppsFlowExecutionController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppsStepExecutionController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppFilesController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppRunnerBackendFilesController.cs`
-- `src/Automaton.Studio.Server/Controllers/FlowsController.cs`
-- `src/Automaton.Studio.Server/Controllers/FlowExecutionsController.cs`
-- `src/Automaton.Studio.Server/Controllers/CustomStepsController.cs`
-- `src/Automaton.Studio.Server/Controllers/RunnersController.cs`
-- `src/Automaton.Studio.Server/Controllers/ProjectsController.cs`
-- `src/Automaton.Studio.Server/Controllers/ProjectResourcesController.cs`
-- `src/Automaton.Studio.Server/Controllers/ProjectMembersController.cs`
-- `src/Automaton.Studio.Server/Controllers/OrganizationsController.cs`
-- `src/Automaton.Studio.Server/Controllers/UserAppsController.cs`
+- `src/Automaton.Api/Controllers/AppsController.cs`
+- `src/Automaton.Api/Controllers/AppsControllerExecutionController.cs`
+- `src/Automaton.Api/Controllers/AppsFlowExecutionController.cs`
+- `src/Automaton.Api/Controllers/AppsStepExecutionController.cs`
+- `src/Automaton.Api/Controllers/AppFilesController.cs`
+- `src/Automaton.Api/Controllers/AppRunnerBackendFilesController.cs`
+- `src/Automaton.Api/Controllers/FlowsController.cs`
+- `src/Automaton.Api/Controllers/FlowExecutionsController.cs`
+- `src/Automaton.Api/Controllers/CustomStepsController.cs`
+- `src/Automaton.Api/Controllers/RunnersController.cs`
+- `src/Automaton.Api/Controllers/ProjectsController.cs`
+- `src/Automaton.Api/Controllers/ProjectResourcesController.cs`
+- `src/Automaton.Api/Controllers/ProjectMembersController.cs`
+- `src/Automaton.Api/Controllers/OrganizationsController.cs`
+- `src/Automaton.Api/Controllers/UserAppsController.cs`
 
 ### What to verify
 
@@ -414,7 +414,7 @@ Raise baseline security without large architecture changes.
 
 Add security headers middleware in:
 
-- `src/Automaton.Studio.Server/Program.cs`
+- `src/Automaton.Api/Program.cs`
 
 Headers to add:
 
@@ -448,10 +448,10 @@ Prevent accidental credential leakage and secure the most sensitive non-browser 
 
 Review these areas for accidental raw-secret exposure:
 
-- `src/Automaton.Studio.Server/Program.cs`
-- `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
-- `src/Automaton.Studio.Server/Controllers/AiApiKeysController.cs`
-- `src/Automaton.Studio.Server/Controllers/SensitiveVariablesController.cs`
+- `src/Automaton.Api/Program.cs`
+- `src/Automaton.Api/Controllers/ApiKeysController.cs`
+- `src/Automaton.Api/Controllers/AiApiKeysController.cs`
+- `src/Automaton.Api/Controllers/SensitiveVariablesController.cs`
 - auth controllers and handlers
 
 Confirm that logs never capture:
@@ -473,9 +473,9 @@ Review and harden:
 
 Primary surfaces:
 
-- `src/Automaton.Studio.Server/Controllers/RunnersController.cs`
-- `src/Automaton.Studio.Server/Controllers/ApiKeysController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppRunnerBackendFilesController.cs`
+- `src/Automaton.Api/Controllers/RunnersController.cs`
+- `src/Automaton.Api/Controllers/ApiKeysController.cs`
+- `src/Automaton.Api/Controllers/AppRunnerBackendFilesController.cs`
 
 ### Notes
 

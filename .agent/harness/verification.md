@@ -103,7 +103,7 @@ Verify:
 
 Use this when touching:
 
-- `src/Automaton.Studio.Server/**`
+- `src/Automaton.Api/**`
 - controllers
 - services
 - entities
@@ -128,13 +128,13 @@ dotnet test
 Check migrations intentionally:
 
 ```bash
-dotnet ef migrations list --project src/Automaton.Studio.Server
+dotnet ef migrations list --project src/Automaton.Api
 ```
 
 When a schema change is needed, create the migration with EF tooling rather than hand-writing files:
 
 ```bash
-dotnet ef migrations add <MigrationName> --project src/Automaton.Studio.Server
+dotnet ef migrations add <MigrationName> --project src/Automaton.Api
 ```
 
 When adding a migration, verify:

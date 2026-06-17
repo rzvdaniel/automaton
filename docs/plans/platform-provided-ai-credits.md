@@ -64,7 +64,7 @@ This document outlines the plan for implementing a platform-provided AI credits 
                               │ HTTPS / SignalR
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Automaton.Studio.Server                                        │
+│  Automaton.Api                                        │
 │                                                                 │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │  AiCreditService                                           │ │

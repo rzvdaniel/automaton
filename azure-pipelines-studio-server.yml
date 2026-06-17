@@ -18,7 +18,7 @@ jobs:
 
   variables:
     automatonServerSolution: './Automaton.Server.sln'
-    automatonServerProject: './Automaton.Studio.Server.csproj'
+    automatonServerProject: './Automaton.Api.csproj'
     buildPlatform: 'Any CPU'
     buildConfiguration: 'Release'
 
@@ -61,7 +61,7 @@ jobs:
     inputs:
       command: 'publish'
       publishWebProjects: false
-      projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Studio.Server/Automaton.Studio.Server.csproj'
+      projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Api/Automaton.Api.csproj'
       arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
       zipAfterPublish: false
     displayName: 'Publish Automaton Server'
@@ -77,6 +77,6 @@ jobs:
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Server artifact
     inputs:
-      targetPath: '$(build.artifactStagingDirectory)/Automaton.Studio.Server'
-      artifact: 'Automaton.Studio.Server'
+      targetPath: '$(build.artifactStagingDirectory)/Automaton.Api'
+      artifact: 'Automaton.Api'
       publishLocation: 'pipeline'

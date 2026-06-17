@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "Automaton.Studio.Server": {
+    "Automaton.Api": {
       "commandName": "Project",
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7091;http://localhost:7091",

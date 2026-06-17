@@ -39,7 +39,7 @@ Instead of creating a full MCP tool, create a lightweight AI utility service wit
 }
 ```
 
-**2. SystemAiConfig.cs** (`src/Automaton.Studio.Server/Config/`)
+**2. SystemAiConfig.cs** (`src/Automaton.Api/Config/`)
 
 ```csharp
 public class SystemAiConfig
@@ -52,7 +52,7 @@ public class SystemAiConfig
 
 ### Phase 2: System AI Service
 
-**3. ISystemAiService.cs** (`src/Automaton.Studio.Server/Services/`)
+**3. ISystemAiService.cs** (`src/Automaton.Api/Services/`)
 
 ```csharp
 public interface ISystemAiService
@@ -62,7 +62,7 @@ public interface ISystemAiService
 }
 ```
 
-**4. SystemAiService.cs** (`src/Automaton.Studio.Server/Services/`)
+**4. SystemAiService.cs** (`src/Automaton.Api/Services/`)
 
 - Injects `AiProviderRegistry` from Automaton.Mcp
 - Uses system API key (not user's)
@@ -96,7 +96,7 @@ public class SystemAiService : ISystemAiService
 
 ### Phase 3: API Endpoint
 
-**5. AiUtilityController.cs** (`src/Automaton.Studio.Server/Controllers/`)
+**5. AiUtilityController.cs** (`src/Automaton.Api/Controllers/`)
 
 ```csharp
 [ApiController]
@@ -183,16 +183,16 @@ public interface IAiProvider
 
 ### New Files (5)
 
-1. `src/Automaton.Studio.Server/Config/SystemAiConfig.cs`
-2. `src/Automaton.Studio.Server/Services/ISystemAiService.cs`
-3. `src/Automaton.Studio.Server/Services/SystemAiService.cs`
-4. `src/Automaton.Studio.Server/Controllers/AiUtilityController.cs`
+1. `src/Automaton.Api/Config/SystemAiConfig.cs`
+2. `src/Automaton.Api/Services/ISystemAiService.cs`
+3. `src/Automaton.Api/Services/SystemAiService.cs`
+4. `src/Automaton.Api/Controllers/AiUtilityController.cs`
 5. `src/automaton-studio-vue/src/shared/services/ai-utility.service.ts`
 
 ### Modified Files (3)
 
 1. `appsettings.json` / `appsettings.Development.json` - Add SystemAi section
-2. `src/Automaton.Studio.Server/Program.cs` - Register SystemAiConfig and SystemAiService
+2. `src/Automaton.Api/Program.cs` - Register SystemAiConfig and SystemAiService
 3. `src/automaton-studio-vue/src/features/apps/views/AppListView.vue` - Use AI for name generation
 
 ### Possibly Modified (if simple completion doesn't exist)

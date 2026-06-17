@@ -6,7 +6,7 @@ This guide provides step-by-step integration tests for the Organizations feature
 
 ## Prerequisites
 
-- Backend server running (`dotnet run` in Automaton.Studio.Server)
+- Backend server running (`dotnet run` in Automaton.Api)
 - Frontend dev server running (`npm run dev` in automaton-studio-vue)
 - Database migration applied (`dotnet ef database update`)
 - At least 2 test user accounts created

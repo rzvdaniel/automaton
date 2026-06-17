@@ -74,17 +74,17 @@ DELETE /api/organizations/{id}/projects/{projectId} # Unlink project (NEW)
 **Files Created:**
 
 Backend:
-- `src/Automaton.Studio.Server/Entities/Organization.cs`
-- `src/Automaton.Studio.Server/Entities/OrganizationMember.cs`
-- `src/Automaton.Studio.Server/Entities/OrganizationAppAssignment.cs`
-- `src/Automaton.Studio.Server/Entities/OrganizationInvitation.cs`
-- `src/Automaton.Studio.Server/Enums/OrganizationRole.cs`
-- `src/Automaton.Studio.Server/Services/OrganizationService.cs`
-- `src/Automaton.Studio.Server/Services/Interfaces/IOrganizationService.cs`
-- `src/Automaton.Studio.Server/Controllers/OrganizationsController.cs`
-- `src/Automaton.Studio.Server/Models/OrganizationModels.cs`
-- `src/Automaton.Studio.Server/Migrations/20260125222020_AddOrganizationsSupport.cs`
-- `src/Automaton.Studio.Server/Data/ApplicationDbContextFactory.cs` (for migrations)
+- `src/Automaton.Api/Entities/Organization.cs`
+- `src/Automaton.Api/Entities/OrganizationMember.cs`
+- `src/Automaton.Api/Entities/OrganizationAppAssignment.cs`
+- `src/Automaton.Api/Entities/OrganizationInvitation.cs`
+- `src/Automaton.Api/Enums/OrganizationRole.cs`
+- `src/Automaton.Api/Services/OrganizationService.cs`
+- `src/Automaton.Api/Services/Interfaces/IOrganizationService.cs`
+- `src/Automaton.Api/Controllers/OrganizationsController.cs`
+- `src/Automaton.Api/Models/OrganizationModels.cs`
+- `src/Automaton.Api/Migrations/20260125222020_AddOrganizationsSupport.cs`
+- `src/Automaton.Api/Data/ApplicationDbContextFactory.cs` (for migrations)
 
 Frontend:
 - `src/automaton-studio-vue/src/features/organizations/types/index.ts`
@@ -349,7 +349,7 @@ ALTER TABLE Projects ADD INDEX idx_project_organization (OrganizationId);
 
 ### Phase 1: Core Entities & Services
 
-**New C# Entities** (`src/Automaton.Studio.Server/Entities/`):
+**New C# Entities** (`src/Automaton.Api/Entities/`):
 
 ```csharp
 // Organization.cs
@@ -464,7 +464,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
 ### Phase 2: Services
 
-**New Services** (`src/Automaton.Studio.Server/Services/`):
+**New Services** (`src/Automaton.Api/Services/`):
 
 ```csharp
 // IOrganizationService.cs
@@ -880,7 +880,7 @@ const menuItems = computed(() => {
 **Create EF Core Migration**:
 
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet ef migrations add AddOrganizationsSupport
 dotnet ef database update
 ```

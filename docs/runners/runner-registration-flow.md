@@ -132,7 +132,7 @@ The `RunnerHostService.RegisterRunnerAsync` method:
 3. If not found, performs POST request to create
 4. Saves the runner ID and name locally
 
-### Server Side (Automaton.Studio.Server)
+### Server Side (Automaton.Api)
 
 - **POST /api/runners**: Creates a new runner (validates name uniqueness)
 - **PUT /api/runners/{id}**: Updates existing runner name

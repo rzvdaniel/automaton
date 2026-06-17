@@ -25,12 +25,12 @@ This does not remove all XSS risk, but it removes the highest-value long-lived s
 
 Primary files:
 
-- `src/Automaton.Studio.Server/Security/RefreshTokenCookieService.cs`
-- `src/Automaton.Studio.Server/Controllers/AccountController.cs`
-- `src/Automaton.Studio.Server/Controllers/TokenController.cs`
-- `src/Automaton.Studio.Server/Controllers/GitHubAuthController.cs`
-- `src/Automaton.Studio.Server/Application/Queries/Handlers/RefreshAccessTokenQueryHandler.cs`
-- `src/Automaton.Studio.Server/Application/Commands/Handlers/RevokeRefreshTokenCommandHandler.cs`
+- `src/Automaton.Api/Security/RefreshTokenCookieService.cs`
+- `src/Automaton.Api/Controllers/AccountController.cs`
+- `src/Automaton.Api/Controllers/TokenController.cs`
+- `src/Automaton.Api/Controllers/GitHubAuthController.cs`
+- `src/Automaton.Api/Application/Queries/Handlers/RefreshAccessTokenQueryHandler.cs`
+- `src/Automaton.Api/Application/Commands/Handlers/RevokeRefreshTokenCommandHandler.cs`
 
 Current behavior:
 

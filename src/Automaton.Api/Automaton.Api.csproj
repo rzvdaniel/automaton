@@ -3,11 +3,11 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>aspnet-Automaton.Studio.Server-73B302BA-8B66-4371-B2F7-55537435EA1F</UserSecretsId>
+    <UserSecretsId>aspnet-Automaton.Api-73B302BA-8B66-4371-B2F7-55537435EA1F</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Automaton.Studio.Server.Tests</_Parameter1>
+      <_Parameter1>Automaton.Api.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 	<ItemGroup>

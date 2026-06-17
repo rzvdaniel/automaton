@@ -82,7 +82,7 @@ public class TunnelControllerResponse
 
 ## Part 2 — Server: Pending Request Registry
 
-**File:** `src/Automaton.Studio.Server/Services/TunnelRequestRegistry.cs`  *(new file)*
+**File:** `src/Automaton.Api/Services/TunnelRequestRegistry.cs`  *(new file)*
 
 Tracks in-flight tunnel requests by `RequestId`. Thread-safe.
 
@@ -90,7 +90,7 @@ Tracks in-flight tunnel requests by `RequestId`. Thread-safe.
 using System.Collections.Concurrent;
 using Automaton.Core.Models;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class TunnelRequestRegistry
 {
@@ -137,7 +137,7 @@ builder.Services.AddSingleton<TunnelRequestRegistry>();
 
 ## Part 3 — Server: Hub Changes
 
-**File:** `src/Automaton.Studio.Server/Hubs/AutomatonHub.cs`
+**File:** `src/Automaton.Api/Hubs/AutomatonHub.cs`
 
 ### 3a. Add client method constant
 
@@ -169,7 +169,7 @@ public async Task TunnelResponse(TunnelResponse response)
 
 ## Part 4 — Server: Execution Service Changes
 
-**File:** `src/Automaton.Studio.Server/Services/AppsControllerExecutionService.cs`
+**File:** `src/Automaton.Api/Services/AppsControllerExecutionService.cs`
 
 Replace `ExecuteOnRunnersAsync` (the part that calls `InvokeAsync<AppControllerExecutionResponse>(RunAppControllerAction, payload, ...)`) with a tunnel call.
 
@@ -233,7 +233,7 @@ private async Task<RunnerAppControllerResult> ExecuteViaTunnelAsync(
 
 Inject `TunnelRequestRegistry` via constructor. Replace existing `ExecuteOnRunnersAsync` calls with `ExecuteViaTunnelAsync`. Remove the old `InvokeAsync(RunAppControllerAction, ...)` RPC call entirely.
 
-**Also update `src/Automaton.Studio.Server/Models/AppControllerModels.cs`:**
+**Also update `src/Automaton.Api/Models/AppControllerModels.cs`:**
 - In `RunnerAppControllerResult`: replace `OutputVariables: Dictionary<string, string>?` with `Data: System.Text.Json.JsonElement?`
 - In `AppControllerActionResponse`: replace `OutputVariables: Dictionary<string, string>?` with `Data: System.Text.Json.JsonElement?`
 - Remove the `AggregateOutputVariables` private helper (no longer needed; just take `Data` from the first successful result)

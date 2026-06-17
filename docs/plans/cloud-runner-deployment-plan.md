@@ -32,7 +32,7 @@ This document outlines the v3 plan for implementing Cloud Runners with a **provi
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Your Hosting                                                       │
 │  ┌───────────────────────────────────────────────────────────────┐ │
-│  │  Automaton.Studio.Server                                      │ │
+│  │  Automaton.Api                                      │ │
 │  │                                                               │ │
 │  │  CloudServerService        - Manage registered servers        │ │
 │  │  CloudRunnerService        - Provision/deprovision runners    │ │
@@ -1245,7 +1245,7 @@ public class GcpServerMetadata
 ## Files to Create
 
 ```
-src/Automaton.Studio.Server/
+src/Automaton.Api/
 ├── Entities/
 │   ├── CloudServer.cs (with JSON fields)
 │   ├── CloudRunner.cs

@@ -367,7 +367,7 @@ Result: Multiple rotated copies kept (configurable)
 
 ### 2. Application Logs (Serilog) - Time-Based Cleanup
 
-**Configuration Location:** `src/Automaton.Studio.Server/Program.cs`
+**Configuration Location:** `src/Automaton.Api/Program.cs`
 
 ```csharp
 .WriteTo.MariaDB(
@@ -739,7 +739,7 @@ The Automaton Runner implements **enterprise-grade resilience** with:
 - **Service Setup Guide:** `scripts/README.md`
 - **Configuration Reference:** `src/Automaton.Runner.Console/appsettings.json`
 - **Circuit Breaker Implementation:** `src/Automaton.Runner.Console/Connection/ResilientPolicy.cs`
-- **Logging Configuration:** `src/Automaton.Studio.Server/Program.cs`
+- **Logging Configuration:** `src/Automaton.Api/Program.cs`
 - **NSSM Documentation:** https://nssm.cc/usage
 - **Serilog Documentation:** https://serilog.net/
 

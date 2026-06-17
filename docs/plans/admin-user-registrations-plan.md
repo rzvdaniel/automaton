@@ -137,7 +137,7 @@ Use a dedicated admin controller instead of extending the generic `UserControlle
 
 Suggested file:
 
-- `src/Automaton.Studio.Server/Controllers/Admin/AdminUsersController.cs`
+- `src/Automaton.Api/Controllers/Admin/AdminUsersController.cs`
 
 Suggested controller shape:
 
@@ -311,7 +311,7 @@ Why this is first:
 
 ### B. Introduce dedicated admin users backend
 
-- [ ] Create `src/Automaton.Studio.Server/Controllers/Admin/AdminUsersController.cs`.
+- [ ] Create `src/Automaton.Api/Controllers/Admin/AdminUsersController.cs`.
 - [ ] Add `GET /api/admin/users` for paged/filterable user operations.
 - [ ] Add `GET /api/admin/users/{id}` for admin user detail.
 - [ ] Add admin support actions only if needed for Phase 1:
@@ -340,7 +340,7 @@ Boundary rule:
 
 ### D. Migrate global admin settings surface
 
-- [ ] Create `src/Automaton.Studio.Server/Controllers/Admin/AdminSettingsController.cs`.
+- [ ] Create `src/Automaton.Api/Controllers/Admin/AdminSettingsController.cs`.
 - [ ] Move app deploy rules endpoints from `SettingsController` to `/api/admin/settings/...`.
 - [ ] Update the admin frontend service to call the new route.
 - [ ] Remove or deprecate the old `SettingsController` admin-only endpoints once callers are migrated.

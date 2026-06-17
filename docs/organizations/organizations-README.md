@@ -27,7 +27,7 @@
 
 **Backend:**
 ```
-src/Automaton.Studio.Server/
+src/Automaton.Api/
 ├── Entities/
 │   ├── Organization.cs
 │   ├── OrganizationMember.cs

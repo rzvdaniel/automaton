@@ -296,7 +296,7 @@ features/organizations/
 
 **Run Migration:**
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet ef database update
 ```
 

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Automaton.Studio.Server.Migrations
+namespace Automaton.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20260511211409_AddHostedRunnerProvisioning")]
@@ -25,7 +25,7 @@ namespace Automaton.Studio.Server.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -86,7 +86,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -134,7 +134,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiChatMessages");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSession", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -208,7 +208,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiChatSessions");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSessionUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatSessionUser", b =>
                 {
                     b.Property<Guid>("SessionId")
                         .HasColumnType("char(36)");
@@ -225,7 +225,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiChatSessionUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiModel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -316,7 +316,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiModels");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiProvider", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -389,7 +389,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AiProviders");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApiKey", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -443,7 +443,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApiKeyUser", b =>
                 {
                     b.Property<Guid>("ApiKeyId")
                         .HasColumnType("char(36)");
@@ -458,7 +458,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppExecutionLog", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppExecutionLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -504,7 +504,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AppExecutionLogs");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -559,7 +559,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AppVersions");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppVersionStep", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -603,7 +603,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AppVersionSteps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -630,7 +630,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -727,7 +727,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUserRole", b =>
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("char(36)");
@@ -742,7 +742,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUserRoles", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.CustomStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.CustomStep", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -790,7 +790,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("CustomSteps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.CustomStepUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.CustomStepUser", b =>
                 {
                     b.Property<Guid>("CustomStepId")
                         .HasColumnType("char(36)");
@@ -805,7 +805,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("CustomStepUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Flow", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Flow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -828,7 +828,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Flows");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecution", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecution", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -854,7 +854,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowExecutions");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionLog", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -881,7 +881,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowExecutionLogs");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionUser", b =>
                 {
                     b.Property<Guid>("FlowExecutionId")
                         .HasColumnType("char(36)");
@@ -896,7 +896,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowExecutionUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowUser", b =>
                 {
                     b.Property<Guid>("FlowId")
                         .HasColumnType("char(36)");
@@ -911,7 +911,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("FlowUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -996,7 +996,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("HostedRunners");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunnerDeployment", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerDeployment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1039,7 +1039,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("HostedRunnerDeployments");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.InvitationToken", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.InvitationToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1084,7 +1084,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("InvitationTokens");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Log", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Log", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1122,7 +1122,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Logs");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1184,7 +1184,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Organizations");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationAppAssignment", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationAppAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1226,7 +1226,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("OrganizationAppAssignments");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationInvitation", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationInvitation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1281,7 +1281,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("OrganizationInvitations");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationMember", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationMember", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1323,7 +1323,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("OrganizationMembers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Project", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1376,7 +1376,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Projects");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectAiApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectAiApiKey", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1401,7 +1401,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectAiApiKeys", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectApiKey", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1426,7 +1426,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectApiKeys", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectApp", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1451,7 +1451,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectApps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectCustomStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectCustomStep", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1476,7 +1476,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectCustomSteps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectFlow", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectFlow", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1501,7 +1501,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectFlows");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectMember", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectMember", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1536,7 +1536,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectMembers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectRunner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectRunner", b =>
                 {
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("char(36)");
@@ -1561,7 +1561,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ProjectRunners");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RecentActivity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1600,7 +1600,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("RecentActivities");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Runner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Runner", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1621,7 +1621,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Runners");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerHost", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1677,7 +1677,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("RunnerHosts");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerUser", b =>
                 {
                     b.Property<Guid>("RunnerId")
                         .HasColumnType("char(36)");
@@ -1692,7 +1692,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("RunnerUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1718,7 +1718,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Schedules");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ScheduleUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ScheduleUser", b =>
                 {
                     b.Property<Guid>("ScheduleId")
                         .HasColumnType("char(36)");
@@ -1733,7 +1733,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariable", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1791,7 +1791,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("SensitiveVariables");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariableUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariableUser", b =>
                 {
                     b.Property<Guid>("SensitiveVariableId")
                         .HasColumnType("char(36)");
@@ -1806,7 +1806,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("SensitiveVariableUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Setting", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")
                         .HasMaxLength(255)
@@ -1831,7 +1831,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("Settings");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.SubscriptionPlan", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.SubscriptionPlan", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1893,7 +1893,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("SubscriptionPlans");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserGitHubToken", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.UserGitHubToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1923,7 +1923,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("UserGitHubTokens");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.UserSetting", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.UserSetting", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1957,7 +1957,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("UserSettings");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -2058,7 +2058,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("WebApps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebAppStep", b =>
                 {
                     b.Property<Guid>("WebAppId")
                         .HasColumnType("char(36)");
@@ -2083,7 +2083,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("WebAppSteps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebAppUser", b =>
                 {
                     b.Property<Guid>("WebAppId")
                         .HasColumnType("char(36)");
@@ -2215,9 +2215,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "AiProvider")
+                    b.HasOne("Automaton.Api.Entities.AiProvider", "AiProvider")
                         .WithMany()
                         .HasForeignKey("AiProviderId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -2225,9 +2225,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("AiProvider");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatMessage", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatMessage", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiChatSession", "Session")
+                    b.HasOne("Automaton.Api.Entities.AiChatSession", "Session")
                         .WithMany("Messages")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2236,15 +2236,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Session");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSessionUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatSessionUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiChatSession", "Session")
+                    b.HasOne("Automaton.Api.Entities.AiChatSession", "Session")
                         .WithMany("AiChatSessionUsers")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2255,9 +2255,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiModel", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiModel", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.AiProvider", "Provider")
+                    b.HasOne("Automaton.Api.Entities.AiProvider", "Provider")
                         .WithMany("Models")
                         .HasForeignKey("AiProviderId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2266,24 +2266,24 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Provider");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKeyUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApiKeyUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", null)
+                    b.HasOne("Automaton.Api.Entities.ApiKey", null)
                         .WithMany("ApiKeyUsers")
                         .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                    b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
                         .WithMany()
                         .HasForeignKey("AppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "CreatedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2294,15 +2294,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("WebApp");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersionStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppVersionStep", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.AppVersion", "AppVersion")
+                    b.HasOne("Automaton.Api.Entities.AppVersion", "AppVersion")
                         .WithMany("Steps")
                         .HasForeignKey("AppVersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "Step")
+                    b.HasOne("Automaton.Api.Entities.CustomStep", "Step")
                         .WithMany()
                         .HasForeignKey("StepId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2313,9 +2313,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Step");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
+                    b.HasOne("Automaton.Api.Entities.SubscriptionPlan", "SubscriptionPlan")
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -2323,15 +2323,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("SubscriptionPlan");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUserRole", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUserRole", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", "Role")
+                    b.HasOne("Automaton.Api.Entities.ApplicationRole", "Role")
                         .WithMany("UserRoles")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany("UserRoles")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2342,18 +2342,18 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.CustomStepUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.CustomStepUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", null)
+                    b.HasOne("Automaton.Api.Entities.CustomStep", null)
                         .WithMany("CustomStepUsers")
                         .HasForeignKey("CustomStepId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionLog", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionLog", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.FlowExecution", "FlowExecution")
+                    b.HasOne("Automaton.Api.Entities.FlowExecution", "FlowExecution")
                         .WithMany()
                         .HasForeignKey("FlowExecutionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2362,48 +2362,48 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("FlowExecution");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecutionUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.FlowExecution", null)
+                    b.HasOne("Automaton.Api.Entities.FlowExecution", null)
                         .WithMany("FlowExecutionUsers")
                         .HasForeignKey("FlowExecutionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.Flow", null)
+                    b.HasOne("Automaton.Api.Entities.Flow", null)
                         .WithMany("FlowUsers")
                         .HasForeignKey("FlowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", "ApiKey")
+                    b.HasOne("Automaton.Api.Entities.ApiKey", "ApiKey")
                         .WithMany()
                         .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.RunnerHost", "RunnerHost")
+                    b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
                         .WithMany("HostedRunners")
                         .HasForeignKey("RunnerHostId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
+                    b.HasOne("Automaton.Api.Entities.Runner", "Runner")
                         .WithMany()
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.SubscriptionPlan", "SubscriptionPlan")
+                    b.HasOne("Automaton.Api.Entities.SubscriptionPlan", "SubscriptionPlan")
                         .WithMany()
                         .HasForeignKey("SubscriptionPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2420,9 +2420,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunnerDeployment", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerDeployment", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.HostedRunner", "HostedRunner")
+                    b.HasOne("Automaton.Api.Entities.HostedRunner", "HostedRunner")
                         .WithMany("Deployments")
                         .HasForeignKey("HostedRunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2431,9 +2431,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("HostedRunner");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Owner")
                         .WithMany("OwnedOrganizations")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2442,26 +2442,26 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationAppAssignment", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationAppAssignment", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "App")
+                    b.HasOne("Automaton.Api.Entities.WebApp", "App")
                         .WithMany()
                         .HasForeignKey("AppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Assigner")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Assigner")
                         .WithMany()
                         .HasForeignKey("AssignedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                    b.HasOne("Automaton.Api.Entities.Organization", "Organization")
                         .WithMany("AppAssignments")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2476,15 +2476,15 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationInvitation", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationInvitation", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Inviter")
                         .WithMany()
                         .HasForeignKey("InvitedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                    b.HasOne("Automaton.Api.Entities.Organization", "Organization")
                         .WithMany("Invitations")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2495,20 +2495,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Organization");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.OrganizationMember", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.OrganizationMember", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Inviter")
                         .WithMany()
                         .HasForeignKey("InvitedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                    b.HasOne("Automaton.Api.Entities.Organization", "Organization")
                         .WithMany("Members")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany("OrganizationMemberships")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2521,14 +2521,14 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Project", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.Organization", "Organization")
+                    b.HasOne("Automaton.Api.Entities.Organization", "Organization")
                         .WithMany("Projects")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Owner")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Owner")
                         .WithMany("OwnedProjects")
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2539,20 +2539,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectAiApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectAiApiKey", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.AiApiKey", "AiApiKey")
+                    b.HasOne("Automaton.Api.Entities.AiApiKey", "AiApiKey")
                         .WithMany("ProjectAiApiKeys")
                         .HasForeignKey("AiApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectAiApiKeys")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2565,20 +2565,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectApiKey", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApiKey", "ApiKey")
+                    b.HasOne("Automaton.Api.Entities.ApiKey", "ApiKey")
                         .WithMany("ProjectApiKeys")
                         .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectApiKeys")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2591,20 +2591,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectApp", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectApp", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectApps")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                    b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
                         .WithMany("ProjectApps")
                         .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2617,20 +2617,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("WebApp");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectCustomStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectCustomStep", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "CustomStep")
+                    b.HasOne("Automaton.Api.Entities.CustomStep", "CustomStep")
                         .WithMany()
                         .HasForeignKey("CustomStepId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectCustomSteps")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2643,20 +2643,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectFlow", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectFlow", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Flow", "Flow")
+                    b.HasOne("Automaton.Api.Entities.Flow", "Flow")
                         .WithMany()
                         .HasForeignKey("FlowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectFlows")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2669,20 +2669,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectMember", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectMember", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "Inviter")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "Inviter")
                         .WithMany()
                         .HasForeignKey("InvitedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("Members")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany("ProjectMemberships")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2695,20 +2695,20 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ProjectRunner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ProjectRunner", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "AddedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "AddedByUser")
                         .WithMany()
                         .HasForeignKey("AddedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Project", "Project")
+                    b.HasOne("Automaton.Api.Entities.Project", "Project")
                         .WithMany("ProjectRunners")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.Runner", "Runner")
+                    b.HasOne("Automaton.Api.Entities.Runner", "Runner")
                         .WithMany("ProjectRunners")
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2721,9 +2721,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Runner");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RecentActivity", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RecentActivity", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "User")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2732,47 +2732,47 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.Runner", null)
+                    b.HasOne("Automaton.Api.Entities.Runner", null)
                         .WithMany("RunnerUsers")
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ScheduleUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ScheduleUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.Schedule", null)
+                    b.HasOne("Automaton.Api.Entities.Schedule", null)
                         .WithMany("ScheduleUsers")
                         .HasForeignKey("ScheduleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariableUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariableUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.SensitiveVariable", null)
+                    b.HasOne("Automaton.Api.Entities.SensitiveVariable", null)
                         .WithMany("SensitiveVariableUsers")
                         .HasForeignKey("SensitiveVariableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebAppStep", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.CustomStep", "CustomStep")
+                    b.HasOne("Automaton.Api.Entities.CustomStep", "CustomStep")
                         .WithMany()
                         .HasForeignKey("CustomStepId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", "LinkedByUser")
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", "LinkedByUser")
                         .WithMany()
                         .HasForeignKey("LinkedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", "WebApp")
+                    b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
                         .WithMany()
                         .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2785,9 +2785,9 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("WebApp");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebAppUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebAppUser", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.WebApp", null)
+                    b.HasOne("Automaton.Api.Entities.WebApp", null)
                         .WithMany("WebAppUsers")
                         .HasForeignKey("WebAppId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2796,7 +2796,7 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationRole", null)
+                    b.HasOne("Automaton.Api.Entities.ApplicationRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2805,7 +2805,7 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", null)
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2814,7 +2814,7 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", null)
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -2823,48 +2823,48 @@ namespace Automaton.Studio.Server.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("Automaton.Studio.Server.Entities.ApplicationUser", null)
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
                 {
                     b.Navigation("ProjectAiApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiChatSession", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiChatSession", b =>
                 {
                     b.Navigation("AiChatSessionUsers");
 
                     b.Navigation("Messages");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AiProvider", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AiProvider", b =>
                 {
                     b.Navigation("Models");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApiKey", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApiKey", b =>
                 {
                     b.Navigation("ApiKeyUsers");
 
                     b.Navigation("ProjectApiKeys");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.AppVersion", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
                     b.Navigation("Steps");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationRole", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationRole", b =>
                 {
                     b.Navigation("UserRoles");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.ApplicationUser", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationUser", b =>
                 {
                     b.Navigation("OrganizationMemberships");
 
@@ -2877,27 +2877,27 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("UserRoles");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.CustomStep", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.CustomStep", b =>
                 {
                     b.Navigation("CustomStepUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Flow", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Flow", b =>
                 {
                     b.Navigation("FlowUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.FlowExecution", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.FlowExecution", b =>
                 {
                     b.Navigation("FlowExecutionUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.HostedRunner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
                     b.Navigation("Deployments");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Organization", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.Navigation("AppAssignments");
 
@@ -2908,7 +2908,7 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("Projects");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Project", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Project", b =>
                 {
                     b.Navigation("Members");
 
@@ -2925,29 +2925,29 @@ namespace Automaton.Studio.Server.Migrations
                     b.Navigation("ProjectRunners");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Runner", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Runner", b =>
                 {
                     b.Navigation("ProjectRunners");
 
                     b.Navigation("RunnerUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.RunnerHost", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
                 {
                     b.Navigation("HostedRunners");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.Schedule", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.SensitiveVariable", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
                 {
                     b.Navigation("SensitiveVariableUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Studio.Server.Entities.WebApp", b =>
+            modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>
                 {
                     b.Navigation("ProjectApps");
 

@@ -25,7 +25,7 @@ A public-facing page where anonymous visitors can browse a user's published apps
 
 #### 1.1 Create Public Apps Controller
 
-**File:** `src/Automaton.Studio.Server/Controllers/PublicAppsController.cs`
+**File:** `src/Automaton.Api/Controllers/PublicAppsController.cs`
 
 ```csharp
 [Route("api/public")]
@@ -106,7 +106,7 @@ public string? DisplayName { get; set; }
 
 #### 1.4 Service Layer
 
-**File:** `src/Automaton.Studio.Server/Services/PublicAppsService.cs`
+**File:** `src/Automaton.Api/Services/PublicAppsService.cs`
 
 ```csharp
 public class PublicAppsService

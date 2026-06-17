@@ -353,7 +353,7 @@ Every new app's `index.html` includes a dev polyfill reference:
 
 ### 1. `automaton-dev.js` — Dev Polyfill
 
-**File:** `src/Automaton.Studio.Server/wwwroot/scripts/automaton-dev.js`
+**File:** `src/Automaton.Api/wwwroot/scripts/automaton-dev.js`
 
 ```javascript
 if (!window.automatonApi) {
@@ -413,7 +413,7 @@ deployBackend: true   (optional, default false)
 }
 ```
 
-**File:** `src/Automaton.Studio.Server/Controllers/AppsController.cs` — new `Import` action.
+**File:** `src/Automaton.Api/Controllers/AppsController.cs` — new `Import` action.
 
 ---
 
@@ -472,7 +472,7 @@ No code change needed — this is a convention. The zip import and MCP tool use 
 
 Hard enforcement at the tool level so misplaced files are rejected regardless of what Claude Code was told.
 
-**File:** `src/Automaton.Studio.Server/Services/Mcp/Apps/AppScopedFileSystem.cs`
+**File:** `src/Automaton.Api/Services/Mcp/Apps/AppScopedFileSystem.cs`
 
 ```csharp
 public override async Task WriteFileAsync(string relativePath, string content)

@@ -6,16 +6,16 @@ This document records the rate limiting currently implemented in Automaton, why 
 
 Current implementation is split across:
 
-- `src/Automaton.Studio.Server/Security/RateLimitingServiceCollectionExtensions.cs`
+- `src/Automaton.Api/Security/RateLimitingServiceCollectionExtensions.cs`
   - ASP.NET Core global limiter plus endpoint-specific policies
   - generic `429 Too Many Requests` response
-- `src/Automaton.Studio.Server/Middleware/EmailRateLimitFilter.cs`
+- `src/Automaton.Api/Middleware/EmailRateLimitFilter.cs`
   - custom per-email throttling for selected auth endpoints
 - controller attributes on protected endpoints
 
 Policy names are defined in:
 
-- `src/Automaton.Studio.Server/Constants/RateLimitPolicyNames.cs`
+- `src/Automaton.Api/Constants/RateLimitPolicyNames.cs`
 
 ## Global Limiter
 
@@ -411,5 +411,5 @@ Current automated coverage includes:
 
 Test files:
 
-- `src/UnitTests/Automaton.Studio.Server.Tests/EmailRateLimitFilterTests.cs`
-- `src/UnitTests/Automaton.Studio.Server.Tests/RateLimitingPipelineTests.cs`
+- `src/UnitTests/Automaton.Api.Tests/EmailRateLimitFilterTests.cs`
+- `src/UnitTests/Automaton.Api.Tests/RateLimitingPipelineTests.cs`

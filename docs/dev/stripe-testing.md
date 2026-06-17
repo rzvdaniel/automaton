@@ -90,7 +90,7 @@ dotnet user-secrets set "Stripe:WebhookSecret" "whsec_..."
 
 ## Development Workflow
 
-1. Start backend: `dotnet watch` in `src/Automaton.Studio.Server`
+1. Start backend: `dotnet watch` in `src/Automaton.Api`
 2. Start frontend: `npm run dev` in `src/automaton-studio-vue`
 3. Start Stripe CLI: `stripe listen --forward-to https://localhost:7091/api/webhooks/stripe`
 4. In the Admin panel, set `StripeProductId` and `StripePriceId` on each paid plan

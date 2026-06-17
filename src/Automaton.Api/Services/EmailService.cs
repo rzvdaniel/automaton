@@ -11,7 +11,7 @@ namespace Automaton.Api.Services;
 
 public class EmailService(ConfigurationService configurationService, ILogger<EmailService> logger) : IEmailService
 {
-    private static readonly ResourceManager TemplateResourceManager = new("Automaton.Studio.Server.Resources.EmailTemplates", typeof(EmailService).Assembly);
+    private static readonly ResourceManager TemplateResourceManager = new("Automaton.Api.Resources.EmailTemplates", typeof(EmailService).Assembly);
     private static readonly FluidParser TemplateParser = new();
 
     public async Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)

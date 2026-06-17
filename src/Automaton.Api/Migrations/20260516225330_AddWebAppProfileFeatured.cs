@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace Automaton.Studio.Server.Migrations
+namespace Automaton.Api.Migrations
 {
     /// <inheritdoc />
     public partial class AddWebAppProfileFeatured : Migration

@@ -11,13 +11,13 @@ Implemented a **manual acceptance approach** for organization invitations with c
 ## Backend Changes
 
 ### 1. Updated: `SignInUserQueryHandler`
-**File**: `Automaton.Studio.Server/Application/Queries/Handlers/SignInUserQueryHandler.cs`
+**File**: `Automaton.Api/Application/Queries/Handlers/SignInUserQueryHandler.cs`
 - Removed auto-acceptance logic on login
 - Users now manually accept invitations via UI
 - Simplified to just return completed task (no auto-accept logic)
 
 ### 2. Updated: `OrganizationService`
-**File**: `Automaton.Studio.Server/Services/OrganizationService.cs`
+**File**: `Automaton.Api/Services/OrganizationService.cs`
 - `InviteMemberAsync()`: 
   - Creates user account if doesn't exist (without password)
   - Generates password setup link for new/password-less users
@@ -36,7 +36,7 @@ Implemented a **manual acceptance approach** for organization invitations with c
   - Marks invitations as consumed without accepting
 
 ### 3. Updated: `OrganizationsController`
-**File**: `Automaton.Studio.Server/Controllers/OrganizationsController.cs`
+**File**: `Automaton.Api/Controllers/OrganizationsController.cs`
 - `POST /api/organizations/invitations/accept`: 
   - Now `[AllowAnonymous]` - works without authentication
   - Accepts token directly from request body
@@ -44,7 +44,7 @@ Implemented a **manual acceptance approach** for organization invitations with c
 - `POST /api/organizations/invitations/{id}/decline`: Decline an invitation (requires auth)
 
 ### 4. Updated: `IOrganizationService` Interface
-**File**: `Automaton.Studio.Server/Services/Interfaces/IOrganizationService.cs`
+**File**: `Automaton.Api/Services/Interfaces/IOrganizationService.cs`
 - Method signatures for pending invitations and decline operations
 
 ## Frontend Changes

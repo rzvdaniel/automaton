@@ -21,7 +21,7 @@ The product-facing recommendation is CLI-only:
 ## Endpoint
 
 - Hosted/local path: `/api/mcp`
-- Related internal prompt file: `src/Automaton.Studio.Server/SystemPrompts/ExternalMcpInstructions.md`
+- Related internal prompt file: `src/Automaton.Api/SystemPrompts/ExternalMcpInstructions.md`
 
 ## Why It Is Hidden For Now
 

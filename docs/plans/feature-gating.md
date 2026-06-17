@@ -35,7 +35,7 @@
 
 ### Phase 1 — `ISubscriptionGateway` service (backend)
 
-Create `src/Automaton.Studio.Server/Services/Interfaces/ISubscriptionGatewayService.cs`:
+Create `src/Automaton.Api/Services/Interfaces/ISubscriptionGatewayService.cs`:
 
 ```csharp
 Task<SubscriptionPlan?> GetUserPlanAsync(Guid userId);

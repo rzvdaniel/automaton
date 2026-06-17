@@ -19,7 +19,7 @@ Build apps locally with your preferred AI coding agent, deploy them with the Aut
 
 - **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)
 - **Studio frontend**: Vue 3 + TypeScript + Vite + PrimeVue (`src/automaton-studio-vue/`)
-- **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Studio.Server/`)
+- **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Api/`)
 - **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
 - **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)
 - **Core libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`
@@ -58,7 +58,7 @@ docker compose -f docker-compose.dev.yml up -d mysql
 Configure the backend connection string:
 
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
 ```
 
@@ -72,7 +72,7 @@ dotnet ef database update
 ### 2. Run Studio backend
 
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet run
 ```
 

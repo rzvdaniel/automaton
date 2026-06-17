@@ -91,7 +91,7 @@ Automaton has four main surfaces:
 2. **Studio**
    - Authenticated web UI for apps, publishing, runners, API keys, AI keys, admin features, and account/project/organization management.
    - Frontend located in `src/automaton-studio-vue/`.
-   - Backend located in `src/Automaton.Studio.Server/`.
+   - Backend located in `src/Automaton.Api/`.
 
 3. **CLI**
    - Local developer tool for creating, pulling, deploying, and publishing Automaton apps.
@@ -129,7 +129,7 @@ Automaton apps have an important source/runtime split:
 
 ### Studio backend
 
-- `src/Automaton.Studio.Server/`
+- `src/Automaton.Api/`
 - ASP.NET Core 9 REST API + SignalR.
 - Controllers, services, EF Core entities/migrations, authentication, runners, apps, publishing, admin.
 
@@ -217,7 +217,7 @@ If changing archive/deploy/pull behavior, add or update targeted tests for:
 
 Affected paths:
 
-- `src/Automaton.Studio.Server/**`
+- `src/Automaton.Api/**`
 - shared backend models/libraries
 - EF Core entities/migrations
 - API key, runner, app, publish, auth, admin behavior
@@ -231,7 +231,7 @@ dotnet test
 For EF changes:
 
 ```bash
-dotnet ef migrations list --project src/Automaton.Studio.Server
+dotnet ef migrations list --project src/Automaton.Api
 ```
 
 Only add migrations intentionally.
@@ -402,7 +402,7 @@ Avoid C# enums when the value must be serialized as a stable string and compared
 - Do not add columns for every new plan entitlement unless there is a strong query/indexing reason.
 - Subscription entitlements should generally extend `PlanCapabilities`.
 - Add migrations intentionally.
-- Create EF Core migrations with the `dotnet ef migrations add <Name> --project src/Automaton.Studio.Server` workflow. Do not hand-write migration files.
+- Create EF Core migrations with the `dotnet ef migrations add <Name> --project src/Automaton.Api` workflow. Do not hand-write migration files.
 - Avoid destructive migrations unless explicitly requested.
 
 ---
@@ -439,10 +439,10 @@ Important areas:
   - `HostedRunnerDeployment`
 
 - Provisioning service:
-  - `src/Automaton.Studio.Server/Services/HostedRunnerProvisioningService.cs`
+  - `src/Automaton.Api/Services/HostedRunnerProvisioningService.cs`
 
 - Admin API:
-  - `src/Automaton.Studio.Server/Controllers/Admin/AdminHostedRunnersController.cs`
+  - `src/Automaton.Api/Controllers/Admin/AdminHostedRunnersController.cs`
 
 - Admin UI:
   - `src/automaton-studio-vue/src/features/admin/views/AdminHostedRunnersView.vue`

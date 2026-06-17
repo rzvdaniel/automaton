@@ -46,7 +46,7 @@ If you changed EF entities, `DbContext`, relationships, indexes, or other persis
 
 ```powershell
 # From repo root
-dotnet ef migrations add <Name> --project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --startup-project src/Automaton.Studio.Server/Automaton.Studio.Server.csproj --output-dir Migrations
+dotnet ef migrations add <Name> --project src/Automaton.Api/Automaton.Api.csproj --startup-project src/Automaton.Api/Automaton.Api.csproj --output-dir Migrations
 ```
 
 **Expected result:** EF creates:
@@ -81,7 +81,7 @@ Run focused tests in areas you modified.
 
 ```powershell
 # From repo root
-dotnet test src/UnitTests/Automaton.Studio.Server.Tests -c Release
+dotnet test src/UnitTests/Automaton.Api.Tests -c Release
 ```
 
 ## Reporting Results

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Automaton.Studio.Server.Migrations
+namespace Automaton.Api.Migrations
 {
     /// <inheritdoc />
     public partial class AddRunnerHeartbeatTracking : Migration

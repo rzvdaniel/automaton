@@ -137,7 +137,7 @@ npm run dev
 Backend:
 
 ```powershell
-cd C:\Work\automaton\src\Automaton.Studio.Server
+cd C:\Work\automaton\src\Automaton.Api
 dotnet run
 ```
 
@@ -145,7 +145,7 @@ dotnet run
 
 Update:
 
-[appsettings.Development.json](/C:/Work/automaton/src/Automaton.Studio.Server/appsettings.Development.json)
+[appsettings.Development.json](/C:/Work/automaton/src/Automaton.Api/appsettings.Development.json)
 
 Set:
 
