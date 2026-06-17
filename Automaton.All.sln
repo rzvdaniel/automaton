@@ -11,9 +11,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{F8CF6650-9B57-4FF4-9049-0307F7A91F0A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api", "src\Automaton.Studio.Server\Automaton.Api.csproj", "{2277C348-E1BF-43C3-B8F9-76310B110E65}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api", "src\Automaton.Api\Automaton.Api.csproj", "{2277C348-E1BF-43C3-B8F9-76310B110E65}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server.Tests", "src\UnitTests\Automaton.Studio.Server.Tests\Automaton.Studio.Server.Tests.csproj", "{E0EC0CE1-0C13-4E4D-AE96-53DDDCCD29FA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api.Tests", "src\UnitTests\Automaton.Api.Tests\Automaton.Api.Tests.csproj", "{E0EC0CE1-0C13-4E4D-AE96-53DDDCCD29FA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Tests", "src\UnitTests\Automaton.Core.Tests\Automaton.Core.Tests.csproj", "{4E4A4ED0-7C86-4198-82E3-41C15239A093}"
 EndProject

@@ -7,13 +7,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core", "src\Autom
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Steps", "src\Automaton.Steps\Automaton.Steps.csproj", "{2668B7B6-4410-4433-AB86-388A5671CAD5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server", "src\Automaton.Studio.Server\Automaton.Studio.Server.csproj", "{D6140B93-4232-4845-B10B-F41DDD8A61EE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api", "src\Automaton.Api\Automaton.Api.csproj", "{D6140B93-4232-4845-B10B-F41DDD8A61EE}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Core.Scripting", "src\Automaton.Core.Scripting\Automaton.Core.Scripting.csproj", "{BE0FFD26-5AD0-4BF2-B8F5-6E3BC423804F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{28B06BA2-AC92-4F2F-9CA1-2CBBB8652448}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Studio.Server.Tests", "src\UnitTests\Automaton.Studio.Server.Tests\Automaton.Studio.Server.Tests.csproj", "{159069F1-CCD8-4806-B545-8172CF4F994C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Automaton.Api.Tests", "src\UnitTests\Automaton.Api.Tests\Automaton.Api.Tests.csproj", "{159069F1-CCD8-4806-B545-8172CF4F994C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
