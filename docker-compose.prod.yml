@@ -31,6 +31,9 @@ x-api-common: &api-common
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
     ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD};
+    RabbitMq__Host: rabbitmq
+    RabbitMq__Username: ${RABBITMQ_USER}
+    RabbitMq__Password: ${RABBITMQ_PASSWORD}
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
@@ -41,6 +44,8 @@ x-api-common: &api-common
     - automaton-prod
   depends_on:
     mysql:
+      condition: service_healthy
+    rabbitmq:
       condition: service_healthy
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz > /dev/null || exit 1"]
@@ -143,6 +148,25 @@ services:
       retries: 10
       start_period: 30s
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: automaton-prod-rabbitmq
+    restart: unless-stopped
+    logging: *default-json-logging
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - prod-rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - automaton-prod
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   api-blue:
     <<: *api-common
     environment:
@@ -169,6 +193,7 @@ services:
 
 volumes:
   prod-mysql-data:
+  prod-rabbitmq-data:
   prod-api-appdata:
   prod-published-apps:
   prod-api-logs:

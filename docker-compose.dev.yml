@@ -27,6 +27,21 @@ services:
       retries: 5
       start_period: 30s
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: automaton-rabbitmq-dev
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-automaton}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-automaton}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - automaton-network
+
   # Automaton Studio Server (optional - uncomment to run server in Docker)
   # automaton-server:
   #   build:
@@ -111,6 +126,8 @@ volumes:
   runner-logs:
     driver: local
   runner-data:
+    driver: local
+  rabbitmq-data:
     driver: local
 
 networks:

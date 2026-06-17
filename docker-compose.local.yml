@@ -33,6 +33,21 @@ services:
       retries: 10
       start_period: 30s
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: automaton-rabbitmq-dev
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-automaton}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-AutomatonRabbit123!}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - automaton-local
+
   api:
     build:
       context: .
@@ -48,6 +63,9 @@ services:
       Cors__AllowedOrigins__1: http://localhost:5174
       JwtOptions__Issuer: http://localhost:7091
       AppConfig__WebsiteUrl: http://localhost:5173
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-automaton}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-AutomatonRabbit123!}
     ports:
       - "${API_LOCAL_PORT:-7091}:8080"
     volumes:
@@ -57,6 +75,8 @@ services:
       - automaton-local
     depends_on:
       mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   studio:
@@ -114,6 +134,7 @@ services:
 
 volumes:
   local-mysql-data:
+  rabbitmq-data:
   local-api-appdata:
   local-api-logs:
   local-runner-config:
