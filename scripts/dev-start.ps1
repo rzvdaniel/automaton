@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     1. Copies appsettings.Development.json from the main repo
-    2. Starts Automaton.Studio.Server  (new terminal window)
+    2. Starts Automaton.Api  (new terminal window)
     3. Starts FastAPI backend          (new terminal window, port 8001)
     4. Starts Automaton.Runner         (new terminal window)
     5. Starts the Vue.js frontend      (new terminal window)
@@ -23,7 +23,7 @@
         https://nodejs.org if not present.
 
     AppData is NOT managed by this script. Copy app files manually into
-    src\Automaton.Studio.Server\AppData as needed.
+    src\Automaton.Api\AppData as needed.
 
 .PARAMETER MainRepo
     Path to the main Automaton repository.
@@ -52,7 +52,7 @@ $ErrorActionPreference = "Stop"
 # ---------- Resolve paths ---------------------------------------------------
 
 $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
-$ServerProject = Join-Path $WorktreeRoot "src\Automaton.Studio.Server"
+$ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
 $RunnerProject = Join-Path $WorktreeRoot "src\Automaton.Runner"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
@@ -76,9 +76,9 @@ function Start-DevWindow([string]$title, [string]$workDir, [string]$cmd) {
         "`$host.UI.RawUI.WindowTitle = '$title'; Set-Location '$workDir'; $escaped"
 }
 
-# ---------- 2. Automaton.Studio.Server --------------------------------------
+# ---------- 2. Automaton.Api --------------------------------------
 
-Write-Step "Starting Automaton.Studio.Server..."
+Write-Step "Starting Automaton.Api..."
 Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
 Write-Ok "Server window launched"
 

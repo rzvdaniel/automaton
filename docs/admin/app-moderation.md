@@ -165,15 +165,15 @@ This gives us a usable first audit trail without introducing a dedicated moderat
 
 Backend:
 
-- `src/Automaton.Studio.Server/Entities/WebApp.cs`
-- `src/Automaton.Studio.Server/Services/AdminAppsService.cs`
-- `src/Automaton.Studio.Server/Controllers/Admin/AdminMarketplaceAppsController.cs`
-- `src/Automaton.Studio.Server/Controllers/PublicMarketplaceController.cs`
-- `src/Automaton.Studio.Server/Controllers/UserAppsController.cs`
-- `src/Automaton.Studio.Server/Controllers/AppFilesController.cs`
-- `src/Automaton.Studio.Server/Services/PublicAppsService.cs`
-- `src/Automaton.Studio.Server/Services/AppsService.cs`
-- `src/Automaton.Studio.Server/Services/WebAppStarService.cs`
+- `src/Automaton.Api/Entities/WebApp.cs`
+- `src/Automaton.Api/Services/AdminAppsService.cs`
+- `src/Automaton.Api/Controllers/Admin/AdminMarketplaceAppsController.cs`
+- `src/Automaton.Api/Controllers/PublicMarketplaceController.cs`
+- `src/Automaton.Api/Controllers/UserAppsController.cs`
+- `src/Automaton.Api/Controllers/AppFilesController.cs`
+- `src/Automaton.Api/Services/PublicAppsService.cs`
+- `src/Automaton.Api/Services/AppsService.cs`
+- `src/Automaton.Api/Services/WebAppStarService.cs`
 
 Frontend:
 
@@ -182,7 +182,7 @@ Frontend:
 
 Migration:
 
-- `src/Automaton.Studio.Server/Migrations/20260531125500_AddWebAppReviewAndAccessStatuses.cs`
+- `src/Automaton.Api/Migrations/20260531125500_AddWebAppReviewAndAccessStatuses.cs`
 
 ## Future Options
 

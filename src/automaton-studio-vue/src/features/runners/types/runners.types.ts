@@ -15,7 +15,7 @@ export const RunnerStatus = {
 export type RunnerStatus = (typeof RunnerStatus)[keyof typeof RunnerStatus]
 
 /**
- * Access scope enum for resources (matches Automaton.Studio.Server.Enums.AccessScope)
+ * Access scope enum for resources (matches Automaton.Api.Enums.AccessScope)
  */
 export const AccessScope = {
   Personal: 0,

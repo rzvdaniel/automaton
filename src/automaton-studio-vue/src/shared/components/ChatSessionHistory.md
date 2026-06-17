@@ -417,7 +417,7 @@ Both components use the same backend infrastructure:
 
 ### Resource Types
 
-**Enum**: `src/Automaton.Studio.Server/Enums/ChatResourceType.cs`
+**Enum**: `src/Automaton.Api/Enums/ChatResourceType.cs`
 
 ```csharp
 public enum ChatResourceType

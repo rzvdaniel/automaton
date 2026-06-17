@@ -4,23 +4,23 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 
 WORKDIR /src
 
-COPY src/Automaton.Studio.Server/*.csproj ./Automaton.Studio.Server/
+COPY src/Automaton.Api/*.csproj ./Automaton.Api/
 COPY src/Automaton.Core/*.csproj ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
 COPY src/Automaton.Ai/*.csproj ./Automaton.Ai/
 COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
 
-RUN dotnet restore Automaton.Studio.Server/Automaton.Studio.Server.csproj
+RUN dotnet restore Automaton.Api/Automaton.Api.csproj
 
-COPY src/Automaton.Studio.Server/ ./Automaton.Studio.Server/
+COPY src/Automaton.Api/ ./Automaton.Api/
 COPY src/Automaton.Core/ ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/ ./Automaton.Steps/
 COPY src/Automaton.Ai/ ./Automaton.Ai/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
 
-RUN dotnet publish Automaton.Studio.Server/Automaton.Studio.Server.csproj \
+RUN dotnet publish Automaton.Api/Automaton.Api.csproj \
     -c Release \
     -o /app/publish \
     -p:UseAppHost=false
@@ -41,4 +41,4 @@ RUN mkdir -p /app/AppData/apps /app/logs
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Automaton.Studio.Server.dll"]
+ENTRYPOINT ["dotnet", "Automaton.Api.dll"]

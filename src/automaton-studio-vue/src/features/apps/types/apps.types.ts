@@ -39,7 +39,7 @@ export interface AppScreenshot {
 
 /**
  * App model from API
- * Matches src/Automaton.Studio.Server/Models/App.cs
+ * Matches src/Automaton.Api/Models/App.cs
  */
 export interface App {
   id: string
@@ -113,7 +113,7 @@ export type AppRuntimeSource = (typeof AppRuntimeSource)[keyof typeof AppRuntime
 
 /**
  * Request to create a new app
- * Matches src/Automaton.Studio.Server/Models/NewApp.cs
+ * Matches src/Automaton.Api/Models/NewApp.cs
  */
 export interface CreateAppRequest {
   name: string
@@ -165,7 +165,7 @@ export interface AppListFilters {
 }
 
 /**
- * Access scope enum for resources (matches Automaton.Studio.Server.Enums.AccessScope)
+ * Access scope enum for resources (matches Automaton.Api.Enums.AccessScope)
  */
 export const AccessScope = {
   Personal: 0,

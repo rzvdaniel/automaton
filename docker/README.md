@@ -50,7 +50,7 @@ This will:
 - Start MySQL on port 3306 (or your configured port)
 - Persist data in a Docker volume
 
-### 4. Configure Automaton.Studio.Server
+### 4. Configure Automaton.Api
 
 Update your `appsettings.Development.json` or use .NET user secrets:
 
@@ -65,7 +65,7 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 
 **Option B: User Secrets (Recommended)**
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
 ```
 
@@ -74,7 +74,7 @@ dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Po
 Database migrations are applied automatically when the server starts for the first time:
 
 ```bash
-cd src/Automaton.Studio.Server
+cd src/Automaton.Api
 dotnet run
 ```
 
