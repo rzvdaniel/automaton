@@ -1,4 +1,4 @@
-﻿namespace Automaton.Studio.Server.Logging;
+﻿namespace Automaton.Api.Logging;
 
 internal static class LoggingRequestFilter
 {

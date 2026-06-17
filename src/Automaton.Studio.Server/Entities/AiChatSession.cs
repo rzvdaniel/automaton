@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Represents a chat session with an AI model for a specific resource (Step or WebApp)

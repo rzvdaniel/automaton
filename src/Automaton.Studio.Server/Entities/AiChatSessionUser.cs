@@ -1,6 +1,6 @@
 using System;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Junction table linking AI chat sessions to users

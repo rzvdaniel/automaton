@@ -1,8 +1,8 @@
-﻿using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services;
 using FluentValidation;
 
-namespace Automaton.Studio.Server.Validators
+namespace Automaton.Api.Validators
 {
     public class RegisterRunnerValidator : AbstractValidator<RegisterRunnerRequest>
     {

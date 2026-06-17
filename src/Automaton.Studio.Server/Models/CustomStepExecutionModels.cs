@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Result of executing a custom step on a runner

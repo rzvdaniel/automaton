@@ -1,13 +1,13 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Automaton.Api.Enums;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Route("api/public/marketplace")]

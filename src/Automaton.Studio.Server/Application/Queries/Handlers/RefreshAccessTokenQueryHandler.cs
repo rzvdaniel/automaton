@@ -1,12 +1,11 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
-using Common.Authentication;
+﻿using Automaton.Api.Authentication;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
 
-namespace Automaton.Studio.Server.Application.Queries.Handlers
+namespace Automaton.Api.Application.Queries.Handlers
 {
     public class RefreshAccessTokenQueryHandler : IRequestHandler<RefreshAccessTokenQuery, JsonWebToken>
     {

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services.Interfaces;
+namespace Automaton.Api.Services.Interfaces;
 
 public interface ITokenBudgetService
 {

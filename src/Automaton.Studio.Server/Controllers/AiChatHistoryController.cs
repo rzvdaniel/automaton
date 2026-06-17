@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Controller for managing AI chat history (sessions and messages)

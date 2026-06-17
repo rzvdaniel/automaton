@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Controllers.Admin;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Constants;
+using Automaton.Api.Controllers.Admin;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

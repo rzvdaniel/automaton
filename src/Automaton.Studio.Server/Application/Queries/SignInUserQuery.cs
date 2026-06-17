@@ -1,7 +1,8 @@
-﻿using Common.Authentication;
+﻿using Automaton.Api.Application.Commands;
+using Automaton.Api.Authentication;
 using MediatR;
 
-namespace Automaton.Studio.Server.Core.Commands;
+namespace Automaton.Api.Application.Queries;
 
 public class SignInUserQuery : SignInUserCommand, IRequest<JsonWebToken>
 {

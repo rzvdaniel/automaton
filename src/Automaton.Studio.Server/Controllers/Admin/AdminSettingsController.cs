@@ -1,8 +1,9 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin controller for global application settings.
@@ -24,7 +25,7 @@ public class AdminSettingsController : ControllerBase
     }
 
     [HttpGet("app-deploy-rules")]
-    public async Task<ActionResult<Models.AppDeployRulesSettings>> GetAppDeployRules()
+    public async Task<ActionResult<AppDeployRulesSettings>> GetAppDeployRules()
     {
         try
         {
@@ -38,7 +39,7 @@ public class AdminSettingsController : ControllerBase
     }
 
     [HttpPut("app-deploy-rules")]
-    public async Task<IActionResult> UpdateAppDeployRules([FromBody] Automaton.Studio.Server.Models.AppDeployRulesSettings settings)
+    public async Task<IActionResult> UpdateAppDeployRules([FromBody] AppDeployRulesSettings settings)
     {
         try
         {

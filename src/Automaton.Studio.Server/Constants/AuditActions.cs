@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Constants;
+namespace Automaton.Api.Constants;
 
 /// <summary>
 /// Generic audit verbs. Use these for the broad action category.

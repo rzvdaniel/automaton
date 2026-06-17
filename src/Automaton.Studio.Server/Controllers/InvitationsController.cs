@@ -1,13 +1,14 @@
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Enums;
+using Automaton.Api.Constants;
+using Automaton.Api.Entities;
+using Automaton.Api.Services;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [Route("api/invitations")]
 public class InvitationsController : ControllerBase
@@ -81,7 +82,7 @@ public class InvitationsController : ControllerBase
             }
 
             existing.IsActive = true;
-            existing.Role = Enum.TryParse<Automaton.Studio.Server.Enums.ProjectRole>(invite.Role, out var r) ? r : Automaton.Studio.Server.Enums.ProjectRole.Viewer;
+            existing.Role = Enum.TryParse<ProjectRole>(invite.Role, out var r) ? r : ProjectRole.Viewer;
             existing.InvitedBy = invite.InvitedBy;
             existing.JoinedAt = DateTime.UtcNow;
         }
@@ -91,7 +92,7 @@ public class InvitationsController : ControllerBase
             {
                 ProjectId = invite.ProjectId,
                 UserId = user.Id,
-                Role = Enum.TryParse<Automaton.Studio.Server.Enums.ProjectRole>(invite.Role, out var r2) ? r2 : Automaton.Studio.Server.Enums.ProjectRole.Viewer,
+                Role = Enum.TryParse<ProjectRole>(invite.Role, out var r2) ? r2 : ProjectRole.Viewer,
                 JoinedAt = DateTime.UtcNow,
                 InvitedBy = invite.InvitedBy,
                 IsActive = true
@@ -179,7 +180,7 @@ public class InvitationsController : ControllerBase
             if (!existingMembership.IsActive)
             {
                 existingMembership.IsActive = true;
-                existingMembership.Role = Enum.TryParse<Automaton.Studio.Server.Enums.ProjectRole>(invite.Role, out var rr) ? rr : Automaton.Studio.Server.Enums.ProjectRole.Viewer;
+                existingMembership.Role = Enum.TryParse<ProjectRole>(invite.Role, out var rr) ? rr : ProjectRole.Viewer;
                 existingMembership.InvitedBy = invite.InvitedBy;
                 existingMembership.JoinedAt = DateTime.UtcNow;
             }
@@ -190,7 +191,7 @@ public class InvitationsController : ControllerBase
             {
                 ProjectId = invite.ProjectId,
                 UserId = user.Id,
-                Role = Enum.TryParse<Automaton.Studio.Server.Enums.ProjectRole>(invite.Role, out var rr2) ? rr2 : Automaton.Studio.Server.Enums.ProjectRole.Viewer,
+                Role = Enum.TryParse<ProjectRole>(invite.Role, out var rr2) ? rr2 : ProjectRole.Viewer,
                 JoinedAt = DateTime.UtcNow,
                 InvitedBy = invite.InvitedBy,
                 IsActive = true

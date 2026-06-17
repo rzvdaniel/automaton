@@ -1,8 +1,9 @@
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
+
 
 #nullable disable
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// DTO for AI chat session information

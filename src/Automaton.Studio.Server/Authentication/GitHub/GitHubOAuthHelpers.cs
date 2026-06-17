@@ -3,7 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.WebUtilities;
 
-namespace Automaton.Studio.Server.Authentication.GitHub;
+namespace Automaton.Api.Authentication.GitHub;
 
 public static class GitHubOAuthHelpers
 {

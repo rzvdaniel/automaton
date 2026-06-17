@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 
-namespace Automaton.Studio.Server.Attributes;
+namespace Automaton.Api.Attributes;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class AppsHostOnlyAttribute : ActionMethodSelectorAttribute

@@ -1,6 +1,8 @@
 ﻿#nullable disable
 
-namespace Automaton.Studio.Server.Entities
+using Automaton;
+
+namespace Automaton.Api.Entities
 {
     public class Flow
     {

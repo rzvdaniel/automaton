@@ -1,11 +1,11 @@
-﻿using AuthServer.Core.Queries;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Application.Queries;
+using Automaton.Api.Data;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace AuthServer.Application.Queries.Handlers
+namespace Automaton.Api.Application.Queries.Handlers
 {
     public class FilterUserQueryHandler : IRequestHandler<FilterUserQuery, AdminUserListResponse>
     {

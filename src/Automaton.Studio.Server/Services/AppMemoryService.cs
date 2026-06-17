@@ -1,12 +1,12 @@
 using System.Text;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Config;
+using Automaton.Api.Data;
+using Automaton.Api.Enums;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Builds a compact App Memory Block summarising what has been built and what

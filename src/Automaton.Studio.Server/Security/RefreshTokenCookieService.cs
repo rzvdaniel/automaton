@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace Automaton.Studio.Server.Security;
+namespace Automaton.Api.Security;
 
 public sealed class RefreshTokenCookieService
 {

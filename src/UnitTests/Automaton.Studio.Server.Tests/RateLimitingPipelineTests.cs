@@ -1,7 +1,3 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Middleware;
-using Automaton.Studio.Server.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -18,6 +14,10 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Automaton.Api.Constants;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Security;
+using Automaton.Api.Middleware;
 
 namespace Automaton.Studio.Server.Tests;
 

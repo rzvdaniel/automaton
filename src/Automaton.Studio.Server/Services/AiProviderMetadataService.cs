@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Data;
+using Automaton.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for retrieving AI provider and model metadata from the database

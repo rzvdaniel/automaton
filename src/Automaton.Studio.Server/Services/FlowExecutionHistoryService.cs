@@ -1,8 +1,9 @@
-﻿using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
+﻿using Automaton.Api.Data;
+using Automaton.Api.Entities;
+
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class FlowExecutionHistoryService
 {
@@ -21,11 +22,11 @@ public class FlowExecutionHistoryService
         this.logger = Serilog.Log.ForContext<FlowExecutionHistoryService>();
     }
 
-    public async Task<Models.FlowExecutionResult> GetAsync(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
+    public async Task<FlowExecutionResult> GetAsync(Guid flowId, int startIndex, int pageSize, CancellationToken cancellationToken)
     {
         var executions = await GetListAsync(flowId, startIndex, pageSize, cancellationToken);
         var totalExecutions = await GetTotalAsync(flowId, cancellationToken);
-        var result = new Models.FlowExecutionResult(executions, totalExecutions);
+        var result = new FlowExecutionResult(executions, totalExecutions);
 
         return result;
     }
@@ -151,7 +152,7 @@ public class FlowExecutionHistoryService
             .CountAsync(cancellationToken);
     }
 
-    private static Models.FlowExecution MapToModel(Entities.FlowExecution entity)
+    private static Models.FlowExecution MapToModel(FlowExecution entity)
     {
         return new Models.FlowExecution
         {

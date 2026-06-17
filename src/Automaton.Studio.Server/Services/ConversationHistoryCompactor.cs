@@ -1,8 +1,8 @@
 using System.Text;
 using Automaton.Ai.Models;
-using Automaton.Studio.Server.Config;
+using Automaton.Api.Config;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Compacts long conversation histories into a short rolling summary plus recent turns.

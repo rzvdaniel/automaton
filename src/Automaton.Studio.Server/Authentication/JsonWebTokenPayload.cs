@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public class JsonWebTokenPayload
     {

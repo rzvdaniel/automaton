@@ -1,9 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AdminAppsService
 {
@@ -30,7 +31,7 @@ public class AdminAppsService
         this.publishedAppStorageService = publishedAppStorageService;
     }
 
-    public IEnumerable<Models.AppModel> ListOwnedByUserForAdmin(Guid userId, Guid? projectId = null)
+    public IEnumerable<AppModel> ListOwnedByUserForAdmin(Guid userId, Guid? projectId = null)
     {
         EnsureAdminAccess();
 
@@ -49,7 +50,7 @@ public class AdminAppsService
             });
     }
 
-    public async Task<Models.AdminAppDetails?> GetDetailsForAdminAsync(Guid appId, CancellationToken cancellationToken = default)
+    public async Task<AdminAppDetails?> GetDetailsForAdminAsync(Guid appId, CancellationToken cancellationToken = default)
     {
         EnsureAdminAccess();
 
@@ -111,7 +112,7 @@ public class AdminAppsService
         await dataContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task UpdateModerationForAdminAsync(Guid appId, Models.AdminMarketplaceModerationRequest request, CancellationToken cancellationToken = default)
+    public async Task UpdateModerationForAdminAsync(Guid appId, AdminMarketplaceModerationRequest request, CancellationToken cancellationToken = default)
     {
         var record = await RequireOwnedAppForAdminAsync(appId, cancellationToken);
         var previousReviewStatus = record.App.ReviewStatus;

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Lightweight model for published app metadata used for access validation.

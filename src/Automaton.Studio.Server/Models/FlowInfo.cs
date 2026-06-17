@@ -1,6 +1,8 @@
 ﻿#nullable disable
 
-namespace Automaton.Studio.Server.Models;
+using Automaton;
+
+namespace Automaton.Api.Models;
 
 public class FlowInfo
 {

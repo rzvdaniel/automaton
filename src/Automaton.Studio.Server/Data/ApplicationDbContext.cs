@@ -1,13 +1,13 @@
+using Automaton.Api.Authentication;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Entities;
-using Common.Authentication;
-using Common.EF;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace Automaton.Studio.Server.Data
+namespace Automaton.Api.Data
 {
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid, IdentityUserClaim<Guid>,
         ApplicationUserRole, IdentityUserLogin<Guid>, IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>, IDataContext
@@ -312,7 +312,7 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.CustomStepId).IsRequired();
             });
 
-            modelBuilder.Entity<Entities.WebApp>(entity =>
+            modelBuilder.Entity<WebApp>(entity =>
             {
                 entity.HasKey(e => new { e.Id });
                 entity.HasIndex(e => e.PublicUrl).IsUnique();
@@ -330,15 +330,15 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.MarketplaceStatus)
                     .IsRequired()
                     .HasMaxLength(40)
-                    .HasDefaultValue(Automaton.Studio.Server.Enums.MarketplaceAppStatuses.Approved);
+                    .HasDefaultValue(MarketplaceAppStatuses.Approved);
                 entity.Property(e => e.ReviewStatus)
                     .IsRequired()
                     .HasMaxLength(40)
-                    .HasDefaultValue(Automaton.Studio.Server.Enums.AppReviewStatuses.Approved);
+                    .HasDefaultValue(AppReviewStatuses.Approved);
                 entity.Property(e => e.AccessStatus)
                     .IsRequired()
                     .HasMaxLength(40)
-                    .HasDefaultValue(Automaton.Studio.Server.Enums.AppAccessStatuses.Active);
+                    .HasDefaultValue(AppAccessStatuses.Active);
                 entity.Property(e => e.MarketplaceModerationReason)
                     .HasMaxLength(2000);
                 entity.Property(e => e.ForkedFromAppName)
@@ -376,7 +376,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.IsActive, e.SortOrder });
             });
 
-            modelBuilder.Entity<Entities.WebAppUser>(entity =>
+            modelBuilder.Entity<WebAppUser>(entity =>
             {
                 entity.HasKey(e => new { e.WebAppId, e.UserId });
                 entity.HasIndex(e => e.WebAppId, "IX_WebAppUser_WebAppId");
@@ -384,7 +384,7 @@ namespace Automaton.Studio.Server.Data
                 entity.Property(e => e.WebAppId).IsRequired();
             });
 
-            modelBuilder.Entity<Entities.WebAppStar>(entity =>
+            modelBuilder.Entity<WebAppStar>(entity =>
             {
                 entity.HasKey(e => new { e.WebAppId, e.UserId });
                 entity.Property(e => e.CreatedAt).IsRequired();
@@ -392,7 +392,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => e.WebAppId);
             });
 
-            modelBuilder.Entity<Entities.WebAppScreenshot>(entity =>
+            modelBuilder.Entity<WebAppScreenshot>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ImageUrl).IsRequired().HasMaxLength(500);
@@ -404,7 +404,7 @@ namespace Automaton.Studio.Server.Data
                 entity.HasIndex(e => new { e.WebAppId, e.SortOrder });
             });
 
-            modelBuilder.Entity<Entities.WebAppStep>(entity =>
+            modelBuilder.Entity<WebAppStep>(entity =>
             {
                 entity.HasKey(e => new { e.WebAppId, e.CustomStepId });
                 entity.Property(e => e.LinkedAt).IsRequired();
@@ -428,7 +428,7 @@ namespace Automaton.Studio.Server.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<Entities.AppVersion>(entity =>
+            modelBuilder.Entity<AppVersion>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.AppId).IsRequired();
@@ -457,7 +457,7 @@ namespace Automaton.Studio.Server.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<Entities.AppVersionStep>(entity =>
+            modelBuilder.Entity<AppVersionStep>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.AppVersionId).IsRequired();
@@ -904,7 +904,7 @@ namespace Automaton.Studio.Server.Data
             });
 
             // Invitation tokens
-            modelBuilder.Entity<Entities.InvitationToken>(entity =>
+            modelBuilder.Entity<InvitationToken>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Token).IsRequired();

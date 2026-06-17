@@ -1,15 +1,14 @@
-using Automaton.Studio.Server.Controllers;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Collections.Generic;
-using Automaton.Studio.Server.Security;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Controllers;
+using Automaton.Api.Services;
+using Automaton.Api.Security;
 
 namespace Automaton.Studio.Server.Tests;
 

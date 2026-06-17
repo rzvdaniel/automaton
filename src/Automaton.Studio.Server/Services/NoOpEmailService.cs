@@ -1,7 +1,7 @@
-﻿using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services.Interfaces;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class NoOpEmailService : IEmailService
 {

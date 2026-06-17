@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Information about a Custom Step linked to an App (server-side)

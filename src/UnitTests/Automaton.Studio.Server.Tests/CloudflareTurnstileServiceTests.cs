@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Config;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;

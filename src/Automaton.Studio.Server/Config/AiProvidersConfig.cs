@@ -1,6 +1,6 @@
 using Automaton.Mcp.SystemPrompts;
 
-namespace Automaton.Studio.Server.Config;
+namespace Automaton.Api.Config;
 
 public class AiProvidersConfig
 {
@@ -56,7 +56,7 @@ public class AiProvidersConfig
 
     /// <summary>
     /// Per-tier iteration limits. Zero values fall back to the built-in defaults
-    /// in <see cref="Automaton.Mcp.SystemPrompts.IterationLimits"/>.
+    /// in <see cref="Mcp.SystemPrompts.IterationLimits"/>.
     /// </summary>
     public IterationLimitsConfig IterationLimits { get; set; } = new();
 

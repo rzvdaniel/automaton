@@ -1,12 +1,12 @@
 using System.Text.Json;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AppVersionService
 {
@@ -79,8 +79,8 @@ public class AppVersionService
 
             var variablesSnapshot = JsonSerializer.Serialize(new
             {
-                inputVariables = definition.CodeInputVariables ?? new List<Automaton.Core.Models.StepVariable>(),
-                outputVariables = definition.CodeOutputVariables ?? new List<Automaton.Core.Models.StepVariable>()
+                inputVariables = definition.CodeInputVariables ?? new List<Core.Models.StepVariable>(),
+                outputVariables = definition.CodeOutputVariables ?? new List<Core.Models.StepVariable>()
             });
 
             var stepSnapshot = new AppVersionStep

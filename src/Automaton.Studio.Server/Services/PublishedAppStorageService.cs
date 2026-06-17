@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Automaton.Studio.Server.Config;
+using Automaton.Api.Config;
 using Microsoft.Extensions.Options;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public sealed record PublishedAppPackageMetadata(
     Guid AppId,

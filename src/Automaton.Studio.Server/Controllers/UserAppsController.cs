@@ -1,16 +1,17 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Attributes;
-using Automaton.Studio.Server.Enums;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Automaton.Api.Enums;
+using Automaton.Api.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Config;
+using Automaton.Api.Attributes;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Controller for serving user-generated web apps.
@@ -131,7 +132,7 @@ public class UserAppsController : ControllerBase
         }
     }
 
-    private async Task<(Models.PublishedAppInfo? App, bool ShouldRedirectToCleanUrl)> GetAuthorizedPrivateAppAsync(Guid appId)
+    private async Task<(PublishedAppInfo? App, bool ShouldRedirectToCleanUrl)> GetAuthorizedPrivateAppAsync(Guid appId)
     {
         var launchCode = Request.Query["launch"].FirstOrDefault();
         if (privateAppLaunchService.TryConsumeLaunchCode(appId, launchCode, out var launchedUserId))

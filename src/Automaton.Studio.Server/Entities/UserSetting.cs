@@ -1,8 +1,9 @@
 #nullable disable
 
+using Automaton;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// User-scoped key-value settings storage for user preferences

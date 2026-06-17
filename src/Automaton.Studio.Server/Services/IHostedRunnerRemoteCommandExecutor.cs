@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Entities;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public interface IHostedRunnerRemoteCommandExecutor
 {

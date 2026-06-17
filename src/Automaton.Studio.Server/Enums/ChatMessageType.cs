@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Enums;
+namespace Automaton.Api.Enums;
 
 /// <summary>
 /// Defines the type of AI chat message

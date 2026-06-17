@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Application.Queries.Handlers;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Entities;
+using Automaton.Api.Application.Queries.Handlers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
+using Automaton.Api.Application.Queries;
 
 namespace Automaton.Studio.Server.Tests;
 

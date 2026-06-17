@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Links sensitive variables to users for authorization

@@ -1,9 +1,9 @@
 using Automaton.Ai;
 using Automaton.Ai.Models;
 using Automaton.Ai.Providers;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Services.Interfaces;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// System-level AI service implementation that uses Automaton's API key

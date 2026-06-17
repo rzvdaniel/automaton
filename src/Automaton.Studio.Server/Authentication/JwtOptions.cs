@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public class JwtOptions
     {

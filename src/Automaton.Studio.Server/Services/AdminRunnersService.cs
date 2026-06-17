@@ -1,9 +1,10 @@
+using Automaton.Api.Data;
+using Automaton.Api.Mapping;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Mapping;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AdminRunnersService
 {
@@ -21,7 +22,7 @@ public class AdminRunnersService
         this.adminAuthorizationService = adminAuthorizationService;
     }
 
-    public async Task<IEnumerable<Models.RunnerDetails>> ListOwnedByUserForAdmin(
+    public async Task<IEnumerable<RunnerDetails>> ListOwnedByUserForAdmin(
         Guid userId,
         Guid? projectId,
         CancellationToken cancellationToken)

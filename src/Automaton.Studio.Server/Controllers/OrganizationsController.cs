@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// API controller for managing organizations.

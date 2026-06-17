@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Constants;
+namespace Automaton.Api.Constants;
 
 public static class AuditEventTypes
 {

@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// A managed runner container allocated to one paid user.

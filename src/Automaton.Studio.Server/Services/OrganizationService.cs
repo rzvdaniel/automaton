@@ -1,18 +1,18 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services.Interfaces;
+
 using Automaton.Mcp.SystemPrompts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Models;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing organizations, members, and app assignments

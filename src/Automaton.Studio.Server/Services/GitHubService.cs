@@ -1,8 +1,8 @@
 using Octokit;
 using System.Text;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing GitHub repository operations for apps

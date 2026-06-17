@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class UserContextService
 {

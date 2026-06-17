@@ -1,10 +1,8 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
-using Common.EF;
+﻿using Automaton.Api.Data;
+using Automaton.Api.Services;
 using MediatR;
 
-namespace Automaton.Studio.Server.Application.Commands.Handlers
+namespace Automaton.Api.Application.Commands.Handlers
 {
     public class UpdateUserInfoCommandHandler : IRequestHandler<UpdateUserInfoCommand>
     {

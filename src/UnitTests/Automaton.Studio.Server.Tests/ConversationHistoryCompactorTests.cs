@@ -1,6 +1,6 @@
 using Automaton.Ai.Models;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Config;
+using Automaton.Api.Services;
 
 namespace Automaton.Studio.Server.Tests;
 

@@ -1,9 +1,9 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Receives Stripe webhook events. No auth — verified by Stripe signature.

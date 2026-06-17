@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Stores encrypted sensitive variable values separately from workflows/custom steps.

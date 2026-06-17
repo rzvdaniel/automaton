@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 
-namespace Automaton.Studio.Server.Authentication.GitHub;
+namespace Automaton.Api.Authentication.GitHub;
 
 public static class GitHubAuthenticationServiceCollectionExtensions
 {

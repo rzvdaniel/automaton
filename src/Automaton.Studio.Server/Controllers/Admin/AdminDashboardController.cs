@@ -1,12 +1,11 @@
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/dashboard")]

@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Services.Interfaces;
+namespace Automaton.Api.Services.Interfaces;
 
 /// <summary>
 /// Service interface for managing organizations and their members.

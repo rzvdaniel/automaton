@@ -1,15 +1,16 @@
-﻿using Automaton.Core.Enums;
+﻿using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Hubs;
+using Automaton.Api.Models;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Hubs;
-using Automaton.Studio.Server.Models;
+
 using Hangfire;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class ScheduleService
 {

@@ -1,9 +1,9 @@
-﻿using AuthServer.Core.Queries;
-using Automaton.Studio.Server.Models;
+﻿using Automaton.Api.Application.Queries;
+using Automaton.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [Route("api/[controller]/[action]")]
 public class UserController : BaseController

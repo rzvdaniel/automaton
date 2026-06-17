@@ -1,16 +1,16 @@
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
 using Automaton.Mcp.SystemPrompts;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-namespace Automaton.Studio.Server.Controllers.Admin;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Constants;
+using Automaton.Api.Services;
+using Automaton.Api.Data;
+using Automaton.Api.Config;
+using Automaton.Api.Models;
+using Automaton.Api.Entities;
+namespace Automaton.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin controller for managing AI providers and models.

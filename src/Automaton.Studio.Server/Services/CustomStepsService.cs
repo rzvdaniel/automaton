@@ -1,14 +1,16 @@
 ﻿using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Hubs;
+using CustomStep = Automaton.Api.Models.CustomStep;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class CustomStepsService
 {
@@ -386,7 +388,7 @@ public class CustomStepsService
         return step;
     }
 
-    private Entities.Runner GetRunner(Guid id, Guid userId)
+    private Runner GetRunner(Guid id, Guid userId)
     {
         var runner = dataContext.Runners.SingleOrDefault(x => x.Id == id && x.RunnerUsers.Any(x => x.UserId == userId));
 
@@ -415,7 +417,7 @@ public class CustomStepsService
     }
 
     private async Task ProcessVariableListAsync(
-        IList<Automaton.Core.Models.StepVariable> variables,
+        IList<Core.Models.StepVariable> variables,
         Guid customStepId,
         string scope)
     {
@@ -468,7 +470,7 @@ public class CustomStepsService
         await DecryptVariableListAsync(definition.CodeOutputVariables);
     }
 
-    private async Task DecryptVariableListAsync(IList<Automaton.Core.Models.StepVariable> variables)
+    private async Task DecryptVariableListAsync(IList<Core.Models.StepVariable> variables)
     {
         if (variables == null) return;
 
@@ -548,7 +550,7 @@ public class CustomStepsService
         return MapToModel(entity, null);
     }
 
-    private static CustomStep MapToModel(Entities.CustomStep entity, Dictionary<Guid, Entities.WebApp>? webAppLookup)
+    private static CustomStep MapToModel(Entities.CustomStep entity, Dictionary<Guid, WebApp>? webAppLookup)
     {
         if (entity == null) return null;
 

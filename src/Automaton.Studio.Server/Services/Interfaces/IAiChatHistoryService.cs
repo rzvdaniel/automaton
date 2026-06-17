@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Services.Interfaces;
+namespace Automaton.Api.Services.Interfaces;
 
 /// <summary>
 /// Service for managing AI chat history (sessions and messages)

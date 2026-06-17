@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Config;
+namespace Automaton.Api.Config;
 
 public class HostedRunnerOptions
 {

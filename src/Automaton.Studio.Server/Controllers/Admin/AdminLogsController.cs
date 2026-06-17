@@ -1,11 +1,11 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin endpoint to query persisted audit events.

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Config;
+namespace Automaton.Api.Config;
 
 public class AppFileRuleBaselineOptions
 {

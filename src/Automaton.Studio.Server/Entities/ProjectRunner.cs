@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Links a Runner to a Project, enabling project-based access control.

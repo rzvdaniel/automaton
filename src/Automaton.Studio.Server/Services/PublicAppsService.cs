@@ -1,11 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Config;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Automaton.Api.Enums;
+using Automaton.Api.Data;
+using Automaton.Api.Config;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for fetching public apps and user profiles (no authentication required)

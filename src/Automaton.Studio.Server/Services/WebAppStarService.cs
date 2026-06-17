@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Data;
+using Automaton.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class WebAppStarService
 {

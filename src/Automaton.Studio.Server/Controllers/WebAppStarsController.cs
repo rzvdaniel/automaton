@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Route("api/marketplace/apps/{appId:guid}/star")]

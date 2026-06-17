@@ -1,6 +1,4 @@
-﻿using Automaton.Studio.Server.Enums;
-
-namespace Automaton.Studio.Server.Models;
+﻿namespace Automaton.Api.Models;
 
 public class CustomStep
 {

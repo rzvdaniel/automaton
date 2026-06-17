@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Enums;
+namespace Automaton.Api.Enums;
 
 public static class AppReviewStatuses
 {

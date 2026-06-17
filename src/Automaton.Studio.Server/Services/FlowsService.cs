@@ -1,13 +1,13 @@
 ﻿using Automaton.Core.Enums;
 using Automaton.Core.Models;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using Automaton.Api.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class FlowsService
 {

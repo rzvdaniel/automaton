@@ -1,14 +1,14 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Logging;
-using Automaton.Studio.Server.Services.Interfaces;
 using Serilog;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Models;
+using Automaton.Api.Logging;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AuditEventService : IAuditEventService
 {

@@ -1,18 +1,18 @@
 using System.Security.Claims;
-using Automaton.Studio.Server.Authentication.GitHub;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services;
-using Common.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using Automaton.Studio.Server.Security;
+using Automaton.Api.Services;
+using Automaton.Api.Authentication.GitHub;
+using Automaton.Api.Constants;
+using Automaton.Api.Entities;
+using Automaton.Api.Security;
+using Automaton.Api.Authentication;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Route("auth/github")]

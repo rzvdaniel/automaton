@@ -1,10 +1,9 @@
+using Automaton.Api.Data;
 using Automaton.Mcp.SystemPrompts;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public interface IAppVerificationStrategyResolver
 {

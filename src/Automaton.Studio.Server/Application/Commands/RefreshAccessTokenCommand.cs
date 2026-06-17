@@ -1,7 +1,4 @@
-using Common.Authentication;
-using MediatR;
-
-namespace Automaton.Studio.Server.Core.Commands
+namespace Automaton.Api.Application.Commands
 {
     public class RefreshAccessTokenCommand
     {

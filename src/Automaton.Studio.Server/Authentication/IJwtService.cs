@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public interface IJwtService
     {

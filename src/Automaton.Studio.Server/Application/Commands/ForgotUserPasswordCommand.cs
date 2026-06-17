@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Core.Commands;
+namespace Automaton.Api.Application.Commands;
 
 public class ForgotUserPasswordCommand : IRequest
 {

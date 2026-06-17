@@ -1,3 +1,4 @@
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Automaton.Core.Models;
 
@@ -34,7 +35,7 @@ public class AppExecutionTests
     [Test]
     public void SelectRunners_RespectsRequestedNames()
     {
-        var runners = new List<Models.RunnerDetails>
+        var runners = new List<RunnerDetails>
         {
             new() { Id = Guid.NewGuid(), Name = "A", Status = RunnerStatus.Online },
             new() { Id = Guid.NewGuid(), Name = "B", Status = RunnerStatus.Online },
@@ -51,7 +52,7 @@ public class AppExecutionTests
     public void SelectRunners_UsesExecutionRunnerWhenNoRequested()
     {
         var execId = Guid.NewGuid();
-        var runners = new List<Models.RunnerDetails>
+        var runners = new List<RunnerDetails>
         {
             new() { Id = execId, Name = "Exec", Status = RunnerStatus.Online },
             new() { Id = Guid.NewGuid(), Name = "Other", Status = RunnerStatus.Online }
@@ -66,9 +67,9 @@ public class AppExecutionTests
     [Test]
     public void SelectRunners_ThrowsWhenNoRunnerSpecified()
     {
-        var runners = new List<Models.RunnerDetails>
+        var runners = new List<RunnerDetails>
         {
-            new Models.RunnerDetails { Id = Guid.NewGuid(), Name = "A", Status = RunnerStatus.Online }
+            new RunnerDetails { Id = Guid.NewGuid(), Name = "A", Status = RunnerStatus.Online }
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() =>

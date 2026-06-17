@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace Common.Validation
+namespace Automaton.Api.Attributes
 {
     /// <summary>
     /// Validates Guid value for Guid.Empty

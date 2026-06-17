@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Defines a subscription product. Feature details live in CapabilitiesJson so new
@@ -36,7 +36,7 @@ public class SubscriptionPlan
     /// <summary>When false, the plan stays in admin history but is hidden from user-facing pricing and checkout.</summary>
     public bool IsActive { get; set; } = true;
 
-    /// <summary>JSON-serialized Automaton.Studio.Server.Models.PlanCapabilities value.</summary>
+    /// <summary>JSON-serialized Automaton.Api.Models.PlanCapabilities value.</summary>
     public string CapabilitiesJson { get; set; } = "{}";
 
     public int SortOrder { get; set; } = 0;

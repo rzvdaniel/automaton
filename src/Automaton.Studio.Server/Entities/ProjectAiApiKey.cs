@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Links an AI API Key to a Project, enabling project-based access control.

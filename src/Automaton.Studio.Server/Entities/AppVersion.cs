@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 public class AppVersion
 {

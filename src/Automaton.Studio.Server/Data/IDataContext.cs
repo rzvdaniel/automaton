@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace Common.EF
+namespace Automaton.Api.Data
 {
     public interface IDataContext
     {

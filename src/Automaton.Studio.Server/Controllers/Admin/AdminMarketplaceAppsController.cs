@@ -1,13 +1,13 @@
 using System.Text.RegularExpressions;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/marketplace-apps")]

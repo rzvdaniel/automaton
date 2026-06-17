@@ -1,11 +1,11 @@
-﻿using Automaton.Core.Models;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 
-namespace Automaton.Studio.Server.Hubs;
+namespace Automaton.Api.Hubs;
 
 [Authorize(Policy = "AllowApiKey")] // Use AllowApiKey policy to support console runner API key authentication
 public class AutomatonHub : Hub
@@ -158,7 +158,7 @@ public class AutomatonHub : Hub
         }
     }
 
-    private Models.RunnerDetails GetRunner()
+    private RunnerDetails GetRunner()
     {
         var httpContext = Context.GetHttpContext();
         var runnerId = httpContext.Request.Headers[RunnerIdHeader].ToString();

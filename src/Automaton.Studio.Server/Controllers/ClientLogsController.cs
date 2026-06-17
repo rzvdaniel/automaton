@@ -4,7 +4,7 @@ using Serilog;
 using Serilog.Context;
 using Serilog.Events;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class ClientLogsController : BaseController
 {

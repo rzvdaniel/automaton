@@ -1,10 +1,9 @@
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 using Serilog;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing app content storage on the file system.

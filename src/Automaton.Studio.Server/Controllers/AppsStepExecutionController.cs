@@ -1,11 +1,11 @@
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Automaton.Api.Constants;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Controller for executing Custom Steps directly from published Web Apps

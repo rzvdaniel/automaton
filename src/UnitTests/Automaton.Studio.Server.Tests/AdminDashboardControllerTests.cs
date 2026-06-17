@@ -1,10 +1,10 @@
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Controllers.Admin;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Controllers.Admin;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Entities;
 
 namespace Automaton.Studio.Server.Tests;
 
@@ -114,7 +114,7 @@ public class AdminDashboardControllerTests
             });
 
         dbContext.FlowExecutions.AddRange(
-            new Automaton.Studio.Server.Entities.FlowExecution
+            new Api.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),
@@ -123,7 +123,7 @@ public class AdminDashboardControllerTests
                 Status = WorkflowStatus.Success.ToString(),
                 Application = "app-1"
             },
-            new Automaton.Studio.Server.Entities.FlowExecution
+            new Api.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),
@@ -132,7 +132,7 @@ public class AdminDashboardControllerTests
                 Status = WorkflowStatus.Error.ToString(),
                 Application = "app-2"
             },
-            new Automaton.Studio.Server.Entities.FlowExecution
+            new Api.Entities.FlowExecution
             {
                 Id = Guid.NewGuid(),
                 FlowId = Guid.NewGuid(),

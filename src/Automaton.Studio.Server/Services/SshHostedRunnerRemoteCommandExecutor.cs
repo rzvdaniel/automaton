@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Config;
+using Automaton.Api.Entities;
 using Microsoft.Extensions.Options;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public sealed class SshHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCommandExecutor
 {

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Config;
+namespace Automaton.Api.Config;
 
 /// <summary>
 /// File-system and URL settings for public published web apps.

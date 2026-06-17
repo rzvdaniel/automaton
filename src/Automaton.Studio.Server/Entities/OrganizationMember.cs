@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Represents a user's membership in an organization with a specific role.

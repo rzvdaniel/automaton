@@ -1,3 +1,4 @@
+using Automaton.Api.Models;
 using Automaton.Core.Models;
 
 namespace Automaton.Studio.Server.Tests;
@@ -29,7 +30,7 @@ public static class AppExecutionTestsHelper
         return missing;
     }
 
-    public static List<Guid> SelectRunners(IEnumerable<Automaton.Studio.Server.Models.RunnerDetails> onlineRunners, List<string>? requestedNames, Guid? executionRunnerId = null)
+    public static List<Guid> SelectRunners(IEnumerable<RunnerDetails> onlineRunners, List<string>? requestedNames, Guid? executionRunnerId = null)
     {
         if (requestedNames != null && requestedNames.Any())
         {

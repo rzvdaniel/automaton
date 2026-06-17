@@ -1,10 +1,12 @@
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IO.Compression;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class AppsController : BaseController
 {
@@ -50,14 +52,14 @@ public class AppsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<Models.AppModel> Get([FromQuery] Guid? projectId = null)
+    public IEnumerable<AppModel> Get([FromQuery] Guid? projectId = null)
     {
         return appsService.List(projectId);
     }
 
     [HttpGet("{id}")]
     [Authorize(Policy = "AllowApiKey")]
-    public ActionResult<Models.AppModel> Get(Guid id)
+    public ActionResult<AppModel> Get(Guid id)
     {
         var app = appsService.Get(id);
 
@@ -74,7 +76,7 @@ public class AppsController : BaseController
     /// </summary>
     [HttpGet("samples")]
     [AllowAnonymous]
-    public async Task<ActionResult<IEnumerable<Models.AppModel>>> GetSampleApps()
+    public async Task<ActionResult<IEnumerable<AppModel>>> GetSampleApps()
     {
         try
         {
@@ -116,7 +118,7 @@ public class AppsController : BaseController
     /// </summary>
     [HttpGet("templates")]
     [AllowAnonymous]
-    public async Task<ActionResult<IEnumerable<Models.AppModel>>> GetTemplates()
+    public async Task<ActionResult<IEnumerable<AppModel>>> GetTemplates()
     {
         try
         {
@@ -134,7 +136,7 @@ public class AppsController : BaseController
     /// Duplicate an owned app (copies files + metadata). Requires authentication.
     /// </summary>
     [HttpPost("{id}/duplicate")]
-    public async Task<ActionResult<Models.AppModel>> Duplicate(Guid id)
+    public async Task<ActionResult<AppModel>> Duplicate(Guid id)
     {
         try
         {
@@ -156,7 +158,7 @@ public class AppsController : BaseController
     /// Get the published app metadata needed to confirm a fork.
     /// </summary>
     [HttpGet("{id}/fork-source")]
-    public async Task<ActionResult<Models.ForkAppSourceModel>> GetForkSource(Guid id)
+    public async Task<ActionResult<ForkAppSourceModel>> GetForkSource(Guid id)
     {
         try
         {
@@ -178,7 +180,7 @@ public class AppsController : BaseController
     /// Fork a published marketplace app into the current user's account.
     /// </summary>
     [HttpPost("{id}/fork")]
-    public async Task<ActionResult<Models.AppModel>> Fork(Guid id, [FromBody] Models.ForkAppRequest? request = null)
+    public async Task<ActionResult<AppModel>> Fork(Guid id, [FromBody] ForkAppRequest? request = null)
     {
         try
         {
@@ -230,7 +232,7 @@ public class AppsController : BaseController
     [HttpPost("import")]
     [RequestSizeLimit(52_428_800)]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<Models.AppModel>> Import(IFormFile file, CancellationToken cancellationToken)
+    public async Task<ActionResult<AppModel>> Import(IFormFile file, CancellationToken cancellationToken)
     {
         try
         {
@@ -265,7 +267,7 @@ public class AppsController : BaseController
 
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> Post(Models.NewApp app)
+    public async Task<IActionResult> Post(NewApp app)
     {
         var appId = await appsService.Create(app);
 
@@ -275,7 +277,7 @@ public class AppsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, Models.AppModel app)
+    public async Task<IActionResult> Put(Guid id, AppModel app)
     {
         await appsService.Update(id, app);
 
@@ -704,7 +706,7 @@ public class AppsController : BaseController
     /// Get steps linked to an app
     /// </summary>
     [HttpGet("{id}/steps")]
-    public async Task<ActionResult<IEnumerable<Models.LinkedStepInfo>>> GetLinkedSteps(Guid id)
+    public async Task<ActionResult<IEnumerable<LinkedStepInfo>>> GetLinkedSteps(Guid id)
     {
         try
         {
@@ -726,7 +728,7 @@ public class AppsController : BaseController
     /// Get available steps that can be linked
     /// </summary>
     [HttpGet("{id}/steps/available")]
-    public async Task<ActionResult<IEnumerable<Models.LinkedStepInfo>>> GetAvailableSteps(Guid id)
+    public async Task<ActionResult<IEnumerable<LinkedStepInfo>>> GetAvailableSteps(Guid id)
     {
         try
         {
@@ -797,7 +799,7 @@ public class AppsController : BaseController
     /// Create a new step and automatically link it to the app
     /// </summary>
     [HttpPost("{appId}/steps/create")]
-    public async Task<ActionResult<Models.LinkedStepInfo>> CreateStepForApp(Guid appId, [FromBody] CreateAppStepRequest request)
+    public async Task<ActionResult<LinkedStepInfo>> CreateStepForApp(Guid appId, [FromBody] CreateAppStepRequest request)
     {
         try
         {
@@ -869,7 +871,7 @@ public class AppsController : BaseController
             {
                 app.Definition.GitHub.LastSyncedCommitSha = commitSha;
                 app.Definition.GitHub.LastSyncedAt = DateTime.UtcNow;
-                app.Definition.GitHub.SyncStatus = Models.GitHubSyncStatus.Synced;
+                app.Definition.GitHub.SyncStatus = GitHubSyncStatus.Synced;
                 await appsService.Update(id, app);
             }
 
@@ -1661,7 +1663,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                frontendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild);
+                frontendRuntimeSource: AppRuntimeSources.CliBuild);
 
             if (written.Count > 0)
             {
@@ -1778,7 +1780,7 @@ public class AppsController : BaseController
                 id,
                 ownerId,
                 frontendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Frontend.SourceAvailable,
-                frontendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliBuild,
+                frontendRuntimeSource: AppRuntimeSources.CliBuild,
                 backendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Backend.SourceAvailable);
 
             return Ok(new { success = true, written, skipped, errors });
@@ -1887,7 +1889,7 @@ public class AppsController : BaseController
             await appsService.SetLocalDevelopmentMetadataAsync(
                 id,
                 ownerId,
-                backendRuntimeSource: Automaton.Studio.Server.Constants.AppRuntimeSources.CliDeploy);
+                backendRuntimeSource: AppRuntimeSources.CliDeploy);
 
             return Ok(new { success = true, written, skipped, errors });
         }

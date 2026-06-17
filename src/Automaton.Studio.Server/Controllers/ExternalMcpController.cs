@@ -1,13 +1,13 @@
+using Automaton.Api.Data;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Mcp.Tools;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// App-agnostic MCP (Model Context Protocol) server for Claude Code, Cursor, Codex, and other

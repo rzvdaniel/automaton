@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Automaton.Mcp.Tools;
 
-namespace Automaton.Studio.Server.Services.Mcp.Apps;
+namespace Automaton.Api.Services.Mcp.Apps;
 
 /// <summary>
 /// Resolves an <see cref="AppScopedFileSystem"/> for the current request by resolving

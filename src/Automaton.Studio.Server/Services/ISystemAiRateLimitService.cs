@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for rate limiting system AI requests.

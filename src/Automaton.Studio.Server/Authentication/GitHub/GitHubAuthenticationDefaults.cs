@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Authentication.GitHub;
+namespace Automaton.Api.Authentication.GitHub;
 
 public static class GitHubAuthenticationDefaults
 {

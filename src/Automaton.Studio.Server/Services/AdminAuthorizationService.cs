@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AdminAuthorizationService
 {

@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Logs a single controller action execution triggered from a published web app.

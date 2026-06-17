@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Response from flow execution containing status and output variables

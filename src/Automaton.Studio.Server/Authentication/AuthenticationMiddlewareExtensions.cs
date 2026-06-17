@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public static class AuthenticationMiddlewareExtensions
     {

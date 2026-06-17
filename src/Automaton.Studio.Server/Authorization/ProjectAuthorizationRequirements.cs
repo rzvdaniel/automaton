@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Authorization;
+namespace Automaton.Api.Authorization;
 
 /// <summary>
 /// Authorization requirement for project membership with specific roles

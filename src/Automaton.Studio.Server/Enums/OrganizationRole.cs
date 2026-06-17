@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Enums;
+namespace Automaton.Api.Enums;
 
 /// <summary>
 /// Defines the roles that can be assigned to organization members.

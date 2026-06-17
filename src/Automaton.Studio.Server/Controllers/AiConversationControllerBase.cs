@@ -1,20 +1,18 @@
 using Automaton.Ai.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Modes;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Shared SSE streaming, session management, and history persistence logic

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 

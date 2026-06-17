@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 
-namespace Automaton.Studio.Server.Data;
+namespace Automaton.Api.Data;
 
 /// <summary>
 /// Design-time factory for creating ApplicationDbContext instances for EF Core migrations.

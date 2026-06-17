@@ -1,8 +1,9 @@
 #nullable disable
+using Automaton;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Automaton.Studio.Server.Entities
+namespace Automaton.Api.Entities
 {
     public class FlowExecutionLog
     {

@@ -1,9 +1,9 @@
 using System.Text.Json;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Config;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.Extensions.Options;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class CloudflareTurnstileService : ICloudflareTurnstileService
 {

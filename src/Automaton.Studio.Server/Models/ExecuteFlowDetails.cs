@@ -1,6 +1,6 @@
 ﻿using MediatR;
 
-namespace Automaton.Studio.Server.Models
+namespace Automaton.Api.Models
 {
     public class ExecuteFlowDetails : IRequest
     {

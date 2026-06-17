@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using Automaton.Ai;
 using Automaton.Ai.Providers;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Data;
+using Automaton.Api.Config;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Wraps the hardcoded <see cref="AiProviderRegistry"/> with on-demand DB lookup.

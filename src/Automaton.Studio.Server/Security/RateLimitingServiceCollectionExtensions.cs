@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Constants;
+using Automaton.Api.Constants;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 
-namespace Automaton.Studio.Server.Security;
+namespace Automaton.Api.Security;
 
 public static class RateLimitingServiceCollectionExtensions
 {

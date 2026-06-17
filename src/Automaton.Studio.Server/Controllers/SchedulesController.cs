@@ -1,8 +1,8 @@
-﻿using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class SchedulesController : BaseController
 {

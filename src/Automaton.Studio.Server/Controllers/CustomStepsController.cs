@@ -1,7 +1,8 @@
-﻿using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class CustomStepsController : BaseController
 {
@@ -13,13 +14,13 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<Models.CustomStep> Get([FromQuery] Guid? projectId = null, [FromQuery] bool? excludeAppLinked = null)
+    public IEnumerable<CustomStep> Get([FromQuery] Guid? projectId = null, [FromQuery] bool? excludeAppLinked = null)
     {
         return customStepsService.List(projectId, excludeAppLinked);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Models.CustomStep>> Get(Guid id)
+    public async Task<ActionResult<CustomStep>> Get(Guid id)
     {
         // Use GetForEditingAsync to decrypt sensitive variables for UI display
         var step = await customStepsService.GetForEditingAsync(id);
@@ -33,7 +34,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPost]
-    public async Task<IActionResult> Post(Models.NewCustomStep customStep)
+    public async Task<IActionResult> Post(NewCustomStep customStep)
     {
         var customStepId = await customStepsService.Create(customStep);
 
@@ -43,7 +44,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, Models.CustomStep customStep)
+    public async Task<IActionResult> Put(Guid id, CustomStep customStep)
     {
         await customStepsService.Update(id, customStep);
 
@@ -59,7 +60,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet("exists/{name}")]
-    public ActionResult<Models.CustomStep> Exists(string name)
+    public ActionResult<CustomStep> Exists(string name)
     {
         var exists = customStepsService.Exists(name);
 
@@ -67,7 +68,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpGet("by-name/{name}")]
-    public async Task<ActionResult<Models.CustomStep>> GetByName(string name)
+    public async Task<ActionResult<CustomStep>> GetByName(string name)
     {
         var step = customStepsService.GetByName(name);
 
@@ -80,7 +81,7 @@ public class CustomStepsController : BaseController
     }
 
     [HttpPost("{id}/execute")]
-    public async Task<ActionResult<IEnumerable<Models.RunnerCustomStepResult>>> Execute(Guid id, [FromBody] ExecuteCustomStepRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<RunnerCustomStepResult>>> Execute(Guid id, [FromBody] ExecuteCustomStepRequest request, CancellationToken cancellationToken)
     {
         if (request?.RunnerIds == null || !request.RunnerIds.Any())
         {

@@ -1,12 +1,13 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Models;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Automaton.Api.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Config;
+using Automaton.Api.Entities;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service to manage application settings stored in database

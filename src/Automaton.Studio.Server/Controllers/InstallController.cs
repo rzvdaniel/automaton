@@ -1,9 +1,9 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Application.Commands;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class InstallController : BaseController
 {

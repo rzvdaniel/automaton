@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace Automaton.Studio.Server.Security;
+namespace Automaton.Api.Security;
 
 public class RateLimitingOptionsValidation : IValidateOptions<RateLimitingOptions>
 {

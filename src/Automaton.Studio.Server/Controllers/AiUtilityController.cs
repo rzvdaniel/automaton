@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Controller for AI utility endpoints that use the system AI service.

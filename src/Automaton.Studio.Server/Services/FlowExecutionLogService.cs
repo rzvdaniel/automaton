@@ -1,7 +1,9 @@
-using Automaton.Studio.Server.Data;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Services
+namespace Automaton.Api.Services
 {
     public class FlowExecutionLogService
     {
@@ -18,7 +20,7 @@ namespace Automaton.Studio.Server.Services
             this.logger = Serilog.Log.ForContext<FlowExecutionLogService>();
         }
 
-        public async Task<IEnumerable<Models.FlowExecutionLogEntry>> GetExecutionLogsAsync(Guid executionId, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<FlowExecutionLogEntry>> GetExecutionLogsAsync(Guid executionId, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -29,7 +31,7 @@ namespace Automaton.Studio.Server.Services
                 if (!hasAccess)
                 {
                     logger.Warning("User {UserId} attempted to access execution logs for {ExecutionId} without permission", userId, executionId);
-                    return Enumerable.Empty<Models.FlowExecutionLogEntry>();
+                    return Enumerable.Empty<FlowExecutionLogEntry>();
                 }
 
                 var executionLog = await dbContext.FlowExecutionLogs
@@ -37,7 +39,7 @@ namespace Automaton.Studio.Server.Services
 
                 if (executionLog == null)
                 {
-                    return Enumerable.Empty<Models.FlowExecutionLogEntry>();
+                    return Enumerable.Empty<FlowExecutionLogEntry>();
                 }
 
                 var logEntries = executionLog.GetLogEntries();
@@ -46,7 +48,7 @@ namespace Automaton.Studio.Server.Services
             catch (Exception ex)
             {
                 logger.Error(ex, "Failed to retrieve execution logs for {ExecutionId}", executionId);
-                return Enumerable.Empty<Models.FlowExecutionLogEntry>();
+                return Enumerable.Empty<FlowExecutionLogEntry>();
             }
         }
 
@@ -96,7 +98,7 @@ namespace Automaton.Studio.Server.Services
             }
         }
 
-        private static Models.FlowExecutionLogEntry MapToModel(Entities.LogEntry entity)
+        private static FlowExecutionLogEntry MapToModel(LogEntry entity)
         {
             return new Models.FlowExecutionLogEntry
             {

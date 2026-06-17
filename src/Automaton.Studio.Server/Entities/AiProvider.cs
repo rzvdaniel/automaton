@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Database entity representing an AI provider (OpenAI, Anthropic, Google, etc.)

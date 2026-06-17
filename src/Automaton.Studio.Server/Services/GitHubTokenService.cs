@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing GitHub Personal Access Tokens per user

@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public static class AppVisibilityPolicy
 {

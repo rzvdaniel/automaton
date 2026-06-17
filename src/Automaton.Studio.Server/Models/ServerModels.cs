@@ -1,3 +1,3 @@
-﻿namespace Automaton.Studio.Server.Models;
+﻿namespace Automaton.Api.Entities;
 
-public record FlowExecutionResult(IEnumerable<Entities.FlowExecution> FlowExecutions, int Total);
+public record FlowExecutionResult(IEnumerable<FlowExecution> FlowExecutions, int Total);

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 public sealed class PlanCapabilities
 {

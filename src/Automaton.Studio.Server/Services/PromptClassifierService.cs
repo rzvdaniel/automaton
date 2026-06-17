@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Automaton.Mcp.SystemPrompts;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Uses the system AI service to classify the complexity of a user's app request,

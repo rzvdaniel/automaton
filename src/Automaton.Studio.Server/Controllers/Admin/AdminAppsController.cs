@@ -1,9 +1,9 @@
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/apps")]

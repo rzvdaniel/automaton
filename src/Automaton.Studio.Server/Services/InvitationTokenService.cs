@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class InvitationTokenService
 {

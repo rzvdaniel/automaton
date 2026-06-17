@@ -1,20 +1,21 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Middleware;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
-using Common.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using Automaton.Studio.Server.Security;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Models;
+using Automaton.Api.Constants;
+using Automaton.Api.Entities;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Data;
+using Automaton.Api.Security;
+using Automaton.Api.Authentication;
+using Automaton.Api.Middleware;
+using Automaton.Api.Application.Queries;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [Route("api/[controller]/[action]")]
 public class AccountController : BaseController
@@ -317,7 +318,7 @@ public class AccountController : BaseController
 
     [HttpGet]
     [Authorize]
-    public async Task<IActionResult> GetSubscriptionPlans([FromServices] Data.ApplicationDbContext db)
+    public async Task<IActionResult> GetSubscriptionPlans([FromServices] ApplicationDbContext db)
     {
         var canAccessHostedRunnerTestPlans = await db.Users
             .AsNoTracking()

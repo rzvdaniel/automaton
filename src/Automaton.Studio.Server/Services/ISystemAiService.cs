@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// System-level AI service that uses Automaton's API key to provide

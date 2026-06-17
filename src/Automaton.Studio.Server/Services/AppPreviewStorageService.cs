@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// In-memory storage for app preview content.

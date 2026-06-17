@@ -1,8 +1,9 @@
 ﻿#nullable disable
 
+using Automaton;
 using Microsoft.AspNetCore.Identity;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 // Add profile data for application users by adding properties to the ApplicationUser class
 public class ApplicationUserRole : IdentityUserRole<Guid>

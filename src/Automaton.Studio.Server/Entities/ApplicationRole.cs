@@ -1,8 +1,9 @@
 ﻿#nullable disable
 
+using Automaton;
 using Microsoft.AspNetCore.Identity;
 
-namespace Automaton.Studio.Server.Entities
+namespace Automaton.Api.Entities
 {
     public class ApplicationRole : IdentityRole<Guid>
     {

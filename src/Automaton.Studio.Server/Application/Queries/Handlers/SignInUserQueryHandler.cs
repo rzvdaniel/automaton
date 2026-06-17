@@ -1,11 +1,10 @@
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services;
-using Common.Authentication;
+using Automaton.Api.Authentication;
+using Automaton.Api.Entities;
+using Automaton.Api.Services;
 using MediatR;
 using Microsoft.AspNetCore.Identity;
 
-namespace Automaton.Studio.Server.Application.Queries.Handlers;
+namespace Automaton.Api.Application.Queries.Handlers;
 
 public class SignInUserQueryHandler : IRequestHandler<SignInUserQuery, JsonWebToken>
 {

@@ -1,14 +1,13 @@
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]

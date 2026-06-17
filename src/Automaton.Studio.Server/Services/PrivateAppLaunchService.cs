@@ -1,10 +1,9 @@
 using System.Security.Claims;
-using Automaton.Studio.Server.Models;
-using Common.Authentication;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Caching.Memory;
+using Automaton.Api.Authentication;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public static class PrivateAppAuthConstants
 {

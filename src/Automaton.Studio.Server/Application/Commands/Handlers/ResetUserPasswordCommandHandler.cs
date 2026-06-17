@@ -1,12 +1,11 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
+﻿using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Text;
 
-namespace Automaton.Studio.Server.Application.Commands.Handlers
+namespace Automaton.Api.Application.Commands.Handlers
 {
     public class ResetUserPasswordCommandHandler : IRequestHandler<ResetUserPasswordCommand>
     {

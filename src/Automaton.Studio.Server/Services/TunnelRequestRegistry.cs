@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Automaton.Core.Models;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class TunnelRequestRegistry
 {

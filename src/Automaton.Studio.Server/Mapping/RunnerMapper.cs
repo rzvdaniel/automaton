@@ -1,11 +1,11 @@
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Enums;
 using System.Collections.Generic;
 using System.Linq;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Entities;
 
-namespace Automaton.Studio.Server.Mapping;
+namespace Automaton.Api.Mapping;
 
 public static class RunnerMapper
 {

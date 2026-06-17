@@ -1,8 +1,7 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Common.Authentication;
+﻿using Automaton.Api.Authentication;
 using MediatR;
 
-namespace Automaton.Studio.Server.Application.Commands.Handlers
+namespace Automaton.Api.Application.Commands.Handlers
 {
     public class RevokeAccessTokenCommandHandler : IRequestHandler<RevokeAccessTokenCommand>
     {

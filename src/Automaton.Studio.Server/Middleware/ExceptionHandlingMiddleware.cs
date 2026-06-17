@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Middleware;
+namespace Automaton.Api.Middleware;
 
 public class ExceptionHandlingMiddleware
 {

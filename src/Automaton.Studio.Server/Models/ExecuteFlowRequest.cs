@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Request model for executing a flow from a web app

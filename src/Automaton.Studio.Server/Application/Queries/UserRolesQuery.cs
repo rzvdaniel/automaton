@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using MediatR;
 
-namespace AuthServer.Core.Queries
+namespace Automaton.Api.Application.Queries
 {
     public class UserRolesQuery : IRequest<IEnumerable<string>>
     {

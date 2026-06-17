@@ -1,11 +1,12 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Hubs;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Hubs;
+using Automaton.Api.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for executing Custom Steps from Web Apps
@@ -111,7 +112,7 @@ public class AppsStepExecutionService
     /// <summary>
     /// Resolve step by name or GUID with decrypted sensitive variables
     /// </summary>
-    private async Task<CustomStep?> ResolveStepAsync(string identifier, Guid ownerId)
+    private async Task<Models.CustomStep?> ResolveStepAsync(string identifier, Guid ownerId)
     {
         // Create an owner-scoped service using the impersonation factory
         var ownerScopedService = customStepsServiceFactory.CreateForUser(ownerId);
@@ -133,7 +134,7 @@ public class AppsStepExecutionService
     /// at runtime - they always use the decrypted values from the step definition.
     /// Only non-sensitive variables can be overridden by the caller.
     /// </summary>
-    private void ApplyRuntimeInputs(CustomStep step, Dictionary<string, string> inputs)
+    private void ApplyRuntimeInputs(Models.CustomStep step, Dictionary<string, string> inputs)
     {
         if (step.Definition?.CodeInputVariables == null || inputs == null || inputs.Count == 0)
         {
@@ -160,7 +161,7 @@ public class AppsStepExecutionService
     /// <summary>
     /// Resolve runners based on configuration
     /// </summary>
-    private async Task<IEnumerable<Entities.Runner>> ResolveRunnersAsync(
+    private async Task<IEnumerable<Runner>> ResolveRunnersAsync(
         PublishedAppInfo app, 
         List<string>? runnerNames)
     {
@@ -189,8 +190,8 @@ public class AppsStepExecutionService
     /// Execute step on multiple runners
     /// </summary>
     private async Task<List<RunnerCustomStepResult>> ExecuteOnRunnersAsync(
-        CustomStep step,
-        IEnumerable<Entities.Runner> runners,
+        Models.CustomStep step,
+        IEnumerable<Runner> runners,
         CancellationToken cancellationToken,
         List<string> logs)
     {

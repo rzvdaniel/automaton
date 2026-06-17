@@ -1,13 +1,12 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing project resources (apps, flows, runners, custom steps)

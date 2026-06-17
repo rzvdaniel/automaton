@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Security;
+namespace Automaton.Api.Security;
 
 public class RateLimitingOptions
 {

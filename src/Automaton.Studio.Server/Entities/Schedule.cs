@@ -1,9 +1,8 @@
 ﻿#nullable disable
 
-using Automaton.Studio.Server.Models;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 public class Schedule
 {

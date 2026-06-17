@@ -1,9 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Centralized service for resource access authorization.
@@ -542,12 +543,12 @@ public class ResourceAuthorizationService
     /// <summary>
     /// Get IQueryable for apps that the user can access
     /// </summary>
-    public IQueryable<Entities.WebApp> GetAccessibleAppsQuery()
+    public IQueryable<WebApp> GetAccessibleAppsQuery()
     {
         return GetAccessibleAppsQuery(UserId);
     }
 
-    public IQueryable<Entities.WebApp> GetAccessibleAppsQuery(Guid userId)
+    public IQueryable<WebApp> GetAccessibleAppsQuery(Guid userId)
     {
         // Apps where user is personal owner
         var personalApps = dbContext.WebApps
@@ -567,12 +568,12 @@ public class ResourceAuthorizationService
     /// <summary>
     /// Get IQueryable for flows that the user can access
     /// </summary>
-    public IQueryable<Entities.Flow> GetAccessibleFlowsQuery()
+    public IQueryable<Flow> GetAccessibleFlowsQuery()
     {
         return GetAccessibleFlowsQuery(UserId);
     }
 
-    public IQueryable<Entities.Flow> GetAccessibleFlowsQuery(Guid userId)
+    public IQueryable<Flow> GetAccessibleFlowsQuery(Guid userId)
     {
         // Flows where user is personal owner
         var personalFlows = dbContext.Flows
@@ -592,12 +593,12 @@ public class ResourceAuthorizationService
     /// <summary>
     /// Get IQueryable for custom steps that the user can access
     /// </summary>
-    public IQueryable<Entities.CustomStep> GetAccessibleCustomStepsQuery()
+    public IQueryable<CustomStep> GetAccessibleCustomStepsQuery()
     {
         return GetAccessibleCustomStepsQuery(UserId);
     }
 
-    public IQueryable<Entities.CustomStep> GetAccessibleCustomStepsQuery(Guid userId)
+    public IQueryable<CustomStep> GetAccessibleCustomStepsQuery(Guid userId)
     {
         // Steps where user is personal owner
         var personalSteps = dbContext.CustomSteps
@@ -617,12 +618,12 @@ public class ResourceAuthorizationService
     /// <summary>
     /// Get IQueryable for runners that the user can access
     /// </summary>
-    public IQueryable<Entities.Runner> GetAccessibleRunnersQuery()
+    public IQueryable<Runner> GetAccessibleRunnersQuery()
     {
         return GetAccessibleRunnersQuery(UserId);
     }
 
-    public IQueryable<Entities.Runner> GetAccessibleRunnersQuery(Guid userId)
+    public IQueryable<Runner> GetAccessibleRunnersQuery(Guid userId)
     {
         // Runners where user is personal owner
         var personalRunners = dbContext.Runners
@@ -643,12 +644,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for apps filtered by project context.
     /// If projectId is null, returns only personal apps. Otherwise, returns only apps in that project.
     /// </summary>
-    public IQueryable<Entities.WebApp> GetAppsQueryByContext(Guid? projectId)
+    public IQueryable<WebApp> GetAppsQueryByContext(Guid? projectId)
     {
         return GetAppsQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.WebApp> GetAppsQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<WebApp> GetAppsQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -669,12 +670,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for flows filtered by project context.
     /// If projectId is null, returns only personal flows. Otherwise, returns only flows in that project.
     /// </summary>
-    public IQueryable<Entities.Flow> GetFlowsQueryByContext(Guid? projectId)
+    public IQueryable<Flow> GetFlowsQueryByContext(Guid? projectId)
     {
         return GetFlowsQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.Flow> GetFlowsQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<Flow> GetFlowsQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -700,12 +701,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for custom steps filtered by project context.
     /// If projectId is null, returns only personal steps. Otherwise, returns only steps in that project.
     /// </summary>
-    public IQueryable<Entities.CustomStep> GetCustomStepsQueryByContext(Guid? projectId)
+    public IQueryable<CustomStep> GetCustomStepsQueryByContext(Guid? projectId)
     {
         return GetCustomStepsQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.CustomStep> GetCustomStepsQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<CustomStep> GetCustomStepsQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -731,12 +732,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for runners filtered by project context.
     /// If projectId is null, returns only personal runners. Otherwise, returns only runners in that project.
     /// </summary>
-    public IQueryable<Entities.Runner> GetRunnersQueryByContext(Guid? projectId)
+    public IQueryable<Runner> GetRunnersQueryByContext(Guid? projectId)
     {
         return GetRunnersQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.Runner> GetRunnersQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<Runner> GetRunnersQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -762,12 +763,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for API keys filtered by project context.
     /// If projectId is null, returns only personal API keys. Otherwise, returns only API keys in that project.
     /// </summary>
-    public IQueryable<Entities.ApiKey> GetApiKeysQueryByContext(Guid? projectId)
+    public IQueryable<ApiKey> GetApiKeysQueryByContext(Guid? projectId)
     {
         return GetApiKeysQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.ApiKey> GetApiKeysQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<ApiKey> GetApiKeysQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -788,12 +789,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for AI API keys filtered by project context.
     /// If projectId is null, returns only personal AI API keys. Otherwise, returns only AI API keys in that project.
     /// </summary>
-    public IQueryable<Entities.AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId)
+    public IQueryable<AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId)
     {
         return GetAiApiKeysQueryByContext(projectId, UserId);
     }
 
-    public IQueryable<Entities.AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId, Guid userId)
+    public IQueryable<AiApiKey> GetAiApiKeysQueryByContext(Guid? projectId, Guid userId)
     {
         if (projectId == null)
         {
@@ -898,7 +899,7 @@ public class ResourceAuthorizationService
     /// <summary>
     /// Get user's membership in a project
     /// </summary>
-    public async Task<Entities.ProjectMember?> GetUserProjectMembershipAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
+    public async Task<ProjectMember?> GetUserProjectMembershipAsync(Guid projectId, Guid userId, CancellationToken cancellationToken = default)
     {
         return await dbContext.ProjectMembers
             .Include(pm => pm.Project)
@@ -989,12 +990,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for API keys that the user can access
     /// Includes both personally owned keys and keys from projects the user is a member of
     /// </summary>
-    public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery()
+    public IQueryable<ApiKey> GetAccessibleApiKeysQuery()
     {
         return GetAccessibleApiKeysQuery(UserId);
     }
 
-    public IQueryable<Entities.ApiKey> GetAccessibleApiKeysQuery(Guid userId)
+    public IQueryable<ApiKey> GetAccessibleApiKeysQuery(Guid userId)
     {
         // Get API keys the user owns
         var ownedKeys = dbContext.ApiKeyUsers
@@ -1085,12 +1086,12 @@ public class ResourceAuthorizationService
     /// Get IQueryable for AI API keys that the user can access
     /// System-level keys are accessible to all users
     /// </summary>
-    public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery()
+    public IQueryable<AiApiKey> GetAccessibleAiApiKeysQuery()
     {
         return GetAccessibleAiApiKeysQuery(UserId);
     }
 
-    public IQueryable<Entities.AiApiKey> GetAccessibleAiApiKeysQuery(Guid userId)
+    public IQueryable<AiApiKey> GetAccessibleAiApiKeysQuery(Guid userId)
     {
         // Return all active system-level AI API keys
         return dbContext.AiApiKeys.Where(ak => ak.IsActive);

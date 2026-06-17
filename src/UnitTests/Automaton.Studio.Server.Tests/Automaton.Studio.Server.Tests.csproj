@@ -26,6 +26,6 @@
     <PackageReference Include="System.Text.Json" Version="9.0.10" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Automaton.Studio.Server\Automaton.Studio.Server.csproj" />
+    <ProjectReference Include="..\..\Automaton.Studio.Server\Automaton.Api.csproj" />
   </ItemGroup>
 </Project>

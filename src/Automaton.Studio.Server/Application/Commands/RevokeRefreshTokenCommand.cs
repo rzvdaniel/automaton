@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace Automaton.Studio.Server.Core.Commands
+namespace Automaton.Api.Application.Commands
 {
     public class RevokeRefreshTokenCommand : IRequest
     {

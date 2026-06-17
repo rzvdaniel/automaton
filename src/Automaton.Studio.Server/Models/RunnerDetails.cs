@@ -1,7 +1,7 @@
-﻿using Automaton.Core.Enums;
-using Automaton.Studio.Server.Enums;
+﻿using Automaton.Api.Enums;
+using Automaton.Core.Enums;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 public class RunnerDetails
 {

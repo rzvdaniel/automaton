@@ -1,6 +1,6 @@
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Generic factory for creating service instances scoped to specific users via impersonation.

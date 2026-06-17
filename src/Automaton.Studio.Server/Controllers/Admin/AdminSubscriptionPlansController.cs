@@ -1,15 +1,15 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Models;
+using Automaton.Api.Constants;
+using Automaton.Api.Entities;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin controller for managing subscription plans and user plan assignments.

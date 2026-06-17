@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
       //if we have more than one instance or host our app on multiple servers, because we want access block token list on all instace and servers and we need to use distributed cache
     public class AccessTokenManagerService : IAccessTokenManagerService

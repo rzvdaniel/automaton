@@ -1,15 +1,15 @@
 using Automaton.Ai.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Services.Mcp;
 using Automaton.Mcp.Client;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.SystemPrompts;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
-using Automaton.Studio.Server.Services.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// AI conversation streaming for Custom Steps via Server-Sent Events (SSE).

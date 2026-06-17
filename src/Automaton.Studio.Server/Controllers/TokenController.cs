@@ -1,15 +1,14 @@
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
-using Common.EF;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Authentication;
-using Automaton.Studio.Server.Security;
+using Automaton.Api.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Security;
+using Automaton.Api.Application.Queries;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 [Route("api/[controller]/[action]")]
 public class TokenController : BaseController

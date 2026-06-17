@@ -2,7 +2,7 @@ using Automaton.Core.Interfaces;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 
-namespace Automaton.Studio.Server.Services
+namespace Automaton.Api.Services
 {
     public class SignalRExecutionNotificationService : IExecutionNotificationService
     {

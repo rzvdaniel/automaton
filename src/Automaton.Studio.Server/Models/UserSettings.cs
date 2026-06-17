@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 /// <summary>
 /// Unified user settings model containing all user preferences

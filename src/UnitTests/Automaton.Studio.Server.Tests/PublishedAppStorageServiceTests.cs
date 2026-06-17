@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Config;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Reflection;
+using Automaton.Api.Config;
+using Automaton.Api.Services;
 
 namespace Automaton.Studio.Server.Tests;
 

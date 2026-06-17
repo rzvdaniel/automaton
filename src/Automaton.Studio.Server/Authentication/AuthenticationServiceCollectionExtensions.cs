@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 using System.Text;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public static class AuthenticationServiceCollectionExtensions
     {

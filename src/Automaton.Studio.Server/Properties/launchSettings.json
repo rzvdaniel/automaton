@@ -8,7 +8,7 @@
     }
   },
   "profiles": {
-    "Automaton.Studio.Server": {
+    "Automaton.Api": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,

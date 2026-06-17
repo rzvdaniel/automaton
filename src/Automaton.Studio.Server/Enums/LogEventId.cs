@@ -1,4 +1,4 @@
-﻿namespace Automaton.Studio.Errors;
+﻿namespace Automaton.Api.Enums;
 
 public static class LogEventId
 {

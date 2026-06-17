@@ -1,12 +1,12 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 
-namespace Automaton.Studio.Server.Authentication;
+namespace Automaton.Api.Authentication;
 
 public class ApiKeyAuthenticationSchemeOptions : AuthenticationSchemeOptions
 {

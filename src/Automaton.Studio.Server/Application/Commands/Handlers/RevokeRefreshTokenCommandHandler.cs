@@ -1,10 +1,9 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Common.Authentication;
+﻿using Automaton.Api.Authentication;
+using Automaton.Api.Data;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Application.Commands.Handlers
+namespace Automaton.Api.Application.Commands.Handlers
 {
     public class RevokeRefreshTokenCommandHandler : IRequestHandler<RevokeRefreshTokenCommand>
     {

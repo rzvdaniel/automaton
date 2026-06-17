@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Enums;
+using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 public class WebApp
 {
@@ -65,17 +65,17 @@ public class WebApp
     /// <summary>
     /// Marketplace moderation status controlling whether the app is publicly discoverable.
     /// </summary>
-    public string MarketplaceStatus { get; set; } = Enums.MarketplaceAppStatuses.Approved;
+    public string MarketplaceStatus { get; set; } = MarketplaceAppStatuses.Approved;
 
     /// <summary>
     /// Review workflow status used by admins to mark apps that need review.
     /// </summary>
-    public string ReviewStatus { get; set; } = Enums.AppReviewStatuses.Approved;
+    public string ReviewStatus { get; set; } = AppReviewStatuses.Approved;
 
     /// <summary>
     /// Public access status controlling whether the app is live, hidden, or disabled.
     /// </summary>
-    public string AccessStatus { get; set; } = Enums.AppAccessStatuses.Active;
+    public string AccessStatus { get; set; } = AppAccessStatuses.Active;
 
     /// <summary>
     /// Optional admin moderation reason shown in the admin review experience.

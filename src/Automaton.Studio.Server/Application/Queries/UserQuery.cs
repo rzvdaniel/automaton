@@ -1,7 +1,7 @@
-﻿using Automaton.Studio.Server.Models;
+﻿using Automaton.Api.Models;
 using MediatR;
 
-namespace AuthServer.Core.Queries
+namespace Automaton.Api.Application.Queries
 {
     public class UserQuery : IRequest<UserDetails>
     {

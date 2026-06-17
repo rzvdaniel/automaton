@@ -1,8 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -154,7 +156,7 @@ public class OrganizationInvitationSecurityTests
     private sealed class NoOpAuditEventService : IAuditEventService
     {
         public Task WriteAsync(
-            Automaton.Studio.Server.Models.AuditEventWriteRequest request,
+            AuditEventWriteRequest request,
             CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;

@@ -2,7 +2,7 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public interface IAccessTokenManagerService
     {

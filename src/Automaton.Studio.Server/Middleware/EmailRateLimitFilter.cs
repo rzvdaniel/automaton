@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace Automaton.Studio.Server.Middleware;
+namespace Automaton.Api.Middleware;
 
 public class EmailRateLimitFilter : IAsyncActionFilter
 {

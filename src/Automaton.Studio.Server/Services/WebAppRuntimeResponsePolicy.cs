@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public static class WebAppRuntimeResponsePolicy
 {

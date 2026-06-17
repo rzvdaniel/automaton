@@ -1,16 +1,16 @@
-using AuthServer.Core.Queries;
-using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
-using Common.Validation;
+using Automaton.Api.Application.Commands;
+using Automaton.Api.Application.Queries;
+using Automaton.Api.Attributes;
+using Automaton.Api.Entities;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 /// <summary>
 /// Admin controller for platform-wide user management operations.

@@ -1,7 +1,8 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers
+namespace Automaton.Api.Controllers
 {
     public class DashboardController : BaseController
     {
@@ -13,7 +14,7 @@ namespace Automaton.Studio.Server.Controllers
         }
 
         [HttpGet("stats")]
-        public async Task<ActionResult<Models.DashboardStats>> GetStats(CancellationToken cancellationToken = default)
+        public async Task<ActionResult<DashboardStats>> GetStats(CancellationToken cancellationToken = default)
         {
             var stats = await dashboardStatsService.GetDashboardStatsAsync(cancellationToken);
             return Ok(stats);

@@ -1,8 +1,9 @@
 ﻿#nullable disable
 
+using Automaton;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 public class Runner
 {

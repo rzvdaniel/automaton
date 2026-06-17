@@ -1,8 +1,10 @@
 using System.Security.Claims;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -157,9 +159,9 @@ public class AppAuthorizationRegressionTests
         dbContext.SaveChanges();
     }
 
-    private static CustomStep CreateStep(Guid id, string name)
+    private static Api.Entities.CustomStep CreateStep(Guid id, string name)
     {
-        return new CustomStep
+        return new Api.Entities.CustomStep
         {
             Id = id,
             Name = name,
@@ -187,7 +189,7 @@ public class AppAuthorizationRegressionTests
     private sealed class NoOpAuditEventService : IAuditEventService
     {
         public Task WriteAsync(
-            Automaton.Studio.Server.Models.AuditEventWriteRequest request,
+            AuditEventWriteRequest request,
             CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;

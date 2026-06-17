@@ -1,9 +1,9 @@
 using System.Net;
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers.Internal;
+namespace Automaton.Api.Controllers.Internal;
 
 [ApiController]
 [Route("internal/runners")]

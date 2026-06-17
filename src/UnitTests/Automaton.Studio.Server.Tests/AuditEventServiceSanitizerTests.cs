@@ -1,4 +1,4 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Services;
 
 namespace Automaton.Studio.Server.Tests;
 

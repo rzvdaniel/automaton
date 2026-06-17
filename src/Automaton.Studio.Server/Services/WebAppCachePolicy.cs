@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Config;
+using Automaton.Api.Config;
 using Microsoft.AspNetCore.Http;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public static class WebAppCachePolicy
 {

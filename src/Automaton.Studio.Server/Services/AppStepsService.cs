@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Service for managing App-Step relationships

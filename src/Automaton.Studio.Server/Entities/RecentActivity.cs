@@ -1,6 +1,6 @@
 using Automaton.Core.Enums;
 
-namespace Automaton.Studio.Server.Entities
+namespace Automaton.Api.Entities
 {
     public class RecentActivity
     {

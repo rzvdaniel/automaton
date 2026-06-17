@@ -1,21 +1,6 @@
 ﻿using Automaton.Core.Scripting;
 using Automaton.Ai.Extensions;
 using Automaton.Mcp.Client.Extensions;
-using Automaton.Studio.Server.Areas.Identity;
-using Automaton.Studio.Server.Authentication;
-using Automaton.Studio.Server.Authentication.GitHub;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Extensions;
-using Automaton.Studio.Server.Hubs;
-using Automaton.Studio.Server.Logging;
-using Automaton.Studio.Server.Middleware;
-using Automaton.Studio.Server.Security;
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Services.Interfaces;
-using Common.Authentication;
 using Destructurama;
 using FluentValidation.AspNetCore;
 using Hangfire;
@@ -32,6 +17,23 @@ using Serilog.Events;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Transactions;
+using Automaton.Api.Services;
+using Automaton.Api.Authentication;
+using Automaton.Api.Enums;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Extensions;
+using Automaton.Api.Entities;
+using Automaton.Api.Authentication.GitHub;
+using Automaton.Api.Logging;
+using Automaton.Api.Areas.Identity;
+using Automaton.Api.Data;
+using Automaton.Api.Services.Mcp;
+using Automaton.Api.Services.Mcp.Apps;
+using Automaton.Api.Security;
+using Automaton.Api.Config;
+using Automaton.Api.Authorization;
+using Automaton.Api.Middleware;
+using Automaton.Api.Hubs;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -149,16 +151,16 @@ services.AddAuthorization(options =>
 
     // Project-based authorization policies
     options.AddPolicy("ProjectAdmin", policy =>
-        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectAdminRequirement()));
+        policy.Requirements.Add(new ProjectAdminRequirement()));
 
     options.AddPolicy("ProjectResourceManager", policy =>
-        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectResourceManagerRequirement()));
+        policy.Requirements.Add(new ProjectResourceManagerRequirement()));
 
     options.AddPolicy("ProjectAppExecutor", policy =>
-        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectAppExecutorRequirement()));
+        policy.Requirements.Add(new ProjectAppExecutorRequirement()));
 
     options.AddPolicy("ProjectMember", policy =>
-        policy.Requirements.Add(new Automaton.Studio.Server.Authorization.ProjectMemberRequirement(
+        policy.Requirements.Add(new ProjectMemberRequirement(
             ProjectRole.ProjectAdmin,
             ProjectRole.Developer,
             ProjectRole.AppUser,
@@ -361,13 +363,13 @@ services.AddScoped<Automaton.Mcp.SystemPrompts.IAppExecutionPolicyPromptStrategy
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
 // MCP Tool Providers for AI Chat
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.StepMcpToolProvider>();
-services.AddScoped<Automaton.Studio.Server.Services.Mcp.AppMcpToolProvider>();
+services.AddScoped<StepMcpToolProvider>();
+services.AddScoped<AppMcpToolProvider>();
 services.AddSingleton<Automaton.Mcp.Tools.IUiAutomationActionAckService,
                      Automaton.Mcp.Tools.UiAutomationActionAckService>();
 // File IO tool group — wired to app-scoped file system
 services.AddScoped<Automaton.Mcp.Tools.IScopedFileSystemFactory,
-                   Automaton.Studio.Server.Services.Mcp.Apps.AppScopedFileSystemFactory>();
+                   AppScopedFileSystemFactory>();
 services.AddScoped<Automaton.Mcp.Tools.FileIoTool>();
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool>(sp => sp.GetRequiredService<Automaton.Mcp.Tools.FileIoTool>());
 // Planning tool group — propose_plan
@@ -380,22 +382,22 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.UiAutomationTool>();
 // Instruction injector — injects .instructions/ files into system prompts
-services.AddScoped<Automaton.Studio.Server.Services.AppInstructionInjector>();
-services.AddScoped<Automaton.Studio.Server.Services.AppMemoryService>();
+services.AddScoped<AppInstructionInjector>();
+services.AddScoped<AppMemoryService>();
 
 // AI providers + MCP client
 services.AddAutomatonAi();
 services.AddAutomatonMcp();
 // Replace the default IAiProviderRegistry with the dynamic decorator that lazy-loads
 // OpenAI-compatible providers from the database on first use — no restart needed.
-services.AddSingleton<Automaton.Ai.IAiProviderRegistry, Automaton.Studio.Server.Services.DynamicAiProviderRegistry>();
+services.AddSingleton<Automaton.Ai.IAiProviderRegistry, DynamicAiProviderRegistry>();
 
 // AI Chat History Service
-services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IAiChatHistoryService, Automaton.Studio.Server.Services.AiChatHistoryService>();
-services.AddScoped<Automaton.Studio.Server.Services.Interfaces.ITokenBudgetService, Automaton.Studio.Server.Services.TokenBudgetService>();
-services.AddScoped<Automaton.Studio.Server.Services.IAppVerificationStrategyResolver, Automaton.Studio.Server.Services.AppVerificationStrategyResolver>();
-services.Configure<Automaton.Studio.Server.Services.StripeOptions>(applicationBuilder.Configuration.GetSection("Stripe"));
-services.AddScoped<Automaton.Studio.Server.Services.StripeService>();
+services.AddScoped<IAiChatHistoryService, AiChatHistoryService>();
+services.AddScoped<ITokenBudgetService, TokenBudgetService>();
+services.AddScoped<IAppVerificationStrategyResolver, AppVerificationStrategyResolver>();
+services.Configure<StripeOptions>(applicationBuilder.Configuration.GetSection("Stripe"));
+services.AddScoped<StripeService>();
 
 // Project/Organization services
 services.AddScoped<ProjectService>();
@@ -405,13 +407,13 @@ services.AddScoped<InvitationTokenService>();
 services.AddScoped<ResourceAuthorizationService>();
 services.AddScoped<SensitiveVariableService>();
 services.AddScoped<UserSettingsService>();
-services.AddScoped<Automaton.Studio.Server.Services.Interfaces.IOrganizationService, Automaton.Studio.Server.Services.OrganizationService>();
+services.AddScoped<IOrganizationService, OrganizationService>();
 
 // Project authorization handlers
-services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectMemberHandler>();
-services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectAdminHandler>();
-services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectResourceManagerHandler>();
-services.AddScoped<IAuthorizationHandler, Automaton.Studio.Server.Authorization.ProjectAppExecutorHandler>();
+services.AddScoped<IAuthorizationHandler, ProjectMemberHandler>();
+services.AddScoped<IAuthorizationHandler, ProjectAdminHandler>();
+services.AddScoped<IAuthorizationHandler, ProjectResourceManagerHandler>();
+services.AddScoped<IAuthorizationHandler, ProjectAppExecutorHandler>();
 
 services.AddScoped(service => configurationService);
 

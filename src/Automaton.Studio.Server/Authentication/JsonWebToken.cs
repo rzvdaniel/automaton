@@ -1,4 +1,4 @@
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public class JsonWebToken
     {

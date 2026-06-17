@@ -1,9 +1,9 @@
+using Automaton.Api.Data;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services
+namespace Automaton.Api.Services
 {
     public class RecentActivityService
     {

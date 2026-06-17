@@ -1,8 +1,8 @@
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Config;
+using Automaton.Api.Entities;
 using System.Globalization;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public static class HostedRunnerDockerCommandBuilder
 {

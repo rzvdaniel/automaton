@@ -1,9 +1,10 @@
+using Automaton.Api.Data;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
-using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services
+namespace Automaton.Api.Services
 {
     public class DashboardStatsService
     {
@@ -23,7 +24,7 @@ namespace Automaton.Studio.Server.Services
             this.logger = Log.ForContext<DashboardStatsService>();
         }
 
-        public async Task<Models.DashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
+        public async Task<DashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
         {
             try
             {

@@ -1,15 +1,15 @@
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Hubs;
+using Automaton.Api.Models;
 using Automaton.Core.Models;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Hubs;
-using Automaton.Studio.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Deploys backend scripts to runners and executes controller actions via HTTP tunnel.

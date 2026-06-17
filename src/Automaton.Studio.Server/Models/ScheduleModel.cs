@@ -1,6 +1,6 @@
-﻿using Automaton.Studio.Server.Enums;
+﻿using Automaton.Api.Enums;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 public class ScheduleModel
 {

@@ -1,8 +1,8 @@
-﻿using AuthServer.Core.Queries;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Application.Queries;
+using Automaton.Api.Services;
 using MediatR;
 
-namespace AuthServer.Application.Queries.Handlers
+namespace Automaton.Api.Application.Queries.Handlers
 {
     public class UserRolesQueryHandler : IRequestHandler<UserRolesQuery, IEnumerable<string>>
     {

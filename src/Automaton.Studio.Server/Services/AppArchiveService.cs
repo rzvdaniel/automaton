@@ -1,9 +1,9 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 using Serilog;
 using System.IO.Compression;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AppArchiveService
 {

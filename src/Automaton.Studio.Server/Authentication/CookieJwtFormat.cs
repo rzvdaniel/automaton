@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
 public class CookieJwtFormat : ISecureDataFormat<AuthenticationTicket>
 {

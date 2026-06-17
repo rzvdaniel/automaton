@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public interface IAppExecutionLogService
 {

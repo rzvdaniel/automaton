@@ -1,9 +1,10 @@
-﻿using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Entities;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 public class FlowExecutionsController : BaseController
 {
@@ -27,7 +28,7 @@ public class FlowExecutionsController : BaseController
     }
 
     [HttpGet("recent/{count}")]
-    public async Task<ActionResult<IEnumerable<FlowExecution>>> GetRecentExecutions(int count, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IEnumerable<Models.FlowExecution>>> GetRecentExecutions(int count, CancellationToken cancellationToken = default)
     {
         var recentExecutions = await flowExecutionService.GetRecentExecutionsAsync(count, cancellationToken);
         return Ok(recentExecutions);
@@ -56,7 +57,7 @@ public class FlowExecutionsController : BaseController
 
     [HttpPost]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult> Post([FromBody] FlowExecution flowExecution, CancellationToken cancellationToken = default)
+    public async Task<ActionResult> Post([FromBody] Models.FlowExecution flowExecution, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -102,7 +103,7 @@ public class FlowExecutionsController : BaseController
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Put(Guid id, FlowExecution flowExecution, CancellationToken cancellationToken)
+    public async Task<IActionResult> Put(Guid id, Models.FlowExecution flowExecution, CancellationToken cancellationToken)
     {
         await flowExecutionService.Update(id, flowExecution, cancellationToken);
 

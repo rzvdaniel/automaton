@@ -1,9 +1,9 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Common.Authentication;
+using Automaton.Api.Authentication;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using System.Collections.Immutable;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AuthTokenService
 {

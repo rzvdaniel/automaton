@@ -3,7 +3,7 @@ using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
 using Automaton.Mcp.Tools;
 
-namespace Automaton.Studio.Server.Services.Mcp;
+namespace Automaton.Api.Services.Mcp;
 
 /// <summary>
 /// Orchestrator that aggregates all registered <see cref="IMcpTool"/> groups

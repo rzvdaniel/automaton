@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Automaton.Studio.Server.Models;
+namespace Automaton.Api.Models;
 
 public class RoleClaim
 {

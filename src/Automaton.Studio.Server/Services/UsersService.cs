@@ -1,15 +1,14 @@
-﻿using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services.Interfaces;
-using Common.Authentication;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
+using Automaton.Api.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Entities;
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class UsersService
 {

@@ -1,10 +1,10 @@
 using System.Text;
-using Automaton.Studio.Server.Config;
+using Automaton.Api.Config;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Options;
 using Serilog;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Reads .instructions/ files from an app's source directory and injects them into the system prompt.

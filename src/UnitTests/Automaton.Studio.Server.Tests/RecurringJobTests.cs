@@ -1,5 +1,5 @@
-using Automaton.Studio.Server.Enums;
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Hangfire;
 using Hangfire.MemoryStorage;
 

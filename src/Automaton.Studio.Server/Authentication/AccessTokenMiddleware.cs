@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public class AccessTokenMiddleware : IMiddleware
     {

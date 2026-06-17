@@ -1,7 +1,7 @@
-﻿using Automaton.Studio.Server.Config;
-using Common.Authentication;
+﻿using Automaton.Api.Authentication;
+using Automaton.Api.Config;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class ConfigurationService
 {

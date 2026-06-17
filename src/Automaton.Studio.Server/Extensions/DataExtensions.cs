@@ -1,7 +1,7 @@
-﻿using Automaton.Studio.Server.Data;
+﻿using Automaton.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace Automaton.Studio.Server.Extensions
+namespace Automaton.Api.Extensions
 {
     public static class DataExtensions
     {

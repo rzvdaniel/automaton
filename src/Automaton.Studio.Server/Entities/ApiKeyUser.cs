@@ -1,6 +1,8 @@
 #nullable disable
 
-namespace Automaton.Studio.Server.Entities;
+using Automaton;
+
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Links an API Key to a User for personal ownership.

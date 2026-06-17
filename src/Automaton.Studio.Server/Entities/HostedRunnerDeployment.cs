@@ -1,7 +1,7 @@
-using Automaton.Studio.Server.Models;
+using Automaton.Api.Models;
 using System.ComponentModel.DataAnnotations;
 
-namespace Automaton.Studio.Server.Entities;
+namespace Automaton.Api.Entities;
 
 /// <summary>
 /// One provisioning/deprovisioning attempt for a hosted runner.

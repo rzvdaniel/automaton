@@ -1,12 +1,12 @@
-using Automaton.Studio.Server.Services;
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using System.Reflection;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
+using Automaton.Api.Config;
 
 namespace Automaton.Studio.Server.Tests;
 

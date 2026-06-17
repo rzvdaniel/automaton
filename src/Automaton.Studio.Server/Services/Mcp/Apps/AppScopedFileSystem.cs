@@ -1,6 +1,6 @@
 using Automaton.Mcp.Tools;
 
-namespace Automaton.Studio.Server.Services.Mcp.Apps;
+namespace Automaton.Api.Services.Mcp.Apps;
 
 /// <summary>
 /// App-scoped file system: extends <see cref="LocalScopedFileSystem"/> with app-specific guards.

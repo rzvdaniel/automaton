@@ -1,6 +1,6 @@
 using Automaton.Mcp.SystemPrompts;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Classifies a user's initial request into a complexity tier to select the right system prompt template.

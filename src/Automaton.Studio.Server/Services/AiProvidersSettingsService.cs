@@ -1,10 +1,10 @@
-using Automaton.Studio.Server.Config;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
+using Automaton.Api.Config;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Provides the effective AiProviders config by merging DB-persisted operational settings

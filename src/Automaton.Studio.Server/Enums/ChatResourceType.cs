@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Enums;
+namespace Automaton.Api.Enums;
 
 /// <summary>
 /// Defines the type of resource that a chat session is associated with

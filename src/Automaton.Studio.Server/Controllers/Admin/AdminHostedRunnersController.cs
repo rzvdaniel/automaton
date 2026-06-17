@@ -1,13 +1,13 @@
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
 using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Models;
+using Automaton.Api.Entities;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 
-namespace Automaton.Studio.Server.Controllers.Admin;
+namespace Automaton.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/hosted-runners")]

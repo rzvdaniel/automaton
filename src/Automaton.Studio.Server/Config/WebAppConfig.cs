@@ -1,4 +1,4 @@
-namespace Automaton.Studio.Server.Config;
+namespace Automaton.Api.Config;
 
 /// <summary>
 /// Configuration for published web apps caching and serving

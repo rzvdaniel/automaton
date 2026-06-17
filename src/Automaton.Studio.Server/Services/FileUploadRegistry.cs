@@ -1,7 +1,7 @@
 using Automaton.Core.Models;
 using System.Collections.Concurrent;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Tracks pending file upload sessions. When the runner finishes writing all chunks,

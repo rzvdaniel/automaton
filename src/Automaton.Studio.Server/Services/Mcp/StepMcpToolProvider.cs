@@ -2,12 +2,11 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Automaton.Mcp.Services;
 using Automaton.Mcp.Models;
-using Automaton.Studio.Server.Models;
 using Automaton.Core.Scripting.Step;
 using Automaton.Core.Scripting.Engines;
 using Automaton.Core.Models;
 
-namespace Automaton.Studio.Server.Services.Mcp;
+namespace Automaton.Api.Services.Mcp;
 
 /// <summary>
 /// Server-side implementation of MCP tools for Custom Step editing

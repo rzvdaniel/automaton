@@ -1,9 +1,8 @@
-﻿using Automaton.Studio.Server.Core.Commands;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services;
+﻿using Automaton.Api.Data;
+using Automaton.Api.Services;
 using MediatR;
 
-namespace Automaton.Studio.Server.Application.Commands.Handlers
+namespace Automaton.Api.Application.Commands.Handlers
 {
     public class RemoveUserRoleCommandHandler : IRequestHandler<RemoveUserRoleCommand>
     {

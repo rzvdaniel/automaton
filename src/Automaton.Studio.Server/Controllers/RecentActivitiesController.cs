@@ -1,7 +1,8 @@
-using Automaton.Studio.Server.Services;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Automaton.Studio.Server.Controllers
+namespace Automaton.Api.Controllers
 {
     public class RecentActivitiesController : BaseController
     {
@@ -13,14 +14,14 @@ namespace Automaton.Studio.Server.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Models.RecentActivity>>> Get(int count = 20, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<IEnumerable<RecentActivity>>> Get(int count = 20, CancellationToken cancellationToken = default)
         {
             var activities = await recentActivityService.GetRecentActivitiesAsync(count, cancellationToken);
             return Ok(activities);
         }
 
         [HttpGet("recent/{count}")]
-        public async Task<ActionResult<IEnumerable<Models.RecentActivity>>> GetRecent(int count, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<IEnumerable<RecentActivity>>> GetRecent(int count, CancellationToken cancellationToken = default)
         {
             var activities = await recentActivityService.GetRecentActivitiesAsync(count, cancellationToken);
             return Ok(activities);

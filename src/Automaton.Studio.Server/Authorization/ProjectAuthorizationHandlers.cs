@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Automaton.Api.Enums;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Authorization;
+namespace Automaton.Api.Authorization;
 
 /// <summary>
 /// Handles authorization for project membership requirements

@@ -1,13 +1,13 @@
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Diagnostics;
 using System.Text.Json;
+using Automaton.Api.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Models;
 
-namespace Automaton.Studio.Server.Controllers;
+namespace Automaton.Api.Controllers;
 
 /// <summary>
 /// Endpoints for deploying and executing AppController backend scripts.

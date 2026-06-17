@@ -1,7 +1,7 @@
 ﻿using System.Security.Authentication;
 using System.Security.Cryptography;
 
-namespace Common.Authentication
+namespace Automaton.Api.Authentication
 {
     public class RefreshToken
     {

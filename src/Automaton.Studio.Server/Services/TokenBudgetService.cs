@@ -1,6 +1,6 @@
-using Automaton.Studio.Server.Services.Interfaces;
+using Automaton.Api.Services.Interfaces;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class TokenBudgetService : ITokenBudgetService
 {

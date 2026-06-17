@@ -2,7 +2,7 @@ using Automaton.Core.Models;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 /// <summary>
 /// Tracks pending file download sessions. Each session has a channel that the server

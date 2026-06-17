@@ -1,13 +1,13 @@
-﻿using AuthServer.Core.Queries;
-using Automaton.Studio.Server.Models;
-using Automaton.Studio.Server.Services;
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Identity;
-using Automaton.Studio.Server.Entities;
-using Automaton.Studio.Server.Data;
 using Microsoft.EntityFrameworkCore;
+using Automaton.Api.Models;
+using Automaton.Api.Entities;
+using Automaton.Api.Data;
+using Automaton.Api.Application.Queries;
+using Automaton.Api.Services;
 
-namespace AuthServer.Application.Queries.Handlers
+namespace Automaton.Api.Application.Queries.Handlers
 {
     public class UserQueryHandler : IRequestHandler<UserQuery, UserDetails>
     {

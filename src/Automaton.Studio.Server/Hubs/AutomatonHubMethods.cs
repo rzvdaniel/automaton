@@ -1,4 +1,4 @@
-﻿namespace Automaton.Studio.Server.Hubs
+﻿namespace Automaton.Api.Hubs
 {
     public static class AutomatonHubMethods
     {

@@ -1,13 +1,15 @@
 ﻿using Automaton.Core.Enums;
-using Automaton.Studio.Server.Constants;
-using Automaton.Studio.Server.Data;
-using Automaton.Studio.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Automaton.Studio.Server.Enums;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Constants;
+using Automaton.Api.Entities;
+using Automaton.Api.Data;
 
-namespace Automaton.Studio.Server.Services;
+namespace Automaton.Api.Services;
 
 public class AppsService
 {
@@ -46,7 +48,7 @@ public class AppsService
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
-    public IEnumerable<Models.AppModel> List(Guid? projectId = null)
+    public IEnumerable<AppModel> List(Guid? projectId = null)
     {
         // Use authorization service to get apps filtered by project context
         var entities = authorizationService.GetAppsQueryByContext(projectId)
@@ -68,7 +70,7 @@ public class AppsService
         return apps;
     }
 
-    public Models.AppModel Get(Guid id)
+    public AppModel Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)
         var appEntity = authorizationService.GetAccessibleAppsQuery()
@@ -88,7 +90,7 @@ public class AppsService
         // If not in file system, fall back to database (for migration)
         if (definition == null && !string.IsNullOrEmpty(appEntity.Definition))
         {
-            definition = JsonSerializer.Deserialize<Models.AppDefinition>(appEntity.Definition) ?? new Models.AppDefinition();
+            definition = JsonSerializer.Deserialize<AppDefinition>(appEntity.Definition) ?? new Models.AppDefinition();
             
             // Migrate to file system
             fileStorageService.SaveAppAsync(ownerId, id, definition).Wait();
@@ -109,7 +111,7 @@ public class AppsService
     /// Returns app info without requiring ownership (for authentication checks).
     /// Used by published app runtime execution endpoints.
     /// </summary>
-    public async Task<Models.PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task<PublishedAppInfo> GetPublishedAppInfoAsync(string slug, CancellationToken cancellationToken = default)
     {
         var appEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -143,12 +145,12 @@ public class AppsService
     /// Use this on authenticated Studio and preview endpoints to avoid resolving
     /// another user's storage or execution context from a raw app ID.
     /// </summary>
-    public async Task<Models.PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
+    public async Task<PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, CancellationToken cancellationToken = default)
     {
         return await GetAccessibleAppInfoByIdAsync(appId, UserId, cancellationToken);
     }
 
-    public async Task<Models.PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
+    public async Task<PublishedAppInfo?> GetAccessibleAppInfoByIdAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
         var appEntity = await authorizationService.GetAccessibleAppsQuery(userId)
             .Include(x => x.WebAppUsers)
@@ -172,7 +174,7 @@ public class AppsService
         };
     }
 
-    public async Task<Guid> Create(Models.NewApp app)
+    public async Task<Guid> Create(NewApp app)
     {
         // If an execution runner id was provided, ensure it belongs to the owner (current user)
         if (app.ExecutionRunnerId.HasValue)
@@ -264,7 +266,7 @@ public class AppsService
         return entity.Id;
     }
 
-    public async Task Update(Guid id, Models.AppModel app)
+    public async Task Update(Guid id, AppModel app)
     {
         // Check if user can update this app (personal owner OR project member with Developer/Admin role)
         if (!await authorizationService.CanUpdateAppAsync(id))
@@ -701,7 +703,7 @@ public class AppsService
         return !string.IsNullOrEmpty(slug) && Regex.IsMatch(slug, @"^[a-z0-9\-]+$");
     }
 
-    internal static Models.AppModel MapToModel(Entities.WebApp entity, Models.AppDefinition? definition = null)
+    internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null)
     {
         if (entity == null) return null;
 
@@ -724,7 +726,7 @@ public class AppsService
             // Project context
             Scope = entity.Scope,
             ProjectId = entity.ProjectId,
-            Definition = definition ?? JsonSerializer.Deserialize<Models.AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
+            Definition = definition ?? JsonSerializer.Deserialize<AppDefinition>(entity.Definition ?? "{}") ?? new Models.AppDefinition(),
             // Analytics
             ViewCount = entity.ViewCount,
             StarCount = entity.StarCount,
@@ -745,7 +747,7 @@ public class AppsService
                     Caption = s.Caption,
                     SortOrder = s.SortOrder
                 })
-                .ToList() ?? new List<Models.AppScreenshotModel>(),
+                .ToList() ?? new List<AppScreenshotModel>(),
             Category = entity.Category,
             Tags = entity.Tags,
             MarketplaceStatus = entity.MarketplaceStatus,
@@ -783,7 +785,7 @@ public class AppsService
     /// <summary>
     /// Duplicate an app owned by the current user, copying editable source files.
     /// </summary>
-    public async Task<Models.AppModel> DuplicateAsync(Guid appId)
+    public async Task<AppModel> DuplicateAsync(Guid appId)
     {
         var source = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -808,7 +810,7 @@ public class AppsService
             Version = 1,
             ExecutionRunnerId = source.ExecutionRunnerId,
             RequiresAuthentication = source.RequiresAuthentication,
-            Scope = Enums.AccessScope.Personal,
+            Scope = AccessScope.Personal,
             ProjectId = null,
             IsSample = false,
             IsFeatured = false,
@@ -848,7 +850,7 @@ public class AppsService
     /// <summary>
     /// Get metadata for the guided fork screen.
     /// </summary>
-    public async Task<Models.ForkAppSourceModel> GetForkSourceAsync(Guid sourceAppId)
+    public async Task<ForkAppSourceModel> GetForkSourceAsync(Guid sourceAppId)
     {
         var source = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -898,7 +900,7 @@ public class AppsService
     /// <summary>
     /// Fork a published marketplace app into the current user's account.
     /// </summary>
-    public async Task<Models.AppModel> ForkAsync(Guid sourceAppId, Models.ForkAppRequest? request = null)
+    public async Task<AppModel> ForkAsync(Guid sourceAppId, ForkAppRequest? request = null)
     {
         request ??= new Models.ForkAppRequest();
 
@@ -951,7 +953,7 @@ public class AppsService
             Version = 1,
             ExecutionRunnerId = null,
             RequiresAuthentication = false,
-            Scope = Enums.AccessScope.Personal,
+            Scope = AccessScope.Personal,
             ProjectId = null,
             IsSample = false,
             IsFeatured = false,
@@ -1033,7 +1035,7 @@ public class AppsService
     /// <summary>
     /// Get all sample apps (publicly accessible)
     /// </summary>
-    public async Task<IEnumerable<Models.AppModel>> GetSampleAppsAsync()
+    public async Task<IEnumerable<AppModel>> GetSampleAppsAsync()
     {
         var entities = await dataContext.WebApps
             .Where(x => x.IsSample && x.IsPublished)
@@ -1124,7 +1126,7 @@ public class AppsService
 
     }
 
-    public async Task<Models.AppScreenshotModel> AddScreenshotAsync(Guid appId, string imageUrl, string? caption = null)
+    public async Task<AppScreenshotModel> AddScreenshotAsync(Guid appId, string imageUrl, string? caption = null)
     {
         var nextSortOrder = await dataContext.WebAppScreenshots
             .Where(s => s.WebAppId == appId)
@@ -1199,7 +1201,7 @@ public class AppsService
         return imageUrl;
     }
 
-    internal static void ApplyStorageMetadata(Models.AppModel app, Models.AppStorageMetadata? metadata)
+    internal static void ApplyStorageMetadata(AppModel app, AppStorageMetadata? metadata)
     {
         if (app == null || metadata == null)
         {
