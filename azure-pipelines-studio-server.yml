@@ -57,15 +57,6 @@ jobs:
       arguments: '--no-restore --no-build'
     displayName: 'Run Tests'
 
-  - script: |
-      echo "System.DefaultWorkingDirectory=$(System.DefaultWorkingDirectory)"
-      echo "Build.ArtifactStagingDirectory=$(Build.ArtifactStagingDirectory)"
-      echo "Listing src/Automaton.Api"
-      find "$(System.DefaultWorkingDirectory)/src/Automaton.Api" -maxdepth 2 -type f | sort
-      echo "Checking appsettings files"
-      ls -la "$(System.DefaultWorkingDirectory)/src/Automaton.Api"/appsettings*.json || true
-    displayName: 'Diagnose appsettings paths'
-
   - task: FileTransform@1
     displayName: Transform appsettings
     condition: eq(${{ parameters.isRelease }}, false)

@@ -71,6 +71,7 @@ App_Data/
 
 # AppSettings files
 appsettings*.json
+!src/Automaton.Api/appsettings.json
 !appsettings.Development.example.json
 !appsettings.Production.example.json
 
