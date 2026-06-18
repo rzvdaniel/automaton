@@ -18,7 +18,7 @@ jobs:
 
   variables:
     automatonServerSolution: './Automaton.Server.sln'
-    automatonServerProject: './Automaton.Api.csproj'
+    automatonServerProject: './src/Automaton.Api/Automaton.Api.csproj'
     buildPlatform: 'Any CPU'
     buildConfiguration: 'Release'
 
@@ -62,7 +62,7 @@ jobs:
       command: 'publish'
       publishWebProjects: false
       projects: '$(System.DefaultWorkingDirectory)/src/Automaton.Api/Automaton.Api.csproj'
-      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)" --no-restore'
+      arguments: '--configuration $(buildConfiguration) --output "$(build.artifactStagingDirectory)/Automaton.Api" --no-restore'
       zipAfterPublish: false
     displayName: 'Publish Automaton Server'
 
@@ -70,9 +70,9 @@ jobs:
     displayName: Transform appsettings
     condition: eq(${{ parameters.isRelease }}, false)
     inputs:
-      folderPath: '$(build.artifactStagingDirectory)'
+      folderPath: '$(build.artifactStagingDirectory)/Automaton.Api'
       fileType: 'json'
-      targetFiles: '**/appsettings.json'
+      targetFiles: 'appsettings.json'
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Automaton Server artifact
