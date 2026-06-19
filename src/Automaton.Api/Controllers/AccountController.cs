@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Automaton.Api.Services;
-using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Models;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
@@ -14,6 +13,8 @@ using Automaton.Api.Security;
 using Automaton.Api.Authentication;
 using Automaton.Api.Middleware;
 using Automaton.Api.Application.Queries;
+using Automaton.Infrastructure.Email;
+using Automaton.Api.Services.Interfaces;
 
 namespace Automaton.Api.Controllers;
 
@@ -24,6 +25,7 @@ public class AccountController : BaseController
     private readonly ApplicationDbContext dataContext;
     private readonly UsersService userManagerService;
     private readonly IEmailService emailService;
+    private readonly EmailConfirmationLinkBuilder emailConfirmationLinkBuilder;
     private readonly ICloudflareTurnstileService cloudflareTurnstileService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly RefreshTokenCookieService refreshTokenCookieService;
@@ -34,6 +36,7 @@ public class AccountController : BaseController
         ApplicationDbContext dataContext,
         UsersService userManagerService,
         IEmailService emailService,
+        EmailConfirmationLinkBuilder emailConfirmationLinkBuilder,
         ICloudflareTurnstileService cloudflareTurnstileService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         RefreshTokenCookieService refreshTokenCookieService,
@@ -44,6 +47,7 @@ public class AccountController : BaseController
         this.dataContext = dataContext;
         this.userManagerService = userManagerService;
         this.emailService = emailService;
+        this.emailConfirmationLinkBuilder = emailConfirmationLinkBuilder;
         this.cloudflareTurnstileService = cloudflareTurnstileService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.refreshTokenCookieService = refreshTokenCookieService;
@@ -113,24 +117,6 @@ public class AccountController : BaseController
             user,
             registerUserCommand.Password,
             GetCorrelationId());
-
-        try
-        {
-            await SendEmailConfirmationAsync(user, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Confirmation email could not be sent to {Email}", registerUserCommand.Email);
-        }
-
-        try
-        {
-            await SendAdminRegistrationNotificationAsync(user, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Admin registration notification could not be sent for user {UserId}", user.Id);
-        }
 
         return StatusCode(StatusCodes.Status201Created, new
         {
@@ -364,7 +350,7 @@ public class AccountController : BaseController
     private async Task SendEmailConfirmationAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
         var token = await userManagerService.GenerateEmailConfirmationTokenAsync(user.Id);
-        var confirmationUrl = BuildEmailConfirmationUrl(user.Id, token);
+        var confirmationUrl = emailConfirmationLinkBuilder.Build(user.Id, token);
 
         var userDetails = new EmailData
         {
@@ -383,20 +369,6 @@ public class AccountController : BaseController
         await emailService.Send(userDetails, cancellationToken);
     }
 
-    private string BuildEmailConfirmationUrl(Guid userId, string token)
-    {
-        var apiBaseUrl = $"{Request.Scheme}://{Request.Host}".TrimEnd('/');
-        var query = new Dictionary<string, string?>
-        {
-            ["userId"] = userId.ToString(),
-            ["token"] = token
-        };
-
-        return QueryHelpers.AddQueryString(
-            $"{apiBaseUrl}/api/Account/ConfirmEmail",
-            query);
-    }
-
     private string BuildEmailConfirmationRedirectUrl(bool success)
     {
         var baseUrl = configurationService.WebsiteUrl.TrimEnd('/');
@@ -410,37 +382,10 @@ public class AccountController : BaseController
             });
     }
 
-    private async Task SendAdminRegistrationNotificationAsync(ApplicationUser user, CancellationToken cancellationToken)
-    {
-        var notificationRecipient = configurationService.EmailConfig.AdminEmail;
-        if (string.IsNullOrWhiteSpace(notificationRecipient))
-        {
-            return;
-        }
-
-        var adminNotification = new EmailData
-        {
-            Template = "AutomatonAdminNewRegistration",
-            From = new EmailAccount { Email = ResolveUserFacingFromEmail() },
-            To = [new EmailAccount { Email = notificationRecipient, Name = "Automaton Admin" }],
-            Variables =
-            {
-                { "Name", user.Name ?? string.Empty },
-                { "Email", user.Email ?? string.Empty },
-                { "PublicUsername", user.PublicUsername ?? string.Empty },
-                { "RegisteredAtUtc", user.RegisteredAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'") },
-                { "AdminUsersUrl", $"{configurationService.WebsiteUrl.TrimEnd('/')}/admin/users" }
-            }
-        };
-
-        await emailService.Send(adminNotification, cancellationToken);
-    }
-
     private string ResolveUserFacingFromEmail()
     {
         return string.IsNullOrWhiteSpace(configurationService.EmailConfig.FromEmail)
             ? configurationService.EmailConfig.EmailAccount
             : configurationService.EmailConfig.FromEmail;
     }
-
 }

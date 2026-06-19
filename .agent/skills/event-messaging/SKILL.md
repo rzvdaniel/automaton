@@ -122,6 +122,8 @@ When moving side effects from API code into the Worker:
 4. Remove the direct API side effect.
 5. Add the side effect inside the Worker handler.
 
+If the moved side effect depends on host configuration such as `EmailConfig`, `AppConfig`, or auth/token settings, copy or bind the required configuration in `Automaton.Worker` before enabling the side effect. Do not assume API-only settings are available in the Worker host.
+
 Never leave the same side effect active in both API and Worker unless duplicate delivery is explicitly intended.
 
 ## Common pitfalls
@@ -132,6 +134,7 @@ Never leave the same side effect active in both API and Worker unless duplicate 
 - Scattering event topic strings instead of using `EventTopics`.
 - Publishing outside the transactional boundary when the event must reflect a committed DB change.
 - Moving email/admin notifications to the Worker before confirming the log-only pipeline works.
+- Moving a side effect to the Worker without also wiring the required host configuration, especially `EmailConfig` for SMTP-backed email delivery.
 
 ## Verification
 

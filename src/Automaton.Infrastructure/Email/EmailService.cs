@@ -119,10 +119,22 @@ public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfig
             ?? _emailConfig.EmailAccount;
         var fromName = emailDetails.From?.Name ?? "Automaton";
 
+        if (string.IsNullOrWhiteSpace(fromAddress))
+        {
+            throw new InvalidOperationException(
+                "Email sender address is not configured. Set EmailConfig:FromEmail or EmailConfig:EmailAccount for this host.");
+        }
+
         message.From.Add(new MailboxAddress(fromName, fromAddress));
 
         foreach (var to in emailDetails.To)
         {
+            if (string.IsNullOrWhiteSpace(to.Email))
+            {
+                throw new InvalidOperationException(
+                    $"Email recipient address is missing for template '{emailDetails.Template}'.");
+            }
+
             message.To.Add(new MailboxAddress(to.Name, to.Email));
         }
 
