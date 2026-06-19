@@ -1,6 +1,6 @@
 # Docker Setup for Automaton Development
 
-This directory contains Docker configurations for setting up a MySQL database for Automaton development.
+This directory contains Docker configurations for local development dependencies such as MySQL and RabbitMQ.
 
 ## Quick Start
 
@@ -50,7 +50,29 @@ This will:
 - Start MySQL on port 3306 (or your configured port)
 - Persist data in a Docker volume
 
-### 4. Configure Automaton.Api
+### 4. Start RabbitMQ
+
+From the project root directory:
+```bash
+docker compose -f docker-compose.rabbitmq.yml up -d
+```
+
+This will:
+- Pull the RabbitMQ management image
+- Start the AMQP broker on port 5672 (or your configured port)
+- Start the management UI on port 15672 (or your configured port)
+- Persist RabbitMQ data in a Docker volume
+
+Management UI:
+```txt
+http://localhost:15672
+```
+
+Default login values come from `.env`:
+- username: `automaton`
+- password: `AutomatonRabbit123!`
+
+### 5. Configure Automaton.Api
 
 Update your `appsettings.Development.json` or use .NET user secrets:
 
@@ -67,9 +89,12 @@ Update your `appsettings.Development.json` or use .NET user secrets:
 ```bash
 cd src/Automaton.Api
 dotnet user-secrets set "ConnectionStrings:MySqlConnection" "Server=localhost;Port=3306;Database=automaton;User=automaton_user;Password=AutomatonPass123!;"
+dotnet user-secrets set "RabbitMq:Host" "localhost"
+dotnet user-secrets set "RabbitMq:Username" "automaton"
+dotnet user-secrets set "RabbitMq:Password" "AutomatonRabbit123!"
 ```
 
-### 5. Start the Server
+### 6. Start the Server
 
 Database migrations are applied automatically when the server starts for the first time:
 
@@ -82,39 +107,47 @@ The server will automatically:
 - Connect to the MySQL database
 - Apply all pending Entity Framework migrations
 - Create the database schema (38 tables)
+- Connect to RabbitMQ using the configured credentials
 - Start the Automaton Studio Server
 
 ## Useful Commands
 
 ### Check MySQL Logs
 ```bash
-docker logs automaton-mysql-dev
+docker logs automaton-mysql
 ```
 
 ### Connect to MySQL CLI
 ```bash
-docker exec -it automaton-mysql-dev mysql -u automaton_user -p
+docker exec -it automaton-mysql mysql -u automaton_user -p
 # Enter password: AutomatonPass123! (or your configured password)
+```
+
+### Check RabbitMQ Logs
+```bash
+docker logs automaton-rabbitmq
 ```
 
 ### Stop the Database
 ```bash
-docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.mysql.yml down
+docker compose -f docker-compose.rabbitmq.yml down
 ```
 
 ### Stop and Remove Data (fresh start)
 ```bash
-docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.mysql.yml down -v
+docker compose -f docker-compose.rabbitmq.yml down -v
 ```
 
 ### Backup the Database
 ```bash
-docker exec automaton-mysql-dev mysqldump -u root -pAutomatonRoot123! automaton > backup.sql
+docker exec automaton-mysql mysqldump -u root -pAutomatonRoot123! automaton > backup.sql
 ```
 
 ### Restore from Backup
 ```bash
-docker exec -i automaton-mysql-dev mysql -u root -pAutomatonRoot123! automaton < backup.sql
+docker exec -i automaton-mysql mysql -u root -pAutomatonRoot123! automaton < backup.sql
 ```
 
 ## Directory Structure
@@ -126,6 +159,8 @@ docker/
 │   │   └── custom.cnf  # Custom MySQL settings
 │   └── init/           # Initialization scripts (run on first start)
 │       └── 01-init.sql # Database initialization
+├── ../docker-compose.mysql.yml
+├── ../docker-compose.rabbitmq.yml
 └── README.md           # This file
 ```
 
@@ -196,10 +231,12 @@ docker push localhost:5000/automaton-mysql:latest
 - Ensure MySQL container is running: `docker ps`
 - Check if port 3306 is available: `netstat -an | grep 3306`
 - Verify connection string has correct host (localhost when connecting from host machine)
+- Ensure RabbitMQ container is running if the API or Worker uses MassTransit
 
 ### Access Denied
 - Verify credentials in `.env` match those in connection string
 - Ensure user has proper privileges (check init script)
+- Verify `RABBITMQ_USER` and `RABBITMQ_PASSWORD` in `.env` match the app config
 
 ### Container Won't Start
 - Check logs: `docker logs automaton-mysql-dev`

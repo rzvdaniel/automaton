@@ -27,6 +27,7 @@ public class AccountController : BaseController
     private readonly ICloudflareTurnstileService cloudflareTurnstileService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly RefreshTokenCookieService refreshTokenCookieService;
+    private readonly AccountRegistrationService accountRegistrationService;
     private readonly ILogger<AccountController> logger;
 
     public AccountController(ConfigurationService configurationService,
@@ -36,6 +37,7 @@ public class AccountController : BaseController
         ICloudflareTurnstileService cloudflareTurnstileService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         RefreshTokenCookieService refreshTokenCookieService,
+        AccountRegistrationService accountRegistrationService,
         ILogger<AccountController> logger)
     {
         this.configurationService = configurationService;
@@ -45,6 +47,7 @@ public class AccountController : BaseController
         this.cloudflareTurnstileService = cloudflareTurnstileService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.refreshTokenCookieService = refreshTokenCookieService;
+        this.accountRegistrationService = accountRegistrationService;
         this.logger = logger;
     }
 
@@ -106,8 +109,10 @@ public class AccountController : BaseController
             RegistrationProvider = RegistrationProviders.Password
         };
 
-        await userManagerService.CreateUser(user, registerUserCommand.Password);
-        await dataContext.SaveChangesAsync();
+        await accountRegistrationService.RegisterAsync(
+            user,
+            registerUserCommand.Password,
+            GetCorrelationId());
 
         try
         {
@@ -437,4 +442,5 @@ public class AccountController : BaseController
             ? configurationService.EmailConfig.EmailAccount
             : configurationService.EmailConfig.FromEmail;
     }
+
 }

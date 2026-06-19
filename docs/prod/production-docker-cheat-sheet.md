@@ -166,6 +166,8 @@ MYSQL_ROOT_PASSWORD=strong-root-password
 MYSQL_DATABASE=automaton
 MYSQL_USER=automaton_user
 MYSQL_PASSWORD=strong-user-password
+RABBITMQ_USER=automaton
+RABBITMQ_PASSWORD=strong-rabbitmq-password
 ```
 
 Optional:
@@ -613,15 +615,15 @@ These services do not rebuild from local source in this repo:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d mysql nginx
+docker compose -f docker-compose.prod.yml up -d mysql rabbitmq nginx
 ```
 
 Pull newer upstream images first if needed:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml pull mysql nginx
-docker compose -f docker-compose.prod.yml up -d mysql nginx
+docker compose -f docker-compose.prod.yml pull mysql rabbitmq nginx
+docker compose -f docker-compose.prod.yml up -d mysql rabbitmq nginx
 ```
 
 nginx mounts `prod-published-apps` read-only. The API colors mount the same volume read-write so publish/unpublish can update static app packages.

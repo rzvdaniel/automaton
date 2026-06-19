@@ -5,9 +5,10 @@
 .DESCRIPTION
     1. Copies appsettings.Development.json from the main repo
     2. Starts Automaton.Api  (new terminal window)
-    3. Starts FastAPI backend          (new terminal window, port 8001)
-    4. Starts Automaton.Runner         (new terminal window)
-    5. Starts the Vue.js frontend      (new terminal window)
+    3. Starts Automaton.Worker         (new terminal window)
+    4. Starts FastAPI backend          (new terminal window, port 8001)
+    5. Starts Automaton.Runner         (new terminal window)
+    6. Starts the Vue.js frontend      (new terminal window)
 
     Requires Python with fastapi and uvicorn installed:
       pip install fastapi "uvicorn[standard]"
@@ -53,6 +54,7 @@ $ErrorActionPreference = "Stop"
 
 $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
 $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
+$WorkerProject = Join-Path $WorktreeRoot "src\Automaton.Worker"
 $RunnerProject = Join-Path $WorktreeRoot "src\Automaton.Runner"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
@@ -85,7 +87,13 @@ Write-Ok "Server window launched"
 # Give the server time to start before the runner connects
 Start-Sleep -Seconds 15
 
-# ---------- 3. FastAPI backend (required for tunnel execution) ---------------
+# ---------- 3. Automaton.Worker ---------------------------------------------
+
+Write-Step "Starting Automaton.Worker..."
+Start-DevWindow "Automaton Worker" $WorkerProject "dotnet watch"
+Write-Ok "Worker window launched"
+
+# ---------- 4. FastAPI backend (required for tunnel execution) ---------------
 
 # Check Python and required packages are installed
 Write-Step "Checking FastAPI prerequisites..."
@@ -191,13 +199,13 @@ if (-not $nodeOk -or -not $npmOk) {
     }
 }
 
-# ---------- 4. Automaton.Runner ---------------------------------------------
+# ---------- 5. Automaton.Runner ---------------------------------------------
 
 Write-Step "Starting Automaton.Runner..."
 Start-DevWindow "Automaton Runner" $RunnerProject "dotnet watch"
 Write-Ok "Runner window launched"
 
-# ---------- 5. Vue.js frontend ----------------------------------------------
+# ---------- 6. Vue.js frontend ----------------------------------------------
 
 Write-Step "Starting Vue.js frontend..."
 Start-DevWindow "Automaton Vue" $VueProject "npm run dev"

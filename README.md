@@ -219,6 +219,7 @@ Current skills include:
 - `AGENTS.md` — repository-level agent/developer contract
 - `.agent/harness/verification.md` — verification matrix
 - `.agent/skills/` — task-specific AI agent skills
+- `docs/dev/messaging-rabbitmq.md` — internal CAP + RabbitMQ event publishing/consumption architecture
 - `docs/runners/docker-runner.md` — runner deployment details
 - `src/automaton-studio-vue/REDESIGN_PLAN.md` — frontend redesign notes, if still relevant
 

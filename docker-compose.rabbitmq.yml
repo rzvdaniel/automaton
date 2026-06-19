@@ -1,0 +1,43 @@
+# RabbitMQ Docker Compose
+# Usage: docker compose -f docker-compose.rabbitmq.yml up -d
+#
+# This provides a standalone RabbitMQ broker for development.
+# Use this when you want to run the API and Worker locally but need RabbitMQ in Docker.
+#
+# Default credentials (can be overridden with environment variables):
+#   - Username: automaton
+#   - Password: AutomatonRabbit123!
+#
+# Local connections:
+#   - AMQP:       localhost:5672
+#   - Management: http://localhost:15672
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: automaton-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-automaton}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-AutomatonRabbit123!}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - rabbitmq-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  rabbitmq-data:
+    driver: local
+
+networks:
+  rabbitmq-network:
+    driver: bridge

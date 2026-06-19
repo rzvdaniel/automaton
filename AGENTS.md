@@ -70,6 +70,7 @@ Recommended skills:
 - Scaffolded/generated apps: `.agent/skills/scaffolded-apps/SKILL.md`
 - Studio frontend: `.agent/skills/studio-frontend/SKILL.md`
 - Studio backend: `.agent/skills/studio-backend/SKILL.md`
+- Event messaging: `.agent/skills/event-messaging/SKILL.md`
 - Audit and logging: `.agent/skills/audit-logging/SKILL.md`
 - Runner debugging: `.agent/skills/runner-debugging/SKILL.md`
 - Retrospective: `.agent/skills/retro/SKILL.md`

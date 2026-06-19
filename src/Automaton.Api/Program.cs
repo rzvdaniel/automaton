@@ -34,6 +34,9 @@ using Automaton.Api.Config;
 using Automaton.Api.Authorization;
 using Automaton.Api.Middleware;
 using Automaton.Api.Hubs;
+using Automaton.Api.Messaging;
+using Automaton.Messaging.Abstractions;
+using DotNetCore.CAP;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
 var configurationManager = applicationBuilder.Configuration;
@@ -62,6 +65,7 @@ services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSect
 services.Configure<GitHubOAuthOptions>(applicationBuilder.Configuration.GetSection("GitHub"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
+services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
 services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
 services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
@@ -169,6 +173,26 @@ services.AddAuthorization(options =>
 
 services.AddHttpClient();
 services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
+services.AddSingleton<IEventPublisher, CapEventPublisher>();
+services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
+services.AddCap(options =>
+{
+    options.UseEntityFramework<ApplicationDbContext>();
+    var rabbitMqHost = configurationManager["RabbitMq:Host"]
+        ?? throw new InvalidOperationException("RabbitMq:Host is required.");
+    var rabbitMqUsername = configurationManager["RabbitMq:Username"]
+        ?? throw new InvalidOperationException("RabbitMq:Username is required.");
+    var rabbitMqPassword = configurationManager["RabbitMq:Password"]
+        ?? throw new InvalidOperationException("RabbitMq:Password is required.");
+
+    options.UseRabbitMQ(rabbitMq =>
+    {
+        rabbitMq.HostName = rabbitMqHost;
+        rabbitMq.UserName = rabbitMqUsername;
+        rabbitMq.Password = rabbitMqPassword;
+        rabbitMq.VirtualHost = configurationManager["RabbitMq:VirtualHost"] ?? "/";
+    });
+});
 services.AddAutomatonRateLimiting();
 services.AddSingleton<RefreshTokenCookieService>();
 
@@ -313,6 +337,7 @@ services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();
 services.AddScoped<RecentActivityService>();
+services.AddScoped<AccountRegistrationService>();
 services.AddScoped<IAuditEventService, AuditEventService>();
 services.AddScoped<AuditEventService>();
 services.AddScoped<DashboardStatsService>();

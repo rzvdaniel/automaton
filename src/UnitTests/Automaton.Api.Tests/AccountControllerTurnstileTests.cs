@@ -9,7 +9,6 @@ using Automaton.Api.Application.Commands;
 using Automaton.Api.Controllers;
 using Automaton.Api.Services;
 using Automaton.Api.Security;
-
 namespace Automaton.Api.Tests;
 
 [TestFixture]
@@ -71,6 +70,7 @@ public class AccountControllerTurnstileTests
             turnstileService,
             null!,
             new RefreshTokenCookieService(),
+            null!,
             NullLogger<AccountController>.Instance)
         {
             ControllerContext = new ControllerContext

@@ -47,6 +47,12 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - automaton-local
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   api:
     build:

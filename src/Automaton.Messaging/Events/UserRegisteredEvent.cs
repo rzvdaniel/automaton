@@ -4,4 +4,5 @@ public sealed record UserRegisteredEvent(
     Guid UserId,
     string Email,
     string? DisplayName,
-    DateTime RegisteredAtUtc);
+    DateTime RegisteredAtUtc,
+    string? CorrelationId = null);

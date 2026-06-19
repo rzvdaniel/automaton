@@ -1,5 +1,6 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 using System.Security.Claims;
 
 namespace Automaton.Api.Controllers;
@@ -23,5 +24,10 @@ public abstract class BaseController : ControllerBase
         Guid.TryParse(userIdString, out Guid userId);
 
         return userId;
+    }
+
+    protected string? GetCorrelationId()
+    {
+        return Activity.Current?.TraceId.ToString() ?? HttpContext.TraceIdentifier;
     }
 }
