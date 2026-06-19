@@ -46,7 +46,7 @@ If you changed EF entities, `DbContext`, relationships, indexes, or other persis
 
 ```powershell
 # From repo root
-dotnet ef migrations add <Name> --project src/Automaton.Api/Automaton.Api.csproj --startup-project src/Automaton.Api/Automaton.Api.csproj --output-dir Migrations
+dotnet ef migrations add <Name> --project src/Automaton.Infrastructure/Automaton.Infrastructure.csproj --startup-project src/Automaton.Api/Automaton.Api.csproj --output-dir Migrations
 ```
 
 **Expected result:** EF creates:

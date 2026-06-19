@@ -36,6 +36,8 @@ using Automaton.Api.Middleware;
 using Automaton.Api.Hubs;
 using Automaton.Api.Messaging;
 using Automaton.Messaging.Abstractions;
+using Automaton.Identity;
+using Automaton.Infrastructure;
 using DotNetCore.CAP;
 
 var applicationBuilder = WebApplication.CreateBuilder(args);
@@ -47,12 +49,7 @@ var configurationService = new ConfigurationService(applicationBuilder.Configura
 
 var services = applicationBuilder.Services;
 
-services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(
-        configurationManager.GetConnectionString("MySqlConnection"),
-        new MySqlServerVersion(new Version(8, 0, 36))
-    )
-);
+services.AddAutomatonInfrastructure(configurationManager);
 
 services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -87,6 +84,8 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
+
+services.AddAutomatonIdentity();
 
 // Configure cookie authentication to not redirect API requests
 services.ConfigureApplicationCookie(options =>

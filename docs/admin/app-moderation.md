@@ -182,7 +182,7 @@ Frontend:
 
 Migration:
 
-- `src/Automaton.Api/Migrations/20260531125500_AddWebAppReviewAndAccessStatuses.cs`
+- `src/Automaton.Infrastructure/Migrations/20260531125500_AddWebAppReviewAndAccessStatuses.cs`
 
 ## Future Options
 

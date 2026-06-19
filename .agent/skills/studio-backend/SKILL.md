@@ -47,7 +47,7 @@ Avoid C# enums when JSON/client comparisons depend on stable string values.
 ## Database rules
 
 - Add migrations intentionally.
-- Create EF Core migrations with `dotnet ef migrations add <Name> --project src/Automaton.Api`; do not create migration files by hand.
+- Create EF Core migrations with `dotnet ef migrations add <Name> --project src/Automaton.Infrastructure --startup-project src/Automaton.Api`; do not create migration files by hand.
 - Avoid destructive migrations unless explicitly requested.
 - Do not add subscription columns for every entitlement unless query/indexing needs justify it.
 - Prefer extending `PlanCapabilities` for plan capabilities.
@@ -75,7 +75,7 @@ dotnet test
 For EF changes:
 
 ```bash
-dotnet ef migrations list --project src/Automaton.Api
+dotnet ef migrations list --project src/Automaton.Infrastructure --startup-project src/Automaton.Api
 ```
 
 For API DTO changes that affect Studio frontend, also run the relevant frontend type generation/build steps from `.agent/harness/verification.md`.

@@ -67,7 +67,7 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 
 - All schema changes require a migration — **always generate migrations with `dotnet ef`, never write migration files by hand**:
   ```bash
-  dotnet ef migrations add <Name> --project src/Automaton.Api/Automaton.Api.csproj --startup-project src/Automaton.Api/Automaton.Api.csproj --output-dir Migrations
+  dotnet ef migrations add <Name> --project src/Automaton.Infrastructure/Automaton.Infrastructure.csproj --startup-project src/Automaton.Api/Automaton.Api.csproj --output-dir Migrations
   ```
   Hand-crafted migrations silently skip the required `.Designer.cs` companion file; EF then ignores the migration and `Database.Migrate()` fails at runtime with confusing column errors.
 - If `dotnet ef` is blocked by environment issues (locked build output, temp-directory permissions, NuGet/network restrictions, missing SDK tooling), stop and report that exact blocker. Do not "temporarily" hand-author a migration as a substitute.

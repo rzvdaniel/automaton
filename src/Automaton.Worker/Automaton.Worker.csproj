@@ -16,5 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Messaging\Automaton.Messaging.csproj" />
+    <ProjectReference Include="..\Automaton.Infrastructure\Automaton.Infrastructure.csproj" />
+    <ProjectReference Include="..\Automaton.Identity\Automaton.Identity.csproj" />
   </ItemGroup>
 </Project>

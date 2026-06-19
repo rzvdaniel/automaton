@@ -1,9 +1,12 @@
 using Automaton.Worker.Consumers;
 using Automaton.Worker.Handlers;
 using Automaton.Messaging.Abstractions;
-using DotNetCore.CAP;
+using Automaton.Identity;
+using Automaton.Infrastructure;
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddAutomatonInfrastructure(builder.Configuration);
+builder.Services.AddAutomatonWorkerIdentity();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<Automaton.Messaging.Events.UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddCap(options =>

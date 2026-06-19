@@ -28,6 +28,7 @@ public sealed class AccountRegistrationService(
                     user.Id,
                     user.Email ?? string.Empty,
                     user.Name,
+                    user.PublicUsername,
                     user.RegisteredAtUtc,
                     correlationId),
                 innerCancellationToken);

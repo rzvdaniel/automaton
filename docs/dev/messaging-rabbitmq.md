@@ -6,10 +6,12 @@ The goal is to keep Automaton free of framework lock-in while still allowing rel
 
 ## Latest updates
 
-The current architecture was recently tightened in two important ways:
+The current architecture was recently tightened in four important ways:
 
 1. Producer-side CAP transaction code is now hidden behind `ITransactionalEventExecutor`.
 2. Consumer-side business handling is now hidden behind `IEventHandler<TEvent>`.
+3. Shared EF/data/email primitives were moved out of `Automaton.Api` into `Automaton.Infrastructure`.
+4. Reusable identity primitives were extracted into `Automaton.Identity`.
 
 That means:
 
@@ -17,6 +19,8 @@ That means:
 - `AccountRegistrationService` no longer depends on `ICapPublisher`
 - `UserRegisteredCapSubscriber` is now only a transport adapter
 - `UserRegisteredEventHandler` is now the transport-agnostic business handler
+- `ApplicationDbContext` and shared entities no longer live only in `Automaton.Api`
+- the Worker can use identity and email primitives without depending on the API assembly
 
 This is the current intended boundary:
 
@@ -29,6 +33,8 @@ Automaton currently uses:
 
 - `Automaton.Api` as the producer
 - `Automaton.Worker` as the consumer
+- `Automaton.Infrastructure` for shared EF/data/email infrastructure
+- `Automaton.Identity` for shared identity primitives
 - CAP as the .NET messaging abstraction and reliability layer
 - RabbitMQ as the transport broker
 - MySQL as CAP's persistent message store
@@ -84,6 +90,31 @@ MySQL is used for two separate things in this architecture:
 
 This is why the Worker needs a MySQL connection string even though it is "just a consumer". CAP uses the database for reliability, not just RabbitMQ.
 
+### Automaton.Infrastructure
+
+`Automaton.Infrastructure` contains backend primitives that both the API and Worker need.
+
+Its responsibilities are:
+
+- host `ApplicationDbContext`
+- host shared EF entities
+- host shared config objects such as `AppConfig` and `EmailConfig`
+- host email transport services such as `IEmailService`, `EmailService`, and `EmailConfirmationLinkBuilder`
+
+This project should not depend on `Automaton.Api` or `Automaton.Worker`.
+
+### Automaton.Identity
+
+`Automaton.Identity` contains reusable identity-level behavior that is not HTTP-specific.
+
+Its responsibilities are:
+
+- load users by id
+- generate email confirmation tokens
+- orchestrate registration notification behavior that depends on identity primitives
+
+This keeps the Worker from depending on API services like `UsersService` or controller helpers.
+
 ### Automaton.Api
 
 `Automaton.Api` is the producer for registration events.
@@ -127,9 +158,28 @@ src/
   Automaton.Messaging/
     Abstractions/
       IEventPublisher.cs
+      IEventHandler.cs
+      ITransactionalEventExecutor.cs
     Events/
       UserRegisteredEvent.cs
     EventTopics.cs
+
+  Automaton.Infrastructure/
+    Data/
+      ApplicationDbContext.cs
+    Email/
+      EmailConfirmationLinkBuilder.cs
+      EmailService.cs
+      IEmailService.cs
+
+  Automaton.Identity/
+    Abstractions/
+      IEmailConfirmationTokenService.cs
+      IUserLookupService.cs
+    Services/
+      EmailConfirmationTokenService.cs
+      UserLookupService.cs
+      UserRegistrationNotificationService.cs
 
   Automaton.Api/
     Services/
@@ -210,6 +260,32 @@ It represents a fact that already happened, so it uses past-tense naming.
 
 That value is separate from CAP's own internal correlation headers.
 In the current implementation it is populated from the current request trace, preferring `Activity.Current.TraceId` and falling back to `HttpContext.TraceIdentifier`.
+
+## Project boundary rule
+
+The intended dependency direction is now:
+
+```text
+Automaton.Api
+  -> Automaton.Messaging
+  -> Automaton.Identity
+  -> Automaton.Infrastructure
+
+Automaton.Worker
+  -> Automaton.Messaging
+  -> Automaton.Identity
+  -> Automaton.Infrastructure
+
+Automaton.Identity
+  -> Automaton.Infrastructure
+```
+
+The important rule is:
+
+- API and Worker may depend on shared backend libraries
+- shared backend libraries must not depend on API or Worker
+
+This is why `UserRegistrationNotificationService` belongs in `Automaton.Identity`, not `Automaton.Infrastructure`: it needs identity primitives such as user lookup and token generation.
 
 ## API publishing flow
 
@@ -307,6 +383,12 @@ That means the Worker code stays focused on business side effects instead of mes
 
 `UserRegisteredCapSubscriber` is the CAP-specific adapter.
 
+Right now the Worker handler is still log-only.
+
+That is intentional.
+
+The API still sends confirmation and admin-notification emails directly from `AccountController`, so the Worker must not send them yet or users will receive duplicates.
+
 ## Current topology
 
 Current shared topic constants are defined in:
@@ -391,6 +473,17 @@ Related files:
 - [docker-compose.local.yml](/C:/Work/automaton/docker-compose.local.yml)
 - [.env.example](/C:/Work/automaton/.env.example)
 
+## Registration side effects today
+
+The registration flow is currently in an intermediate migration state:
+
+- `AccountRegistrationService` creates the user and publishes `UserRegisteredEvent`
+- `AccountController` still sends confirmation and admin-notification emails directly
+- `UserRegisteredEventHandler` currently logs only
+- `UserRegistrationNotificationService` now exists in `Automaton.Identity` and is ready to be called from the Worker when the direct API side effects are removed
+
+This is deliberate because it lets the event pipeline be verified before moving the side effects.
+
 ## Migration rule
 
 When migrating side effects from synchronous API code into the Worker:
@@ -404,8 +497,8 @@ For `UserRegisteredEvent`, the safe order is:
 1. API publishes event
 2. Worker logs event only
 3. verify pipeline
-4. remove direct email/notification side effects from API
-5. add those side effects in Worker
+4. switch the Worker handler to `UserRegistrationNotificationService`
+5. remove the direct API side effects
 
 This avoids duplicate emails and duplicate admin notifications.
 
@@ -445,6 +538,9 @@ Portable pieces in the current shape:
 - `IEventHandler<UserRegisteredEvent>`
 - `UserRegisteredEventHandler`
 - `AccountRegistrationService`
+- `IUserLookupService`
+- `IEmailConfirmationTokenService`
+- `UserRegistrationNotificationService`
 
 Transport/framework-specific pieces in the current shape:
 

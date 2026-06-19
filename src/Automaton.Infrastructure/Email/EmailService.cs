@@ -1,18 +1,20 @@
-﻿using Automaton.Api.Models;
+using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Fluid;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MimeKit;
 using System.Resources;
-using System.Text.Json;
 
 namespace Automaton.Api.Services;
 
-public class EmailService(ConfigurationService configurationService, ILogger<EmailService> logger) : IEmailService
+public class EmailService(IOptions<Automaton.Api.Config.EmailConfig> emailConfigOptions, ILogger<EmailService> logger) : IEmailService
 {
-    private static readonly ResourceManager TemplateResourceManager = new("Automaton.Api.Resources.EmailTemplates", typeof(EmailService).Assembly);
+    private static readonly ResourceManager TemplateResourceManager = new("Automaton.Infrastructure.Resources.EmailTemplates", typeof(EmailService).Assembly);
     private static readonly FluidParser TemplateParser = new();
+    private readonly Automaton.Api.Config.EmailConfig _emailConfig = emailConfigOptions.Value;
 
     public async Task<bool> Send(EmailData emailDetails, CancellationToken cancellationToken)
     {
@@ -23,23 +25,23 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
 
             using var client = new SmtpClient();
             client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-            
-            var socketOptions = ResolveSocketOptions(configurationService.EmailConfig.EmailPort, configurationService.EmailConfig.EmailUseSsl);
-            
+
+            var socketOptions = ResolveSocketOptions(_emailConfig.EmailPort, _emailConfig.EmailUseSsl);
+
             await client.ConnectAsync(
-                configurationService.EmailConfig.EmailHost,
-                configurationService.EmailConfig.EmailPort,
+                _emailConfig.EmailHost,
+                _emailConfig.EmailPort,
                 socketOptions,
                 cancellationToken);
 
             await client.AuthenticateAsync(
-                configurationService.EmailConfig.EmailAccount,
-                configurationService.EmailConfig.EmailPassword,
+                _emailConfig.EmailAccount,
+                _emailConfig.EmailPassword,
                 cancellationToken);
 
             await client.SendAsync(message, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
-            
+
             logger.LogDebug("Email sent successfully to {ToCount} recipient(s)", emailDetails.To?.Count() ?? 0);
             return true;
         }
@@ -52,20 +54,16 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
 
     private static SecureSocketOptions ResolveSocketOptions(int port, bool useSsl)
     {
-        // Port 587 is reserved for STARTTLS (explicit TLS)
-        // Port 465 is reserved for implicit SSL/TLS (SMTPS)
-        // Port 25 is typically plain text or opportunistic STARTTLS
         if (port == 587)
         {
             return SecureSocketOptions.StartTls;
         }
-        
+
         if (port == 465)
         {
             return SecureSocketOptions.SslOnConnect;
         }
-        
-        // For other ports, respect the useSsl configuration
+
         return useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.None;
     }
 
@@ -117,8 +115,8 @@ public class EmailService(ConfigurationService configurationService, ILogger<Ema
         var message = new MimeMessage();
 
         var fromAddress = emailDetails.From?.Email
-            ?? configurationService.EmailConfig.FromEmail
-            ?? configurationService.EmailConfig.EmailAccount;
+            ?? _emailConfig.FromEmail
+            ?? _emailConfig.EmailAccount;
         var fromName = emailDetails.From?.Name ?? "Automaton";
 
         message.From.Add(new MailboxAddress(fromName, fromAddress));

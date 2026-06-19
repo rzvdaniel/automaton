@@ -57,6 +57,8 @@
     <ProjectReference Include="..\Automaton.Steps\Automaton.Steps.csproj" />
     <ProjectReference Include="..\Automaton.Ai\Automaton.Ai.csproj" />
     <ProjectReference Include="..\Automaton.Mcp\Automaton.Mcp.csproj" />
+    <ProjectReference Include="..\Automaton.Infrastructure\Automaton.Infrastructure.csproj" />
+    <ProjectReference Include="..\Automaton.Identity\Automaton.Identity.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Resources\Errors.Designer.cs">

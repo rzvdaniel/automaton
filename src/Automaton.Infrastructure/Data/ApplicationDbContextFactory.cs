@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using System.Reflection;
 
 namespace Automaton.Api.Data;
 
@@ -12,9 +13,10 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+        var startupProjectPath = ResolveStartupProjectPath();
 
         var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
+            .SetBasePath(startupProjectPath)
             .AddJsonFile("appsettings.json", optional: false)
             .AddJsonFile($"appsettings.{environment}.json", optional: true)
             .AddEnvironmentVariables()
@@ -24,8 +26,21 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
             ?? throw new InvalidOperationException("Connection string 'MySqlConnection' not found.");
 
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+        optionsBuilder.UseMySql(
+            connectionString,
+            ServerVersion.AutoDetect(connectionString),
+            mySqlOptions => mySqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name));
 
         return new ApplicationDbContext(optionsBuilder.Options);
+    }
+
+    private static string ResolveStartupProjectPath()
+    {
+        var currentDirectory = Directory.GetCurrentDirectory();
+        var apiProjectPath = Path.GetFullPath(Path.Combine(currentDirectory, "..", "Automaton.Api"));
+
+        return Directory.Exists(apiProjectPath)
+            ? apiProjectPath
+            : currentDirectory;
     }
 }

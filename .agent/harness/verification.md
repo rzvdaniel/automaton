@@ -128,13 +128,13 @@ dotnet test
 Check migrations intentionally:
 
 ```bash
-dotnet ef migrations list --project src/Automaton.Api
+dotnet ef migrations list --project src/Automaton.Infrastructure --startup-project src/Automaton.Api
 ```
 
 When a schema change is needed, create the migration with EF tooling rather than hand-writing files:
 
 ```bash
-dotnet ef migrations add <MigrationName> --project src/Automaton.Api
+dotnet ef migrations add <MigrationName> --project src/Automaton.Infrastructure --startup-project src/Automaton.Api
 ```
 
 When adding a migration, verify:

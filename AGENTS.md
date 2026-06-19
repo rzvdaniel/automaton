@@ -132,7 +132,17 @@ Automaton apps have an important source/runtime split:
 
 - `src/Automaton.Api/`
 - ASP.NET Core 9 REST API + SignalR.
-- Controllers, services, EF Core entities/migrations, authentication, runners, apps, publishing, admin.
+- Controllers, services, authentication, runners, apps, publishing, admin.
+
+### Shared backend infrastructure
+
+- `src/Automaton.Infrastructure/`
+- Shared EF Core DbContext, entities, migrations, email infrastructure, and backend configuration models.
+
+### Shared identity primitives
+
+- `src/Automaton.Identity/`
+- Reusable identity services shared by API and Worker.
 
 ### CLI
 
@@ -219,8 +229,8 @@ If changing archive/deploy/pull behavior, add or update targeted tests for:
 Affected paths:
 
 - `src/Automaton.Api/**`
-- shared backend models/libraries
-- EF Core entities/migrations
+- `src/Automaton.Infrastructure/**`
+- `src/Automaton.Identity/**`
 - API key, runner, app, publish, auth, admin behavior
 
 Run the relevant backend test project. If unsure, run:
@@ -232,7 +242,7 @@ dotnet test
 For EF changes:
 
 ```bash
-dotnet ef migrations list --project src/Automaton.Api
+dotnet ef migrations list --project src/Automaton.Infrastructure --startup-project src/Automaton.Api
 ```
 
 Only add migrations intentionally.
@@ -403,7 +413,7 @@ Avoid C# enums when the value must be serialized as a stable string and compared
 - Do not add columns for every new plan entitlement unless there is a strong query/indexing reason.
 - Subscription entitlements should generally extend `PlanCapabilities`.
 - Add migrations intentionally.
-- Create EF Core migrations with the `dotnet ef migrations add <Name> --project src/Automaton.Api` workflow. Do not hand-write migration files.
+- Create EF Core migrations with the `dotnet ef migrations add <Name> --project src/Automaton.Infrastructure --startup-project src/Automaton.Api` workflow. Do not hand-write migration files.
 - Avoid destructive migrations unless explicitly requested.
 
 ---

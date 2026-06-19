@@ -32,6 +32,14 @@ The goal is to contain transport-specific code so future transport changes are r
 
 ## Current architecture shape
 
+Shared backend split:
+
+- `Automaton.Infrastructure` holds shared EF/data/email primitives
+- `Automaton.Identity` holds reusable identity primitives
+- `Automaton.Api` and `Automaton.Worker` may depend on both
+- `Automaton.Identity` may depend on `Automaton.Infrastructure`
+- `Automaton.Infrastructure` must not depend on `Automaton.Identity`, `Automaton.Api`, or `Automaton.Worker`
+
 Producer side:
 
 - `AccountController`
@@ -45,6 +53,7 @@ Consumer side:
 - `IEventHandler<TEvent>`
 - event-specific handler such as `UserRegisteredEventHandler`
 - transport adapter such as `UserRegisteredCapSubscriber`
+- optional identity-backed side-effect orchestration such as `UserRegistrationNotificationService`
 
 Shared layer:
 
@@ -57,12 +66,14 @@ Shared layer:
 - Put event contracts in `src/Automaton.Messaging/Events/`.
 - Put messaging abstractions in `src/Automaton.Messaging/Abstractions/`.
 - Keep `src/Automaton.Messaging/` free of CAP, RabbitMQ, or host registration code.
+- Keep shared dependency direction one-way: `Automaton.Identity -> Automaton.Infrastructure`.
 - Controllers must not depend on `ICapPublisher`.
 - Controllers must not depend on CAP subscriber concepts or RabbitMQ client concepts.
 - Application services should prefer `IEventPublisher` and `ITransactionalEventExecutor`.
 - CAP-backed transaction code must stay behind `ITransactionalEventExecutor`.
 - CAP subscribers must be thin adapters.
 - Business handling logic must live in `IEventHandler<TEvent>` implementations, not in CAP subscriber classes.
+- Do not place identity-orchestrating services in `Automaton.Infrastructure` if they depend on identity abstractions.
 - Shared topic names must live in `EventTopics`.
 - Use past-tense event names for facts that already happened, such as `UserRegisteredEvent`.
 
