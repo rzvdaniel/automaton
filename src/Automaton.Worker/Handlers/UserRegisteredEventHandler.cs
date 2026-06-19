@@ -12,13 +12,7 @@ public sealed class UserRegisteredEventHandler(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        logger.LogInformation(
-            "Consumed {EventName} for user {UserId} ({Email}) public username {PublicUsername} with correlation {CorrelationId}",
-            nameof(UserRegisteredEvent),
-            message.UserId,
-            message.Email,
-            message.PublicUsername,
-            message.CorrelationId);
+
 
         try
         {
@@ -26,7 +20,7 @@ public sealed class UserRegisteredEventHandler(
                 message.UserId,
                 cancellationToken);
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Completed registration notifications for user {UserId} with correlation {CorrelationId}",
                 message.UserId,
                 message.CorrelationId);

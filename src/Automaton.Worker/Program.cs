@@ -3,8 +3,45 @@ using Automaton.Worker.Handlers;
 using Automaton.Messaging.Abstractions;
 using Automaton.Identity;
 using Automaton.Infrastructure;
+using Serilog;
+using Serilog.Events;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddSerilog((services, config) =>
+{
+    var logDirectory = builder.Configuration["Logging:File:Path"] ?? "Logs/worker";
+    var retainedFileCountLimit = builder.Configuration.GetValue<int?>("Logging:File:RetainedFileCountLimit") ?? 14;
+
+    var logConfig = config
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.AspNetCore.DataProtection", LogEventLevel.Warning)
+        .MinimumLevel.Override("DotNetCore.CAP", LogEventLevel.Warning);
+
+    if (builder.Environment.IsDevelopment())
+    {
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Debug);
+    }
+    else
+    {
+        logConfig.WriteTo.Console(
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+            restrictedToMinimumLevel: LogEventLevel.Information);
+    }
+
+    logConfig.WriteTo.File(
+        path: Path.Combine(logDirectory, "worker-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: retainedFileCountLimit,
+        restrictedToMinimumLevel: LogEventLevel.Information,
+        shared: true,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");
+});
+
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();

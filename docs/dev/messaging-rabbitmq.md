@@ -53,6 +53,31 @@ The complete flow is:
 
 The important design point is that the registration endpoint owns the main business action, while the Worker owns side effects that should happen after registration succeeds.
 
+## Validated pattern
+
+`UserRegisteredEvent` is now the validated reference implementation for future Automaton events.
+
+What was verified locally:
+
+- RabbitMQ runs in Docker locally
+- `Automaton.Api` publishes successfully through CAP
+- `Automaton.Worker` receives successfully through CAP
+- CAP records published and received entries in MySQL
+- registration confirmation and admin-notification emails are sent from the Worker path
+
+This is the pattern to repeat for future events:
+
+1. define the shared event contract in `Automaton.Messaging`
+2. publish from API/application code through `IEventPublisher`
+3. if the main business action should create durable audit history, write that audit event in the API/application flow when the main action succeeds
+4. if publish must reflect a committed DB change, wrap it in `ITransactionalEventExecutor`
+5. publish the integration event from the same application flow
+6. add a thin CAP subscriber in `Automaton.Worker`
+7. put business side effects in `IEventHandler<TEvent>`
+8. keep Worker delivery details as operational logs unless there is a strong reason to add separate audit events
+9. make sure the Worker host has the configuration required by those side effects
+10. verify end to end before moving on to the next event
+
 ## What each part is responsible for
 
 ### CAP
@@ -383,11 +408,14 @@ That means the Worker code stays focused on business side effects instead of mes
 
 `UserRegisteredCapSubscriber` is the CAP-specific adapter.
 
-Right now the Worker handler is still log-only.
+`UserRegisteredEventHandler` is no longer log-only.
 
-That is intentional.
+It now calls `UserRegistrationNotificationService`, which sends:
 
-The API still sends confirmation and admin-notification emails directly from `AccountController`, so the Worker must not send them yet or users will receive duplicates.
+- the user confirmation email
+- the admin new-registration notification
+
+Failures are logged and rethrown so CAP retry behavior remains active.
 
 ## Current topology
 
@@ -475,14 +503,14 @@ Related files:
 
 ## Registration side effects today
 
-The registration flow is currently in an intermediate migration state:
+The registration flow is now fully moved to the Worker side for post-registration side effects:
 
 - `AccountRegistrationService` creates the user and publishes `UserRegisteredEvent`
-- `AccountController` still sends confirmation and admin-notification emails directly
-- `UserRegisteredEventHandler` currently logs only
-- `UserRegistrationNotificationService` now exists in `Automaton.Identity` and is ready to be called from the Worker when the direct API side effects are removed
+- `AccountController` no longer owns the registration confirmation/admin-notification side effects
+- `UserRegisteredEventHandler` calls `UserRegistrationNotificationService`
+- `UserRegistrationNotificationService` generates the email confirmation token, builds the confirmation link, sends the user email, and sends the admin notification
 
-This is deliberate because it lets the event pipeline be verified before moving the side effects.
+This is now the reference example for future background side-effect migrations.
 
 ## Migration rule
 
@@ -492,15 +520,22 @@ When migrating side effects from synchronous API code into the Worker:
 - move one side effect at a time
 - never leave the same side effect active in both API and Worker
 
-For `UserRegisteredEvent`, the safe order is:
+The safe order for future events is:
 
 1. API publishes event
 2. Worker logs event only
 3. verify pipeline
-4. switch the Worker handler to `UserRegistrationNotificationService`
-5. remove the direct API side effects
+4. move the side effect into the Worker handler
+5. remove the direct API side effect from the API host
+6. verify that no duplicate side effects are produced
 
 This avoids duplicate emails and duplicate admin notifications.
+
+One important implementation detail:
+
+- if the Worker side effect needs host configuration such as `EmailConfig`, `AppConfig`, or identity/token services, wire that into `Automaton.Worker` before enabling the side effect
+- do not assume config previously used only by the API host is automatically available in the Worker host
+- for account lifecycle flows such as registration, keep the main audit event in the API flow and keep Worker success/failure details as operational logs unless audit requirements clearly justify more
 
 ## Why CAP here
 
@@ -560,6 +595,8 @@ For local end-to-end verification:
 2. Start `Automaton.Worker`.
 3. Start `Automaton.Api`.
 4. Register a user.
-5. Confirm the Worker logs the event.
-6. Confirm the queue drains back to zero.
-7. Confirm no error queue or retry storm appears.
+5. Confirm CAP writes rows to `cap.published` and `cap.received`.
+6. Confirm the Worker handles the event and performs the intended side effect.
+7. Confirm the queue drains back to zero.
+8. Confirm no error queue or retry storm appears.
+9. Confirm no duplicate side effects are produced.
