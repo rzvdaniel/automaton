@@ -1,0 +1,34 @@
+# Build Automaton Worker from local source.
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+
+WORKDIR /src
+
+COPY src/Automaton.Worker/*.csproj ./Automaton.Worker/
+COPY src/Automaton.Messaging/*.csproj ./Automaton.Messaging/
+COPY src/Automaton.Infrastructure/*.csproj ./Automaton.Infrastructure/
+COPY src/Automaton.Identity/*.csproj ./Automaton.Identity/
+COPY src/Automaton.Core/*.csproj ./Automaton.Core/
+
+RUN dotnet restore Automaton.Worker/Automaton.Worker.csproj
+
+COPY src/Automaton.Worker/ ./Automaton.Worker/
+COPY src/Automaton.Messaging/ ./Automaton.Messaging/
+COPY src/Automaton.Infrastructure/ ./Automaton.Infrastructure/
+COPY src/Automaton.Identity/ ./Automaton.Identity/
+COPY src/Automaton.Core/ ./Automaton.Core/
+
+RUN dotnet publish Automaton.Worker/Automaton.Worker.csproj \
+    -c Release \
+    -o /app/publish \
+    -p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+RUN mkdir -p /app/logs
+
+ENTRYPOINT ["dotnet", "Automaton.Worker.dll"]

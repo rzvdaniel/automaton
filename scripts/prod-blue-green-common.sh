@@ -499,10 +499,11 @@ switch_all_live_colors() {
 
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
-    echo "[INFO] Ensuring MySQL, RabbitMQ, and nginx are up"
-    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq nginx
+    echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and nginx are up"
+    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker nginx
     wait_for_service_healthy mysql 120
     wait_for_service_healthy rabbitmq 120
+    wait_for_service_healthy worker 120
     wait_for_service_healthy nginx 120
 }
 

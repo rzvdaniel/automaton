@@ -85,6 +85,38 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: automaton-local-worker:latest
+    container_name: automaton-local-worker
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+      AppConfig__WebsiteUrl: http://localhost:5173
+      AppConfig__ApiUrl: http://api:8080
+      EmailConfig__EmailHost: smtp4dev
+      EmailConfig__EmailPort: 25
+      EmailConfig__EmailUseSsl: "false"
+      EmailConfig__SendEmailsInDevelopment: "true"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-automaton}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-AutomatonRabbit123!}
+      Logging__File__Path: /app/logs
+    volumes:
+      - local-worker-logs:/app/logs
+    networks:
+      - automaton-local
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      smtp4dev:
+        condition: service_started
+
   studio:
     build:
       context: .
@@ -116,6 +148,16 @@ services:
     networks:
       - automaton-local
 
+  smtp4dev:
+    image: rnwood/smtp4dev:latest
+    container_name: automaton-local-smtp4dev
+    restart: unless-stopped
+    ports:
+      - "${SMTP4DEV_WEB_PORT:-3000}:80"
+      - "${SMTP4DEV_SMTP_PORT:-2525}:25"
+    networks:
+      - automaton-local
+
   runner:
     build:
       context: ./src
@@ -143,6 +185,7 @@ volumes:
   rabbitmq-data:
   local-api-appdata:
   local-api-logs:
+  local-worker-logs:
   local-runner-config:
   local-runner-logs:
   local-runner-data:

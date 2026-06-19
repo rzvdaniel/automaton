@@ -3,6 +3,7 @@ using Automaton.Worker.Handlers;
 using Automaton.Messaging.Abstractions;
 using Automaton.Identity;
 using Automaton.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
 using Serilog;
 using Serilog.Events;
 
@@ -44,6 +45,13 @@ builder.Services.AddSerilog((services, config) =>
 
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+        .SetApplicationName("Automaton.Worker");
+}
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<Automaton.Messaging.Events.UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddCap(options =>

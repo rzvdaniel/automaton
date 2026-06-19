@@ -58,10 +58,40 @@ services:
   #   depends_on:
   #     mysql:
   #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_started
   #   networks:
   #     - automaton-network
   #   volumes:
   #     - ./logs:/app/Logs
+
+  # Automaton Worker (optional - uncomment to run the background worker in Docker)
+  # automaton-worker:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.worker
+  #   container_name: automaton-worker-dev
+  #   restart: unless-stopped
+  #   environment:
+  #     - DOTNET_ENVIRONMENT=Development
+  #     - ConnectionStrings__MySqlConnection=Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD:-AutomatonPass123!};
+  #     - AppConfig__WebsiteUrl=http://host.docker.internal:5173
+  #     - AppConfig__ApiUrl=https://host.docker.internal:7091
+  #     - RabbitMq__Host=rabbitmq
+  #     - RabbitMq__Username=${RABBITMQ_USER:-automaton}
+  #     - RabbitMq__Password=${RABBITMQ_PASSWORD:-automaton}
+  #     - Logging__File__Path=/app/logs
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_started
+  #   networks:
+  #     - automaton-network
+  #   volumes:
+  #     - worker-logs:/app/logs
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
 
   # =============================================================================
   # Automaton Runner (Development)
@@ -128,6 +158,8 @@ volumes:
   runner-data:
     driver: local
   rabbitmq-data:
+    driver: local
+  worker-logs:
     driver: local
 
 networks:

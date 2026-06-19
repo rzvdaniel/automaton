@@ -20,6 +20,7 @@ Build apps locally with your preferred AI coding agent, deploy them with the Aut
 - **Website**: Vue 3 + TypeScript + Vite (`src/automaton-vue/`)
 - **Studio frontend**: Vue 3 + TypeScript + Vite + PrimeVue (`src/automaton-studio-vue/`)
 - **Studio backend**: ASP.NET Core 9 REST API + SignalR (`src/Automaton.Api/`)
+- **Worker**: .NET background worker for CAP/RabbitMQ consumers and async side effects (`src/Automaton.Worker/`)
 - **CLI**: .NET global tool for local app workflows (`src/Automaton.Cli/`)
 - **Runner**: cross-platform .NET runner for backend execution (`src/Automaton.Runner/`)
 - **Core libraries**: `Automaton.Core`, `Automaton.Steps`, `Automaton.Core.Scripting`
@@ -48,11 +49,12 @@ Public app serving must never expose backend files, secrets, logs, runner state,
 
 ## Quickstart for repository development
 
-### 1. Start local database
+### 1. Start local infrastructure
 
 ```bash
 # From repo root
 docker compose -f docker-compose.dev.yml up -d mysql
+docker compose -f docker-compose.rabbitmq.yml up -d
 ```
 
 Configure the backend connection string:
@@ -81,7 +83,14 @@ Swagger:
 - `https://localhost:7091/swagger/index.html`
 - `https://localhost:7091/swagger/v1/swagger.json`
 
-### 3. Run Studio frontend
+### 3. Run Worker
+
+```bash
+cd src/Automaton.Worker
+dotnet run
+```
+
+### 4. Run Studio frontend
 
 ```bash
 cd src/automaton-studio-vue
@@ -95,7 +104,7 @@ Default Vite dev URL:
 http://localhost:5173
 ```
 
-### 4. Run website
+### 5. Run website
 
 ```bash
 cd src/automaton-vue
@@ -220,6 +229,7 @@ Current skills include:
 - `.agent/harness/verification.md` — verification matrix
 - `.agent/skills/` — task-specific AI agent skills
 - `docs/dev/messaging-rabbitmq.md` — internal CAP + RabbitMQ event publishing/consumption architecture
+- production `appsettings.Production.json` is mounted into both `Automaton.Api` and `Automaton.Worker`; RabbitMQ/MySQL credentials live there, not in the public reverse proxy
 - `docs/runners/docker-runner.md` — runner deployment details
 - `src/automaton-studio-vue/REDESIGN_PLAN.md` — frontend redesign notes, if still relevant
 

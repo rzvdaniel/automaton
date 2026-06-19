@@ -5,6 +5,9 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 COPY src/Automaton.Api/*.csproj ./Automaton.Api/
+COPY src/Automaton.Messaging/*.csproj ./Automaton.Messaging/
+COPY src/Automaton.Infrastructure/*.csproj ./Automaton.Infrastructure/
+COPY src/Automaton.Identity/*.csproj ./Automaton.Identity/
 COPY src/Automaton.Core/*.csproj ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/*.csproj ./Automaton.Steps/
@@ -14,6 +17,9 @@ COPY src/Automaton.Mcp/*.csproj ./Automaton.Mcp/
 RUN dotnet restore Automaton.Api/Automaton.Api.csproj
 
 COPY src/Automaton.Api/ ./Automaton.Api/
+COPY src/Automaton.Messaging/ ./Automaton.Messaging/
+COPY src/Automaton.Infrastructure/ ./Automaton.Infrastructure/
+COPY src/Automaton.Identity/ ./Automaton.Identity/
 COPY src/Automaton.Core/ ./Automaton.Core/
 COPY src/Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
 COPY src/Automaton.Steps/ ./Automaton.Steps/

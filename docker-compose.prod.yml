@@ -30,10 +30,6 @@ x-api-common: &api-common
   environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
-    ConnectionStrings__MySqlConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-automaton};User=${MYSQL_USER:-automaton_user};Password=${MYSQL_PASSWORD};
-    RabbitMq__Host: rabbitmq
-    RabbitMq__Username: ${RABBITMQ_USER}
-    RabbitMq__Password: ${RABBITMQ_PASSWORD}
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
@@ -53,6 +49,28 @@ x-api-common: &api-common
     timeout: 5s
     retries: 12
     start_period: 30s
+
+x-worker-common: &worker-common
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.worker
+  image: automaton-prod-worker:latest
+  restart: unless-stopped
+  logging: *default-json-logging
+  environment:
+    DOTNET_ENVIRONMENT: Production
+    Logging__File__Path: /app/logs
+  volumes:
+    - prod-worker-logs:/app/logs
+    - prod-worker-dataprotection:/app/data-protection-keys
+    - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
+  networks:
+    - automaton-prod
+  depends_on:
+    mysql:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
 
 x-studio-common: &studio-common
   build:
@@ -167,6 +185,10 @@ services:
       retries: 10
       start_period: 30s
 
+  worker:
+    <<: *worker-common
+    container_name: automaton-prod-worker
+
   api-blue:
     <<: *api-common
     environment:
@@ -197,6 +219,8 @@ volumes:
   prod-api-appdata:
   prod-published-apps:
   prod-api-logs:
+  prod-worker-logs:
+  prod-worker-dataprotection:
 
 networks:
   automaton-prod:
