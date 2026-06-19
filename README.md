@@ -189,6 +189,7 @@ npm run build
 ```bash
 bash -n scripts/prod-redeploy-all.sh
 bash -n scripts/prod-redeploy-api.sh
+bash -n scripts/prod-redeploy-worker.sh
 bash -n scripts/prod-redeploy-studio.sh
 bash -n scripts/prod-redeploy-website.sh
 bash -n scripts/prod-verify.sh
