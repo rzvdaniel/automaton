@@ -1,3 +1,4 @@
+using Automaton.Api.Middleware;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +23,7 @@ public class AppMediaController : ControllerBase
     }
 
     [HttpPost]
+    [MediaUploadRequestLimits]
     public async Task<IActionResult> Upload(Guid appId, IFormFile file, CancellationToken ct)
     {
         var userId = GetUserId();
