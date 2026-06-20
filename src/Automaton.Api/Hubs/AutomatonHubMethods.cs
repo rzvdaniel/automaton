@@ -14,6 +14,7 @@
         public const string FetchFileChunk = "FetchFileChunk";
         public const string FileChunkReady = "FileChunkReady";
         public const string GetAppMediaStats = "GetAppMediaStats";
+        public const string GetAppMediaFileMetadata = "GetAppMediaFileMetadata";
         public const string ListAppBackendFiles = "ListAppBackendFiles";
         public const string ReadAppBackendFile = "ReadAppBackendFile";
         public const string DeleteAppBackendFile = "DeleteAppBackendFile";

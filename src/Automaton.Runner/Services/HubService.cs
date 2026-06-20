@@ -32,6 +32,7 @@ public class HubService
     private const string FetchFileChunkMethod = "FetchFileChunk";
     private const string FileChunkReadyMethod = "FileChunkReady";
     private const string GetAppMediaStatsMethod = "GetAppMediaStats";
+    private const string GetAppMediaFileMetadataMethod = "GetAppMediaFileMetadata";
     private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
@@ -351,6 +352,11 @@ public class HubService
             connection.On<string, AppMediaStatsResponse>(GetAppMediaStatsMethod, (appId) =>
             {
                 return GetAppMediaStats(appId);
+            });
+
+            connection.On<string, string, AppMediaFileMetadataResponse>(GetAppMediaFileMetadataMethod, (appId, relativePath) =>
+            {
+                return GetAppMediaFileMetadata(appId, relativePath);
             });
 
             connection.On<string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId) =>
@@ -1517,6 +1523,60 @@ public class HubService
             return new AppMediaStatsResponse
             {
                 Success = false,
+                Error = ex.Message
+            };
+        }
+    }
+
+    private static AppMediaFileMetadataResponse GetAppMediaFileMetadata(string appId, string relativePath)
+    {
+        try
+        {
+            var filePath = ResolveAppMediaFilePath(ParseAppId(appId), relativePath);
+            if (!File.Exists(filePath))
+            {
+                return new AppMediaFileMetadataResponse
+                {
+                    Success = false,
+                    StatusCode = 404,
+                    Error = "File not found."
+                };
+            }
+
+            var info = new FileInfo(filePath);
+            return new AppMediaFileMetadataResponse
+            {
+                Success = true,
+                StatusCode = 200,
+                FileName = info.Name,
+                ContentType = GetContentType(info.Name),
+                Length = info.Length
+            };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new AppMediaFileMetadataResponse
+            {
+                Success = false,
+                StatusCode = 403,
+                Error = ex.Message
+            };
+        }
+        catch (ArgumentException ex)
+        {
+            return new AppMediaFileMetadataResponse
+            {
+                Success = false,
+                StatusCode = 400,
+                Error = ex.Message
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AppMediaFileMetadataResponse
+            {
+                Success = false,
+                StatusCode = 500,
                 Error = ex.Message
             };
         }

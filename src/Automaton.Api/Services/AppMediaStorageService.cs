@@ -150,13 +150,28 @@ public class AppMediaStorageService
             return StatusCodes.Status404NotFound;
         }
 
+        var metadata = await automatonHub.Clients.Client(runner.ConnectionId!)
+            .InvokeAsync<AppMediaFileMetadataResponse>(
+                AutomatonHubMethods.GetAppMediaFileMetadata,
+                appId.ToString(),
+                normalizedPath,
+                ct);
+
+        if (!metadata.Success)
+        {
+            return metadata.StatusCode;
+        }
+
         var sessionId = Guid.NewGuid().ToString("N");
         var channel = downloadRegistry.Register(sessionId);
 
         try
         {
             long offset = 0;
-            var wroteHeaders = false;
+            response.ContentType = metadata.ContentType;
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Cache-Control"] = "public, max-age=3600";
+            response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(metadata.FileName);
 
             while (true)
             {
@@ -188,16 +203,12 @@ public class AppMediaStorageService
 
                 if (chunk.StatusCode != StatusCodes.Status200OK)
                 {
-                    return chunk.StatusCode;
-                }
-
-                if (!wroteHeaders)
-                {
-                    response.ContentType = chunk.ContentType;
-                    response.Headers["X-Content-Type-Options"] = "nosniff";
-                    response.Headers["Cache-Control"] = "public, max-age=3600";
-                    response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(normalizedPath);
-                    wroteHeaders = true;
+                    logger.LogWarning(
+                        "Media download chunk failed after preflight for app {AppId}, path {Path}, status {StatusCode}",
+                        appId,
+                        normalizedPath,
+                        chunk.StatusCode);
+                    return response.HasStarted ? StatusCodes.Status200OK : chunk.StatusCode;
                 }
 
                 if (chunk.Data.Length > 0)
@@ -260,9 +271,8 @@ public class AppMediaStorageService
             .FirstOrDefaultAsync(ct);
     }
 
-    private static string BuildInlineContentDispositionHeader(string normalizedPath)
+    private static string BuildInlineContentDispositionHeader(string fileName)
     {
-        var fileName = Path.GetFileName(normalizedPath).Replace("\"", string.Empty, StringComparison.Ordinal);
-        return $"inline; filename=\"{fileName}\"";
+        return $"inline; filename=\"{fileName.Replace("\"", string.Empty, StringComparison.Ordinal)}\"";
     }
 }

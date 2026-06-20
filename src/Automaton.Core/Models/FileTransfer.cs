@@ -65,6 +65,16 @@ public class AppMediaStatsResponse
     public string? Error { get; set; }
 }
 
+public class AppMediaFileMetadataResponse
+{
+    public bool Success { get; set; }
+    public int StatusCode { get; set; } = 200;
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public long Length { get; set; }
+    public string? Error { get; set; }
+}
+
 public class AppBackendFileEntry
 {
     public string Path { get; set; } = string.Empty;
