@@ -123,6 +123,67 @@ For AI-generated local apps:
 - Keep app-local URLs relative.
 - Do not hardcode Automaton runtime script tags such as `automaton-config.js` or `automaton-api.js`.
 
+## Media and static asset placement
+
+Bundled frontend static assets and runtime media are different.
+
+Use the frontend public/static asset folder for files that are shipped with the app source and only change when the app is edited or redeployed.
+
+Examples:
+
+```text
+frontend/public/logo.png
+frontend/public/default-cover.jpg
+frontend/public/placeholder-avatar.png
+frontend/public/favicon.ico
+frontend/public/manifest.webmanifest
+frontend/public/icons/icon-192.png
+frontend/public/sw.js
+```
+
+Use runner app data for files created after the app is running.
+
+Examples:
+
+```text
+$AUTOMATON_APP_DATA_DIR/media/uploads/post-cover.jpg
+$AUTOMATON_APP_DATA_DIR/media/avatars/user-123.png
+$AUTOMATON_APP_DATA_DIR/media/documents/file.pdf
+$AUTOMATON_APP_DATA_DIR/media/generated/report.csv
+```
+
+Do not write runtime uploads or generated durable files into `frontend/public/`, `frontend/dist/`, `backend/`, `wwwroot/`, `live/frontend/`, or `live/backend/`.
+
+Recommended rule:
+
+```text
+Bundled with the app source?
+→ frontend public/static folder
+
+Created after the app is running?
+→ runner app data/media
+```
+
+Persist app-relative media references, not physical runner paths.
+
+Good:
+
+```json
+{
+  "coverImage": "/media/uploads/2026/06/my-post-cover-a1b2c3.jpg"
+}
+```
+
+Bad:
+
+```json
+{
+  "coverImage": "/home/user/.automaton/apps/app-123/data/media/uploads/cover.jpg"
+}
+```
+
+For details, use `https://automaton.monster/llms/automaton-media-assets.md`.
+
 ## Backend contract
 
 Automaton backends are Python controllers, not web servers.
@@ -339,6 +400,9 @@ https://automaton.monster/llms.txt
 
 Frontend structure:
 https://automaton.monster/llms/automaton-frontend-structure.md
+
+Media and static asset placement:
+https://automaton.monster/llms/automaton-media-assets.md
 
 Backend controllers:
 https://automaton.monster/llms/automaton-backend-controllers.md
