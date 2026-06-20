@@ -167,9 +167,12 @@ public class AppMediaStorageServiceTests
         Func<string, string, AppMediaFileMetadataResponse> onGetMetadata,
         Action<FetchFileChunkRequest> onFetch) : IHubClients
     {
+        private readonly FakeClientProxy clientProxy = new(onGetMetadata, onFetch);
+
         public IClientProxy All => throw new NotSupportedException();
         public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
-        public ISingleClientProxy Client(string connectionId) => new FakeClientProxy(onGetMetadata, onFetch);
+        public ISingleClientProxy Client(string connectionId) => clientProxy;
+        IClientProxy IHubClients<IClientProxy>.Client(string connectionId) => clientProxy;
         public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
         public IClientProxy Group(string groupName) => throw new NotSupportedException();
         public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
