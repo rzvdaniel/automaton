@@ -275,14 +275,7 @@ public class UserAppsController : ControllerBase
 
     private async Task<IActionResult> ServePublishedAppMedia(string slug, string path, CancellationToken cancellationToken)
     {
-        var app = await dbContext.WebApps
-            .Include(a => a.WebAppUsers)
-            .FirstOrDefaultAsync(a =>
-                a.IsPublished &&
-                a.AccessStatus == AppAccessStatuses.Active &&
-                a.PublicUrl != null &&
-                a.PublicUrl.ToLower() == slug.ToLower(), cancellationToken);
-
+        var app = await appsService.GetPublishedAppInfoAsync(slug, cancellationToken);
         if (app == null)
         {
             return NotFound();
@@ -294,13 +287,12 @@ public class UserAppsController : ControllerBase
             return Unauthorized();
         }
 
-        var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
-        if (ownerId == null)
+        if (app.OwnerId == null)
         {
             return NotFound();
         }
 
-        var statusCode = await mediaStorageService.ProxyReadAsync(app.Id, ownerId.Value, path, Response, cancellationToken);
+        var statusCode = await mediaStorageService.ProxyReadAsync(app.Id, app.OwnerId.Value, path, Response, cancellationToken);
         if (statusCode == StatusCodes.Status200OK)
         {
             return new EmptyResult();

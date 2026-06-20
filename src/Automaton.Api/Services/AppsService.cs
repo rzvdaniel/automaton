@@ -127,7 +127,7 @@ public class AppsService
             return null;
         }
 
-        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId;
+        var ownerId = await ResolveAppOwnerIdAsync(appEntity, cancellationToken);
 
         return new Models.PublishedAppInfo
         {
@@ -161,7 +161,7 @@ public class AppsService
             return null;
         }
 
-        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId;
+        var ownerId = await ResolveAppOwnerIdAsync(appEntity, cancellationToken);
 
         return new Models.PublishedAppInfo
         {
@@ -172,6 +172,38 @@ public class AppsService
             OwnerId = ownerId,
             ExecutionRunnerId = appEntity.ExecutionRunnerId
         };
+    }
+
+    private async Task<Guid?> ResolveAppOwnerIdAsync(WebApp appEntity, CancellationToken cancellationToken)
+    {
+        if (appEntity.ProjectId.HasValue)
+        {
+            var projectOwnerId = await dataContext.Projects
+                .Where(project => project.Id == appEntity.ProjectId.Value)
+                .Select(project => (Guid?)project.OwnerId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (projectOwnerId.HasValue)
+            {
+                return projectOwnerId.Value;
+            }
+        }
+
+        var linkedUserIds = await dataContext.WebAppUsers
+            .Where(webAppUser => webAppUser.WebAppId == appEntity.Id)
+            .Select(webAppUser => webAppUser.UserId)
+            .Distinct()
+            .OrderBy(userId => userId)
+            .ToListAsync(cancellationToken);
+
+        if (linkedUserIds.Count > 1)
+        {
+            logger.Warning(
+                "App {AppId} has multiple linked users but no explicit owner field; using the lowest user id as a stable fallback",
+                appEntity.Id);
+        }
+
+        return linkedUserIds.FirstOrDefault();
     }
 
     public async Task<Guid> Create(NewApp app)

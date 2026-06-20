@@ -3,6 +3,9 @@ using Automaton.Api.Controllers;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -44,9 +47,12 @@ public class UserAppsControllerTests
         });
         await dbContext.SaveChangesAsync();
 
+        var httpContext = new DefaultHttpContext();
+        var appsService = CreateAppsService(dbContext, httpContext);
+
         var controller = new UserAppsController(
             dbContext,
-            null!,
+            appsService,
             null!,
             null!,
             null!,
@@ -57,7 +63,7 @@ public class UserAppsControllerTests
         {
             ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
             {
-                HttpContext = new DefaultHttpContext()
+                HttpContext = httpContext
             }
         };
 
@@ -75,6 +81,26 @@ public class UserAppsControllerTests
         return new ApplicationDbContext(options);
     }
 
+    private static AppsService CreateAppsService(ApplicationDbContext dbContext, HttpContext httpContext)
+    {
+        var userContextService = new UserContextService(new HttpContextAccessor
+        {
+            HttpContext = httpContext
+        });
+
+        var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+
+        return new AppsService(
+            dbContext,
+            userContextService,
+            null!,
+            authorizationService,
+            null!,
+            null!,
+            new StubWebHostEnvironment(),
+            new NoOpAuditEventService());
+    }
+
     private sealed class StubWebHostEnvironment : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = "Automaton.Tests";
@@ -83,5 +109,28 @@ public class UserAppsControllerTests
         public string EnvironmentName { get; set; } = "Production";
         public string ContentRootPath { get; set; } = string.Empty;
         public IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(
+            AuditEventWriteRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

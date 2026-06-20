@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
@@ -48,6 +49,56 @@ public class AppAuthorizationRegressionTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Id, Is.EqualTo(appId));
         Assert.That(result.OwnerId, Is.EqualTo(ownerId));
+    }
+
+    [Test]
+    public async Task GetPublishedAppInfoAsync_UsesProjectOwnerAsOwnerId()
+    {
+        var projectOwnerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        dbContext.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "project",
+            DisplayName = "Project",
+            Description = string.Empty,
+            OwnerId = projectOwnerId,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            IsActive = true
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Project App",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            PublicUrl = "project-app",
+            IsPublished = true,
+            AccessStatus = AppAccessStatuses.Active,
+            ProjectId = projectId,
+            Scope = AccessScope.Project,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow
+        });
+        dbContext.WebAppUsers.Add(new WebAppUser
+        {
+            WebAppId = appId,
+            UserId = collaboratorId
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateAppsService(dbContext, collaboratorId);
+
+        var result = await service.GetPublishedAppInfoAsync("project-app", CancellationToken.None);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.OwnerId, Is.EqualTo(projectOwnerId));
     }
 
     [Test]
