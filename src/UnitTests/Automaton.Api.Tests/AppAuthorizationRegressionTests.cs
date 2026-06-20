@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Tests;
 
@@ -102,6 +104,45 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
+    public void Get_ReturnsProjectOwnerAsUserId_ForProjectScopedApp()
+    {
+        var projectOwnerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        using var dbContext = CreateDbContext();
+        SeedProjectScopedApp(dbContext, appId, projectId, projectOwnerId, collaboratorId);
+
+        var service = CreateAppsService(dbContext, collaboratorId, tempRoot.Path);
+
+        var result = service.Get(appId);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.UserId, Is.EqualTo(projectOwnerId));
+    }
+
+    [Test]
+    public void List_ReturnsProjectOwnerAsUserId_ForProjectScopedApp()
+    {
+        var projectOwnerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        using var dbContext = CreateDbContext();
+        SeedProjectScopedApp(dbContext, appId, projectId, projectOwnerId, collaboratorId);
+
+        var service = CreateAppsService(dbContext, collaboratorId, tempRoot.Path);
+
+        var result = service.List(projectId).Single();
+
+        Assert.That(result.UserId, Is.EqualTo(projectOwnerId));
+    }
+
+    [Test]
     public async Task GetLinkedStepsAsync_ReturnsOnlyStepsLinkedToApp()
     {
         var ownerId = Guid.NewGuid();
@@ -163,7 +204,7 @@ public class AppAuthorizationRegressionTests
         return new ApplicationDbContext(options);
     }
 
-    private static AppsService CreateAppsService(ApplicationDbContext dbContext, Guid userId)
+    private static AppsService CreateAppsService(ApplicationDbContext dbContext, Guid userId, string? contentRootPath = null)
     {
         var userContextService = new UserContextService(new HttpContextAccessor
         {
@@ -177,16 +218,82 @@ public class AppAuthorizationRegressionTests
         });
 
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var environment = new StubWebHostEnvironment(contentRootPath ?? Path.GetTempPath());
+        var settingsService = new SettingsService(
+            dbContext,
+            userContextService,
+            Options.Create(new AppFileRuleBaselineOptions
+            {
+                RemixSourceExclude = [".env", ".env.*", "secrets.json", "secrets", "secrets/**"],
+                RemixFrontendExclude = []
+            }));
+        var fileStorageService = new AppFileStorageService(environment, settingsService);
 
         return new AppsService(
             dbContext,
             userContextService,
             null!,
             authorizationService,
+            fileStorageService,
             null!,
-            null!,
-            new StubWebHostEnvironment(),
+            environment,
             new NoOpAuditEventService());
+    }
+
+    private static void SeedProjectScopedApp(
+        ApplicationDbContext dbContext,
+        Guid appId,
+        Guid projectId,
+        Guid projectOwnerId,
+        Guid collaboratorId)
+    {
+        dbContext.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "project",
+            DisplayName = "Project",
+            Description = string.Empty,
+            OwnerId = projectOwnerId,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            IsActive = true
+        });
+        dbContext.ProjectMembers.Add(new ProjectMember
+        {
+            ProjectId = projectId,
+            UserId = collaboratorId,
+            Role = ProjectRole.Developer,
+            JoinedAt = DateTime.UtcNow,
+            IsActive = true
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Project App",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            PublicUrl = "project-app",
+            IsPublished = true,
+            AccessStatus = AppAccessStatuses.Active,
+            ProjectId = projectId,
+            Scope = AccessScope.Project,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow
+        });
+        dbContext.ProjectApps.Add(new ProjectApp
+        {
+            ProjectId = projectId,
+            WebAppId = appId,
+            AddedAt = DateTime.UtcNow,
+            AddedBy = projectOwnerId
+        });
+        dbContext.WebAppUsers.Add(new WebAppUser
+        {
+            WebAppId = appId,
+            UserId = collaboratorId
+        });
+        dbContext.SaveChanges();
     }
 
     private static void SeedApp(ApplicationDbContext dbContext, Guid appId, Guid ownerId, string slug)
@@ -227,14 +334,33 @@ public class AppAuthorizationRegressionTests
         };
     }
 
-    private sealed class StubWebHostEnvironment : IWebHostEnvironment
+    private sealed class StubWebHostEnvironment(string contentRootPath) : IWebHostEnvironment
     {
         public string ApplicationName { get; set; } = "Automaton.Tests";
         public IFileProvider WebRootFileProvider { get; set; } = null!;
-        public string WebRootPath { get; set; } = string.Empty;
+        public string WebRootPath { get; set; } = contentRootPath;
         public string EnvironmentName { get; set; } = "Production";
-        public string ContentRootPath { get; set; } = string.Empty;
+        public string ContentRootPath { get; set; } = contentRootPath;
         public IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public TemporaryDirectory()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "automaton-tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+        }
     }
 
     private sealed class NoOpAuditEventService : IAuditEventService

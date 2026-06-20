@@ -58,8 +58,8 @@ public class AppsService
             .AsEnumerable()
             .Select(e =>
             {
-                var app = MapToModel(e, null);
-                var ownerId = e.WebAppUsers?.FirstOrDefault()?.UserId ?? UserId;
+                var ownerId = ResolveAppOwnerId(e) ?? UserId;
+                var app = MapToModel(e, null, ownerId);
                 ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, e.Id).Result);
                 app.HasDeployedFrontend = File.Exists(Path.Combine(
                     fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, e.Id),
@@ -84,7 +84,7 @@ public class AppsService
         }
 
         // Load app definition from file system
-        var ownerId = appEntity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var ownerId = ResolveAppOwnerId(appEntity) ?? UserId;
         var definition = fileStorageService.LoadAppAsync(ownerId, id).Result;
         
         // If not in file system, fall back to database (for migration)
@@ -97,7 +97,7 @@ public class AppsService
             logger.Debug("Migrated app {AppId} from database to file system", id);
         }
 
-        var app = MapToModel(appEntity, definition);
+        var app = MapToModel(appEntity, definition, ownerId);
         ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, id).Result);
         app.HasDeployedFrontend = File.Exists(Path.Combine(
             fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id),
@@ -195,6 +195,38 @@ public class AppsService
             .Distinct()
             .OrderBy(userId => userId)
             .ToListAsync(cancellationToken);
+
+        if (linkedUserIds.Count > 1)
+        {
+            logger.Warning(
+                "App {AppId} has multiple linked users but no explicit owner field; using the lowest user id as a stable fallback",
+                appEntity.Id);
+        }
+
+        return linkedUserIds.FirstOrDefault();
+    }
+
+    private Guid? ResolveAppOwnerId(WebApp appEntity)
+    {
+        if (appEntity.ProjectId.HasValue)
+        {
+            var projectOwnerId = dataContext.Projects
+                .Where(project => project.Id == appEntity.ProjectId.Value)
+                .Select(project => (Guid?)project.OwnerId)
+                .FirstOrDefault();
+
+            if (projectOwnerId.HasValue)
+            {
+                return projectOwnerId.Value;
+            }
+        }
+
+        var linkedUserIds = dataContext.WebAppUsers
+            .Where(webAppUser => webAppUser.WebAppId == appEntity.Id)
+            .Select(webAppUser => webAppUser.UserId)
+            .Distinct()
+            .OrderBy(userId => userId)
+            .ToList();
 
         if (linkedUserIds.Count > 1)
         {
@@ -317,7 +349,7 @@ public class AppsService
         }
 
         // Get owner ID for file storage
-        var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var ownerId = ResolveAppOwnerId(entity) ?? UserId;
         var previousName = entity.Name;
         var previousSummary = entity.Summary;
         var previousDescription = entity.Description;
@@ -463,7 +495,7 @@ public class AppsService
         }
 
         var appName = app.Name;
-        var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
         // Delete from file system
         await fileStorageService.DeleteAppAsync(ownerId, id);
@@ -549,7 +581,7 @@ public class AppsService
             }
         }
 
-        var ownerId = entity.WebAppUsers.FirstOrDefault()?.UserId ?? UserId;
+        var ownerId = ResolveAppOwnerId(entity) ?? UserId;
         var nextVersion = entity.Version + 1;
 
         await publishedAppStorageService.PublishAsync(
@@ -735,14 +767,14 @@ public class AppsService
         return !string.IsNullOrEmpty(slug) && Regex.IsMatch(slug, @"^[a-z0-9\-]+$");
     }
 
-    internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null)
+    internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null, Guid? ownerId = null)
     {
         if (entity == null) return null;
 
         return new Models.AppModel
         {
             Id = entity.Id,
-            UserId = entity.WebAppUsers?.FirstOrDefault()?.UserId,
+            UserId = ownerId ?? entity.WebAppUsers?.FirstOrDefault()?.UserId,
             Name = entity.Name,
             Summary = entity.Summary,
             Description = entity.Description,
@@ -874,7 +906,7 @@ public class AppsService
             .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
-        var duplicated = MapToModel(newEntity, null);
+        var duplicated = MapToModel(newEntity, null, UserId);
         ApplyStorageMetadata(duplicated, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
         return duplicated;
     }
@@ -1048,7 +1080,7 @@ public class AppsService
             .Include(x => x.WebAppScreenshots)
             .FirstAsync(x => x.Id == newId);
 
-        var forked = MapToModel(newEntity, null);
+        var forked = MapToModel(newEntity, null, UserId);
         ApplyStorageMetadata(forked, await fileStorageService.GetAppStorageMetadataAsync(UserId, newId));
         return forked;
     }
