@@ -160,6 +160,17 @@ For AI-generated local apps:
 
 Only files inside `frontend.deployDir` become public runtime. Do not expect `frontend/src/`, `frontend/package.json`, `frontend/vite.config.*`, `backend/`, or local project files to appear in the public app.
 
+## Media and static asset placement
+
+Bundled frontend assets and runtime media are different.
+
+- Files bundled with the app source, such as logos, default covers, placeholder avatars, favicons, PWA manifests, icons, service workers, and demo images, belong in the frontend public/static asset folder.
+- Files created after the app is running, such as blog images uploaded through an admin UI, user avatars, attachments, generated reports, SQLite databases, and durable app state, belong under `AUTOMATON_APP_DATA_DIR` on the runner.
+- Do not write runtime uploads or generated durable files into `frontend/public/`, `frontend/dist/`, `backend/`, `wwwroot/`, or deployed runtime folders.
+- Store app content references as app-relative media URLs, not physical runner paths.
+
+For details, use `/llms/automaton-media-assets.md`.
+
 ## Backend rules
 
 Default to frontend-only. Create `backend/` only when the requested core feature truly requires server-side execution, secrets, persistence, auth, scheduled work, or browser-unsafe access.
@@ -315,6 +326,9 @@ https://automaton.monster/docs/build-an-automaton-app
 
 Frontend structure contract:
 https://automaton.monster/llms/automaton-frontend-structure.md
+
+Media and static asset placement:
+https://automaton.monster/llms/automaton-media-assets.md
 
 Backend controller contract:
 https://automaton.monster/llms/automaton-backend-controllers.md
