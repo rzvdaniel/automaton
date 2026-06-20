@@ -288,6 +288,12 @@ public class UserAppsController : ControllerBase
             return NotFound();
         }
 
+        if (app.RequiresAuthentication && User.Identity?.IsAuthenticated != true)
+        {
+            logger.LogWarning("Unauthenticated access to protected app media: {Slug}", slug);
+            return Unauthorized();
+        }
+
         var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
         if (ownerId == null)
         {
