@@ -67,6 +67,7 @@ public class AccountControllerTurnstileTests
             null!,
             null!,
             null!,
+            null!,
             turnstileService,
             null!,
             new RefreshTokenCookieService(),
