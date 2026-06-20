@@ -9,6 +9,9 @@ public class FileUploadChunk
     public bool IsLast { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = "application/octet-stream";
+    public Guid? AppId { get; set; }
+    public string RelativePath { get; set; } = string.Empty;
+    public string StorageScope { get; set; } = string.Empty;
 }
 
 /// <summary>Runner sends to server when all upload chunks have been written to disk.</summary>
@@ -32,6 +35,9 @@ public class FetchFileChunkRequest
     public string SessionId { get; set; } = string.Empty;
     public long Offset { get; set; }
     public int ChunkSize { get; set; }
+    public Guid? AppId { get; set; }
+    public string RelativePath { get; set; } = string.Empty;
+    public string StorageScope { get; set; } = string.Empty;
 }
 
 /// <summary>Runner sends to server with file bytes for download.</summary>
@@ -42,6 +48,21 @@ public class FileChunkReadyMessage
     public bool IsLast { get; set; }
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = "application/octet-stream";
+    public int StatusCode { get; set; } = 200;
+    public string? Error { get; set; }
+}
+
+public static class FileTransferStorageScopes
+{
+    public const string Media = "media";
+}
+
+public class AppMediaStatsResponse
+{
+    public bool Success { get; set; }
+    public long TotalBytes { get; set; }
+    public int FileCount { get; set; }
+    public string? Error { get; set; }
 }
 
 public class AppBackendFileEntry

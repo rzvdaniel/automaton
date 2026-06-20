@@ -37,6 +37,7 @@ public class UserAppsController : ControllerBase
     private readonly ApplicationDbContext dbContext;
     private readonly AppsService appsService;
     private readonly AppFileStorageService fileStorageService;
+    private readonly AppMediaStorageService mediaStorageService;
     private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
@@ -47,6 +48,7 @@ public class UserAppsController : ControllerBase
         ApplicationDbContext dbContext,
         AppsService appsService,
         AppFileStorageService fileStorageService,
+        AppMediaStorageService mediaStorageService,
         PublishedAppStorageService publishedAppStorageService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
@@ -56,6 +58,7 @@ public class UserAppsController : ControllerBase
         this.dbContext = dbContext;
         this.appsService = appsService;
         this.fileStorageService = fileStorageService;
+        this.mediaStorageService = mediaStorageService;
         this.publishedAppStorageService = publishedAppStorageService;
         this.logger = logger;
         this.environment = environment;
@@ -189,12 +192,27 @@ public class UserAppsController : ControllerBase
         return await ServePublishedAppFile(slug, path);
     }
 
+    [HttpGet("apps/{slug}/media/{*path}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ServeStudioHostedAppMedia(string slug, string path, CancellationToken cancellationToken)
+    {
+        return await ServePublishedAppMedia(slug, path, cancellationToken);
+    }
+
     [HttpGet("{slug}/{*path}")]
     [AppsHostOnly]
     [AllowAnonymous]
     public async Task<IActionResult> ServeDedicatedAppsHostAppFile(string slug, string path = "index.html")
     {
         return await ServePublishedAppFile(slug, path);
+    }
+
+    [HttpGet("{slug}/media/{*path}")]
+    [AppsHostOnly]
+    [AllowAnonymous]
+    public async Task<IActionResult> ServeDedicatedAppsHostAppMedia(string slug, string path, CancellationToken cancellationToken)
+    {
+        return await ServePublishedAppMedia(slug, path, cancellationToken);
     }
 
     private async Task<IActionResult> ServePublishedAppFile(string slug, string path = "index.html")
@@ -253,6 +271,36 @@ public class UserAppsController : ControllerBase
             logger.LogError(ex, "Error serving app file: {Slug}/{Path}", slug, path);
             return StatusCode(500, GetErrorPage("Error", "An error occurred while loading this app."));
         }
+    }
+
+    private async Task<IActionResult> ServePublishedAppMedia(string slug, string path, CancellationToken cancellationToken)
+    {
+        var app = await dbContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .FirstOrDefaultAsync(a =>
+                a.IsPublished &&
+                a.AccessStatus == AppAccessStatuses.Active &&
+                a.PublicUrl != null &&
+                a.PublicUrl.ToLower() == slug.ToLower(), cancellationToken);
+
+        if (app == null)
+        {
+            return NotFound();
+        }
+
+        var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
+        if (ownerId == null)
+        {
+            return NotFound();
+        }
+
+        var statusCode = await mediaStorageService.ProxyReadAsync(app.Id, ownerId.Value, path, Response, cancellationToken);
+        if (statusCode == StatusCodes.Status200OK)
+        {
+            return new EmptyResult();
+        }
+
+        return StatusCode(statusCode);
     }
 
     private async Task<IActionResult> ServeRuntimeFileAsync(Guid appId, Guid ownerId, string? path, string backendApiPath)

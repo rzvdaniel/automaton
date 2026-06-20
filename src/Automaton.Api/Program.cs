@@ -59,6 +59,7 @@ services.AddSingleton<IAiProvidersSettingsService, AiProvidersSettingsService>()
 
 services.Configure<WebAppConfig>(applicationBuilder.Configuration.GetSection("WebAppConfig"));
 services.Configure<PublishedAppsConfig>(applicationBuilder.Configuration.GetSection("PublishedApps"));
+services.Configure<MediaStorageOptions>(applicationBuilder.Configuration.GetSection(MediaStorageOptions.SectionName));
 services.Configure<GitHubOAuthOptions>(applicationBuilder.Configuration.GetSection("GitHub"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
@@ -343,6 +344,7 @@ services.AddScoped<DashboardStatsService>();
 services.AddScoped<UserContextService>();
 services.AddScoped<AdminAuthorizationService>();
 services.AddScoped<AppFileStorageService>();
+services.AddScoped<AppMediaStorageService>();
 services.AddScoped<PublishedAppStorageService>();
 services.AddScoped<AppArchiveService>();
 services.AddSingleton<AppPreviewStorageService>();

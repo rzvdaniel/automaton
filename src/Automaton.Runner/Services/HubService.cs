@@ -31,6 +31,7 @@ public class HubService
     private const string FileUploadFailedMethod = "FileUploadFailed";
     private const string FetchFileChunkMethod = "FetchFileChunk";
     private const string FileChunkReadyMethod = "FileChunkReady";
+    private const string GetAppMediaStatsMethod = "GetAppMediaStats";
     private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
@@ -345,6 +346,11 @@ public class HubService
             connection.On<FetchFileChunkRequest>(FetchFileChunkMethod, async (request) =>
             {
                 await HandleFetchFileChunkAsync(request);
+            });
+
+            connection.On<string, AppMediaStatsResponse>(GetAppMediaStatsMethod, (appId) =>
+            {
+                return GetAppMediaStats(appId);
             });
 
             connection.On<string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId) =>
@@ -1342,9 +1348,11 @@ public class HubService
     {
         try
         {
-            var dir = Path.Combine(Path.GetTempPath(), "uploads", chunk.SessionId);
-            Directory.CreateDirectory(dir);
-            var filePath = Path.Combine(dir, chunk.FileName);
+            var filePath = string.Equals(chunk.StorageScope, FileTransferStorageScopes.Media, StringComparison.Ordinal)
+                ? ResolveAppMediaUploadPath(chunk)
+                : ResolveTempUploadPath(chunk);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
             await using var fs = new FileStream(filePath,
                 chunk.ChunkIndex == 0 ? FileMode.Create : FileMode.Append,
@@ -1386,26 +1394,51 @@ public class HubService
     {
         try
         {
-            var dir = Path.Combine(Path.GetTempPath(), "results", request.SessionId);
-            var files = Directory.Exists(dir) ? Directory.GetFiles(dir) : [];
+            string filePath;
+            string fileName;
+            string contentType;
 
-            if (files.Length == 0)
+            if (string.Equals(request.StorageScope, FileTransferStorageScopes.Media, StringComparison.Ordinal))
             {
-                logger.Warning("No result file found for download: SessionId={SessionId}", request.SessionId);
-                await connection!.SendAsync(FileChunkReadyMethod, new FileChunkReadyMessage
+                if (!request.AppId.HasValue)
                 {
-                    SessionId = request.SessionId,
-                    Data = [],
-                    IsLast = true,
-                    FileName = "error",
-                    ContentType = "application/octet-stream"
-                });
-                return;
-            }
+                    await SendFileChunkErrorAsync(request.SessionId, 400, "App ID is required.");
+                    return;
+                }
 
-            var filePath = files[0];
-            var fileName = Path.GetFileName(filePath);
-            var contentType = GetContentType(fileName);
+                filePath = ResolveAppMediaFilePath(request.AppId.Value, request.RelativePath);
+                if (!File.Exists(filePath))
+                {
+                    await SendFileChunkErrorAsync(request.SessionId, 404, "File not found.");
+                    return;
+                }
+
+                fileName = Path.GetFileName(filePath);
+                contentType = GetContentType(fileName);
+            }
+            else
+            {
+                var dir = Path.Combine(Path.GetTempPath(), "results", request.SessionId);
+                var files = Directory.Exists(dir) ? Directory.GetFiles(dir) : [];
+
+                if (files.Length == 0)
+                {
+                    logger.Warning("No result file found for download: SessionId={SessionId}", request.SessionId);
+                    await connection!.SendAsync(FileChunkReadyMethod, new FileChunkReadyMessage
+                    {
+                        SessionId = request.SessionId,
+                        Data = [],
+                        IsLast = true,
+                        FileName = "error",
+                        ContentType = "application/octet-stream"
+                    });
+                    return;
+                }
+
+                filePath = files[0];
+                fileName = Path.GetFileName(filePath);
+                contentType = GetContentType(fileName);
+            }
 
             await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             fs.Seek(request.Offset, SeekOrigin.Begin);
@@ -1430,7 +1463,77 @@ public class HubService
         catch (Exception ex)
         {
             logger.Error(ex, "Failed to handle download chunk request: SessionId={SessionId}", request.SessionId);
+            await SendFileChunkErrorAsync(request.SessionId, 500, ex.Message);
         }
+    }
+
+    private static string ResolveTempUploadPath(FileUploadChunk chunk)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "uploads", chunk.SessionId);
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, chunk.FileName);
+    }
+
+    private static string ResolveAppMediaUploadPath(FileUploadChunk chunk)
+    {
+        if (!chunk.AppId.HasValue)
+        {
+            throw new ArgumentException("App ID is required for media uploads.");
+        }
+
+        return ResolveAppMediaFilePath(chunk.AppId.Value, chunk.RelativePath);
+    }
+
+    private static string GetAppMediaDirectory(Guid appId)
+    {
+        return Path.GetFullPath(Path.Combine(GetAppDataDirectory(appId), "media"));
+    }
+
+    private static string ResolveAppMediaFilePath(Guid appId, string relativePath)
+    {
+        return AppMediaPathHelper.ResolvePath(GetAppMediaDirectory(appId), relativePath);
+    }
+
+    private static AppMediaStatsResponse GetAppMediaStats(string appId)
+    {
+        try
+        {
+            var mediaDir = GetAppMediaDirectory(ParseAppId(appId));
+            if (!Directory.Exists(mediaDir))
+            {
+                return new AppMediaStatsResponse { Success = true };
+            }
+
+            var files = Directory.EnumerateFiles(mediaDir, "*", SearchOption.AllDirectories).ToList();
+            return new AppMediaStatsResponse
+            {
+                Success = true,
+                FileCount = files.Count,
+                TotalBytes = files.Sum(path => new FileInfo(path).Length)
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AppMediaStatsResponse
+            {
+                Success = false,
+                Error = ex.Message
+            };
+        }
+    }
+
+    private async Task SendFileChunkErrorAsync(string sessionId, int statusCode, string error)
+    {
+        await connection!.SendAsync(FileChunkReadyMethod, new FileChunkReadyMessage
+        {
+            SessionId = sessionId,
+            StatusCode = statusCode,
+            Error = error,
+            Data = [],
+            IsLast = true,
+            FileName = "error",
+            ContentType = "application/octet-stream"
+        });
     }
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
