@@ -194,6 +194,9 @@ public class AppMediaStorageService
                 if (!wroteHeaders)
                 {
                     response.ContentType = chunk.ContentType;
+                    response.Headers["X-Content-Type-Options"] = "nosniff";
+                    response.Headers["Cache-Control"] = "public, max-age=3600";
+                    response.Headers["Content-Disposition"] = BuildInlineContentDispositionHeader(normalizedPath);
                     wroteHeaders = true;
                 }
 
@@ -255,5 +258,11 @@ public class AppMediaStorageService
                 .Select(a => a.ExecutionRunnerId)
                 .FirstOrDefault())
             .FirstOrDefaultAsync(ct);
+    }
+
+    private static string BuildInlineContentDispositionHeader(string normalizedPath)
+    {
+        var fileName = Path.GetFileName(normalizedPath).Replace("\"", string.Empty, StringComparison.Ordinal);
+        return $"inline; filename=\"{fileName}\"";
     }
 }
