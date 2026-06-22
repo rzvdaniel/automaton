@@ -57,6 +57,12 @@ public static class FileTransferStorageScopes
     public const string Media = "media";
 }
 
+public static class AppRunnerFileAreas
+{
+    public const string Backend = "backend";
+    public const string Data = "data";
+}
+
 public class AppMediaStatsResponse
 {
     public bool Success { get; set; }
@@ -88,6 +94,7 @@ public class AppBackendFilesResponse
 {
     public bool Success { get; set; }
     public string? Error { get; set; }
+    public string Area { get; set; } = AppRunnerFileAreas.Backend;
     public List<AppBackendFileEntry> Files { get; set; } = [];
 }
 
@@ -95,6 +102,7 @@ public class AppBackendFileContentResponse
 {
     public bool Success { get; set; }
     public string? Error { get; set; }
+    public string Area { get; set; } = AppRunnerFileAreas.Backend;
     public string Path { get; set; } = string.Empty;
     public string? Content { get; set; }
     public long Size { get; set; }
@@ -105,4 +113,5 @@ public class AppBackendFileDeleteResponse
 {
     public bool Success { get; set; }
     public string? Error { get; set; }
+    public string Area { get; set; } = AppRunnerFileAreas.Backend;
 }

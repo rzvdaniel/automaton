@@ -18,6 +18,7 @@ import type {
   CreateAppStepRequest,
   RunnerBackendFileContent,
   RunnerBackendFilesResponse,
+  RunnerFileArea,
   ForkAppRequest,
   ForkAppSource,
 } from '../types/apps.types'
@@ -233,22 +234,26 @@ class AppsService {
     return data
   }
 
-  async listRunnerBackendFiles(id: string): Promise<RunnerBackendFilesResponse> {
+  async listRunnerBackendFiles(id: string, area: RunnerFileArea): Promise<RunnerBackendFilesResponse> {
     const { data } = await apiClient.get<RunnerBackendFilesResponse>(
       `/api/apps/${id}/runner-backend/files`,
+      { params: { area } },
     )
     return data
   }
 
-  async readRunnerBackendFile(id: string, path: string): Promise<RunnerBackendFileContent> {
+  async readRunnerBackendFile(id: string, path: string, area: RunnerFileArea): Promise<RunnerBackendFileContent> {
     const { data } = await apiClient.get<RunnerBackendFileContent>(
       `/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`,
+      { params: { area } },
     )
     return data
   }
 
-  async deleteRunnerBackendFile(id: string, path: string): Promise<void> {
-    await apiClient.delete(`/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`)
+  async deleteRunnerBackendFile(id: string, path: string, area: RunnerFileArea): Promise<void> {
+    await apiClient.delete(`/api/apps/${id}/runner-backend/files/${this.encodePath(path)}`, {
+      params: { area },
+    })
   }
 
   /**

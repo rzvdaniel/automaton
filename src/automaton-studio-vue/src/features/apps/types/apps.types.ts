@@ -228,14 +228,23 @@ export interface RunnerBackendFile {
   isText: boolean
 }
 
+export const RunnerFileArea = {
+  Backend: 'backend',
+  Data: 'data',
+} as const
+
+export type RunnerFileArea = (typeof RunnerFileArea)[keyof typeof RunnerFileArea]
+
 export interface RunnerBackendFilesResponse {
   success: boolean
+  area: RunnerFileArea
   error?: string
   files: RunnerBackendFile[]
 }
 
 export interface RunnerBackendFileContent {
   success: boolean
+  area: RunnerFileArea
   error?: string
   path: string
   content?: string

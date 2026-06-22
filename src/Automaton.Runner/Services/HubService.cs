@@ -359,19 +359,19 @@ public class HubService
                 return GetAppMediaFileMetadata(appId, relativePath);
             });
 
-            connection.On<string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId) =>
+            connection.On<string, string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId, area) =>
             {
-                return ListAppBackendFiles(appId);
+                return ListAppBackendFiles(appId, area);
             });
 
-            connection.On<string, string, AppBackendFileContentResponse>(ReadAppBackendFileMethod, (appId, path) =>
+            connection.On<string, string, string, AppBackendFileContentResponse>(ReadAppBackendFileMethod, (appId, path, area) =>
             {
-                return ReadAppBackendFile(appId, path);
+                return ReadAppBackendFile(appId, path, area);
             });
 
-            connection.On<string, string, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, (appId, path) =>
+            connection.On<string, string, string, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, (appId, path, area) =>
             {
-                return DeleteAppBackendFile(appId, path);
+                return DeleteAppBackendFile(appId, path, area);
             });
 
             // Handle connection events
@@ -636,22 +636,27 @@ public class HubService
         return fullPath;
     }
 
-    private static AppBackendFilesResponse ListAppBackendFiles(string appId)
+    private static AppBackendFilesResponse ListAppBackendFiles(string appId, string? area)
     {
         try
         {
-            var backendDir = GetAppBackendDirectory(ParseAppId(appId));
-            if (!Directory.Exists(backendDir))
+            var runnerFileArea = NormalizeRunnerFileArea(area);
+            var rootDirectory = GetRunnerFileRootDirectory(ParseAppId(appId), runnerFileArea);
+            if (!Directory.Exists(rootDirectory))
             {
-                return new AppBackendFilesResponse { Success = true };
+                return new AppBackendFilesResponse
+                {
+                    Success = true,
+                    Area = runnerFileArea
+                };
             }
 
             var files = Directory
-                .EnumerateFiles(backendDir, "*", SearchOption.AllDirectories)
+                .EnumerateFiles(rootDirectory, "*", SearchOption.AllDirectories)
                 .Select(path =>
                 {
                     var info = new FileInfo(path);
-                    var relativePath = Path.GetRelativePath(backendDir, path).Replace(Path.DirectorySeparatorChar, '/');
+                    var relativePath = Path.GetRelativePath(rootDirectory, path).Replace(Path.DirectorySeparatorChar, '/');
                     return new AppBackendFileEntry
                     {
                         Path = relativePath,
@@ -667,33 +672,47 @@ public class HubService
             return new AppBackendFilesResponse
             {
                 Success = true,
+                Area = runnerFileArea,
                 Files = files
             };
         }
         catch (Exception ex)
         {
-            return new AppBackendFilesResponse { Success = false, Error = ex.Message };
+            return new AppBackendFilesResponse
+            {
+                Success = false,
+                Area = NormalizeRunnerFileArea(area),
+                Error = ex.Message
+            };
         }
     }
 
-    private static AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath)
+    private static AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath, string? area)
     {
         try
         {
-            var path = ResolveAppBackendFilePath(ParseAppId(appId), relativePath);
+            var runnerFileArea = NormalizeRunnerFileArea(area);
+            var path = ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
+            var normalizedRelativePath = NormalizeRunnerRelativePath(relativePath);
             if (!File.Exists(path))
             {
-                return new AppBackendFileContentResponse { Success = false, Error = "File not found." };
+                return new AppBackendFileContentResponse
+                {
+                    Success = false,
+                    Area = runnerFileArea,
+                    Path = normalizedRelativePath,
+                    Error = "File not found."
+                };
             }
 
             var info = new FileInfo(path);
-            var normalizedRelativePath = NormalizeRunnerRelativePath(relativePath);
             var isText = IsTextFile(normalizedRelativePath);
             if (!isText)
             {
                 return new AppBackendFileContentResponse
                 {
                     Success = true,
+                    Area = runnerFileArea,
                     Path = normalizedRelativePath,
                     Size = info.Length,
                     IsText = false,
@@ -707,6 +726,7 @@ public class HubService
                 return new AppBackendFileContentResponse
                 {
                     Success = false,
+                    Area = runnerFileArea,
                     Path = normalizedRelativePath,
                     Size = info.Length,
                     IsText = true,
@@ -717,6 +737,7 @@ public class HubService
             return new AppBackendFileContentResponse
             {
                 Success = true,
+                Area = runnerFileArea,
                 Path = normalizedRelativePath,
                 Content = File.ReadAllText(path),
                 Size = info.Length,
@@ -725,27 +746,81 @@ public class HubService
         }
         catch (Exception ex)
         {
-            return new AppBackendFileContentResponse { Success = false, Error = ex.Message };
+            return new AppBackendFileContentResponse
+            {
+                Success = false,
+                Area = NormalizeRunnerFileArea(area),
+                Path = NormalizeRunnerRelativePath(relativePath),
+                Error = ex.Message
+            };
         }
     }
 
-    private static AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath)
+    private static AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath, string? area)
     {
         try
         {
-            var path = ResolveAppBackendFilePath(ParseAppId(appId), relativePath);
+            var runnerFileArea = NormalizeRunnerFileArea(area);
+            var path = ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
             if (!File.Exists(path))
             {
-                return new AppBackendFileDeleteResponse { Success = false, Error = "File not found." };
+                return new AppBackendFileDeleteResponse
+                {
+                    Success = false,
+                    Area = runnerFileArea,
+                    Error = "File not found."
+                };
             }
 
             File.Delete(path);
-            return new AppBackendFileDeleteResponse { Success = true };
+            return new AppBackendFileDeleteResponse
+            {
+                Success = true,
+                Area = runnerFileArea
+            };
         }
         catch (Exception ex)
         {
-            return new AppBackendFileDeleteResponse { Success = false, Error = ex.Message };
+            return new AppBackendFileDeleteResponse
+            {
+                Success = false,
+                Area = NormalizeRunnerFileArea(area),
+                Error = ex.Message
+            };
         }
+    }
+
+    private static string NormalizeRunnerFileArea(string? area)
+    {
+        return string.Equals(area, AppRunnerFileAreas.Data, StringComparison.OrdinalIgnoreCase)
+            ? AppRunnerFileAreas.Data
+            : AppRunnerFileAreas.Backend;
+    }
+
+    private static string GetRunnerFileRootDirectory(Guid appId, string area)
+    {
+        return area == AppRunnerFileAreas.Data
+            ? GetAppDataDirectory(appId)
+            : GetAppBackendDirectory(appId);
+    }
+
+    private static string ResolveRunnerFilePath(Guid appId, string relativePath, string area)
+    {
+        var rootDirectory = GetRunnerFileRootDirectory(appId, area);
+        var normalized = NormalizeRunnerRelativePath(relativePath);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ArgumentException("Invalid runner file path.");
+        }
+
+        var fullPath = Path.GetFullPath(Path.Combine(rootDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        if (!fullPath.StartsWith(rootDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fullPath, rootDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("Runner file path must stay inside the requested app directory.");
+        }
+
+        return fullPath;
     }
 
     private static string GetAppBackendDirectory(Guid appId)

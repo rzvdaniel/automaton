@@ -43,13 +43,18 @@ public class AppRunnerBackendFilesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<AppBackendFilesResponse>> List(Guid appId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AppBackendFilesResponse>> List(
+        Guid appId,
+        [FromQuery] string? area,
+        CancellationToken cancellationToken)
     {
+        var runnerFileArea = NormalizeArea(area);
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFilesResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Error = ConfirmedEmailGuardService.SensitiveActionMessage
             });
         }
@@ -59,11 +64,14 @@ public class AppRunnerBackendFilesController : ControllerBase
             return NotFound();
         }
 
-        var ownerId = await ResolveAppOwnerIdAsync(appId, cancellationToken);
-        var liveBackendFiles = await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId);
-        if (!liveBackendFiles.Any())
+        var hasRuntimeFiles = await HasRuntimeFilesAsync(appId, runnerFileArea, cancellationToken);
+        if (!hasRuntimeFiles)
         {
-            return Ok(new AppBackendFilesResponse { Success = true });
+            return Ok(new AppBackendFilesResponse
+            {
+                Success = true,
+                Area = runnerFileArea
+            });
         }
 
         var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
@@ -79,6 +87,7 @@ public class AppRunnerBackendFilesController : ControllerBase
                 .InvokeAsync<AppBackendFilesResponse>(
                     AutomatonHubMethods.ListAppBackendFiles,
                     appId.ToString(),
+                    runnerFileArea,
                     cancellationToken);
         }
         catch (HubException ex)
@@ -87,7 +96,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' could not list backend files. Update or reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = BuildRunnerErrorMessage(runner.Name, runnerFileArea)
             });
         }
         catch (IOException ex)
@@ -96,7 +106,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
         catch (InvalidOperationException ex)
@@ -105,7 +116,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
 
@@ -116,13 +128,16 @@ public class AppRunnerBackendFilesController : ControllerBase
     public async Task<ActionResult<AppBackendFileContentResponse>> Read(
         Guid appId,
         string path,
+        [FromQuery] string? area,
         CancellationToken cancellationToken)
     {
+        var runnerFileArea = NormalizeArea(area);
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFileContentResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Path = path,
                 Error = ConfirmedEmailGuardService.SensitiveActionMessage
             });
@@ -142,6 +157,7 @@ public class AppRunnerBackendFilesController : ControllerBase
                     AutomatonHubMethods.ReadAppBackendFile,
                     appId.ToString(),
                     path,
+                    runnerFileArea,
                     cancellationToken);
         }
         catch (HubException ex)
@@ -150,8 +166,9 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileContentResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Path = path,
-                Error = $"Runner '{runner.Name}' could not read this backend file. Update or reconnect the runner, then redeploy the backend."
+                Error = BuildRunnerErrorMessage(runner.Name, runnerFileArea)
             });
         }
         catch (IOException ex)
@@ -160,8 +177,9 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileContentResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Path = path,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
         catch (InvalidOperationException ex)
@@ -170,8 +188,9 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileContentResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Path = path,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
 
@@ -182,13 +201,16 @@ public class AppRunnerBackendFilesController : ControllerBase
     public async Task<ActionResult<AppBackendFileDeleteResponse>> Delete(
         Guid appId,
         string path,
+        [FromQuery] string? area,
         CancellationToken cancellationToken)
     {
+        var runnerFileArea = NormalizeArea(area);
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new AppBackendFileDeleteResponse
             {
                 Success = false,
+                Area = runnerFileArea,
                 Error = ConfirmedEmailGuardService.SensitiveActionMessage
             });
         }
@@ -207,6 +229,7 @@ public class AppRunnerBackendFilesController : ControllerBase
                     AutomatonHubMethods.DeleteAppBackendFile,
                     appId.ToString(),
                     path,
+                    runnerFileArea,
                     cancellationToken);
         }
         catch (HubException ex)
@@ -215,7 +238,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileDeleteResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' could not delete this backend file. Update or reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = BuildRunnerErrorMessage(runner.Name, runnerFileArea)
             });
         }
         catch (IOException ex)
@@ -224,7 +248,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileDeleteResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
         catch (InvalidOperationException ex)
@@ -233,7 +258,8 @@ public class AppRunnerBackendFilesController : ControllerBase
             return BadRequest(new AppBackendFileDeleteResponse
             {
                 Success = false,
-                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then redeploy the backend."
+                Area = runnerFileArea,
+                Error = $"Runner '{runner.Name}' is no longer connected. Reconnect the runner, then try again."
             });
         }
 
@@ -273,6 +299,7 @@ public class AppRunnerBackendFilesController : ControllerBase
             return (null, BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
+                Area = AppRunnerFileAreas.Backend,
                 Error = "No accessible runner is configured for this app."
             }));
         }
@@ -282,10 +309,36 @@ public class AppRunnerBackendFilesController : ControllerBase
             return (null, BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
+                Area = AppRunnerFileAreas.Backend,
                 Error = $"Runner '{runner.Name}' is not connected."
             }));
         }
 
         return (runner, null);
+    }
+
+    private static string NormalizeArea(string? area)
+    {
+        return string.Equals(area, AppRunnerFileAreas.Data, StringComparison.OrdinalIgnoreCase)
+            ? AppRunnerFileAreas.Data
+            : AppRunnerFileAreas.Backend;
+    }
+
+    private static string BuildRunnerErrorMessage(string runnerName, string area)
+    {
+        var areaLabel = area == AppRunnerFileAreas.Data ? "data files" : "backend files";
+        return $"Runner '{runnerName}' could not access {areaLabel}. Update or reconnect the runner, then try again.";
+    }
+
+    private async Task<bool> HasRuntimeFilesAsync(Guid appId, string area, CancellationToken cancellationToken)
+    {
+        if (area == AppRunnerFileAreas.Data)
+        {
+            return true;
+        }
+
+        var ownerId = await ResolveAppOwnerIdAsync(appId, cancellationToken);
+        var liveBackendFiles = await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId);
+        return liveBackendFiles.Any();
     }
 }
