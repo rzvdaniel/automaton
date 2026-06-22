@@ -49,6 +49,26 @@ Automaton apps are static frontend apps with optional Python backend controllers
 - Backend runtime files are not publicly served.
 - Source files are not publicly served.
 - Runner backends also get private persistent per-app storage at `AUTOMATON_APP_DATA_DIR`.
+- `AUTOMATON_APP_DATA_DIR` is created and injected by the Automaton runner. Do not hardcode its physical path.
+
+Recommended runtime data convention:
+
+```text
+$AUTOMATON_APP_DATA_DIR/
+  media/
+  db/
+  generated/
+  cache/
+  logs/
+  tmp/
+```
+
+Rules:
+
+- Treat `AUTOMATON_APP_DATA_DIR` as the only hard requirement for durable runtime app data.
+- Use the listed subfolders when they fit. Do not create empty folders unnecessarily.
+- Only `media/` currently has platform-aware public URL behavior.
+- Prefer `db/` over a narrower convention such as `sqlite/`.
 
 ## Canonical `automaton.json` examples
 
@@ -149,7 +169,8 @@ Examples:
 $AUTOMATON_APP_DATA_DIR/media/uploads/post-cover.jpg
 $AUTOMATON_APP_DATA_DIR/media/avatars/user-123.png
 $AUTOMATON_APP_DATA_DIR/media/documents/file.pdf
-$AUTOMATON_APP_DATA_DIR/media/generated/report.csv
+$AUTOMATON_APP_DATA_DIR/generated/report.csv
+$AUTOMATON_APP_DATA_DIR/db/app.sqlite3
 ```
 
 Do not write runtime uploads or generated durable files into `frontend/public/`, `frontend/dist/`, `backend/`, `wwwroot/`, `live/frontend/`, or `live/backend/`.
@@ -161,8 +182,17 @@ Bundled with the app source?
 → frontend public/static folder
 
 Created after the app is running?
-→ runner app data/media
+→ runner app data under `AUTOMATON_APP_DATA_DIR`
 ```
+
+Recommended folder meanings:
+
+- `media/` for uploaded files and media that may be referenced by `/media/...`
+- `db/` for SQLite and durable structured storage
+- `generated/` for exports, reports, PDFs, CSVs, and generated documents
+- `cache/` for disposable cache
+- `logs/` for optional app-owned log files
+- `tmp/` for temporary files safe to delete
 
 Persist app-relative media references, not physical runner paths.
 
@@ -214,6 +244,8 @@ Each action must return the standard envelope:
 For persistent backend files:
 
 - Store SQLite databases, uploads, generated documents, and other durable files under `os.environ["AUTOMATON_APP_DATA_DIR"]`.
+- Prefer a small convention under that directory: `db/`, `media/`, `generated/`, `cache/`, `logs/`, `tmp/`.
+- `AUTOMATON_APP_DATA_DIR` is created and injected by the Automaton runner. Do not hardcode its physical path.
 - Never store persistent files next to controller files in `backend/`; backend deploys can replace controller files.
 - `AUTOMATON_APP_DATA_DIR` is private runner storage and is not publicly served by default.
 - Controller subprocesses also receive `AUTOMATON_APP_ID`, `AUTOMATON_APP_HOME`, and `AUTOMATON_APP_BACKEND_DIR`.
@@ -230,7 +262,9 @@ from pathlib import Path
 DATA_DIR = Path(os.environ["AUTOMATON_APP_DATA_DIR"])
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-DB_PATH = DATA_DIR / "app.sqlite3"
+DB_DIR = DATA_DIR / "db"
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "app.sqlite3"
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -280,7 +314,9 @@ from pathlib import Path
 
 DATA_DIR = Path(os.environ["AUTOMATON_APP_DATA_DIR"])
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "todos.sqlite3"
+DB_DIR = DATA_DIR / "db"
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "todos.sqlite3"
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)

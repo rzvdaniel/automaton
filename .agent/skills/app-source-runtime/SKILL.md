@@ -40,6 +40,30 @@ Public serving should use deployed frontend output only. It must not expose back
 - Default generated local frontend apps to `frontend/` with a build pipeline that outputs to `frontend/dist/`.
 - Default generated backend apps to `backend/` when a backend is requested.
 
+## Runtime app data
+
+Runtime-created durable files must live under `AUTOMATON_APP_DATA_DIR`.
+
+Use a small convention so generated apps stay predictable:
+
+```txt
+$AUTOMATON_APP_DATA_DIR/
+  media/
+  db/
+  generated/
+  cache/
+  logs/
+  tmp/
+```
+
+Rules:
+
+- Treat `AUTOMATON_APP_DATA_DIR` as the only hard requirement.
+- Use the listed subfolders when they fit; do not create empty folders unnecessarily.
+- `media/` is the only platform-aware folder today. Files under `media/` may be referenced by app-relative public URLs such as `/media/uploads/...`.
+- Prefer `db/` over a narrower folder name such as `sqlite/`.
+- Do not store runtime data in `source/`, `live/`, `frontend/dist/`, `wwwroot`, or next to deployed backend controller files.
+
 ## Fork/remix rules
 
 Forks/remixes should:

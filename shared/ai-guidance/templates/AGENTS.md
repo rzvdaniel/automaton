@@ -42,6 +42,8 @@ Do not invent a generic project structure before making that decision.
 - Backend source, when needed, normally lives in `backend/`.
 - Public frontend runtime normally comes from `frontend/dist/`.
 - `automaton.json` defines the real deploy contract.
+- Durable runtime app data belongs under `AUTOMATON_APP_DATA_DIR`; read `.automaton/agents/references/llms.txt` for the recommended `media/`, `db/`, `generated/`, `cache/`, `logs/`, and `tmp/` convention.
+- `AUTOMATON_APP_DATA_DIR` is created and injected by the Automaton runner. Do not hardcode its physical path.
 
 ## Shortest path
 

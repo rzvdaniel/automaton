@@ -39,6 +39,29 @@ Rules:
 - Persistent app files, including SQLite databases and uploads, must be stored under the `AUTOMATON_APP_DATA_DIR` environment variable.
 - Do not store persistent files next to controller files in `backend/`; backend deploys can replace controller files.
 
+Recommended runtime data layout:
+
+```text
+AUTOMATON_APP_DATA_DIR/
+├─ media/
+├─ db/
+├─ generated/
+├─ cache/
+├─ logs/
+└─ tmp/
+```
+
+Guidance:
+- `media/` is for uploaded files and other app-owned media.
+- `db/` is for SQLite databases and other durable structured storage.
+- `generated/` is for exports, reports, generated documents, and similar artifacts.
+- `cache/` is for disposable cached data.
+- `logs/` is optional and should be used only when an app needs its own log files.
+- `tmp/` is for temporary files that are safe to delete.
+- Do not create empty folders unless the app needs them.
+- Prefer `db/` over a narrower convention such as `sqlite/`.
+- Only `media/` currently has platform-aware URL behavior. A file stored under `AUTOMATON_APP_DATA_DIR/media/uploads/...` may be referenced by the app as `/media/uploads/...`.
+
 ## CLI deploy contract
 
 For local CLI apps, `automaton.json` now uses explicit nested config:

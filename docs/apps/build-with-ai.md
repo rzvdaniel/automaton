@@ -45,6 +45,9 @@ Keep the model simple:
 - Deploy writes runtime files to `live/frontend/` and `live/backend/`.
 - Public serving reads only `live/frontend/`.
 - Runner execution reads only `live/backend/`.
+- Durable runtime app data belongs under `AUTOMATON_APP_DATA_DIR`.
+- Recommended runtime data convention: `media/`, `db/`, `generated/`, `cache/`, `logs/`, `tmp/`.
+- Only `media/` currently has a public URL contract via `/media/...`.
 
 ### Default flow: AI-first
 
@@ -262,6 +265,7 @@ Notes:
 - Default AI-generated local apps should use `frontend/` with a build step and deploy only `frontend/dist/`.
 - Plain static root apps are still supported, but only as an explicit no-build choice with `"frontend": { "deployDir": "." }`.
 - Source files are local editable project files; public Automaton runtime is produced from `frontend.deployDir`, not from raw frontend source folders.
+- Durable runtime files such as uploads, SQLite databases, generated exports, and private app state belong under `AUTOMATON_APP_DATA_DIR`, not under `frontend/`, `backend/`, or deployed runtime folders.
 
 ## Python Controller Pattern
 

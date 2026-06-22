@@ -11,8 +11,23 @@ Bundled with the app source?
 → put it in the frontend public/static folder
 
 Created after the app is running?
-→ put it in runner app data/media
+→ put it under AUTOMATON_APP_DATA_DIR
 ```
+
+Recommended runtime data convention:
+
+```text
+$AUTOMATON_APP_DATA_DIR/
+  media/
+  db/
+  generated/
+  cache/
+  logs/
+  tmp/
+```
+
+Only `media/` currently has a platform-aware public URL convention.
+`AUTOMATON_APP_DATA_DIR` is created and injected by the Automaton runner. Do not hardcode its physical path.
 
 ## Frontend static assets
 
@@ -63,7 +78,8 @@ Examples:
 $AUTOMATON_APP_DATA_DIR/media/uploads/post-cover.jpg
 $AUTOMATON_APP_DATA_DIR/media/avatars/user-123.png
 $AUTOMATON_APP_DATA_DIR/media/documents/file.pdf
-$AUTOMATON_APP_DATA_DIR/media/generated/report.csv
+$AUTOMATON_APP_DATA_DIR/generated/report.csv
+$AUTOMATON_APP_DATA_DIR/db/app.sqlite3
 ```
 
 Good uses:
@@ -74,6 +90,15 @@ Good uses:
 - generated reports
 - exported files
 - SQLite databases and durable app state
+
+Recommended folder meanings:
+
+- `media/` for uploaded images, documents, avatars, and files that may be referenced as `/media/...`
+- `db/` for SQLite databases and other durable structured storage
+- `generated/` for reports, exports, PDFs, CSVs, and generated documents
+- `cache/` for disposable cached data
+- `logs/` for optional app-owned log files
+- `tmp/` for temporary files safe to delete
 
 Do not write runtime uploads or generated durable files into:
 
@@ -135,6 +160,14 @@ DATA_DIR = Path(os.environ["AUTOMATON_APP_DATA_DIR"])
 MEDIA_DIR = DATA_DIR / "media"
 UPLOADS_DIR = MEDIA_DIR / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+```
+
+For SQLite or other durable structured storage:
+
+```python
+DB_DIR = DATA_DIR / "db"
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "app.sqlite3"
 ```
 
 Generate safe filenames instead of trusting user-provided names.

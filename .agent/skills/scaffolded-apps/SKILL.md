@@ -64,6 +64,39 @@ When updating `llms.txt` or app-building instructions:
 - mention runner requirements for backend apps
 - include deployment command and expected output
 - avoid stale workflow automation language when the task is app creation/deployment
+- for backend/runtime file storage, instruct apps to use `AUTOMATON_APP_DATA_DIR`
+- recommend `media/`, `db/`, `generated/`, `cache/`, `logs/`, and `tmp/` under `AUTOMATON_APP_DATA_DIR`
+- explain that only `media/` currently has a platform URL convention via `/media/...`
+
+## Runtime data guidance
+
+Generated AI-facing instructions should treat this as the hard rule:
+
+- all durable runtime app data must go under `AUTOMATON_APP_DATA_DIR`
+
+Recommended convention:
+
+```txt
+$AUTOMATON_APP_DATA_DIR/
+  media/
+  db/
+  generated/
+  cache/
+  logs/
+  tmp/
+```
+
+Use these folders when they fit. Do not create empty folders by default.
+
+Additional guidance:
+
+- use `media/` for uploaded images, documents, avatars, and files the app may reference with `/media/...`
+- use `db/` for SQLite and other durable structured storage
+- use `generated/` for reports, exports, PDFs, CSVs, and generated documents
+- use `cache/` for disposable cached data
+- use `logs/` only when the app truly needs app-owned log files
+- use `tmp/` for temporary files that are safe to delete
+- do not write runtime data into `frontend/public`, `frontend/dist`, `wwwroot`, `live/frontend`, or `live/backend`
 
 ## Verification
 
