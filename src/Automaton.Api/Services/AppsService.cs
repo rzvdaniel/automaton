@@ -53,9 +53,10 @@ public class AppsService
         // Use authorization service to get apps filtered by project context
         var entities = authorizationService.GetAppsQueryByContext(projectId)
             .Include(x => x.WebAppUsers)
-            .Include(x => x.WebAppScreenshots);
+            .Include(x => x.WebAppScreenshots)
+            .AsSplitQuery()
+            .ToList();
         var apps = entities
-            .AsEnumerable()
             .Select(e =>
             {
                 var ownerId = ResolveAppOwnerId(e) ?? UserId;
