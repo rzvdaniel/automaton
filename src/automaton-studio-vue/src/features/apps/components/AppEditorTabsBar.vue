@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  activeTab: 'build' | 'code' | 'backend-server' | 'monitor' | 'settings'
+  activeTab: 'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'
   editorModeNoticeLabel: string | null | undefined
   editorModeNoticeText: string | null | undefined
   showsLocalLiveBanner: boolean
@@ -10,14 +10,15 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:activeTab': [value: 'build' | 'code' | 'backend-server' | 'monitor' | 'settings']
+  'update:activeTab': [value: 'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings']
 }>()
 
 const tabs = [
   { key: 'build', label: 'Editor', icon: 'pi pi-eye' },
   { key: 'code', label: 'Code', icon: 'pi pi-file-edit' },
   { key: 'backend-server', label: 'Backend', icon: 'pi pi-server' },
-  { key: 'monitor', label: 'Monitor', icon: 'pi pi-chart-bar' },
+  { key: 'ai', label: 'AI', icon: 'pi pi-sparkles' },
+  { key: 'logs', label: 'Logs', icon: 'pi pi-list' },
   { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
 ] as const
 </script>

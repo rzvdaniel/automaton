@@ -7,7 +7,7 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import type { AppChatStats } from '@/shared/types/ai.types'
 
 const props = defineProps<{
-  activeTab: 'build' | 'code' | 'backend-server' | 'monitor' | 'settings'
+  activeTab: 'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'
   hasRunners: boolean | null
   selectedRunnerId: string | null
   isSaving: boolean

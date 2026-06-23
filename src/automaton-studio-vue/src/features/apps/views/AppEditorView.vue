@@ -25,7 +25,6 @@ import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
 import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
-import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
@@ -40,8 +39,7 @@ import { aiConversationClient } from '@/shared/services/ai/ai-conversation-clien
 import type { PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
-import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
-import type { AppChatStats, ChatSession, ChatMessage } from '@/shared/types/ai.types'
+import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import {
   executeUiAutomationAction,
@@ -85,7 +83,7 @@ const selectedRunnerId = ref<string | null>(null)
 const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
-const activeTab = ref<'build' | 'code' | 'backend-server' | 'monitor' | 'settings'>('build')
+const activeTab = ref<'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'>('build')
 const appEditorNavGroups = [
   {
     label: 'Develop',
@@ -93,6 +91,12 @@ const appEditorNavGroups = [
       { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
       { key: 'code', label: 'Files', icon: 'pi pi-file-edit' },
       { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
+    ],
+  },
+  {
+    label: 'AI',
+    items: [
+      { key: 'ai', label: 'Build Sessions', icon: 'pi pi-sparkles' },
     ],
   },
   {
@@ -109,8 +113,7 @@ const appEditorNavGroups = [
       { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
       { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
       { key: 'backend-server', label: 'Services', icon: 'pi pi-server', disabled: true },
-      { key: 'monitor', label: 'Logs', icon: 'pi pi-list' },
-      { key: 'monitoring', label: 'Monitoring', icon: 'pi pi-chart-bar', disabled: true },
+      { key: 'logs', label: 'Logs', icon: 'pi pi-list' },
     ],
   },
   {
@@ -121,7 +124,7 @@ const appEditorNavGroups = [
 ] as const
 
 const activeNavItem = computed(() => {
-  if (rightPanelMode.value === 'versionHistory' && activeTab.value !== 'settings' && activeTab.value !== 'monitor') {
+  if (rightPanelMode.value === 'versionHistory' && activeTab.value !== 'settings' && activeTab.value !== 'logs' && activeTab.value !== 'ai') {
     return 'versions'
   }
 
@@ -138,9 +141,6 @@ watch(
   { immediate: true },
 )
 
-// Active sub-tab in monitor view
-const activeMonitorTab = ref<'build-logs' | 'execution-history' | 'usage'>('build-logs')
-
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
 const buildLogsRef   = ref<{ reload: () => void } | null>(null)
@@ -150,13 +150,9 @@ const liveBuildSession = ref<ChatSession | null>(null)
 const liveBuildMessages = ref<ChatMessage[]>([])
 const liveBuildIsBusy = ref(false)
 
-// Refresh runtime logs and usage whenever the user navigates to those monitor sub-tabs
-watch([activeTab, activeMonitorTab], ([tab, monitorTab]) => {
-  if (tab === 'monitor' && monitorTab === 'execution-history') {
+watch(activeTab, (tab) => {
+  if (tab === 'logs') {
     nextTick(() => runtimeLogsRef.value?.loadLogs())
-  }
-  if (tab === 'monitor' && monitorTab === 'usage') {
-    usageRefreshTick.value += 1
   }
 })
 
@@ -166,10 +162,6 @@ const isRightPanelOpen = ref(false)
 
 // Ref to version history component for manual refresh
 const versionHistoryRef = ref<any>(null)
-
-// AI Chat app statistics
-const chatStats = ref<AppChatStats | null>(null)
-const usageRefreshTick = ref(0)
 
 // AI Assistant configuration
 const aiSystemPrompt = `You are an AI assistant helping to build a web application. 
@@ -240,7 +232,8 @@ function handleSideNavSelect(target: string) {
     case 'build':
     case 'code':
     case 'backend-server':
-    case 'monitor':
+    case 'ai':
+    case 'logs':
     case 'settings':
       activeTab.value = target
       rightPanelMode.value = 'aiAssistant'
@@ -382,14 +375,6 @@ onMounted(async () => {
       if (editorStore.currentApp?.executionRunnerId) {
         selectedRunnerId.value = editorStore.currentApp.executionRunnerId
       }
-      
-      // Load chat statistics for this app
-      try {
-        chatStats.value = await aiChatHistoryService.getAppChatStats(appId.value)
-      } catch (err) {
-        console.warn('Failed to load chat stats:', err)
-        // Chat stats are optional, don't fail the load
-      }
     } catch (err: unknown) {
       toast.add({
         severity: 'error',
@@ -426,20 +411,6 @@ watch(selectedRunnerId, async (newRunnerId) => {
 onUnmounted(() => {
   editorStore.reset()
 })
-
-// Format token count for display (K/M notation)
-// Refresh chat statistics from the backend
-async function refreshChatStats() {
-  if (appId.value) {
-    try {
-      chatStats.value = await aiChatHistoryService.getAppChatStats(appId.value)
-      usageRefreshTick.value += 1
-    } catch (err) {
-      console.warn('Failed to refresh chat stats:', err)
-      // Non-critical error, don't interrupt user workflow
-    }
-  }
-}
 
 // Warn before leaving with unsaved changes
 function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -1043,6 +1014,10 @@ async function handleVersionCreated() {
   buildLogsRef.value?.reload()
 }
 
+function handleBuildSessionsChanged() {
+  buildLogsRef.value?.reload()
+}
+
 function handleLiveChatStateUpdated(payload: {
   activeSession: ChatSession | null
   messages: ChatMessage[]
@@ -1305,49 +1280,21 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         />
 
         <div class="app-editor-content">
-          <!-- Monitor View -->
-          <div v-show="activeTab === 'monitor'" class="monitor-view">
-            <div class="monitor-tabs">
-              <button
-                class="logs-sub-tab"
-                :class="{ active: activeMonitorTab === 'build-logs' }"
-                @click="activeMonitorTab = 'build-logs'"
-              >
-                <i class="pi pi-sparkles"></i> Build Logs
-              </button>
-              <button
-                class="logs-sub-tab"
-                :class="{ active: activeMonitorTab === 'execution-history' }"
-                @click="activeMonitorTab = 'execution-history'"
-              >
-                <i class="pi pi-server"></i> Execution History
-              </button>
-              <button
-                class="logs-sub-tab"
-                :class="{ active: activeMonitorTab === 'usage' }"
-                @click="activeMonitorTab = 'usage'"
-              >
-                <i class="pi pi-chart-line"></i> Usage
-              </button>
-            </div>
-            <div class="monitor-content">
-              <AppBuildLogs
-                v-show="activeMonitorTab === 'build-logs'"
-                ref="buildLogsRef"
-                :app-id="resolvedAppId"
-                :live-active-session="liveBuildSession"
-                :live-messages="liveBuildMessages"
-                :live-is-busy="liveBuildIsBusy"
-              />
-              <AppRuntimeLogs
-                v-show="activeMonitorTab === 'execution-history'"
-                ref="runtimeLogsRef"
-                :app-id="resolvedAppId"
-              />
-              <div v-show="activeMonitorTab === 'usage'" class="usage-view">
-                <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
-              </div>
-            </div>
+          <div v-show="activeTab === 'ai'" class="panel-view">
+            <AppBuildLogs
+              ref="buildLogsRef"
+              :app-id="resolvedAppId"
+              :live-active-session="liveBuildSession"
+              :live-messages="liveBuildMessages"
+              :live-is-busy="liveBuildIsBusy"
+            />
+          </div>
+
+          <div v-show="activeTab === 'logs'" class="panel-view">
+            <AppRuntimeLogs
+              ref="runtimeLogsRef"
+              :app-id="resolvedAppId"
+            />
           </div>
 
           <!-- Settings View -->
@@ -1494,7 +1441,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       :ui-logs="editorStore.uiLogEntries"
                       :tool-execution-handler="handleAiToolExecuted"
                       @session-created="handleVersionCreated"
-                      @chat-message-sent="refreshChatStats"
+                      @chat-message-sent="handleBuildSessionsChanged"
                       @session-name-generated="handleSessionNameGenerated"
                       @initial-prompt-consumed="handleInitialPromptConsumed"
                       @live-chat-state-updated="handleLiveChatStateUpdated"
@@ -1760,36 +1707,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   overflow: hidden;
 }
 
-.usage-view {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-/* Runner label in header */
-/* Monitor view */
-.monitor-view {
+.panel-view {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.monitor-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--p-surface-200);
-  flex-shrink: 0;
-}
-
-.monitor-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-:global(.app-dark) .monitor-tabs {
-  border-color: var(--p-surface-700);
 }
 
 /* Console badge in tab */
