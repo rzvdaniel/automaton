@@ -278,39 +278,6 @@ export function useAiChat(resourceType: string, resourceId: string, options?: Us
   }
 
   /**
-   * Map backend message type to frontend message type
-   */
-  function mapMessageType(messageType: string): ChatMessage['type'] {
-    switch (messageType) {
-      case 'ToolExecution':
-        return 'toolExecution'
-      case 'CodeSuccess':
-        return 'codeSuccess'
-      case 'CodeError':
-        return 'codeError'
-      case 'Generating':
-        return 'generating'
-      case 'System':
-        return 'system'
-      case 'Reasoning':
-        return 'reasoning'
-      default:
-        return 'text'
-    }
-  }
-
-  /**
-   * Parse tool metadata
-   */
-  function parseToolMetadata(metadata: string): any {
-    try {
-      return JSON.parse(metadata)
-    } catch {
-      return null
-    }
-  }
-
-  /**
    * Create a new session
    */
   async function createSession(title?: string) {

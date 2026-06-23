@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import Button from 'primevue/button'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
+import { useAppEditorStore } from '../stores/app-editor.store'
 import { PREVIEW_SIZES } from '../types/apps.types'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
@@ -26,41 +25,6 @@ const router = useRouter()
 const { isDark } = useUserSettings()
 
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
-const uiTestEntries = computed(() =>
-  editorStore.uiLogEntries.filter((entry) => entry.message.startsWith('[AI UI Test]')),
-)
-const uiPassCount = computed(() =>
-  uiTestEntries.value.filter((entry) => !entry.message.includes('FAILED')).length,
-)
-const uiFailCount = computed(() =>
-  uiTestEntries.value.filter((entry) => entry.message.includes('FAILED')).length,
-)
-const lastUiTestAction = computed(() => {
-  const first = uiTestEntries.value[0]
-  if (!first) return null
-  const marker = '[AI UI Test] '
-  const message = first.message.startsWith(marker)
-    ? first.message.slice(marker.length)
-    : first.message
-  return message.split(' — ')[0]
-})
-
-function focusAllLogs() {
-  editorStore.setUiLogFilter(UiLogFilter.All)
-}
-
-function focusFailedLogs() {
-  editorStore.setUiLogFilter(UiLogFilter.Errors)
-}
-
-function focusPassedLogs() {
-  editorStore.setUiLogFilter(UiLogFilter.Runtime)
-}
-
-const isPassFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.Runtime)
-const isFailFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.Errors)
-const isAllFilterActive = computed(() => editorStore.uiLogFilter === UiLogFilter.All)
-
 const SPLITTER_STORAGE_KEY = 'app-editor-build-visual-splitter'
 const defaultSplitterSizes = [74, 26]
 
@@ -120,16 +84,6 @@ function handleSplitterResize(event: { sizes?: number[] }): void {
 
 if (splitterSizes.value.length === 2) {
   saveSplitterSizes(splitterSizes.value)
-}
-
-function setSplitterPreset(previewSize: number, logsSize: number): void {
-  splitterSizes.value = normalizeSizes([previewSize, logsSize])
-  saveSplitterSizes(splitterSizes.value)
-  splitterRenderKey.value += 1
-}
-
-function maximizePreview(): void {
-  setSplitterPreset(90, 10)
 }
 
 function handleSplitterResizing(): void {

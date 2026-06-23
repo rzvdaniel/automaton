@@ -124,7 +124,7 @@ export const aiChatHistoryService = {
     }
 
     for (const message of mappedMessages) {
-      if (message.role !== 'tool') continue
+      if (message.role !== 'system') continue
 
       const toolCallId = (message as ChatMessage & { toolCallId?: string }).toolCallId
       if (!toolCallId) continue

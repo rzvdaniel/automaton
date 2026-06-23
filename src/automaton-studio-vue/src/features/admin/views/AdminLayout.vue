@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
@@ -85,10 +84,6 @@ const navigate = (to: string) => {
   router.push(to)
 }
 
-const currentSection = computed(() => {
-  const matched = navItems.find((item) => route.path.startsWith(item.routePrefix))
-  return matched?.label || 'Administration'
-})
 </script>
 
 <template>

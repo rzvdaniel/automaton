@@ -21,14 +21,12 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
-import Divider from 'primevue/divider'
 import { adminAiProvidersService } from '../services/adminAiProvidersService'
 import type {
   AiProviderAdmin,
   AiModelAdmin,
   AiApiKeyAdmin,
   CreateAiProviderRequest,
-  UpdateAiProviderRequest,
   CreateAiApiKeyRequest,
   UpdateAiApiKeyRequest,
 } from '../types/admin.types'
@@ -315,7 +313,7 @@ function formatDate(dateStr?: string): string {
         <TabView v-model:activeIndex="activeTab">
 
           <!-- ── Tab 1: Details ─────────────────────────────── -->
-          <TabPanel header="Details">
+          <TabPanel header="Details" value="details">
             <div class="flex flex-column gap-4 pt-2" style="max-width: 600px">
               <div v-if="isNew" class="flex flex-column gap-2">
                 <label for="providerName" class="font-medium">Name *</label>
@@ -405,7 +403,7 @@ function formatDate(dateStr?: string): string {
           </TabPanel>
 
           <!-- ── Tab 2: Models ────────────────────────────────── -->
-          <TabPanel header="Models">
+          <TabPanel header="Models" value="models">
             <div v-if="isNew" class="flex flex-column align-items-center justify-content-center py-6 gap-3 text-color-secondary">
               <i class="pi pi-list text-4xl" />
               <p class="m-0 font-medium">Create the provider first</p>
@@ -481,7 +479,7 @@ function formatDate(dateStr?: string): string {
           </TabPanel>
 
           <!-- ── Tab 3: API Keys ──────────────────────────────── -->
-          <TabPanel header="API Keys">
+          <TabPanel header="API Keys" value="api-keys">
             <div v-if="isNew" class="flex flex-column align-items-center justify-content-center py-6 gap-3 text-color-secondary">
               <i class="pi pi-key text-4xl" />
               <p class="m-0 font-medium">Create the provider first</p>

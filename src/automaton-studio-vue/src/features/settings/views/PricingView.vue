@@ -7,32 +7,16 @@ import Dialog from 'primevue/dialog'
 import { useSubscriptionsEnabled } from '@/shared/composables/useSubscriptionsEnabled'
 import { usePaidPlansAvailable } from '@/shared/composables/usePaidPlansAvailable'
 import billingService, { type BillingStatusResponse } from '../services/billingService'
-
-interface SubscriptionPlan {
-  id: string
-  name: string
-  description: string | null
-  priceUsd: number
-  capabilities: {
-    hostedRunner: {
-      enabled: boolean
-      cpuCores: number
-      memoryMb: number
-      diskMb: number
-      maxApps: number
-      visibility: string
-    }
-  }
-  isDefault: boolean
-  sortOrder: number
-}
+import { adminSubscriptionPlansService } from '@/features/admin/services/adminSubscriptionPlansService'
+import type { SubscriptionPlan } from '@/features/admin/types/admin.types'
 
 const router = useRouter()
 const subscriptionsEnabled = useSubscriptionsEnabled()
-const { plans, loading: plansLoading, hasPaidPlans, ensureLoaded } = usePaidPlansAvailable()
+const { loading: plansLoading, hasPaidPlans, ensureLoaded } = usePaidPlansAvailable()
 const loading = ref(true)
 const checkoutLoadingId = ref<string | null>(null)
 const currentStatus = ref<BillingStatusResponse | null>(null)
+const plans = ref<SubscriptionPlan[]>([])
 
 // Upgrade confirmation dialog
 const confirmDialogVisible = ref(false)
@@ -43,6 +27,11 @@ onMounted(async () => {
   try {
     await Promise.all([
       ensureLoaded(),
+      adminSubscriptionPlansService.getPlans().then((result) => {
+        plans.value = result
+      }).catch(() => {
+        plans.value = []
+      }),
       billingService.getBillingStatus().then(s => { currentStatus.value = s }).catch(() => {}),
     ])
   } finally {

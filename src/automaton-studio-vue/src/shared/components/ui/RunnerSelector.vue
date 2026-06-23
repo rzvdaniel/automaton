@@ -63,7 +63,7 @@ async function loadRunners() {
     if (!props.modelValue) {
       const onlineRunners = data.filter((r) => r.status === 'Online')
       if (onlineRunners.length === 1) {
-        emit('update:modelValue', onlineRunners[0].id)
+        emit('update:modelValue', onlineRunners[0]?.id ?? null)
       }
     }
   } catch (error) {

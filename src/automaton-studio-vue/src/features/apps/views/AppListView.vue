@@ -31,6 +31,7 @@ import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const publicDocsUrl = 'https://automaton.monster/docs'
 const publicCliDocsUrl = `${publicDocsUrl}/automaton-cli`
+const apiBase = import.meta.env.VITE_API_BASE_URL || ''
 
 const router = useRouter()
 const toast = useToast()
@@ -38,6 +39,10 @@ const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
 const { defaultAiModel } = useUserSettings()
+
+function openExternal(url: string) {
+  window.open(url, '_blank', 'noopener')
+}
 
 // AI generation state
 const aiDescription = ref('')
@@ -678,7 +683,7 @@ const handleRetry = async () => {
                 size="small"
                 severity="secondary"
                 outlined
-                @click="window.open(publicCliDocsUrl, '_blank', 'noopener')"
+                @click="openExternal(publicCliDocsUrl)"
               />
               <Button
                 label="Open Studio documentation"
@@ -686,13 +691,13 @@ const handleRetry = async () => {
                 size="small"
                 severity="secondary"
                 outlined
-                @click="window.open(publicDocsUrl, '_blank', 'noopener')"
+                @click="openExternal(publicDocsUrl)"
               />
             </div>
             <p class="text-color-secondary text-sm mb-2">
               Use <a href="https://automaton.monster/llms.txt" target="_blank" rel="noopener" class="qs-link">llms.txt</a>
               when you want the exact structure and AI instructions. Use
-              <button type="button" class="qs-inline-link" @click="window.open(publicDocsUrl, '_blank', 'noopener')">Studio documentation</button>
+              <button type="button" class="qs-inline-link" @click="openExternal(publicDocsUrl)">Studio documentation</button>
               when you want a more guided walkthrough with quick starts and examples.
             </p>
           </div>

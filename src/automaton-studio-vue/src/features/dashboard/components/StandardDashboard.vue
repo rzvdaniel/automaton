@@ -326,7 +326,7 @@ const resendConfirmation = async () => {
             <span class="hero-status-value">
               {{
                 dashboardStore.recentApps.length > 0
-                  ? `Updated ${formatTimeAgo(dashboardStore.recentApps[0].updated)}`
+                  ? `Updated ${formatTimeAgo(dashboardStore.recentApps[0]?.updated ?? new Date().toISOString())}`
                   : 'No recent deploys'
               }}
             </span>
@@ -336,7 +336,7 @@ const resendConfirmation = async () => {
             <span class="hero-status-value">
               {{
                 dashboardStore.publishedAppsList.length > 0
-                  ? dashboardStore.publishedAppsList[0].name
+                  ? (dashboardStore.publishedAppsList[0]?.name ?? 'No published apps yet')
                   : 'No published apps yet'
               }}
             </span>

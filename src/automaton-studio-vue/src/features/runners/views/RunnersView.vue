@@ -104,10 +104,6 @@ function formatRelativeTime(value?: string | null) {
   return formatDateTime(value)
 }
 
-function hasApiColorMismatch(runner: Runner) {
-  return !!runner.apiColor && viewMode.value && runner.status === RunnerStatus.Online
-}
-
 // Get status color for grid view indicator
 function getStatusColor(status: RunnerStatus): string {
   return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'

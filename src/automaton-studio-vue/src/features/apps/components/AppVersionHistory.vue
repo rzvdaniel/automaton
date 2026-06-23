@@ -4,12 +4,11 @@
  * Displays app version history and allows restoration from previous versions
  * Shows timeline of snapshots with triggers and summaries
  */
-import { ref, watch, onMounted, onUnmounted, defineExpose, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
-import Card from 'primevue/card'
 import Divider from 'primevue/divider'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'

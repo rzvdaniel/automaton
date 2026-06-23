@@ -28,7 +28,9 @@ const gradient = computed(() => {
   for (let i = 0; i < props.appId.length; i++) {
     hash = (hash * 31 + props.appId.charCodeAt(i)) >>> 0
   }
-  const [from, to] = gradients[hash % gradients.length]
+  const gradientPair = gradients[hash % gradients.length] ?? gradients[0]
+  const from = gradientPair?.[0] ?? '#667eea'
+  const to = gradientPair?.[1] ?? '#764ba2'
   return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`
 })
 

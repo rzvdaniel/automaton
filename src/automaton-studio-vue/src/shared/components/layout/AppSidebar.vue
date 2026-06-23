@@ -114,18 +114,18 @@ const apiKeysBadge = computed(() => {
 })
 
 const apiKeysNavItem = computed<NavItem>(() => ({
-  ...mainNavItems[2],
+  ...mainNavItems[2]!,
   accent: 'green',
   badge: apiKeysBadge.value,
 }))
 
 const primaryNavItems = computed<NavItem[]>(() => [
-  mainNavItems[0],
-  mainNavItems[1],
+  mainNavItems[0]!,
+  mainNavItems[1]!,
   apiKeysNavItem.value,
-  mainNavItems[3],
-  mainNavItems[4],
-  mainNavItems[5],
+  mainNavItems[3]!,
+  mainNavItems[4]!,
+  mainNavItems[5]!,
 ])
 
 function filterItems(items: NavItem[]) {

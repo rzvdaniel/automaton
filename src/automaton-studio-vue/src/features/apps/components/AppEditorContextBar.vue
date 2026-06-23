@@ -42,7 +42,7 @@ const emit = defineEmits<{
             v-else
             :model-value="editingName"
             class="app-name-input"
-            @update:model-value="emit('update:editingName', $event)"
+            @update:model-value="emit('update:editingName', typeof $event === 'string' ? $event : '')"
             @blur="emit('saveName')"
             @keyup.enter="emit('saveName')"
             @keyup.escape="emit('cancelEditing')"

@@ -117,6 +117,7 @@ function openCreateDialog() {
     supportsVision: false,
     costPer1MTokensInput: undefined,
     costPer1MTokensOutput: undefined,
+    extraBodyJson: undefined,
     sortOrder: 0,
   }
   formErrors.value = {}
@@ -138,6 +139,7 @@ function openEditDialog(model: AiModelAdmin) {
     supportsVision: model.supportsVision,
     costPer1MTokensInput: model.costPer1MTokensInput,
     costPer1MTokensOutput: model.costPer1MTokensOutput,
+    extraBodyJson: model.extraBodyJson ?? undefined,
     sortOrder: model.sortOrder,
   }
   formErrors.value = {}
@@ -171,7 +173,7 @@ async function handleSave() {
         isActive: formData.value.isActive,
         isDefault: formData.value.isDefault,
         isPlanningModel: formData.value.isPlanningModel,
-        maxTokens: formData.value.maxTokens,
+        maxTokens: formData.value.maxTokens ?? undefined,
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
         supportsVision: formData.value.supportsVision,
@@ -190,7 +192,7 @@ async function handleSave() {
         isActive: formData.value.isActive,
         isDefault: formData.value.isDefault,
         isPlanningModel: formData.value.isPlanningModel,
-        maxTokens: formData.value.maxTokens,
+        maxTokens: formData.value.maxTokens ?? undefined,
         supportsStreaming: formData.value.supportsStreaming,
         supportsTools: formData.value.supportsTools,
         supportsVision: formData.value.supportsVision,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import EmptyState from '@/shared/components/EmptyState.vue'

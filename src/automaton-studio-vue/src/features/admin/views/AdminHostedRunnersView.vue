@@ -576,7 +576,7 @@ onMounted(refreshAll)
           </div>
           <div class="col-12 md:col-6">
             <label class="block text-sm font-medium mb-2">Status</label>
-            <Select v-model="hostForm.status" :options="statusOptions" option-label="label" option-value="value" class="w-full" />
+            <Select v-model="hostForm.status" :options="[...statusOptions]" option-label="label" option-value="value" class="w-full" />
           </div>
         </div>
         <div class="grid">

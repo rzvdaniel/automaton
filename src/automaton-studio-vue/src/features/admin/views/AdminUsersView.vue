@@ -238,14 +238,6 @@ function onSort(event: { sortField?: string | ((item: unknown) => string); sortO
   void loadUsers()
 }
 
-function formatRoles(roles: string[]) {
-  if (roles.length === 0) {
-    return 'No roles'
-  }
-
-  return roles.join(', ')
-}
-
 function formatDate(value?: string) {
   if (!value) {
     return '—'

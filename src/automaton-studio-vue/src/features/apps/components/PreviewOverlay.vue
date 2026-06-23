@@ -13,8 +13,6 @@ import { PREVIEW_SIZES } from '../types/apps.types'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const editorStore = useAppEditorStore()
-const iframeRef = ref<HTMLIFrameElement>()
-
 // Preview mode options
 const previewModes = ref([
   { icon: 'pi pi-desktop', value: 'desktop' as PreviewMode, label: 'Desktop' },

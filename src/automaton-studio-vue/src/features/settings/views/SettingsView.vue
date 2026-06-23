@@ -5,7 +5,6 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import Textarea from 'primevue/textarea'
 import Password from 'primevue/password'
 import SelectButton from 'primevue/selectbutton'
 import Select from 'primevue/select'
@@ -20,14 +19,17 @@ import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
 import type { AiProvider } from '@/shared/types/ai.types'
 import type { ChangePasswordFormErrors } from '@/features/auth/types/auth.types'
-import { AppExecutionPolicy, AppVerificationStrategy } from '../types/settings.types'
+import {
+  AppExecutionPolicy,
+  AppVerificationStrategy,
+  type AppExecutionPolicyType,
+  type AppVerificationStrategyType,
+} from '../types/settings.types'
 const {
   theme: themePreference,
   fontSize,
   defaultAiModel,
-  defaultAiProvider,
   defaultPlanningModel,
-  defaultPlanningProvider,
   showAiDebugDetails,
   appVerificationStrategy,
   appExecutionPolicy,
@@ -268,8 +270,8 @@ async function saveAiPreferences() {
     await setDefaultAiModel(aiModel, aiProv)
     await setDefaultPlanningModel(planModel, planProv)
     await setShowAiDebugDetails(aiDebugDetailsEnabled.value)
-    await setAppVerificationStrategy(selectedAppVerificationStrategy.value)
-    await setAppExecutionPolicy(selectedAppExecutionPolicy.value)
+    await setAppVerificationStrategy(selectedAppVerificationStrategy.value as AppVerificationStrategyType | undefined)
+    await setAppExecutionPolicy(selectedAppExecutionPolicy.value as AppExecutionPolicyType | undefined)
 
     toast.add({
       severity: 'success',

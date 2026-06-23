@@ -75,11 +75,6 @@ const filteredSessions = computed(() => {
 })
 
 /**
- * Active session
- */
-const activeSession = computed(() => sessions.value.find((s) => s.isActive))
-
-/**
  * Load all sessions for the resource
  */
 async function loadSessions() {
@@ -384,22 +379,6 @@ function formatDate(dateStr: string): string {
   }).format(date)
 }
 
-/**
- * Get resource type display name
- */
-function getResourceTypeLabel(type: ChatResourceType): string {
-  switch (type) {
-    case 'WebApp':
-      return 'App'
-    case 'CustomStep':
-      return 'Step'
-    case 'Flow':
-      return 'Flow'
-    default:
-      return 'Chat'
-  }
-}
-
 onMounted(() => {
   loadSessions()
 })
@@ -443,16 +422,15 @@ defineExpose({
 
     <!-- Search -->
     <div v-if="sessions.length > 0" class="search-container">
-      <InputText
-        v-model="searchQuery"
-        placeholder="Search sessions..."
-        class="w-full"
-        size="small"
-      >
-        <template #prefix>
-          <i class="pi pi-search"></i>
-        </template>
-      </InputText>
+      <div class="search-field">
+        <i class="pi pi-search search-icon"></i>
+        <InputText
+          v-model="searchQuery"
+          placeholder="Search sessions..."
+          class="w-full"
+          size="small"
+        />
+      </div>
     </div>
 
     <!-- Loading state -->

@@ -236,8 +236,10 @@ export async function executeUiAutomationAction(
     }))
 
     const summary = buildUiLogSummary(filteredLogs, logs)
-    const details = summary.hasBlockingIssues
-      ? `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. Blocking errors detected: ${summary.blockingIssueCount}.`
+    const hasBlockingIssues = summary?.hasBlockingIssues ?? false
+    const blockingIssueCount = summary?.blockingIssueCount ?? 0
+    const details = hasBlockingIssues
+      ? `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. Blocking errors detected: ${blockingIssueCount}.`
       : `Collected ${logs.length}/${filteredLogs.length} ${minLevel}+ logs. No blocking errors detected.`
 
     return { success: true, action, logs, logSummary: summary, details }
@@ -289,4 +291,3 @@ export async function executeUiAutomationAction(
   // requires adding it to UiAutomationAction and implementing it in automaton-api-preview.js.
   return executeViaPostMessageBridge(action, args)
 }
-

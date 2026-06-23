@@ -109,7 +109,7 @@ const handleOpenApp = async () => {
   await handleOpenPrivateApp()
 }
 
-const handleOpenPublicApp = () => {
+const handleOpenPublicApp = async (): Promise<void> => {
   if (!canOpenPublicApp.value || !publicAppUrl.value) {
     return
   }
@@ -136,10 +136,6 @@ const handleOpenPrivateApp = async () => {
       life: 5000,
     })
   }
-}
-
-const handlePublish = () => {
-  emit('publish', props.app)
 }
 
 const handleUnpublish = async () => {
@@ -257,7 +253,12 @@ const toggleMenu = (event: Event) => {
 }
 
 const menuItems = computed(() => {
-  const items = [
+  const items: Array<{
+    label: string
+    icon: string
+    command: () => Promise<void>
+    disabled?: boolean
+  }> = [
     {
       label: isExporting.value ? 'Exporting...' : 'Export',
       icon: 'pi pi-download',

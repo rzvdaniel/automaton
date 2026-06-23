@@ -131,16 +131,6 @@ const selectedSessionDuration = computed(() => {
   return formatDuration(durationMs)
 })
 
-const selectedSessionFileCount = computed(() => changeItems.value.length)
-
-const selectedSessionEstimatedCost = computed(() => {
-  if (!selectedSession.value) {
-    return 'Not available'
-  }
-
-  return 'Not available'
-})
-
 const selectedSessionResponses = computed(() => {
   if (!selectedMessages.value.length) {
     return selectedSession.value?.totalApiCalls ?? 0
@@ -344,11 +334,6 @@ function formatTokens(n?: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return n.toString()
-}
-
-function formatPercent(value?: number) {
-  if (!value) return '0%'
-  return `${value.toFixed(1)}%`
 }
 
 function formatDuration(durationMs: number) {

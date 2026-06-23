@@ -1,6 +1,11 @@
 import { ref, readonly, computed, watch } from 'vue'
 import { userSettingsService } from '@/features/settings/services/userSettingsService'
-import type { ThemeMode, UserSettingsDto } from '@/features/settings/types/settings.types'
+import type {
+  AppExecutionPolicyType,
+  AppVerificationStrategyType,
+  ThemeMode,
+  UserSettingsDto,
+} from '@/features/settings/types/settings.types'
 
 // Default values
 const DEFAULTS: UserSettingsDto = {
@@ -276,7 +281,7 @@ export function useUserSettings() {
     }
   }
 
-  async function setAppVerificationStrategy(strategy: string | undefined) {
+  async function setAppVerificationStrategy(strategy: AppVerificationStrategyType | undefined) {
     const previousSettings = { ...settings.value }
 
     settings.value = { ...settings.value, appVerificationStrategy: strategy }
@@ -298,7 +303,7 @@ export function useUserSettings() {
     }
   }
 
-  async function setAppExecutionPolicy(policy: string | undefined) {
+  async function setAppExecutionPolicy(policy: AppExecutionPolicyType | undefined) {
     const previousSettings = { ...settings.value }
 
     settings.value = { ...settings.value, appExecutionPolicy: policy }

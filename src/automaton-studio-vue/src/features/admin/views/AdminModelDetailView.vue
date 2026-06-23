@@ -126,7 +126,7 @@ async function handleSave() {
         isActive: form.value.isActive,
         isDefault: form.value.isDefault,
         isPlanningModel: form.value.isPlanningModel,
-        maxTokens: form.value.maxTokens,
+        maxTokens: form.value.maxTokens ?? undefined,
         supportsStreaming: form.value.supportsStreaming,
         supportsTools: form.value.supportsTools,
         supportsVision: form.value.supportsVision,

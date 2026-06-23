@@ -16,7 +16,6 @@ import Dialog from 'primevue/dialog'
 import { useAiChat } from '@/shared/composables/useAiChat'
 import { aiUtilityService } from '@/shared/services/ai-utility.service'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
-import { ConversationMode } from '@/shared/types/ai.types'
 import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
@@ -81,11 +80,9 @@ const {
   selectedModel,
   availableModels,
   modelDisplayNames,
-  error,
   hasMessages,
   loadProviders,
   sendMessage: sendAiMessage,
-  getOrCreateActiveSession,
   cancelGeneration,
   sessions,
   activeSession,
@@ -279,8 +276,9 @@ const messageGroups = computed<MessageGroup[]>(() => {
   let toolBatch: ChatMessage[] = []
 
   function flushTools() {
-    if (toolBatch.length > 0) {
-      groups.push({ type: 'tool-group', messages: [...toolBatch], id: `tg-${toolBatch[0].id}` })
+    const firstTool = toolBatch[0]
+    if (firstTool) {
+      groups.push({ type: 'tool-group', messages: [...toolBatch], id: `tg-${firstTool.id}` })
       toolBatch = []
     }
   }

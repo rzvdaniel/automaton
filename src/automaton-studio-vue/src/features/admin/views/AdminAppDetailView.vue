@@ -148,7 +148,7 @@ async function saveModeration() {
     await adminAppsService.updateModeration(details.value.app.id, {
       reviewStatus: reviewStatus.value,
       accessStatus: accessStatus.value,
-      marketplaceModerationReason: moderationReason.value.trim() || null,
+      marketplaceModerationReason: moderationReason.value.trim() || undefined,
     })
     details.value.app.reviewStatus = reviewStatus.value
     details.value.app.accessStatus = accessStatus.value
@@ -253,7 +253,7 @@ onMounted(() => {
 
     <template v-else-if="details">
       <TabView class="admin-app-tabs">
-        <TabPanel header="Overview">
+        <TabPanel header="Overview" value="overview">
           <div class="summary-grid">
             <Card class="detail-card">
               <template #title>Overview</template>
@@ -355,7 +355,7 @@ onMounted(() => {
           </div>
         </TabPanel>
 
-        <TabPanel header="Source Code">
+        <TabPanel header="Source Code" value="source-code">
           <Card class="detail-card detail-card--workspace">
             <template #content>
               <Splitter class="viewer-splitter">
