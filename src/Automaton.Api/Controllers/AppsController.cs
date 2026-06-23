@@ -1051,7 +1051,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get files for a specific filesystem scope: source, live, or versions.
+    /// Get files for a specific filesystem scope: source or versions.
     /// </summary>
     [HttpGet("{id}/filesystem")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1075,7 +1075,6 @@ public class AppsController : BaseController
             var files = normalizedScope switch
             {
                 AppFileSystemScopes.Source => await fileStorageService.GetSourceFilesAsync(ownerId, id),
-                AppFileSystemScopes.Live => await GetRuntimeFilesAsync(ownerId, id),
                 AppFileSystemScopes.Versions => await fileStorageService.GetVersionFilesAsync(ownerId, id),
                 _ => Enumerable.Empty<string>()
             };
@@ -1096,7 +1095,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Get the real app-root filesystem view: source/, live/, versions/, and metadata files.
+    /// Get the app editor root filesystem view: source/, versions/, and metadata files.
     /// </summary>
     [HttpGet("{id}/filesystem/root")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1112,13 +1111,14 @@ public class AppsController : BaseController
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
             var files = await fileStorageService.GetAppRootEntriesAsync(ownerId, id);
+            var visibleFiles = files.Where(path => !path.StartsWith("live/", StringComparison.OrdinalIgnoreCase));
 
             return Ok(new
             {
                 success = true,
                 scope = "root",
                 editable = false,
-                files = files.ToList()
+                files = visibleFiles.ToList()
             });
         }
         catch (Exception ex)
@@ -1145,6 +1145,12 @@ public class AppsController : BaseController
             }
 
             var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+            var normalizedPath = path.Replace('\\', '/');
+            if (normalizedPath.StartsWith("live/", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(new { success = false, message = "File not found" });
+            }
+
             var content = await fileStorageService.ReadAppRootFileAsync(ownerId, id, path);
             if (content == null)
             {
@@ -1167,7 +1173,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Read content of a file from source, live, or versions scope.
+    /// Read content of a file from source or versions scope.
     /// </summary>
     [HttpGet("{id}/filesystem/{scope}/{*path}")]
     [Authorize(Policy = "AllowApiKey")]
@@ -1191,7 +1197,6 @@ public class AppsController : BaseController
             var content = normalizedScope switch
             {
                 AppFileSystemScopes.Source => await fileStorageService.ReadSourceFileAsync(ownerId, id, path),
-                AppFileSystemScopes.Live => await ReadRuntimeFileAsync(ownerId, id, path),
                 AppFileSystemScopes.Versions => await fileStorageService.ReadVersionFileAsync(ownerId, id, path),
                 _ => null
             };
@@ -1217,7 +1222,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Write content to a file in source or live scope.
+    /// Write content to a file in source scope.
     /// Versions are immutable and cannot be modified.
     /// </summary>
     [HttpPut("{id}/filesystem/{scope}/{*path}")]
@@ -1244,14 +1249,7 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Version snapshots are read-only" });
             }
 
-            if (normalizedScope == AppFileSystemScopes.Source)
-            {
-                await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
-            }
-            else
-            {
-                await WriteRuntimeFileAsync(ownerId, id, path, request.Content);
-            }
+            await fileStorageService.WriteSourceFileAsync(ownerId, id, path, request.Content);
 
             return Ok(new { success = true, scope = normalizedScope, editable = true });
         }
@@ -1263,7 +1261,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Delete a file in source or live scope.
+    /// Delete a file in source scope.
     /// Versions are immutable and cannot be modified.
     /// </summary>
     [HttpDelete("{id}/filesystem/{scope}/{*path}")]
@@ -1290,14 +1288,7 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Version snapshots are read-only" });
             }
 
-            if (normalizedScope == AppFileSystemScopes.Source)
-            {
-                await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
-            }
-            else
-            {
-                await DeleteRuntimeFileAsync(ownerId, id, path);
-            }
+            await fileStorageService.DeleteSourceFileAsync(ownerId, id, path);
 
             return Ok(new { success = true, scope = normalizedScope, editable = true });
         }
@@ -1309,7 +1300,7 @@ public class AppsController : BaseController
     }
 
     /// <summary>
-    /// Delete a directory in source or live scope.
+    /// Delete a directory in source scope.
     /// Versions are immutable and cannot be modified.
     /// </summary>
     [HttpDelete("{id}/filesystem/{scope}/directory/{*path}")]
@@ -1336,14 +1327,7 @@ public class AppsController : BaseController
                 return BadRequest(new { success = false, message = "Version snapshots are read-only" });
             }
 
-            if (normalizedScope == AppFileSystemScopes.Source)
-            {
-                await fileStorageService.DeleteSourceDirectoryAsync(ownerId, id, path);
-            }
-            else
-            {
-                await fileStorageService.DeleteRuntimeDirectoryAsync(ownerId, id, path);
-            }
+            await fileStorageService.DeleteSourceDirectoryAsync(ownerId, id, path);
 
             return Ok(new { success = true, scope = normalizedScope, editable = true });
         }
@@ -1397,73 +1381,11 @@ public class AppsController : BaseController
         }
     }
 
-    private async Task<IEnumerable<string>> GetRuntimeFilesAsync(Guid ownerId, Guid appId)
-    {
-        var frontendFiles = await fileStorageService.GetRuntimeFilesAsync(ownerId, appId);
-        var backendFiles = await fileStorageService.GetRuntimeBackendFilesAsync(ownerId, appId);
-
-        return frontendFiles.Select(path => $"frontend/{path.Replace('\\', '/')}")
-            .Concat(backendFiles.Select(path => $"backend/{path.Replace('\\', '/')}"));
-    }
-
-    private async Task<string?> ReadRuntimeFileAsync(Guid ownerId, Guid appId, string path)
-    {
-        var normalizedPath = path.Replace('\\', '/');
-        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
-        {
-            return await fileStorageService.ReadRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..]);
-        }
-
-        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
-        {
-            return await fileStorageService.ReadRuntimeBackendFileAsync(ownerId, appId, normalizedPath["backend/".Length..]);
-        }
-
-        return null;
-    }
-
-    private async Task WriteRuntimeFileAsync(Guid ownerId, Guid appId, string path, string content)
-    {
-        var normalizedPath = path.Replace('\\', '/');
-        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
-        {
-            await fileStorageService.WriteRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..], content);
-            return;
-        }
-
-        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
-        {
-            await fileStorageService.WriteFileAtPathAsync(fileStorageService.GetAppRuntimeBackendDirectoryPath(ownerId, appId), normalizedPath["backend/".Length..], content, validateExtension: true);
-            return;
-        }
-
-        throw new InvalidOperationException("Runtime files must live under frontend/ or backend/");
-    }
-
-    private async Task DeleteRuntimeFileAsync(Guid ownerId, Guid appId, string path)
-    {
-        var normalizedPath = path.Replace('\\', '/');
-        if (normalizedPath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
-        {
-            await fileStorageService.DeleteRuntimeFileAsync(ownerId, appId, normalizedPath["frontend/".Length..]);
-            return;
-        }
-
-        if (normalizedPath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
-        {
-            await fileStorageService.DeleteFileAtPathAsync(fileStorageService.GetAppRuntimeBackendDirectoryPath(ownerId, appId), normalizedPath["backend/".Length..]);
-            return;
-        }
-
-        throw new InvalidOperationException("Runtime files must live under frontend/ or backend/");
-    }
-
     private static string? NormalizeFileSystemScope(string? scope)
     {
         return scope?.Trim().ToLowerInvariant() switch
         {
             AppFileSystemScopes.Source => AppFileSystemScopes.Source,
-            AppFileSystemScopes.Live => AppFileSystemScopes.Live,
             AppFileSystemScopes.Versions => AppFileSystemScopes.Versions,
             _ => null
         };
@@ -2054,7 +1976,6 @@ public class WriteFileRequest
 public static class AppFileSystemScopes
 {
     public const string Source = "source";
-    public const string Live = "live";
     public const string Versions = "versions";
 }
 

@@ -300,8 +300,6 @@ const existingFilePaths = computed(() => {
   return paths
 })
 
-const isEditingRuntimeFile = computed(() => editorStore.activeFile?.scope === AppFileSystemScope.Live)
-
 // Load app on mount
 onMounted(async () => {
   // Clear ?prompt from URL immediately so navigating back doesn't re-submit it
@@ -824,7 +822,6 @@ async function handleCreateFile(path: string, content: string) {
     const normalizedPath = path.replace(/\\/g, '/')
     const scopedPath =
       normalizedPath.startsWith(`${AppFileSystemScope.Source}/`) ||
-      normalizedPath.startsWith(`${AppFileSystemScope.Live}/`) ||
       normalizedPath.startsWith(`${AppFileSystemScope.Versions}/`)
         ? normalizedPath
         : `${editorStore.currentFileScope}/${normalizedPath}`
@@ -1231,7 +1228,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       />
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
-        This app was deployed from local files. Studio is showing the live artifact because source files are not available here. Use <code>automaton deploy</code> from your local project, or upload source files to enable Studio deploy.
+        This app was deployed from local files. Source files are not available in Studio, so the Code tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
       </div>
 
       <!-- Monitor View -->
@@ -1361,10 +1358,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
                     <!-- Editor Content -->
                     <div class="editor-content">
-                      <div v-if="isEditingRuntimeFile" class="runtime-warning-banner">
-                          <strong>LIVE FILE</strong>
-                          Changes apply to the deployed app and may be overwritten by the next deploy.
-                      </div>
                       <CodeEditor
                         v-if="editorStore.activeFilePath"
                         :key="editorStore.activeFilePath"
@@ -1508,10 +1501,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 </div>
 
                 <div class="editor-content">
-                  <div v-if="isEditingRuntimeFile" class="runtime-warning-banner">
-                    <strong>LIVE FILE</strong>
-                    Changes apply to the deployed app and may be overwritten by the next deploy.
-                  </div>
                   <CodeEditor
                     v-if="editorStore.activeFilePath"
                     :key="editorStore.activeFilePath"

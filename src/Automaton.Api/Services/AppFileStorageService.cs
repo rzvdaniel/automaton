@@ -482,7 +482,7 @@ public class AppFileStorageService
 
     /// <summary>
     /// Get all files under the app root, including source, live, versions, and metadata.
-    /// Paths are relative to the app root.
+    /// Paths are relative to the app root. Callers may filter runtime folders based on their UI needs.
     /// </summary>
     public Task<IEnumerable<string>> GetAppRootEntriesAsync(Guid userId, Guid appId)
     {

@@ -149,10 +149,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   const currentScopeEditable = computed(() => currentFileScope.value !== FileSystemScope.Versions)
   const defaultEditorScope = computed<AppFileSystemScope>(() => {
-    if (currentApp.value?.developmentMode === DevelopmentMode.Local && !currentApp.value.frontend.sourceAvailable) {
-      return FileSystemScope.Live
-    }
-
     return FileSystemScope.Source
   })
   const canDeployFrontendFromStudio = computed(() => currentApp.value?.frontend.sourceAvailable ?? false)
@@ -163,7 +159,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || canDeployFromStudio.value)
   const editorModeNoticeLabel = computed(() => {
     if (showsLocalLiveBanner.value) {
-      return 'Editing live files'
+      return 'Source files unavailable'
     }
 
     if (showsSourceDeployBanner.value) {
@@ -174,7 +170,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   })
   const editorModeNoticeText = computed(() => {
     if (showsLocalLiveBanner.value) {
-      return 'This app was deployed from local files. Studio is showing the live artifact because source files are not available here. Use automaton deploy from your local project, or upload source files to enable Studio deploy.'
+      return 'This app was deployed from local files. Source files are not available in Studio, so the Code tab only shows uploaded source content. Use automaton pull or upload source files to edit the app here.'
     }
 
     if (!showsSourceDeployBanner.value || !currentApp.value) {
@@ -184,8 +180,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     return `You are editing source files. Frontend source ${currentApp.value.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved'}. Backend source ${currentApp.value.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved'}.`
   })
   const preferredPreviewScope = computed<AppFileSystemScope>(() => {
-    const hasLiveIndex = Boolean(findFileInTree(fileTree.value, 'live/frontend/index.html'))
-    return hasLiveIndex ? FileSystemScope.Live : FileSystemScope.Source
+    return FileSystemScope.Source
   })
 
   function getScopePrefix(scope: AppFileSystemScope): string {
@@ -195,7 +190,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   function getScopeFromScopedPath(path: string): AppFileSystemScope {
     const normalizedPath = path.replace(/\\/g, '/')
     if (normalizedPath.startsWith(getScopePrefix(FileSystemScope.Source))) return FileSystemScope.Source
-    if (normalizedPath.startsWith(getScopePrefix(FileSystemScope.Live))) return FileSystemScope.Live
     if (normalizedPath.startsWith(getScopePrefix(FileSystemScope.Versions))) return FileSystemScope.Versions
     return currentFileScope.value
   }
@@ -207,7 +201,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   function isEditableScope(scope: AppFileSystemScope): boolean {
-    return scope === FileSystemScope.Source || scope === FileSystemScope.Live
+    return scope === FileSystemScope.Source
   }
 
   function normalizePreviewPath(path: string): string | null {
@@ -252,12 +246,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Auto-open index.html if it exists
       const preferredFile =
-        (defaultEditorScope.value === FileSystemScope.Live
-          ? findFileInTree(fileTree.value, 'live/frontend/index.html')
-          : null) ??
         findFileInTree(fileTree.value, 'source/frontend/index.html') ??
-        findFileInTree(fileTree.value, 'source/index.html') ??
-        findFileInTree(fileTree.value, 'live/frontend/index.html')
+        findFileInTree(fileTree.value, 'source/index.html')
       if (preferredFile) {
         await openFile(preferredFile.path)
       }
@@ -396,13 +386,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
             getRelativePathFromScopedPath(filePath, fileScope),
             file.content,
           )
-        } else if (fileScope === FileSystemScope.Live) {
-          await appsService.writeScopedFile(
-            currentApp.value.id,
-            fileScope,
-            getRelativePathFromScopedPath(filePath, fileScope),
-            file.content,
-          )
         } else {
           throw new Error('Version snapshots are read-only')
         }
@@ -436,8 +419,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         const fileScope = file.scope ?? FileSystemScope.Source
         if (fileScope === FileSystemScope.Source) {
           await appsService.writeFile(currentApp.value.id, getRelativePathFromScopedPath(file.path, fileScope), file.content)
-        } else if (fileScope === FileSystemScope.Live) {
-          await appsService.writeScopedFile(currentApp.value.id, fileScope, getRelativePathFromScopedPath(file.path, fileScope), file.content)
+        } else {
+          throw new Error('Version snapshots are read-only')
         }
         file.isDirty = false
         file.originalContent = file.content
@@ -468,13 +451,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
           getRelativePathFromScopedPath(filePath, fileScope),
           content,
         )
-      } else if (fileScope === FileSystemScope.Live) {
-        await appsService.writeScopedFile(
-          currentApp.value.id,
-          fileScope,
-          getRelativePathFromScopedPath(filePath, fileScope),
-          content,
-        )
       } else {
         throw new Error('Version snapshots are read-only')
       }
@@ -502,12 +478,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
           currentApp.value.id,
           getRelativePathFromScopedPath(filePath, fileScope),
         )
-      } else if (fileScope === FileSystemScope.Live) {
-        await appsService.deleteScopedFile(
-          currentApp.value.id,
-          fileScope,
-          getRelativePathFromScopedPath(filePath, fileScope),
-        )
       } else {
         throw new Error('Version snapshots are read-only')
       }
@@ -531,7 +501,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       currentFileScope.value = folderScope
       const relativePath = getRelativePathFromScopedPath(folderPath, folderScope)
 
-      if (folderScope === FileSystemScope.Source || folderScope === FileSystemScope.Live) {
+      if (folderScope === FileSystemScope.Source) {
         await appsService.deleteScopedDirectory(currentApp.value.id, folderScope, relativePath)
       } else {
         throw new Error('Version snapshots are read-only')

@@ -617,6 +617,8 @@ class AppsService {
       const filePaths = response.files
         .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
         .filter((path): path is string => Boolean(path))
+        .map((path) => path.replace(/\\/g, '/'))
+        .filter((path) => !path.startsWith('live/'))
 
       return this.buildFileTree(filePaths, { includeMetadata: true })
     }
