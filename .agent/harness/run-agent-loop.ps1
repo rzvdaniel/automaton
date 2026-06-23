@@ -13,6 +13,10 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     .\.agent\harness\run-developer.ps1
     .\.agent\harness\run-reviewer.ps1
 
+    if (-not (Test-Path "AgentRuns\current\review.md")) {
+        throw "Review file was not created."
+    }
+
     $review = Get-Content AgentRuns\current\review.md -Raw
 
     Write-Host ""
@@ -33,10 +37,6 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     }
 }
 
-Write-Host ""
-Write-Host "Loop finished. Review git diff manually:"
-Write-Host "git diff"
-
 $metricFiles = @(
     "AgentRuns\current\orchestrator-metrics.json",
     "AgentRuns\current\developer-metrics.json",
@@ -51,26 +51,34 @@ foreach ($file in $metricFiles) {
     }
 }
 
-$totalInput = ($items | Measure-Object input_tokens -Sum).Sum
-$totalCached = ($items | Measure-Object cached_input_tokens -Sum).Sum
-$totalOutput = ($items | Measure-Object output_tokens -Sum).Sum
-$totalReasoning = ($items | Measure-Object reasoning_output_tokens -Sum).Sum
-$totalTokens = ($items | Measure-Object total_tokens -Sum).Sum
+if ($items.Count -gt 0) {
+    $totalInput = ($items | Measure-Object input_tokens -Sum).Sum
+    $totalCached = ($items | Measure-Object cached_input_tokens -Sum).Sum
+    $totalOutput = ($items | Measure-Object output_tokens -Sum).Sum
+    $totalReasoning = ($items | Measure-Object reasoning_output_tokens -Sum).Sum
+    $totalTokens = ($items | Measure-Object total_tokens -Sum).Sum
 
-$summary = [ordered]@{
-    total_input_tokens = $totalInput
-    total_cached_input_tokens = $totalCached
-    total_output_tokens = $totalOutput
-    total_reasoning_output_tokens = $totalReasoning
-    total_tokens = $totalTokens
-    captured_at = (Get-Date).ToString("o")
-    roles = $items
+    $summary = [ordered]@{
+        total_input_tokens = $totalInput
+        total_cached_input_tokens = $totalCached
+        total_output_tokens = $totalOutput
+        total_reasoning_output_tokens = $totalReasoning
+        total_tokens = $totalTokens
+        captured_at = (Get-Date).ToString("o")
+        roles = $items
+    }
+
+    $summary | ConvertTo-Json -Depth 10 |
+        Set-Content "AgentRuns\current\metrics.json"
+
+    Write-Host ""
+    Write-Host "Metrics:"
+    Write-Host "----------------------------------------"
+    Get-Content AgentRuns\current\metrics.json
 }
 
-$summary | ConvertTo-Json -Depth 10 |
-    Set-Content "AgentRuns\current\metrics.json"
-
 Write-Host ""
-Write-Host "Metrics:"
+Write-Host "Loop finished. Review manually:"
 Write-Host "----------------------------------------"
-Get-Content AgentRuns\current\metrics.json
+Write-Host "git diff"
+Write-Host "AgentRuns\current\review.md"

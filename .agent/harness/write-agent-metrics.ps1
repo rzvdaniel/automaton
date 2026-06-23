@@ -5,6 +5,11 @@ param(
     [string]$MetricsPath
 )
 
+if (-not (Test-Path $JsonlPath)) {
+    Write-Host "No JSONL file found for $Role"
+    return
+}
+
 $usageLine = Get-Content $JsonlPath |
     Where-Object { $_ -match '"type":"turn.completed"' } |
     Select-Object -Last 1

@@ -2,6 +2,12 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Running Orchestrator..."
 
+$model = "gpt-5.5"
+$jsonl = "AgentRuns\current\orchestrator.jsonl"
+$metrics = "AgentRuns\current\orchestrator-metrics.json"
+
+Write-Host "Model: $model"
+
 $prompt = @"
 Read .agent/agents/orchestrator.md.
 Read AgentRuns/current/goal.md.
@@ -14,13 +20,6 @@ Use PowerShell Set-Content when writing AgentRuns files.
 Do not modify application code.
 "@
 
-$jsonl = "AgentRuns\current\orchestrator.jsonl"
-$metrics = "AgentRuns\current\orchestrator-metrics.json"
-
-$model = "gpt-5.5-low"
-
-Write-Host "Model: $model"
-
 $prompt | codex exec `
     -m $model `
     --json `
@@ -29,19 +28,36 @@ $prompt | codex exec `
     - `
     2>&1 | Tee-Object $jsonl
 
+if ($LASTEXITCODE -ne 0) {
+    throw "Codex orchestrator failed with exit code $LASTEXITCODE. See $jsonl"
+}
+
+$jsonlContent = Get-Content $jsonl -Raw
+
+if ($jsonlContent -match '"type":"error"' -or $jsonlContent -match '"type":"turn.failed"') {
+    throw "Codex orchestrator failed. See $jsonl"
+}
+
 .\.agent\harness\write-agent-metrics.ps1 `
     -Role "orchestrator" `
     -Model $model `
     -JsonlPath $jsonl `
     -MetricsPath $metrics
 
+if (-not (Test-Path "AgentRuns\current\task.md")) {
+    throw "Orchestrator did not create AgentRuns\current\task.md"
+}
+
+$taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+if ([string]::IsNullOrWhiteSpace($taskContent)) {
+    throw "Orchestrator created an empty task.md"
+}
+
 Write-Host ""
 Write-Host "Task created:"
 Write-Host "----------------------------------------"
-
-if (Test-Path "AgentRuns\current\task.md") {
-    Get-Content AgentRuns\current\task.md
-}
+Get-Content AgentRuns\current\task.md
 
 Write-Host ""
 Write-Host "Metrics:"
