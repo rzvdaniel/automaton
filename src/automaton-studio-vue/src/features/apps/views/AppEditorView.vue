@@ -28,6 +28,7 @@ import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import AppUsageStats from '../components/AppUsageStats.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
+import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
@@ -41,6 +42,7 @@ import { AppFileSystemScope } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
 import { aiChatHistoryService } from '@/shared/services/api/ai-chat-history.service'
 import type { AppChatStats, ChatSession, ChatMessage } from '@/shared/types/ai.types'
+import { useSidebarState } from '@/shared/composables/useSidebarState'
 import {
   executeUiAutomationAction,
   UiAutomationAction,
@@ -53,6 +55,7 @@ const router = useRouter()
 const confirm = useConfirm()
 const toast = useToast()
 const editorStore = useAppEditorStore()
+const { closeMobile, setHovered } = useSidebarState()
 
 // Get app ID from route
 const appId = computed(() => route.params.id as string)
@@ -83,6 +86,47 @@ const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
 const activeTab = ref<'build' | 'code' | 'backend-server' | 'monitor' | 'settings'>('build')
+const appEditorNavGroups = [
+  {
+    label: 'Develop',
+    items: [
+      { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
+      { key: 'code', label: 'Files', icon: 'pi pi-file-edit' },
+      { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
+    ],
+  },
+  {
+    label: 'Deploy',
+    items: [
+      { key: 'deployments', label: 'Deployments', icon: 'pi pi-cloud-upload', disabled: true },
+      { key: 'published-app', label: 'Published App', icon: 'pi pi-globe', disabled: true },
+      { key: 'domains', label: 'Domains', icon: 'pi pi-link', disabled: true },
+    ],
+  },
+  {
+    label: 'Manage',
+    items: [
+      { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
+      { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
+      { key: 'backend-server', label: 'Services', icon: 'pi pi-server', disabled: true },
+      { key: 'monitor', label: 'Logs', icon: 'pi pi-list' },
+      { key: 'monitoring', label: 'Monitoring', icon: 'pi pi-chart-bar', disabled: true },
+    ],
+  },
+  {
+    items: [
+      { key: 'settings', label: 'Settings', icon: 'pi pi-cog' },
+    ],
+  },
+] as const
+
+const activeNavItem = computed(() => {
+  if (rightPanelMode.value === 'versionHistory' && activeTab.value !== 'settings' && activeTab.value !== 'monitor') {
+    return 'versions'
+  }
+
+  return activeTab.value
+})
 
 watch(
   () => route.query.settings,
@@ -189,6 +233,26 @@ function toggleAssistantPanel() {
   }
 
   isRightPanelOpen.value = !isRightPanelOpen.value
+}
+
+function handleSideNavSelect(target: string) {
+  switch (target) {
+    case 'build':
+    case 'code':
+    case 'backend-server':
+    case 'monitor':
+    case 'settings':
+      activeTab.value = target
+      rightPanelMode.value = 'aiAssistant'
+      return
+    case 'versions':
+      activeTab.value = 'build'
+      rightPanelMode.value = 'versionHistory'
+      isRightPanelOpen.value = true
+      return
+    default:
+      return
+  }
 }
 
 // Load sizes from localStorage or use defaults
@@ -302,6 +366,9 @@ const existingFilePaths = computed(() => {
 
 // Load app on mount
 onMounted(async () => {
+  closeMobile()
+  setHovered(false)
+
   // Clear ?prompt from URL immediately so navigating back doesn't re-submit it
   if (route.query.prompt) {
     const { prompt: _, ...rest } = route.query
@@ -1187,6 +1254,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
     <!-- Main editor -->
     <template v-else-if="editorStore.currentApp">
       <AppEditorWorkspaceBar
+        :active-tab="activeTab"
         :app-name="editorStore.currentApp.name"
         :is-editing-name="isEditingName"
         :editing-name="editingName"
@@ -1194,7 +1262,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :has-deployed-frontend="editorStore.hasDeployedFrontend"
         :can-open-private-app="editorStore.hasDeployedFrontend"
         :can-open-public-app="editorStore.isPublished"
-        :active-tab="activeTab"
         :has-runners="hasRunners"
         :selected-runner-id="selectedRunnerId"
         :is-saving="editorStore.isSaving"
@@ -1209,7 +1276,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @start-editing="startEditingName"
         @save-name="saveAppName"
         @cancel-editing="cancelEditingName"
-        @update:active-tab="activeTab = $event"
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
@@ -1231,76 +1297,227 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         This app was deployed from local files. Source files are not available in Studio, so the Code tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
       </div>
 
-      <!-- Monitor View -->
-      <div v-show="activeTab === 'monitor'" class="monitor-view">
-        <div class="monitor-tabs">
-          <button
-            class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'build-logs' }"
-            @click="activeMonitorTab = 'build-logs'"
-          >
-            <i class="pi pi-sparkles"></i> Build Logs
-          </button>
-          <button
-            class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'execution-history' }"
-            @click="activeMonitorTab = 'execution-history'"
-          >
-            <i class="pi pi-server"></i> Execution History
-          </button>
-          <button
-            class="logs-sub-tab"
-            :class="{ active: activeMonitorTab === 'usage' }"
-            @click="activeMonitorTab = 'usage'"
-          >
-            <i class="pi pi-chart-line"></i> Usage
-          </button>
-        </div>
-        <div class="monitor-content">
-          <AppBuildLogs
-            v-show="activeMonitorTab === 'build-logs'"
-            ref="buildLogsRef"
-            :app-id="resolvedAppId"
-            :live-active-session="liveBuildSession"
-            :live-messages="liveBuildMessages"
-            :live-is-busy="liveBuildIsBusy"
-          />
-          <AppRuntimeLogs
-            v-show="activeMonitorTab === 'execution-history'"
-            ref="runtimeLogsRef"
-            :app-id="resolvedAppId"
-          />
-          <div v-show="activeMonitorTab === 'usage'" class="usage-view">
-            <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
+      <div class="app-editor-shell">
+        <AppEditorSideNav
+          :active-item="activeNavItem"
+          :groups="appEditorNavGroups"
+          @select="handleSideNavSelect"
+        />
+
+        <div class="app-editor-content">
+          <!-- Monitor View -->
+          <div v-show="activeTab === 'monitor'" class="monitor-view">
+            <div class="monitor-tabs">
+              <button
+                class="logs-sub-tab"
+                :class="{ active: activeMonitorTab === 'build-logs' }"
+                @click="activeMonitorTab = 'build-logs'"
+              >
+                <i class="pi pi-sparkles"></i> Build Logs
+              </button>
+              <button
+                class="logs-sub-tab"
+                :class="{ active: activeMonitorTab === 'execution-history' }"
+                @click="activeMonitorTab = 'execution-history'"
+              >
+                <i class="pi pi-server"></i> Execution History
+              </button>
+              <button
+                class="logs-sub-tab"
+                :class="{ active: activeMonitorTab === 'usage' }"
+                @click="activeMonitorTab = 'usage'"
+              >
+                <i class="pi pi-chart-line"></i> Usage
+              </button>
+            </div>
+            <div class="monitor-content">
+              <AppBuildLogs
+                v-show="activeMonitorTab === 'build-logs'"
+                ref="buildLogsRef"
+                :app-id="resolvedAppId"
+                :live-active-session="liveBuildSession"
+                :live-messages="liveBuildMessages"
+                :live-is-busy="liveBuildIsBusy"
+              />
+              <AppRuntimeLogs
+                v-show="activeMonitorTab === 'execution-history'"
+                ref="runtimeLogsRef"
+                :app-id="resolvedAppId"
+              />
+              <div v-show="activeMonitorTab === 'usage'" class="usage-view">
+                <AppUsageStats :app-id="resolvedAppId" :refresh-token="usageRefreshTick" />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Settings View -->
-      <div v-show="activeTab === 'settings'" class="settings-view">
-        <AppSettings />
-      </div>
+          <!-- Settings View -->
+          <div v-show="activeTab === 'settings'" class="settings-view">
+            <AppSettings />
+          </div>
 
-      <div v-if="activeTab === 'backend-server'" class="backend-server-view">
-        <BackendServerFiles :app-id="resolvedAppId" />
-      </div>
+          <div v-if="activeTab === 'backend-server'" class="backend-server-view">
+            <BackendServerFiles :app-id="resolvedAppId" />
+          </div>
 
-      <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
-      <div v-show="activeTab === 'build' || activeTab === 'code'" class="build-content-wrapper">
-        <Splitter
-          v-if="isRightPanelOpen"
-          class="build-outer-splitter"
-          layout="horizontal"
-          :gutter-size="8"
-          @resize="handleSplitterResizing"
-          @resizeend="handleRightPanelSplitterResize"
-        >
-          <!-- Left: main workspace (visual or code) -->
-          <SplitterPanel :size="100 - rightPanelSize" :min-size="40" class="splitter-panel">
-            <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
+          <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
+          <div v-show="activeTab === 'build' || activeTab === 'code'" class="build-content-wrapper">
+            <Splitter
+              v-if="isRightPanelOpen"
+              class="build-outer-splitter"
+              layout="horizontal"
+              :gutter-size="8"
+              @resize="handleSplitterResizing"
+              @resizeend="handleRightPanelSplitterResize"
+            >
+              <!-- Left: main workspace (visual or code) -->
+              <SplitterPanel :size="100 - rightPanelSize" :min-size="40" class="splitter-panel">
+                <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
+                  <!-- Visual mode workspace - shown in Build tab -->
+                  <div v-show="activeTab === 'build'" class="build-visual-view">
+                    <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" :runner-id="selectedRunnerId" />
+                  </div>
+
+                  <!-- Code mode: file tree + editor - shown in Code tab -->
+                  <Splitter
+                    v-show="activeTab === 'code'"
+                    class="editor-layout"
+                    layout="horizontal"
+                    :gutter-size="8"
+                    @resize="handleSplitterResizing"
+                    @resizeend="handleSplitterResize"
+                  >
+                    <!-- Left Panel: File Tree -->
+                    <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
+                      <div class="file-panel">
+                        <FileTree
+                          title="App Files"
+                          :show-create="editorStore.currentScopeEditable"
+                          :allow-delete="editorStore.currentScopeEditable"
+                          empty-message="No app files yet"
+                          @create-file="showCreateFileDialog = true"
+                          @delete-file="handleDeleteFile"
+                          @delete-folder="handleDeleteFolder"
+                          @delete-selection="handleDeleteSelection"
+                        />
+                      </div>
+                    </SplitterPanel>
+
+                    <!-- Center Panel: Code Editor -->
+                    <SplitterPanel :size="panelSizes[1]" :min-size="30" class="splitter-panel">
+                      <div class="editor-panel">
+                        <!-- File Tabs -->
+                        <div class="editor-tabs-container">
+                          <div
+                            v-for="file in editorStore.openFiles"
+                            :key="file.path"
+                            class="editor-tab"
+                            :class="{ active: editorStore.activeFilePath === file.path }"
+                            @click="editorStore.activeFilePath = file.path"
+                          >
+                            <span class="tab-name">
+                              <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
+                              {{ file.isBackendStep ? file.stepName : file.path }}
+                              <span v-if="file.isDirty" class="dirty-indicator">*</span>
+                            </span>
+                            <Button
+                              icon="pi pi-times"
+                              text
+                              rounded
+                              size="small"
+                              class="tab-close"
+                              @click="(e: Event) => handleCloseTab(e, file.path)"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Editor Content -->
+                        <div class="editor-content">
+                          <CodeEditor
+                            v-if="editorStore.activeFilePath"
+                            :key="editorStore.activeFilePath"
+                            :file-path="editorStore.activeFilePath"
+                            :read-only="editorStore.activeFile?.isReadOnly"
+                            @save="handleSaveFile"
+                          />
+                          <div v-else class="no-file-selected">
+                            <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
+                            <p>Select a file to edit</p>
+                            <Button
+                              v-if="editorStore.currentScopeEditable"
+                              label="Create File"
+                              icon="pi pi-plus"
+                              size="small"
+                              outlined
+                              @click="showCreateFileDialog = true"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </SplitterPanel>
+                  </Splitter>
+                </div>
+              </SplitterPanel>
+
+              <!-- Right: single shared AI Assistant + Version History panel -->
+              <SplitterPanel :size="rightPanelSize" :min-size="15" class="splitter-panel">
+                <div class="right-panel-container" :class="{ 'no-pointer-events': isResizing }">
+                  <div class="right-panel-header">
+                    <button
+                      class="right-panel-tab"
+                      :class="{ active: rightPanelMode === 'aiAssistant' }"
+                      @click="rightPanelMode = 'aiAssistant'"
+                    >
+                      <i class="pi pi-sparkles"></i>
+                      <span>AI Assistant</span>
+                    </button>
+                    <button
+                      class="right-panel-tab"
+                      :class="{ active: rightPanelMode === 'versionHistory' }"
+                      @click="rightPanelMode = 'versionHistory'"
+                    >
+                      <i class="pi pi-history"></i>
+                      <span>History</span>
+                    </button>
+                  </div>
+                  <div class="ai-sidebar">
+                    <AiAssistant
+                      v-show="rightPanelMode === 'aiAssistant'"
+                      :key="`ai-assistant-${resolvedAppId}`"
+                      resource-type="WebApp"
+                      :resource-id="resolvedAppId"
+                      :runner-id="selectedRunnerId"
+                      :initial-prompt="initialPrompt"
+                      :initial-mode="initialMode"
+                      :initial-model="initialModel"
+                      :system-prompt="aiSystemPrompt"
+                      :suggestions="aiSuggestions"
+                      :ui-logs="editorStore.uiLogEntries"
+                      :tool-execution-handler="handleAiToolExecuted"
+                      @session-created="handleVersionCreated"
+                      @chat-message-sent="refreshChatStats"
+                      @session-name-generated="handleSessionNameGenerated"
+                      @initial-prompt-consumed="handleInitialPromptConsumed"
+                      @live-chat-state-updated="handleLiveChatStateUpdated"
+                    />
+                    <AppVersionHistory
+                      v-show="rightPanelMode === 'versionHistory'"
+                      ref="versionHistoryRef"
+                      :app-id="resolvedAppId"
+                      @version-restored="handleVersionRestored"
+                      @version-created="handleVersionCreated"
+                    />
+                  </div>
+                </div>
+              </SplitterPanel>
+            </Splitter>
+
+            <div v-else class="build-main-content build-main-content--full">
               <!-- Visual mode workspace - shown in Build tab -->
               <div v-show="activeTab === 'build'" class="build-visual-view">
-                <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" :runner-id="selectedRunnerId" />
+                <BuildVisualWorkspace
+                  :suspend-heavy-rendering="isVisualResizing"
+                  :runner-id="selectedRunnerId"
+                />
               </div>
 
               <!-- Code mode: file tree + editor - shown in Code tab -->
@@ -1312,7 +1529,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 @resize="handleSplitterResizing"
                 @resizeend="handleSplitterResize"
               >
-                <!-- Left Panel: File Tree -->
                 <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
                   <div class="file-panel">
                     <FileTree
@@ -1328,10 +1544,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                   </div>
                 </SplitterPanel>
 
-                <!-- Center Panel: Code Editor -->
                 <SplitterPanel :size="panelSizes[1]" :min-size="30" class="splitter-panel">
                   <div class="editor-panel">
-                    <!-- File Tabs -->
                     <div class="editor-tabs-container">
                       <div
                         v-for="file in editorStore.openFiles"
@@ -1341,7 +1555,11 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                         @click="editorStore.activeFilePath = file.path"
                       >
                         <span class="tab-name">
-                          <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
+                          <i
+                            v-if="file.isBackendStep"
+                            class="pi pi-server mr-1"
+                            style="font-size: 0.7rem;"
+                          ></i>
                           {{ file.isBackendStep ? file.stepName : file.path }}
                           <span v-if="file.isDirty" class="dirty-indicator">*</span>
                         </span>
@@ -1356,7 +1574,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       </div>
                     </div>
 
-                    <!-- Editor Content -->
                     <div class="editor-content">
                       <CodeEditor
                         v-if="editorStore.activeFilePath"
@@ -1381,170 +1598,29 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                   </div>
                 </SplitterPanel>
               </Splitter>
-            </div>
-          </SplitterPanel>
 
-          <!-- Right: single shared AI Assistant + Version History panel -->
-          <SplitterPanel :size="rightPanelSize" :min-size="15" class="splitter-panel">
-            <div class="right-panel-container" :class="{ 'no-pointer-events': isResizing }">
-              <div class="right-panel-header">
-                <button
-                  class="right-panel-tab"
-                  :class="{ active: rightPanelMode === 'aiAssistant' }"
-                  @click="rightPanelMode = 'aiAssistant'"
-                >
-                  <i class="pi pi-sparkles"></i>
-                  <span>AI Assistant</span>
-                </button>
-                <button
-                  class="right-panel-tab"
-                  :class="{ active: rightPanelMode === 'versionHistory' }"
-                  @click="rightPanelMode = 'versionHistory'"
-                >
-                  <i class="pi pi-history"></i>
-                  <span>History</span>
-                </button>
-              </div>
-              <div class="ai-sidebar">
-                <AiAssistant
-                  v-show="rightPanelMode === 'aiAssistant'"
-                  :key="`ai-assistant-${resolvedAppId}`"
-                  resource-type="WebApp"
-                  :resource-id="resolvedAppId"
-                  :runner-id="selectedRunnerId"
-                  :initial-prompt="initialPrompt"
-                  :initial-mode="initialMode"
-                  :initial-model="initialModel"
-                  :system-prompt="aiSystemPrompt"
-                  :suggestions="aiSuggestions"
-                  :ui-logs="editorStore.uiLogEntries"
-                  :tool-execution-handler="handleAiToolExecuted"
-                  @session-created="handleVersionCreated"
-                  @chat-message-sent="refreshChatStats"
-                  @session-name-generated="handleSessionNameGenerated"
-                  @initial-prompt-consumed="handleInitialPromptConsumed"
-                  @live-chat-state-updated="handleLiveChatStateUpdated"
-                />
-                <AppVersionHistory
-                  v-show="rightPanelMode === 'versionHistory'"
-                  ref="versionHistoryRef"
-                  :app-id="resolvedAppId"
-                  @version-restored="handleVersionRestored"
-                  @version-created="handleVersionCreated"
-                />
-              </div>
-            </div>
-          </SplitterPanel>
-        </Splitter>
-
-        <div v-else class="build-main-content build-main-content--full">
-          <!-- Visual mode workspace - shown in Build tab -->
-          <div v-show="activeTab === 'build'" class="build-visual-view">
-            <BuildVisualWorkspace
-              :suspend-heavy-rendering="isVisualResizing"
-              :runner-id="selectedRunnerId"
-            />
-          </div>
-
-          <!-- Code mode: file tree + editor - shown in Code tab -->
-          <Splitter
-            v-show="activeTab === 'code'"
-            class="editor-layout"
-            layout="horizontal"
-            :gutter-size="8"
-            @resize="handleSplitterResizing"
-            @resizeend="handleSplitterResize"
-          >
-            <SplitterPanel :size="panelSizes[0]" :min-size="10" class="splitter-panel">
-              <div class="file-panel">
-                <FileTree
-                  title="App Files"
-                  :show-create="editorStore.currentScopeEditable"
-                  :allow-delete="editorStore.currentScopeEditable"
-                  empty-message="No app files yet"
-                  @create-file="showCreateFileDialog = true"
-                  @delete-file="handleDeleteFile"
-                  @delete-folder="handleDeleteFolder"
-                  @delete-selection="handleDeleteSelection"
-                />
-              </div>
-            </SplitterPanel>
-
-            <SplitterPanel :size="panelSizes[1]" :min-size="30" class="splitter-panel">
-              <div class="editor-panel">
-                <div class="editor-tabs-container">
-                  <div
-                    v-for="file in editorStore.openFiles"
-                    :key="file.path"
-                    class="editor-tab"
-                    :class="{ active: editorStore.activeFilePath === file.path }"
-                    @click="editorStore.activeFilePath = file.path"
-                  >
-                    <span class="tab-name">
-                      <i
-                        v-if="file.isBackendStep"
-                        class="pi pi-server mr-1"
-                        style="font-size: 0.7rem;"
-                      ></i>
-                      {{ file.isBackendStep ? file.stepName : file.path }}
-                      <span v-if="file.isDirty" class="dirty-indicator">*</span>
-                    </span>
-                    <Button
-                      icon="pi pi-times"
-                      text
-                      rounded
-                      size="small"
-                      class="tab-close"
-                      @click="(e: Event) => handleCloseTab(e, file.path)"
-                    />
+              <div class="assistant-collapsed-card">
+                <div class="assistant-collapsed-copy">
+                  <div class="assistant-collapsed-title">AI Assistant (Experimental)</div>
+                  <div class="assistant-collapsed-text">
+                    Bring your own AI provider to generate code, edit files, and help ship this app.
                   </div>
                 </div>
-
-                <div class="editor-content">
-                  <CodeEditor
-                    v-if="editorStore.activeFilePath"
-                    :key="editorStore.activeFilePath"
-                    :file-path="editorStore.activeFilePath"
-                    :read-only="editorStore.activeFile?.isReadOnly"
-                    @save="handleSaveFile"
+                <div class="assistant-collapsed-actions">
+                  <Button
+                    label="Open Assistant"
+                    icon="pi pi-sparkles"
+                    @click="toggleAssistantPanel"
                   />
-                  <div v-else class="no-file-selected">
-                    <i class="pi pi-file text-4xl text-color-secondary mb-2"></i>
-                    <p>Select a file to edit</p>
-                    <Button
-                      v-if="editorStore.currentScopeEditable"
-                      label="Create File"
-                      icon="pi pi-plus"
-                      size="small"
-                      outlined
-                      @click="showCreateFileDialog = true"
-                    />
-                  </div>
+                  <Button
+                    label="Configure AI"
+                    icon="pi pi-cog"
+                    severity="secondary"
+                    outlined
+                    @click="router.push('/ai-keys')"
+                  />
                 </div>
               </div>
-            </SplitterPanel>
-          </Splitter>
-
-          <div v-if="activeTab !== 'backend-server'" class="assistant-collapsed-card">
-            <div class="assistant-collapsed-copy">
-              <div class="assistant-collapsed-title">AI Assistant (Experimental)</div>
-              <div class="assistant-collapsed-text">
-                Bring your own AI provider to generate code, edit files, and help ship this app.
-              </div>
-            </div>
-            <div class="assistant-collapsed-actions">
-              <Button
-                label="Open Assistant"
-                icon="pi pi-sparkles"
-                @click="toggleAssistantPanel"
-              />
-              <Button
-                label="Configure AI"
-                icon="pi pi-cog"
-                severity="secondary"
-                outlined
-                @click="router.push('/ai-keys')"
-              />
             </div>
           </div>
         </div>
@@ -1746,6 +1822,21 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .mode-banner-live {
   background: color-mix(in srgb, var(--p-orange-100) 78%, white);
   color: var(--p-orange-900);
+}
+
+.app-editor-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-editor-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* AI Console (terminal) view container */
@@ -2023,6 +2114,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   .assistant-collapsed-card {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-editor-shell {
+    flex-direction: column;
   }
 }
 

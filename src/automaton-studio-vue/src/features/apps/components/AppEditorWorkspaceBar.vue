@@ -7,11 +7,11 @@ import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
-type AppEditorTab = 'build' | 'code' | 'backend-server' | 'monitor' | 'settings'
 
 const { isDark } = useUserSettings()
 
 const props = defineProps<{
+  activeTab: 'build' | 'code' | 'backend-server' | 'monitor' | 'settings'
   appName: string
   isEditingName: boolean
   editingName: string
@@ -19,7 +19,6 @@ const props = defineProps<{
   hasDeployedFrontend: boolean
   canOpenPrivateApp: boolean
   canOpenPublicApp: boolean
-  activeTab: AppEditorTab
   hasRunners: boolean | null
   selectedRunnerId: string | null
   isSaving: boolean
@@ -37,7 +36,6 @@ const emit = defineEmits<{
   startEditing: []
   saveName: []
   cancelEditing: []
-  'update:activeTab': [value: AppEditorTab]
   'update:selectedRunnerId': [value: string | null]
   runnersLoaded: [count: number]
   saveAll: []
@@ -55,25 +53,17 @@ const emit = defineEmits<{
   toggleAssistant: []
 }>()
 
-const tabs = [
-  { key: 'build', label: 'Editor' },
-  { key: 'code', label: 'Code' },
-  { key: 'backend-server', label: 'Backend' },
-  { key: 'monitor', label: 'Monitor' },
-  { key: 'settings', label: 'Settings' },
-] as const
-
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const openAppMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 
-const isEditorActionTab = computed(
-  () => props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
-)
-
 const openAppLabel = computed(() => {
   return 'Open App'
 })
+
+const showsEditorActions = computed(() =>
+  props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
+)
 
 const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPublicApp)
 
@@ -177,7 +167,7 @@ function handlePrimaryAction() {
           v-else
           :model-value="editingName"
           class="app-name-input"
-          @update:model-value="emit('update:editingName', $event)"
+          @update:model-value="emit('update:editingName', $event ?? '')"
           @blur="emit('saveName')"
           @keyup.enter="emit('saveName')"
           @keyup.escape="emit('cancelEditing')"
@@ -205,21 +195,10 @@ function handlePrimaryAction() {
         </div>
       </div>
 
-      <div class="workspace-tabs">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="workspace-tab"
-          :class="{ active: activeTab === tab.key }"
-          @click="emit('update:activeTab', tab.key)"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
     </div>
 
-    <div v-if="isEditorActionTab" class="workspace-actions">
-      <div v-if="hasRunners !== false" class="runtime-control">
+    <div class="workspace-actions">
+      <div v-if="showsEditorActions && hasRunners !== false" class="runtime-control">
         <RunnerSelector
           :model-value="selectedRunnerId"
           :disabled="isSaving"
@@ -229,7 +208,7 @@ function handlePrimaryAction() {
       </div>
 
       <Button
-        v-if="activeTab !== 'backend-server'"
+        v-if="showsEditorActions && activeTab !== 'backend-server'"
         icon="pi pi-eye"
         label="Preview"
         text
@@ -238,7 +217,7 @@ function handlePrimaryAction() {
       />
 
       <Button
-        v-if="activeTab !== 'backend-server'"
+        v-if="showsEditorActions"
         :label="isAssistantOpen ? 'Hide Assistant' : 'Assistant'"
         icon="pi pi-sparkles"
         text
@@ -246,7 +225,7 @@ function handlePrimaryAction() {
         @click="emit('toggleAssistant')"
       />
 
-      <div v-if="activeTab !== 'backend-server'" class="deploy-actions">
+      <div v-if="showsEditorActions && activeTab !== 'backend-server'" class="deploy-actions">
         <Button
           label="Deploy"
           icon="pi pi-cloud-upload"
@@ -267,7 +246,7 @@ function handlePrimaryAction() {
       </div>
 
       <Button
-        v-if="activeTab !== 'backend-server' && !isPublished"
+        v-if="showsEditorActions && !isPublished"
         label="Publish"
         icon="pi pi-globe"
         outlined
@@ -275,7 +254,7 @@ function handlePrimaryAction() {
         @click="emit('publish')"
       />
 
-      <div v-else-if="activeTab !== 'backend-server' && isPublished" class="published-actions">
+      <div v-else-if="showsEditorActions" class="published-actions">
         <Button
           label="Published"
           icon="pi pi-globe"

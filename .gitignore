@@ -103,3 +103,5 @@ src/automaton-vue/docs/.vitepress/dist/
 !src/automaton-vue/docs/.vitepress/config.ts
 !src/automaton-vue/docs/.vitepress/theme/
 !src/automaton-vue/docs/.vitepress/theme/index.ts
+
+AgentRuns/
