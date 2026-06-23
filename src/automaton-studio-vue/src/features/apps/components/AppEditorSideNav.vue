@@ -1,6 +1,6 @@
 <script setup lang="ts">
 type AppEditorTab = 'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'
-type NavTarget = AppEditorTab | 'versions'
+type NavTarget = AppEditorTab | 'history'
 
 interface NavItem {
   key: string

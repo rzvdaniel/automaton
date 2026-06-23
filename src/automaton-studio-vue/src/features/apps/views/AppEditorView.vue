@@ -90,7 +90,7 @@ const appEditorNavGroups = [
     items: [
       { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
       { key: 'code', label: 'Files', icon: 'pi pi-file-edit' },
-      { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
+      { key: 'history', label: 'History', icon: 'pi pi-history' },
     ],
   },
   {
@@ -125,7 +125,7 @@ const appEditorNavGroups = [
 
 const activeNavItem = computed(() => {
   if (rightPanelMode.value === 'versionHistory' && activeTab.value !== 'settings' && activeTab.value !== 'logs' && activeTab.value !== 'ai') {
-    return 'versions'
+    return 'history'
   }
 
   return activeTab.value
@@ -238,7 +238,7 @@ function handleSideNavSelect(target: string) {
       activeTab.value = target
       rightPanelMode.value = 'aiAssistant'
       return
-    case 'versions':
+    case 'history':
       activeTab.value = 'build'
       rightPanelMode.value = 'versionHistory'
       isRightPanelOpen.value = true
