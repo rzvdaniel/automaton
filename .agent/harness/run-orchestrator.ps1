@@ -14,7 +14,26 @@ Use PowerShell Set-Content when writing AgentRuns files.
 Do not modify application code.
 "@
 
-$prompt | codex exec --dangerously-bypass-approvals-and-sandbox --cd . -
+$jsonl = "AgentRuns\current\orchestrator.jsonl"
+$metrics = "AgentRuns\current\orchestrator-metrics.json"
+
+$model = "gpt-5.5-low"
+
+Write-Host "Model: $model"
+
+$prompt | codex exec `
+    -m $model `
+    --json `
+    --dangerously-bypass-approvals-and-sandbox `
+    --cd . `
+    - `
+    2>&1 | Tee-Object $jsonl
+
+.\.agent\harness\write-agent-metrics.ps1 `
+    -Role "orchestrator" `
+    -Model $model `
+    -JsonlPath $jsonl `
+    -MetricsPath $metrics
 
 Write-Host ""
 Write-Host "Task created:"
@@ -22,4 +41,12 @@ Write-Host "----------------------------------------"
 
 if (Test-Path "AgentRuns\current\task.md") {
     Get-Content AgentRuns\current\task.md
+}
+
+Write-Host ""
+Write-Host "Metrics:"
+Write-Host "----------------------------------------"
+
+if (Test-Path $metrics) {
+    Get-Content $metrics
 }

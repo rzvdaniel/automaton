@@ -21,7 +21,26 @@ Rules:
 Use PowerShell Set-Content when writing AgentRuns files.
 "@
 
-$prompt | codex exec --dangerously-bypass-approvals-and-sandbox --cd . -
+$jsonl = "AgentRuns\current\developer.jsonl"
+$metrics = "AgentRuns\current\developer-metrics.json"
+
+$model = "gpt-5.4"
+
+Write-Host "Model: $model"
+
+$prompt | codex exec `
+    -m $model `
+    --json `
+    --dangerously-bypass-approvals-and-sandbox `
+    --cd . `
+    - `
+    2>&1 | Tee-Object $jsonl
+
+.\.agent\harness\write-agent-metrics.ps1 `
+    -Role "developer" `
+    -Model $model `
+    -JsonlPath $jsonl `
+    -MetricsPath $metrics
 
 Write-Host ""
 Write-Host "Developer result:"

@@ -21,7 +21,26 @@ Write the review to AgentRuns/current/review.md.
 Use PowerShell Set-Content when writing AgentRuns files.
 "@
 
-$prompt | codex exec --dangerously-bypass-approvals-and-sandbox --cd . -
+$jsonl = "AgentRuns\current\reviewer.jsonl"
+$metrics = "AgentRuns\current\reviewer-metrics.json"
+
+$model = "gpt-5.5-low"
+
+Write-Host "Model: $model"
+
+$prompt | codex exec `
+    -m $model `
+    --json `
+    --dangerously-bypass-approvals-and-sandbox `
+    --cd . `
+    - `
+    2>&1 | Tee-Object $jsonl
+
+.\.agent\harness\write-agent-metrics.ps1 `
+    -Role "reviewer" `
+    -Model $model `
+    -JsonlPath $jsonl `
+    -MetricsPath $metrics
 
 Write-Host ""
 Write-Host "Review:"
