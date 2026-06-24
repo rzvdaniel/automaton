@@ -93,12 +93,23 @@ if ($codexReportedFailure) {
         $jsonlFailureLines = ""
 
         if (Test-Path $jsonl) {
-            $jsonlFailureLines = (Select-String `
+            $failureLines = Select-String `
                 -Path $jsonl `
-                -Pattern '"type":"error"', '"type":"turn.failed"', 'ERROR', 'Exit code' `
+                -Pattern '"type":"error"', '"type":"turn.failed"', 'ERROR codex_core', 'Exit code' `
                 -ErrorAction SilentlyContinue |
-                Select-Object -First 20 |
-                ForEach-Object { $_.Line }) -join [Environment]::NewLine
+                Select-Object -First 10 |
+                ForEach-Object {
+                    $line = $_.Line
+
+                    if ($line.Length -gt 1200) {
+                        $line.Substring(0, 1200) + "... [truncated]"
+                    }
+                    else {
+                        $line
+                    }
+                }
+
+            $jsonlFailureLines = $failureLines -join [Environment]::NewLine
         }
 
         $recovery = @"
