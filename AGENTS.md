@@ -29,14 +29,24 @@ Canonical agent material lives under `.agent/`.
 
 - Skills: `.agent/skills/<skill-name>/SKILL.md`
 - Harness docs: `.agent/harness/`
+- Repository maps: `.agent/maps/`
 - Reusable prompts: `.agent/prompts/`, if present
+
+For targeted repository navigation, read:
+
+```txt
+.agent/maps/automaton.md
+```
+
+Use this map before broad repository searches.
 
 Before changing code:
 
 1. Identify the affected area.
-2. Read the matching skill from `.agent/skills/`.
-3. Follow the verification matrix in this file or `.agent/harness/verification.md`, if present.
-4. If the task exposes a missing rule or recurring mistake, update the relevant `.agent/` file.
+2. Read `.agent/maps/automaton.md` for targeted repository navigation.
+3. Read the matching skill from `.agent/skills/`.
+4. Follow the verification matrix in this file or `.agent/harness/verification.md`, if present.
+5. If the task exposes a missing rule or recurring mistake, update the relevant `.agent/` file.
 
 ### Skill format
 
@@ -114,6 +124,8 @@ Automaton apps have an important source/runtime split:
 ---
 
 ## 4. Repository map
+
+For detailed targeted navigation, read `.agent/maps/automaton.md` before broad repository searches.
 
 ### Website
 
