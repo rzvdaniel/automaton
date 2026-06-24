@@ -17,9 +17,23 @@ Rules:
 - Do not include large code dumps in context.md.
 - Include only useful implementation and review context.
 
+## Repository navigation
+
+Before searching broadly, read these files when they exist:
+
+- `AGENTS.md`
+- `.agent/maps/automaton.md`
+
+Use them as the repository map:
+
+- identify likely projects and folders
+- identify likely files for the goal
+- avoid broad repo scans
+- inspect only the smallest set of relevant files needed to write `task.md` and `context.md`
+
 ## Token/context budget
 
-- Read .agent/repo-map.md first.
+- Read `AGENTS.md` and `.agent/maps/automaton.md` first when available.
 - Prefer targeted searches.
 - Inspect only files likely relevant to the goal.
 - Do not perform broad repository exploration unless necessary.
