@@ -26,6 +26,15 @@ import { getFileIcon } from '../types/apps.types'
 import { buildPreviewApiScript } from '../utils/preview-api-script'
 
 class AppsService {
+  private readonly internalRootFilePaths = new Set([
+    'live',
+    'versions',
+    '_metadata.json',
+    'source/_metadata.json',
+  ])
+
+  private readonly internalRootFilePrefixes = ['live/', 'versions/'] as const
+
   private sortFileNodes(nodes: FileNode[]): FileNode[] {
     return [...nodes]
       .map((node) => ({
@@ -618,12 +627,20 @@ class AppsService {
         .map((f) => (typeof f === 'string' ? f : (f as AppFile).path))
         .filter((path): path is string => Boolean(path))
         .map((path) => path.replace(/\\/g, '/'))
-        .filter((path) => !path.startsWith('live/'))
+        .filter((path) => !this.isInternalRootFile(path))
 
       return this.buildFileTree(filePaths, { includeMetadata: true })
     }
 
     return []
+  }
+
+  private isInternalRootFile(path: string): boolean {
+    if (this.internalRootFilePaths.has(path)) {
+      return true
+    }
+
+    return this.internalRootFilePrefixes.some((prefix) => path.startsWith(prefix))
   }
 
   /**

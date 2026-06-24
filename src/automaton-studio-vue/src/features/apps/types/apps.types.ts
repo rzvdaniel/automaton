@@ -438,6 +438,7 @@ export interface AppVersion {
   createdBy: string
   aiSessionId?: string
   aiModel?: string
+  filesChangeSummary?: string
 }
 
 /**
@@ -445,7 +446,6 @@ export interface AppVersion {
  */
 export interface AppVersionDetail extends AppVersion {
   snapshotPath: string
-  filesChangeSummary?: string // JSON structure
 }
 
 /**

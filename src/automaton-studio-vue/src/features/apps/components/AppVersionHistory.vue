@@ -21,6 +21,8 @@ import type { AppVersion, AppVersionDetail, AppVersionList } from '../types/apps
 
 interface Props {
   appId: string
+  title?: string
+  fullPage?: boolean
 }
 
 const props = defineProps<Props>()
@@ -360,6 +362,20 @@ function formatDate(dateStr: string): string {
   }).format(date)
 }
 
+function getChangedFileCount(version: Pick<AppVersion, 'summary'> & { filesChangeSummary?: string }): number | null {
+  if (!version.filesChangeSummary) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(version.filesChangeSummary)
+    const totalChanges = Number(parsed.totalChanges)
+    return Number.isFinite(totalChanges) ? totalChanges : null
+  } catch {
+    return null
+  }
+}
+
 onMounted(() => {
   loadVersions()
 })
@@ -371,12 +387,12 @@ defineExpose({
 </script>
 
 <template>
-  <div class="version-history-panel">
+  <div class="version-history-panel" :class="{ 'version-history-panel--page': fullPage }">
     <!-- Header -->
     <div class="panel-header">
       <div class="header-title">
         <i class="pi pi-history text-lg"></i>
-        <h3>Version History</h3>
+        <h3>{{ title || 'Versions' }}</h3>
       </div>
       <Button
         v-tooltip.left="'Create manual snapshot'"
@@ -487,6 +503,13 @@ defineExpose({
               <div v-if="version.aiModel" class="meta-item">
                 <i class="pi pi-bolt text-xs"></i>
                 <span class="text-xs">{{ version.aiModel }}</span>
+              </div>
+              <div v-if="getChangedFileCount(version) !== null" class="meta-item">
+                <i class="pi pi-file-edit text-xs"></i>
+                <span class="text-xs">
+                  {{ getChangedFileCount(version) }}
+                  {{ getChangedFileCount(version) === 1 ? 'file changed' : 'files changed' }}
+                </span>
               </div>
             </div>
           </div>
@@ -691,6 +714,10 @@ defineExpose({
   height: 100%;
 }
 
+.version-history-panel--page {
+  background: var(--p-surface-0);
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -732,6 +759,10 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.version-history-panel--page .versions-list {
+  padding: 1rem 1.25rem 1.25rem;
 }
 
 .scroll-sentinel {

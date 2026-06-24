@@ -83,14 +83,14 @@ const selectedRunnerId = ref<string | null>(null)
 const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
-const activeTab = ref<'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'>('build')
+const activeTab = ref<'build' | 'code' | 'versions' | 'backend-server' | 'ai' | 'logs' | 'settings'>('build')
 const appEditorNavGroups = [
   {
     label: 'Develop',
     items: [
       { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
       { key: 'code', label: 'Files', icon: 'pi pi-file-edit' },
-      { key: 'history', label: 'History', icon: 'pi pi-history' },
+      { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
     ],
   },
   {
@@ -124,10 +124,6 @@ const appEditorNavGroups = [
 ] as const
 
 const activeNavItem = computed(() => {
-  if (rightPanelMode.value === 'versionHistory' && activeTab.value !== 'settings' && activeTab.value !== 'logs' && activeTab.value !== 'ai') {
-    return 'history'
-  }
-
   return activeTab.value
 })
 
@@ -156,8 +152,8 @@ watch(activeTab, (tab) => {
   }
 })
 
-// Right panel mode (aiAssistant or versionHistory)
-const rightPanelMode = ref<'aiAssistant' | 'versionHistory'>('aiAssistant')
+// Right panel mode
+const rightPanelMode = ref<'aiAssistant'>('aiAssistant')
 const isRightPanelOpen = ref(false)
 
 // Ref to version history component for manual refresh
@@ -231,17 +227,13 @@ function handleSideNavSelect(target: string) {
   switch (target) {
     case 'build':
     case 'code':
+    case 'versions':
     case 'backend-server':
     case 'ai':
     case 'logs':
     case 'settings':
       activeTab.value = target
       rightPanelMode.value = 'aiAssistant'
-      return
-    case 'history':
-      activeTab.value = 'build'
-      rightPanelMode.value = 'versionHistory'
-      isRightPanelOpen.value = true
       return
     default:
       return
@@ -1052,9 +1044,9 @@ async function handleVersionRestored(versionNumber: number) {
   }
 }
 
-// Watch for version history tab activation - reload versions when tab becomes visible
-watch(rightPanelMode, async (mode) => {
-  if (mode === 'versionHistory' && versionHistoryRef.value?.loadVersions) {
+// Reload versions when the dedicated page becomes visible
+watch(activeTab, async (tab) => {
+  if (tab === 'versions' && versionHistoryRef.value?.loadVersions) {
     await versionHistoryRef.value.loadVersions()
   }
 })
@@ -1300,6 +1292,17 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             />
           </div>
 
+          <div v-show="activeTab === 'versions'" class="panel-view">
+            <AppVersionHistory
+              ref="versionHistoryRef"
+              :app-id="resolvedAppId"
+              title="Source Versions"
+              full-page
+              @version-restored="handleVersionRestored"
+              @version-created="handleVersionCreated"
+            />
+          </div>
+
           <!-- Settings View -->
           <div v-show="activeTab === 'settings'" class="settings-view">
             <AppSettings />
@@ -1408,7 +1411,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 </div>
               </SplitterPanel>
 
-              <!-- Right: single shared AI Assistant + Version History panel -->
+              <!-- Right: single shared AI Assistant panel -->
               <SplitterPanel :size="rightPanelSize" :min-size="15" class="splitter-panel">
                 <div class="right-panel-container" :class="{ 'no-pointer-events': isResizing }">
                   <div class="right-panel-header">
@@ -1420,18 +1423,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       <i class="pi pi-sparkles"></i>
                       <span>AI Assistant</span>
                     </button>
-                    <button
-                      class="right-panel-tab"
-                      :class="{ active: rightPanelMode === 'versionHistory' }"
-                      @click="rightPanelMode = 'versionHistory'"
-                    >
-                      <i class="pi pi-history"></i>
-                      <span>History</span>
-                    </button>
                   </div>
                   <div class="ai-sidebar">
                     <AiAssistant
-                      v-show="rightPanelMode === 'aiAssistant'"
                       :key="`ai-assistant-${resolvedAppId}`"
                       resource-type="WebApp"
                       :resource-id="resolvedAppId"
@@ -1448,13 +1442,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       @session-name-generated="handleSessionNameGenerated"
                       @initial-prompt-consumed="handleInitialPromptConsumed"
                       @live-chat-state-updated="handleLiveChatStateUpdated"
-                    />
-                    <AppVersionHistory
-                      v-show="rightPanelMode === 'versionHistory'"
-                      ref="versionHistoryRef"
-                      :app-id="resolvedAppId"
-                      @version-restored="handleVersionRestored"
-                      @version-created="handleVersionCreated"
                     />
                   </div>
                 </div>
