@@ -5,6 +5,36 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$goalPath = "AgentRuns\current\goal.md"
+$taskPath = "AgentRuns\current\task.md"
+$contextPath = "AgentRuns\current\context.md"
+
+if (Test-Path $goalPath) {
+    $goalLastWrite = (Get-Item $goalPath).LastWriteTimeUtc
+
+    $taskIsMissingOrOlder =
+        -not (Test-Path $taskPath) `
+        -or ((Get-Item $taskPath).LastWriteTimeUtc -lt $goalLastWrite)
+
+    $contextIsOlder =
+        (Test-Path $contextPath) `
+        -and ((Get-Item $contextPath).LastWriteTimeUtc -lt $goalLastWrite)
+
+    if ($taskIsMissingOrOlder -or $contextIsOlder) {
+        throw @"
+AgentRuns/current/goal.md is newer than the generated task/context files.
+
+This looks like a new goal, but run-agent-loop.ps1 only continues an existing generated task.
+
+Run this instead:
+
+.\.agent\harness\start-agent-task.ps1
+
+That will clear stale generated files and regenerate task.md/context.md from goal.md.
+"@
+    }
+}
+
 for ($i = 1; $i -le $MaxIterations; $i++) {
     Write-Host ""
     Write-Host "========================================"
