@@ -6,8 +6,34 @@ $model = "gpt-5.5"
 $jsonl = "AgentRuns\current\reviewer.jsonl"
 $metrics = "AgentRuns\current\reviewer-metrics.json"
 $reviewPath = "AgentRuns\current\review.md"
+$reviewerErrorSummaryPath = "AgentRuns\current\reviewer-error-summary.txt"
+$developerErrorSummaryPath = "AgentRuns\current\developer-error-summary.txt"
 
 Write-Host "Model: $model"
+
+# Clear previous reviewer outputs so stale reviews are not mistaken for current results.
+Set-Content $reviewPath ""
+Remove-Item $reviewerErrorSummaryPath -ErrorAction SilentlyContinue
+
+if (-not (Test-Path "AgentRuns\current\task.md")) {
+    throw "AgentRuns\current\task.md does not exist."
+}
+
+$taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+if ([string]::IsNullOrWhiteSpace($taskContent)) {
+    throw "AgentRuns\current\task.md is empty."
+}
+
+if (-not (Test-Path "AgentRuns\current\result.md")) {
+    throw "AgentRuns\current\result.md does not exist."
+}
+
+$resultContent = Get-Content "AgentRuns\current\result.md" -Raw
+
+if ([string]::IsNullOrWhiteSpace($resultContent)) {
+    throw "AgentRuns\current\result.md is empty."
+}
 
 $prompt = @"
 Read .agent/agents/reviewer.md.
@@ -16,33 +42,154 @@ Read AgentRuns/current/context.md if it exists.
 Read AgentRuns/current/result.md.
 Read AgentRuns/current/developer-error-summary.txt if it exists.
 
-Review the current git diff against the task and context.
+Review the current git diff.
 
 Follow the reviewer role instructions.
 
 Important:
-- If result.md is a recovery result, inspect developer-error-summary.txt and the current git diff.
-- If the captured error appears related to the current diff, use decision: fix.
-- If the captured error appears unrelated/pre-existing, say so clearly and do not block only for that reason.
-- Use PowerShell Set-Content when writing AgentRuns files.
+- If result.md is a recovery result, review the current git diff and captured error summary.
+- If captured verification errors appear related to the current diff, use decision: fix.
+- If the implementation cannot be safely reviewed, use decision: stop.
+- Always write AgentRuns/current/review.md before finishing.
+
+Use PowerShell Set-Content when writing AgentRuns files.
 "@
 
-$prompt | codex exec `
-    -m $model `
-    --json `
-    --dangerously-bypass-approvals-and-sandbox `
-    --cd . `
-    - `
-    2>&1 | Tee-Object $jsonl
+$codexFailed = $false
+$codexError = $null
+$codexExitCode = 0
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Codex reviewer failed with exit code $LASTEXITCODE. See $jsonl"
+try {
+    & {
+        # Prevent native stderr from becoming a terminating PowerShell error before
+        # the harness can capture Codex output and create a fallback review.
+        $ErrorActionPreference = "Continue"
+
+        $prompt | codex exec `
+            -m $model `
+            --json `
+            --dangerously-bypass-approvals-and-sandbox `
+            --cd . `
+            - `
+            2>&1
+    } | Tee-Object $jsonl
+
+    $codexExitCode = $LASTEXITCODE
+}
+catch {
+    $codexFailed = $true
+    $codexError = $_
+    $codexExitCode = 1
 }
 
-$jsonlContent = Get-Content $jsonl -Raw
+$jsonlContent = ""
 
-if ($jsonlContent -match '"type":"error"' -or $jsonlContent -match '"type":"turn.failed"') {
-    throw "Codex reviewer failed. See $jsonl"
+if (Test-Path $jsonl) {
+    $jsonlContent = Get-Content $jsonl -Raw
+}
+
+$codexReportedFailure =
+    $codexFailed `
+    -or $codexExitCode -ne 0 `
+    -or $jsonlContent -match '"type":"error"' `
+    -or $jsonlContent -match '"type":"turn.failed"'
+
+$gitStatus = git status --short
+
+if ($codexReportedFailure) {
+    Write-Host ""
+    Write-Host "Reviewer Codex run failed."
+    Write-Host "Writing fallback review.md so the loop can stop or continue safely."
+
+    $errorText = ""
+
+    if ($codexError) {
+        $errorText = $codexError.ToString()
+    }
+
+    $reviewerErrorSummary = ""
+
+    if (Test-Path $jsonl) {
+        $reviewerErrorSummary = Get-Content $jsonl |
+            Select-Object -Last 160 |
+            Out-String
+
+        Set-Content $reviewerErrorSummaryPath $reviewerErrorSummary
+    }
+    else {
+        $reviewerErrorSummary = "No reviewer JSONL file was created."
+        Set-Content $reviewerErrorSummaryPath $reviewerErrorSummary
+    }
+
+    $developerErrorSummary = ""
+
+    if (Test-Path $developerErrorSummaryPath) {
+        $developerErrorSummary = Get-Content $developerErrorSummaryPath -Raw
+    }
+
+    $decision = "stop"
+    $severity = "major"
+    $nextAction = "Human should inspect AgentRuns/current/reviewer-error-summary.txt and the current git diff."
+
+    if ($gitStatus -and -not [string]::IsNullOrWhiteSpace($developerErrorSummary)) {
+        $decision = "fix"
+        $severity = "major"
+        $nextAction = "Run the developer again. The previous developer step produced changes but verification/reviewer execution failed, so the developer should inspect the current diff and captured error summaries."
+    }
+    elseif ($gitStatus) {
+        $decision = "stop"
+        $severity = "major"
+        $nextAction = "Human should inspect the current git diff. Code changes exist, but the reviewer failed before producing a normal review."
+    }
+
+    $fallbackReview = @"
+decision: $decision
+severity: $severity
+
+reason:
+The reviewer agent exited with code $codexExitCode before completing normally, so this fallback review was generated by run-reviewer.ps1.
+
+Current git status:
+
+````text
+$gitStatus
+````
+
+Reviewer error summary was written to:
+
+````text
+$reviewerErrorSummaryPath
+````
+
+Developer error summary:
+
+````text
+$developerErrorSummary
+````
+
+Reviewer error:
+
+````text
+$errorText
+````
+
+Last reviewer output:
+
+````text
+$reviewerErrorSummary
+````
+
+next_action:
+$nextAction
+
+follow_up_items:
+- Inspect AgentRuns/current/reviewer-error-summary.txt.
+- Inspect AgentRuns/current/developer-error-summary.txt if it exists.
+- Run git diff.
+- If the errors are related to the current diff, fix them before accepting.
+"@
+
+    Set-Content $reviewPath $fallbackReview
 }
 
 try {
@@ -82,4 +229,11 @@ if (Test-Path $metrics) {
 }
 else {
     Write-Host "No reviewer metrics file created."
+}
+
+if (Test-Path $reviewerErrorSummaryPath) {
+    Write-Host ""
+    Write-Host "Reviewer error summary:"
+    Write-Host "----------------------------------------"
+    Write-Host $reviewerErrorSummaryPath
 }
