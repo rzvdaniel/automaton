@@ -28,47 +28,46 @@ if ($gitStatus) {
 
 New-Item -ItemType Directory -Force -Path "AgentRuns\current" | Out-Null
 
-Write-Host ""
-Write-Host "Clearing previous agent run files..."
-
-Set-Content "AgentRuns\current\result.md" ""
-Set-Content "AgentRuns\current\review.md" ""
-
-Remove-Item "AgentRuns\current\*.jsonl" -ErrorAction SilentlyContinue
-Remove-Item "AgentRuns\current\*-metrics.json" -ErrorAction SilentlyContinue
-Remove-Item "AgentRuns\current\metrics.json" -ErrorAction SilentlyContinue
-Remove-Item "AgentRuns\current\scope.json" -ErrorAction SilentlyContinue
-Remove-Item "AgentRuns\current\context.md" -ErrorAction SilentlyContinue
-
-# Do not automatically clear goal.md.
-# Do not automatically clear task.md, because Small/Tiny mode may rely on a manually written task.
-
 if (-not (Test-Path "AgentRuns\current\goal.md")) {
     Set-Content "AgentRuns\current\goal.md" ""
 }
 
-if (-not (Test-Path "AgentRuns\current\task.md")) {
-    Set-Content "AgentRuns\current\task.md" ""
-}
-
 $goalContent = Get-Content "AgentRuns\current\goal.md" -Raw
-$taskContent = Get-Content "AgentRuns\current\task.md" -Raw
 
-if ([string]::IsNullOrWhiteSpace($goalContent) -and [string]::IsNullOrWhiteSpace($taskContent)) {
+if ([string]::IsNullOrWhiteSpace($goalContent)) {
     Write-Host ""
-    Write-Host "No goal.md or task.md content found."
+    Write-Host "No goal.md content found."
     Write-Host "Write your goal here:"
     Write-Host "AgentRuns\current\goal.md"
-    Write-Host ""
-    Write-Host "Or write a direct task here for Small/Tiny mode:"
-    Write-Host "AgentRuns\current\task.md"
     exit 1
 }
+
+Write-Host ""
+Write-Host "Clearing previous generated agent run files..."
+
+# User-authored input:
+# - goal.md is preserved.
+#
+# Generated files:
+# - always clear these to avoid stale state from a previous run.
+Set-Content "AgentRuns\current\task.md" ""
+Set-Content "AgentRuns\current\result.md" ""
+Set-Content "AgentRuns\current\review.md" ""
+
+Remove-Item "AgentRuns\current\context.md" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\scope.json" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\*.jsonl" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\*-metrics.json" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\metrics.json" -ErrorAction SilentlyContinue
 
 $effectiveMode = $Mode.ToLowerInvariant()
 
 if ($effectiveMode -eq "auto") {
     .\.agent\harness\classify-agent-scope.ps1
+
+    if (-not (Test-Path "AgentRuns\current\scope.json")) {
+        throw "Classifier did not create AgentRuns\current\scope.json"
+    }
 
     $scope = Get-Content "AgentRuns\current\scope.json" -Raw | ConvertFrom-Json
     $effectiveMode = $scope.mode.ToLowerInvariant()
@@ -97,26 +96,41 @@ Write-Host "----------------------------------------"
 
 switch ($effectiveMode) {
     "normal" {
-        # In normal mode, the orchestrator creates/replaces task.md from goal.md.
         .\.agent\harness\run-orchestrator.ps1
         .\.agent\harness\run-agent-loop.ps1 -MaxIterations $MaxIterations
     }
 
     "small" {
+        # In Auto mode, classify-agent-scope.ps1 should already have generated task.md.
+        # In forced Small mode, generate task.md from goal.md now.
         $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
 
         if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            throw "Small mode requires a manually written AgentRuns\current\task.md"
+            .\.agent\harness\classify-agent-scope.ps1 -ForcedMode Small
+        }
+
+        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+        if ([string]::IsNullOrWhiteSpace($taskContent)) {
+            throw "Small mode requires generated AgentRuns\current\task.md"
         }
 
         .\.agent\harness\run-agent-loop.ps1 -MaxIterations $MaxIterations
     }
 
     "tiny" {
+        # In Auto mode, classify-agent-scope.ps1 should already have generated task.md.
+        # In forced Tiny mode, generate task.md from goal.md now.
         $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
 
         if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            throw "Tiny mode requires a manually written AgentRuns\current\task.md"
+            .\.agent\harness\classify-agent-scope.ps1 -ForcedMode Tiny
+        }
+
+        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+        if ([string]::IsNullOrWhiteSpace($taskContent)) {
+            throw "Tiny mode requires generated AgentRuns\current\task.md"
         }
 
         .\.agent\harness\run-agent-loop.ps1 -MaxIterations 1 -SkipReviewer
@@ -139,4 +153,12 @@ if (Test-Path "AgentRuns\current\review.md") {
 
 if (Test-Path "AgentRuns\current\scope.json") {
     Write-Host "AgentRuns\current\scope.json"
+}
+
+if (Test-Path "AgentRuns\current\context.md") {
+    Write-Host "AgentRuns\current\context.md"
+}
+
+if (Test-Path "AgentRuns\current\metrics.json") {
+    Write-Host "AgentRuns\current\metrics.json"
 }
