@@ -19,20 +19,19 @@ if ([string]::IsNullOrWhiteSpace($taskContent)) {
     throw "AgentRuns\current\task.md is empty."
 }
 
+.\.agent\harness\prepare-developer-input.ps1
+
 $prompt = @"
 Read .agent/agents/developer.md.
-Read AgentRuns/current/task.md.
-Read AgentRuns/current/context.md if it exists.
-Read AgentRuns/current/review.md if it exists.
+Read AgentRuns/current/developer-input.md.
 
-Follow the developer role instructions.
+Implement only the requested task or reviewer fix.
 
-Important:
-- Always write AgentRuns/current/result.md before finishing.
-- If verification fails, do not stop silently.
-- Capture the failure in result.md.
-- Explain whether the failure appears related to the current diff.
-- If code changes were made, result.md must still be written.
+Rules:
+- Prefer changing only files listed in context.
+- Do not inspect unrelated directories unless necessary.
+- If you inspect extra files, explain why in result.md.
+- Always write AgentRuns/current/result.md.
 
 Use PowerShell Set-Content when writing AgentRuns files.
 "@

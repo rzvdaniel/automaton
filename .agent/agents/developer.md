@@ -20,6 +20,15 @@ Rules:
 - Run verification commands from the task where possible.
 - If you make no code changes, explain why in `result.md`.
 
+## Token/context budget
+
+- Read only task/context/review input first.
+- Prefer files listed in context.md.
+- Do not perform broad repository searches unless required.
+- Do not open large files unless necessary.
+- If a file is large, inspect relevant sections only.
+- Keep result.md under 120 lines.
+
 `result.md` format:
 
 ## Summary

@@ -22,6 +22,14 @@ If verification was not run, decide whether that should block acceptance.
 For small UI/copy changes, missing verification may be minor.
 For risky behavior changes, missing verification should usually be `fix` or `major`.
 
+## Token/context budget
+
+- Start from AgentRuns/current/review-input.md.
+- Review the prepared diff first.
+- Do not inspect unrelated files.
+- Do not read full source files unless the diff is insufficient.
+- Keep review.md under 120 lines.
+
 Use this format:
 
 decision: accept | fix | done | stop

@@ -35,22 +35,22 @@ if ([string]::IsNullOrWhiteSpace($resultContent)) {
     throw "AgentRuns\current\result.md is empty."
 }
 
+# Prepare a compact reviewer input so Codex does not need to inspect broadly.
+.\.agent\harness\prepare-review-input.ps1
+
+if (-not (Test-Path "AgentRuns\current\review-input.md")) {
+    throw "prepare-review-input.ps1 did not create AgentRuns\current\review-input.md"
+}
+
 $prompt = @"
 Read .agent/agents/reviewer.md.
-Read AgentRuns/current/task.md.
-Read AgentRuns/current/context.md if it exists.
-Read AgentRuns/current/result.md.
-Read AgentRuns/current/developer-error-summary.txt if it exists.
+Read AgentRuns/current/review-input.md.
 
-Review the current git diff.
+Review only the prepared review input.
+Do not inspect unrelated repository files unless the prepared diff is insufficient.
+If the diff is truncated, say whether that prevents acceptance.
 
-Follow the reviewer role instructions.
-
-Important:
-- If result.md is a recovery result, review the current git diff and captured error summary.
-- If captured verification errors appear related to the current diff, use decision: fix.
-- If the implementation cannot be safely reviewed, use decision: stop.
-- Always write AgentRuns/current/review.md before finishing.
+Always write AgentRuns/current/review.md.
 
 Use PowerShell Set-Content when writing AgentRuns files.
 "@

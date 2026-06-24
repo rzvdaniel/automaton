@@ -17,6 +17,14 @@ Rules:
 - Do not include large code dumps in context.md.
 - Include only useful implementation and review context.
 
+## Token/context budget
+
+- Read .agent/repo-map.md first.
+- Prefer targeted searches.
+- Inspect only files likely relevant to the goal.
+- Do not perform broad repository exploration unless necessary.
+- Keep context.md concise and actionable.
+
 `task.md` must include:
 - title
 - goal
