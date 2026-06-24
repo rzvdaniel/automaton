@@ -11,7 +11,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 const { isDark } = useUserSettings()
 
 const props = defineProps<{
-  activeTab: 'build' | 'code' | 'versions' | 'backend-server' | 'ai' | 'logs' | 'settings'
+  activeTab: 'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'
   appName: string
   isEditingName: boolean
   editingName: string
@@ -62,7 +62,7 @@ const openAppLabel = computed(() => {
 })
 
 const showsEditorActions = computed(() =>
-  props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
+  props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
 )
 
 const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPublicApp)
@@ -208,7 +208,7 @@ function handlePrimaryAction() {
       </div>
 
       <Button
-        v-if="showsEditorActions && activeTab !== 'backend-server'"
+        v-if="showsEditorActions && activeTab !== 'services'"
         icon="pi pi-eye"
         label="Preview"
         text
@@ -225,7 +225,7 @@ function handlePrimaryAction() {
         @click="emit('toggleAssistant')"
       />
 
-      <div v-if="showsEditorActions && activeTab !== 'backend-server'" class="deploy-actions">
+      <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
           label="Deploy"
           icon="pi pi-cloud-upload"
@@ -283,7 +283,7 @@ function handlePrimaryAction() {
       </div>
 
       <Button
-        v-if="hasUnsavedChanges && activeTab === 'code'"
+        v-if="hasUnsavedChanges && activeTab === 'files'"
         label="Save All"
         icon="pi pi-save"
         :loading="isSaving"

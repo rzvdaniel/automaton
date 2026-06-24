@@ -170,7 +170,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   })
   const editorModeNoticeText = computed(() => {
     if (showsLocalLiveBanner.value) {
-      return 'This app was deployed from local files. Source files are not available in Studio, so the Code tab only shows uploaded source content. Use automaton pull or upload source files to edit the app here.'
+      return 'This app was deployed from local files. Source files are not available in Studio, so the Files tab only shows uploaded source content. Use automaton pull or upload source files to edit the app here.'
     }
 
     if (!showsSourceDeployBanner.value || !currentApp.value) {

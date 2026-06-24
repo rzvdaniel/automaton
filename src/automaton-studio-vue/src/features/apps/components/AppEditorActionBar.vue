@@ -7,7 +7,7 @@ import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import type { AppChatStats } from '@/shared/types/ai.types'
 
 const props = defineProps<{
-  activeTab: 'build' | 'code' | 'backend-server' | 'ai' | 'logs' | 'settings'
+  activeTab: 'build' | 'files' | 'services' | 'logs' | 'settings'
   hasRunners: boolean | null
   selectedRunnerId: string | null
   isSaving: boolean
@@ -41,7 +41,7 @@ const emit = defineEmits<{
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 const isEditorActionTab = computed(
-  () => props.activeTab === 'build' || props.activeTab === 'code' || props.activeTab === 'backend-server',
+  () => props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
 )
 
 const openAppLabel = computed(() => {
@@ -195,7 +195,7 @@ function formatTokenCount(count: number): string {
       </div>
 
       <Button
-        v-if="activeTab !== 'backend-server'"
+        v-if="activeTab !== 'services'"
         v-tooltip.bottom="'Open full-screen preview'"
         icon="pi pi-eye"
         label="Preview"
@@ -204,7 +204,7 @@ function formatTokenCount(count: number): string {
         @click="emit('preview')"
       />
 
-      <div v-if="activeTab !== 'backend-server'" class="deploy-actions">
+      <div v-if="activeTab !== 'services'" class="deploy-actions">
         <Button
           :label="primaryActionLabel"
           :icon="primaryActionIcon"
@@ -225,7 +225,7 @@ function formatTokenCount(count: number): string {
 
     <div class="action-bar-right">
       <Button
-        v-if="hasUnsavedChanges && activeTab === 'code'"
+        v-if="hasUnsavedChanges && activeTab === 'files'"
         label="Save All"
         icon="pi pi-save"
         :loading="isSaving"

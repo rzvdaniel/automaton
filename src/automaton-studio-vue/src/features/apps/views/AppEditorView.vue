@@ -23,7 +23,6 @@ import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
 import AppSettings from '../components/AppSettings.vue'
 import AppVersionHistory from '../components/AppVersionHistory.vue'
-import AppBuildLogs from '../components/AppBuildLogs.vue'
 import AppRuntimeLogs from '../components/AppRuntimeLogs.vue'
 import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
@@ -39,7 +38,6 @@ import { aiConversationClient } from '@/shared/services/ai/ai-conversation-clien
 import type { PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
 import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
-import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import {
   executeUiAutomationAction,
@@ -83,20 +81,14 @@ const selectedRunnerId = ref<string | null>(null)
 const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
-const activeTab = ref<'build' | 'code' | 'versions' | 'backend-server' | 'ai' | 'logs' | 'settings'>('build')
+const activeTab = ref<'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'>('build')
 const appEditorNavGroups = [
   {
     label: 'Develop',
     items: [
       { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
-      { key: 'code', label: 'Files', icon: 'pi pi-file-edit' },
+      { key: 'files', label: 'Files', icon: 'pi pi-file-edit' },
       { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
-    ],
-  },
-  {
-    label: 'AI',
-    items: [
-      { key: 'ai', label: 'Build Sessions', icon: 'pi pi-sparkles' },
     ],
   },
   {
@@ -112,7 +104,7 @@ const appEditorNavGroups = [
     items: [
       { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
       { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
-      { key: 'backend-server', label: 'Services', icon: 'pi pi-server', disabled: true },
+      { key: 'services', label: 'Services', icon: 'pi pi-server', disabled: true },
       { key: 'logs', label: 'Logs', icon: 'pi pi-list' },
     ],
   },
@@ -139,13 +131,6 @@ watch(
 
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
-const buildLogsRef   = ref<{ reload: () => void } | null>(null)
-
-// Live AI chat mirror used by Logs -> AI Build Logs so it reflects in-progress streaming state.
-const liveBuildSession = ref<ChatSession | null>(null)
-const liveBuildMessages = ref<ChatMessage[]>([])
-const liveBuildIsBusy = ref(false)
-
 watch(activeTab, (tab) => {
   if (tab === 'logs') {
     nextTick(() => runtimeLogsRef.value?.loadLogs())
@@ -212,7 +197,7 @@ function handleRightPanelSplitterResize(event: any) {
 }
 
 function toggleAssistantPanel() {
-  if (activeTab.value === 'backend-server') {
+  if (activeTab.value === 'services') {
     return
   }
 
@@ -226,10 +211,9 @@ function toggleAssistantPanel() {
 function handleSideNavSelect(target: string) {
   switch (target) {
     case 'build':
-    case 'code':
+    case 'files':
     case 'versions':
-    case 'backend-server':
-    case 'ai':
+    case 'services':
     case 'logs':
     case 'settings':
       activeTab.value = target
@@ -1006,21 +990,6 @@ async function handleVersionCreated() {
   if (versionHistoryRef.value?.loadVersions) {
     await versionHistoryRef.value.loadVersions()
   }
-  buildLogsRef.value?.reload()
-}
-
-function handleBuildSessionsChanged() {
-  buildLogsRef.value?.reload()
-}
-
-function handleLiveChatStateUpdated(payload: {
-  activeSession: ChatSession | null
-  messages: ChatMessage[]
-  isBusy: boolean
-}) {
-  liveBuildSession.value = payload.activeSession
-  liveBuildMessages.value = payload.messages
-  liveBuildIsBusy.value = payload.isBusy
 }
 
 // Handle version restored
@@ -1264,7 +1233,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       />
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
-        This app was deployed from local files. Source files are not available in Studio, so the Code tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
+        This app was deployed from local files. Source files are not available in Studio, so the Files tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
       </div>
 
       <div class="app-editor-shell">
@@ -1275,16 +1244,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         />
 
         <div class="app-editor-content">
-          <div v-show="activeTab === 'ai'" class="panel-view">
-            <AppBuildLogs
-              ref="buildLogsRef"
-              :app-id="resolvedAppId"
-              :live-active-session="liveBuildSession"
-              :live-messages="liveBuildMessages"
-              :live-is-busy="liveBuildIsBusy"
-            />
-          </div>
-
           <div v-show="activeTab === 'logs'" class="panel-view">
             <AppRuntimeLogs
               ref="runtimeLogsRef"
@@ -1308,12 +1267,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             <AppSettings />
           </div>
 
-          <div v-if="activeTab === 'backend-server'" class="backend-server-view">
+          <div v-if="activeTab === 'services'" class="backend-server-view">
             <BackendServerFiles :app-id="resolvedAppId" />
           </div>
 
-          <!-- Build View - single shared layout for Visual (Build tab) and Code modes (Code tab) -->
-          <div v-show="activeTab === 'build' || activeTab === 'code'" class="build-content-wrapper">
+          <!-- Build View - single shared layout for Visual (Build tab) and Files modes (Files tab) -->
+          <div v-show="activeTab === 'build' || activeTab === 'files'" class="build-content-wrapper">
             <Splitter
               v-if="isRightPanelOpen"
               class="build-outer-splitter"
@@ -1322,7 +1281,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               @resize="handleSplitterResizing"
               @resizeend="handleRightPanelSplitterResize"
             >
-              <!-- Left: main workspace (visual or code) -->
+              <!-- Left: main workspace (visual or files) -->
               <SplitterPanel :size="100 - rightPanelSize" :min-size="40" class="splitter-panel">
                 <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
                   <!-- Visual mode workspace - shown in Build tab -->
@@ -1330,9 +1289,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                     <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" :runner-id="selectedRunnerId" />
                   </div>
 
-                  <!-- Code mode: file tree + editor - shown in Code tab -->
+                  <!-- Files mode: file tree + editor - shown in Files tab -->
                   <Splitter
-                    v-show="activeTab === 'code'"
+                    v-show="activeTab === 'files'"
                     class="editor-layout"
                     layout="horizontal"
                     :gutter-size="8"
@@ -1438,10 +1397,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       :ui-logs="editorStore.uiLogEntries"
                       :tool-execution-handler="handleAiToolExecuted"
                       @session-created="handleVersionCreated"
-                      @chat-message-sent="handleBuildSessionsChanged"
                       @session-name-generated="handleSessionNameGenerated"
                       @initial-prompt-consumed="handleInitialPromptConsumed"
-                      @live-chat-state-updated="handleLiveChatStateUpdated"
                     />
                   </div>
                 </div>
@@ -1457,9 +1414,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 />
               </div>
 
-              <!-- Code mode: file tree + editor - shown in Code tab -->
+              <!-- Files mode: file tree + editor - shown in Files tab -->
               <Splitter
-                v-show="activeTab === 'code'"
+                v-show="activeTab === 'files'"
                 class="editor-layout"
                 layout="horizontal"
                 :gutter-size="8"

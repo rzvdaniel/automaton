@@ -1,7 +1,4 @@
 <script setup lang="ts">
-type AppEditorTab = 'build' | 'code' | 'versions' | 'backend-server' | 'ai' | 'logs' | 'settings'
-type NavTarget = AppEditorTab
-
 interface NavItem {
   key: string
   label: string
@@ -15,7 +12,7 @@ interface NavGroup {
 }
 
 defineProps<{
-  activeItem: NavTarget
+  activeItem: 'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'
   groups: ReadonlyArray<NavGroup>
 }>()
 
