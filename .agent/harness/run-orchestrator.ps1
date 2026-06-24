@@ -13,8 +13,11 @@ Read .agent/agents/orchestrator.md.
 Read AgentRuns/current/goal.md.
 Read AgentRuns/current/review.md if it exists.
 
-Create the next small implementation task.
-Write the task to AgentRuns/current/task.md.
+Follow the orchestrator role instructions.
+
+Write:
+- AgentRuns/current/task.md
+- AgentRuns/current/context.md
 
 Use PowerShell Set-Content when writing AgentRuns files.
 Do not modify application code.
@@ -54,10 +57,25 @@ if ([string]::IsNullOrWhiteSpace($taskContent)) {
     throw "Orchestrator created an empty task.md"
 }
 
+if (-not (Test-Path "AgentRuns\current\context.md")) {
+    throw "Orchestrator did not create AgentRuns\current\context.md"
+}
+
+$contextContent = Get-Content "AgentRuns\current\context.md" -Raw
+
+if ([string]::IsNullOrWhiteSpace($contextContent)) {
+    throw "Orchestrator created an empty context.md"
+}
+
 Write-Host ""
 Write-Host "Task created:"
 Write-Host "----------------------------------------"
 Get-Content AgentRuns\current\task.md
+
+Write-Host ""
+Write-Host "Context created:"
+Write-Host "----------------------------------------"
+Get-Content AgentRuns\current\context.md
 
 Write-Host ""
 Write-Host "Metrics:"

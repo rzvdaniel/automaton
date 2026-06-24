@@ -1,5 +1,6 @@
 param(
-    [int]$MaxIterations = 3
+    [int]$MaxIterations = 3,
+    [switch]$SkipReviewer
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,13 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     Write-Host "========================================"
 
     .\.agent\harness\run-developer.ps1
+
+    if ($SkipReviewer) {
+        Write-Host ""
+        Write-Host "Skipping reviewer. Manual git diff review required."
+        break
+    }
+
     .\.agent\harness\run-reviewer.ps1
 
     if (-not (Test-Path "AgentRuns\current\review.md")) {

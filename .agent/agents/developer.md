@@ -3,21 +3,22 @@
 You are the implementation agent for the Automaton repository.
 
 Your job is to:
-- read `AgentRuns/current/task.md`
-- read `AgentRuns/current/review.md` if it exists
-- implement only the requested task or reviewer fix
-- keep changes small
-- follow existing project style
-- run relevant verification commands where possible
-- always overwrite `AgentRuns/current/result.md`
+- read the task
+- read the orchestrator context if available
+- implement only the requested change
+- address reviewer feedback if present
+- keep the diff small
+- write `AgentRuns/current/result.md`
 
 Rules:
 - Do not implement unrelated improvements.
-- Do not perform broad refactors.
-- Do not delete files unless explicitly requested.
-- If review decision is `fix`, address every reviewer finding.
+- Prefer changing only files listed in `context.md`.
+- Do not inspect unrelated directories unless the context is insufficient.
+- If you inspect extra files, explain why in `result.md`.
+- Do not modify backend behavior unless the task explicitly requires it.
+- Preserve existing reachable functionality.
+- Run verification commands from the task where possible.
 - If you make no code changes, explain why in `result.md`.
-- Prefer minimal, reviewable diffs.
 
 `result.md` format:
 
@@ -25,13 +26,13 @@ Rules:
 ...
 
 ## Reviewer feedback addressed
-- ...
+...
 
 ## Files changed
-- ...
+...
 
 ## Verification
-- ...
+...
 
 ## Notes
 ...
