@@ -5,6 +5,7 @@ Write-Host "Running Reviewer..."
 $model = "gpt-5.5"
 $jsonl = "AgentRuns\current\reviewer.jsonl"
 $metrics = "AgentRuns\current\reviewer-metrics.json"
+$reviewPath = "AgentRuns\current\review.md"
 
 Write-Host "Model: $model"
 
@@ -13,12 +14,17 @@ Read .agent/agents/reviewer.md.
 Read AgentRuns/current/task.md.
 Read AgentRuns/current/context.md if it exists.
 Read AgentRuns/current/result.md.
+Read AgentRuns/current/developer-error-summary.txt if it exists.
 
-Review the current git diff.
+Review the current git diff against the task and context.
 
 Follow the reviewer role instructions.
 
-Use PowerShell Set-Content when writing AgentRuns files.
+Important:
+- If result.md is a recovery result, inspect developer-error-summary.txt and the current git diff.
+- If the captured error appears related to the current diff, use decision: fix.
+- If the captured error appears unrelated/pre-existing, say so clearly and do not block only for that reason.
+- Use PowerShell Set-Content when writing AgentRuns files.
 "@
 
 $prompt | codex exec `
@@ -39,17 +45,24 @@ if ($jsonlContent -match '"type":"error"' -or $jsonlContent -match '"type":"turn
     throw "Codex reviewer failed. See $jsonl"
 }
 
-.\.agent\harness\write-agent-metrics.ps1 `
-    -Role "reviewer" `
-    -Model $model `
-    -JsonlPath $jsonl `
-    -MetricsPath $metrics
+try {
+    .\.agent\harness\write-agent-metrics.ps1 `
+        -Role "reviewer" `
+        -Model $model `
+        -JsonlPath $jsonl `
+        -MetricsPath $metrics
+}
+catch {
+    Write-Host ""
+    Write-Host "Warning: failed to write reviewer metrics."
+    Write-Host $_
+}
 
-if (-not (Test-Path "AgentRuns\current\review.md")) {
+if (-not (Test-Path $reviewPath)) {
     throw "Reviewer did not create AgentRuns\current\review.md"
 }
 
-$reviewContent = Get-Content "AgentRuns\current\review.md" -Raw
+$reviewContent = Get-Content $reviewPath -Raw
 
 if ([string]::IsNullOrWhiteSpace($reviewContent)) {
     throw "Reviewer created an empty review.md"
@@ -58,7 +71,7 @@ if ([string]::IsNullOrWhiteSpace($reviewContent)) {
 Write-Host ""
 Write-Host "Review:"
 Write-Host "----------------------------------------"
-Get-Content AgentRuns\current\review.md
+Get-Content $reviewPath
 
 Write-Host ""
 Write-Host "Metrics:"
@@ -66,4 +79,7 @@ Write-Host "----------------------------------------"
 
 if (Test-Path $metrics) {
     Get-Content $metrics
+}
+else {
+    Write-Host "No reviewer metrics file created."
 }
