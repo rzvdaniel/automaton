@@ -6,29 +6,34 @@ Your job is to:
 - read the task
 - read implementation context if available
 - read developer result
-- inspect the current git diff
+- inspect the prepared current git diff
 - check whether acceptance criteria were met
 - write `AgentRuns/current/review.md`
 
 Review rules:
-- Review primarily the changed files.
-- Use context.md to understand expected behavior and risks.
+- Review primarily `AgentRuns/current/review-input.md`.
+- Review primarily the changed files shown in the prepared diff.
+- Use `context.md` only when it is already included in the prepared review input.
 - Do not inspect unrelated repository files unless the diff suggests a problem.
 - Do not request changes for unrelated pre-existing issues.
 - Consider type-check passing as strong evidence.
 - Consider build failure blocking only if caused by the current diff.
 - Also check the verification results from `result.md`.
-If verification was not run, decide whether that should block acceptance.
-For small UI/copy changes, missing verification may be minor.
-For risky behavior changes, missing verification should usually be `fix` or `major`.
+- If verification was not run, decide whether that should block acceptance.
+- For small UI/copy changes, missing verification may be minor.
+- For risky behavior changes, missing verification should usually be `fix` or `major`.
 
 ## Token/context budget
 
-- Start from AgentRuns/current/review-input.md.
+The token budget in `AgentRuns/current/review-input.md` is mandatory guidance.
+
+- Start from `AgentRuns/current/review-input.md`.
 - Review the prepared diff first.
-- Do not inspect unrelated files.
+- Do not inspect repository files unless the prepared diff is truncated, incomplete, or insufficient to evaluate acceptance criteria.
 - Do not read full source files unless the diff is insufficient.
-- Keep review.md under 120 lines.
+- For `small` tasks, task + result + diff should normally be enough.
+- `micro` and `tiny` tasks are normally developer-only and should not reach reviewer unless run manually.
+- Keep `review.md` under 120 lines.
 
 Use this format:
 

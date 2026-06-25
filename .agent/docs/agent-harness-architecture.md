@@ -17,52 +17,32 @@ Its objectives are to:
 
 # Design Principles
 
-The harness is built around five principles.
-
 ## 1. Single Responsibility
 
 Each agent has one clear responsibility.
 
-* Scope Classifier chooses the execution strategy.
-* Orchestrator plans the work.
+* Scope Classifier chooses the execution strategy and token budget.
+* Orchestrator plans larger work.
 * Developer modifies code.
-* Reviewer validates the implementation.
+* Reviewer validates the implementation when the selected mode requires review.
 
 No role should perform another role's responsibilities.
 
----
-
 ## 2. Recoverability
 
-AI failures should never lose useful work.
-
-If code changes already exist, the harness should generate recovery files instead of aborting.
-
----
+AI failures should never lose useful work. If code changes already exist, the harness should generate recovery files instead of aborting.
 
 ## 3. Determinism
 
-Every execution produces a reproducible trail.
-
-Generated files describe exactly what happened and allow another agent—or a human—to continue from the current state.
-
----
+Every execution produces a reproducible trail. Generated files describe exactly what happened and allow another agent—or a human—to continue from the current state.
 
 ## 4. Minimal Context
 
-Every role should receive only the information it needs.
-
-Large repository exploration should happen once.
-
-Subsequent roles should reuse prepared context rather than rediscovering it.
-
----
+Every role should receive only the information it needs. Large repository exploration should happen once. Subsequent roles should reuse prepared context rather than rediscovering it.
 
 ## 5. Human Override
 
-Every stage can be inspected, edited, or rerun manually.
-
-The harness assists the user but never removes control.
+Every stage can be inspected, edited, or rerun manually. The harness assists the user but never removes control.
 
 ---
 
@@ -74,9 +54,17 @@ goal.md
     ▼
 Scope Classifier
     │
+    ├── Micro
+    │       ▼
+    │   Developer
+    │       ▼
+    │   Human git diff review
+    │
     ├── Tiny
     │       ▼
     │   Developer
+    │       ▼
+    │   Human git diff review
     │
     ├── Small
     │       ▼
@@ -119,21 +107,69 @@ The loop continues until:
 
 # Execution Modes
 
+## Micro
+
+Input:
+
+* `goal.md`
+
+Classifier generates:
+
+* `scope.json`
+* `task.md`
+
+Runs:
+
+* Developer only
+
+Used for the cheapest safe path: one obvious file, mechanical UI/copy/default-value/CSS changes, and no reviewer judgment required.
+
+Examples:
+
+* rename a visible label
+* change a default boolean
+* change a default splitter ratio
+* tiny CSS spacing tweak
+* one-line config value
+
+Manual `git diff` review is expected.
+
+Default budget:
+
+```json
+{
+  "developer_input_max": 60000,
+  "reviewer_input_max": 0,
+  "max_files_to_inspect": 3
+}
+```
+
 ## Tiny
 
 Input:
 
 * `goal.md`
 
+Classifier generates:
+
+* `scope.json`
+* `task.md`
+
 Runs:
 
-* Developer
+* Developer only
 
-Used for trivial changes.
+Used for trivial mechanical changes where human review is expected.
 
-Manual review is expected.
+Default budget:
 
----
+```json
+{
+  "developer_input_max": 80000,
+  "reviewer_input_max": 0,
+  "max_files_to_inspect": 5
+}
+```
 
 ## Small
 
@@ -143,6 +179,7 @@ Input:
 
 Classifier generates:
 
+* `scope.json`
 * `task.md`
 
 Runs:
@@ -150,9 +187,17 @@ Runs:
 * Developer
 * Reviewer
 
-No orchestrator is required.
+No orchestrator is required. Used for clear, limited work that benefits from reviewer validation.
 
----
+Default budget:
+
+```json
+{
+  "developer_input_max": 120000,
+  "reviewer_input_max": 40000,
+  "max_files_to_inspect": 8
+}
+```
 
 ## Normal
 
@@ -163,7 +208,17 @@ Runs:
 3. Developer
 4. Reviewer
 
-Used for larger or cross-project work.
+Used for ambiguous, larger, cross-project, or architecture-sensitive work.
+
+Default budget:
+
+```json
+{
+  "developer_input_max": 300000,
+  "reviewer_input_max": 80000,
+  "max_files_to_inspect": 0
+}
+```
 
 ---
 
@@ -178,40 +233,58 @@ Determine:
 * execution mode
 * implementation complexity
 * recommended maximum iterations
+* reviewer requirement
+* token budget
 
 Produces:
 
-```
+```text
 scope.json
 ```
 
-Small/Tiny modes also generate:
+Micro/Tiny/Small modes also generate:
 
-```
+```text
 task.md
 ```
 
----
+`scope.json` includes:
+
+```json
+{
+  "mode": "normal|small|tiny|micro",
+  "max_iterations": 1,
+  "confidence": "low|medium|high",
+  "reason": "...",
+  "requires_orchestrator": false,
+  "writes_task_md": true,
+  "requires_reviewer": false,
+  "token_budget": {
+    "developer_input_max": 60000,
+    "reviewer_input_max": 0,
+    "max_files_to_inspect": 3
+  }
+}
+```
 
 ## Orchestrator
 
 Purpose:
 
-Convert a user goal into a precise implementation task.
+Convert a user goal into a precise implementation task for normal mode.
 
 Reads:
 
-```
+```text
 goal.md
 review.md (optional)
-
 .agent/maps/automaton.md
 .agent/agents/orchestrator.md
 ```
 
 Produces:
 
-```
+```text
 task.md
 context.md
 ```
@@ -225,8 +298,6 @@ Responsibilities:
 * reduce repository exploration
 * prepare developer context
 
----
-
 ## Developer
 
 Purpose:
@@ -235,52 +306,54 @@ Implement code.
 
 Reads:
 
-```
+```text
 developer-input.md
 ```
 
 Generated from:
 
-```
+```text
+scope.json
 task.md
-context.md
-review.md
+context.md, when available
+review.md, when available
 ```
 
 Produces:
 
-```
+```text
 result.md
 ```
 
 Developer is the **only** role allowed to modify code.
 
+For micro/tiny/small modes, the developer must follow the file-inspection budget in `developer-input.md` and search before opening files when exact files are unknown.
+
 If Codex crashes after modifying files, the harness generates:
 
-```
+```text
 result.md
 developer-error-summary.txt
 ```
 
-allowing reviewer to continue.
-
----
+allowing reviewer or human review to continue.
 
 ## Reviewer
 
 Purpose:
 
-Validate the implementation.
+Validate the implementation when the selected mode requires reviewer validation.
 
 Reads:
 
-```
+```text
 review-input.md
 ```
 
 Generated from:
 
-```
+```text
+scope.json
 task.md
 context.md
 result.md
@@ -292,17 +365,19 @@ developer-error-summary.txt
 
 Produces:
 
-```
+```text
 review.md
 ```
 
 Possible decisions:
 
-```
+```text
 accept
 fix
 stop
 ```
+
+Reviewer should not inspect repository files unless the prepared diff is truncated, incomplete, or insufficient to evaluate acceptance criteria.
 
 ---
 
@@ -310,13 +385,11 @@ stop
 
 A new task always starts from:
 
-```
+```text
 AgentRuns/current/goal.md
 ```
 
 The user edits **only** `goal.md`.
-
----
 
 ## New Goal
 
@@ -333,7 +406,14 @@ This script:
 * generates planning artifacts
 * starts the appropriate workflow
 
----
+Modes can be forced:
+
+```powershell
+.\.agent\harness\start-agent-task.ps1 -Mode Micro
+.\.agent\harness\start-agent-task.ps1 -Mode Tiny
+.\.agent\harness\start-agent-task.ps1 -Mode Small
+.\.agent\harness\start-agent-task.ps1 -Mode Normal
+```
 
 ## Continue Existing Task
 
@@ -343,9 +423,7 @@ Execute:
 .\.agent\harness\run-agent-loop.ps1
 ```
 
-This continues an already generated task.
-
-It should **never** be used immediately after editing `goal.md`.
+This continues an already generated task. It should **never** be used immediately after editing `goal.md`.
 
 ---
 
@@ -355,11 +433,9 @@ The harness prevents stale planning.
 
 `run-agent-loop.ps1` checks:
 
-```
+```text
 goal.md
-
 vs
-
 task.md
 context.md
 ```
@@ -378,67 +454,47 @@ preventing developers from working on obsolete tasks.
 
 ## User-authored
 
-```
+```text
 goal.md
 ```
 
----
-
 ## Planning
 
-```
+```text
 scope.json
-
 task.md
-
 context.md
 ```
 
----
-
 ## Developer
 
-```
+```text
 developer-input.md
-
 result.md
-
 developer-error-summary.txt
 ```
 
----
-
 ## Reviewer
 
-```
+```text
 review-input.md
-
 review.md
-
 reviewer-error-summary.txt
 ```
 
----
-
 ## Metrics
 
-```
-classifier-metrics.json
-
+```text
+scope-classifier-metrics.json
 orchestrator-metrics.json
-
 developer-metrics.json
-
 reviewer-metrics.json
-
 metrics.json
 ```
 
----
-
 ## Raw Logs
 
-```
+```text
 *.jsonl
 ```
 
@@ -460,24 +516,16 @@ Contains:
 * architecture
 * verification rules
 
----
-
 ## .agent/maps/automaton.md
 
 Compact repository navigation.
 
 Purpose:
 
-Reduce repository exploration.
+* reduce repository exploration
+* guide normal-mode orchestration
 
-Contains:
-
-* projects
-* important folders
-* important files
-* verification commands
-
----
+Micro tasks should normally avoid reading maps unless search fails.
 
 ## .agent/agents/
 
@@ -485,19 +533,17 @@ Role behaviour.
 
 Examples:
 
-```
+```text
 orchestrator.md
 developer.md
 reviewer.md
 ```
 
----
-
 ## .agent/skills/
 
 Reusable implementation knowledge.
 
-Skills describe *how* to perform recurring tasks.
+Skills describe *how* to perform recurring tasks. Micro tasks should normally avoid skills unless the task cannot be implemented safely without them.
 
 ---
 
@@ -507,31 +553,26 @@ Skills describe *how* to perform recurring tasks.
 
 If:
 
-```
+```text
 code changed
-
 AND
-
 Codex failed
 ```
 
 the harness generates:
 
-```
+```text
 result.md
-
 developer-error-summary.txt
 ```
 
-allowing reviewer to continue.
-
----
+allowing reviewer or human review to continue.
 
 ## Reviewer Failure
 
 Reviewer failures generate:
 
-```
+```text
 reviewer-error-summary.txt
 ```
 
@@ -547,27 +588,20 @@ Developer usually performs verification.
 
 Typical commands:
 
-```
+```text
 npm run type-check
-
 npm run build
-
 dotnet build
-
 dotnet test
 ```
 
 ## Future Improvement
 
-Move verification into the harness.
+Move verification into the harness. The harness should execute verification and generate:
 
-The harness should execute verification and generate:
-
-```
+```text
 verification-summary.md
-
 verification-build.log
-
 verification-test.log
 ```
 
@@ -583,30 +617,31 @@ The primary optimisation goal is reducing context.
 
 Reviewer reads:
 
-```
+```text
 review-input.md
 ```
 
 Developer reads:
 
-```
+```text
 developer-input.md
 ```
 
 Orchestrator navigates using:
 
-```
+```text
 .agent/maps/automaton.md
 ```
 
 instead of broad repository searches.
 
----
+Micro and tiny modes skip orchestrator and reviewer, and `prepare-developer-input.ps1` omits large context by default.
 
 ## Future
 
 Future improvements include:
 
+* candidate-file pre-search artifacts
 * symbol-level context
 * line-range context
 * cached repository maps
@@ -618,23 +653,20 @@ Future improvements include:
 
 Each role records token usage.
 
-```
-classifier-metrics.json
-
+```text
+scope-classifier-metrics.json
 orchestrator-metrics.json
-
 developer-metrics.json
-
 reviewer-metrics.json
 ```
 
 The loop aggregates them into:
 
-```
+```text
 metrics.json
 ```
 
-Metrics help identify expensive stages and validate optimisation work.
+Metrics help identify expensive stages and validate optimisation work. Aggregated metrics include the scope classifier so the total run cost is not underreported.
 
 ---
 
@@ -642,13 +674,15 @@ Metrics help identify expensive stages and validate optimisation work.
 
 The current optimisation roadmap is:
 
-1. Keep `context.md` concise.
-2. Cap `developer-input.md`.
-3. Cap `review-input.md`.
-4. Prefer `.agent/maps/automaton.md` over broad repository exploration.
-5. Reduce orchestrator repository scanning.
-6. Move verification into the harness.
-7. Eventually provide symbol-level context instead of entire files.
+1. Route one-file mechanical tasks through `micro`.
+2. Keep `context.md` concise.
+3. Cap `developer-input.md` by mode.
+4. Cap `review-input.md` by mode.
+5. Prefer search and exact candidate files over broad repository exploration.
+6. Prefer `.agent/maps/automaton.md` over broad repository exploration for normal mode only.
+7. Reduce orchestrator repository scanning.
+8. Move verification into the harness.
+9. Eventually provide symbol-level context instead of entire files.
 
 ---
 
@@ -660,23 +694,17 @@ The current optimisation roadmap is:
 start-agent-task.ps1
 ```
 
----
-
 ## Continue Existing Task
 
 ```powershell
 run-agent-loop.ps1
 ```
 
----
-
 ## Individual Roles
 
 ```powershell
 run-orchestrator.ps1
-
 run-developer.ps1
-
 run-reviewer.ps1
 ```
 

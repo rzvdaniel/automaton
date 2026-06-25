@@ -1,6 +1,6 @@
 param(
     [int]$MaxIterations = 3,
-    [ValidateSet("Auto", "Normal", "Small", "Tiny")]
+    [ValidateSet("Auto", "Normal", "Micro", "Small", "Tiny")]
     [string]$Mode = "Auto"
 )
 
@@ -55,6 +55,10 @@ Set-Content "AgentRuns\current\result.md" ""
 Set-Content "AgentRuns\current\review.md" ""
 
 Remove-Item "AgentRuns\current\context.md" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\developer-input.md" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\review-input.md" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\developer-error-summary.txt" -ErrorAction SilentlyContinue
+Remove-Item "AgentRuns\current\reviewer-error-summary.txt" -ErrorAction SilentlyContinue
 Remove-Item "AgentRuns\current\scope.json" -ErrorAction SilentlyContinue
 Remove-Item "AgentRuns\current\*.jsonl" -ErrorAction SilentlyContinue
 Remove-Item "AgentRuns\current\*-metrics.json" -ErrorAction SilentlyContinue
@@ -90,6 +94,25 @@ if ($effectiveMode -eq "auto") {
     Write-Host "Reason: $($scope.reason)"
 }
 
+function Ensure-GeneratedTask {
+    param(
+        [ValidateSet("Micro", "Small", "Tiny")]
+        [string]$ForcedMode
+    )
+
+    $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+    if ([string]::IsNullOrWhiteSpace($taskContent)) {
+        .\.agent\harness\classify-agent-scope.ps1 -ForcedMode $ForcedMode
+    }
+
+    $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+
+    if ([string]::IsNullOrWhiteSpace($taskContent)) {
+        throw "$ForcedMode mode requires generated AgentRuns\current\task.md"
+    }
+}
+
 Write-Host ""
 Write-Host "Running mode: $effectiveMode"
 Write-Host "----------------------------------------"
@@ -103,36 +126,21 @@ switch ($effectiveMode) {
     "small" {
         # In Auto mode, classify-agent-scope.ps1 should already have generated task.md.
         # In forced Small mode, generate task.md from goal.md now.
-        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
-
-        if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            .\.agent\harness\classify-agent-scope.ps1 -ForcedMode Small
-        }
-
-        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
-
-        if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            throw "Small mode requires generated AgentRuns\current\task.md"
-        }
-
+        Ensure-GeneratedTask -ForcedMode Small
         .\.agent\harness\run-agent-loop.ps1 -MaxIterations $MaxIterations
     }
 
     "tiny" {
         # In Auto mode, classify-agent-scope.ps1 should already have generated task.md.
         # In forced Tiny mode, generate task.md from goal.md now.
-        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
+        Ensure-GeneratedTask -ForcedMode Tiny
+        .\.agent\harness\run-agent-loop.ps1 -MaxIterations 1 -SkipReviewer
+    }
 
-        if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            .\.agent\harness\classify-agent-scope.ps1 -ForcedMode Tiny
-        }
-
-        $taskContent = Get-Content "AgentRuns\current\task.md" -Raw
-
-        if ([string]::IsNullOrWhiteSpace($taskContent)) {
-            throw "Tiny mode requires generated AgentRuns\current\task.md"
-        }
-
+    "micro" {
+        # In Auto mode, classify-agent-scope.ps1 should already have generated task.md.
+        # In forced Micro mode, generate task.md from goal.md now.
+        Ensure-GeneratedTask -ForcedMode Micro
         .\.agent\harness\run-agent-loop.ps1 -MaxIterations 1 -SkipReviewer
     }
 
