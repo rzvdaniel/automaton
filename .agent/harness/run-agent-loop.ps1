@@ -76,6 +76,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
 }
 
 $metricFiles = @(
+    "AgentRuns\current\scope-classifier-metrics.json",
     "AgentRuns\current\orchestrator-metrics.json",
     "AgentRuns\current\developer-metrics.json",
     "AgentRuns\current\reviewer-metrics.json"
