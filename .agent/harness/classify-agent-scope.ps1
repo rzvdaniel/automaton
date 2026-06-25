@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Auto", "Small", "Tiny")]
+    [ValidateSet("Auto", "Micro", "Small", "Tiny")]
     [string]$ForcedMode = "Auto"
 )
 
@@ -10,6 +10,7 @@ Write-Host "Classifying agent task scope..."
 $model = "gpt-5.4"
 $jsonl = "AgentRuns\current\scope-classifier.jsonl"
 $scopePath = "AgentRuns\current\scope.json"
+$metrics = "AgentRuns\current\scope-classifier-metrics.json"
 
 Write-Host "Model: $model"
 Write-Host "Forced mode: $ForcedMode"
@@ -38,7 +39,7 @@ Do not run build commands.
 Forced mode:
 $ForcedMode
 
-Decide the best mode unless Forced mode is Small or Tiny.
+Decide the best mode unless Forced mode is Micro, Small, or Tiny.
 
 Modes:
 
@@ -50,48 +51,70 @@ normal:
 - In normal mode, do not write task.md. The orchestrator will write it.
 
 small:
-- Use for clear, limited work.
-- Use for small UI changes, labels, simple bug fixes, simple wiring.
+- Use for clear, limited work that still benefits from reviewer validation.
+- Use for small bug fixes, small wiring changes, or small UI behavior changes.
 - Flow: developer + reviewer only.
 - You must write AgentRuns/current/task.md.
 
 tiny:
-- Use for very small mechanical changes.
-- Examples: rename label, change icon, change copy text, remove one menu item.
+- Use for very small mechanical changes where human review of git diff is enough.
+- Examples: change copy text, change icon, remove one menu item, simple config tweak.
 - Flow: developer only, then human reviews git diff.
 - You must write AgentRuns/current/task.md.
 
+micro:
+- Use for the cheapest possible safe path.
+- Use when the task is likely one obvious file and a label/default/state/CSS tweak.
+- Examples: rename a visible label, change a default boolean, change a default splitter ratio, tiny CSS spacing tweak, one-line config value.
+- Do not use when architecture, cross-file behavior, data changes, security, backend behavior, or test changes are likely.
+- Flow: developer only, no reviewer, no orchestrator.
+- You must write AgentRuns/current/task.md.
+
 Rules:
+- If Forced mode is Micro, choose micro.
 - If Forced mode is Small, choose small.
 - If Forced mode is Tiny, choose tiny.
 - If Forced mode is Auto, choose the best mode.
 - If the goal is vague, choose normal.
 - If there is any risk of behavior change across multiple areas, choose normal.
-- Prefer small over tiny when reviewer verification is useful.
+- Prefer micro over tiny only when the change is very likely one obvious file and does not require reviewer judgment.
+- Prefer small over tiny/micro when reviewer verification is useful.
 - Prefer normal when unsure.
 
 Write valid JSON to AgentRuns/current/scope.json using this shape:
 
 {
-  "mode": "normal|small|tiny",
+  "mode": "normal|small|tiny|micro",
   "max_iterations": 1|2|3,
   "confidence": "low|medium|high",
   "reason": "...",
   "requires_orchestrator": true|false,
-  "writes_task_md": true|false
+  "writes_task_md": true|false,
+  "requires_reviewer": true|false,
+  "token_budget": {
+    "developer_input_max": 60000,
+    "reviewer_input_max": 0,
+    "max_files_to_inspect": 3
+  }
 }
 
+Token budget rules:
+- micro: developer_input_max 60000, reviewer_input_max 0, max_files_to_inspect 3.
+- tiny: developer_input_max 80000, reviewer_input_max 0, max_files_to_inspect 5.
+- small: developer_input_max 120000, reviewer_input_max 40000, max_files_to_inspect 8.
+- normal: developer_input_max 300000, reviewer_input_max 80000, max_files_to_inspect 0.
+
 Max iteration rules:
-- 1 = tiny or very clear small task.
+- 1 = micro, tiny, or very clear small task.
 - 2 = normal small/medium task where one fix pass may be useful.
 - 3 = larger or riskier task, or when unsure.
 - Never choose more than 3.
-- For tiny mode, always choose 1.
+- For micro and tiny mode, always choose 1.
 - For small mode, usually choose 1 or 2.
 - For normal mode, choose 2 or 3.
 - Prefer fewer iterations when the task is clear.
 
-If mode is small or tiny, also write AgentRuns/current/task.md.
+If mode is micro, small, or tiny, also write AgentRuns/current/task.md.
 
 task.md must include:
 - title
@@ -100,11 +123,13 @@ task.md must include:
 - constraints
 - acceptance criteria
 - verification commands
+- token budget guidance
 
-For small/tiny task.md:
+For micro/small/tiny task.md:
 - Keep the task focused and executable.
 - Do not invent repository details.
 - If exact files are unknown, say "likely files unknown; developer should inspect only the minimum needed."
+- For micro tasks, explicitly say the developer should search first and inspect no more than 3 files unless unavoidable.
 - Do not create context.md. context.md is only for normal orchestrator mode.
 
 Important:
@@ -123,6 +148,19 @@ $prompt | codex exec `
 
 if ($LASTEXITCODE -ne 0) {
     throw "Scope classifier failed with exit code $LASTEXITCODE. See $jsonl"
+}
+
+try {
+    .\.agent\harness\write-agent-metrics.ps1 `
+        -Role "scope-classifier" `
+        -Model $model `
+        -JsonlPath $jsonl `
+        -MetricsPath $metrics
+}
+catch {
+    Write-Host ""
+    Write-Host "Warning: failed to write scope classifier metrics."
+    Write-Host $_
 }
 
 $jsonlContent = Get-Content $jsonl -Raw
@@ -148,7 +186,7 @@ catch {
     throw "scope.json is not valid JSON."
 }
 
-if ($scope.mode -notin @("normal", "small", "tiny")) {
+if ($scope.mode -notin @("normal", "small", "tiny", "micro")) {
     throw "Invalid scope mode: $($scope.mode)"
 }
 
@@ -174,6 +212,14 @@ if ($null -eq $scope.writes_task_md) {
     throw "scope.json is missing writes_task_md"
 }
 
+if ($null -eq $scope.requires_reviewer) {
+    throw "scope.json is missing requires_reviewer"
+}
+
+if ($null -eq $scope.token_budget) {
+    throw "scope.json is missing token_budget"
+}
+
 if ($scope.mode -eq "normal") {
     if ($scope.requires_orchestrator -ne $true) {
         throw "Normal mode must set requires_orchestrator = true"
@@ -184,7 +230,7 @@ if ($scope.mode -eq "normal") {
     }
 }
 
-if ($scope.mode -in @("small", "tiny")) {
+if ($scope.mode -in @("micro", "small", "tiny")) {
     if ($scope.requires_orchestrator -ne $false) {
         throw "$($scope.mode) mode must set requires_orchestrator = false"
     }
@@ -204,8 +250,16 @@ if ($scope.mode -in @("small", "tiny")) {
     }
 }
 
-if ($scope.mode -eq "tiny" -and $maxIterations -ne 1) {
-    throw "Tiny mode must use max_iterations = 1"
+if ($scope.mode -in @("micro", "tiny") -and $maxIterations -ne 1) {
+    throw "$($scope.mode) mode must use max_iterations = 1"
+}
+
+if ($scope.mode -in @("micro", "tiny") -and $scope.requires_reviewer -ne $false) {
+    throw "$($scope.mode) mode must set requires_reviewer = false"
+}
+
+if ($scope.mode -eq "small" -and $scope.requires_reviewer -ne $true) {
+    throw "Small mode must set requires_reviewer = true"
 }
 
 Write-Host ""
