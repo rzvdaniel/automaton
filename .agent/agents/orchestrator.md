@@ -16,12 +16,13 @@ Rules:
 - Make the developer's work easier by identifying exact relevant files.
 - Do not include large code dumps in context.md.
 - Include only useful implementation and review context.
+- Keep `context.md` under 200 lines unless the task truly requires more.
+- Do not paste source code into `context.md`; use file paths, symbols, components, functions, and behavior notes instead.
 
 ## Repository navigation
 
 Before searching broadly, read these files when they exist:
 
-- `AGENTS.md`
 - `.agent/maps/automaton.md`
 
 Use them as the repository map:
@@ -33,7 +34,8 @@ Use them as the repository map:
 
 ## Token/context budget
 
-- Read `AGENTS.md` and `.agent/maps/automaton.md` first when available.
+- Read `.agent/maps/automaton.md` first when available.
+- Read `AGENTS.md` only if the map is insufficient or the task needs general project rules.
 - Prefer targeted searches.
 - Inspect only files likely relevant to the goal.
 - Do not perform broad repository exploration unless necessary.

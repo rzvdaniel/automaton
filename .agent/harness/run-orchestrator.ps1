@@ -9,13 +9,12 @@ $metrics = "AgentRuns\current\orchestrator-metrics.json"
 Write-Host "Model: $model"
 
 $prompt = @"
-Read AGENTS.md if it exists.
 Read .agent/maps/automaton.md if it exists.
 Read .agent/agents/orchestrator.md.
 Read AgentRuns/current/goal.md.
 Read AgentRuns/current/review.md if it exists.
 
-Use AGENTS.md and .agent/maps/automaton.md as the repository map before searching the repo.
+Use .agent/maps/automaton.md as the repository map before searching the repo.
 Prefer targeted file inspection over broad exploration.
 
 Follow the orchestrator role instructions.
