@@ -26,7 +26,7 @@ const { isDark } = useUserSettings()
 
 const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
 const SPLITTER_STORAGE_KEY = 'app-editor-build-visual-splitter'
-const defaultSplitterSizes = [74, 26]
+const defaultSplitterSizes = [84, 16]
 
 function normalizeSizes(sizes: number[]): number[] {
   if (!Array.isArray(sizes) || sizes.length !== 2) {
@@ -91,7 +91,7 @@ function handleSplitterResizing(): void {
 }
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
-const isAdvancedExpanded = ref(false)
+const isAdvancedExpanded = ref(true)
 const activeLogTab = ref<'ui-logs' | 'backend-logs'>('ui-logs')
 
 // Backend connection status
@@ -227,14 +227,14 @@ const previewViewportStyle = computed(() => {
             </div>
         </div>
       </div>
-      <!-- Logs toggle bar (collapsed) -->
+      <!-- Console toggle bar (collapsed) -->
       <button
         class="advanced-toggle-handle"
         :class="{ 'advanced-toggle-handle-dark': isDark }"
         @click="isAdvancedExpanded = true"
       >
         <i class="pi pi-chevron-up"></i>
-        <span>Logs</span>
+        <span>Console</span>
       </button>
     </div>
 
@@ -326,14 +326,14 @@ const previewViewportStyle = computed(() => {
       </SplitterPanel>
 
       <SplitterPanel :size="splitterSizes[1]" :min-size="12" class="splitter-panel">
-        <!-- Logs toggle bar (expanded) -->
+        <!-- Console toggle bar (expanded) -->
         <button
           class="advanced-toggle-handle advanced-toggle-handle-expanded"
           :class="{ 'advanced-toggle-handle-dark': isDark }"
           @click="isAdvancedExpanded = false"
         >
           <i class="pi pi-chevron-down"></i>
-          <span>Logs</span>
+          <span>Console</span>
         </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
