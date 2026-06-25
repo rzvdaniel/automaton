@@ -197,12 +197,11 @@ public class AppFileStorageService
                 throw new DirectoryNotFoundException($"App source directory not found: {sourcePath}");
             }
 
-            var versionFolder = $"v{versionNumber:D3}";
-            var versionSnapshotPath = Path.Combine(GetVersionsPath(userId, appId), versionFolder, "files");
+            var versionSnapshotPath = GetVersionSnapshotFilesPath(userId, appId, versionNumber);
 
-            if (!Directory.Exists(versionSnapshotPath))
+            if (versionSnapshotPath == null)
             {
-                throw new DirectoryNotFoundException($"Version snapshot not found: {versionSnapshotPath}");
+                throw new DirectoryNotFoundException($"Version snapshot not found for version v{versionNumber:D3}");
             }
 
             foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
@@ -405,6 +404,60 @@ public class AppFileStorageService
     public string GetAppVersionDirectoryPath(Guid userId, Guid appId)
     {
         return GetVersionsPath(userId, appId);
+    }
+
+    public string? GetVersionSnapshotFilesPath(Guid userId, Guid appId, int versionNumber)
+    {
+        var versionFolder = Path.Combine(GetVersionsPath(userId, appId), $"v{versionNumber:D3}");
+        var nestedFilesPath = Path.Combine(versionFolder, "files");
+        if (Directory.Exists(nestedFilesPath))
+        {
+            return nestedFilesPath;
+        }
+
+        if (Directory.Exists(versionFolder))
+        {
+            return versionFolder;
+        }
+
+        return null;
+    }
+
+    public bool DirectoriesMatch(string currentPath, string snapshotPath)
+    {
+        if (!Directory.Exists(currentPath) || !Directory.Exists(snapshotPath))
+        {
+            return false;
+        }
+
+        var currentFiles = Directory.GetFiles(currentPath, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(currentPath, path))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var snapshotFiles = Directory.GetFiles(snapshotPath, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(snapshotPath, path))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (!currentFiles.SequenceEqual(snapshotFiles, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        foreach (var relativePath in currentFiles)
+        {
+            var currentFilePath = Path.Combine(currentPath, relativePath);
+            var snapshotFilePath = Path.Combine(snapshotPath, relativePath);
+            var currentBytes = File.ReadAllBytes(currentFilePath);
+            var snapshotBytes = File.ReadAllBytes(snapshotFilePath);
+
+            if (!currentBytes.AsSpan().SequenceEqual(snapshotBytes))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

@@ -180,6 +180,79 @@ public class DeployServiceTests
         Assert.That(result.Uploaded?.Written, Is.EqualTo(2));
         Assert.That(result.SourceUploaded?.Written, Is.EqualTo(3));
         AssertCheck(result, DeployCheckNames.BackendDeploy, true, "no backend controllers found");
+        Assert.That(result.Checks.Any(check => check.Name == "restore_point"), Is.True);
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenRestorePointFails_ContinuesDeploymentWithWarning()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (Action<string>?)null,
+            null,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")),
+            (_, _, _, _) => throw new InvalidOperationException("snapshot failed"));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.HasWarnings, Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == "restore_point" && !check.Success && check.IsWarning && check.Message.Contains("snapshot failed")), Is.True);
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenRestorePointSkipped_ReportsNonBlockingWarning()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "App",
+            Server = "https://api.example.com",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            }
+        });
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        WriteFrontendIndexHtml(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (Action<string>?)null,
+            null,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(3, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(2, 0, 0.1)),
+            (_, _, _, _, _, _) => Task.FromResult(new DeployUploadResult(0, 0, 0)),
+            (_, _, _, _) => Task.FromResult(new DeployBackendResult(true, 0, "no backend controllers found")),
+            (_, _, _, _) => Task.FromResult((false, "Skipped restore point creation because source files have not changed since the latest restore point.")));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.HasWarnings, Is.True);
+        Assert.That(result.Checks.Any(check => check.Name == "restore_point" && !check.Success && check.IsWarning && check.Message.Contains("Skipped restore point creation")), Is.True);
     }
 
     [Test]
@@ -353,6 +426,7 @@ public class DeployServiceTests
             DeployCheckNames.Credentials,
             DeployCheckNames.Build,
             DeployCheckNames.FrontendPackage,
+            "restore_point",
             DeployCheckNames.SourceUpload,
             DeployCheckNames.Upload,
             DeployCheckNames.BackendPackage,

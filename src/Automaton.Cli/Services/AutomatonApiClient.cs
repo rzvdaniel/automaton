@@ -167,9 +167,15 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
-    public async Task<JsonElement> CreateVersionSnapshotAsync(string appId, string? summary = null, CancellationToken ct = default)
+    public async Task<JsonElement> CreateVersionSnapshotAsync(
+        string appId,
+        string? trigger = null,
+        string? summary = null,
+        string? source = null,
+        string? reason = null,
+        CancellationToken ct = default)
     {
-        var payload = JsonSerializer.Serialize(new { summary, trigger = "ManualSave" }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { summary, trigger = trigger ?? "ManualSave", source, reason }, JsonOptions);
         using var resp = await PostJsonAsync($"api/apps/{appId}/versions/snapshot", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);

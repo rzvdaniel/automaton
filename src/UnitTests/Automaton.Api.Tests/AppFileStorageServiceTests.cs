@@ -138,6 +138,73 @@ public class AppFileStorageServiceTests
         }
     }
 
+    [Test]
+    public async Task RestoreVersionAsync_RestoresNestedFilesSnapshotIntoSourceOnly()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var userId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        try
+        {
+            var service = CreateStorageService(root);
+
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<h1>current</h1>");
+            await service.WriteSourceFileAsync(userId, appId, "backend/controller.py", "print('current')");
+            await service.WriteRuntimeFileAsync(userId, appId, "index.html", "<h1>live</h1>");
+
+            await service.CreateVersionSnapshotAsync(userId, appId, 1);
+
+            await service.WriteSourceFileAsync(userId, appId, "frontend/index.html", "<h1>changed</h1>");
+            await service.DeleteSourceFileAsync(userId, appId, "backend/controller.py");
+
+            await service.RestoreVersionAsync(userId, appId, 1);
+
+            Assert.That(await service.ReadSourceFileAsync(userId, appId, "frontend/index.html"), Is.EqualTo("<h1>current</h1>"));
+            Assert.That(await service.ReadSourceFileAsync(userId, appId, "backend/controller.py"), Is.EqualTo("print('current')"));
+            Assert.That(await service.ReadRuntimeFileAsync(userId, appId, "index.html"), Is.EqualTo("<h1>live</h1>"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RestoreVersionAsync_RestoresLegacyFlatSnapshotFormat()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        var userId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        try
+        {
+            var service = CreateStorageService(root);
+            await service.WriteSourceFileAsync(userId, appId, "index.html", "<h1>current</h1>");
+            await service.WriteSourceFileAsync(userId, appId, "frontend/ignored.html", "<h1>ignored</h1>");
+
+            var legacyVersionPath = Path.Combine(service.GetAppVersionDirectoryPath(userId, appId), "v001");
+            Directory.CreateDirectory(legacyVersionPath);
+            File.WriteAllText(Path.Combine(legacyVersionPath, "index.html"), "<h1>legacy</h1>");
+            Directory.CreateDirectory(Path.Combine(legacyVersionPath, "backend"));
+            File.WriteAllText(Path.Combine(legacyVersionPath, "backend", "controller.py"), "print('legacy')");
+
+            await service.RestoreVersionAsync(userId, appId, 1);
+
+            Assert.That(await service.ReadSourceFileAsync(userId, appId, "index.html"), Is.EqualTo("<h1>legacy</h1>"));
+            Assert.That(await service.ReadSourceFileAsync(userId, appId, "backend/controller.py"), Is.EqualTo("print('legacy')"));
+            Assert.That(await service.ReadSourceFileAsync(userId, appId, "frontend/ignored.html"), Is.Null);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static bool InvokeIsBuildBasedFrontendSourcePath(string path)
     {
         try

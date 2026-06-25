@@ -10,6 +10,8 @@ public class AppVersion
     public int VersionNumber { get; set; }
     public string Summary { get; set; } = string.Empty;
     public AppVersionTrigger Trigger { get; set; }
+    public string? Source { get; set; }
+    public string? Reason { get; set; }
     public DateTime CreatedAt { get; set; }
     public Guid CreatedBy { get; set; }
     public Guid? AiSessionId { get; set; }

@@ -14,6 +14,8 @@ public class AppVersionService
     private readonly AppFileStorageService fileStorageService;
     private readonly Serilog.ILogger logger;
 
+    public sealed record CreateSnapshotResult(bool SnapshotCreated, AppVersion? Version, string Message);
+
     public AppVersionService(ApplicationDbContext dataContext, AppFileStorageService fileStorageService)
     {
         this.dataContext = dataContext;
@@ -21,13 +23,15 @@ public class AppVersionService
         this.logger = Serilog.Log.ForContext<AppVersionService>();
     }
 
-    public async Task<AppVersion> CreateSnapshotAsync(
+    public async Task<CreateSnapshotResult> CreateSnapshotAsync(
         Guid appId,
         Guid userId,
         AppVersionTrigger trigger,
         Guid? aiSessionId = null,
         string? aiModel = null,
-        string? summary = null)
+        string? summary = null,
+        string? source = null,
+        string? reason = null)
     {
         var app = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
@@ -39,6 +43,16 @@ public class AppVersionService
         }
 
         var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId ?? userId;
+        var resolvedSource = source ?? GetDefaultSource(trigger);
+        var resolvedReason = reason ?? GetDefaultReason(trigger);
+
+        if (trigger == AppVersionTrigger.ManualSave &&
+            string.Equals(resolvedSource, AppVersionSources.CliDeploy, StringComparison.Ordinal) &&
+            await MatchesLatestSnapshotAsync(ownerId, appId))
+        {
+            return new CreateSnapshotResult(false, null, "Skipped restore point creation because source files have not changed since the latest restore point.");
+        }
+
         var nextVersion = await GetNextVersionNumberAsync(appId);
 
         var snapshotPath = await fileStorageService.CreateVersionSnapshotAsync(ownerId, appId, nextVersion);
@@ -56,6 +70,8 @@ public class AppVersionService
             VersionNumber = nextVersion,
             Summary = resolvedSummary,
             Trigger = trigger,
+            Source = resolvedSource,
+            Reason = resolvedReason,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId,
             AiSessionId = aiSessionId,
@@ -102,7 +118,7 @@ public class AppVersionService
 
         logger.Debug("Created app version {VersionNumber} for app {AppId}", nextVersion, appId);
 
-        return appVersion;
+        return new CreateSnapshotResult(true, appVersion, "Version snapshot created.");
     }
 
     public async Task UpdateSummaryAsync(Guid appVersionId, string summary)
@@ -364,5 +380,60 @@ public class AppVersionService
             .MaxAsync();
 
         return (maxVersion ?? 0) + 1;
+    }
+
+    public string GetEffectiveSource(AppVersion version)
+    {
+        return !string.IsNullOrWhiteSpace(version.Source)
+            ? version.Source
+            : GetDefaultSource(version.Trigger);
+    }
+
+    public string GetEffectiveReason(AppVersion version)
+    {
+        return !string.IsNullOrWhiteSpace(version.Reason)
+            ? version.Reason
+            : GetDefaultReason(version.Trigger);
+    }
+
+    private static string GetDefaultSource(AppVersionTrigger trigger) => trigger switch
+    {
+        AppVersionTrigger.NewGeneration => AppVersionSources.AiChat,
+        _ => AppVersionSources.Studio,
+    };
+
+    private static string GetDefaultReason(AppVersionTrigger trigger) => trigger switch
+    {
+        AppVersionTrigger.NewGeneration => AppVersionReasons.AfterAiSession,
+        AppVersionTrigger.Publish => AppVersionReasons.Publish,
+        AppVersionTrigger.Restore => AppVersionReasons.Restore,
+        _ => AppVersionReasons.Manual,
+    };
+
+    private async Task<bool> MatchesLatestSnapshotAsync(Guid ownerId, Guid appId)
+    {
+        var latestVersion = await dataContext.AppVersions
+            .Where(version => version.AppId == appId)
+            .OrderByDescending(version => version.VersionNumber)
+            .FirstOrDefaultAsync();
+
+        if (latestVersion == null)
+        {
+            return false;
+        }
+
+        var currentSourcePath = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
+        if (!Directory.Exists(currentSourcePath))
+        {
+            return false;
+        }
+
+        var latestSnapshotPath = fileStorageService.GetVersionSnapshotFilesPath(ownerId, appId, latestVersion.VersionNumber);
+        if (latestSnapshotPath == null)
+        {
+            return false;
+        }
+
+        return fileStorageService.DirectoriesMatch(currentSourcePath, latestSnapshotPath);
     }
 }

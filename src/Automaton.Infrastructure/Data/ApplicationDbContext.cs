@@ -435,6 +435,8 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.VersionNumber).IsRequired();
                 entity.Property(e => e.Summary).IsRequired().HasMaxLength(4000);
                 entity.Property(e => e.Trigger).IsRequired();
+                entity.Property(e => e.Source).HasMaxLength(80);
+                entity.Property(e => e.Reason).HasMaxLength(160);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.CreatedBy).IsRequired();
                 entity.Property(e => e.AiModel).HasMaxLength(200);

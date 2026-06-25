@@ -242,7 +242,7 @@ async function createSnapshot() {
   showSnapshotDialog.value = false
   isCreatingSnapshot.value = true
   try {
-    await appsService.createVersionSnapshot(props.appId, 'ManualSave', snapshotSummary.value || undefined)
+    await appsService.createVersionSnapshot(props.appId, 'ManualSave', snapshotSummary.value || undefined, 'Studio', 'Manual')
     toast.add({
       severity: 'success',
       summary: 'Success',
@@ -309,6 +309,46 @@ function getTriggerLabel(trigger: string): string {
       return 'Restore'
     default:
       return trigger
+  }
+}
+
+function getSourceLabel(version: Pick<AppVersion, 'trigger'> & { source?: string }): string {
+  const source = version.source || getFallbackSource(version.trigger)
+  switch (source) {
+    case 'AiChat':
+      return 'AI Chat'
+    case 'CliDeploy':
+      return 'CLI Deploy'
+    case 'Studio':
+      return 'Studio'
+    default:
+      return source
+  }
+}
+
+function getReasonLabel(version: Pick<AppVersion, 'trigger'> & { reason?: string }): string {
+  return version.reason || getFallbackReason(version.trigger)
+}
+
+function getFallbackSource(trigger: string): string {
+  switch (trigger) {
+    case 'NewGeneration':
+      return 'AiChat'
+    default:
+      return 'Studio'
+  }
+}
+
+function getFallbackReason(trigger: string): string {
+  switch (trigger) {
+    case 'NewGeneration':
+      return 'After AI Session'
+    case 'Publish':
+      return 'Publish'
+    case 'Restore':
+      return 'Restore'
+    default:
+      return 'Manual'
   }
 }
 
@@ -434,7 +474,7 @@ defineExpose({
       <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
       <p>No versions yet</p>
       <p class="text-sm text-color-secondary mb-3">
-        Versions are created automatically before each AI edit, or manually via snapshots
+        Restore points are created after AI sessions, before CLI deployments, or manually in Studio
       </p>
       <Button
         label="Create Snapshot"
@@ -495,6 +535,14 @@ defineExpose({
               <div class="meta-item">
                 <i class="pi pi-calendar text-xs"></i>
                 <span class="text-xs">{{ formatDate(version.createdAt) }}</span>
+              </div>
+              <div class="meta-item">
+                <i class="pi pi-desktop text-xs"></i>
+                <span class="text-xs">{{ getSourceLabel(version) }}</span>
+              </div>
+              <div class="meta-item">
+                <i class="pi pi-comment text-xs"></i>
+                <span class="text-xs">{{ getReasonLabel(version) }}</span>
               </div>
               <div class="meta-item">
                 <i class="pi pi-user text-xs"></i>
@@ -570,6 +618,14 @@ defineExpose({
                 :icon="getTriggerIcon(selectedVersion.trigger)"
                 size="small"
               />
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Source:</span>
+              <span class="detail-value">{{ getSourceLabel(selectedVersion) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Reason:</span>
+              <span class="detail-value">{{ getReasonLabel(selectedVersion) }}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Created:</span>

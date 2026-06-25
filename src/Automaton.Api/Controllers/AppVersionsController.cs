@@ -35,7 +35,7 @@ public class AppVersionsController : BaseController
     /// </summary>
     [HttpPost("snapshot")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult<AppVersionDto>> CreateSnapshot(Guid appId, [FromBody] CreateVersionSnapshotRequest? request = null)
+    public async Task<ActionResult<CreateVersionSnapshotResponse>> CreateSnapshot(Guid appId, [FromBody] CreateVersionSnapshotRequest? request = null)
     {
         try
         {
@@ -65,30 +65,35 @@ public class AppVersionsController : BaseController
             }
 
             // Create the snapshot
-            var version = await appVersionService.CreateSnapshotAsync(
+            var result = await appVersionService.CreateSnapshotAsync(
                 appId,
                 userId,
                 trigger,
                 aiSessionId: null,
                 aiModel: null,
-                summary: string.IsNullOrWhiteSpace(request?.Summary) ? null : request.Summary
+                summary: string.IsNullOrWhiteSpace(request?.Summary) ? null : request.Summary,
+                source: string.IsNullOrWhiteSpace(request?.Source) ? null : request.Source,
+                reason: string.IsNullOrWhiteSpace(request?.Reason) ? null : request.Reason
             );
 
-            var dto = new AppVersionDto
+            if (!result.SnapshotCreated)
             {
-                Id = version.Id,
-                AppId = version.AppId,
-                VersionNumber = version.VersionNumber,
-                Summary = version.Summary ?? "Snapshot created",
-                Trigger = version.Trigger.ToString(),
-                CreatedAt = version.CreatedAt,
-                CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
-                AiSessionId = version.AiSessionId,
-                AiModel = version.AiModel
-            };
+                return Ok(new CreateVersionSnapshotResponse
+                {
+                    SnapshotCreated = false,
+                    Message = result.Message
+                });
+            }
 
-            logger.LogDebug("[AppVersionsController] Created snapshot for app {AppId}, version {Version}", appId, version.VersionNumber);
-            return CreatedAtAction(nameof(GetVersionDetail), new { appId, versionNumber = version.VersionNumber }, dto);
+            var dto = MapVersionDto(result.Version!, appVersionService);
+
+            logger.LogDebug("[AppVersionsController] Created snapshot for app {AppId}, version {Version}", appId, result.Version!.VersionNumber);
+            return CreatedAtAction(nameof(GetVersionDetail), new { appId, versionNumber = result.Version.VersionNumber }, new CreateVersionSnapshotResponse
+            {
+                SnapshotCreated = true,
+                Message = result.Message,
+                Version = dto
+            });
         }
         catch (Exception ex)
         {
@@ -124,18 +129,7 @@ public class AppVersionsController : BaseController
                 TotalCount = result.TotalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize,
-                Versions = result.Versions.Select(v => new AppVersionDto
-                {
-                    Id = v.Id,
-                    AppId = v.AppId,
-                    VersionNumber = v.VersionNumber,
-                    Summary = v.Summary ?? string.Empty,
-                    Trigger = v.Trigger.ToString(),
-                    CreatedAt = v.CreatedAt,
-                    CreatedBy = v.CreatedByUser?.Email ?? v.CreatedBy.ToString(),
-                    AiSessionId = v.AiSessionId,
-                    AiModel = v.AiModel
-                }).ToList()
+                Versions = result.Versions.Select(v => MapVersionDto(v, appVersionService)).ToList()
             };
 
             return Ok(dto);
@@ -175,6 +169,8 @@ public class AppVersionsController : BaseController
                 VersionNumber = version.VersionNumber,
                 Summary = version.Summary ?? string.Empty,
                 Trigger = version.Trigger.ToString(),
+                Source = appVersionService.GetEffectiveSource(version),
+                Reason = appVersionService.GetEffectiveReason(version),
                 CreatedAt = version.CreatedAt,
                 CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
                 AiSessionId = version.AiSessionId,
@@ -246,5 +242,24 @@ public class AppVersionsController : BaseController
             logger.LogError(ex, "[AppVersionsController] Error restoring app {AppId} to version {Version}", appId, versionNumber);
             return StatusCode(500, new { message = "Failed to restore version" });
         }
+    }
+
+    private static AppVersionDto MapVersionDto(Entities.AppVersion version, AppVersionService appVersionService)
+    {
+        return new AppVersionDto
+        {
+            Id = version.Id,
+            AppId = version.AppId,
+            VersionNumber = version.VersionNumber,
+            Summary = version.Summary ?? "Snapshot created",
+            Trigger = version.Trigger.ToString(),
+            Source = appVersionService.GetEffectiveSource(version),
+            Reason = appVersionService.GetEffectiveReason(version),
+            CreatedAt = version.CreatedAt,
+            CreatedBy = version.CreatedByUser?.Email ?? version.CreatedBy.ToString(),
+            AiSessionId = version.AiSessionId,
+            AiModel = version.AiModel,
+            SnapshotCreated = true
+        };
     }
 }

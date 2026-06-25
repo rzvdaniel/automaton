@@ -14,6 +14,7 @@ public sealed class DeployService
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadAsync;
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>> _uploadBackendAsync;
     private readonly Func<string, string, string, CancellationToken, Task<DeployBackendResult>> _deployBackendAsync;
+    private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> _createSnapshotAsync;
 
     public DeployService(
         ConfigService config,
@@ -21,8 +22,9 @@ public sealed class DeployService
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadSourceAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
-        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
-        : this(config, null, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync)
+        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null,
+        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
+        : this(config, null, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync, createSnapshotAsync)
     {
     }
 
@@ -33,8 +35,9 @@ public sealed class DeployService
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadSourceAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
-        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
-        : this(config, progress, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync)
+        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null,
+        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
+        : this(config, progress, null, runBuildAsync, uploadSourceAsync, uploadAsync, uploadBackendAsync, deployBackendAsync, createSnapshotAsync)
     {
     }
 
@@ -46,7 +49,8 @@ public sealed class DeployService
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadSourceAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<DeployUploadResult>>? uploadBackendAsync = null,
-        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null)
+        Func<string, string, string, CancellationToken, Task<DeployBackendResult>>? deployBackendAsync = null,
+        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
     {
         _config = config;
         _progress = progress;
@@ -56,6 +60,7 @@ public sealed class DeployService
         _uploadAsync = uploadAsync ?? UploadAsync;
         _uploadBackendAsync = uploadBackendAsync ?? UploadBackendAsync;
         _deployBackendAsync = deployBackendAsync ?? DeployBackendAsync;
+        _createSnapshotAsync = createSnapshotAsync ?? CreateSnapshotAsync;
     }
 
     public async Task<DeployResult> DeployAsync(
@@ -102,6 +107,27 @@ public sealed class DeployService
         if (!packageCheck.Success || deployDirectory == null)
         {
             return CreateResult(false, checks, nextSteps, projectConfig, server, clean, skipBackend, directoryOverride, sourceUploadResult, uploadResult, backendUploadResult, backendResult);
+        }
+
+        try
+        {
+            ReportProgress("Creating restore point before deployment...");
+            var snapshotResult = await _createSnapshotAsync(server, apiKey, projectConfig.AppId, cancellationToken);
+            if (snapshotResult.Created)
+            {
+                ReportProgress(snapshotResult.Message);
+                AddCheck(checks, new DeployCheckResult("restore_point", true, snapshotResult.Message));
+            }
+            else
+            {
+                ReportProgress(snapshotResult.Message);
+                AddCheck(checks, new DeployCheckResult("restore_point", false, snapshotResult.Message, IsWarning: true));
+            }
+        }
+        catch (Exception ex)
+        {
+            ReportProgress($"Restore point warning: {ex.Message}");
+            AddCheck(checks, new DeployCheckResult("restore_point", false, ex.Message, IsWarning: true));
         }
 
         try
@@ -570,5 +596,35 @@ public sealed class DeployService
         var message = deployResult.TryGetProperty("message", out var messageProperty) ? messageProperty.GetString() : null;
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
         return new DeployBackendResult(success, runnerCount, message);
+    }
+
+    private static async Task<(bool Created, string Message)> CreateSnapshotAsync(
+        string server,
+        string apiKey,
+        string appId,
+        CancellationToken cancellationToken)
+    {
+        using var client = new AutomatonApiClient(server, apiKey);
+        var snapshotResult = await client.CreateVersionSnapshotAsync(
+            appId,
+            trigger: "ManualSave",
+            source: "CliDeploy",
+            reason: "Before Deployment",
+            ct: cancellationToken);
+
+        var created = snapshotResult.TryGetProperty("snapshotCreated", out var createdProperty) && createdProperty.GetBoolean();
+        var message = snapshotResult.TryGetProperty("message", out var messageProperty)
+            ? messageProperty.GetString()
+            : null;
+
+        if (created && snapshotResult.TryGetProperty("version", out var versionProperty) &&
+            versionProperty.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            versionProperty.TryGetProperty("versionNumber", out var versionNumberProperty))
+        {
+            var versionNumber = versionNumberProperty.GetInt32();
+            return (true, message ?? $"Created restore point v{versionNumber:D3} before deployment.");
+        }
+
+        return (false, message ?? "Skipped restore point creation because no source changes were detected.");
     }
 }

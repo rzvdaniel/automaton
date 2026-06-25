@@ -1,5 +1,6 @@
 using Automaton.Ai.Models;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Services.Mcp;
@@ -97,12 +98,20 @@ public class AiAppConversationController : AiConversationControllerBase
 
         try
         {
-            var snapshot = await _appVersionService.CreateSnapshotAsync(
+            var snapshotResult = await _appVersionService.CreateSnapshotAsync(
                 resourceId,
                 userId,
                 AppVersionTrigger.NewGeneration,
-                aiSessionId: sessionId);
+                aiSessionId: sessionId,
+                source: AppVersionSources.AiChat,
+                reason: AppVersionReasons.AfterAiSession);
 
+            if (!snapshotResult.SnapshotCreated || snapshotResult.Version == null)
+            {
+                return;
+            }
+
+            var snapshot = snapshotResult.Version;
             _logger.LogDebug("Created post-generation snapshot {SnapshotId} for app {AppId}", snapshot.Id, resourceId);
 
             if (!_systemAiService.IsAvailable) return;

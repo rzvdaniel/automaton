@@ -425,6 +425,14 @@ export function getFileIcon(filePath: string): string {
  */
 export type AppVersionTrigger = 'ManualSave' | 'Publish' | 'Restore' | 'NewGeneration'
 
+export const AppVersionSource = {
+  AiChat: 'AiChat',
+  CliDeploy: 'CliDeploy',
+  Studio: 'Studio',
+} as const
+
+export type AppVersionSource = (typeof AppVersionSource)[keyof typeof AppVersionSource]
+
 /**
  * Basic version info for list view
  */
@@ -434,11 +442,14 @@ export interface AppVersion {
   versionNumber: number
   summary: string
   trigger: AppVersionTrigger
+  source?: AppVersionSource | string
+  reason?: string
   createdAt: string // ISO date string
   createdBy: string
   aiSessionId?: string
   aiModel?: string
   filesChangeSummary?: string
+  snapshotCreated?: boolean
 }
 
 /**
