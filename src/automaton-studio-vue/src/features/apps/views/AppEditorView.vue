@@ -88,7 +88,6 @@ const appEditorNavGroups = [
     items: [
       { key: 'build', label: 'App', icon: 'pi pi-sparkles' },
       { key: 'files', label: 'Files', icon: 'pi pi-file-edit' },
-      { key: 'versions', label: 'Versions', icon: 'pi pi-history' },
     ],
   },
   {
@@ -102,6 +101,7 @@ const appEditorNavGroups = [
   {
     label: 'Manage',
     items: [
+      { key: 'versions', label: 'Restore Points', icon: 'pi pi-history' },
       { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
       { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
       { key: 'services', label: 'Services', icon: 'pi pi-server', disabled: true },
@@ -1255,7 +1255,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             <AppVersionHistory
               ref="versionHistoryRef"
               :app-id="resolvedAppId"
-              title="Source Versions"
+              title="Restore Points"
               full-page
               @version-restored="handleVersionRestored"
               @version-created="handleVersionCreated"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * AppVersionHistory.vue
- * Displays app version history and allows restoration from previous versions
+ * Displays app restore history and allows restoration from previous snapshots
  * Shows timeline of snapshots with triggers and summaries
  */
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
@@ -66,7 +66,7 @@ const loadVersions = async (search?: string) => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load versions',
+      detail: error instanceof Error ? error.message : 'Failed to load restore points',
       life: 5000,
     })
   } finally {
@@ -92,7 +92,7 @@ async function loadMoreVersions() {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load more versions',
+      detail: error instanceof Error ? error.message : 'Failed to load more restore points',
       life: 5000,
     })
   } finally {
@@ -137,7 +137,7 @@ onUnmounted(() => {
 })
 
 /**
- * View version details
+ * View restore point details
  */
 async function viewVersionDetail(version: AppVersion) {
   try {
@@ -148,7 +148,7 @@ async function viewVersionDetail(version: AppVersion) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to load version details',
+      detail: error instanceof Error ? error.message : 'Failed to load restore point details',
       life: 5000,
     })
   }
@@ -246,7 +246,7 @@ async function createSnapshot() {
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: 'Version snapshot created',
+      detail: 'Restore point created',
       life: 3000,
     })
     emit('versionCreated')
@@ -255,7 +255,7 @@ async function createSnapshot() {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: error instanceof Error ? error.message : 'Failed to create snapshot',
+      detail: error instanceof Error ? error.message : 'Failed to create restore point',
       life: 5000,
     })
   } finally {
@@ -268,7 +268,7 @@ async function createSnapshot() {
  */
 async function restoreVersion(versionNumber: number) {
   confirm.require({
-    message: `Restore app to version ${versionNumber}? Current files will be replaced.`,
+    message: `Restore app to restore point ${versionNumber}? Current files will be replaced.`,
     header: 'Confirm Restore',
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Restore',
@@ -284,7 +284,7 @@ async function restoreVersion(versionNumber: number) {
         toast.add({
           severity: 'error',
           summary: 'Error',
-          detail: error instanceof Error ? error.message : 'Failed to restore version',
+          detail: error instanceof Error ? error.message : 'Failed to restore app to this point',
           life: 5000,
         })
       } finally {
@@ -432,10 +432,10 @@ defineExpose({
     <div class="panel-header">
       <div class="header-title">
         <i class="pi pi-history text-lg"></i>
-        <h3>{{ title || 'Versions' }}</h3>
+        <h3>{{ title || 'Restore Points' }}</h3>
       </div>
       <Button
-        v-tooltip.left="'Create manual snapshot'"
+        v-tooltip.left="'Create manual restore point'"
         icon="pi pi-camera"
         size="small"
         rounded
@@ -456,7 +456,7 @@ defineExpose({
         />
         <InputText
           v-model="searchQuery"
-          placeholder="Search versions..."
+          placeholder="Search restore points..."
           size="small"
           class="w-full"
         />
@@ -466,18 +466,18 @@ defineExpose({
     <!-- Loading state -->
     <div v-if="isLoading" class="loading-state">
       <ProgressSpinner :style="{ width: '40px', height: '40px' }" stroke-width="4" />
-      <p class="mt-2 text-sm text-color-secondary">Loading versions...</p>
+      <p class="mt-2 text-sm text-color-secondary">Loading restore points...</p>
     </div>
 
     <!-- Empty state -->
     <div v-else-if="!versionList || versionList.versions.length === 0" class="empty-state">
       <i class="pi pi-history text-3xl text-color-secondary mb-2"></i>
-      <p>No versions yet</p>
+      <p>No restore points yet</p>
       <p class="text-sm text-color-secondary mb-3">
         Restore points are created after AI sessions, before CLI deployments, or manually in Studio
       </p>
       <Button
-        label="Create Snapshot"
+        label="Create Restore Point"
         icon="pi pi-camera"
         size="small"
         :loading="isCreatingSnapshot"
@@ -515,7 +515,7 @@ defineExpose({
                   @click="viewVersionDetail(version)"
                 />
                 <Button
-                  v-tooltip.top="'Restore this version'"
+                  v-tooltip.top="'Restore this point'"
                   icon="pi pi-refresh"
                   size="small"
                   text
@@ -574,7 +574,7 @@ defineExpose({
     <Dialog
       v-model:visible="showVersionDetail"
       modal
-      :header="`Version ${selectedVersion?.versionNumber} Details`"
+      :header="`Restore Point ${selectedVersion?.versionNumber} Details`"
       :style="{ width: '90vw', maxWidth: '800px' }"
     >
       <div v-if="selectedVersion" class="version-detail">
@@ -604,10 +604,10 @@ defineExpose({
 
         <!-- Metadata -->
         <div class="detail-section">
-          <h4>Version Info</h4>
+          <h4>Restore Point Info</h4>
           <div class="detail-grid">
             <div class="detail-row">
-              <span class="detail-label">Version:</span>
+              <span class="detail-label">Restore Point:</span>
               <span class="detail-value">{{ selectedVersion.versionNumber }}</span>
             </div>
             <div class="detail-row">
@@ -710,7 +710,7 @@ defineExpose({
           @click="showVersionDetail = false"
         />
         <Button
-          label="Restore This Version"
+          label="Restore This Point"
           icon="pi pi-refresh"
           severity="warn"
           :loading="isRestoringVersion"
@@ -723,12 +723,12 @@ defineExpose({
     <Dialog
       v-model:visible="showSnapshotDialog"
       modal
-      header="Create Snapshot"
+      header="Create Restore Point"
       :style="{ width: '420px' }"
     >
       <div class="snapshot-dialog">
         <p class="text-color-secondary mb-3">
-          Create a manual snapshot of the current app state. Optionally add a summary to describe what changed.
+          Create a manual restore point for the current app state. Optionally add a summary to describe what changed.
         </p>
         <div class="field">
           <label for="snapshotSummary" class="block font-semibold mb-2">Summary (optional)</label>
@@ -749,7 +749,7 @@ defineExpose({
           @click="showSnapshotDialog = false"
         />
         <Button
-          label="Create Snapshot"
+          label="Create Restore Point"
           icon="pi pi-camera"
           :loading="isCreatingSnapshot"
           @click="createSnapshot"
