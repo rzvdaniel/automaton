@@ -53,6 +53,21 @@ function Get-EffectiveMaxIterations {
     return 3
 }
 
+function Save-IterationMetrics {
+    param(
+        [string]$Role,
+        [int]$Iteration
+    )
+
+    $sourcePath = "AgentRuns\current\$Role-metrics.json"
+    if (-not (Test-Path $sourcePath)) {
+        return
+    }
+
+    $targetPath = "AgentRuns\current\$Role-metrics.iteration-$Iteration.json"
+    Copy-Item $sourcePath $targetPath -Force
+}
+
 if (Test-Path $goalPath) {
     $goalLastWrite = (Get-Item $goalPath).LastWriteTimeUtc
 
@@ -93,6 +108,7 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
     Write-Host "========================================"
 
     .\.agent\harness\run-developer.ps1
+    Save-IterationMetrics -Role "developer" -Iteration $i
 
     if ($SkipReviewer) {
         Write-Host ""
@@ -102,6 +118,7 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
     }
 
     .\.agent\harness\run-reviewer.ps1
+    Save-IterationMetrics -Role "reviewer" -Iteration $i
 
     if (-not (Test-Path "AgentRuns\current\review.md")) {
         throw "Review file was not created."
@@ -167,16 +184,34 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
 
 $metricFiles = @(
     "AgentRuns\current\scope-classifier-metrics.json",
-    "AgentRuns\current\orchestrator-metrics.json",
-    "AgentRuns\current\developer-metrics.json",
-    "AgentRuns\current\reviewer-metrics.json"
+    "AgentRuns\current\orchestrator-metrics.json"
 )
+
+$iterationMetricFiles = Get-ChildItem "AgentRuns\current" -Filter "*-metrics.iteration-*.json" -ErrorAction SilentlyContinue |
+    Sort-Object Name |
+    ForEach-Object { $_.FullName }
+
+if ($iterationMetricFiles.Count -gt 0) {
+    $metricFiles += $iterationMetricFiles
+}
+else {
+    $metricFiles += @(
+        "AgentRuns\current\developer-metrics.json",
+        "AgentRuns\current\reviewer-metrics.json"
+    )
+}
 
 $items = @()
 
 foreach ($file in $metricFiles) {
     if (Test-Path $file) {
-        $items += Get-Content $file -Raw | ConvertFrom-Json
+        $metric = Get-Content $file -Raw | ConvertFrom-Json
+
+        if ($file -match 'iteration-(\d+)\.json$') {
+            $metric | Add-Member -NotePropertyName iteration -NotePropertyValue ([int]$Matches[1]) -Force
+        }
+
+        $items += $metric
     }
 }
 
