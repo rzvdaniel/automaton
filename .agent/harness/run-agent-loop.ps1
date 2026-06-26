@@ -120,42 +120,48 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
     Write-Host "Parsed reviewer decision: $lastDecision"
     Write-Host "Parsed reviewer severity: $lastSeverity"
 
+    $shouldStopLoop = $false
+
     switch ($lastDecision) {
         "accept" {
             Write-Host ""
             Write-Host "Stopping loop because reviewer accepted the task."
-            break
+            $shouldStopLoop = $true
         }
 
         "done" {
             Write-Host ""
             Write-Host "Stopping loop because reviewer marked the task done."
-            break
+            $shouldStopLoop = $true
         }
 
         "stop" {
             Write-Host ""
             Write-Host "Stopping loop because reviewer requested human intervention."
-            break
+            $shouldStopLoop = $true
         }
 
         "fix" {
             if ($i -lt $effectiveMaxIterations) {
                 Write-Host ""
                 Write-Host "Reviewer requested fixes. Continuing to developer iteration $($i + 1) / $effectiveMaxIterations."
-                continue
             }
-
-            Write-Host ""
-            Write-Host "Reviewer requested fixes, but maximum iterations were reached. Manual review required."
-            break
+            else {
+                Write-Host ""
+                Write-Host "Reviewer requested fixes, but maximum iterations were reached. Manual review required."
+                $shouldStopLoop = $true
+            }
         }
 
         default {
             Write-Host ""
             Write-Host "Reviewer decision was missing or unknown. Stopping for manual review."
-            break
+            $shouldStopLoop = $true
         }
+    }
+
+    if ($shouldStopLoop) {
+        break
     }
 }
 
