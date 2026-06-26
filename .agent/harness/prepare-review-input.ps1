@@ -25,6 +25,55 @@ function Read-TextFileOrEmpty {
     return $content
 }
 
+function Get-UntrackedFiles {
+    $files = git ls-files --others --exclude-standard | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    return @($files)
+}
+
+function Get-UntrackedDiffStat {
+    param(
+        [string[]]$Files
+    )
+
+    if ($Files.Count -eq 0) {
+        return ""
+    }
+
+    $lines = foreach ($file in $Files) {
+        $lineCount = (Get-Content $file | Measure-Object -Line).Lines
+        "{0} | {1} +" -f $file, $lineCount
+    }
+
+    return ($lines -join [Environment]::NewLine) + [Environment]::NewLine
+}
+
+function Get-UntrackedDiff {
+    param(
+        [string[]]$Files
+    )
+
+    if ($Files.Count -eq 0) {
+        return ""
+    }
+
+    $builder = [System.Text.StringBuilder]::new()
+
+    foreach ($file in $Files) {
+        $null = $builder.AppendLine("diff --git a/$file b/$file")
+        $null = $builder.AppendLine("new file mode 100644")
+        $null = $builder.AppendLine("index 0000000..0000000")
+        $null = $builder.AppendLine("--- /dev/null")
+        $null = $builder.AppendLine("+++ b/$file")
+        $null = $builder.AppendLine("@@ -0,0 +1 @@")
+
+        foreach ($line in Get-Content $file) {
+            $null = $builder.Append('+').AppendLine($line)
+        }
+    }
+
+    return $builder.ToString()
+}
+
 $scopeJson = ""
 $mode = "unknown"
 $reviewerInputMax = 40000
@@ -68,6 +117,13 @@ $developerError = Read-TextFileOrEmpty -Path "AgentRuns\current\developer-error-
 $changedFiles = git diff --name-only | Out-String
 $diffStat = git diff --stat | Out-String
 $diff = git diff --unified=3 | Out-String
+$untrackedFiles = Get-UntrackedFiles
+
+if ($untrackedFiles.Count -gt 0) {
+    $changedFiles += (($untrackedFiles -join [Environment]::NewLine) + [Environment]::NewLine)
+    $diffStat += Get-UntrackedDiffStat -Files $untrackedFiles
+    $diff += Get-UntrackedDiff -Files $untrackedFiles
+}
 
 if ($diff.Length -gt $maxDiffChars) {
     $diff = $diff.Substring(0, $maxDiffChars) + "`n`n[diff truncated by prepare-review-input.ps1]"
