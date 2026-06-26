@@ -5,10 +5,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$goalPath = "AgentRuns\current\goal.md"
-$taskPath = "AgentRuns\current\task.md"
-$contextPath = "AgentRuns\current\context.md"
-$scopePath = "AgentRuns\current\scope.json"
+$runRoot = "AgentRuns\current"
+$goalPath = "$runRoot\goal.md"
+$taskPath = "$runRoot\task.md"
+$contextPath = "$runRoot\context.md"
+$scopePath = "$runRoot\scope.json"
+$reviewsDir = "$runRoot\reviews"
+$resultsDir = "$runRoot\results"
+$decisionsPath = "$runRoot\decisions.json"
 
 function Get-ReviewField {
     param(
@@ -25,6 +29,22 @@ function Get-ReviewField {
     }
 
     return $match.Groups[1].Value.ToLowerInvariant()
+}
+
+function Get-ReviewSection {
+    param(
+        [string]$Review,
+        [string]$SectionName
+    )
+
+    $sectionPattern = "(?ims)^\s*$([regex]::Escape($SectionName))\s*:\s*(.*?)(?=^\s*(decision|severity|reason|next_action|follow_up_items)\s*:|\z)"
+    $match = [regex]::Match($Review, $sectionPattern)
+
+    if (-not $match.Success) {
+        return ""
+    }
+
+    return $match.Groups[1].Value.Trim()
 }
 
 function Get-EffectiveMaxIterations {
@@ -59,13 +79,75 @@ function Save-IterationMetrics {
         [int]$Iteration
     )
 
-    $sourcePath = "AgentRuns\current\$Role-metrics.json"
+    $sourcePath = "$runRoot\$Role-metrics.json"
     if (-not (Test-Path $sourcePath)) {
         return
     }
 
-    $targetPath = "AgentRuns\current\$Role-metrics.iteration-$Iteration.json"
+    $targetPath = "$runRoot\$Role-metrics.iteration-$Iteration.json"
     Copy-Item $sourcePath $targetPath -Force
+}
+
+function Save-IterationTextArtifact {
+    param(
+        [string]$SourcePath,
+        [string]$TargetDirectory,
+        [string]$Name,
+        [int]$Iteration
+    )
+
+    if (-not (Test-Path $SourcePath)) {
+        return ""
+    }
+
+    New-Item -ItemType Directory -Force -Path $TargetDirectory | Out-Null
+    $targetPath = Join-Path $TargetDirectory "$Name.iteration-$Iteration.md"
+    Copy-Item $SourcePath $targetPath -Force
+    return $targetPath
+}
+
+function Save-DecisionSnapshot {
+    param(
+        [int]$Iteration,
+        [string]$Decision,
+        [string]$Severity,
+        [string]$Review,
+        [string]$ReviewPath,
+        [string]$ResultPath
+    )
+
+    $items = @()
+
+    if (Test-Path $decisionsPath) {
+        try {
+            $existing = Get-Content $decisionsPath -Raw | ConvertFrom-Json
+            if ($null -ne $existing) {
+                $items += @($existing)
+            }
+        }
+        catch {
+            Write-Host "Warning: could not parse existing decisions.json. Rebuilding it from current iteration."
+        }
+    }
+
+    $items = @($items | Where-Object { $_.iteration -ne $Iteration })
+
+    $decisionItem = [ordered]@{
+        iteration = $Iteration
+        decision = $Decision
+        severity = $Severity
+        reason = Get-ReviewSection -Review $Review -SectionName "reason"
+        next_action = Get-ReviewSection -Review $Review -SectionName "next_action"
+        follow_up_items = Get-ReviewSection -Review $Review -SectionName "follow_up_items"
+        review_path = $ReviewPath
+        result_path = $ResultPath
+        captured_at = (Get-Date).ToString("o")
+    }
+
+    $items += [pscustomobject]$decisionItem
+    $items = @($items | Sort-Object iteration)
+
+    $items | ConvertTo-Json -Depth 8 | Set-Content $decisionsPath
 }
 
 if (Test-Path $goalPath) {
@@ -109,6 +191,7 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
 
     .\.agent\harness\run-developer.ps1
     Save-IterationMetrics -Role "developer" -Iteration $i
+    $resultSnapshotPath = Save-IterationTextArtifact -SourcePath "$runRoot\result.md" -TargetDirectory $resultsDir -Name "result" -Iteration $i
 
     if ($SkipReviewer) {
         Write-Host ""
@@ -119,14 +202,23 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
 
     .\.agent\harness\run-reviewer.ps1
     Save-IterationMetrics -Role "reviewer" -Iteration $i
+    $reviewSnapshotPath = Save-IterationTextArtifact -SourcePath "$runRoot\review.md" -TargetDirectory $reviewsDir -Name "review" -Iteration $i
 
-    if (-not (Test-Path "AgentRuns\current\review.md")) {
+    if (-not (Test-Path "$runRoot\review.md")) {
         throw "Review file was not created."
     }
 
-    $review = Get-Content AgentRuns\current\review.md -Raw
+    $review = Get-Content "$runRoot\review.md" -Raw
     $lastDecision = Get-ReviewField -Review $review -FieldName "decision"
     $lastSeverity = Get-ReviewField -Review $review -FieldName "severity"
+
+    Save-DecisionSnapshot `
+        -Iteration $i `
+        -Decision $lastDecision `
+        -Severity $lastSeverity `
+        -Review $review `
+        -ReviewPath $reviewSnapshotPath `
+        -ResultPath $resultSnapshotPath
 
     Write-Host ""
     Write-Host "Current review:"
@@ -183,11 +275,11 @@ for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
 }
 
 $metricFiles = @(
-    "AgentRuns\current\scope-classifier-metrics.json",
-    "AgentRuns\current\orchestrator-metrics.json"
+    "$runRoot\scope-classifier-metrics.json",
+    "$runRoot\orchestrator-metrics.json"
 )
 
-$iterationMetricFiles = Get-ChildItem "AgentRuns\current" -Filter "*-metrics.iteration-*.json" -ErrorAction SilentlyContinue |
+$iterationMetricFiles = Get-ChildItem $runRoot -Filter "*-metrics.iteration-*.json" -ErrorAction SilentlyContinue |
     Sort-Object Name |
     ForEach-Object { $_.FullName }
 
@@ -196,8 +288,8 @@ if ($iterationMetricFiles.Count -gt 0) {
 }
 else {
     $metricFiles += @(
-        "AgentRuns\current\developer-metrics.json",
-        "AgentRuns\current\reviewer-metrics.json"
+        "$runRoot\developer-metrics.json",
+        "$runRoot\reviewer-metrics.json"
     )
 }
 
@@ -233,12 +325,12 @@ if ($items.Count -gt 0) {
     }
 
     $summary | ConvertTo-Json -Depth 10 |
-        Set-Content "AgentRuns\current\metrics.json"
+        Set-Content "$runRoot\metrics.json"
 
     Write-Host ""
     Write-Host "Metrics:"
     Write-Host "----------------------------------------"
-    Get-Content AgentRuns\current\metrics.json
+    Get-Content "$runRoot\metrics.json"
 }
 
 Write-Host ""
@@ -247,5 +339,9 @@ Write-Host "----------------------------------------"
 Write-Host "Last reviewer decision: $lastDecision"
 Write-Host "Last reviewer severity: $lastSeverity"
 Write-Host "git diff"
-Write-Host "AgentRuns\current\result.md"
-Write-Host "AgentRuns\current\review.md"
+Write-Host "$runRoot\result.md"
+Write-Host "$runRoot\review.md"
+
+if (Test-Path $decisionsPath) {
+    Write-Host $decisionsPath
+}
