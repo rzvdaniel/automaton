@@ -1,5 +1,5 @@
 param(
-    [int]$MaxIterations = 3,
+    [int]$MaxIterations = 0,
     [switch]$SkipReviewer
 )
 
@@ -8,6 +8,50 @@ $ErrorActionPreference = "Stop"
 $goalPath = "AgentRuns\current\goal.md"
 $taskPath = "AgentRuns\current\task.md"
 $contextPath = "AgentRuns\current\context.md"
+$scopePath = "AgentRuns\current\scope.json"
+
+function Get-ReviewField {
+    param(
+        [string]$Review,
+        [string]$FieldName
+    )
+
+    $match = [regex]::Match(
+        $Review,
+        "(?im)^\s*$([regex]::Escape($FieldName))\s*:\s*([a-zA-Z_-]+)\s*$")
+
+    if (-not $match.Success) {
+        return ""
+    }
+
+    return $match.Groups[1].Value.ToLowerInvariant()
+}
+
+function Get-EffectiveMaxIterations {
+    param(
+        [int]$RequestedMaxIterations
+    )
+
+    if ($RequestedMaxIterations -gt 0) {
+        return $RequestedMaxIterations
+    }
+
+    if (Test-Path $scopePath) {
+        try {
+            $scope = Get-Content $scopePath -Raw | ConvertFrom-Json
+            $scopeMaxIterations = [int]$scope.max_iterations
+
+            if ($scopeMaxIterations -ge 1) {
+                return [Math]::Min($scopeMaxIterations, 3)
+            }
+        }
+        catch {
+            Write-Host "Warning: could not read max_iterations from scope.json. Falling back to 3."
+        }
+    }
+
+    return 3
+}
 
 if (Test-Path $goalPath) {
     $goalLastWrite = (Get-Item $goalPath).LastWriteTimeUtc
@@ -35,10 +79,17 @@ That will clear stale generated files and regenerate task.md/context.md from goa
     }
 }
 
-for ($i = 1; $i -le $MaxIterations; $i++) {
+$effectiveMaxIterations = Get-EffectiveMaxIterations -RequestedMaxIterations $MaxIterations
+$lastDecision = ""
+$lastSeverity = ""
+
+Write-Host ""
+Write-Host "Agent loop max iterations: $effectiveMaxIterations"
+
+for ($i = 1; $i -le $effectiveMaxIterations; $i++) {
     Write-Host ""
     Write-Host "========================================"
-    Write-Host "Agent loop iteration $i / $MaxIterations"
+    Write-Host "Agent loop iteration $i / $effectiveMaxIterations"
     Write-Host "========================================"
 
     .\.agent\harness\run-developer.ps1
@@ -46,6 +97,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     if ($SkipReviewer) {
         Write-Host ""
         Write-Host "Skipping reviewer. Manual git diff review required."
+        $lastDecision = "manual-review"
         break
     }
 
@@ -56,22 +108,54 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     }
 
     $review = Get-Content AgentRuns\current\review.md -Raw
+    $lastDecision = Get-ReviewField -Review $review -FieldName "decision"
+    $lastSeverity = Get-ReviewField -Review $review -FieldName "severity"
 
     Write-Host ""
     Write-Host "Current review:"
     Write-Host "----------------------------------------"
     Write-Host $review
 
-    if ($review -match "decision:\s*(accept|done|stop)") {
-        Write-Host ""
-        Write-Host "Stopping loop because reviewer decision is accept/done/stop."
-        break
-    }
+    Write-Host ""
+    Write-Host "Parsed reviewer decision: $lastDecision"
+    Write-Host "Parsed reviewer severity: $lastSeverity"
 
-    if ($review -match "severity:\s*minor") {
-        Write-Host ""
-        Write-Host "Stopping loop because remaining issues are minor."
-        break
+    switch ($lastDecision) {
+        "accept" {
+            Write-Host ""
+            Write-Host "Stopping loop because reviewer accepted the task."
+            break
+        }
+
+        "done" {
+            Write-Host ""
+            Write-Host "Stopping loop because reviewer marked the task done."
+            break
+        }
+
+        "stop" {
+            Write-Host ""
+            Write-Host "Stopping loop because reviewer requested human intervention."
+            break
+        }
+
+        "fix" {
+            if ($i -lt $effectiveMaxIterations) {
+                Write-Host ""
+                Write-Host "Reviewer requested fixes. Continuing to developer iteration $($i + 1) / $effectiveMaxIterations."
+                continue
+            }
+
+            Write-Host ""
+            Write-Host "Reviewer requested fixes, but maximum iterations were reached. Manual review required."
+            break
+        }
+
+        default {
+            Write-Host ""
+            Write-Host "Reviewer decision was missing or unknown. Stopping for manual review."
+            break
+        }
     }
 }
 
@@ -119,5 +203,8 @@ if ($items.Count -gt 0) {
 Write-Host ""
 Write-Host "Loop finished. Review manually:"
 Write-Host "----------------------------------------"
+Write-Host "Last reviewer decision: $lastDecision"
+Write-Host "Last reviewer severity: $lastSeverity"
 Write-Host "git diff"
+Write-Host "AgentRuns\current\result.md"
 Write-Host "AgentRuns\current\review.md"
