@@ -11,6 +11,7 @@ Its objectives are to:
 * Support iterative development
 * Recover gracefully from AI failures
 * Produce reproducible execution
+* Preserve reviewer decisions and iteration history
 * Keep humans in control
 
 ---
@@ -25,7 +26,7 @@ Each agent has one clear responsibility.
 * Orchestrator plans larger work.
 * Developer modifies code.
 * Reviewer validates the implementation when the selected mode requires review.
-* The loop script owns iteration control.
+* The loop script owns iteration control and artifact history.
 
 No role should perform another role's responsibilities.
 
@@ -125,14 +126,6 @@ Runs:
 * Developer only
 
 Used for the cheapest safe path: one obvious file, mechanical UI/copy/default-value/CSS changes, and no reviewer judgment required.
-
-Examples:
-
-* rename a visible label
-* change a default boolean
-* change a default splitter ratio
-* tiny CSS spacing tweak
-* one-line config value
 
 Manual `git diff` review is expected.
 
@@ -542,7 +535,13 @@ context.md
 developer-input.md
 result.md
 developer-error-summary.txt
+results/
+  result.iteration-1.md
+  result.iteration-2.md
+  result.iteration-3.md
 ```
+
+`result.md` is the latest developer result. The `results/` folder preserves each iteration result.
 
 ## Reviewer
 
@@ -550,6 +549,42 @@ developer-error-summary.txt
 review-input.md
 review.md
 reviewer-error-summary.txt
+reviews/
+  review.iteration-1.md
+  review.iteration-2.md
+  review.iteration-3.md
+decisions.json
+```
+
+`review.md` is the latest reviewer output. The `reviews/` folder preserves each full reviewer decision. `decisions.json` is a compact structured timeline suitable for CLI summaries, Studio UI, or analysis.
+
+Example `decisions.json`:
+
+```json
+[
+  {
+    "iteration": 1,
+    "decision": "fix",
+    "severity": "major",
+    "reason": "Legacy data path mismatch between C# and FastAPI.",
+    "next_action": "Fix compatibility mode and rerun reviewer.",
+    "follow_up_items": "Consider documenting override precedence.",
+    "review_path": "AgentRuns/current/reviews/review.iteration-1.md",
+    "result_path": "AgentRuns/current/results/result.iteration-1.md",
+    "captured_at": "2026-06-26T12:42:08+02:00"
+  },
+  {
+    "iteration": 2,
+    "decision": "accept",
+    "severity": "minor",
+    "reason": "Acceptance criteria satisfied; optional verification remains.",
+    "next_action": "No fix pass required.",
+    "follow_up_items": "Run targeted tests before merge if CI does not cover them.",
+    "review_path": "AgentRuns/current/reviews/review.iteration-2.md",
+    "result_path": "AgentRuns/current/results/result.iteration-2.md",
+    "captured_at": "2026-06-26T13:10:00+02:00"
+  }
+]
 ```
 
 ## Metrics
@@ -575,6 +610,30 @@ The non-iteration developer/reviewer metrics files represent the latest role run
 ```
 
 These contain the raw Codex execution stream.
+
+---
+
+# Review History Strategy
+
+Reviewer output is a task artifact, not an operational log.
+
+The harness keeps three reviewer views:
+
+```text
+review.md                         latest reviewer decision
+reviews/review.iteration-N.md      full reviewer decision for one pass
+decisions.json                     compact decision timeline
+```
+
+This enables:
+
+* seeing why a reviewer asked for changes
+* comparing fix iterations
+* showing a review timeline in Studio or CLI
+* measuring acceptance/fix rates over time
+* debugging reviewer behavior without reading raw JSONL logs
+
+`decisions.json` is derived from `review.md` and should be treated as an index/timeline. The full source of truth for each reviewer pass is the corresponding `reviews/review.iteration-N.md` file.
 
 ---
 
@@ -767,9 +826,10 @@ The current optimisation roadmap is:
 4. Cap `review-input.md` by mode.
 5. Prefer search and exact candidate files over broad repository exploration.
 6. Prefer `.agent/maps/automaton.md` over broad repository exploration for normal mode only.
-7. Reduce orchestrator repository scanning.
-8. Move verification into the harness.
-9. Eventually provide symbol-level context instead of entire files.
+7. Preserve review decisions as structured artifacts.
+8. Reduce orchestrator repository scanning.
+9. Move verification into the harness.
+10. Eventually provide symbol-level context instead of entire files.
 
 ---
 
@@ -813,6 +873,7 @@ Rather than simply executing prompts, it should:
 * minimise token usage through prepared context
 * recover automatically from failures
 * provide deterministic execution
+* preserve useful decision history
 * continuously improve through metrics and documentation updates
 
 The harness should evolve in the same way that CI/CD systems evolved: from simple scripts into a structured, observable, and reliable orchestration framework for AI-assisted software development.
