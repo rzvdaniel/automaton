@@ -25,6 +25,7 @@ Each agent has one clear responsibility.
 * Orchestrator plans larger work.
 * Developer modifies code.
 * Reviewer validates the implementation when the selected mode requires review.
+* The loop script owns iteration control.
 
 No role should perform another role's responsibilities.
 
@@ -71,6 +72,10 @@ Scope Classifier
     │   Developer
     │       ▼
     │   Reviewer
+    │       │
+    │       ├── accept/done ───► finish
+    │       ├── stop ──────────► human intervention
+    │       └── fix ───────────► Developer, if iterations remain
     │
     └── Normal
             ▼
@@ -86,22 +91,19 @@ Scope Classifier
             ▼
         Reviewer
             │
-     accept / fix
-            │
-      if fix
-            │
-            ▼
-      Developer
-            │
-            ▼
-        Reviewer
+            ├── accept/done ───► finish
+            ├── stop ──────────► human intervention
+            └── fix ───────────► Developer, if iterations remain
 ```
 
 The loop continues until:
 
-* accepted
-* stopped
-* maximum iterations reached
+* reviewer returns `accept`
+* reviewer returns `done`
+* reviewer returns `stop`
+* reviewer returns an unknown or missing decision
+* maximum iterations are reached
+* reviewer is skipped because the selected mode is developer-only
 
 ---
 
@@ -189,6 +191,8 @@ Runs:
 
 No orchestrator is required. Used for clear, limited work that benefits from reviewer validation.
 
+If the reviewer returns `fix`, `run-agent-loop.ps1` runs another developer/reviewer iteration until the task is accepted, stopped, or `max_iterations` is reached.
+
 Default budget:
 
 ```json
@@ -207,8 +211,11 @@ Runs:
 2. Orchestrator
 3. Developer
 4. Reviewer
+5. Developer/Reviewer fix iterations when needed
 
 Used for ambiguous, larger, cross-project, or architecture-sensitive work.
+
+The orchestrator runs once. It is not re-run after reviewer feedback. Follow-up developer passes receive the existing task/context plus the latest review.
 
 Default budget:
 
@@ -219,6 +226,46 @@ Default budget:
   "max_files_to_inspect": 0
 }
 ```
+
+---
+
+# Reviewer Decision State Machine
+
+`run-agent-loop.ps1` parses `AgentRuns/current/review.md` after every reviewer pass.
+
+Expected format:
+
+```text
+decision: accept | fix | done | stop
+severity: none | minor | major | critical
+```
+
+Decision handling:
+
+```text
+accept  -> finish successfully
+done    -> finish successfully
+stop    -> stop for human intervention
+fix     -> run another developer/reviewer iteration if iterations remain
+unknown -> stop for human review
+missing -> stop for human review
+```
+
+When `decision: fix` is returned and iterations remain, the loop prints the next iteration number and invokes the developer again.
+
+When `decision: fix` is returned on the last allowed iteration, the loop stops and reports that manual review is required.
+
+---
+
+# Iteration Ownership
+
+`start-agent-task.ps1` starts a new task from `goal.md` and delegates to the appropriate workflow.
+
+`run-agent-loop.ps1` owns developer/reviewer iteration after planning has been generated.
+
+The classifier writes `max_iterations` to `scope.json`. If `run-agent-loop.ps1` is called without `-MaxIterations`, it reads `scope.json` and uses that value. The loop caps automatic iterations at 3.
+
+The orchestrator runs only once per normal task. It should not be re-run for normal reviewer fixes unless the human edits `goal.md` or intentionally restarts the task.
 
 ---
 
@@ -329,6 +376,8 @@ Developer is the **only** role allowed to modify code.
 
 For micro/tiny/small modes, the developer must follow the file-inspection budget in `developer-input.md` and search before opening files when exact files are unknown.
 
+For reviewer fix iterations, the developer should treat `review.md` as the immediate source of truth for the next pass while preserving the original task constraints.
+
 If Codex crashes after modifying files, the harness generates:
 
 ```text
@@ -374,6 +423,7 @@ Possible decisions:
 ```text
 accept
 fix
+done
 stop
 ```
 
@@ -405,6 +455,7 @@ This script:
 * classifies the goal
 * generates planning artifacts
 * starts the appropriate workflow
+* runs the developer/reviewer loop automatically when the selected mode requires it
 
 Modes can be forced:
 
@@ -423,7 +474,26 @@ Execute:
 .\.agent\harness\run-agent-loop.ps1
 ```
 
-This continues an already generated task. It should **never** be used immediately after editing `goal.md`.
+Use this when:
+
+* a task already has valid `task.md` and optional `context.md`
+* the previous execution was interrupted
+* a harness bug was fixed and the same task should continue
+* a reviewer returned `fix` but the task was not continued automatically
+
+Do **not** use it immediately after editing `goal.md`. In that case, use `start-agent-task.ps1` so stale planning is cleared and regenerated.
+
+## Individual Roles
+
+Individual role scripts are for debugging or manual override:
+
+```powershell
+.\.agent\harness\run-orchestrator.ps1
+.\.agent\harness\run-developer.ps1
+.\.agent\harness\run-reviewer.ps1
+```
+
+Do not use individual role scripts as the normal workflow.
 
 ---
 
@@ -489,8 +559,14 @@ scope-classifier-metrics.json
 orchestrator-metrics.json
 developer-metrics.json
 reviewer-metrics.json
+developer-metrics.iteration-1.json
+reviewer-metrics.iteration-1.json
+developer-metrics.iteration-2.json
+reviewer-metrics.iteration-2.json
 metrics.json
 ```
+
+The non-iteration developer/reviewer metrics files represent the latest role run. Iteration snapshot files preserve each pass for aggregation.
 
 ## Raw Logs
 
@@ -637,6 +713,8 @@ instead of broad repository searches.
 
 Micro and tiny modes skip orchestrator and reviewer, and `prepare-developer-input.ps1` omits large context by default.
 
+Reviewer fix iterations reuse the original task/context and latest review instead of re-running the orchestrator.
+
 ## Future
 
 Future improvements include:
@@ -660,13 +738,22 @@ developer-metrics.json
 reviewer-metrics.json
 ```
 
-The loop aggregates them into:
+For multi-iteration runs, the loop copies developer/reviewer metrics after each pass:
+
+```text
+developer-metrics.iteration-1.json
+reviewer-metrics.iteration-1.json
+developer-metrics.iteration-2.json
+reviewer-metrics.iteration-2.json
+```
+
+The loop aggregates classifier, orchestrator, and all iteration metrics into:
 
 ```text
 metrics.json
 ```
 
-Metrics help identify expensive stages and validate optimisation work. Aggregated metrics include the scope classifier so the total run cost is not underreported.
+Metrics help identify expensive stages and validate optimisation work. Aggregated metrics include the scope classifier and every developer/reviewer iteration so the total run cost is not underreported.
 
 ---
 
@@ -694,11 +781,15 @@ The current optimisation roadmap is:
 start-agent-task.ps1
 ```
 
+Starts a fresh task from `goal.md`. Use this after creating or editing `goal.md`.
+
 ## Continue Existing Task
 
 ```powershell
 run-agent-loop.ps1
 ```
+
+Continues an existing generated task. Use this after interruptions or manual harness fixes, not after editing `goal.md`.
 
 ## Individual Roles
 
@@ -707,6 +798,8 @@ run-orchestrator.ps1
 run-developer.ps1
 run-reviewer.ps1
 ```
+
+Use individual role scripts only for debugging or manual override.
 
 ---
 
