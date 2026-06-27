@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * PreviewOverlay.vue
- * Full-screen preview overlay for the App Editor
+ * Full-screen application overlay for the App Editor
  * Provides responsive viewport switching with maximum visibility
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -97,7 +97,7 @@ onUnmounted(() => {
             @click="handleClose"
           />
           <span class="app-name">{{ editorStore.currentApp?.name }}</span>
-          <span class="preview-badge">Preview</span>
+          <span class="preview-badge">Application</span>
         </div>
 
         <div class="header-center">
@@ -177,13 +177,13 @@ onUnmounted(() => {
           <!-- Loading state -->
           <div v-if="editorStore.isLoadingPreview" class="preview-loading">
             <i class="pi pi-spin pi-spinner text-4xl"></i>
-            <p class="mt-2">Loading preview...</p>
+            <p class="mt-2">Loading application...</p>
           </div>
 
           <!-- Empty state -->
           <div v-else-if="!editorStore.previewUrl" class="preview-empty">
-            <i class="pi pi-eye text-4xl text-color-secondary"></i>
-            <p class="mt-2 text-color-secondary">No preview available</p>
+            <i class="pi pi-desktop text-4xl text-color-secondary"></i>
+            <p class="mt-2 text-color-secondary">No deployed application available</p>
             <Button
               label="Refresh"
               icon="pi pi-refresh"
@@ -201,7 +201,7 @@ onUnmounted(() => {
             :src="editorStore.previewUrl"
             class="preview-iframe"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-            title="App Preview"
+            title="Running Application"
           />
         </div>
       </div>

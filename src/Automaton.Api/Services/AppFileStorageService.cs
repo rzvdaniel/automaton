@@ -387,6 +387,8 @@ public class AppFileStorageService
         var metadata = await LoadStorageMetadataAsync(userId, appId) ?? CreateDefaultStorageMetadata();
         metadata.Frontend.SourceAvailable = HasFrontendSourceEntries(userId, appId);
         metadata.Backend.SourceAvailable = HasBackendSourceEntries(userId, appId);
+        metadata.Frontend.RuntimeAvailable = metadata.Frontend.RuntimeAvailable || HasFrontendRuntimeEntries(userId, appId);
+        metadata.Backend.RuntimeAvailable = metadata.Backend.RuntimeAvailable || HasBackendRuntimeEntries(userId, appId);
         return metadata;
     }
 
@@ -883,6 +885,16 @@ public class AppFileStorageService
     public bool HasBackendSourceEntries(Guid userId, Guid appId)
     {
         return HasAnyEntries(GetSourceBackendPath(userId, appId));
+    }
+
+    public bool HasFrontendRuntimeEntries(Guid userId, Guid appId)
+    {
+        return HasAnyEntries(GetLiveFrontendPath(userId, appId));
+    }
+
+    public bool HasBackendRuntimeEntries(Guid userId, Guid appId)
+    {
+        return HasAnyEntries(GetLiveBackendPath(userId, appId));
     }
 
     private static bool HasAnyEntries(string path)

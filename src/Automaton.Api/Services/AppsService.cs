@@ -62,9 +62,6 @@ public class AppsService
                 var ownerId = ResolveAppOwnerId(e) ?? UserId;
                 var app = MapToModel(e, null, ownerId);
                 ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, e.Id).Result);
-                app.HasDeployedFrontend = File.Exists(Path.Combine(
-                    fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, e.Id),
-                    "index.html"));
                 return app;
             });
 
@@ -100,9 +97,6 @@ public class AppsService
 
         var app = MapToModel(appEntity, definition, ownerId);
         ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, id).Result);
-        app.HasDeployedFrontend = File.Exists(Path.Combine(
-            fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, id),
-            "index.html"));
 
         return app;
     }
@@ -1117,8 +1111,10 @@ public class AppsService
         Guid ownerId,
         bool? frontendSourceAvailable = null,
         string? frontendRuntimeSource = null,
+        bool? frontendRuntimeAvailable = null,
         bool? backendSourceAvailable = null,
-        string? backendRuntimeSource = null)
+        string? backendRuntimeSource = null,
+        bool? backendRuntimeAvailable = null)
     {
         return fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
@@ -1131,6 +1127,10 @@ public class AppsService
             {
                 metadata.Frontend.RuntimeSource = frontendRuntimeSource;
             }
+            if (frontendRuntimeAvailable.HasValue)
+            {
+                metadata.Frontend.RuntimeAvailable = frontendRuntimeAvailable.Value;
+            }
             if (backendSourceAvailable.HasValue)
             {
                 metadata.Backend.SourceAvailable = backendSourceAvailable.Value;
@@ -1138,6 +1138,10 @@ public class AppsService
             if (!string.IsNullOrWhiteSpace(backendRuntimeSource))
             {
                 metadata.Backend.RuntimeSource = backendRuntimeSource;
+            }
+            if (backendRuntimeAvailable.HasValue)
+            {
+                metadata.Backend.RuntimeAvailable = backendRuntimeAvailable.Value;
             }
         });
     }
@@ -1277,17 +1281,20 @@ public class AppsService
         app.Frontend = new Models.AppComponentOwnershipModel
         {
             SourceAvailable = metadata.Frontend.SourceAvailable,
-            RuntimeSource = metadata.Frontend.RuntimeSource
+            RuntimeSource = metadata.Frontend.RuntimeSource,
+            RuntimeAvailable = metadata.Frontend.RuntimeAvailable
         };
         app.Backend = new Models.AppComponentOwnershipModel
         {
             SourceAvailable = metadata.Backend.SourceAvailable,
-            RuntimeSource = metadata.Backend.RuntimeSource
+            RuntimeSource = metadata.Backend.RuntimeSource,
+            RuntimeAvailable = metadata.Backend.RuntimeAvailable
         };
         app.SourceAvailable = app.Frontend.SourceAvailable || app.Backend.SourceAvailable;
         app.RuntimeSource = app.Frontend.RuntimeSource == app.Backend.RuntimeSource
             ? app.Frontend.RuntimeSource
             : $"{app.Frontend.RuntimeSource}|{app.Backend.RuntimeSource}";
+        app.HasDeployedFrontend = metadata.Frontend.RuntimeAvailable;
     }
 
     private async Task<string> LoadDefaultFrontendTemplateAsync()

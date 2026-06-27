@@ -94,6 +94,7 @@ export interface App {
 export interface AppComponentOwnership {
   sourceAvailable: boolean
   runtimeSource: AppRuntimeSource
+  runtimeAvailable: boolean
 }
 
 export const AppDevelopmentMode = {

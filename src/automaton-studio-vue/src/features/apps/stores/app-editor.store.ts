@@ -5,7 +5,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
-import { useAuthStore } from '@/features/auth/stores/auth.store'
+import { runnersService } from '@/features/runners/services/runners.service'
+import { RunnerStatus } from '@/features/runners/types/runners.types'
 import type {
   App,
   AppFileSystemScope,
@@ -32,7 +33,6 @@ export const UiLogFilter = {
 export type UiLogFilter = typeof UiLogFilter[keyof typeof UiLogFilter]
 
 export const useAppEditorStore = defineStore('appEditor', () => {
-  const authStore = useAuthStore()
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
 
   // ============================================
@@ -52,12 +52,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Currently active file path (selected tab)
   const activeFilePath = ref<string | null>(null)
 
-  // Preview HTML content
-  const previewHtml = ref('')
-
   // Preview URL for iframe (HTTP-based preview)
   const previewUrl = ref('')
-  const previewTestRunId = ref('')
+  const sourceChangedSinceDeploy = ref(false)
+  const lastDeployError = ref<string | null>(null)
+  const assignedRunnerOnline = ref<boolean | null>(null)
 
   // Preview warning message (missing assets, etc.)
   const previewWarning = ref<string | null>(null)
@@ -154,6 +153,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const canDeployFrontendFromStudio = computed(() => currentApp.value?.frontend.sourceAvailable ?? false)
   const canDeployBackendFromStudio = computed(() => currentApp.value?.backend.sourceAvailable ?? false)
   const canDeployFromStudio = computed(() => canDeployFrontendFromStudio.value || canDeployBackendFromStudio.value)
+  const runnerOffline = computed(() => !!currentApp.value?.executionRunnerId && assignedRunnerOnline.value === false)
+  const applicationState = computed(() => {
+    if (lastDeployError.value) return 'Build failed'
+    if (runnerOffline.value) return 'Runner offline'
+    if (sourceChangedSinceDeploy.value) return 'Source changed'
+    if (currentApp.value?.hasDeployedFrontend) return 'Deployed'
+    return 'Not deployed'
+  })
   const isLocalManagedApp = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Local)
   const showsLocalLiveBanner = computed(() => isLocalManagedApp.value && !currentApp.value?.frontend.sourceAvailable)
   const showsSourceDeployBanner = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Studio || canDeployFromStudio.value)
@@ -179,10 +186,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     return `You are editing source files. Frontend source ${currentApp.value.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved'}. Backend source ${currentApp.value.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved'}.`
   })
-  const preferredPreviewScope = computed<AppFileSystemScope>(() => {
-    return FileSystemScope.Source
-  })
-
   function getScopePrefix(scope: AppFileSystemScope): string {
     return `${scope}/`
   }
@@ -204,21 +207,23 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     return scope === FileSystemScope.Source
   }
 
-  function normalizePreviewPath(path: string): string | null {
-    const normalizedPath = path.replace(/\\/g, '/').replace(/^\/+/, '')
-    if (normalizedPath.startsWith('backend/')) {
-      return null
-    }
-
-    if (normalizedPath.startsWith('frontend/')) {
-      return normalizedPath.slice('frontend/'.length)
-    }
-
-    return normalizedPath
-  }
-
   async function loadUnifiedFileTree(appId: string): Promise<void> {
     fileTree.value = await appsService.getRootFileTree(appId)
+  }
+
+  async function refreshAssignedRunnerStatus(): Promise<void> {
+    if (!currentApp.value?.executionRunnerId) {
+      assignedRunnerOnline.value = null
+      return
+    }
+
+    try {
+      const runners = await runnersService.list()
+      const assignedRunner = runners.find((runner) => runner.id === currentApp.value?.executionRunnerId)
+      assignedRunnerOnline.value = assignedRunner ? assignedRunner.status === RunnerStatus.Online : null
+    } catch {
+      assignedRunnerOnline.value = null
+    }
   }
 
   // ============================================
@@ -235,6 +240,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     try {
       // Load app metadata
       currentApp.value = await appsService.get(appId)
+      await refreshAssignedRunnerStatus()
 
       // Load file tree
       currentFileScope.value = defaultEditorScope.value
@@ -254,6 +260,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Load preview
       await refreshPreview()
+      sourceChangedSinceDeploy.value = false
+      lastDeployError.value = null
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -393,11 +401,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       file.isDirty = false
       file.originalContent = file.content
-
-      // If saving index.html, refresh preview
-      if (filePath === 'source/index.html' || filePath === 'source/frontend/index.html') {
-        await refreshPreview()
-      }
+      sourceChangedSinceDeploy.value = true
+      lastDeployError.value = null
+      await refreshPreview()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -426,7 +432,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         file.originalContent = file.content
       }
 
-      // Refresh preview after saving
+      sourceChangedSinceDeploy.value = dirtyFiles.length > 0
+      lastDeployError.value = null
       await refreshPreview()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
@@ -455,6 +462,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         throw new Error('Version snapshots are read-only')
       }
       await loadUnifiedFileTree(currentApp.value.id)
+      sourceChangedSinceDeploy.value = true
+      lastDeployError.value = null
 
       // Open the new file
       await openFile(filePath)
@@ -487,6 +496,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Refresh file tree
       await loadUnifiedFileTree(currentApp.value.id)
+      sourceChangedSinceDeploy.value = true
+      lastDeployError.value = null
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -517,6 +528,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
 
       await loadUnifiedFileTree(currentApp.value.id)
+      sourceChangedSinceDeploy.value = true
+      lastDeployError.value = null
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -535,116 +548,29 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     previewWarning.value = null
 
     try {
-      const userId = currentApp.value.userId || authStore.userId
-      if (!userId) {
-        console.warn('Preview user ID is missing; unable to build preview URL')
+      if (!currentApp.value.hasDeployedFrontend) {
         previewUrl.value = ''
+        previewWarning.value = sourceChangedSinceDeploy.value
+          ? 'Source has changed. Deploy to update the running application.'
+          : 'Application has not been deployed yet.'
         return
       }
 
-      // Build preview URL (uses user ID and app ID)
-      // Add cache-busting timestamp to force iframe reload
-      const cacheBuster = Date.now()
-      const nextPreviewUrl = `${apiBaseUrl}/app-preview/${userId}/${currentApp.value.id}/index.html?v=${cacheBuster}`
-
-      const previewScope = preferredPreviewScope.value
-      const previewFiles = await buildPreviewFiles(currentApp.value.id, previewScope)
-
-      // Use current index.html from files (not stale htmlContent from app definition)
-      const currentIndexHtml = previewFiles['index.html'] || undefined
-      if (!previewTestRunId.value) {
-        previewTestRunId.value = `preview-${currentApp.value.id}-${Date.now()}`
-      }
-
-      previewHtml.value = await appsService.getPreviewHtml(
-        currentApp.value.id,
-        currentIndexHtml,
-        previewTestRunId.value,
-        false,
-      )
-      
-      // Upload preview content to server for HTTP-based serving
-      await appsService.uploadPreviewContent(currentApp.value.id, previewHtml.value, previewFiles)
-      previewUrl.value = nextPreviewUrl
+      const { runtimeToken } = await appsService.createRuntimeLaunch(currentApp.value.id)
+      const runtimeUrl = new URL(`${apiBaseUrl}/a/${currentApp.value.id}/`, window.location.origin)
+      runtimeUrl.searchParams.set('token', runtimeToken)
+      runtimeUrl.searchParams.set('v', Date.now().toString())
+      previewUrl.value = runtimeUrl.toString()
+      previewWarning.value = sourceChangedSinceDeploy.value
+        ? 'Source has changed. Deploy to update the running application.'
+        : null
     } catch (err: unknown) {
       console.error('Failed to refresh preview:', err)
+      previewUrl.value = ''
     } finally {
       isLoadingPreview.value = false
     }
   }
-
-  async function buildPreviewFiles(appId: string, scope: AppFileSystemScope): Promise<Record<string, string>> {
-    const files: Record<string, string> = {}
-
-    try {
-      const response = await appsService.getScopedFiles(appId, scope)
-      if (response.success && response.files) {
-        const paths = response.files
-          .map((file) => (typeof file === 'string' ? file : file.path))
-          .filter((path): path is string => Boolean(path))
-          .map((path) => path.replace(/\\/g, '/'))
-          .filter((path) => isTextPreviewFile(path))
-
-        const contents = await Promise.all(
-          paths.map(async (path) => {
-            try {
-              const result =
-                scope === FileSystemScope.Source
-                  ? await appsService.readFile(appId, path)
-                  : await appsService.readScopedFile(appId, scope, path)
-              return { path: normalizePreviewPath(path), content: result.content ?? '' }
-            } catch {
-              return { path: normalizePreviewPath(path), content: '' }
-            }
-          })
-        )
-
-        for (const entry of contents) {
-          if (entry.path) {
-            files[entry.path] = entry.content
-          }
-        }
-      }
-    } catch (err: unknown) {
-      console.warn('Failed to load preview files:', err)
-    }
-
-    for (const openFile of openFiles.value) {
-      if (openFile.path && openFile.scope === scope) {
-        const normalizedPath = normalizePreviewPath(getRelativePathFromScopedPath(openFile.path, scope))
-        if (normalizedPath) {
-          files[normalizedPath] = openFile.content
-        }
-      }
-    }
-
-    return files
-  }
-
-  function isTextPreviewFile(path: string): boolean {
-    const extension = path.split('.').pop()?.toLowerCase()
-    if (!extension) return true
-
-    return [
-      'html',
-      'htm',
-      'css',
-      'js',
-      'mjs',
-      'ts',
-      'tsx',
-      'jsx',
-      'json',
-      'xml',
-      'txt',
-      'md',
-      'yml',
-      'yaml',
-      'map',
-      'webmanifest',
-    ].includes(extension)
-  }
-
 
   /**
    * Set preview mode
@@ -731,7 +657,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         deployStatusMessage.value = 'Installing packages…'
       }
       const result = await appsService.deployBackend(currentApp.value.id)
+      lastDeployError.value = null
       return result
+    } catch (err: unknown) {
+      lastDeployError.value = getErrorMessage(err)
+      throw err
     } finally {
       isDeployingBackend.value = false
       deployStatusMessage.value = null
@@ -764,8 +694,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const result = await appsService.deployApp(currentApp.value.id)
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
+      await refreshAssignedRunnerStatus()
+      sourceChangedSinceDeploy.value = false
+      lastDeployError.value = null
       await refreshPreview()
       return result
+    } catch (err: unknown) {
+      lastDeployError.value = getErrorMessage(err)
+      throw err
     } finally {
       isDeployingApp.value = false
       deployAppStatusMessage.value = null
@@ -797,8 +733,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const result = await appsService.deployFrontend(currentApp.value.id)
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
+      await refreshAssignedRunnerStatus()
+      sourceChangedSinceDeploy.value = false
+      lastDeployError.value = null
       await refreshPreview()
       return result
+    } catch (err: unknown) {
+      lastDeployError.value = getErrorMessage(err)
+      throw err
     } finally {
       isDeployingApp.value = false
       deployAppStatusMessage.value = null
@@ -830,7 +772,13 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const result = await appsService.redeployBackendComponent(currentApp.value.id)
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
+      await refreshAssignedRunnerStatus()
+      sourceChangedSinceDeploy.value = false
+      lastDeployError.value = null
       return result
+    } catch (err: unknown) {
+      lastDeployError.value = getErrorMessage(err)
+      throw err
     } finally {
       isDeployingBackend.value = false
       deployStatusMessage.value = null
@@ -868,6 +816,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
           executionRunnerId: runnerId || undefined
         }
       }
+
+      await refreshAssignedRunnerStatus()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -980,21 +930,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         }
       }
 
-      // Refresh preview if any file that affects rendering was changed:
-      // index.html, CSS files, or JS files (they are all inlined/referenced by the preview)
-      // Refresh preview unless the file only affects backend/non-browser concerns
-      const affectsPreview = (f: string) =>
-        !f.includes('backend/') &&
-        !f.startsWith('versions/') &&
-        !f.startsWith('.plans/') &&
-        !f.startsWith('.instructions/')
-
-      const shouldRefresh =
-        !affectedFiles || affectedFiles.some(affectsPreview)
-
-      if (shouldRefresh) {
-        await refreshPreview()
-      }
+      sourceChangedSinceDeploy.value = true
+      lastDeployError.value = null
+      await refreshPreview()
     } catch (err: unknown) {
       console.error('Failed to refresh files after AI update:', err)
     }
@@ -1085,9 +1023,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree.value = []
     openFiles.value = []
     activeFilePath.value = null
-    previewHtml.value = ''
     previewUrl.value = ''
-    previewTestRunId.value = ''
+    sourceChangedSinceDeploy.value = false
+    lastDeployError.value = null
     previewMode.value = 'desktop'
     isLoading.value = false
     isSaving.value = false
@@ -1126,9 +1064,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree,
     openFiles,
     activeFilePath,
-    previewHtml,
     previewUrl,
-    previewTestRunId,
+    sourceChangedSinceDeploy,
+    lastDeployError,
     previewWarning,
     previewMode,
     isLoading,
@@ -1156,13 +1094,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     canDeployFrontendFromStudio,
     canDeployBackendFromStudio,
     canDeployFromStudio,
+    runnerOffline,
+    applicationState,
     isLocalManagedApp,
     showsLocalLiveBanner,
     showsSourceDeployBanner,
     editorModeNoticeLabel,
     editorModeNoticeText,
     isEditableScope,
-    preferredPreviewScope,
 
     // Actions
     loadApp,

@@ -59,7 +59,7 @@ const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 const openAppLabel = computed(() => {
   if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
-    return 'Open Runtime'
+    return 'Open Application'
   }
 
   return 'Open App'
@@ -213,8 +213,8 @@ function handlePrimaryAction() {
 
       <Button
         v-if="showsEditorActions && activeTab !== 'services'"
-        icon="pi pi-eye"
-        label="Studio Preview"
+        icon="pi pi-desktop"
+        label="Application"
         text
         severity="secondary"
         @click="emit('preview')"

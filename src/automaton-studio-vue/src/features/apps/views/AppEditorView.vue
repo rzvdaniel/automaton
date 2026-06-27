@@ -118,6 +118,20 @@ const appEditorNavGroups = [
 const activeNavItem = computed(() => {
   return activeTab.value
 })
+const applicationStatusTone = computed(() => {
+  switch (editorStore.applicationState) {
+    case 'Deployed':
+      return 'success'
+    case 'Source changed':
+      return 'warn'
+    case 'Build failed':
+      return 'danger'
+    case 'Runner offline':
+      return 'contrast'
+    default:
+      return 'secondary'
+  }
+})
 
 watch(
   () => route.query.settings,
@@ -1231,6 +1245,27 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @unpublish="handleUnpublish"
         @toggle-assistant="toggleAssistantPanel"
       />
+      <div v-if="activeTab === 'build'" class="application-status-banner">
+        <span class="application-status-banner__label">Application</span>
+        <Button
+          :label="editorStore.applicationState"
+          :severity="applicationStatusTone"
+          size="small"
+          text
+        />
+        <span
+          v-if="editorStore.sourceChangedSinceDeploy"
+          class="application-status-banner__message"
+        >
+          Source changed since last deploy. Deploy to update the running application.
+        </span>
+        <span
+          v-else-if="editorStore.lastDeployError"
+          class="application-status-banner__message"
+        >
+          {{ editorStore.lastDeployError }}
+        </span>
+      </div>
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
         This app was deployed from local files. Source files are not available in Studio, so the Files tab can only show files that were uploaded into <code>source/</code>. Use <code>automaton pull</code> or upload source files to edit the app here.
@@ -1580,6 +1615,28 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   flex-direction: column;
   height: 100%;
   min-width: 0;
+}
+
+.application-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--p-surface-200);
+  background: var(--p-surface-50);
+}
+
+.application-status-banner__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.application-status-banner__message {
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
 }
 
 .build-outer-splitter {

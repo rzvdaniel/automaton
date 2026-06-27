@@ -151,7 +151,7 @@ const previewViewportStyle = computed(() => {
 
 <template>
   <div class="build-visual-workspace">
-    <!-- Collapsed: preview fills all space -->
+    <!-- Collapsed: application fills all space -->
     <div v-if="!isAdvancedExpanded" class="preview-only">
       <div class="preview-content">
         <div
@@ -166,20 +166,20 @@ const previewViewportStyle = computed(() => {
               :src="editorStore.previewUrl"
               class="preview-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-              title="App Preview"
+              title="Running Application"
             />
             <div class="preview-resize-overlay">
               <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
-              <p class="mt-2 text-color-secondary">Resizing preview...</p>
+              <p class="mt-2 text-color-secondary">Resizing application...</p>
             </div>
           </div>
           <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
             <i class="pi pi-spin pi-spinner text-3xl"></i>
-            <p class="mt-2">Loading preview...</p>
+            <p class="mt-2">Loading application...</p>
           </div>
           <div v-else-if="!editorStore.previewUrl" class="preview-empty">
-            <i class="pi pi-eye-slash text-3xl text-color-secondary"></i>
-            <p class="mt-2 text-color-secondary">No preview available</p>
+            <i class="pi pi-desktop text-3xl text-color-secondary"></i>
+            <p class="mt-2 text-color-secondary">No deployed application available</p>
           </div>
           <iframe
               v-else
@@ -188,7 +188,7 @@ const previewViewportStyle = computed(() => {
               class="preview-iframe"
               :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-              title="App Preview"
+              title="Running Application"
             />
             <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
             <div v-if="showBackendCard" class="backend-prompt">
@@ -196,7 +196,7 @@ const previewViewportStyle = computed(() => {
                 <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
                   <p class="backend-prompt-title">Backend execution requires Pro</p>
-                  <p class="backend-prompt-desc">UI preview is free. Running live logic, APIs, and workflows requires a Pro plan or a self-hosted runner.</p>
+                  <p class="backend-prompt-desc">The running application can render without backend execution. Live logic, APIs, and workflows require a Pro plan or a self-hosted runner.</p>
                   <div class="backend-prompt-actions">
                     <button
                       class="prompt-btn prompt-btn--primary"
@@ -262,20 +262,20 @@ const previewViewportStyle = computed(() => {
                 :src="editorStore.previewUrl"
                 class="preview-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-                title="App Preview"
+                title="Running Application"
               />
               <div class="preview-resize-overlay">
                 <i class="pi pi-arrows-v text-3xl text-color-secondary"></i>
-                <p class="mt-2 text-color-secondary">Resizing preview...</p>
+                <p class="mt-2 text-color-secondary">Resizing application...</p>
               </div>
             </div>
             <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
               <i class="pi pi-spin pi-spinner text-3xl"></i>
-              <p class="mt-2">Loading preview...</p>
+              <p class="mt-2">Loading application...</p>
             </div>
             <div v-else-if="!editorStore.previewUrl" class="preview-empty">
-              <i class="pi pi-eye-slash text-3xl text-color-secondary"></i>
-              <p class="mt-2 text-color-secondary">No preview available</p>
+              <i class="pi pi-desktop text-3xl text-color-secondary"></i>
+              <p class="mt-2 text-color-secondary">No deployed application available</p>
             </div>
             <iframe
               v-else
@@ -284,7 +284,7 @@ const previewViewportStyle = computed(() => {
               class="preview-iframe"
               :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
-              title="App Preview"
+              title="Running Application"
             />
             <!-- Inline backend prompt (non-blocking overlay at bottom of iframe) -->
             <div v-if="showBackendCard" class="backend-prompt">
@@ -292,7 +292,7 @@ const previewViewportStyle = computed(() => {
                 <div class="backend-prompt-icon">⚡</div>
                 <div class="backend-prompt-body">
                   <p class="backend-prompt-title">Backend execution requires Pro</p>
-                  <p class="backend-prompt-desc">UI preview is free. Running live logic, APIs, and workflows requires a Pro plan or a self-hosted runner.</p>
+                  <p class="backend-prompt-desc">The running application can render without backend execution. Live logic, APIs, and workflows require a Pro plan or a self-hosted runner.</p>
                   <div class="backend-prompt-actions">
                     <button
                       class="prompt-btn prompt-btn--primary"

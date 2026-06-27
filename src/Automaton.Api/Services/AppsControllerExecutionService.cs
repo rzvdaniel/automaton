@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using System.Text;
+using System.IO.Compression;
 
 namespace Automaton.Api.Services;
 
@@ -169,6 +170,19 @@ public class AppsControllerExecutionService
                 },
                 cancellationToken);
 
+        if (result.Success)
+        {
+            await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
+            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+            {
+                metadata.DevelopmentMode = AppDevelopmentModes.Local;
+                metadata.Frontend.RuntimeSource = AppRuntimeSources.CliBuild;
+                metadata.Frontend.RuntimeAvailable = result.RuntimeFilesDeployed > 0 || metadata.Frontend.RuntimeAvailable;
+                metadata.Backend.RuntimeSource = AppRuntimeSources.CliDeploy;
+                metadata.Backend.RuntimeAvailable = result.RuntimeFilesDeployed > 0 || metadata.Backend.RuntimeAvailable;
+            });
+        }
+
         return new DeployPackageResponse
         {
             Success = result.Success,
@@ -195,10 +209,12 @@ public class AppsControllerExecutionService
             if (metadata.Frontend.SourceAvailable)
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+                metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
             }
             if (metadata.Backend.SourceAvailable)
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+                metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
             }
         });
 
@@ -226,6 +242,7 @@ public class AppsControllerExecutionService
             if (metadata.Frontend.SourceAvailable)
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+                metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
             }
         });
 
@@ -250,6 +267,7 @@ public class AppsControllerExecutionService
             if (metadata.Backend.SourceAvailable)
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+                metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
             }
         });
 
@@ -533,6 +551,56 @@ public class AppsControllerExecutionService
 
     private static string GetActionLabel(bool updated, int fileCount) =>
         updated ? $"updated from source ({fileCount} file(s))" : "preserved existing live files";
+
+    private async Task PersistDeployPackageSourceAsync(
+        Guid appId,
+        Guid ownerId,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        await fileStorageService.ClearSourceAsync(ownerId, appId);
+        var sourceRoot = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
+        Directory.CreateDirectory(sourceRoot);
+
+        using var stream = file.OpenReadStream();
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+
+        foreach (var entry in archive.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrEmpty(entry.Name))
+            {
+                continue;
+            }
+
+            var normalizedPath = entry.FullName.Replace('\\', '/').TrimStart('/');
+            if (!normalizedPath.StartsWith("source/", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var relativeSourcePath = normalizedPath["source/".Length..];
+            if (string.IsNullOrWhiteSpace(relativeSourcePath))
+            {
+                continue;
+            }
+
+            AppFileStorageService.ValidateFileExtensionPublic(relativeSourcePath);
+
+            var destinationPath = Path.GetFullPath(Path.Combine(sourceRoot, relativeSourcePath));
+            var fullSourceRoot = Path.GetFullPath(sourceRoot);
+            if (!destinationPath.StartsWith(fullSourceRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Deploy package source entry '{relativeSourcePath}' escapes the app source directory.");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            await using var entryStream = entry.Open();
+            await using var outputStream = File.Create(destinationPath);
+            await entryStream.CopyToAsync(outputStream, cancellationToken);
+        }
+    }
 
     private async Task<FileUploadCompleteMessage> UploadPackageToRunnerAsync(
         Guid appId,

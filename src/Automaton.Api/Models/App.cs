@@ -62,6 +62,7 @@ public class AppComponentOwnershipModel
 {
     public bool SourceAvailable { get; set; } = true;
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
+    public bool RuntimeAvailable { get; set; }
 }
 
 public class ForkAppRequest

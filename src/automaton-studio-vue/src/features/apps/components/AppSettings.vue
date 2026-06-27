@@ -877,7 +877,7 @@ async function handleSaveTemplateStatus() {
                   class="w-full"
                 />
                 <small class="text-color-secondary">
-                  Runner used for preview and step execution
+                  Runner used for the running application and step execution
                 </small>
               </div>
 
