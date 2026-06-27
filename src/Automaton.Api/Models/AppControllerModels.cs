@@ -37,6 +37,17 @@ public class DeployBackendRequest
     public List<string>? RunnerNames { get; set; }
 }
 
+public class DeployPackageResponse
+{
+    public bool Success { get; set; }
+    public int RunnerCount { get; set; }
+    public int SourceFilesDeployed { get; set; }
+    public int RuntimeFilesDeployed { get; set; }
+    public string? SnapshotPath { get; set; }
+    public string? Message { get; set; }
+    public List<string>? Logs { get; set; }
+}
+
 public class DeployAppResponse
 {
     public bool Success { get; set; }

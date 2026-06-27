@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Automaton.Cli.Models;
+using Automaton.Core.Models;
 
 namespace Automaton.Cli.Services;
 
@@ -78,6 +79,75 @@ public static class ZipService
         return CreateZip(projectRoot, projectRoot, includeAutomatonConfig: true, additionalIgnorePatterns: SourceIgnorePatterns, scopeConfig: scopeConfig);
     }
 
+    public static Stream CreateDeployPackageZip(
+        string projectRoot,
+        string appId,
+        string frontendDeployDir,
+        string? backendDeployDir,
+        DeployScopeConfig? sourceScopeConfig,
+        FrontendConfig? frontendConfig,
+        BackendConfig? backendConfig)
+    {
+        var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
+            using (var writer = new StreamWriter(manifestEntry.Open()))
+            {
+                writer.Write(System.Text.Json.JsonSerializer.Serialize(new AppDeploymentPackageManifest
+                {
+                    AppId = appId,
+                    HasBackend = !string.IsNullOrWhiteSpace(backendDeployDir)
+                }));
+            }
+
+            AddDirectoryWithPrefix(
+                archive,
+                projectRoot,
+                projectRoot,
+                "source",
+                includeAutomatonConfig: true,
+                additionalIgnorePatterns: SourceIgnorePatterns,
+                scopeConfig: sourceScopeConfig);
+
+            AddDirectoryWithPrefix(
+                archive,
+                frontendDeployDir,
+                frontendDeployDir,
+                "runtime/frontend",
+                includeAutomatonConfig: false,
+                additionalIgnorePatterns: null,
+                scopeConfig: frontendConfig == null
+                    ? null
+                    : new DeployScopeConfig
+                    {
+                        Include = frontendConfig.Include,
+                        Exclude = frontendConfig.Exclude
+                    });
+
+            if (!string.IsNullOrWhiteSpace(backendDeployDir))
+            {
+                AddDirectoryWithPrefix(
+                    archive,
+                    backendDeployDir,
+                    backendDeployDir,
+                    "runtime/backend",
+                    includeAutomatonConfig: false,
+                    additionalIgnorePatterns: null,
+                    scopeConfig: backendConfig == null
+                        ? null
+                        : new DeployScopeConfig
+                        {
+                            Include = backendConfig.Include,
+                            Exclude = backendConfig.Exclude
+                        });
+            }
+        }
+
+        ms.Position = 0;
+        return ms;
+    }
+
     private static Stream CreateZip(
         string projectRoot,
         string sourceDir,
@@ -119,6 +189,30 @@ public static class ZipService
             if (IsIgnored(ignoreMatcher, relativeDir, isDirectory: true)) continue;
 
             AddDirectory(archive, rootDir, dir, ignoreMatcher, includeMatcher, additionalExcludes);
+        }
+    }
+
+    private static void AddDirectoryWithPrefix(
+        ZipArchive archive,
+        string projectRoot,
+        string sourceDir,
+        string entryPrefix,
+        bool includeAutomatonConfig,
+        IEnumerable<string>? additionalIgnorePatterns,
+        DeployScopeConfig? scopeConfig)
+    {
+        var ignoreMatcher = CreateIgnoreMatcher(projectRoot, includeAutomatonConfig, additionalIgnorePatterns);
+        var includeMatcher = CreateIncludeMatcher(scopeConfig?.Include);
+
+        foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
+        {
+            var entryName = Path.GetRelativePath(sourceDir, file).Replace('\\', '/');
+            if (IsIgnored(ignoreMatcher, entryName) || IsExcludedByScope(entryName, includeMatcher, scopeConfig?.Exclude))
+            {
+                continue;
+            }
+
+            archive.CreateEntryFromFile(file, $"{entryPrefix}/{entryName}", CompressionLevel.Optimal);
         }
     }
 

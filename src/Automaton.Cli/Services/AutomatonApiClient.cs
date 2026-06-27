@@ -94,50 +94,15 @@ public class AutomatonApiClient : IDisposable
     /// <summary>
     /// Upload a zip archive to the app. clean=true wipes existing files first.
     /// </summary>
-    public async Task<JsonElement> UploadZipAsync(string appId, Stream zipStream, bool clean = false, CancellationToken ct = default)
+    public async Task<JsonElement> DeployPackageAsync(string appId, Stream zipStream, bool clean = false, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
         var streamContent = new StreamContent(zipStream);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
-        content.Add(streamContent, "file", "app.zip");
+        content.Add(streamContent, "file", "deploy-package.zip");
 
-        var url = $"api/apps/{appId}/upload{(clean ? "?clean=true" : "")}";
+        var url = $"api/apps/{appId}/deploy-package{(clean ? "?clean=true" : "")}";
         using var resp = await _http.PostAsync(url, content, ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
-    }
-
-    public async Task<JsonElement> UploadSourceZipAsync(string appId, Stream zipStream, bool clean = true, CancellationToken ct = default)
-    {
-        using var content = new MultipartFormDataContent();
-        var streamContent = new StreamContent(zipStream);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
-        content.Add(streamContent, "file", "source.zip");
-
-        var url = $"api/apps/{appId}/source/upload{(clean ? "?clean=true" : "")}";
-        using var resp = await _http.PostAsync(url, content, ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
-    }
-
-    public async Task<JsonElement> UploadBackendZipAsync(string appId, Stream zipStream, bool clean = true, CancellationToken ct = default)
-    {
-        using var content = new MultipartFormDataContent();
-        var streamContent = new StreamContent(zipStream);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
-        content.Add(streamContent, "file", "backend.zip");
-
-        var url = $"api/apps/{appId}/backend/upload{(clean ? "?clean=true" : "")}";
-        using var resp = await _http.PostAsync(url, content, ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
-    }
-
-    // ── Backend deploy ────────────────────────────────────────────────────────
-
-    public async Task<JsonElement> DeployBackendAsync(string appId, CancellationToken ct = default)
-    {
-        using var resp = await PostJsonAsync($"api/apps/{appId}/backend/deploy", "{}", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }

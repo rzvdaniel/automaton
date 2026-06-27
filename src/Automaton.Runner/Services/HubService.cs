@@ -36,6 +36,7 @@ public class HubService
     private const string ListAppBackendFilesMethod = "ListAppBackendFiles";
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
+    private const string DeployAppPackageMethod = "DeployAppPackage";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
     private const string HeartbeatMethod = "Heartbeat";
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -49,6 +50,8 @@ public class HubService
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
+    private readonly RunnerBackendEnvironmentService backendEnvironmentService;
+    private readonly RunnerDeploymentService runnerDeploymentService;
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
@@ -64,7 +67,9 @@ public class HubService
         FlowExecutionService flowExecutionService,
         TunnelForwarderService tunnelForwarder,
         IServiceProvider serviceProvider,
-        RunnerWorkspaceService runnerWorkspaceService)
+        RunnerWorkspaceService runnerWorkspaceService,
+        RunnerBackendEnvironmentService backendEnvironmentService,
+        RunnerDeploymentService runnerDeploymentService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -72,6 +77,8 @@ public class HubService
         this.tunnelForwarder = tunnelForwarder;
         this.serviceProvider = serviceProvider;
         this.runnerWorkspaceService = runnerWorkspaceService;
+        this.backendEnvironmentService = backendEnvironmentService;
+        this.runnerDeploymentService = runnerDeploymentService;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -375,6 +382,11 @@ public class HubService
             connection.On<string, string, string, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, (appId, path, area) =>
             {
                 return DeleteAppBackendFile(appId, path, area);
+            });
+
+            connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, (request) =>
+            {
+                return runnerDeploymentService.DeployPackage(request);
             });
 
             // Handle connection events
@@ -814,88 +826,27 @@ public class HubService
 
     private AppControllerUploadResult InstallRequirements(Guid appId, string requirementsPath)
     {
-        var logs = new List<string>();
         try
         {
-            logs.AddRange(EnsureAppVirtualEnvironment(appId, recreate: true));
-
-            var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
-            var pipPath = GetVenvPipPath(venvDir);
-            var pythonPath = GetVenvPythonPath(venvDir);
-            var installMode = $"venv: {venvDir}";
-
-            logs.Add($"📦 Installing packages ({installMode})...");
-            WriteLine($"📦 Installing packages for app {appId} ({installMode})...");
-            logger.Debug("Installing packages for app {AppId} from {ReqPath} into {VenvDir}",
-                appId, requirementsPath, venvDir);
-
-            var (_, stdout, stderr) = RunProcessCapture(
-                pipPath,
-                $"install -r \"{requirementsPath}\" --no-color --progress-bar off --disable-pip-version-check",
-                timeoutMs: 300_000);
-
-            AppendProcessLogs(logs, stdout, stderr);
-
-            logs.Add("✅ Packages installed successfully");
-            logs.Add($"🐍 App virtual environment ready: {pythonPath}");
-            logger.Debug("Packages installed for app {AppId} into {VenvDir}", appId, venvDir);
-            WriteLine($"✅ Packages installed for app {appId}");
+            var logs = backendEnvironmentService.InstallRequirements(appId, requirementsPath);
             return new AppControllerUploadResult { Success = true, Logs = logs };
         }
         catch (Exception ex)
         {
-            logs.Add($"❌ {ex.Message}");
             logger.Error(ex, "Failed to set up app virtual environment for app {AppId}", appId);
             WriteLine($"⚠️ App dependency install failed for app {appId}: {ex.Message}");
-            return new AppControllerUploadResult { Success = false, Logs = logs };
+            return new AppControllerUploadResult { Success = false, Logs = [$"ERROR: {ex.Message}"] };
         }
     }
 
     private List<string> EnsureAppVirtualEnvironment(Guid appId, bool recreate)
     {
-        var logs = new List<string>();
-        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
-        var appRootDir = runnerWorkspaceService.GetAppRoot(appId);
-
-        Directory.CreateDirectory(appRootDir);
-
-        if (recreate && Directory.Exists(venvDir))
-        {
-            logs.Add($"♻️ Rebuilding app virtual environment: {venvDir}");
-            Directory.Delete(venvDir, recursive: true);
-        }
-
-        var pythonPath = GetVenvPythonPath(venvDir);
-        if (File.Exists(pythonPath))
-        {
-            logs.Add($"🐍 Using existing app virtual environment: {pythonPath}");
-            return logs;
-        }
-
-        logs.Add($"🐍 Creating app virtual environment: {venvDir}");
-        WriteLine($"🐍 Creating app virtual environment for app {appId}...");
-        logger.Debug("Creating app virtual environment for app {AppId} at {VenvDir}", appId, venvDir);
-
-        var (_, stdout, stderr) = RunProcessCapture(
-            "python",
-            $"-m venv --system-site-packages \"{venvDir}\"",
-            timeoutMs: 120_000);
-
-        AppendProcessLogs(logs, stdout, stderr);
-
-        if (!File.Exists(pythonPath))
-        {
-            throw new InvalidOperationException($"Virtual environment created without python executable at {pythonPath}");
-        }
-
-        return logs;
+        return backendEnvironmentService.EnsureAppVirtualEnvironment(appId, recreate);
     }
 
     private static string GetVenvPythonPath(string venvDir)
     {
-        return OperatingSystem.IsWindows()
-            ? Path.Combine(venvDir, "Scripts", "python.exe")
-            : Path.Combine(venvDir, "bin", "python");
+        return RunnerBackendEnvironmentService.GetVenvPythonPath(venvDir);
     }
 
     private static string GetVenvPipPath(string venvDir)
@@ -967,98 +918,7 @@ public class HubService
     /// </summary>
     private List<string> InstallSystemPackages(Guid appId, string packageListContent)
     {
-        var logs = new List<string>();
-        if (!IsRunningInContainer)
-        {
-            logs.Add("⚠️ system-requirements.txt is only supported on Docker runners — skipped on this runner");
-            logger.Warning("system-requirements.txt skipped for app {AppId} — not running in a container", appId);
-            return logs;
-        }
-
-        var packages = packageListContent
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(l => !l.StartsWith('#') && !string.IsNullOrWhiteSpace(l))
-            .Where(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^[a-zA-Z0-9][a-zA-Z0-9\-_.+]*$"))
-            .ToList();
-
-        if (packages.Count == 0)
-        {
-            logs.Add("ℹ️ No system packages to install");
-            return logs;
-        }
-
-        var packageList = string.Join(" ", packages);
-        logs.Add($"🔧 Installing system packages: {packageList}");
-        WriteLine($"🔧 Installing system packages for app {appId}: {packageList}");
-        logger.Debug("Installing system packages for app {AppId}: {Packages}", appId, packageList);
-
-        try
-        {
-            // Step 1: update package index
-            var updatePsi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "sudo",
-                Arguments = "apt-get update -qq",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using (var updateProc = System.Diagnostics.Process.Start(updatePsi)
-                ?? throw new InvalidOperationException("Failed to start apt-get update"))
-            {
-                updateProc.WaitForExit(60_000);
-            }
-
-            // Step 2: install packages (sudo -E preserves DEBIAN_FRONTEND from the process environment)
-            var installPsi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "sudo",
-                Arguments = $"-E apt-get install -y --no-install-recommends {packageList}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            installPsi.Environment["DEBIAN_FRONTEND"] = "noninteractive";
-
-            using var process = System.Diagnostics.Process.Start(installPsi)
-                ?? throw new InvalidOperationException("Failed to start apt-get install");
-
-            var stdoutTask = Task.Run(() => process.StandardOutput.ReadToEnd());
-            var stderrTask = Task.Run(() => process.StandardError.ReadToEnd());
-            process.WaitForExit(300_000); // 5-minute timeout
-            var stdout = stdoutTask.Result;
-            var stderr = stderrTask.Result;
-
-            foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                logs.Add(line);
-
-            if (!string.IsNullOrWhiteSpace(stderr))
-                foreach (var line in stderr.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    logs.Add($"⚠️ {line}");
-
-            if (process.ExitCode == 0)
-            {
-                logs.Add("✅ System packages installed successfully");
-                logger.Debug("System packages installed for app {AppId}", appId);
-                WriteLine($"✅ System packages installed for app {appId}");
-            }
-            else
-            {
-                logs.Add($"❌ apt-get install failed (exit code {process.ExitCode})");
-                logger.Warning("apt-get install exited {ExitCode} for app {AppId}", process.ExitCode, appId);
-                WriteLine($"⚠️ System package install failed for app {appId}");
-            }
-        }
-        catch (Exception ex)
-        {
-            logs.Add($"⚠️ apt-get unavailable: {ex.Message}");
-            logger.Error(ex, "Failed to run apt-get for app {AppId}", appId);
-            WriteLine($"⚠️ apt-get unavailable for app {appId}: {ex.Message}");
-        }
-
-        return logs;
+        return backendEnvironmentService.InstallSystemPackages(appId, packageListContent);
     }
 
     private async Task HandleConnectionError(Exception ex)

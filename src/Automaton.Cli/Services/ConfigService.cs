@@ -8,8 +8,8 @@ namespace Automaton.Cli.Services;
 /// <summary>
 /// Reads and writes automaton.json (project-level) and ~/.automaton/config.json (global).
 /// Project config and project-local credentials are discovered by walking up from the current directory.
-/// Resolution order for server: project config > project-local config > global config file > env vars > prompt.
-/// Resolution order for api-key: project-local config > global config file > env vars > prompt.
+/// Resolution order for server: AUTOMATON_SERVER > project config > project-local config > global config file > prompt.
+/// Resolution order for api-key: AUTOMATON_API_KEY > project-local config > global config file > prompt.
 /// </summary>
 public class ConfigService
 {
@@ -236,13 +236,13 @@ public class ConfigService
         var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
 
-        var server = projectConfig?.Server
+        var server = envServer
+            ?? projectConfig?.Server
             ?? local.Server
-            ?? global.Server
-            ?? envServer;
-        var apiKey = local.ApiKey
-            ?? global.ApiKey
-            ?? envApiKey;
+            ?? global.Server;
+        var apiKey = envApiKey
+            ?? local.ApiKey
+            ?? global.ApiKey;
 
         return (server?.TrimEnd('/'), apiKey);
     }

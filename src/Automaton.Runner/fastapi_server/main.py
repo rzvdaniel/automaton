@@ -101,7 +101,7 @@ def _app_data_dir(app_home: str, app_id: str) -> str:
 
 def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inputs: dict):
     app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
-    backend_dir = os.path.join(app_home, "backend")
+    backend_dir = os.path.join(app_home, "runtime", "backend")
     data_dir = _app_data_dir(app_home, app_id)
     python_path = _venv_python_path(app_id)
     if not os.path.exists(python_path):

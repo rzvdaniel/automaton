@@ -5,14 +5,13 @@ public static class DeployCheckNames
     public const string AppLink = "appLink";
     public const string Credentials = "credentials";
     public const string RemoteAppAccess = "remoteAppAccess";
-    public const string SourceUpload = "sourceUpload";
     public const string FrontendPackage = "frontendPackage";
     public const string Build = "build";
     public const string RunnerLookup = "runnerLookup";
     public const string RunnerAssignment = "runnerAssignment";
-    public const string Upload = "upload";
     public const string BackendPackage = "backendPackage";
-    public const string BackendDeploy = "backendDeploy";
+    public const string PackageUpload = "packageUpload";
+    public const string PackageDeploy = "packageDeploy";
 }
 
 public sealed record DeployCheckResult(string Name, bool Success, string Message, bool IsWarning = false);

@@ -2,6 +2,11 @@
 
 This guide explains how to run the local `Automaton.Cli` project from an app folder without replacing the globally installed NuGet tool.
 
+Environment note:
+
+- `AUTOMATON_SERVER` and `AUTOMATON_API_KEY` now override stored project and global CLI config.
+- This is the safest way to force commands to a local API during development without rewriting existing login state.
+
 ## Goal
 
 Use:
@@ -103,23 +108,32 @@ automaton-dev config --show
 automaton-dev deploy
 ```
 
+To force a local server for the current shell, even if `automaton.json`, `.\.automaton\config.json`, or `%USERPROFILE%\.automaton\config.json` point somewhere else:
+
+```powershell
+$env:AUTOMATON_SERVER="http://localhost:5091"
+$env:AUTOMATON_API_KEY="<your-local-api-key>"
+automaton-dev whoami
+automaton-dev deploy
+```
+
 ## Which server and API key are used
 
 For most commands, the CLI resolves credentials in this order:
 
 Server:
 
-1. `automaton.json` `server`
-2. nearest `.automaton\config.json`
-3. global `%USERPROFILE%\.automaton\config.json`
-4. `AUTOMATON_SERVER`
+1. `AUTOMATON_SERVER`
+2. `automaton.json` `server`
+3. nearest `.automaton\config.json`
+4. global `%USERPROFILE%\.automaton\config.json`
 5. prompt
 
 API key:
 
-1. nearest `.automaton\config.json`
-2. global `%USERPROFILE%\.automaton\config.json`
-3. `AUTOMATON_API_KEY`
+1. `AUTOMATON_API_KEY`
+2. nearest `.automaton\config.json`
+3. global `%USERPROFILE%\.automaton\config.json`
 4. prompt
 
 Important exception:

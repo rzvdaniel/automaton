@@ -18,5 +18,6 @@
         public const string ListAppBackendFiles = "ListAppBackendFiles";
         public const string ReadAppBackendFile = "ReadAppBackendFile";
         public const string DeleteAppBackendFile = "DeleteAppBackendFile";
+        public const string DeployAppPackage = "DeployAppPackage";
     }
 }

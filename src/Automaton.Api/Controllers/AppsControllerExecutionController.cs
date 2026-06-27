@@ -88,6 +88,32 @@ public class AppsControllerExecutionController : ControllerBase
         }
     }
 
+    [HttpPost("api/apps/{appId:guid}/deploy-package")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<DeployPackageResponse>> DeployPackage(
+        Guid appId,
+        [FromForm] IFormFile? file,
+        [FromQuery] bool clean = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
+        try
+        {
+            var userId = userContextService.GetUserId();
+            var result = await controllerExecutionService.DeployPackageAsync(appId, userId, file, clean, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Deploy package failed: AppId={AppId}", appId);
+            return StatusCode(500, new { error = "Deploy package failed: " + ex.Message });
+        }
+    }
+
     [HttpPost("api/apps/{appId:guid}/deploy")]
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployAppResponse>> DeployApp(

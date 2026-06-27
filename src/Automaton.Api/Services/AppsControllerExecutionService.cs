@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 
 namespace Automaton.Api.Services;
 
@@ -20,6 +21,7 @@ public class AppsControllerExecutionService
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly TunnelRequestRegistry tunnelRegistry;
+    private readonly FileUploadRegistry uploadRegistry;
     private readonly AppsTunnelConfig tunnelConfig;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly Serilog.ILogger logger;
@@ -29,6 +31,7 @@ public class AppsControllerExecutionService
         AppFileStorageService fileStorageService,
         IHubContext<AutomatonHub> automatonHub,
         TunnelRequestRegistry tunnelRegistry,
+        FileUploadRegistry uploadRegistry,
         IOptions<AppsTunnelConfig> tunnelConfig,
         ApiInstanceIdentityService apiInstanceIdentityService)
     {
@@ -36,6 +39,7 @@ public class AppsControllerExecutionService
         this.fileStorageService = fileStorageService;
         this.automatonHub = automatonHub;
         this.tunnelRegistry = tunnelRegistry;
+        this.uploadRegistry = uploadRegistry;
         this.tunnelConfig = tunnelConfig.Value;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
@@ -129,6 +133,50 @@ public class AppsControllerExecutionService
             HasRequirements = hasRequirements,
             Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
             InstallLogs = installLogs.Count > 0 ? installLogs : null
+        };
+    }
+
+    public async Task<DeployPackageResponse> DeployPackageAsync(
+        Guid appId,
+        Guid ownerId,
+        IFormFile? file,
+        bool clean,
+        CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length <= 0)
+        {
+            throw new InvalidOperationException("A deployment package file is required.");
+        }
+
+        var runners = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).ToList();
+        if (runners.Count == 0)
+        {
+            throw new InvalidOperationException("No connected runner is assigned to this app.");
+        }
+
+        var runner = runners[0];
+        var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
+
+        var result = await automatonHub.Clients.Client(runner.ConnectionId!)
+            .InvokeAsync<DeployAppPackageResult>(
+                AutomatonHubMethods.DeployAppPackage,
+                new DeployAppPackageRequest
+                {
+                    AppId = appId,
+                    PackagePath = completion.LocalPath,
+                    Clean = clean
+                },
+                cancellationToken);
+
+        return new DeployPackageResponse
+        {
+            Success = result.Success,
+            RunnerCount = result.Success ? 1 : 0,
+            SourceFilesDeployed = result.SourceFilesDeployed,
+            RuntimeFilesDeployed = result.RuntimeFilesDeployed,
+            SnapshotPath = result.SnapshotPath,
+            Message = result.Message,
+            Logs = result.Logs
         };
     }
 
@@ -435,6 +483,41 @@ public class AppsControllerExecutionService
 
     private static string GetActionLabel(bool updated, int fileCount) =>
         updated ? $"updated from source ({fileCount} file(s))" : "preserved existing live files";
+
+    private async Task<FileUploadCompleteMessage> UploadPackageToRunnerAsync(
+        Guid appId,
+        Runner runner,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        const int chunkSize = 256 * 1024;
+        var (sessionId, completionTask) = uploadRegistry.Register(TimeSpan.FromMinutes(10), cancellationToken);
+
+        using var stream = file.OpenReadStream();
+        var buffer = new byte[chunkSize];
+        var chunkIndex = 0;
+        int bytesRead;
+
+        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            var isLast = stream.Position >= stream.Length;
+            var chunk = new FileUploadChunk
+            {
+                SessionId = sessionId,
+                ChunkIndex = chunkIndex++,
+                Data = bytesRead == chunkSize ? buffer : buffer[..bytesRead],
+                IsLast = isLast,
+                FileName = $"{appId:N}.zip",
+                ContentType = "application/zip",
+                AppId = appId
+            };
+
+            await automatonHub.Clients.Client(runner.ConnectionId!)
+                .SendAsync(AutomatonHubMethods.ReceiveFileChunk, chunk, cancellationToken);
+        }
+
+        return await completionTask;
+    }
 
     private async Task<List<RunnerAppControllerResult>> ExecuteViaTunnelAsync(
         Guid appId,

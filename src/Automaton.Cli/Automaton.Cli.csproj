@@ -29,6 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="..\..\shared\ai-guidance\llms.txt">
       <LogicalName>Automaton.Cli.AiGuidance.llms.txt</LogicalName>
     </EmbeddedResource>

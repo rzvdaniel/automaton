@@ -120,7 +120,7 @@ public class ConfigServiceTests
     }
 
     [Test]
-    public void ResolveExistingConfig_WhenLocalScopeRequested_PrefersProjectLocalConfigOverEnvironmentVariables()
+    public void ResolveExistingConfig_WhenLocalScopeRequested_PrefersEnvironmentVariablesOverProjectLocalConfig()
     {
         var projectRoot = CreateTempDirectory();
         var configService = new ConfigService();
@@ -132,11 +132,40 @@ public class ConfigServiceTests
         });
 
         Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com");
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
 
         var resolved = configService.ResolveExistingConfig(global: false, directory: projectRoot);
 
-        Assert.That(resolved.Server, Is.EqualTo("https://local.example.com"));
-        Assert.That(resolved.ApiKey, Is.EqualTo("ak_local"));
+        Assert.That(resolved.Server, Is.EqualTo("https://env.example.com"));
+        Assert.That(resolved.ApiKey, Is.EqualTo("ak_env"));
+    }
+
+    [Test]
+    public void RequireCredentials_WhenEnvironmentVariablesExist_OverridesProjectConfigAndStoredCredentials()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://local.example.com",
+            ApiKey = "ak_local"
+        });
+
+        var projectConfig = new AutomatonConfig
+        {
+            AppId = Guid.NewGuid().ToString(),
+            Name = "Test App",
+            Server = "https://project.example.com"
+        };
+
+        Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com/");
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
+
+        var (server, apiKey) = configService.RequireCredentials(projectConfig, projectRoot);
+
+        Assert.That(server, Is.EqualTo("https://env.example.com"));
+        Assert.That(apiKey, Is.EqualTo("ak_env"));
     }
 
     [Test]
