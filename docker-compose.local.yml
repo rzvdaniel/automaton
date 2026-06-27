@@ -173,7 +173,7 @@ services:
       AUTOMATON_WORKSPACE_ROOT: /automaton/workspace
       RUNNER_SCRIPTS_DIR: /automaton/workspace/apps
     volumes:
-      - local-runner-config:/home/automaton/.config/AutomatonRunner
+      - local-runner-config:/app/config
       - local-runner-logs:/app/logs
       - local-runner-workspace:/automaton/workspace
     networks:

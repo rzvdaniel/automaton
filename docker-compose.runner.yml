@@ -25,7 +25,7 @@ services:
     command: ["/app/docker-entrypoint.sh"]
     volumes:
       # Persist runner configuration and registration
-      - runner-config:/home/automaton/.config/AutomatonRunner
+      - runner-config:/app/config
       # Persist logs
       - runner-logs:/app/logs
       # Persist runner workspace, deployed apps, and private app data

@@ -120,7 +120,7 @@ services:
       - RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
     volumes:
       # Persist runner configuration and registration
-      - runner-config:/home/automaton/.config/AutomatonRunner
+      - runner-config:/app/config
       # Persist logs
       - runner-logs:/app/logs
       # Persist app workspace, runtime files, venvs, and private app data

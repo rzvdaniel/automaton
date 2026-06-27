@@ -121,8 +121,8 @@ COPY --from=build /app/publish .
 COPY Automaton.Runner/fastapi_server /app/fastapi_server
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 
-# Pre-create writable data directories so named volumes inherit correct ownership
-RUN mkdir -p /automaton/workspace/apps /automaton/workspace/data /automaton/workspace/cache /automaton/workspace/runner /app/logs
+# Pre-create writable directories so named volumes inherit correct ownership
+RUN mkdir -p /automaton/workspace/apps /automaton/workspace/data /automaton/workspace/cache /automaton/workspace/runner /app/logs /app/config
 
 # Set ownership for non-root user
 RUN chown -R automaton:automaton /app /automaton
