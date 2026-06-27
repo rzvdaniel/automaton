@@ -11,6 +11,13 @@ This plan keeps the core architectural decision from the earlier refactor propos
 
 This version narrows scope so the migration can ship incrementally without trying to replace deploy packaging, app serving, backend lifecycle management, Studio file browsing, and terminology all at once.
 
+Companion plan:
+
+- `docs/plans/runner-runtime-access-simplification-plan.md`
+
+Use this workspace migration plan as the storage/orchestration backbone.
+Use the companion plan as the runtime-access and host-boundary follow-up once runner-owned deploy/runtime state is real.
+
 ## Core Decision
 
 Target model:
@@ -284,6 +291,12 @@ Verification:
 - SPA fallback tests
 - Backend proxy tests
 
+Runtime-access alignment:
+
+- This phase is the infrastructure foundation for Phase 3E in `runner-runtime-access-simplification-plan.md`.
+- Do not treat the gateway as only a transport detail.
+- It is the start of moving app runtime delivery away from API-hosted special cases and toward a dedicated runtime surface.
+
 ### Phase 8 - Managed Hosting Edge Routing
 
 Goal:
@@ -305,6 +318,11 @@ Verification:
 
 - NGINX config generation tests or syntax checks where applicable
 - Publish routing smoke validation
+
+Runtime-access alignment:
+
+- This phase should be implemented together with the explicit runtime-host model from Phase 3F in `runner-runtime-access-simplification-plan.md`.
+- Avoid adding more API-versus-Studio host inference once runtime-host configuration exists.
 
 ### Phase 9 - Terminology Cleanup
 
@@ -406,6 +424,34 @@ Without yet taking on:
 - full Studio filesystem cutover
 - full naming cleanup
 
+## Phase Mapping To Runtime Access Simplification
+
+These two plans are meant to stack, not compete.
+
+Recommended sequence:
+
+1. Complete this plan’s Phase 1 through Phase 3.
+2. Use those phases to make runner-owned deploy/runtime state the source of truth.
+3. Then execute the runtime simplification plan in this order:
+   - Phase 3A - define runtime boundaries
+   - Phase 3B - unify private/public runtime serving
+   - Phase 3C - move runtime frontend ownership to the runner
+   - Phase 3D - reduce private/public to access policy
+4. Continue with this plan’s Phase 4 through Phase 6 as runner-owned versions, Studio source cutover, and backend lifecycle mature.
+5. Land this plan’s Phase 7 together with the runtime simplification plan’s Phase 3E.
+6. Land this plan’s Phase 8 together with the runtime simplification plan’s Phase 3F.
+7. Finish with this plan’s Phase 9 terminology cleanup.
+
+Practical reading:
+
+- This plan answers: where app state lives, how deploy works, and which system owns runtime state.
+- `runner-runtime-access-simplification-plan.md` answers: how apps should be opened, routed, served, and separated from Studio once runner ownership exists.
+
+Dependency rule:
+
+- Do not try to fully simplify runtime routing before runner-owned deploy/runtime state is real.
+- Do not keep expanding API-hosted runtime special cases after Phase 3 is complete.
+
 ## Immediate Next Steps
 
 1. Finish any remaining workspace-path cleanup in runner code.
@@ -414,6 +460,7 @@ Without yet taking on:
 4. Update CLI deploy packaging to build one package.
 5. Add API deploy-package orchestration endpoint.
 6. Add regression tests before removing old deploy endpoints.
+7. After Phase 3 is stable, begin the runtime-access simplification plan instead of adding more special-case app routes.
 
 ## Files Likely Affected By The Next Milestone
 
@@ -462,3 +509,5 @@ Do it in a narrower order than originally proposed:
 - terminology cleanup last
 
 That preserves the architecture goal while sharply reducing migration risk.
+
+After Phase 3, treat runtime-access simplification as the next architecture step rather than a separate optional cleanup.

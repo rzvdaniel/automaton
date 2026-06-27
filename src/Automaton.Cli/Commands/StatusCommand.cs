@@ -62,7 +62,7 @@ public static class StatusCommand
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? CliAppUrlBuilder.BuildPublishedUrl(server!, publicUrl) : null;
-                var openAppUrl = CliAppUrlBuilder.BuildDeployedUrl(server!, appConfig.AppId);
+                var openAppUrl = CliAppUrlBuilder.BuildRestrictedAppUrl(server!, appConfig.AppId);
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
                 var statusResult = new CommandDiagnosticResult { Success = true, Summary = "Status loaded", Checks = checks, NextSteps = [] };
 

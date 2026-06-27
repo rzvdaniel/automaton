@@ -131,7 +131,10 @@ public class PrivateAppLaunchService
 
     public CookieOptions BuildRuntimeCookieOptions(HttpRequest request)
     {
-        var secure = !environment.IsDevelopment() || request.IsHttps;
+        var host = request.Host.Host;
+        var isLocalhost = host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                          host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
+        var secure = !isLocalhost && (!environment.IsDevelopment() || request.IsHttps);
 
         return new CookieOptions
         {

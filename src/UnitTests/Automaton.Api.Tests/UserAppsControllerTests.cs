@@ -24,7 +24,7 @@ namespace Automaton.Api.Tests;
 public class UserAppsControllerTests
 {
     [Test]
-    public async Task ServePrivateApp_ReturnsHtmlUnauthorizedPage_ForAnonymousRequest()
+    public async Task ServeRestrictedApp_ReturnsHtmlUnauthorizedPage_ForAnonymousRequest()
     {
         var appId = Guid.NewGuid();
 
@@ -49,7 +49,7 @@ public class UserAppsControllerTests
             }
         };
 
-        var result = await controller.ServePrivateApp(appId);
+        var result = await controller.ServeRestrictedApp(appId);
 
         Assert.That(result, Is.InstanceOf<ContentResult>());
         var contentResult = (ContentResult)result;

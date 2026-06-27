@@ -67,8 +67,8 @@ public static class OpenCommand
                 }
                 else
                 {
-                    var launchCode = await client.CreatePrivateLaunchAsync(appConfig.AppId);
-                    url = CliAppUrlBuilder.BuildPrivateLaunchUrl(server!, appConfig.AppId, launchCode);
+                    var launchCode = await client.CreateRuntimeLaunchAsync(appConfig.AppId);
+                    url = CliAppUrlBuilder.BuildRuntimeLaunchUrl(server!, appConfig.AppId, launchCode);
                 }
 
                 CliBrowserService.OpenUrl(url);

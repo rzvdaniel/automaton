@@ -145,8 +145,8 @@ public static class DeployCommand
                             var (client, server) = CreateApiClient(config, cwd);
                             using (client)
                             {
-                            var launchCode = await client.CreatePrivateLaunchAsync(result.AppId!);
-                            CliBrowserService.OpenUrl(CliAppUrlBuilder.BuildPrivateLaunchUrl(server, result.AppId, launchCode));
+                            var launchCode = await client.CreateRuntimeLaunchAsync(result.AppId!);
+                            CliBrowserService.OpenUrl(CliAppUrlBuilder.BuildRuntimeLaunchUrl(server, result.AppId, launchCode));
                             }
                         }
                     }
@@ -294,7 +294,7 @@ public static class DeployCommand
                     ? "[yellow bold]Deploy complete with warnings.[/]"
                     : "[green bold]Deploy complete.[/]");
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[bold]Private app:[/] {Markup.Escape(result.OpenAppUrl)}");
+                AnsiConsole.MarkupLine($"[bold]Restricted runtime:[/] {Markup.Escape(result.OpenAppUrl)}");
                 AnsiConsole.MarkupLine("[bold]Open now:[/] automaton open");
                 if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
                 {
@@ -401,7 +401,7 @@ public static class DeployCommand
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
                 Console.WriteLine();
-                Console.WriteLine($"Private app: {result.OpenAppUrl}");
+                Console.WriteLine($"Restricted runtime: {result.OpenAppUrl}");
                 Console.WriteLine("Open now: automaton open");
                 if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
                 {

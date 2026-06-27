@@ -238,8 +238,8 @@ class AppsService {
     return data
   }
 
-  async createPrivateLaunch(id: string): Promise<{ launchCode: string }> {
-    const { data } = await apiClient.post<{ launchCode: string }>(`/api/apps/${id}/private-launch`, {})
+  async createRuntimeLaunch(id: string): Promise<{ runtimeToken: string }> {
+    const { data } = await apiClient.post<{ runtimeToken: string }>(`/api/apps/${id}/runtime-launch`, {})
     return data
   }
 

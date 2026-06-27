@@ -32,7 +32,7 @@ export function getPublishedAppsUrlPrefix(): string {
 
 export function getDeployedAppUrl(appId?: string | null): string {
   const normalizedAppId = appId?.trim()
-  return normalizedAppId ? `${getPublicAppsBaseUrl()}/private/${encodeURIComponent(normalizedAppId)}/` : ''
+  return normalizedAppId ? `${getPublicAppsBaseUrl()}/a/${encodeURIComponent(normalizedAppId)}/` : ''
 }
 
 export function getPublishedAppUrl(slug?: string | null): string {

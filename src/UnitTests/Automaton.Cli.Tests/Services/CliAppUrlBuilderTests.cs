@@ -31,7 +31,7 @@ public class CliAppUrlBuilderTests
     {
         var url = CliAppUrlBuilder.BuildStudioAppUrl("http://localhost:5091", "app-123");
 
-        Assert.That(url, Is.EqualTo("http://localhost:5173/apps/app-123/editor"));
+        Assert.That(url, Is.EqualTo("http://localhost:5173/apps/app-123"));
     }
 
     [Test]
@@ -39,15 +39,15 @@ public class CliAppUrlBuilderTests
     {
         var url = CliAppUrlBuilder.BuildStudioAppUrl("http://127.0.0.1:5091", "app-123");
 
-        Assert.That(url, Is.EqualTo("http://127.0.0.1:5173/apps/app-123/editor"));
+        Assert.That(url, Is.EqualTo("http://127.0.0.1:5173/apps/app-123"));
     }
 
     [Test]
-    public void BuildDeployedUrl_WhenServerIsLocalhostApi_KeepsApiHost()
+    public void BuildRestrictedAppUrl_WhenServerIsLocalhostApi_KeepsApiHost()
     {
-        var url = CliAppUrlBuilder.BuildDeployedUrl("http://localhost:5091", "app-123");
+        var url = CliAppUrlBuilder.BuildRestrictedAppUrl("http://localhost:5091", "app-123");
 
-        Assert.That(url, Is.EqualTo("http://localhost:5091/private/app-123/"));
+        Assert.That(url, Is.EqualTo("http://localhost:5091/a/app-123/"));
     }
 
     [Test]
@@ -57,7 +57,7 @@ public class CliAppUrlBuilderTests
 
         var url = CliAppUrlBuilder.BuildStudioAppUrl("http://localhost:5091", "app-123");
 
-        Assert.That(url, Is.EqualTo("http://localhost:6001/apps/app-123/editor"));
+        Assert.That(url, Is.EqualTo("http://localhost:6001/apps/app-123"));
     }
 
     [Test]
@@ -65,6 +65,6 @@ public class CliAppUrlBuilderTests
     {
         var url = CliAppUrlBuilder.BuildStudioAppUrl("https://api.automaton.monster", "app-123");
 
-        Assert.That(url, Is.EqualTo("https://studio.automaton.monster/apps/app-123/editor"));
+        Assert.That(url, Is.EqualTo("https://studio.automaton.monster/apps/app-123"));
     }
 }

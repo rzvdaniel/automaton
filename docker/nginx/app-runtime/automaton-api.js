@@ -3,6 +3,7 @@
   const appId = String(config.appId || '').trim();
   const apiBaseUrl = String(config.apiBaseUrl || '').replace(/\/+$/, '');
   const backendApiPath = String(config.backendApiPath || '').trim();
+  const runtimeToken = String(config.runtimeToken || '').trim();
 
   if (!backendApiPath) {
     console.warn('Automaton app backend API path is not configured.');
@@ -21,10 +22,17 @@
   }
 
   async function apiCall(path, method, body) {
+    const headers = {};
+    if (body) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (runtimeToken) {
+      headers['Authorization'] = `Bearer ${runtimeToken}`;
+    }
+
     const response = await fetch(`${getAppApiRoot()}${path}`, {
       method,
-      credentials: 'include',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
 
@@ -77,7 +85,7 @@
 
     const response = await fetch(`${getAppApiRoot()}/files/upload`, {
       method: 'POST',
-      credentials: 'include',
+      headers: runtimeToken ? { 'Authorization': `Bearer ${runtimeToken}` } : undefined,
       body: formData,
     });
 
@@ -94,7 +102,7 @@
 
   async function downloadFile(sessionId, filename) {
     const response = await fetch(getDownloadUrl(sessionId), {
-      credentials: 'include',
+      headers: runtimeToken ? { 'Authorization': `Bearer ${runtimeToken}` } : undefined,
     });
 
     if (!response.ok) {

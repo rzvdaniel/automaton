@@ -39,6 +39,7 @@ public class UserAppsController : ControllerBase
     private readonly AppFileStorageService fileStorageService;
     private readonly AppMediaStorageService mediaStorageService;
     private readonly PublishedAppStorageService publishedAppStorageService;
+    private readonly AppsControllerExecutionService appsControllerExecutionService;
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
@@ -50,6 +51,7 @@ public class UserAppsController : ControllerBase
         AppFileStorageService fileStorageService,
         AppMediaStorageService mediaStorageService,
         PublishedAppStorageService publishedAppStorageService,
+        AppsControllerExecutionService appsControllerExecutionService,
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
         IOptions<WebAppConfig> webAppConfig,
@@ -60,6 +62,7 @@ public class UserAppsController : ControllerBase
         this.fileStorageService = fileStorageService;
         this.mediaStorageService = mediaStorageService;
         this.publishedAppStorageService = publishedAppStorageService;
+        this.appsControllerExecutionService = appsControllerExecutionService;
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
@@ -92,32 +95,35 @@ public class UserAppsController : ControllerBase
     /// Serve a user app's index.html by its public URL slug.
     /// Example: https://apps.automaton.monster/my-cool-app
     /// </summary>
-    [HttpGet("private/{appId:guid}")]
+    [HttpGet("a/{appId:guid}")]
     [AllowAnonymous]
-    [Produces("text/html")]
-    public async Task<IActionResult> ServePrivateApp(Guid appId)
+    public async Task<IActionResult> ServeRestrictedApp(Guid appId)
     {
-        return await ServePrivateAppFile(appId, "index.html");
+        return await ServeRestrictedAppFile(appId, "index.html");
     }
 
-    [HttpGet("private/{appId:guid}/{*path}")]
+    [HttpGet("a/{appId:guid}/{*path}")]
     [AllowAnonymous]
-    public async Task<IActionResult> ServePrivateAppFile(Guid appId, string path = "index.html")
+    public async Task<IActionResult> ServeRestrictedAppFile(Guid appId, string path = "index.html")
     {
         try
         {
-            var (app, shouldRedirectToCleanUrl) = await GetAuthorizedPrivateAppAsync(appId);
+            var isHtmlEntryPoint =
+                string.IsNullOrWhiteSpace(path) ||
+                string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(path, "/", StringComparison.OrdinalIgnoreCase) ||
+                Path.GetExtension(path).Equals(".html", StringComparison.OrdinalIgnoreCase);
+
+            var app = isHtmlEntryPoint
+                ? await GetAuthorizedRestrictedAppAsync(appId)
+                : await GetRuntimeAppAsync(appId);
+
             if (app == null)
             {
                 return HtmlPage(
                     StatusCodes.Status401Unauthorized,
                     "Authentication Required",
-                    "This private app requires a valid launch or login.");
-            }
-
-            if (shouldRedirectToCleanUrl)
-            {
-                return Redirect(BuildCleanPrivateUrl(appId, path));
+                    "This restricted app requires a valid launch or login.");
             }
 
             if (app.OwnerId == null)
@@ -136,7 +142,7 @@ public class UserAppsController : ControllerBase
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error serving private app file: {AppId}/{Path}", appId, path);
+            logger.LogError(ex, "Error serving restricted app file: {AppId}/{Path}", appId, path);
             return HtmlPage(
                 StatusCodes.Status500InternalServerError,
                 "Error",
@@ -144,50 +150,40 @@ public class UserAppsController : ControllerBase
         }
     }
 
-    private async Task<(PublishedAppInfo? App, bool ShouldRedirectToCleanUrl)> GetAuthorizedPrivateAppAsync(Guid appId)
+    private async Task<PublishedAppInfo?> GetAuthorizedRestrictedAppAsync(Guid appId)
     {
-        var launchCode = Request.Query["launch"].FirstOrDefault();
-        if (privateAppLaunchService.TryConsumeLaunchCode(appId, launchCode, out var launchedUserId))
-        {
-            var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, launchedUserId);
-            if (app == null)
-            {
-                return (null, false);
-            }
-
-            var runtimeToken = privateAppLaunchService.CreateRuntimeToken(appId, launchedUserId);
-            if (!string.IsNullOrWhiteSpace(runtimeToken))
-            {
-                Response.Cookies.Append(
-                    PrivateAppAuthConstants.CookieName,
-                    runtimeToken,
-                    privateAppLaunchService.BuildRuntimeCookieOptions(Request));
-            }
-
-            return (app, true);
-        }
-
         if (User.Identity?.IsAuthenticated != true)
         {
-            return (null, false);
+            return null;
         }
 
         if (privateAppLaunchService.IsScopedPrivateAppPrincipal(User, appId))
         {
-            return (await appsService.GetAccessibleAppInfoByIdAsync(appId), false);
+            return await appsService.GetAccessibleAppInfoByIdAsync(appId);
         }
 
-        return (await appsService.GetAccessibleAppInfoByIdAsync(appId), false);
+        return await appsService.GetAccessibleAppInfoByIdAsync(appId);
     }
 
-    private string BuildCleanPrivateUrl(Guid appId, string? path)
+    private async Task<PublishedAppInfo?> GetRuntimeAppAsync(Guid appId)
     {
-        if (string.IsNullOrWhiteSpace(path) || string.Equals(path, "index.html", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"/private/{appId}/";
-        }
+        var app = await dbContext.WebApps
+            .Include(a => a.WebAppUsers)
+            .Where(a => a.Id == appId && a.AccessStatus == AppAccessStatuses.Active)
+            .Select(a => new PublishedAppInfo
+            {
+                Id = a.Id,
+                Name = a.Name,
+                PublicUrl = a.PublicUrl,
+                OwnerId = a.WebAppUsers
+                    .Select(u => (Guid?)u.UserId)
+                    .FirstOrDefault(),
+                RequiresAuthentication = a.RequiresAuthentication,
+                ExecutionRunnerId = a.ExecutionRunnerId
+            })
+            .FirstOrDefaultAsync();
 
-        return $"/private/{appId}/{path.TrimStart('/')}";
+        return app;
     }
 
     /// <summary>
@@ -275,6 +271,7 @@ public class UserAppsController : ControllerBase
                 slug, path, app.Id, isHtmlEntryPoint);
 
             return await ServePublishedStaticFileAsync(
+                app.Id,
                 slug,
                 path,
                 backendApiPath: $"/api/web-apps/{Uri.EscapeDataString(slug)}");
@@ -335,27 +332,32 @@ public class UserAppsController : ControllerBase
             return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
         }
 
-        var content = await fileStorageService.ReadRuntimeFileBytesAsync(ownerId, appId, runtimePath);
+        var runnerContent = await appsControllerExecutionService.ReadRuntimeFrontendFileFromRunnerAsync(
+            appId,
+            ownerId,
+            runtimePath,
+            HttpContext.RequestAborted);
+        var content = runnerContent?.Content;
         if (content == null)
         {
             return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
         }
 
-        var contentType = WebAppRuntimeFilePolicy.GetContentType(runtimePath);
+        var contentType = runnerContent?.ContentType ?? WebAppRuntimeFilePolicy.GetContentType(runtimePath);
         WebAppRuntimeResponsePolicy.ApplyPublicAssetCorsHeaders(Response);
         WebAppCachePolicy.ApplyPublishedFileHeaders(Response, Request, runtimePath, webAppConfig);
 
         if (contentType == "text/html")
         {
             var html = Encoding.UTF8.GetString(content);
-            var injectedHtml = InjectRuntimeScripts(html, backendApiPath);
+            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath);
             return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
         }
 
         return File(content, contentType);
     }
 
-    private async Task<IActionResult> ServePublishedStaticFileAsync(string slug, string? path, string backendApiPath)
+    private async Task<IActionResult> ServePublishedStaticFileAsync(Guid appId, string slug, string? path, string backendApiPath)
     {
         path = string.IsNullOrEmpty(path) ? "index.html" : path;
 
@@ -378,14 +380,14 @@ public class UserAppsController : ControllerBase
         if (contentType == "text/html")
         {
             var html = Encoding.UTF8.GetString(content);
-            var injectedHtml = InjectRuntimeScripts(html, backendApiPath);
+            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath);
             return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
         }
 
         return File(content, contentType);
     }
 
-    private string InjectRuntimeScripts(string html, string backendApiPath)
+    private string InjectRuntimeScripts(string html, Guid appId, string backendApiPath)
     {
         if (html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase) ||
             html.Contains("automaton-api.js", StringComparison.OrdinalIgnoreCase))
@@ -404,8 +406,10 @@ public class UserAppsController : ControllerBase
 
         var payload = System.Text.Json.JsonSerializer.Serialize(new
         {
+            appId,
             apiBaseUrl,
-            backendApiPath
+            backendApiPath,
+            runtimeToken = Request.Query["token"].FirstOrDefault()
         });
 
         var runtimeScripts = $"""

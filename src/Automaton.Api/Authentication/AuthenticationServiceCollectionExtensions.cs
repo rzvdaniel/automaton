@@ -57,11 +57,11 @@ namespace Automaton.Api.Authentication
                         OnMessageReceived = messageReceivedContext =>
                         {
                             var path = messageReceivedContext.HttpContext.Request.Path;
-                            var privateAppToken = messageReceivedContext.Request.Cookies[PrivateAppAuthConstants.CookieName];
-                            if (!string.IsNullOrWhiteSpace(privateAppToken) &&
-                                (path.StartsWithSegments("/private") || path.StartsWithSegments("/api/web-apps/app")))
+                            var runtimeToken = messageReceivedContext.Request.Query["token"].FirstOrDefault();
+                            if (!string.IsNullOrWhiteSpace(runtimeToken) &&
+                                (path.StartsWithSegments("/a") || path.StartsWithSegments("/api/web-apps/app")))
                             {
-                                messageReceivedContext.Token = privateAppToken;
+                                messageReceivedContext.Token = runtimeToken;
                             }
 
                             return Task.CompletedTask;

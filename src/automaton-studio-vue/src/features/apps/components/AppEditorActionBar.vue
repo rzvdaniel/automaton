@@ -50,7 +50,7 @@ const openAppLabel = computed(() => {
   }
 
   if (props.hasDeployedFrontend) {
-    return 'Open Private App'
+    return 'Open Runtime'
   }
 
   return 'Open App'
@@ -198,7 +198,7 @@ function formatTokenCount(count: number): string {
         v-if="activeTab !== 'services'"
         v-tooltip.bottom="'Open full-screen preview'"
         icon="pi pi-eye"
-        label="Preview"
+        label="Studio Preview"
         outlined
         severity="secondary"
         @click="emit('preview')"

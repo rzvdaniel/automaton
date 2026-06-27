@@ -2,25 +2,25 @@ namespace Automaton.Cli.Services;
 
 public static class CliAppUrlBuilder
 {
-    public static string BuildDeployedUrl(string? server, string? appId)
+    public static string BuildRestrictedAppUrl(string? server, string? appId)
     {
         if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(appId))
         {
             return string.Empty;
         }
 
-        return $"{ResolveAppsBaseUrl(server).TrimEnd('/')}/private/{Uri.EscapeDataString(appId.Trim())}/";
+        return $"{ResolveAppsBaseUrl(server).TrimEnd('/')}/a/{Uri.EscapeDataString(appId.Trim())}/";
     }
 
-    public static string BuildPrivateLaunchUrl(string? server, string? appId, string? launchCode)
+    public static string BuildRuntimeLaunchUrl(string? server, string? appId, string? runtimeToken)
     {
-        var deployedUrl = BuildDeployedUrl(server, appId);
-        if (string.IsNullOrWhiteSpace(deployedUrl) || string.IsNullOrWhiteSpace(launchCode))
+        var deployedUrl = BuildRestrictedAppUrl(server, appId);
+        if (string.IsNullOrWhiteSpace(deployedUrl) || string.IsNullOrWhiteSpace(runtimeToken))
         {
             return string.Empty;
         }
 
-        return $"{deployedUrl}?launch={Uri.EscapeDataString(launchCode.Trim())}";
+        return $"{deployedUrl}?token={Uri.EscapeDataString(runtimeToken.Trim())}";
     }
 
     public static string BuildPublishedUrl(string server, string slug)
@@ -35,7 +35,7 @@ public static class CliAppUrlBuilder
             return string.Empty;
         }
 
-        return $"{ResolveStudioBaseUrl(server).TrimEnd('/')}/apps/{Uri.EscapeDataString(appId.Trim())}/editor";
+        return $"{ResolveStudioBaseUrl(server).TrimEnd('/')}/apps/{Uri.EscapeDataString(appId.Trim())}";
     }
 
     private static string ResolveAppsBaseUrl(string server)

@@ -1,4 +1,6 @@
+import base64
 import json
+import mimetypes
 import os
 import subprocess
 import sys
@@ -189,6 +191,44 @@ async def execute_controller(controller_name: str, request: Request) -> JSONResp
             status_code=500,
             content={"success": False, "data": None, "error": str(e)},
         )
+
+
+@app.post("/api/runtime-file")
+async def read_runtime_file(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+        app_id = str(body.get("app_id", ""))
+        relative_path = str(body.get("path", "index.html")).strip().lstrip("/\\")
+
+        if not app_id:
+            return JSONResponse(status_code=400, content={"error": "app_id is required"})
+
+        app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
+        frontend_dir = os.path.join(app_home, "runtime", "frontend")
+        full_path = os.path.abspath(os.path.join(frontend_dir, relative_path))
+
+        if not full_path.startswith(os.path.abspath(frontend_dir) + os.sep) and full_path != os.path.abspath(frontend_dir):
+            return JSONResponse(status_code=400, content={"error": "invalid path"})
+
+        if not os.path.isfile(full_path):
+            return JSONResponse(status_code=404, content={"error": "file not found"})
+
+        with open(full_path, "rb") as f:
+            content = f.read()
+
+        content_type, _ = mimetypes.guess_type(full_path)
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "contentBase64": base64.b64encode(content).decode("ascii"),
+                "contentType": content_type,
+            },
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/health")

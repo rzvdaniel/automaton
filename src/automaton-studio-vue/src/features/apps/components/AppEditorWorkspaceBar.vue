@@ -58,6 +58,10 @@ const openAppMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 
 const openAppLabel = computed(() => {
+  if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
+    return 'Open Runtime'
+  }
+
   return 'Open App'
 })
 
@@ -70,8 +74,8 @@ const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPu
 const openAppMenuItems = computed<MenuItem[]>(() => {
   if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
     return [
-      { label: 'Open App', command: () => emit('openPrivateApp') },
-      { label: 'Copy Link', command: () => emit('copyPrivateLink') },
+      { label: 'Open Restricted Runtime', command: () => emit('openPrivateApp') },
+      { label: 'Copy Restricted Runtime Link', command: () => emit('copyPrivateLink') },
     ]
   }
 
@@ -79,8 +83,8 @@ const openAppMenuItems = computed<MenuItem[]>(() => {
 
   if (props.canOpenPrivateApp) {
     items.push(
-      { label: 'Open Private App', command: () => emit('openPrivateApp') },
-      { label: 'Copy Private Link', command: () => emit('copyPrivateLink') },
+      { label: 'Open Restricted Runtime', command: () => emit('openPrivateApp') },
+      { label: 'Copy Restricted Runtime Link', command: () => emit('copyPrivateLink') },
     )
   }
 
@@ -210,7 +214,7 @@ function handlePrimaryAction() {
       <Button
         v-if="showsEditorActions && activeTab !== 'services'"
         icon="pi pi-eye"
-        label="Preview"
+        label="Studio Preview"
         text
         severity="secondary"
         @click="emit('preview')"

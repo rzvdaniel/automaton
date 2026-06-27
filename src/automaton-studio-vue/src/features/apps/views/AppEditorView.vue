@@ -545,7 +545,7 @@ function getOpenAppLabel(): string {
   }
 
   if (editorStore.currentApp?.hasDeployedFrontend) {
-    return 'Open Private App'
+    return 'Open Runtime'
   }
 
   return 'Open App'
@@ -573,9 +573,9 @@ async function getPrivateAppLaunchUrl(): Promise<string> {
     return ''
   }
 
-  const { launchCode } = await appsService.createPrivateLaunch(editorStore.currentApp.id)
+  const { runtimeToken } = await appsService.createRuntimeLaunch(editorStore.currentApp.id)
   const url = new URL(privateUrl)
-  url.searchParams.set('launch', launchCode)
+  url.searchParams.set('token', runtimeToken)
   return url.toString()
 }
 
@@ -789,7 +789,7 @@ function openPrivateApp() {
       toast.add({
         severity: 'error',
         summary: 'Open Failed',
-        detail: err instanceof Error ? err.message : 'Failed to open private app',
+        detail: err instanceof Error ? err.message : 'Failed to open restricted runtime',
         life: 5000,
       })
     }
@@ -797,7 +797,7 @@ function openPrivateApp() {
 }
 
 async function copyPrivateAppLink() {
-  await copyUrl('Private URL', getPrivateAppUrl())
+  await copyUrl('Restricted runtime URL', getPrivateAppUrl())
 }
 
 async function copyPublicAppLink() {

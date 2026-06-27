@@ -123,12 +123,12 @@ const handleOpenPrivateApp = async () => {
   }
 
   try {
-    const { launchCode } = await appsService.createPrivateLaunch(props.app.id)
+    const { runtimeToken } = await appsService.createRuntimeLaunch(props.app.id)
     const url = new URL(privateAppUrl.value, window.location.origin)
-    url.searchParams.set('launch', launchCode)
+    url.searchParams.set('token', runtimeToken)
     window.open(url.toString(), '_blank', 'noopener')
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to open private app'
+    const message = err instanceof Error ? err.message : 'Failed to open restricted runtime'
     toast.add({
       severity: 'error',
       summary: 'Open Failed',
@@ -274,7 +274,7 @@ const menuItems = computed(() => {
 
   if (canOpenPrivateApp.value) {
     items.unshift({
-      label: canOpenPublicApp.value ? 'Open Private App' : 'Open App',
+      label: canOpenPublicApp.value ? 'Open Restricted Runtime' : 'Open Runtime',
       icon: 'pi pi-lock',
       command: handleOpenPrivateApp,
     })

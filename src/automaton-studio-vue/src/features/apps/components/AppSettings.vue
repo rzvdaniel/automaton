@@ -272,15 +272,15 @@ function openPublicUrl() {
 async function openPrivateUrl() {
   if (fullPrivateUrl.value) {
     try {
-      const { launchCode } = await appsService.createPrivateLaunch(app.value!.id)
+      const { runtimeToken } = await appsService.createRuntimeLaunch(app.value!.id)
       const url = new URL(fullPrivateUrl.value, window.location.origin)
-      url.searchParams.set('launch', launchCode)
+      url.searchParams.set('token', runtimeToken)
       window.open(url.toString(), '_blank')
     } catch (err: unknown) {
       toast.add({
         severity: 'error',
         summary: 'Open Failed',
-        detail: err instanceof Error ? err.message : 'Failed to open private app',
+        detail: err instanceof Error ? err.message : 'Failed to open restricted runtime',
         life: 5000,
       })
     }

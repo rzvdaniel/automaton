@@ -334,9 +334,9 @@ public class AppsController : BaseController
         return NoContent();
     }
 
-    [HttpPost("{id}/private-launch")]
+    [HttpPost("{id}/runtime-launch")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<IActionResult> CreatePrivateLaunch(Guid id)
+    public async Task<IActionResult> CreateRuntimeLaunch(Guid id)
     {
         var app = await appsService.GetAccessibleAppInfoByIdAsync(id);
         if (app == null)
@@ -344,8 +344,8 @@ public class AppsController : BaseController
             return NotFound(new { message = "App not found" });
         }
 
-        var launchCode = privateAppLaunchService.CreateLaunchCode(id, userContextService.GetUserId());
-        return Ok(new { launchCode });
+        var runtimeToken = privateAppLaunchService.CreateRuntimeToken(id, userContextService.GetUserId());
+        return Ok(new { runtimeToken });
     }
 
     [HttpPut("{id}/runner")]

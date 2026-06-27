@@ -72,13 +72,13 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
     }
 
-    public async Task<string> CreatePrivateLaunchAsync(string appId, CancellationToken ct = default)
+    public async Task<string> CreateRuntimeLaunchAsync(string appId, CancellationToken ct = default)
     {
-        using var resp = await PostJsonAsync($"api/apps/{appId}/private-launch", "{}", ct);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/runtime-launch", "{}", ct);
         await EnsureSuccessAsync(resp);
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
-        return doc.RootElement.GetProperty("launchCode").GetString()
-            ?? throw new InvalidOperationException("Private launch response did not include a launchCode.");
+        return doc.RootElement.GetProperty("runtimeToken").GetString()
+            ?? throw new InvalidOperationException("Runtime launch response did not include a runtimeToken.");
     }
 
     public async Task<JsonElement> CreateApiKeyAsync(string name, string? description, int scope, CancellationToken ct = default)

@@ -7,7 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 
 
 def _load_controller_module(scripts_dir: str, app_id: str, controller_name: str):
-    backend_dir = os.path.join(scripts_dir, app_id, "backend")
+    backend_dir = os.path.join(scripts_dir, app_id, "runtime", "backend")
     script_path = os.path.join(backend_dir, controller_name + ".py")
 
     if not os.path.exists(script_path):

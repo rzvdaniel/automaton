@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using System.Text;
 
 namespace Automaton.Api.Services;
 
@@ -264,6 +265,55 @@ public class AppsControllerExecutionService
             BackendDeploy = backendDeploy,
             Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}"
         };
+    }
+
+    public async Task<(byte[] Content, string ContentType)?> ReadRuntimeFrontendFileFromRunnerAsync(
+        Guid appId,
+        Guid ownerId,
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        var runners = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).ToList();
+        if (runners.Count == 0)
+        {
+            return null;
+        }
+
+        var body = JsonSerializer.Serialize(new
+        {
+            app_id = appId,
+            path = relativePath
+        });
+
+        var tunnelResponse = await SendTunnelRequestAsync(
+            runners[0],
+            method: "POST",
+            path: "/api/runtime-file",
+            body,
+            cancellationToken);
+
+        if (tunnelResponse.StatusCode == StatusCodes.Status404NotFound)
+        {
+            return null;
+        }
+
+        if (tunnelResponse.StatusCode < 200 || tunnelResponse.StatusCode >= 300)
+        {
+            throw new InvalidOperationException(tunnelResponse.Error ?? $"Runner returned HTTP {tunnelResponse.StatusCode}.");
+        }
+
+        var payload = JsonSerializer.Deserialize<RunnerRuntimeFileResponse>(
+            tunnelResponse.Body ?? "{}",
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        if (string.IsNullOrWhiteSpace(payload?.ContentBase64))
+        {
+            return null;
+        }
+
+        return (
+            Convert.FromBase64String(payload.ContentBase64),
+            string.IsNullOrWhiteSpace(payload.ContentType) ? "application/octet-stream" : payload.ContentType);
     }
 
     /// <summary>
@@ -621,7 +671,22 @@ public class AppsControllerExecutionService
         return results;
     }
 
-    private async Task<TunnelResponse> SendTunnelRequestAsync(Runner runner, string controllerName, string body, CancellationToken cancellationToken)
+    private Task<TunnelResponse> SendTunnelRequestAsync(Runner runner, string controllerName, string body, CancellationToken cancellationToken)
+    {
+        return SendTunnelRequestAsync(
+            runner,
+            method: "POST",
+            path: $"/api/controller/{controllerName}",
+            body,
+            cancellationToken);
+    }
+
+    private async Task<TunnelResponse> SendTunnelRequestAsync(
+        Runner runner,
+        string method,
+        string path,
+        string? body,
+        CancellationToken cancellationToken)
     {
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
@@ -647,8 +712,8 @@ public class AppsControllerExecutionService
         var tunnelRequest = new TunnelRequest
         {
             RequestId = requestId,
-            Method = "POST",
-            Path = $"/api/controller/{controllerName}",
+            Method = method,
+            Path = path,
             Body = body
         };
 
@@ -657,5 +722,11 @@ public class AppsControllerExecutionService
             .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
 
         return await responseTask;
+    }
+
+    private sealed class RunnerRuntimeFileResponse
+    {
+        public string? ContentBase64 { get; set; }
+        public string? ContentType { get; set; }
     }
 }
