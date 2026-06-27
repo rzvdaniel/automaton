@@ -109,7 +109,10 @@ public class UserAppsController : ControllerBase
             var (app, shouldRedirectToCleanUrl) = await GetAuthorizedPrivateAppAsync(appId);
             if (app == null)
             {
-                return Unauthorized(GetErrorPage("Authentication Required", "This private app requires a valid launch or login."));
+                return HtmlPage(
+                    StatusCodes.Status401Unauthorized,
+                    "Authentication Required",
+                    "This private app requires a valid launch or login.");
             }
 
             if (shouldRedirectToCleanUrl)
@@ -119,7 +122,10 @@ public class UserAppsController : ControllerBase
 
             if (app.OwnerId == null)
             {
-                return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
+                return HtmlPage(
+                    StatusCodes.Status500InternalServerError,
+                    "Configuration Error",
+                    "This app is not properly configured.");
             }
 
             return await ServeRuntimeFileAsync(
@@ -131,7 +137,10 @@ public class UserAppsController : ControllerBase
         catch (Exception ex)
         {
             logger.LogError(ex, "Error serving private app file: {AppId}/{Path}", appId, path);
-            return StatusCode(500, GetErrorPage("Error", "An error occurred while loading this app."));
+            return HtmlPage(
+                StatusCodes.Status500InternalServerError,
+                "Error",
+                "An error occurred while loading this app.");
         }
     }
 
@@ -230,7 +239,10 @@ public class UserAppsController : ControllerBase
             if (app == null)
             {
                 logger.LogWarning("App not found or not published: {Slug}", slug);
-                return NotFound(GetErrorPage("App Not Found", "This app does not exist or is not published."));
+                return HtmlPage(
+                    StatusCodes.Status404NotFound,
+                    "App Not Found",
+                    "This app does not exist or is not published.");
             }
 
             var isHtmlEntryPoint =
@@ -242,14 +254,20 @@ public class UserAppsController : ControllerBase
             if (app.RequiresAuthentication && isHtmlEntryPoint && User.Identity?.IsAuthenticated != true)
             {
                 logger.LogWarning("Unauthenticated access to protected app: {Slug}", slug);
-                return Unauthorized(GetErrorPage("Authentication Required", "This app requires you to be logged in."));
+                return HtmlPage(
+                    StatusCodes.Status401Unauthorized,
+                    "Authentication Required",
+                    "This app requires you to be logged in.");
             }
 
             var ownerId = app.WebAppUsers.FirstOrDefault()?.UserId;
             if (ownerId == null)
             {
                 logger.LogError("App has no owner: {AppId}", app.Id);
-                return StatusCode(500, GetErrorPage("Configuration Error", "This app is not properly configured."));
+                return HtmlPage(
+                    StatusCodes.Status500InternalServerError,
+                    "Configuration Error",
+                    "This app is not properly configured.");
             }
 
             logger.LogDebug(
@@ -264,12 +282,18 @@ public class UserAppsController : ControllerBase
         catch (UnauthorizedAccessException)
         {
             logger.LogWarning("Path traversal attempt for app: {Slug}, path: {Path}", slug, path);
-            return BadRequest(GetErrorPage("Access Denied", "Invalid file path."));
+            return HtmlPage(
+                StatusCodes.Status400BadRequest,
+                "Access Denied",
+                "Invalid file path.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error serving app file: {Slug}/{Path}", slug, path);
-            return StatusCode(500, GetErrorPage("Error", "An error occurred while loading this app."));
+            return HtmlPage(
+                StatusCodes.Status500InternalServerError,
+                "Error",
+                "An error occurred while loading this app.");
         }
     }
 
@@ -393,6 +417,16 @@ public class UserAppsController : ControllerBase
         return headCloseIndex >= 0
             ? html.Insert(headCloseIndex, runtimeScripts)
             : runtimeScripts + html;
+    }
+
+    private static ContentResult HtmlPage(int statusCode, string title, string message)
+    {
+        return new ContentResult
+        {
+            StatusCode = statusCode,
+            ContentType = "text/html; charset=utf-8",
+            Content = GetErrorPage(title, message)
+        };
     }
 
     /// <summary>

@@ -83,6 +83,29 @@ public static class CliAppUrlBuilder
             return builder.Uri.ToString().TrimEnd('/');
         }
 
+        if (Uri.TryCreate(server, UriKind.Absolute, out serverUri) && IsLocalDevelopmentApiHost(serverUri))
+        {
+            var builder = new UriBuilder(serverUri)
+            {
+                Port = 5173,
+                Path = string.Empty,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+            return builder.Uri.ToString().TrimEnd('/');
+        }
+
         return server.TrimEnd('/');
+    }
+
+    private static bool IsLocalDevelopmentApiHost(Uri serverUri)
+    {
+        if (!string.Equals(serverUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return serverUri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || serverUri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
     }
 }

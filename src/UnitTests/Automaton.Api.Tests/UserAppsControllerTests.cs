@@ -6,18 +6,58 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Api.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Automaton.Api.Tests;
 
 [TestFixture]
 public class UserAppsControllerTests
 {
+    [Test]
+    public async Task ServePrivateApp_ReturnsHtmlUnauthorizedPage_ForAnonymousRequest()
+    {
+        var appId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        var httpContext = new DefaultHttpContext();
+        var appsService = CreateAppsService(dbContext, httpContext);
+
+        var controller = new UserAppsController(
+            dbContext,
+            appsService,
+            null!,
+            null!,
+            null!,
+            NullLogger<UserAppsController>.Instance,
+            new StubWebHostEnvironment(),
+            Options.Create(new WebAppConfig()),
+            CreatePrivateAppLaunchService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+
+        var result = await controller.ServePrivateApp(appId);
+
+        Assert.That(result, Is.InstanceOf<ContentResult>());
+        var contentResult = (ContentResult)result;
+        Assert.That(contentResult.StatusCode, Is.EqualTo(StatusCodes.Status401Unauthorized));
+        Assert.That(contentResult.ContentType, Is.EqualTo("text/html; charset=utf-8"));
+        Assert.That(contentResult.Content, Does.Contain("Authentication Required"));
+    }
+
     [Test]
     public async Task ServeStudioHostedAppMedia_ReturnsUnauthorized_ForProtectedPublishedApp_WhenAnonymous()
     {
@@ -99,6 +139,24 @@ public class UserAppsControllerTests
             null!,
             new StubWebHostEnvironment(),
             new NoOpAuditEventService());
+    }
+
+    private static PrivateAppLaunchService CreatePrivateAppLaunchService()
+    {
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("0123456789abcdef0123456789abcdef"));
+        var jwtOptions = new JwtOptions
+        {
+            Issuer = "Automaton.Tests",
+            Audience = "Automaton.Tests",
+            Subject = "Automaton.Tests",
+            SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256)
+        };
+
+        return new PrivateAppLaunchService(
+            new MemoryCache(new MemoryCacheOptions()),
+            jwtOptions,
+            NullLogger<PrivateAppLaunchService>.Instance,
+            new StubWebHostEnvironment());
     }
 
     private sealed class StubWebHostEnvironment : IWebHostEnvironment
