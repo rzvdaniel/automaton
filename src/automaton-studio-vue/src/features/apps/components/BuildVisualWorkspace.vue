@@ -4,7 +4,7 @@ import SplitterPanel from 'primevue/splitterpanel'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import { PREVIEW_SIZES } from '../types/apps.types'
+import { APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
 import LiveUiLogPanel from './LiveUiLogPanel.vue'
@@ -24,7 +24,7 @@ const editorStore = useAppEditorStore()
 const router = useRouter()
 const { isDark } = useUserSettings()
 
-const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
+const currentSize = computed(() => APPLICATION_VIEWPORT_SIZES[editorStore.applicationViewportMode] ?? APPLICATION_VIEWPORT_SIZES.desktop)
 const SPLITTER_STORAGE_KEY = 'app-editor-build-visual-splitter'
 const defaultSplitterSizes = [84, 16]
 
@@ -116,14 +116,14 @@ function startIdleTimer() {
 }
 
 watch(
-  () => editorStore.previewUrl,
+  () => editorStore.applicationUrl,
   (url) => {
     if (url && showBackendPrompt.value) startIdleTimer()
   },
 )
 
 onMounted(() => {
-  if (editorStore.previewUrl && showBackendPrompt.value) startIdleTimer()
+  if (editorStore.applicationUrl && showBackendPrompt.value) startIdleTimer()
 })
 
 onUnmounted(() => {
@@ -131,7 +131,7 @@ onUnmounted(() => {
 })
 
 const previewViewportStyle = computed(() => {
-  if (editorStore.previewMode === 'desktop') {
+  if (editorStore.applicationViewportMode === 'desktop') {
     return {
       width: '100%',
       height: '100%',
@@ -156,14 +156,14 @@ const previewViewportStyle = computed(() => {
       <div class="preview-content">
         <div
           class="preview-viewport"
-          :class="editorStore.previewMode"
+          :class="editorStore.applicationViewportMode"
           :style="previewViewportStyle"
         >
           <div v-if="isHeavyRenderingSuspended" class="preview-loading">
             <iframe
-              v-if="editorStore.previewUrl"
-              :key="editorStore.previewUrl"
-              :src="editorStore.previewUrl"
+              v-if="editorStore.applicationUrl"
+              :key="editorStore.applicationUrl"
+              :src="editorStore.applicationUrl"
               class="preview-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="Running Application"
@@ -173,18 +173,18 @@ const previewViewportStyle = computed(() => {
               <p class="mt-2 text-color-secondary">Resizing application...</p>
             </div>
           </div>
-          <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
+          <div v-else-if="editorStore.isLoadingApplication" class="preview-loading">
             <i class="pi pi-spin pi-spinner text-3xl"></i>
             <p class="mt-2">Loading application...</p>
           </div>
-          <div v-else-if="!editorStore.previewUrl" class="preview-empty">
+          <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
             <i class="pi pi-desktop text-3xl text-color-secondary"></i>
             <p class="mt-2 text-color-secondary">No deployed application available</p>
           </div>
           <iframe
               v-else
-              :key="editorStore.previewUrl"
-              :src="editorStore.previewUrl"
+              :key="editorStore.applicationUrl"
+              :src="editorStore.applicationUrl"
               class="preview-iframe"
               :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
@@ -252,14 +252,14 @@ const previewViewportStyle = computed(() => {
         <div class="preview-content">
           <div
             class="preview-viewport"
-            :class="editorStore.previewMode"
+            :class="editorStore.applicationViewportMode"
             :style="previewViewportStyle"
           >
             <div v-if="isHeavyRenderingSuspended" class="preview-loading">
               <iframe
-                v-if="editorStore.previewUrl"
-                :key="editorStore.previewUrl"
-                :src="editorStore.previewUrl"
+                v-if="editorStore.applicationUrl"
+                :key="editorStore.applicationUrl"
+                :src="editorStore.applicationUrl"
                 class="preview-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
                 title="Running Application"
@@ -269,18 +269,18 @@ const previewViewportStyle = computed(() => {
                 <p class="mt-2 text-color-secondary">Resizing application...</p>
               </div>
             </div>
-            <div v-else-if="editorStore.isLoadingPreview" class="preview-loading">
+            <div v-else-if="editorStore.isLoadingApplication" class="preview-loading">
               <i class="pi pi-spin pi-spinner text-3xl"></i>
               <p class="mt-2">Loading application...</p>
             </div>
-            <div v-else-if="!editorStore.previewUrl" class="preview-empty">
+            <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
               <i class="pi pi-desktop text-3xl text-color-secondary"></i>
               <p class="mt-2 text-color-secondary">No deployed application available</p>
             </div>
             <iframe
               v-else
-              :key="editorStore.previewUrl"
-              :src="editorStore.previewUrl"
+              :key="editorStore.applicationUrl"
+              :src="editorStore.applicationUrl"
               class="preview-iframe"
               :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"

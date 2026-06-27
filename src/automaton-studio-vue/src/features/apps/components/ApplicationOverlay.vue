@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * PreviewOverlay.vue
+ * ApplicationOverlay.vue
  * Full-screen application overlay for the App Editor
  * Provides responsive viewport switching with maximum visibility
  */
@@ -8,20 +8,20 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { PreviewMode } from '../types/apps.types'
-import { PREVIEW_SIZES } from '../types/apps.types'
+import type { ApplicationViewportMode } from '../types/apps.types'
+import { APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
 const editorStore = useAppEditorStore()
-// Preview mode options
-const previewModes = ref([
-  { icon: 'pi pi-desktop', value: 'desktop' as PreviewMode, label: 'Desktop' },
-  { icon: 'pi pi-tablet', value: 'tablet' as PreviewMode, label: 'Tablet' },
-  { icon: 'pi pi-mobile', value: 'mobile' as PreviewMode, label: 'Mobile' },
+// Application viewport mode options
+const applicationViewportModes = ref([
+  { icon: 'pi pi-desktop', value: 'desktop' as ApplicationViewportMode, label: 'Desktop' },
+  { icon: 'pi pi-tablet', value: 'tablet' as ApplicationViewportMode, label: 'Tablet' },
+  { icon: 'pi pi-mobile', value: 'mobile' as ApplicationViewportMode, label: 'Mobile' },
 ])
 
 // Current viewport size
-const currentSize = computed(() => PREVIEW_SIZES[editorStore.previewMode] ?? PREVIEW_SIZES.desktop)
+const currentSize = computed(() => APPLICATION_VIEWPORT_SIZES[editorStore.applicationViewportMode] ?? APPLICATION_VIEWPORT_SIZES.desktop)
 const publishedAppUrl = computed(() => {
   const publicUrl = editorStore.currentApp?.publicUrl?.trim()
   if (!publicUrl) return ''
@@ -47,17 +47,17 @@ onUnmounted(() => {
 
 // Handle refresh button
 async function handleRefresh() {
-  await editorStore.refreshPreview()
+  await editorStore.refreshApplication()
 }
 
 // Handle mode change
-function handleModeChange(mode: PreviewMode) {
-  editorStore.setPreviewMode(mode)
+function handleModeChange(mode: ApplicationViewportMode) {
+  editorStore.setApplicationViewportMode(mode)
 }
 
 // Handle close
 function handleClose() {
-  editorStore.closePreviewOverlay()
+  editorStore.closeApplicationOverlay()
 }
 
 function openPublishedApp() {
@@ -103,8 +103,8 @@ onUnmounted(() => {
         <div class="header-center">
           <div class="header-center-controls">
             <SelectButton
-              :model-value="editorStore.previewMode"
-              :options="previewModes"
+              :model-value="editorStore.applicationViewportMode"
+              :options="applicationViewportModes"
               option-value="value"
               :allow-empty="false"
               @update:model-value="handleModeChange"
@@ -125,7 +125,7 @@ onUnmounted(() => {
             label="Refresh"
             text
             severity="secondary"
-            :loading="editorStore.isLoadingPreview"
+            :loading="editorStore.isLoadingApplication"
             @click="handleRefresh"
           />
           <Button
@@ -153,9 +153,9 @@ onUnmounted(() => {
               @click="openPublishedApp"
             />
           </div>
-          <div v-if="editorStore.previewWarning" class="preview-warning">
+          <div v-if="editorStore.applicationWarning" class="preview-warning">
             <i class="pi pi-exclamation-triangle"></i>
-            <span>{{ editorStore.previewWarning }}</span>
+            <span>{{ editorStore.applicationWarning }}</span>
             <Button
               icon="pi pi-times"
               text
@@ -163,25 +163,25 @@ onUnmounted(() => {
               size="small"
               severity="secondary"
               aria-label="Dismiss warning"
-              @click="editorStore.setPreviewWarning(null)"
+              @click="editorStore.setApplicationWarning(null)"
             />
           </div>
         <div
           class="preview-viewport"
-          :class="editorStore.previewMode"
+          :class="editorStore.applicationViewportMode"
           :style="{
             width: currentSize.width,
             height: currentSize.height,
           }"
         >
           <!-- Loading state -->
-          <div v-if="editorStore.isLoadingPreview" class="preview-loading">
+          <div v-if="editorStore.isLoadingApplication" class="preview-loading">
             <i class="pi pi-spin pi-spinner text-4xl"></i>
             <p class="mt-2">Loading application...</p>
           </div>
 
           <!-- Empty state -->
-          <div v-else-if="!editorStore.previewUrl" class="preview-empty">
+          <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
             <i class="pi pi-desktop text-4xl text-color-secondary"></i>
             <p class="mt-2 text-color-secondary">No deployed application available</p>
             <Button
@@ -197,8 +197,8 @@ onUnmounted(() => {
           <iframe
             v-else
             ref="iframeRef"
-            :key="editorStore.previewUrl"
-            :src="editorStore.previewUrl"
+            :key="editorStore.applicationUrl"
+            :src="editorStore.applicationUrl"
             class="preview-iframe"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
             title="Running Application"

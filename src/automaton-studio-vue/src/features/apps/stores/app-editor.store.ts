@@ -12,7 +12,7 @@ import type {
   AppFileSystemScope,
   FileNode,
   OpenFile,
-  PreviewMode,
+  ApplicationViewportMode,
   PublishAppRequest,
 } from '../types/apps.types'
 import {
@@ -53,21 +53,21 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const activeFilePath = ref<string | null>(null)
 
   // Preview URL for iframe (HTTP-based preview)
-  const previewUrl = ref('')
+  const applicationUrl = ref('')
   const sourceChangedSinceDeploy = ref(false)
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
 
   // Preview warning message (missing assets, etc.)
-  const previewWarning = ref<string | null>(null)
+  const applicationWarning = ref<string | null>(null)
 
   // Preview mode (desktop, tablet, mobile)
-  const previewMode = ref<PreviewMode>('desktop')
+  const applicationViewportMode = ref<ApplicationViewportMode>('desktop')
 
   // Loading states
   const isLoading = ref(false)
   const isSaving = ref(false)
-  const isLoadingPreview = ref(false)
+  const isLoadingApplication = ref(false)
   const isDeployingApp = ref(false)
   const isDeployingBackend = ref(false)
   const deployStatusMessage = ref<string | null>(null)
@@ -77,7 +77,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const error = ref<string | null>(null)
 
   // Preview overlay visibility (full-screen preview)
-  const showPreviewOverlay = ref(false)
+  const showApplicationOverlay = ref(false)
 
   // Console entries for step execution results
   const consoleEntries = ref<ConsoleEntry[]>([])
@@ -252,10 +252,10 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       sourceChangedSinceDeploy.value = hasPersistedSourceDivergence(currentApp.value)
     }
 
-    previewWarning.value = getPreviewWarningMessage()
+    applicationWarning.value = getApplicationWarningMessage()
   }
 
-  function getPreviewWarningMessage(): string | null {
+  function getApplicationWarningMessage(): string | null {
     if (!currentApp.value) {
       return null
     }
@@ -359,8 +359,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         await openFile(preferredFile.path)
       }
 
-      // Load preview
-      await refreshPreview()
+      // Load running application
+      await refreshApplication()
       syncSourceChangeStateFromMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -505,7 +505,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       sourceChangedSinceDeploy.value = true
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
-      await refreshPreview()
+      await refreshApplication()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -537,7 +537,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       sourceChangedSinceDeploy.value = dirtyFiles.length > 0
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
-      await refreshPreview()
+      await refreshApplication()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -645,15 +645,15 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   /**
    * Refresh the preview iframe
    */
-  async function refreshPreview(): Promise<void> {
+  async function refreshApplication(): Promise<void> {
     if (!currentApp.value) return
 
-    isLoadingPreview.value = true
+    isLoadingApplication.value = true
 
     try {
       if (!hasApplicationRuntime.value) {
-        previewUrl.value = ''
-        previewWarning.value = getPreviewWarningMessage()
+        applicationUrl.value = ''
+        applicationWarning.value = getApplicationWarningMessage()
         return
       }
 
@@ -661,31 +661,31 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       const runtimeUrl = new URL(`${apiBaseUrl}/a/${currentApp.value.id}/`, window.location.origin)
       runtimeUrl.searchParams.set('token', runtimeToken)
       runtimeUrl.searchParams.set('v', Date.now().toString())
-      previewUrl.value = runtimeUrl.toString()
-      previewWarning.value = getPreviewWarningMessage()
+      applicationUrl.value = runtimeUrl.toString()
+      applicationWarning.value = getApplicationWarningMessage()
     } catch (err: unknown) {
-      console.error('Failed to refresh preview:', err)
-      previewUrl.value = ''
-      previewWarning.value = getPreviewWarningMessage()
+      console.error('Failed to refresh application:', err)
+      applicationUrl.value = ''
+      applicationWarning.value = getApplicationWarningMessage()
     } finally {
-      isLoadingPreview.value = false
+      isLoadingApplication.value = false
     }
   }
 
   /**
    * Set preview mode
    */
-  function setPreviewMode(mode: PreviewMode): void {
+  function setApplicationViewportMode(mode: ApplicationViewportMode): void {
     if (mode) {
-      previewMode.value = mode
+      applicationViewportMode.value = mode
     }
   }
 
   /**
    * Set preview warning message
    */
-  function setPreviewWarning(message: string | null): void {
-    previewWarning.value = message
+  function setApplicationWarning(message: string | null): void {
+    applicationWarning.value = message
   }
 
   /**
@@ -713,8 +713,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         tags: request.tags ?? currentApp.value.tags,
       }
 
-      // Refresh preview with published API
-      await refreshPreview()
+      // Refresh running application with published API
+      await refreshApplication()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -797,7 +797,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await refreshAssignedRunnerStatus()
       syncSourceChangeStateFromMetadata()
       lastDeployError.value = null
-      await refreshPreview()
+      await refreshApplication()
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -836,7 +836,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await refreshAssignedRunnerStatus()
       syncSourceChangeStateFromMetadata()
       lastDeployError.value = null
-      await refreshPreview()
+      await refreshApplication()
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -1033,34 +1033,34 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       sourceChangedSinceDeploy.value = true
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
-      await refreshPreview()
+      await refreshApplication()
     } catch (err: unknown) {
       console.error('Failed to refresh files after AI update:', err)
     }
   }
 
   /**
-   * Toggle preview overlay visibility
+   * Toggle application overlay visibility
    */
-  function togglePreviewOverlay(): void {
-    showPreviewOverlay.value = !showPreviewOverlay.value
+  function toggleApplicationOverlay(): void {
+    showApplicationOverlay.value = !showApplicationOverlay.value
   }
 
   /**
-   * Open preview overlay — always refreshes so the latest saved files are shown.
+   * Open application overlay — always refreshes so the latest saved files are shown.
    */
-  function openPreviewOverlay(): void {
-    showPreviewOverlay.value = true
+  function openApplicationOverlay(): void {
+    showApplicationOverlay.value = true
     if (currentApp.value) {
-      void refreshPreview()
+      void refreshApplication()
     }
   }
 
   /**
-   * Close preview overlay
+   * Close application overlay
    */
-  function closePreviewOverlay(): void {
-    showPreviewOverlay.value = false
+  function closeApplicationOverlay(): void {
+    showApplicationOverlay.value = false
   }
 
   /**
@@ -1124,16 +1124,16 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree.value = []
     openFiles.value = []
     activeFilePath.value = null
-    previewUrl.value = ''
+    applicationUrl.value = ''
     sourceChangedSinceDeploy.value = false
     lastDeployError.value = null
     assignedRunnerOnline.value = null
-    previewMode.value = 'desktop'
+    applicationViewportMode.value = 'desktop'
     isLoading.value = false
     isSaving.value = false
-    isLoadingPreview.value = false
+    isLoadingApplication.value = false
     error.value = null
-    showPreviewOverlay.value = false
+    showApplicationOverlay.value = false
     consoleEntries.value = []
     uiLogEntries.value = []
     uiLogFingerprintWindow.value = []
@@ -1166,18 +1166,18 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     fileTree,
     openFiles,
     activeFilePath,
-    previewUrl,
+    applicationUrl,
     sourceChangedSinceDeploy,
     lastDeployError,
-    previewWarning,
-    previewMode,
+    applicationWarning,
+    applicationViewportMode,
     isLoading,
     isSaving,
-    isLoadingPreview,
+    isLoadingApplication,
     isDeployingApp,
     isDeployingBackend,
     error,
-    showPreviewOverlay,
+    showApplicationOverlay,
     consoleEntries,
     uiLogEntries,
     uiLogFilter,
@@ -1219,9 +1219,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     createFile,
     deleteFile,
     deleteFolder,
-    refreshPreview,
-    setPreviewMode,
-    setPreviewWarning,
+    refreshApplication,
+    setApplicationViewportMode,
+    setApplicationWarning,
     publishApp,
     unpublishApp,
     deployFrontend,
@@ -1236,9 +1236,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     reloadFile,
     reloadActiveFile,
     refreshFilesAfterAiUpdate,
-    togglePreviewOverlay,
-    openPreviewOverlay,
-    closePreviewOverlay,
+    toggleApplicationOverlay,
+    openApplicationOverlay,
+    closeApplicationOverlay,
     addConsoleEntry,
     clearConsole,
     addUiLogEntry,

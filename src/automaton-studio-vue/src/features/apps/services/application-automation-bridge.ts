@@ -76,7 +76,7 @@ export interface UiAutomationResult {
   error?: string
 }
 
-const PREVIEW_AUTOMATION_TIMEOUT_MS = 12000
+const APPLICATION_AUTOMATION_TIMEOUT_MS = 12000
 
 const UI_LOG_LEVEL_RANK: Record<UiLogEntry['level'], number> = {
   debug: 10,
@@ -143,7 +143,7 @@ function truncateLogMessage(message: string, maxChars: number): string {
   return `${normalized.slice(0, Math.max(0, maxChars - 1))}…`
 }
 
-function getPreviewIframe(): HTMLIFrameElement | null {
+function getApplicationIframe(): HTMLIFrameElement | null {
   return (
     document.querySelector<HTMLIFrameElement>('.build-visual-workspace .preview-iframe')
     ?? document.querySelector<HTMLIFrameElement>('.preview-overlay .preview-iframe')
@@ -154,15 +154,15 @@ async function executeViaPostMessageBridge(
   action: UiAutomationAction,
   args: Record<string, unknown>,
 ): Promise<UiAutomationResult> {
-  const iframe = getPreviewIframe()
+  const iframe = getApplicationIframe()
   const targetWindow = iframe?.contentWindow
   if (!targetWindow) {
-    return { success: false, action, error: 'Preview iframe is not available.' }
+    return { success: false, action, error: 'Application iframe is not available.' }
   }
 
   const requestId = crypto.randomUUID()
   const timeoutMs = Math.max(
-    PREVIEW_AUTOMATION_TIMEOUT_MS,
+    APPLICATION_AUTOMATION_TIMEOUT_MS,
     Number(args.timeoutMs ?? 0) + 2000,
   )
 
@@ -172,7 +172,7 @@ async function executeViaPostMessageBridge(
       resolve({
         success: false,
         action,
-        error: `Timed out waiting for preview automation response (${timeoutMs}ms).`,
+        error: `Timed out waiting for application automation response (${timeoutMs}ms).`,
       })
     }, timeoutMs)
 
@@ -193,7 +193,7 @@ async function executeViaPostMessageBridge(
         data.result ?? {
           success: false,
           action,
-          error: 'Preview automation returned an empty response.',
+          error: 'Application automation returned an empty response.',
         },
       )
     }
@@ -251,9 +251,9 @@ export async function executeUiAutomationAction(
     const waitForSel = args.waitForSelector !== undefined ? String(args.waitForSelector).trim() : ''
     const timeoutMs = Number(args.timeoutMs ?? 5000)
 
-    const iframeEl = getPreviewIframe()
+    const iframeEl = getApplicationIframe()
     if (!iframeEl) {
-      return { success: false, action, error: 'Preview iframe is not available' }
+      return { success: false, action, error: 'Application iframe is not available' }
     }
 
     // Register load listener BEFORE triggering reload to avoid a race condition.
@@ -282,7 +282,7 @@ export async function executeUiAutomationAction(
       }
     }
 
-    return { success: true, action, details: 'Reloaded preview' }
+    return { success: true, action, details: 'Reloaded application' }
   }
 
   // All other actions are implemented in automaton-api-preview.js inside the iframe.

@@ -3,7 +3,7 @@
  * AppEditorView.vue
  * Main Visual IDE for editing apps
  * Editor-first layout with on-demand AI assistant
- * Preview opens as full-screen overlay
+ * Application opens as full-screen overlay
  */
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -17,7 +17,7 @@ import { useToast } from 'primevue/usetoast'
 // Import components
 import FileTree from '../components/FileTree.vue'
 import AiAssistant from '../components/AiAssistant.vue'
-import PreviewOverlay from '../components/PreviewOverlay.vue'
+import ApplicationOverlay from '../components/ApplicationOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
@@ -43,7 +43,7 @@ import {
   executeUiAutomationAction,
   UiAutomationAction,
   type UiAutomationResult,
-} from '../services/preview-automation-bridge'
+} from '../services/application-automation-bridge'
 import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 
 const route = useRoute()
@@ -547,9 +547,9 @@ function handlePreviewMessage(event: MessageEvent) {
     const tagName = event.data?.data?.tagName as string | undefined
     if (url) {
       const label = tagName ? `${tagName.toUpperCase()} ` : ''
-      editorStore.setPreviewWarning(`Missing preview asset: ${label}${url}`)
+      editorStore.setApplicationWarning(`Missing application asset: ${label}${url}`)
     } else {
-      editorStore.setPreviewWarning('Missing preview asset: a referenced file could not be loaded')
+      editorStore.setApplicationWarning('Missing application asset: a referenced file could not be loaded')
     }
   }
 
@@ -1293,7 +1293,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
-        @preview="editorStore.openPreviewOverlay()"
+        @preview="editorStore.openApplicationOverlay()"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"
         @deploy-backend="handleDeployBackend"
@@ -1626,7 +1626,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       <StatusBar />
 
       <!-- Full-screen Preview Overlay -->
-      <PreviewOverlay v-if="editorStore.showPreviewOverlay" />
+      <ApplicationOverlay v-if="editorStore.showApplicationOverlay" />
     </template>
 
     <!-- Error state -->

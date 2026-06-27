@@ -21,7 +21,7 @@ import ReasoningBlock from './ReasoningBlock.vue'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
 import type { UiLogEntry } from '../types/console.types'
-import { UiAutomationAction } from '../services/preview-automation-bridge'
+import { UiAutomationAction } from '../services/application-automation-bridge'
 
 // Props
 const props = withDefaults(

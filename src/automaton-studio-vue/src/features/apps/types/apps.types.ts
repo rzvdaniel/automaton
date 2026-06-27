@@ -319,14 +319,14 @@ export interface LinkedStepInfoExtended extends LinkedStepInfo {
 }
 
 /**
- * Preview mode for responsive testing
+ * Application viewport mode for responsive testing
  */
-export type PreviewMode = 'desktop' | 'tablet' | 'mobile'
+export type ApplicationViewportMode = 'desktop' | 'tablet' | 'mobile'
 
 /**
- * Preview viewport sizes
+ * Application viewport sizes
  */
-export const PREVIEW_SIZES: Record<PreviewMode, { width: string; height: string }> = {
+export const APPLICATION_VIEWPORT_SIZES: Record<ApplicationViewportMode, { width: string; height: string }> = {
   desktop: { width: '100%', height: '100%' },
   tablet: { width: '768px', height: '1024px' },
   mobile: { width: '375px', height: '667px' },

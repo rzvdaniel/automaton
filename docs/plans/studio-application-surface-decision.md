@@ -64,5 +64,5 @@ This removes multiple confusing concepts at once:
 
 - turn the `Application` tab into an explicit app control panel
 - show explicit runtime deployment timestamps and source/runtime divergence state
-- keep the legacy source-preview backend isolated until no Studio editor surface depends on it
-- retire source-preview-only backend code after the new Application flow is fully stable
+- source-preview serving/storage has been retired from the Studio editor path
+- remaining `preview/*` execution endpoints are runtime automation/test plumbing and should be renamed or removed separately once AI tooling no longer depends on them
