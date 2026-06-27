@@ -122,10 +122,10 @@ COPY Automaton.Runner/fastapi_server /app/fastapi_server
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 
 # Pre-create writable data directories so named volumes inherit correct ownership
-RUN mkdir -p /app/data/apps /app/logs
+RUN mkdir -p /automaton/workspace/apps /automaton/workspace/data /automaton/workspace/cache /automaton/workspace/runner /app/logs
 
 # Set ownership for non-root user
-RUN chown -R automaton:automaton /app
+RUN chown -R automaton:automaton /app /automaton
 
 # Environment defaults
 # - Production server URL is the default (override for development)
@@ -134,7 +134,8 @@ ENV DOTNET_ENVIRONMENT=Production
 ENV AUTOMATON_SERVER_URL="https://api.automaton.monster"
 ENV AUTOMATON_API_KEY=""
 ENV AUTOMATON_RUNNER_NAME=""
-ENV RUNNER_SCRIPTS_DIR=/app/data/apps
+ENV AUTOMATON_WORKSPACE_ROOT=/automaton/workspace
+ENV RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
 
 # PythonNet configuration - required for Python custom steps on Linux
 ENV PYTHONNET_PYDLL=/usr/local/lib/libpython3.13.so

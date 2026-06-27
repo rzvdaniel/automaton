@@ -48,6 +48,7 @@ public class HubService
     private readonly IServiceProvider serviceProvider;
     private readonly ILogger logger;
     private readonly IConnectionPolicy resilientConnectionPolicy;
+    private readonly RunnerWorkspaceService runnerWorkspaceService;
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
@@ -62,13 +63,15 @@ public class HubService
         ApiKeyAuthenticationService apiKeyAuthService,
         FlowExecutionService flowExecutionService,
         TunnelForwarderService tunnelForwarder,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        RunnerWorkspaceService runnerWorkspaceService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
         this.flowExecutionService = flowExecutionService;
         this.tunnelForwarder = tunnelForwarder;
         this.serviceProvider = serviceProvider;
+        this.runnerWorkspaceService = runnerWorkspaceService;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -543,16 +546,12 @@ public class HubService
     /// Each app gets its own Python virtual environment under the persistent app data directory.
     /// requirements.txt rebuilds that app's venv so removed packages do not linger.
     /// </summary>
-    private static string AppsRootDir =>
-        Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
-        ?? Path.Combine(AppContext.BaseDirectory, "data", "apps");
-
     private AppControllerUploadResult UploadControllerScriptHandler(AppControllerUploadPayload payload)
     {
         try
         {
-            var backendDir = GetAppBackendDirectory(payload.AppId);
-            var dataDir = GetAppDataDirectory(payload.AppId);
+            var backendDir = runnerWorkspaceService.GetAppBackendDirectory(payload.AppId);
+            var dataDir = runnerWorkspaceService.GetAppDataDirectory(payload.AppId);
 
             Directory.CreateDirectory(backendDir);
             Directory.CreateDirectory(dataDir);
@@ -582,7 +581,7 @@ public class HubService
 
             EnsureAppVirtualEnvironment(payload.AppId, recreate: false);
 
-            var filePath = ResolveBackendUploadPath(backendDir, relativePath);
+            var filePath = runnerWorkspaceService.ResolveBackendUploadPath(payload.AppId, relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
             File.WriteAllBytes(filePath, payload.Content);
 
@@ -618,25 +617,7 @@ public class HubService
         return relativePath.Replace('\\', '/').TrimStart('/');
     }
 
-    private static string ResolveBackendUploadPath(string backendDir, string relativePath)
-    {
-        var normalized = NormalizeBackendRelativePath(relativePath);
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new ArgumentException("Invalid backend file path.");
-        }
-
-        var fullPath = Path.GetFullPath(Path.Combine(backendDir, normalized.Replace('/', Path.DirectorySeparatorChar)));
-        if (!fullPath.StartsWith(backendDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, backendDir, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new UnauthorizedAccessException("Backend file path must stay inside the app backend directory.");
-        }
-
-        return fullPath;
-    }
-
-    private static AppBackendFilesResponse ListAppBackendFiles(string appId, string? area)
+    private AppBackendFilesResponse ListAppBackendFiles(string appId, string? area)
     {
         try
         {
@@ -687,13 +668,13 @@ public class HubService
         }
     }
 
-    private static AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath, string? area)
+    private AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath, string? area)
     {
         try
         {
             var runnerFileArea = NormalizeRunnerFileArea(area);
-            var path = ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
-            var normalizedRelativePath = NormalizeRunnerRelativePath(relativePath);
+            var path = runnerWorkspaceService.ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
+            var normalizedRelativePath = runnerWorkspaceService.NormalizeRelativePath(relativePath);
             if (!File.Exists(path))
             {
                 return new AppBackendFileContentResponse
@@ -750,18 +731,18 @@ public class HubService
             {
                 Success = false,
                 Area = NormalizeRunnerFileArea(area),
-                Path = NormalizeRunnerRelativePath(relativePath),
+                Path = runnerWorkspaceService.NormalizeRelativePath(relativePath),
                 Error = ex.Message
             };
         }
     }
 
-    private static AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath, string? area)
+    private AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath, string? area)
     {
         try
         {
             var runnerFileArea = NormalizeRunnerFileArea(area);
-            var path = ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
+            var path = runnerWorkspaceService.ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
             if (!File.Exists(path))
             {
                 return new AppBackendFileDeleteResponse
@@ -797,50 +778,11 @@ public class HubService
             : AppRunnerFileAreas.Backend;
     }
 
-    private static string GetRunnerFileRootDirectory(Guid appId, string area)
+    private string GetRunnerFileRootDirectory(Guid appId, string area)
     {
         return area == AppRunnerFileAreas.Data
-            ? GetAppDataDirectory(appId)
-            : GetAppBackendDirectory(appId);
-    }
-
-    private static string ResolveRunnerFilePath(Guid appId, string relativePath, string area)
-    {
-        var rootDirectory = GetRunnerFileRootDirectory(appId, area);
-        var normalized = NormalizeRunnerRelativePath(relativePath);
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new ArgumentException("Invalid runner file path.");
-        }
-
-        var fullPath = Path.GetFullPath(Path.Combine(rootDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
-        if (!fullPath.StartsWith(rootDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, rootDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new UnauthorizedAccessException("Runner file path must stay inside the requested app directory.");
-        }
-
-        return fullPath;
-    }
-
-    private static string GetAppBackendDirectory(Guid appId)
-    {
-        return Path.GetFullPath(Path.Combine(GetAppRootDirectory(appId), "backend"));
-    }
-
-    private static string GetAppDataDirectory(Guid appId)
-    {
-        return Path.GetFullPath(Path.Combine(GetAppRootDirectory(appId), "data"));
-    }
-
-    private static string GetAppRootDirectory(Guid appId)
-    {
-        return Path.GetFullPath(Path.Combine(AppsRootDir, appId.ToString()));
-    }
-
-    private static string GetAppVenvDirectory(Guid appId)
-    {
-        return Path.Combine(GetAppRootDirectory(appId), "venv");
+            ? runnerWorkspaceService.GetAppDataDirectory(appId)
+            : runnerWorkspaceService.GetAppBackendDirectory(appId);
     }
 
     private static Guid ParseAppId(string appId)
@@ -851,33 +793,6 @@ public class HubService
         }
 
         return parsed;
-    }
-
-    private static string ResolveAppBackendFilePath(Guid appId, string relativePath)
-    {
-        var backendDir = GetAppBackendDirectory(appId);
-        var normalizedPath = NormalizeRunnerRelativePath(relativePath);
-        var fullPath = Path.GetFullPath(Path.Combine(backendDir, normalizedPath));
-
-        if (!fullPath.StartsWith(backendDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(fullPath, backendDir, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new UnauthorizedAccessException("Path must stay inside the app backend directory.");
-        }
-
-        return fullPath;
-    }
-
-    private static string NormalizeRunnerRelativePath(string relativePath)
-    {
-        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
-        if (string.IsNullOrWhiteSpace(normalized)
-            || normalized.Split('/').Any(part => part is "" or "." or ".."))
-        {
-            throw new ArgumentException("Invalid backend file path.");
-        }
-
-        return normalized;
     }
 
     private static bool IsTextFile(string relativePath)
@@ -904,7 +819,7 @@ public class HubService
         {
             logs.AddRange(EnsureAppVirtualEnvironment(appId, recreate: true));
 
-            var venvDir = GetAppVenvDirectory(appId);
+            var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
             var pipPath = GetVenvPipPath(venvDir);
             var pythonPath = GetVenvPythonPath(venvDir);
             var installMode = $"venv: {venvDir}";
@@ -939,8 +854,8 @@ public class HubService
     private List<string> EnsureAppVirtualEnvironment(Guid appId, bool recreate)
     {
         var logs = new List<string>();
-        var venvDir = GetAppVenvDirectory(appId);
-        var appRootDir = GetAppRootDirectory(appId);
+        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
+        var appRootDir = runnerWorkspaceService.GetAppRoot(appId);
 
         Directory.CreateDirectory(appRootDir);
 
@@ -1555,27 +1470,27 @@ public class HubService
         return Path.Combine(dir, chunk.FileName);
     }
 
-    private static string ResolveAppMediaUploadPath(FileUploadChunk chunk)
+    private string ResolveAppMediaUploadPath(FileUploadChunk chunk)
     {
         if (!chunk.AppId.HasValue)
         {
             throw new ArgumentException("App ID is required for media uploads.");
         }
 
-        return ResolveAppMediaFilePath(chunk.AppId.Value, chunk.RelativePath);
+        return runnerWorkspaceService.ResolveAppMediaFilePath(chunk.AppId.Value, chunk.RelativePath);
     }
 
-    private static string GetAppMediaDirectory(Guid appId)
+    private string GetAppMediaDirectory(Guid appId)
     {
-        return Path.GetFullPath(Path.Combine(GetAppDataDirectory(appId), "media"));
+        return Path.GetFullPath(Path.Combine(runnerWorkspaceService.GetAppDataDirectory(appId), "media"));
     }
 
-    private static string ResolveAppMediaFilePath(Guid appId, string relativePath)
+    private string ResolveAppMediaFilePath(Guid appId, string relativePath)
     {
-        return AppMediaPathHelper.ResolvePath(GetAppMediaDirectory(appId), relativePath);
+        return runnerWorkspaceService.ResolveAppMediaFilePath(appId, relativePath);
     }
 
-    private static AppMediaStatsResponse GetAppMediaStats(string appId)
+    private AppMediaStatsResponse GetAppMediaStats(string appId)
     {
         try
         {
@@ -1603,11 +1518,11 @@ public class HubService
         }
     }
 
-    private static AppMediaFileMetadataResponse GetAppMediaFileMetadata(string appId, string relativePath)
+    private AppMediaFileMetadataResponse GetAppMediaFileMetadata(string appId, string relativePath)
     {
         try
         {
-            var filePath = ResolveAppMediaFilePath(ParseAppId(appId), relativePath);
+            var filePath = runnerWorkspaceService.ResolveAppMediaFilePath(ParseAppId(appId), relativePath);
             if (!File.Exists(filePath))
             {
                 return new AppMediaFileMetadataResponse

@@ -29,7 +29,7 @@ public static class HostedRunnerDockerCommandBuilder
             $"-e AUTOMATON_RUNNER_NAME={ShellQuote(runner.Name)}",
             $"-e AUTOMATON_HOSTED_RUNNER_ID={ShellQuote(runner.Id.ToString())}",
             $"-v {ShellQuote($"{runnerRoot}/config:/home/automaton/.config/AutomatonRunner")}",
-            $"-v {ShellQuote($"{dataVolumeName}:/app/data")}",
+            $"-v {ShellQuote($"{dataVolumeName}:/automaton/workspace")}",
             $"-v {ShellQuote($"{runnerRoot}/logs:/app/logs")}",
             ShellQuote(options.DockerImage)
         });

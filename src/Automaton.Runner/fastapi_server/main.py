@@ -19,17 +19,31 @@ async def shutdown():
 
 
 def _default_scripts_dir() -> str:
+    return os.path.join(_default_workspace_root(), "apps")
+
+
+def _default_workspace_root() -> str:
     if (
         os.environ.get("DOTNET_RUNNING_IN_CONTAINER", "").lower() == "true"
         or os.path.exists("/.dockerenv")
     ):
-        return "/app/data/apps"
+        return "/automaton/workspace"
 
     runner_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(runner_root, "data", "apps")
+    return os.path.join(runner_root, "workspace")
+
+
+def _workspace_root_from_env() -> str | None:
+    value = os.environ.get("AUTOMATON_WORKSPACE_ROOT")
+    return value or None
+
+
+def _effective_workspace_root() -> str:
+    return _workspace_root_from_env() or _default_workspace_root()
 
 
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
+WORKSPACE_ROOT = _effective_workspace_root()
 RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controller_runner.py")
 
 
@@ -38,10 +52,11 @@ def _print_startup_diagnostics() -> None:
     scripts_dir_abs = os.path.abspath(SCRIPTS_DIR)
     cwd_abs = os.path.abspath(os.getcwd())
     source_tree_hint = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "data", "apps")
+        os.path.join(os.path.dirname(__file__), "..", "workspace", "apps")
     )
 
     print(f"[Automaton FastAPI] RUNNER_SCRIPTS_DIR resolved to: {scripts_dir_abs}")
+    print(f"[Automaton FastAPI] AUTOMATON_WORKSPACE_ROOT resolved to: {os.path.abspath(WORKSPACE_ROOT)}")
     print(f"[Automaton FastAPI] Working directory: {cwd_abs}")
     print(
         "[Automaton FastAPI] RUNNER_SCRIPTS_DIR source: "
@@ -57,7 +72,7 @@ def _print_startup_diagnostics() -> None:
     if not env_value and scripts_dir_abs == source_tree_hint:
         print(
             "[Automaton FastAPI] WARNING: FastAPI appears to be running manually from the source tree. "
-            "If your runner deployed files under bin/.../data/apps, this instance will not see them. "
+            "If your runner deployed files under bin/.../workspace/apps, this instance will not see them. "
             "Start the runner instead, or set RUNNER_SCRIPTS_DIR explicitly before launching FastAPI."
         )
 
@@ -67,6 +82,7 @@ async def debug_scripts_dir():
     return {
         "scripts_dir": SCRIPTS_DIR,
         "runner_scripts_dir_env": os.environ.get("RUNNER_SCRIPTS_DIR", "(not set)"),
+        "workspace_root": WORKSPACE_ROOT,
     }
 
 
@@ -76,10 +92,17 @@ def _venv_python_path(app_id: str) -> str:
     return os.path.join(SCRIPTS_DIR, app_id, "venv", "bin", "python")
 
 
+def _app_data_dir(app_home: str, app_id: str) -> str:
+    if _workspace_root_from_env() is None and os.environ.get("RUNNER_SCRIPTS_DIR"):
+        return os.path.join(app_home, "data")
+
+    return os.path.join(WORKSPACE_ROOT, "data", app_id)
+
+
 def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inputs: dict):
     app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
     backend_dir = os.path.join(app_home, "backend")
-    data_dir = os.path.join(app_home, "data")
+    data_dir = _app_data_dir(app_home, app_id)
     python_path = _venv_python_path(app_id)
     if not os.path.exists(python_path):
         raise HTTPException(

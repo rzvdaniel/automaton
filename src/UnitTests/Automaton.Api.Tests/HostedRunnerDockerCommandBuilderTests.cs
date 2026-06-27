@@ -36,8 +36,8 @@ public class HostedRunnerDockerCommandBuilderTests
             Assert.That(command, Does.Contain("AUTOMATON_SERVER_URL='https://api.automaton.monster'"));
             Assert.That(command, Does.Contain("AUTOMATON_API_KEY='*** generated runner key ***'"));
             Assert.That(command, Does.Contain("docker volume create 'automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data'"));
-            Assert.That(command, Does.Contain("-v 'automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data:/app/data'"));
-            Assert.That(command, Does.Not.Contain("/opt/automaton/hosted-runners/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/data:/app/data"));
+            Assert.That(command, Does.Contain("-v 'automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data:/automaton/workspace'"));
+            Assert.That(command, Does.Not.Contain("/opt/automaton/hosted-runners/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/data:/automaton/workspace"));
             Assert.That(command, Does.Not.Contain("ak_runner_"));
         });
     }
@@ -85,7 +85,7 @@ public class HostedRunnerDockerCommandBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(command, Does.Contain("automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data:/app/data"));
+            Assert.That(command, Does.Contain("automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data:/automaton/workspace"));
             Assert.That(command, Does.Not.Contain("temporary-container-id"));
             Assert.That(command, Does.Not.Contain("docker volume rm"));
             Assert.That(command, Does.Not.Contain("docker rm -v"));

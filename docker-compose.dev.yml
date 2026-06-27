@@ -116,14 +116,15 @@ services:
       - DOTNET_ENVIRONMENT=Development
       # Override production default to point to local server
       - AUTOMATON_SERVER_URL=https://host.docker.internal:7091
-      - RUNNER_SCRIPTS_DIR=/app/data/apps
+      - AUTOMATON_WORKSPACE_ROOT=/automaton/workspace
+      - RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
     volumes:
       # Persist runner configuration and registration
       - runner-config:/home/automaton/.config/AutomatonRunner
       # Persist logs
       - runner-logs:/app/logs
-      # Persist deployed app backends, app venvs, and private app data
-      - runner-data:/app/data
+      # Persist app workspace, runtime files, venvs, and private app data
+      - runner-workspace:/automaton/workspace
     networks:
       - automaton-network
     # Add host entry for Linux compatibility (optional, Windows/Mac use host.docker.internal)
@@ -155,7 +156,7 @@ volumes:
     driver: local
   runner-logs:
     driver: local
-  runner-data:
+  runner-workspace:
     driver: local
   rabbitmq-data:
     driver: local

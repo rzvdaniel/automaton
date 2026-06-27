@@ -266,6 +266,7 @@ public class Program
                 services.AddSingleton<ConfigurationService>();
                 services.AddSingleton<FileStorageService>();
                 services.AddSingleton<ApiKeyAuthenticationService>();
+                services.AddSingleton<RunnerWorkspaceService>();
                 services.AddSingleton<HubService>();
                 services.AddSingleton<FlowExecutionService>();
                 services.AddSingleton<RunnerHostService>();

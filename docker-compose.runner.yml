@@ -18,7 +18,8 @@ services:
     env_file:
       - .env
     environment:
-      - RUNNER_SCRIPTS_DIR=/app/data/apps
+      - AUTOMATON_WORKSPACE_ROOT=/automaton/workspace
+      - RUNNER_SCRIPTS_DIR=/automaton/workspace/apps
       # Uncomment for local dev only (self-signed cert on localhost):
       # - DOTNET_ENVIRONMENT=Development
     command: ["/app/docker-entrypoint.sh"]
@@ -27,8 +28,8 @@ services:
       - runner-config:/home/automaton/.config/AutomatonRunner
       # Persist logs
       - runner-logs:/app/logs
-      # Persist deployed backend scripts (app controllers)
-      - runner-data:/app/data
+      # Persist runner workspace, deployed apps, and private app data
+      - runner-workspace:/automaton/workspace
     networks:
       - runner-network
 
@@ -37,7 +38,7 @@ volumes:
     driver: local
   runner-logs:
     driver: local
-  runner-data:
+  runner-workspace:
     driver: local
 
 networks:

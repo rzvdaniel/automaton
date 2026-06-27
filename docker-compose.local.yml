@@ -170,11 +170,12 @@ services:
       AUTOMATON_SERVER_URL: http://api:8080
       AUTOMATON_API_KEY: ${LOCAL_AUTOMATON_API_KEY:-}
       AUTOMATON_RUNNER_NAME: ${LOCAL_AUTOMATON_RUNNER_NAME:-local-docker-runner}
-      RUNNER_SCRIPTS_DIR: /app/data/apps
+      AUTOMATON_WORKSPACE_ROOT: /automaton/workspace
+      RUNNER_SCRIPTS_DIR: /automaton/workspace/apps
     volumes:
       - local-runner-config:/home/automaton/.config/AutomatonRunner
       - local-runner-logs:/app/logs
-      - local-runner-data:/app/data
+      - local-runner-workspace:/automaton/workspace
     networks:
       - automaton-local
     depends_on:
@@ -188,7 +189,7 @@ volumes:
   local-worker-logs:
   local-runner-config:
   local-runner-logs:
-  local-runner-data:
+  local-runner-workspace:
 
 networks:
   automaton-local:

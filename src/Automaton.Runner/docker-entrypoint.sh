@@ -1,13 +1,24 @@
 #!/bin/bash
 set -e
 
-# Ensure writable data directories exist (guards against pre-existing root-owned volumes)
-mkdir -p /app/data/apps
+# Ensure writable workspace directories exist (guards against pre-existing root-owned volumes)
+WORKSPACE_ROOT="${AUTOMATON_WORKSPACE_ROOT:-/automaton/workspace}"
+DEFAULT_WORKSPACE_ROOT="/automaton/workspace"
+DEFAULT_APPS_DIR="$DEFAULT_WORKSPACE_ROOT/apps"
+if [ -n "${RUNNER_SCRIPTS_DIR:-}" ]; then
+    if [ "$RUNNER_SCRIPTS_DIR" = "$DEFAULT_APPS_DIR" ] && [ "$WORKSPACE_ROOT" != "$DEFAULT_WORKSPACE_ROOT" ]; then
+        APPS_DIR="$WORKSPACE_ROOT/apps"
+    else
+        APPS_DIR="$RUNNER_SCRIPTS_DIR"
+    fi
+else
+    APPS_DIR="$WORKSPACE_ROOT/apps"
+fi
+mkdir -p "$APPS_DIR" "$WORKSPACE_ROOT/data" "$WORKSPACE_ROOT/cache" "$WORKSPACE_ROOT/runner"
 
 # (Re)install system packages declared by apps via system-requirements.txt.
 # apt-get packages are installed to the container filesystem (ephemeral), so they must be
 # reinstalled on every container recreate. The files themselves live on the persistent volume.
-APPS_DIR="/app/data/apps"
 ALL_PKGS=""
 for sysreq in "$APPS_DIR"/*/backend/system-requirements.txt; do
     [ -f "$sysreq" ] || continue

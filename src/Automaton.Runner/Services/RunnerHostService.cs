@@ -17,6 +17,7 @@ public class RunnerHostService
     private readonly HttpClient httpClient;
     private readonly ILogger logger;
     private readonly ScriptEngineSettingsReporter scriptEngineSettingsReporter;
+    private readonly RunnerWorkspaceService runnerWorkspaceService;
 
     private CancellationTokenSource? cancellationTokenSource;
 
@@ -26,7 +27,8 @@ public class RunnerHostService
         ApiKeyAuthenticationService apiKeyAuthService,
         HubService hubService,
         HttpClient httpClient,
-        ScriptEngineSettingsReporter scriptEngineSettingsReporter)
+        ScriptEngineSettingsReporter scriptEngineSettingsReporter,
+        RunnerWorkspaceService runnerWorkspaceService)
     {
         this.configService = configService;
         this.storageService = storageService;
@@ -35,6 +37,7 @@ public class RunnerHostService
         this.httpClient = httpClient;
         this.logger = Log.ForContext<RunnerHostService>();
         this.scriptEngineSettingsReporter = scriptEngineSettingsReporter;
+        this.runnerWorkspaceService = runnerWorkspaceService;
     }
 
     /// <summary>
@@ -1270,10 +1273,7 @@ public class RunnerHostService
         // FastAPI inherits the runner's process environment but RUNNER_SCRIPTS_DIR may not be
         // set when running locally (dotnet run). Always inject it explicitly so the fallback
         // /app/data/apps (Docker-only) is never used on a standalone machine.
-        var scriptsDir =
-            Environment.GetEnvironmentVariable("RUNNER_SCRIPTS_DIR")
-            ?? Path.Combine(AppContext.BaseDirectory, "data", "apps");
-
+        var scriptsDir = runnerWorkspaceService.GetFastApiScriptsRoot();
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName = "python",
@@ -1284,9 +1284,30 @@ public class RunnerHostService
         };
         psi.Environment["RUNNER_SCRIPTS_DIR"] = scriptsDir;
 
+        if (runnerWorkspaceService.UsesLegacyScriptsLayout)
+        {
+            psi.Environment.Remove("AUTOMATON_WORKSPACE_ROOT");
+        }
+        else
+        {
+            psi.Environment["AUTOMATON_WORKSPACE_ROOT"] = runnerWorkspaceService.WorkspaceRoot;
+        }
+
         try
         {
-            logger.Debug("Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir}", scriptsDir);
+            if (runnerWorkspaceService.UsesLegacyScriptsLayout)
+            {
+                logger.Debug(
+                    "Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir} in legacy scripts layout mode",
+                    scriptsDir);
+            }
+            else
+            {
+                logger.Debug(
+                    "Launching FastAPI backend with RUNNER_SCRIPTS_DIR={ScriptsDir} and workspace root {WorkspaceRoot}",
+                    scriptsDir,
+                    runnerWorkspaceService.WorkspaceRoot);
+            }
             WriteLine($"🔧 FastAPI scripts dir: {scriptsDir}");
             var proc = System.Diagnostics.Process.Start(psi);
             logger.Debug("FastAPI backend launched (PID {Pid})", proc?.Id);

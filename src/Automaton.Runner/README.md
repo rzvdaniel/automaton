@@ -123,14 +123,15 @@ The runner normally starts and manages the local FastAPI backend for app control
 - Preferred: start `automaton-runner` and let it launch FastAPI.
 - Manual FastAPI starts are for debugging only.
 
-If you launch `fastapi_server/main.py` manually, you must point it at the same app data directory the runner uses:
+If you launch `fastapi_server/main.py` manually, you must point it at the same workspace directories the runner uses:
 
 ```powershell
-$env:RUNNER_SCRIPTS_DIR="C:\path\to\Automaton.Runner\bin\Debug\net9.0\data\apps"
+$env:AUTOMATON_WORKSPACE_ROOT="C:\path\to\Automaton.Runner\bin\Debug\net9.0\workspace"
+$env:RUNNER_SCRIPTS_DIR="$env:AUTOMATON_WORKSPACE_ROOT\apps"
 python fastapi_server/main.py
 ```
 
-Otherwise FastAPI may look under the source-tree `data/apps` folder instead of the runner output folder and return:
+Otherwise FastAPI may look under the source-tree `workspace/apps` folder instead of the runner output folder and return:
 
 ```text
 Controller 'xyz' not deployed for app '...'
