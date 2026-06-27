@@ -335,8 +335,6 @@ Routes:
 - `POST /api/web-apps/{slug}/files/upload` in `AppFilesController.cs`
 - `GET /api/web-apps/preview/{appId}/files/{sessionId}` in `AppFilesController.cs`
 - `GET /api/web-apps/{slug}/files/{sessionId}` in `AppFilesController.cs`
-- `POST /api/apps/{appId}/preview` in `AppPreviewController.cs`
-- `GET /app-preview/{userId}/{appId}/{*path}` in `AppPreviewController.cs`
 
 Why:
 

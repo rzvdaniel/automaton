@@ -229,8 +229,9 @@ function resolveSafePreviewNavigationTarget(targetUrl) {
   try {
     const resolved = new URL(trimmed, window.location.href);
     const sameOrigin = resolved.origin === window.location.origin;
-    const inPreviewPath = resolved.pathname.includes('/app-preview/');
-    return sameOrigin && inPreviewPath ? resolved.toString() : null;
+    const runtimePathPrefix = `/a/${APP_ID}/`;
+    const inRuntimePath = resolved.pathname.startsWith(runtimePathPrefix);
+    return sameOrigin && inRuntimePath ? resolved.toString() : null;
   } catch {
     return null;
   }
@@ -247,7 +248,7 @@ const uiActionHandlers = {
     if (!url) return { success: false, error: "Missing required argument 'url'" };
     const safeTarget = resolveSafePreviewNavigationTarget(url);
     if (!safeTarget) {
-      return { success: false, error: 'Blocked ui_navigate outside preview app scope. Use relative app URLs only.' };
+      return { success: false, error: 'Blocked ui_navigate outside the current application runtime. Use relative app URLs only.' };
     }
     window.location.assign(safeTarget);
     return { success: true, details: `Navigated to ${safeTarget}` };

@@ -48,7 +48,7 @@ This removes multiple confusing concepts at once:
 
 ## First-Cut Implementation
 
-1. Replace the current source-preview pane/AppPreviewController usage in the main app pane with the restricted runtime URL used by `automaton open`.
+1. Use the restricted runtime URL used by `automaton open` as the main `Application` pane surface inside Studio.
 2. Rename `Preview` UI labels to `Application` or `Running Application`.
 3. Keep `Files` as the editable source editor.
 4. Show an `undeployed changes` indicator when source changed after the last successful deployment.
@@ -58,7 +58,7 @@ This removes multiple confusing concepts at once:
    - `Build failed`
    - `Runner offline`
 6. Do not change public publishing behavior yet.
-7. Do not remove old preview backend code until the new `Application` surface works.
+7. Retire legacy preview backend code only after the new `Application` surface is stable and no editor flows still depend on it.
 
 ## Follow-Up
 

@@ -177,6 +177,23 @@ const applicationSourceTimestampText = computed(() => {
   return null
 })
 
+const applicationStatusMessage = computed(() => {
+  switch (editorStore.applicationState) {
+    case 'Deployed':
+      return 'Running application is up to date.'
+    case 'Source changed':
+      return 'Source changed since last deploy. Deploy to update the running application.'
+    case 'Runner offline':
+      return 'The assigned runner is offline. Runtime updates and backend execution may be unavailable until it reconnects.'
+    case 'Build failed':
+      return editorStore.lastDeployError
+    case 'Not deployed':
+      return 'Deploy this app to create the running application.'
+    default:
+      return null
+  }
+})
+
 watch(
   () => route.query.settings,
   (section) => {
@@ -1298,16 +1315,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
           text
         />
         <span
-          v-if="editorStore.sourceChangedSinceDeploy"
+          v-if="applicationStatusMessage"
           class="application-status-banner__message"
         >
-          Source changed since last deploy. Deploy to update the running application.
-        </span>
-        <span
-          v-else-if="editorStore.lastDeployError"
-          class="application-status-banner__message"
-        >
-          {{ editorStore.lastDeployError }}
+          {{ applicationStatusMessage }}
         </span>
         <span
           v-if="applicationRuntimeTimestampText"

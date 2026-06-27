@@ -133,7 +133,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Public URL slug
    */
   const publicUrl = computed(() => currentApp.value?.publicUrl ?? '')
-  const hasDeployedFrontend = computed(() => currentApp.value?.hasDeployedFrontend ?? false)
+  const hasApplicationRuntime = computed(() => {
+    if (!currentApp.value) {
+      return false
+    }
+
+    return currentApp.value.frontend.runtimeAvailable || currentApp.value.hasDeployedFrontend
+  })
+  const hasDeployedFrontend = computed(() => hasApplicationRuntime.value)
   const applicationDeployedAtUtc = computed(() => {
     const frontendDeployed = currentApp.value?.frontend.runtimeDeployedAtUtc ?? null
     const backendDeployed = currentApp.value?.backend.runtimeDeployedAtUtc ?? null
@@ -165,7 +172,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (lastDeployError.value) return 'Build failed'
     if (runnerOffline.value) return 'Runner offline'
     if (sourceChangedSinceDeploy.value) return 'Source changed'
-    if (currentApp.value?.hasDeployedFrontend) return 'Deployed'
+    if (hasApplicationRuntime.value) return 'Deployed'
     return 'Not deployed'
   })
   const isLocalManagedApp = computed(() => currentApp.value?.developmentMode === DevelopmentMode.Local)
@@ -244,7 +251,32 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!hasUnsavedChanges.value) {
       sourceChangedSinceDeploy.value = hasPersistedSourceDivergence(currentApp.value)
     }
+
+    previewWarning.value = getPreviewWarningMessage()
   }
+
+  function getPreviewWarningMessage(): string | null {
+    if (!currentApp.value) {
+      return null
+    }
+
+    if (!hasApplicationRuntime.value) {
+      return sourceChangedSinceDeploy.value
+        ? 'Source has changed. Deploy to update the running application.'
+        : 'Application has not been deployed yet.'
+    }
+
+    if (sourceChangedSinceDeploy.value) {
+      return 'Source has changed. Deploy to update the running application.'
+    }
+
+    if (lastDeployError.value) {
+      return lastDeployError.value
+    }
+
+    return null
+  }
+
   function getScopePrefix(scope: AppFileSystemScope): string {
     return `${scope}/`
   }
@@ -617,16 +649,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (!currentApp.value) return
 
     isLoadingPreview.value = true
-    
-    // Clear any previous preview warnings
-    previewWarning.value = null
 
     try {
-      if (!currentApp.value.hasDeployedFrontend) {
+      if (!hasApplicationRuntime.value) {
         previewUrl.value = ''
-        previewWarning.value = sourceChangedSinceDeploy.value
-          ? 'Source has changed. Deploy to update the running application.'
-          : 'Application has not been deployed yet.'
+        previewWarning.value = getPreviewWarningMessage()
         return
       }
 
@@ -635,12 +662,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       runtimeUrl.searchParams.set('token', runtimeToken)
       runtimeUrl.searchParams.set('v', Date.now().toString())
       previewUrl.value = runtimeUrl.toString()
-      previewWarning.value = sourceChangedSinceDeploy.value
-        ? 'Source has changed. Deploy to update the running application.'
-        : null
+      previewWarning.value = getPreviewWarningMessage()
     } catch (err: unknown) {
       console.error('Failed to refresh preview:', err)
       previewUrl.value = ''
+      previewWarning.value = getPreviewWarningMessage()
     } finally {
       isLoadingPreview.value = false
     }
@@ -1163,6 +1189,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     mainHtmlFile,
     isPublished,
     publicUrl,
+    hasApplicationRuntime,
     hasDeployedFrontend,
     applicationDeployedAtUtc,
     frontendSourceModifiedAtUtc,

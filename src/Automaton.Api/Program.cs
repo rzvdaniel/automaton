@@ -347,7 +347,6 @@ services.AddScoped<AppFileStorageService>();
 services.AddScoped<AppMediaStorageService>();
 services.AddScoped<PublishedAppStorageService>();
 services.AddScoped<AppArchiveService>();
-services.AddSingleton<AppPreviewStorageService>();
 services.AddScoped<AppVersionService>();
 services.AddSingleton<PrivateAppLaunchService>();
 
