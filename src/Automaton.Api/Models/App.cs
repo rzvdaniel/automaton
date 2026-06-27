@@ -61,8 +61,10 @@ public class AppModel
 public class AppComponentOwnershipModel
 {
     public bool SourceAvailable { get; set; } = true;
+    public DateTime? SourceModifiedAtUtc { get; set; }
     public string RuntimeSource { get; set; } = Constants.AppRuntimeSources.Studio;
     public bool RuntimeAvailable { get; set; }
+    public DateTime? RuntimeDeployedAtUtc { get; set; }
 }
 
 public class ForkAppRequest

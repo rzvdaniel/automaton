@@ -1122,6 +1122,10 @@ public class AppsService
             if (frontendSourceAvailable.HasValue)
             {
                 metadata.Frontend.SourceAvailable = frontendSourceAvailable.Value;
+                if (frontendSourceAvailable.Value && metadata.Frontend.SourceModifiedAtUtc == null)
+                {
+                    metadata.Frontend.SourceModifiedAtUtc = DateTime.UtcNow;
+                }
             }
             if (!string.IsNullOrWhiteSpace(frontendRuntimeSource))
             {
@@ -1130,10 +1134,18 @@ public class AppsService
             if (frontendRuntimeAvailable.HasValue)
             {
                 metadata.Frontend.RuntimeAvailable = frontendRuntimeAvailable.Value;
+                if (frontendRuntimeAvailable.Value && metadata.Frontend.RuntimeDeployedAtUtc == null)
+                {
+                    metadata.Frontend.RuntimeDeployedAtUtc = DateTime.UtcNow;
+                }
             }
             if (backendSourceAvailable.HasValue)
             {
                 metadata.Backend.SourceAvailable = backendSourceAvailable.Value;
+                if (backendSourceAvailable.Value && metadata.Backend.SourceModifiedAtUtc == null)
+                {
+                    metadata.Backend.SourceModifiedAtUtc = DateTime.UtcNow;
+                }
             }
             if (!string.IsNullOrWhiteSpace(backendRuntimeSource))
             {
@@ -1142,6 +1154,10 @@ public class AppsService
             if (backendRuntimeAvailable.HasValue)
             {
                 metadata.Backend.RuntimeAvailable = backendRuntimeAvailable.Value;
+                if (backendRuntimeAvailable.Value && metadata.Backend.RuntimeDeployedAtUtc == null)
+                {
+                    metadata.Backend.RuntimeDeployedAtUtc = DateTime.UtcNow;
+                }
             }
         });
     }
@@ -1281,14 +1297,18 @@ public class AppsService
         app.Frontend = new Models.AppComponentOwnershipModel
         {
             SourceAvailable = metadata.Frontend.SourceAvailable,
+            SourceModifiedAtUtc = metadata.Frontend.SourceModifiedAtUtc,
             RuntimeSource = metadata.Frontend.RuntimeSource,
-            RuntimeAvailable = metadata.Frontend.RuntimeAvailable
+            RuntimeAvailable = metadata.Frontend.RuntimeAvailable,
+            RuntimeDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc
         };
         app.Backend = new Models.AppComponentOwnershipModel
         {
             SourceAvailable = metadata.Backend.SourceAvailable,
+            SourceModifiedAtUtc = metadata.Backend.SourceModifiedAtUtc,
             RuntimeSource = metadata.Backend.RuntimeSource,
-            RuntimeAvailable = metadata.Backend.RuntimeAvailable
+            RuntimeAvailable = metadata.Backend.RuntimeAvailable,
+            RuntimeDeployedAtUtc = metadata.Backend.RuntimeDeployedAtUtc
         };
         app.SourceAvailable = app.Frontend.SourceAvailable || app.Backend.SourceAvailable;
         app.RuntimeSource = app.Frontend.RuntimeSource == app.Backend.RuntimeSource

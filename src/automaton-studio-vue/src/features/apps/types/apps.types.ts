@@ -93,8 +93,10 @@ export interface App {
 
 export interface AppComponentOwnership {
   sourceAvailable: boolean
+  sourceModifiedAtUtc?: string | null
   runtimeSource: AppRuntimeSource
   runtimeAvailable: boolean
+  runtimeDeployedAtUtc?: string | null
 }
 
 export const AppDevelopmentMode = {

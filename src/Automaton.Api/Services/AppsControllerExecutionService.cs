@@ -172,14 +172,23 @@ public class AppsControllerExecutionService
 
         if (result.Success)
         {
+            var deployedAtUtc = DateTime.UtcNow;
             await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
             {
                 metadata.DevelopmentMode = AppDevelopmentModes.Local;
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.CliBuild;
-                metadata.Frontend.RuntimeAvailable = result.RuntimeFilesDeployed > 0 || metadata.Frontend.RuntimeAvailable;
+                metadata.Frontend.RuntimeAvailable = metadata.Frontend.SourceAvailable || metadata.Frontend.RuntimeAvailable;
+                if (metadata.Frontend.RuntimeAvailable)
+                {
+                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
                 metadata.Backend.RuntimeSource = AppRuntimeSources.CliDeploy;
-                metadata.Backend.RuntimeAvailable = result.RuntimeFilesDeployed > 0 || metadata.Backend.RuntimeAvailable;
+                metadata.Backend.RuntimeAvailable = metadata.Backend.SourceAvailable || metadata.Backend.RuntimeAvailable;
+                if (metadata.Backend.RuntimeAvailable)
+                {
+                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
             });
         }
 
@@ -202,6 +211,7 @@ public class AppsControllerExecutionService
     {
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
         var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var deployedAtUtc = DateTime.UtcNow;
 
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
@@ -210,11 +220,19 @@ public class AppsControllerExecutionService
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
+                if (frontendSync.Updated)
+                {
+                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
             }
             if (metadata.Backend.SourceAvailable)
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
+                if (backendSync.Updated)
+                {
+                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
             }
         });
 
@@ -228,13 +246,16 @@ public class AppsControllerExecutionService
             FrontendAction = frontendSync.Updated ? "updated" : "preserved",
             BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
-            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}"
+            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
+            FrontendRuntimeDeployedAtUtc = frontendSync.Updated ? deployedAtUtc : null,
+            BackendRuntimeDeployedAtUtc = backendSync.Updated ? deployedAtUtc : null
         };
     }
 
     public async Task<DeployAppResponse> DeployFrontendAsync(Guid appId, Guid ownerId)
     {
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+        var deployedAtUtc = DateTime.UtcNow;
 
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
@@ -243,6 +264,10 @@ public class AppsControllerExecutionService
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
+                if (frontendSync.Updated)
+                {
+                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
             }
         });
 
@@ -253,13 +278,15 @@ public class AppsControllerExecutionService
             BackendFilesSynced = 0,
             FrontendAction = frontendSync.Updated ? "updated" : "preserved",
             BackendAction = "preserved",
-            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files"
+            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files",
+            FrontendRuntimeDeployedAtUtc = frontendSync.Updated ? deployedAtUtc : null
         };
     }
 
     public async Task<DeployAppResponse> DeployBackendComponentAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
     {
         var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+        var deployedAtUtc = DateTime.UtcNow;
 
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
@@ -268,6 +295,10 @@ public class AppsControllerExecutionService
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
+                if (backendSync.Updated)
+                {
+                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
             }
         });
 
@@ -281,7 +312,8 @@ public class AppsControllerExecutionService
             FrontendAction = "preserved",
             BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
-            Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}"
+            Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
+            BackendRuntimeDeployedAtUtc = backendSync.Updated ? deployedAtUtc : null
         };
     }
 

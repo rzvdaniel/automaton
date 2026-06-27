@@ -133,6 +133,50 @@ const applicationStatusTone = computed(() => {
   }
 })
 
+function formatUtcTimestamp(value?: string | null): string | null {
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date)
+}
+
+const applicationRuntimeTimestampText = computed(() => {
+  const deployedAt = formatUtcTimestamp(editorStore.applicationDeployedAtUtc)
+  return deployedAt ? `Deployed at ${deployedAt}` : null
+})
+
+const applicationSourceTimestampText = computed(() => {
+  const frontendModifiedAt = formatUtcTimestamp(editorStore.frontendSourceModifiedAtUtc)
+  const backendModifiedAt = formatUtcTimestamp(editorStore.backendSourceModifiedAtUtc)
+
+  if (frontendModifiedAt && backendModifiedAt) {
+    return `Source updated at ${frontendModifiedAt} (frontend), ${backendModifiedAt} (backend)`
+  }
+
+  if (frontendModifiedAt) {
+    return `Frontend source updated at ${frontendModifiedAt}`
+  }
+
+  if (backendModifiedAt) {
+    return `Backend source updated at ${backendModifiedAt}`
+  }
+
+  return null
+})
+
 watch(
   () => route.query.settings,
   (section) => {
@@ -1265,6 +1309,18 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         >
           {{ editorStore.lastDeployError }}
         </span>
+        <span
+          v-if="applicationRuntimeTimestampText"
+          class="application-status-banner__meta"
+        >
+          {{ applicationRuntimeTimestampText }}
+        </span>
+        <span
+          v-if="editorStore.sourceChangedSinceDeploy && applicationSourceTimestampText"
+          class="application-status-banner__meta"
+        >
+          {{ applicationSourceTimestampText }}
+        </span>
       </div>
 
       <div v-if="editorStore.showsLocalLiveBanner" class="mode-banner mode-banner-live">
@@ -1637,6 +1693,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .application-status-banner__message {
   font-size: 0.9rem;
   color: var(--p-text-muted-color);
+}
+
+.application-status-banner__meta {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
 }
 
 .build-outer-splitter {

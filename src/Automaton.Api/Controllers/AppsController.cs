@@ -1705,6 +1705,19 @@ public class AppsController : BaseController
                 frontendRuntimeSource: AppRuntimeSources.CliBuild,
                 backendSourceAvailable: (await fileStorageService.GetAppStorageMetadataAsync(ownerId, id)).Backend.SourceAvailable);
 
+            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, id, metadata =>
+            {
+                var modifiedAtUtc = DateTime.UtcNow;
+                if (metadata.Frontend.SourceAvailable)
+                {
+                    metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
+                }
+                if (metadata.Backend.SourceAvailable)
+                {
+                    metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
+                }
+            });
+
             return Ok(new { success = true, written, skipped, errors });
         }
         catch (InvalidDataException)

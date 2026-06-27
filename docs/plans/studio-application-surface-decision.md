@@ -63,5 +63,6 @@ This removes multiple confusing concepts at once:
 ## Follow-Up
 
 - turn the `Application` tab into an explicit app control panel
-- refine runtime/deploy state modeling
-- retire source-preview-only backend code after no Studio surface depends on it
+- show explicit runtime deployment timestamps and source/runtime divergence state
+- keep the legacy source-preview backend isolated until no Studio editor surface depends on it
+- retire source-preview-only backend code after the new Application flow is fully stable

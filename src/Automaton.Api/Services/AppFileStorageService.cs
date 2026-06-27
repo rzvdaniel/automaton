@@ -571,31 +571,34 @@ public class AppFileStorageService
     /// <summary>
     /// Write an editable source file for an app.
     /// </summary>
-    public Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)
+    public async Task WriteSourceFileAsync(Guid userId, Guid appId, string relativePath, string content)
     {
-        return WriteFileAsync(GetSourcePath(userId, appId), relativePath, content, validateExtension: true);
+        await WriteFileAsync(GetSourcePath(userId, appId), relativePath, content, validateExtension: true);
+        await MarkSourceModifiedAsync(userId, appId, relativePath);
     }
 
     /// <summary>
     /// Delete an editable source file for an app.
     /// </summary>
-    public Task DeleteSourceFileAsync(Guid userId, Guid appId, string relativePath)
+    public async Task DeleteSourceFileAsync(Guid userId, Guid appId, string relativePath)
     {
-        return DeleteFileAsync(GetSourcePath(userId, appId), relativePath);
+        await DeleteFileAsync(GetSourcePath(userId, appId), relativePath);
+        await MarkSourceModifiedAsync(userId, appId, relativePath);
     }
 
     /// <summary>
     /// Delete an editable source directory for an app.
     /// </summary>
-    public Task DeleteSourceDirectoryAsync(Guid userId, Guid appId, string relativePath)
+    public async Task DeleteSourceDirectoryAsync(Guid userId, Guid appId, string relativePath)
     {
-        return DeleteDirectoryAsync(GetSourcePath(userId, appId), relativePath);
+        await DeleteDirectoryAsync(GetSourcePath(userId, appId), relativePath);
+        await MarkSourceModifiedAsync(userId, appId, relativePath);
     }
 
     /// <summary>
     /// Remove all editable source files while preserving live files and versions.
     /// </summary>
-    public Task ClearSourceAsync(Guid userId, Guid appId)
+    public async Task ClearSourceAsync(Guid userId, Guid appId)
     {
         var sourcePath = GetSourcePath(userId, appId);
         if (Directory.Exists(sourcePath))
@@ -604,7 +607,11 @@ public class AppFileStorageService
         }
 
         Directory.CreateDirectory(sourcePath);
-        return Task.CompletedTask;
+        await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
+        {
+            metadata.Frontend.SourceModifiedAtUtc = DateTime.UtcNow;
+            metadata.Backend.SourceModifiedAtUtc = DateTime.UtcNow;
+        });
     }
 
     /// <summary>
@@ -700,7 +707,7 @@ public class AppFileStorageService
     /// <summary>
     /// Remove all deployed frontend live files while preserving source, backend live files, and versions.
     /// </summary>
-    public Task ClearFrontendRuntimeAsync(Guid userId, Guid appId)
+    public async Task ClearFrontendRuntimeAsync(Guid userId, Guid appId)
     {
         var runtimePath = GetLiveFrontendPath(userId, appId);
         if (Directory.Exists(runtimePath))
@@ -709,7 +716,11 @@ public class AppFileStorageService
         }
 
         Directory.CreateDirectory(runtimePath);
-        return Task.CompletedTask;
+        await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
+        {
+            metadata.Frontend.RuntimeAvailable = false;
+            metadata.Frontend.RuntimeDeployedAtUtc = null;
+        });
     }
 
     /// <summary>
@@ -835,7 +846,7 @@ public class AppFileStorageService
     /// <summary>
     /// Remove all deployed backend live files while preserving source, frontend live files, and versions.
     /// </summary>
-    public Task ClearRuntimeBackendAsync(Guid userId, Guid appId)
+    public async Task ClearRuntimeBackendAsync(Guid userId, Guid appId)
     {
         var runtimePath = GetLiveBackendPath(userId, appId);
         if (Directory.Exists(runtimePath))
@@ -844,7 +855,11 @@ public class AppFileStorageService
         }
 
         Directory.CreateDirectory(runtimePath);
-        return Task.CompletedTask;
+        await UpdateAppStorageMetadataAsync(userId, appId, metadata =>
+        {
+            metadata.Backend.RuntimeAvailable = false;
+            metadata.Backend.RuntimeDeployedAtUtc = null;
+        });
     }
 
     /// <summary>
@@ -895,6 +910,29 @@ public class AppFileStorageService
     public bool HasBackendRuntimeEntries(Guid userId, Guid appId)
     {
         return HasAnyEntries(GetLiveBackendPath(userId, appId));
+    }
+
+    private Task MarkSourceModifiedAsync(Guid userId, Guid appId, string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        var modifiedAtUtc = DateTime.UtcNow;
+
+        return UpdateAppStorageMetadataAsync(userId, appId, metadata =>
+        {
+            if (normalized.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase))
+            {
+                metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
+            }
+            else if (normalized.StartsWith("backend/", StringComparison.OrdinalIgnoreCase))
+            {
+                metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
+            }
+            else
+            {
+                metadata.Frontend.SourceModifiedAtUtc = modifiedAtUtc;
+                metadata.Backend.SourceModifiedAtUtc = modifiedAtUtc;
+            }
+        });
     }
 
     private static bool HasAnyEntries(string path)

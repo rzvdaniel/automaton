@@ -2,7 +2,7 @@
  * Apps service for API calls
  * Connects to ASP.NET backend apps endpoints
  */
-import apiClient, { tokenStorage } from '@/shared/services/api/axios-instance'
+import apiClient from '@/shared/services/api/axios-instance'
 import type {
   App,
   AppScreenshot,
@@ -23,7 +23,6 @@ import type {
   ForkAppSource,
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
-import { buildPreviewApiScript } from '../utils/preview-api-script'
 
 class AppsService {
   private readonly internalRootFilePaths = new Set([
@@ -711,75 +710,6 @@ class AppsService {
   }
 
   /**
-   * Get preview HTML for an app (with automatonApi.js injected)
-   * Returns the app HTML with the Automaton API script injected
-   * The preview makes direct fetch calls to the backend with the auth token
-   */
-  async getPreviewHtml(
-    id: string,
-    rawHtml?: string,
-    testRunId?: string,
-    useMockBackend = true,
-  ): Promise<string> {
-    const app = await this.get(id)
-    let html = rawHtml || app.definition?.htmlContent || '<!DOCTYPE html><html lang="en"><head></head><body></body></html>'
-
-    // Get current auth token and base URL for injection
-    const token = tokenStorage.getAccessToken() || ''
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-
-    // Strip any existing automatonApi injection to prevent double-injection issues.
-    // Old injections used a plain <script> tag (no id), newer ones use id="__automaton_api__".
-    html = html.replace(/<script\b[^>]*>[\s\S]*?\(function\s*\(\s*window\s*,\s*APP_(?:ID|SLUG)\b[\s\S]*?<\/script>/gi, '')
-
-    // Inject preview API that makes direct fetch calls
-    const resolvedTestRunId = testRunId || `preview-${id}-${Date.now()}`
-    const previewScript = buildPreviewApiScript(
-      id,
-      baseUrl,
-      token,
-      resolvedTestRunId,
-      useMockBackend,
-    )
-
-    // Inject base tag for resolving relative paths to app files in preview
-    const appBaseUrl = `${baseUrl}/app-preview/${app.userId}/${id}/`
-    const baseTag = `<base href="${appBaseUrl}">`
-
-    // Vite production builds often emit root-absolute asset URLs like "/assets/...".
-    // In preview those must resolve under /app-preview/{userId}/{appId}/ rather than site root.
-    html = html.replace(
-      /\b(href|src)=["']\/(?!\/)([^"']+)["']/gi,
-      (_, attr: string, assetPath: string) => `${attr}="${assetPath}"`,
-    )
-
-    // Add cache-busting to CSS and JS references to ensure changes are immediately visible
-    const cacheBuster = Date.now()
-    html = html.replace(
-      /(<link[^>]+href=["'])([^"'?]+\.css)(["'])/gi,
-      `$1$2?v=${cacheBuster}$3`
-    )
-    html = html.replace(
-      /(<script[^>]+src=["'])([^"'?]+\.js)(["'])/gi,
-      `$1$2?v=${cacheBuster}$3`
-    )
-
-    // Inject both base tag and script at the start of <head> if exists, otherwise prepend
-    if (html.includes('<head>')) {
-      const headIndex = html.indexOf('<head>') + 6
-      return html.slice(0, headIndex) + baseTag + previewScript + html.slice(headIndex)
-    } else if (html.includes('<body')) {
-      const bodyMatch = html.match(/<body[^>]*>/)
-      if (bodyMatch) {
-        const bodyIndex = html.indexOf(bodyMatch[0]) + bodyMatch[0].length
-        return html.slice(0, bodyIndex) + baseTag + previewScript + html.slice(bodyIndex)
-      }
-    }
-
-    return baseTag + previewScript + html
-  }
-
-  /**
    * Get version history for an app with pagination
    * GET /api/apps/{appId}/versions
    */
@@ -823,14 +753,6 @@ class AppsService {
       {}
     )
     return data
-  }
-
-  /**
-   * Upload preview content to the server for HTTP-based preview
-   * POST /api/apps/{id}/preview
-   */
-  async uploadPreviewContent(id: string, html: string, files?: Record<string, string>): Promise<void> {
-    await apiClient.post(`/api/apps/${id}/preview`, { html, files })
   }
 
   /**

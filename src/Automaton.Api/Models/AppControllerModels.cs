@@ -57,6 +57,8 @@ public class DeployAppResponse
     public string BackendAction { get; set; } = "preserved";
     public DeployBackendResponse BackendDeploy { get; set; } = new();
     public string? Message { get; set; }
+    public DateTime? FrontendRuntimeDeployedAtUtc { get; set; }
+    public DateTime? BackendRuntimeDeployedAtUtc { get; set; }
 }
 
 // ── Execution request/response models ────────────────────────────────────────
