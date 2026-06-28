@@ -1295,7 +1295,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :can-deploy-frontend-from-studio="editorStore.canDeployFrontendFromStudio"
         :is-deploying-app="editorStore.isDeployingApp"
         :is-deploying-backend="editorStore.isDeployingBackend"
-        :is-assistant-open="isRightPanelOpen"
         @back="handleBack"
         @update:editing-name="editingName = $event"
         @start-editing="startEditingName"
@@ -1315,7 +1314,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @copy-public-link="copyPublicAppLink"
         @open-publishing-settings="openPublishingSettings"
         @unpublish="handleUnpublish"
-        @toggle-assistant="toggleAssistantPanel"
       />
       <div v-if="activeTab === 'build'" class="application-status-banner">
         <span class="application-status-banner__label">Application</span>
@@ -1487,6 +1485,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               <SplitterPanel :size="rightPanelSize" :min-size="15" class="splitter-panel">
                 <div class="right-panel-container" :class="{ 'no-pointer-events': isResizing }">
                   <div class="right-panel-header">
+                    <button class="right-panel-close" type="button" aria-label="Collapse AI Assistant" @click="toggleAssistantPanel">
+                      <i class="pi pi-angle-right"></i>
+                    </button>
                     <button
                       class="right-panel-tab"
                       :class="{ active: rightPanelMode === 'aiAssistant' }"
@@ -1494,9 +1495,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                     >
                       <i class="pi pi-sparkles"></i>
                       <span>AI Assistant</span>
-                    </button>
-                    <button class="right-panel-close" type="button" aria-label="Collapse AI Assistant" @click="toggleAssistantPanel">
-                      <i class="pi pi-angle-right"></i>
                     </button>
                   </div>
                   <div class="ai-sidebar">
@@ -1613,7 +1611,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
               <button class="assistant-collapsed-rail" type="button" aria-label="Open AI Assistant" @click="openAssistantPanel">
                 <i class="pi pi-sparkles"></i>
-                <span>Assistant</span>
+                <span>AI</span>
               </button>
             </div>
           </div>
@@ -1726,11 +1724,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .right-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
-  padding-right: 0.5rem;
 }
 
 .right-panel-tab {
@@ -1770,11 +1767,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   width: 2rem;
   height: 2rem;
   border: none;
-  border-radius: 999px;
+  border-radius: 0.5rem;
   background: transparent;
   color: var(--p-text-muted-color);
   cursor: pointer;
   transition: all 0.15s ease;
+  margin-left: 0.5rem;
 }
 
 .right-panel-close:hover {
@@ -2015,9 +2013,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  width: 2.75rem;
-  min-width: 2.75rem;
+  gap: 0.35rem;
+  width: 2.1rem;
+  min-width: 2.1rem;
   border: 0;
   border-left: 1px solid var(--p-surface-200);
   background:
@@ -2036,15 +2034,15 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 }
 
 .assistant-collapsed-rail i {
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .assistant-collapsed-rail span {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -2147,8 +2145,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 @media (max-width: 1100px) {
   .assistant-collapsed-rail {
-    width: 2.5rem;
-    min-width: 2.5rem;
+    width: 2rem;
+    min-width: 2rem;
   }
 }
 

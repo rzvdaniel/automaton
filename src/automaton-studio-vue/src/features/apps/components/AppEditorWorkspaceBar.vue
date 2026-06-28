@@ -27,7 +27,6 @@ const props = defineProps<{
   canDeployFrontendFromStudio: boolean
   isDeployingApp: boolean
   isDeployingBackend: boolean
-  isAssistantOpen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -50,7 +49,6 @@ const emit = defineEmits<{
   copyPublicLink: []
   openPublishingSettings: []
   unpublish: []
-  toggleAssistant: []
 }>()
 
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -218,17 +216,6 @@ function handlePrimaryAction() {
         text
         severity="secondary"
         @click="emit('preview')"
-      />
-
-      <Button
-        v-if="showsEditorActions"
-        icon="pi pi-sparkles"
-        text
-        :severity="isAssistantOpen ? 'contrast' : 'secondary'"
-        rounded
-        aria-label="Toggle AI Assistant"
-        v-tooltip.bottom="isAssistantOpen ? 'Hide AI Assistant' : 'Show AI Assistant'"
-        @click="emit('toggleAssistant')"
       />
 
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
