@@ -177,6 +177,8 @@ For AI-generated local apps:
 - Keep app-local URLs relative. Avoid root-relative paths such as `/assets/...`, `/manifest.webmanifest`, `/favicon.ico`, or `/sw.js`.
 - Keep Vite hashed asset filenames. Do not manually rewrite deployed HTML for cache busting.
 - Do not hardcode `automaton-config.js`, `automaton-api.js`, or other Automaton runtime script tags. Automaton injects runtime scripts at publish time.
+- Keep frontend console logging minimal. Use `console.warn(...)` and `console.error(...)` for meaningful issues, not noisy `console.log(...)` traces throughout the app.
+- Never log sensitive frontend data such as tokens, passwords, cookies, session values, or raw personal input.
 
 Only files inside `frontend.deployDir` become public runtime. Do not expect `frontend/src/`, `frontend/package.json`, `frontend/vite.config.*`, `backend/`, or local project files to appear in the public app.
 
@@ -220,6 +222,14 @@ Every action must return exactly:
 {"success": True,  "data": <payload>, "error": ""}   # success
 {"success": False, "data": None,      "error": "..."}  # failure
 ```
+
+Backend diagnostics guidance for AI-generated apps:
+
+- Add a small amount of useful backend logging around meaningful actions and error paths so Backend Runtime in Studio helps users understand what the app is doing.
+- Use normal language logging where appropriate; for simple Python controller apps, plain `print(...)` is acceptable because Automaton captures stdout.
+- Log startup/setup, important create/update/delete actions, validation failures, external API failures, database failures, and unexpected exceptions.
+- Do not log secrets, tokens, passwords, API keys, cookies, session values, or full sensitive payloads.
+- Do not log every tiny internal step or every successful read unless it materially helps debugging.
 
 For persistent backend files:
 

@@ -59,6 +59,8 @@ automaton deploy
 - Default to frontend-only unless the requested feature truly needs backend execution.
 - If backend behavior is required, use Automaton Python controllers under `backend/`.
 - Do not create FastAPI, Flask, Express, or custom HTTP servers inside an Automaton backend.
+- Add a small amount of useful backend logging around meaningful actions and error paths. For simple Python controllers, plain `print(...)` is acceptable because Automaton captures stdout in Studio.
+- Keep frontend console logging minimal. Prefer `console.warn(...)` and `console.error(...)` for real issues, and never log secrets or sensitive user data.
 - Do not say the app is done until `automaton deploy` succeeds.
 
 ## Publishing rules
