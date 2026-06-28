@@ -77,6 +77,7 @@ public class AppExecutionLogService : IAppExecutionLogService
                 ActionName = l.ActionName,
                 RequestPayload = l.RequestPayload,
                 ResponsePayload = l.ResponsePayload,
+                RuntimeEvents = AppRuntimeLogEventParser.Parse(l.ResponsePayload, l.CreatedAt),
                 Success = l.Success,
                 ErrorMessage = l.ErrorMessage,
                 DurationMs = l.DurationMs,

@@ -95,7 +95,7 @@ function handleSplitterResizing(): void {
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
 const isAdvancedExpanded = ref(true)
-const activeLogTab = ref<'ui-logs' | 'backend-logs'>('ui-logs')
+const activeLogTab = ref<'ui-logs' | 'backend-logs'>('backend-logs')
 
 // Backend connection status
 const backendConnected = computed(() => !!props.runnerId)
@@ -416,14 +416,15 @@ async function refreshApplication(): Promise<void> {
           <span class="text-sm text-color-secondary">Resizing logs...</span>
         </div>
         <div v-else class="logs-tabbed-container">
+          <div class="logs-console-title">Runtime Console</div>
           <div class="logs-tab-bar">
             <button
               class="logs-tab"
               :class="{ active: activeLogTab === 'ui-logs' }"
               @click="activeLogTab = 'ui-logs'"
             >
-              <i class="pi pi-wave-pulse"></i>
-              Live UI Logs
+              <i class="pi pi-desktop"></i>
+              Frontend
             </button>
             <button
               class="logs-tab"
@@ -431,7 +432,7 @@ async function refreshApplication(): Promise<void> {
               @click="activeLogTab = 'backend-logs'"
             >
               <i class="pi pi-server"></i>
-              Live Backend Logs
+              Backend
               <span v-if="editorStore.consoleEntries.length > 0" class="logs-tab-badge">{{ editorStore.consoleEntries.length }}</span>
             </button>
           </div>
@@ -838,6 +839,16 @@ async function refreshApplication(): Promise<void> {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+
+.logs-console-title {
+  padding: 0.45rem 0.85rem 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+  flex-shrink: 0;
 }
 
 .logs-tab-bar {

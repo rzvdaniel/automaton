@@ -10,7 +10,7 @@ const editorStore = useAppEditorStore()
 const filterOptions = [
   { label: 'All', value: UiLogFilter.All },
   { label: 'Errors', value: UiLogFilter.Errors },
-  { label: 'Console', value: UiLogFilter.Console },
+  { label: 'Frontend', value: UiLogFilter.Console },
   { label: 'Runtime', value: UiLogFilter.Runtime },
 ]
 
@@ -40,7 +40,7 @@ function formatTime(date: Date): string {
 }
 
 function sourceLabel(source: string): string {
-  if (source === 'application-console') return 'Console'
+  if (source === 'application-console') return 'Frontend'
   if (source === 'application-network') return 'Network'
   return 'Runtime'
 }
@@ -93,7 +93,7 @@ function downloadLogsAsJson(): void {
     <div class="live-logs-header">
       <div class="flex align-items-center gap-2">
         <i class="pi pi-wave-pulse text-color-secondary"></i>
-        <span class="font-semibold">Live UI Logs</span>
+        <span class="font-semibold">Frontend Runtime</span>
         <Tag :value="editorStore.uiLogEntries.length.toString()" severity="secondary" rounded />
       </div>
       <div class="flex align-items-center gap-2">
@@ -136,7 +136,7 @@ function downloadLogsAsJson(): void {
 
     <div class="live-logs-content">
       <div v-if="entries.length === 0" class="empty-state">
-        <span class="text-color-secondary text-sm">No live logs yet</span>
+        <span class="text-color-secondary text-sm">No frontend runtime logs yet</span>
       </div>
       <div v-else class="entries">
         <div

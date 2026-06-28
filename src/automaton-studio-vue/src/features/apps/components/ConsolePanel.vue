@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * ConsolePanel.vue
- * Displays step execution results from the running application and AI testing
+ * Displays backend runtime action results from the running application and AI testing.
  */
 import { computed } from 'vue'
 import Button from 'primevue/button'
@@ -66,7 +66,7 @@ function clearConsole(): void {
     <div class="console-header">
       <div class="flex align-items-center gap-2">
         <i class="pi pi-terminal text-color-secondary"></i>
-        <span class="font-semibold">Live Backend Logs</span>
+        <span class="font-semibold">Backend Runtime</span>
         <Tag v-if="hasEntries" :value="entries.length.toString()" severity="secondary" rounded />
       </div>
       <Button

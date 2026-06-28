@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * AppRuntimeLogs.vue
- * Shows controller execution logs for the current app (runtime diagnostics).
+ * Shows backend runtime action logs for the current app.
  */
 import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
@@ -89,6 +89,10 @@ function tryFormatJson(raw?: string): string {
   }
 }
 
+function formatRuntimeEvent(event: { level: string; message: string }): string {
+  return `${event.level.toUpperCase()} ${event.message}`
+}
+
 onMounted(loadLogs)
 watch(() => props.appId, loadLogs)
 
@@ -148,8 +152,8 @@ defineExpose({ loadLogs })
     <!-- Empty -->
     <div v-else-if="logs.length === 0" class="empty-state">
       <i class="pi pi-server text-4xl text-color-secondary mb-2"></i>
-      <p class="text-color-secondary">No execution logs yet.</p>
-      <p class="text-color-secondary text-sm">Logs appear after your published app's controllers are called.</p>
+      <p class="text-color-secondary">No runtime logs yet.</p>
+      <p class="text-color-secondary text-sm">Logs appear after the running application triggers backend actions.</p>
     </div>
 
     <!-- Log list -->
@@ -197,6 +201,10 @@ defineExpose({ loadLogs })
           <div v-if="log.responsePayload" class="detail-section">
             <div class="detail-label">Response</div>
             <pre class="detail-code">{{ tryFormatJson(log.responsePayload) }}</pre>
+          </div>
+          <div v-if="log.runtimeEvents.length > 0" class="detail-section">
+            <div class="detail-label">Backend Output</div>
+            <pre class="detail-code">{{ log.runtimeEvents.map(formatRuntimeEvent).join('\n') }}</pre>
           </div>
           <div class="detail-meta">
             <span v-if="log.ipAddress">IP: {{ log.ipAddress }}</span>

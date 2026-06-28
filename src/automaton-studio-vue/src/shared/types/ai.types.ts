@@ -390,12 +390,21 @@ export interface AppExecutionLog {
   actionName: string
   requestPayload?: string
   responsePayload?: string
+  runtimeEvents: AppRuntimeLogEvent[]
   success: boolean
   errorMessage?: string
   durationMs: number
   userId?: string
   ipAddress?: string
   createdAt: string
+}
+
+export interface AppRuntimeLogEvent {
+  timestamp: string
+  level: string
+  message: string
+  source: string
+  stream: string
 }
 
 export interface AppExecutionLogPage {
