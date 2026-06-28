@@ -249,7 +249,7 @@ async function copyPrivateUrl() {
     toast.add({
       severity: 'success',
       summary: 'Copied',
-      detail: 'Studio application URL copied to clipboard',
+      detail: 'Authenticated application URL copied to clipboard',
       life: 2000,
     })
   } catch {
@@ -721,7 +721,7 @@ async function handleSaveTemplateStatus() {
               </div>
 
               <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Studio Application URL</label>
+                <label class="font-medium">Authenticated Application URL</label>
                 <div class="p-inputgroup url-inputgroup">
                   <InputText :model-value="studioApplicationUrl" readonly />
                   <Button
@@ -740,12 +740,12 @@ async function handleSaveTemplateStatus() {
                   />
                 </div>
                 <small class="text-color-secondary">
-                  Opens the unpublished application inside Studio using your authenticated session.
+                  Opens the running application in a clean tab using your authenticated Studio session.
                 </small>
               </div>
 
               <div v-else-if="studioApplicationUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Studio Application URL</label>
+                <label class="font-medium">Authenticated Application URL</label>
                 <div class="p-inputgroup url-inputgroup">
                   <InputText :model-value="studioApplicationUrl" readonly />
                   <Button
@@ -764,7 +764,7 @@ async function handleSaveTemplateStatus() {
                   />
                 </div>
                 <small class="text-color-secondary">
-                  Unpublished apps are accessible only inside Studio.
+                  Unpublished apps open only for logged-in users with access to this app.
                 </small>
               </div>
 

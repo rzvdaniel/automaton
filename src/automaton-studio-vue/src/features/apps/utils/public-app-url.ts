@@ -39,6 +39,8 @@ export function getStudioAppUrl(appId?: string | null): string {
   const normalizedAppId = appId?.trim()
   if (!normalizedAppId) return ''
 
+  const sameOriginStudioUrl = `${window.location.origin.replace(/\/+$/, '')}/apps/${encodeURIComponent(normalizedAppId)}`
+
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
   if (apiBaseUrl) {
     try {
@@ -52,18 +54,14 @@ export function getStudioAppUrl(appId?: string | null): string {
       }
 
       if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-        parsed.port = '5173'
-        parsed.pathname = `/apps/${encodeURIComponent(normalizedAppId)}`
-        parsed.search = ''
-        parsed.hash = ''
-        return parsed.toString().replace(/\/+$/, '')
+        return sameOriginStudioUrl
       }
     } catch {
       // fall through to same-origin studio path
     }
   }
 
-  return `${window.location.origin.replace(/\/+$/, '')}/apps/${encodeURIComponent(normalizedAppId)}`
+  return sameOriginStudioUrl
 }
 
 export function getStudioApplicationUrl(appId?: string | null): string {

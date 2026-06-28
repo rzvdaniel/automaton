@@ -146,7 +146,6 @@ function truncateLogMessage(message: string, maxChars: number): string {
 function getApplicationIframe(): HTMLIFrameElement | null {
   return (
     document.querySelector<HTMLIFrameElement>('.build-visual-workspace .application-iframe')
-    ?? document.querySelector<HTMLIFrameElement>('.application-overlay .application-iframe')
   )
 }
 

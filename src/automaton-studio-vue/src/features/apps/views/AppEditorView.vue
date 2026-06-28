@@ -3,7 +3,6 @@
  * AppEditorView.vue
  * Main Visual IDE for editing apps
  * Editor-first layout with on-demand AI assistant
- * Application opens as full-screen overlay
  */
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -17,7 +16,6 @@ import { useToast } from 'primevue/usetoast'
 // Import components
 import FileTree from '../components/FileTree.vue'
 import AiAssistant from '../components/AiAssistant.vue'
-import ApplicationOverlay from '../components/ApplicationOverlay.vue'
 import PublishDialog from '../components/PublishDialog.vue'
 import CreateFileDialog from '../components/CreateFileDialog.vue'
 import StatusBar from '../components/StatusBar.vue'
@@ -637,6 +635,15 @@ function getPublicAppUrl(): string {
   return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
 }
 
+function openApplicationInNewTab(): void {
+  const url = getPrivateAppUrl()
+  if (!url) {
+    return
+  }
+
+  window.open(url, '_blank', 'noopener')
+}
+
 async function copyUrl(label: string, url: string) {
   if (!url) {
     return
@@ -844,7 +851,7 @@ function openPrivateApp() {
 }
 
 async function copyPrivateAppLink() {
-  await copyUrl('Studio application URL', getPrivateAppUrl())
+  await copyUrl('Authenticated application URL', getPrivateAppUrl())
 }
 
 async function copyPublicAppLink() {
@@ -1265,7 +1272,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
-        @preview="editorStore.openApplicationOverlay()"
+        @preview="openApplicationInNewTab()"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"
         @deploy-backend="handleDeployBackend"
@@ -1597,8 +1604,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       <!-- Status Bar -->
       <StatusBar />
 
-      <!-- Full-screen Preview Overlay -->
-      <ApplicationOverlay v-if="editorStore.showApplicationOverlay" />
     </template>
 
     <!-- Error state -->

@@ -76,9 +76,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Error state
   const error = ref<string | null>(null)
 
-  // Preview overlay visibility (full-screen preview)
-  const showApplicationOverlay = ref(false)
-
   // Console entries for step execution results
   const consoleEntries = ref<ConsoleEntry[]>([])
   const uiLogEntries = ref<UiLogEntry[]>([])
@@ -1040,30 +1037,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   /**
-   * Toggle application overlay visibility
-   */
-  function toggleApplicationOverlay(): void {
-    showApplicationOverlay.value = !showApplicationOverlay.value
-  }
-
-  /**
-   * Open application overlay — always refreshes so the latest saved files are shown.
-   */
-  function openApplicationOverlay(): void {
-    showApplicationOverlay.value = true
-    if (currentApp.value) {
-      void refreshApplication()
-    }
-  }
-
-  /**
-   * Close application overlay
-   */
-  function closeApplicationOverlay(): void {
-    showApplicationOverlay.value = false
-  }
-
-  /**
    * Add a console entry for step execution result
    */
   function addConsoleEntry(entry: ConsoleEntry): void {
@@ -1133,7 +1106,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isSaving.value = false
     isLoadingApplication.value = false
     error.value = null
-    showApplicationOverlay.value = false
     consoleEntries.value = []
     uiLogEntries.value = []
     uiLogFingerprintWindow.value = []
@@ -1177,7 +1149,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isDeployingApp,
     isDeployingBackend,
     error,
-    showApplicationOverlay,
     consoleEntries,
     uiLogEntries,
     uiLogFilter,
@@ -1236,9 +1207,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     reloadFile,
     reloadActiveFile,
     refreshFilesAfterAiUpdate,
-    toggleApplicationOverlay,
-    openApplicationOverlay,
-    closeApplicationOverlay,
     addConsoleEntry,
     clearConsole,
     addUiLogEntry,

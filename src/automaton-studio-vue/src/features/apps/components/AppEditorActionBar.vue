@@ -196,7 +196,7 @@ function formatTokenCount(count: number): string {
 
       <Button
         v-if="activeTab !== 'services'"
-        v-tooltip.bottom="'Open full-screen application view'"
+        v-tooltip.bottom="'Open the running application in a new tab'"
         icon="pi pi-desktop"
         label="Application"
         outlined
