@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
@@ -26,9 +26,6 @@ const props = defineProps<{
   isDeployingApp: boolean
   isDeployingBackend: boolean
   applicationState: 'Deployed' | 'Source changed' | 'Build failed' | 'Runner offline' | 'Not deployed'
-  applicationStatusMessage: string | null
-  applicationRuntimeTimestampText: string | null
-  applicationSourceTimestampText: string | null
   sourceChangedSinceDeploy: boolean
 }>()
 
@@ -52,6 +49,8 @@ const emit = defineEmits<{
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 const statusPopover = ref<InstanceType<typeof Popover> | null>(null)
+const isStatusDetailsOpen = ref(false)
+let statusAutoCollapseTimer: number | null = null
 
 const showsEditorActions = computed(() =>
   props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
@@ -79,9 +78,13 @@ const isPrimaryActionDisabled = computed(() => {
 })
 
 const statusUi = computed(() => {
+  if (props.isDeployingApp) {
+    return { icon: 'pi pi-spin pi-spinner', severity: 'info' as const, shortLabel: 'Deploying' }
+  }
+
   switch (props.applicationState) {
     case 'Deployed':
-      return { icon: props.isDeployingApp ? 'pi pi-spin pi-spinner' : 'pi pi-check-circle', severity: 'success' as const, shortLabel: '' }
+      return { icon: 'pi pi-check-circle', severity: 'success' as const, shortLabel: 'Everything deployed' }
     case 'Source changed':
       return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, shortLabel: 'Source changed' }
     case 'Build failed':
@@ -93,7 +96,126 @@ const statusUi = computed(() => {
   }
 })
 
-const showStatusText = computed(() => props.applicationState !== 'Deployed')
+const statusDotClass = computed(() => `status-dot status-dot--${statusUi.value.severity}`)
+const statusSummary = computed(() => {
+  if (props.isDeployingApp) {
+    return { icon: 'pi pi-spin pi-spinner', severity: 'info' as const, label: 'Deploying' }
+  }
+
+  if (props.applicationState === 'Deployed') {
+    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Healthy' }
+  }
+
+  if (props.applicationState === 'Source changed') {
+    return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Ready to deploy' }
+  }
+
+  if (props.applicationState === 'Build failed') {
+    return { icon: 'pi pi-times-circle', severity: 'danger' as const, label: 'Build failed' }
+  }
+
+  if (props.applicationState === 'Runner offline') {
+    return { icon: 'pi pi-ban', severity: 'contrast' as const, label: 'Runner offline' }
+  }
+
+  return { icon: statusUi.value.icon, severity: statusUi.value.severity, label: 'Not deployed' }
+})
+
+const runnerStatus = computed(() => {
+  if (props.applicationState === 'Runner offline') {
+    return { icon: 'pi pi-times-circle', severity: 'danger' as const, label: 'Runner offline' }
+  }
+
+  return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Runner connected' }
+})
+
+const deploymentStatus = computed(() => {
+  if (props.isDeployingApp) {
+    return { icon: 'pi pi-spin pi-spinner', severity: 'info' as const, label: 'Deployment in progress' }
+  }
+
+  if (props.applicationState === 'Source changed') {
+    return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Source changes pending deployment' }
+  }
+
+  if (props.applicationState === 'Build failed') {
+    return { icon: 'pi pi-times-circle', severity: 'danger' as const, label: 'Last deploy failed' }
+  }
+
+  if (props.applicationState === 'Not deployed') {
+    return { icon: 'pi pi-info-circle', severity: 'secondary' as const, label: 'Application not deployed' }
+  }
+
+  return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'No pending changes' }
+})
+
+const publishingStatus = computed(() => {
+  if (props.isPublished) {
+    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Published' }
+  }
+
+  return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Unpublished' }
+})
+
+const statusIssuesCount = computed(() => {
+  let count = 0
+
+  if (runnerStatus.value.severity !== 'success') {
+    count += 1
+  }
+
+  if (deploymentStatus.value.severity !== 'success') {
+    count += 1
+  }
+
+  if (publishingStatus.value.severity !== 'success') {
+    count += 1
+  }
+
+  return count
+})
+
+const statusIssuesLabel = computed(() => {
+  if (statusIssuesCount.value === 0) {
+    return 'No issues'
+  }
+
+  if (statusIssuesCount.value === 1) {
+    return '1 issue requires attention'
+  }
+
+  return `${statusIssuesCount.value} issues require attention`
+})
+
+const shouldAutoExpandStatusDetails = computed(() => {
+  return props.applicationState === 'Build failed' || props.applicationState === 'Runner offline'
+})
+
+const shouldAutoCollapseStatusDetails = computed(() => {
+  return statusSummary.value.label === 'Healthy'
+})
+
+function clearStatusAutoCollapseTimer() {
+  if (statusAutoCollapseTimer != null) {
+    window.clearTimeout(statusAutoCollapseTimer)
+    statusAutoCollapseTimer = null
+  }
+}
+
+function scheduleStatusAutoCollapse() {
+  clearStatusAutoCollapseTimer()
+
+  if (!shouldAutoCollapseStatusDetails.value || !isStatusDetailsOpen.value) {
+    return
+  }
+
+  statusAutoCollapseTimer = window.setTimeout(() => {
+    if (shouldAutoCollapseStatusDetails.value) {
+      isStatusDetailsOpen.value = false
+    }
+    statusAutoCollapseTimer = null
+  }, 4000)
+}
 
 function getGroupedMenuEvent(event: Event, selector: string) {
   const trigger = event.currentTarget instanceof HTMLElement
@@ -116,12 +238,39 @@ function togglePublishedMenu(event: Event) {
 }
 
 function toggleStatusPopover(event: Event) {
+  isStatusDetailsOpen.value = shouldAutoExpandStatusDetails.value
   statusPopover.value?.toggle(event)
+  scheduleStatusAutoCollapse()
+}
+
+function toggleStatusDetails() {
+  isStatusDetailsOpen.value = !isStatusDetailsOpen.value
+  scheduleStatusAutoCollapse()
 }
 
 function handlePrimaryAction() {
   emit('deployApp')
 }
+
+watch(
+  () => statusSummary.value.label,
+  () => {
+    scheduleStatusAutoCollapse()
+  },
+)
+
+watch(isStatusDetailsOpen, (isOpen) => {
+  if (isOpen) {
+    scheduleStatusAutoCollapse()
+    return
+  }
+
+  clearStatusAutoCollapseTimer()
+})
+
+onBeforeUnmount(() => {
+  clearStatusAutoCollapseTimer()
+})
 </script>
 
 <template>
@@ -151,6 +300,75 @@ function handlePrimaryAction() {
         />
         <Tag v-if="isPublished" value="Published" severity="success" />
         <Tag v-else value="Draft" severity="warn" />
+        <Button
+          v-if="showsEditorActions"
+          text
+          size="small"
+          class="status-indicator-button"
+          rounded
+          :aria-label="`Application status: ${statusUi.shortLabel}`"
+          v-tooltip.bottom="`Application status: ${statusUi.shortLabel}`"
+          @click="toggleStatusPopover"
+        >
+          <span :class="statusDotClass" aria-hidden="true"></span>
+        </Button>
+        <Popover ref="statusPopover" class="status-popover">
+          <div class="status-popover__content">
+            <div class="status-popover__title-row">
+              <div class="status-popover__eyebrow">Application Status</div>
+              <div class="status-popover__header">
+                <i :class="[statusSummary.icon, `status-popover__icon status-popover__icon--${statusSummary.severity}`]"></i>
+                <div>
+                  <div class="status-popover__title">{{ statusSummary.label }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="status-popover__summary-line">
+              {{ statusIssuesLabel }}
+            </div>
+            <button
+              type="button"
+              class="status-popover__toggle"
+              :aria-expanded="isStatusDetailsOpen"
+              @click="toggleStatusDetails"
+            >
+              <span>{{ isStatusDetailsOpen ? 'Hide details' : 'Show details' }}</span>
+              <i :class="['pi', isStatusDetailsOpen ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
+            </button>
+            <div v-if="isStatusDetailsOpen" class="status-popover__details">
+              <div class="status-popover__section">
+                <div class="status-popover__section-label">Runtime</div>
+                <div class="status-popover__item">
+                  <i :class="[runnerStatus.icon, `status-popover__icon status-popover__icon--${runnerStatus.severity}`]"></i>
+                  <span>{{ runnerStatus.label }}</span>
+                </div>
+              </div>
+              <div class="status-popover__section">
+                <div class="status-popover__section-label">Deployment</div>
+                <div class="status-popover__item">
+                  <i :class="[deploymentStatus.icon, `status-popover__icon status-popover__icon--${deploymentStatus.severity}`]"></i>
+                  <span>{{ deploymentStatus.label }}</span>
+                </div>
+              </div>
+              <div class="status-popover__section">
+                <div class="status-popover__section-label">Publishing</div>
+                <div class="status-popover__item">
+                  <i :class="[publishingStatus.icon, `status-popover__icon status-popover__icon--${publishingStatus.severity}`]"></i>
+                  <span>{{ publishingStatus.label }}</span>
+                </div>
+              </div>
+            </div>
+            <Button
+              v-if="props.applicationState !== 'Deployed'"
+              label="Deploy"
+              icon="pi pi-cloud-upload"
+              size="small"
+              :loading="props.isDeployingApp"
+              :disabled="!props.canDeployFromStudio || props.isDeployingApp"
+              @click="handlePrimaryAction"
+            />
+          </div>
+        </Popover>
       </div>
 
     </div>
@@ -164,45 +382,6 @@ function handlePrimaryAction() {
           @runners-loaded="emit('runnersLoaded', $event)"
         />
       </div>
-
-      <Button
-        v-if="showsEditorActions"
-        :icon="statusUi.icon"
-        :label="showStatusText ? statusUi.shortLabel : undefined"
-        :severity="statusUi.severity"
-        text
-        size="small"
-        class="status-indicator-button"
-        @click="toggleStatusPopover"
-      />
-      <Popover ref="statusPopover" class="status-popover">
-        <div class="status-popover__content">
-          <div class="status-popover__header">
-            <i :class="[statusUi.icon, `status-popover__icon status-popover__icon--${statusUi.severity}`]"></i>
-            <div>
-              <div class="status-popover__title">{{ props.applicationState }}</div>
-              <div v-if="props.applicationStatusMessage" class="status-popover__message">
-                {{ props.applicationStatusMessage }}
-              </div>
-            </div>
-          </div>
-          <div v-if="props.applicationRuntimeTimestampText" class="status-popover__meta">
-            {{ props.applicationRuntimeTimestampText }}
-          </div>
-          <div v-if="props.sourceChangedSinceDeploy && props.applicationSourceTimestampText" class="status-popover__meta">
-            {{ props.applicationSourceTimestampText }}
-          </div>
-          <Button
-            v-if="props.applicationState !== 'Deployed'"
-            label="Deploy now"
-            icon="pi pi-cloud-upload"
-            size="small"
-            :loading="props.isDeployingApp"
-            :disabled="!props.canDeployFromStudio || props.isDeployingApp"
-            @click="handlePrimaryAction"
-          />
-        </div>
-      </Popover>
 
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
@@ -390,7 +569,48 @@ function handlePrimaryAction() {
 }
 
 .status-indicator-button {
-  gap: 0.35rem;
+  min-width: 2.2rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+}
+
+.status-indicator-button :deep(.p-button-label) {
+  display: none;
+}
+
+.status-indicator-button :deep(.p-button-icon) {
+  display: none;
+}
+
+.status-dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  background: var(--p-text-muted-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--p-surface-0) 55%, transparent);
+}
+
+.status-dot--success {
+  background: var(--p-green-500);
+}
+
+.status-dot--warn {
+  background: var(--p-orange-500);
+}
+
+.status-dot--danger {
+  background: var(--p-red-500);
+}
+
+.status-dot--info {
+  background: var(--p-blue-500);
+  animation: status-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.status-dot--contrast,
+.status-dot--secondary {
+  background: var(--p-text-muted-color);
 }
 
 .status-popover__content {
@@ -398,6 +618,20 @@ function handlePrimaryAction() {
   flex-direction: column;
   gap: 0.85rem;
   width: min(22rem, 70vw);
+}
+
+.status-popover__title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.status-popover__eyebrow {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
 }
 
 .status-popover__header {
@@ -410,16 +644,55 @@ function handlePrimaryAction() {
   font-weight: 700;
 }
 
-.status-popover__message {
-  margin-top: 0.2rem;
+.status-popover__summary-line {
   color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
 }
 
-.status-popover__meta {
+.status-popover__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--p-primary-600);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.status-popover__toggle:hover {
+  color: var(--p-primary-500);
+}
+
+.status-popover__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.status-popover__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.status-popover__section-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--p-text-muted-color);
-  font-size: 0.82rem;
+}
+
+.status-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
 }
 
 .status-popover__icon {
@@ -436,6 +709,10 @@ function handlePrimaryAction() {
 
 .status-popover__icon--danger {
   color: var(--p-red-500);
+}
+
+.status-popover__icon--info {
+  color: var(--p-blue-500);
 }
 
 .status-popover__icon--contrast,
@@ -510,6 +787,10 @@ function handlePrimaryAction() {
   border-left-color: color-mix(in srgb, var(--p-surface-600) 75%, transparent);
 }
 
+:global(.app-dark) .status-dot {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--p-surface-900) 72%, transparent);
+}
+
 :global(.deploy-menu.p-menu) {
   min-width: 10rem;
   border: 1px solid color-mix(in srgb, var(--p-surface-300) 75%, transparent);
@@ -546,6 +827,19 @@ function handlePrimaryAction() {
 
 :global(.app-dark) .deploy-menu .p-menu-item-link:hover {
   background: var(--p-surface-800);
+}
+
+@keyframes status-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
 }
 
 @media (max-width: 1200px) {

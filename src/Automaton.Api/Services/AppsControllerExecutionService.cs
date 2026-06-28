@@ -220,19 +220,13 @@ public class AppsControllerExecutionService
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
-                if (frontendSync.Updated)
-                {
-                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
+                metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
             }
             if (metadata.Backend.SourceAvailable)
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
-                if (backendSync.Updated)
-                {
-                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
+                metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
             }
         });
 
@@ -247,8 +241,8 @@ public class AppsControllerExecutionService
             BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
             Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
-            FrontendRuntimeDeployedAtUtc = frontendSync.Updated ? deployedAtUtc : null,
-            BackendRuntimeDeployedAtUtc = backendSync.Updated ? deployedAtUtc : null
+            FrontendRuntimeDeployedAtUtc = deployedAtUtc,
+            BackendRuntimeDeployedAtUtc = deployedAtUtc
         };
     }
 
@@ -264,10 +258,7 @@ public class AppsControllerExecutionService
             {
                 metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
-                if (frontendSync.Updated)
-                {
-                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
+                metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
             }
         });
 
@@ -279,7 +270,7 @@ public class AppsControllerExecutionService
             FrontendAction = frontendSync.Updated ? "updated" : "preserved",
             BackendAction = "preserved",
             Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files",
-            FrontendRuntimeDeployedAtUtc = frontendSync.Updated ? deployedAtUtc : null
+            FrontendRuntimeDeployedAtUtc = deployedAtUtc
         };
     }
 
@@ -295,10 +286,7 @@ public class AppsControllerExecutionService
             {
                 metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
                 metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
-                if (backendSync.Updated)
-                {
-                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
+                metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
             }
         });
 
@@ -313,7 +301,7 @@ public class AppsControllerExecutionService
             BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
             Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
-            BackendRuntimeDeployedAtUtc = backendSync.Updated ? deployedAtUtc : null
+            BackendRuntimeDeployedAtUtc = deployedAtUtc
         };
     }
 

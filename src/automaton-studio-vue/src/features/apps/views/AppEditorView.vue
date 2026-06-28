@@ -116,67 +116,6 @@ const activeNavItem = computed(() => {
   return activeTab.value
 })
 
-function formatUtcTimestamp(value?: string | null): string | null {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(date)
-}
-
-const applicationRuntimeTimestampText = computed(() => {
-  const deployedAt = formatUtcTimestamp(editorStore.applicationDeployedAtUtc)
-  return deployedAt ? `Deployed at ${deployedAt}` : null
-})
-
-const applicationSourceTimestampText = computed(() => {
-  const frontendModifiedAt = formatUtcTimestamp(editorStore.frontendSourceModifiedAtUtc)
-  const backendModifiedAt = formatUtcTimestamp(editorStore.backendSourceModifiedAtUtc)
-
-  if (frontendModifiedAt && backendModifiedAt) {
-    return `Source updated at ${frontendModifiedAt} (frontend), ${backendModifiedAt} (backend)`
-  }
-
-  if (frontendModifiedAt) {
-    return `Frontend source updated at ${frontendModifiedAt}`
-  }
-
-  if (backendModifiedAt) {
-    return `Backend source updated at ${backendModifiedAt}`
-  }
-
-  return null
-})
-
-const applicationStatusMessage = computed(() => {
-  switch (editorStore.applicationState) {
-    case 'Deployed':
-      return 'Running application is up to date.'
-    case 'Source changed':
-      return 'Source changed since last deploy. Deploy to update the running application.'
-    case 'Runner offline':
-      return 'The assigned runner is offline. Runtime updates and backend execution may be unavailable until it reconnects.'
-    case 'Build failed':
-      return editorStore.lastDeployError
-    case 'Not deployed':
-      return 'Deploy this app to create the running application.'
-    default:
-      return null
-  }
-})
-
 watch(
   () => route.query.settings,
   (section) => {
@@ -1209,9 +1148,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-deploying-app="editorStore.isDeployingApp"
         :is-deploying-backend="editorStore.isDeployingBackend"
         :application-state="editorStore.applicationState"
-        :application-status-message="applicationStatusMessage"
-        :application-runtime-timestamp-text="applicationRuntimeTimestampText"
-        :application-source-timestamp-text="applicationSourceTimestampText"
         :source-changed-since-deploy="editorStore.sourceChangedSinceDeploy"
         @back="handleBack"
         @update:editing-name="editingName = $event"

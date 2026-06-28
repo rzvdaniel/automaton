@@ -55,6 +55,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   // Preview URL for iframe (HTTP-based preview)
   const applicationUrl = ref('')
   const sourceChangedSinceDeploy = ref(false)
+  const localDeployBaseline = ref<{ frontend: string | null; backend: string | null } | null>(null)
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
 
@@ -234,6 +235,39 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     return frontendChangedAfterDeploy || backendChangedAfterDeploy
   }
 
+  function hasSourceChangedSinceLocalDeploy(app: App | null): boolean {
+    if (!app || !localDeployBaseline.value) {
+      return false
+    }
+
+    const frontendChangedSinceBaseline =
+      app.frontend.sourceAvailable &&
+      compareTimestamps(app.frontend.sourceModifiedAtUtc, localDeployBaseline.value.frontend) > 0
+
+    const backendChangedSinceBaseline =
+      app.backend.sourceAvailable &&
+      compareTimestamps(app.backend.sourceModifiedAtUtc, localDeployBaseline.value.backend) > 0
+
+    return frontendChangedSinceBaseline || backendChangedSinceBaseline
+  }
+
+  function syncLocalDeployBaselineFromMetadata(): void {
+    if (!currentApp.value || hasPersistedSourceDivergence(currentApp.value)) {
+      localDeployBaseline.value = null
+      return
+    }
+
+    localDeployBaseline.value = {
+      frontend: currentApp.value.frontend.sourceModifiedAtUtc ?? null,
+      backend: currentApp.value.backend.sourceModifiedAtUtc ?? null,
+    }
+  }
+
+  function markSourceChangedAfterDeploy(): void {
+    localDeployBaseline.value = null
+    sourceChangedSinceDeploy.value = true
+  }
+
   function compareTimestamps(left?: string | null, right?: string | null): number {
     const leftMillis = toUtcMillis(left)
     const rightMillis = toUtcMillis(right)
@@ -246,10 +280,39 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   function syncSourceChangeStateFromMetadata(): void {
     if (!hasUnsavedChanges.value) {
-      sourceChangedSinceDeploy.value = hasPersistedSourceDivergence(currentApp.value)
+      sourceChangedSinceDeploy.value = localDeployBaseline.value
+        ? hasSourceChangedSinceLocalDeploy(currentApp.value)
+        : hasPersistedSourceDivergence(currentApp.value)
     }
 
     applicationWarning.value = getApplicationWarningMessage()
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms)
+    })
+  }
+
+  async function finalizeSuccessfulDeployment(): Promise<void> {
+    // Clear the pending-deploy warning immediately after a successful deploy.
+    // The API metadata can lag briefly, which otherwise leaves the UI orange
+    // even though the deploy toast already reported success.
+    localDeployBaseline.value = {
+      frontend: currentApp.value?.frontend.sourceModifiedAtUtc ?? null,
+      backend: currentApp.value?.backend.sourceModifiedAtUtc ?? null,
+    }
+    sourceChangedSinceDeploy.value = false
+    lastDeployError.value = null
+
+    await refreshCurrentAppMetadata()
+    await refreshApplication()
+
+    if (!localDeployBaseline.value || hasSourceChangedSinceLocalDeploy(currentApp.value)) {
+      await sleep(1500)
+      await refreshCurrentAppMetadata()
+      await refreshApplication()
+    }
   }
 
   function getApplicationWarningMessage(): string | null {
@@ -321,6 +384,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     currentApp.value = await appsService.get(currentApp.value.id)
     await refreshAssignedRunnerStatus()
+    syncLocalDeployBaselineFromMetadata()
     syncSourceChangeStateFromMetadata()
   }
 
@@ -358,6 +422,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Load running application
       await refreshApplication()
+      syncLocalDeployBaselineFromMetadata()
       syncSourceChangeStateFromMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -499,7 +564,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       file.isDirty = false
       file.originalContent = file.content
-      sourceChangedSinceDeploy.value = true
+      markSourceChangedAfterDeploy()
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
       await refreshApplication()
@@ -531,7 +596,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         file.originalContent = file.content
       }
 
-      sourceChangedSinceDeploy.value = dirtyFiles.length > 0
+      if (dirtyFiles.length > 0) {
+        markSourceChangedAfterDeploy()
+      }
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
       await refreshApplication()
@@ -562,7 +629,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         throw new Error('Version snapshots are read-only')
       }
       await loadUnifiedFileTree(currentApp.value.id)
-      sourceChangedSinceDeploy.value = true
+      markSourceChangedAfterDeploy()
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
 
@@ -597,7 +664,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       // Refresh file tree
       await loadUnifiedFileTree(currentApp.value.id)
-      sourceChangedSinceDeploy.value = true
+      markSourceChangedAfterDeploy()
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -630,7 +697,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
 
       await loadUnifiedFileTree(currentApp.value.id)
-      sourceChangedSinceDeploy.value = true
+      markSourceChangedAfterDeploy()
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -792,9 +859,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
-      syncSourceChangeStateFromMetadata()
-      lastDeployError.value = null
-      await refreshApplication()
+      await finalizeSuccessfulDeployment()
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -831,9 +896,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
-      syncSourceChangeStateFromMetadata()
-      lastDeployError.value = null
-      await refreshApplication()
+      await finalizeSuccessfulDeployment()
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -870,8 +933,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
-      syncSourceChangeStateFromMetadata()
-      lastDeployError.value = null
+      await finalizeSuccessfulDeployment()
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -1027,7 +1089,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         }
       }
 
-      sourceChangedSinceDeploy.value = true
+      markSourceChangedAfterDeploy()
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
       await refreshApplication()
@@ -1098,6 +1160,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     openFiles.value = []
     activeFilePath.value = null
     applicationUrl.value = ''
+    localDeployBaseline.value = null
     sourceChangedSinceDeploy.value = false
     lastDeployError.value = null
     assignedRunnerOnline.value = null
