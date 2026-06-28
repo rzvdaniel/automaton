@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
+import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import type { MenuItem } from 'primevue/menuitem'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
@@ -24,6 +25,11 @@ const props = defineProps<{
   canDeployFrontendFromStudio: boolean
   isDeployingApp: boolean
   isDeployingBackend: boolean
+  applicationState: 'Deployed' | 'Source changed' | 'Build failed' | 'Runner offline' | 'Not deployed'
+  applicationStatusMessage: string | null
+  applicationRuntimeTimestampText: string | null
+  applicationSourceTimestampText: string | null
+  sourceChangedSinceDeploy: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,6 +51,7 @@ const emit = defineEmits<{
 
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
+const statusPopover = ref<InstanceType<typeof Popover> | null>(null)
 
 const showsEditorActions = computed(() =>
   props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
@@ -71,6 +78,23 @@ const isPrimaryActionDisabled = computed(() => {
   return !props.canDeployFromStudio || props.isDeployingApp
 })
 
+const statusUi = computed(() => {
+  switch (props.applicationState) {
+    case 'Deployed':
+      return { icon: props.isDeployingApp ? 'pi pi-spin pi-spinner' : 'pi pi-check-circle', severity: 'success' as const, shortLabel: '' }
+    case 'Source changed':
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, shortLabel: 'Source changed' }
+    case 'Build failed':
+      return { icon: 'pi pi-times-circle', severity: 'danger' as const, shortLabel: 'Build failed' }
+    case 'Runner offline':
+      return { icon: 'pi pi-ban', severity: 'contrast' as const, shortLabel: 'Runner offline' }
+    default:
+      return { icon: 'pi pi-info-circle', severity: 'secondary' as const, shortLabel: 'Not deployed' }
+  }
+})
+
+const showStatusText = computed(() => props.applicationState !== 'Deployed')
+
 function getGroupedMenuEvent(event: Event, selector: string) {
   const trigger = event.currentTarget instanceof HTMLElement
     ? event.currentTarget.closest(selector) ?? event.currentTarget
@@ -89,6 +113,10 @@ function toggleActionMenu(event: Event) {
 
 function togglePublishedMenu(event: Event) {
   publishedMenu.value?.toggle(getGroupedMenuEvent(event, '.published-actions'))
+}
+
+function toggleStatusPopover(event: Event) {
+  statusPopover.value?.toggle(event)
 }
 
 function handlePrimaryAction() {
@@ -136,6 +164,45 @@ function handlePrimaryAction() {
           @runners-loaded="emit('runnersLoaded', $event)"
         />
       </div>
+
+      <Button
+        v-if="showsEditorActions"
+        :icon="statusUi.icon"
+        :label="showStatusText ? statusUi.shortLabel : undefined"
+        :severity="statusUi.severity"
+        text
+        size="small"
+        class="status-indicator-button"
+        @click="toggleStatusPopover"
+      />
+      <Popover ref="statusPopover" class="status-popover">
+        <div class="status-popover__content">
+          <div class="status-popover__header">
+            <i :class="[statusUi.icon, `status-popover__icon status-popover__icon--${statusUi.severity}`]"></i>
+            <div>
+              <div class="status-popover__title">{{ props.applicationState }}</div>
+              <div v-if="props.applicationStatusMessage" class="status-popover__message">
+                {{ props.applicationStatusMessage }}
+              </div>
+            </div>
+          </div>
+          <div v-if="props.applicationRuntimeTimestampText" class="status-popover__meta">
+            {{ props.applicationRuntimeTimestampText }}
+          </div>
+          <div v-if="props.sourceChangedSinceDeploy && props.applicationSourceTimestampText" class="status-popover__meta">
+            {{ props.applicationSourceTimestampText }}
+          </div>
+          <Button
+            v-if="props.applicationState !== 'Deployed'"
+            label="Deploy now"
+            icon="pi pi-cloud-upload"
+            size="small"
+            :loading="props.isDeployingApp"
+            :disabled="!props.canDeployFromStudio || props.isDeployingApp"
+            @click="handlePrimaryAction"
+          />
+        </div>
+      </Popover>
 
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
@@ -320,6 +387,60 @@ function handlePrimaryAction() {
 .runtime-control {
   display: inline-flex;
   align-items: center;
+}
+
+.status-indicator-button {
+  gap: 0.35rem;
+}
+
+.status-popover__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: min(22rem, 70vw);
+}
+
+.status-popover__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.status-popover__title {
+  font-weight: 700;
+}
+
+.status-popover__message {
+  margin-top: 0.2rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.status-popover__meta {
+  color: var(--p-text-muted-color);
+  font-size: 0.82rem;
+}
+
+.status-popover__icon {
+  margin-top: 0.1rem;
+}
+
+.status-popover__icon--success {
+  color: var(--p-green-500);
+}
+
+.status-popover__icon--warn {
+  color: var(--p-orange-500);
+}
+
+.status-popover__icon--danger {
+  color: var(--p-red-500);
+}
+
+.status-popover__icon--contrast,
+.status-popover__icon--secondary {
+  color: var(--p-text-muted-color);
 }
 
 .deploy-actions {
