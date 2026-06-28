@@ -35,6 +35,42 @@ export function getDeployedAppUrl(appId?: string | null): string {
   return normalizedAppId ? `${getPublicAppsBaseUrl()}/a/${encodeURIComponent(normalizedAppId)}/` : ''
 }
 
+export function getStudioAppUrl(appId?: string | null): string {
+  const normalizedAppId = appId?.trim()
+  if (!normalizedAppId) return ''
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (apiBaseUrl) {
+    try {
+      const parsed = new URL(apiBaseUrl, window.location.origin)
+      if (parsed.hostname.startsWith('api.')) {
+        parsed.hostname = `studio.${parsed.hostname.slice('api.'.length)}`
+        parsed.pathname = `/apps/${encodeURIComponent(normalizedAppId)}`
+        parsed.search = ''
+        parsed.hash = ''
+        return parsed.toString().replace(/\/+$/, '')
+      }
+
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        parsed.port = '5173'
+        parsed.pathname = `/apps/${encodeURIComponent(normalizedAppId)}`
+        parsed.search = ''
+        parsed.hash = ''
+        return parsed.toString().replace(/\/+$/, '')
+      }
+    } catch {
+      // fall through to same-origin studio path
+    }
+  }
+
+  return `${window.location.origin.replace(/\/+$/, '')}/apps/${encodeURIComponent(normalizedAppId)}`
+}
+
+export function getStudioApplicationUrl(appId?: string | null): string {
+  const studioAppUrl = getStudioAppUrl(appId)
+  return studioAppUrl ? `${studioAppUrl}/application` : ''
+}
+
 export function getPublishedAppUrl(slug?: string | null): string {
   const normalizedSlug = slug?.trim()
   if (!normalizedSlug) return ''
@@ -45,5 +81,5 @@ export function getPublishedAppUrl(slug?: string | null): string {
 }
 
 export function getOpenAppUrl(app: { id?: string | null; isPublished?: boolean; publicUrl?: string | null }): string {
-  return getDeployedAppUrl(app.id)
+  return getStudioApplicationUrl(app.id)
 }

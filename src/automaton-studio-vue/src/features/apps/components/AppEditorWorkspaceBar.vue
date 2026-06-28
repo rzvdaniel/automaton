@@ -74,8 +74,8 @@ const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPu
 const openAppMenuItems = computed<MenuItem[]>(() => {
   if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
     return [
-      { label: 'Open Restricted Runtime', command: () => emit('openPrivateApp') },
-      { label: 'Copy Restricted Runtime Link', command: () => emit('copyPrivateLink') },
+      { label: 'Open in Studio', command: () => emit('openPrivateApp') },
+      { label: 'Copy Studio Link', command: () => emit('copyPrivateLink') },
     ]
   }
 
@@ -83,8 +83,8 @@ const openAppMenuItems = computed<MenuItem[]>(() => {
 
   if (props.canOpenPrivateApp) {
     items.push(
-      { label: 'Open Restricted Runtime', command: () => emit('openPrivateApp') },
-      { label: 'Copy Restricted Runtime Link', command: () => emit('copyPrivateLink') },
+      { label: 'Open in Studio', command: () => emit('openPrivateApp') },
+      { label: 'Copy Studio Link', command: () => emit('copyPrivateLink') },
     )
   }
 

@@ -328,7 +328,7 @@ public sealed class DeployService
                 : "Deploy failed",
             AppId = projectConfig?.AppId,
             AppName = projectConfig?.Name,
-            OpenAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId) ? CliAppUrlBuilder.BuildRestrictedAppUrl(server, projectConfig.AppId) : null,
+            OpenAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId) ? CliAppUrlBuilder.BuildStudioApplicationUrl(server, projectConfig.AppId) : null,
             StudioAppUrl = !string.IsNullOrWhiteSpace(projectConfig?.AppId) ? CliAppUrlBuilder.BuildStudioAppUrl(server, projectConfig.AppId) : null,
             DeployDirectory = deployDirectory,
             Clean = clean,

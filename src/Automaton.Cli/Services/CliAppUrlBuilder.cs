@@ -38,6 +38,14 @@ public static class CliAppUrlBuilder
         return $"{ResolveStudioBaseUrl(server).TrimEnd('/')}/apps/{Uri.EscapeDataString(appId.Trim())}";
     }
 
+    public static string BuildStudioApplicationUrl(string? server, string? appId)
+    {
+        var studioAppUrl = BuildStudioAppUrl(server, appId);
+        return string.IsNullOrWhiteSpace(studioAppUrl)
+            ? string.Empty
+            : $"{studioAppUrl.TrimEnd('/')}/application";
+    }
+
     private static string ResolveAppsBaseUrl(string server)
     {
         var configuredAppsBaseUrl = Environment.GetEnvironmentVariable("AUTOMATON_APPS_BASE_URL");

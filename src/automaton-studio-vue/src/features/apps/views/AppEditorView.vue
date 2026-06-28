@@ -32,7 +32,6 @@ import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
 import { useAppEditorStore } from '../stores/app-editor.store'
-import { appsService } from '../services/apps.service'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import type { PublishAppRequest } from '../types/apps.types'
@@ -620,7 +619,7 @@ function getOpenAppLabel(): string {
   }
 
   if (editorStore.currentApp?.hasDeployedFrontend) {
-    return 'Open Runtime'
+    return 'Open Application'
   }
 
   return 'Open App'
@@ -636,22 +635,6 @@ function getPrivateAppUrl(): string {
 
 function getPublicAppUrl(): string {
   return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
-}
-
-async function getPrivateAppLaunchUrl(): Promise<string> {
-  if (!editorStore.currentApp?.id) {
-    return ''
-  }
-
-  const privateUrl = getPrivateAppUrl()
-  if (!privateUrl) {
-    return ''
-  }
-
-  const { runtimeToken } = await appsService.createRuntimeLaunch(editorStore.currentApp.id)
-  const url = new URL(privateUrl)
-  url.searchParams.set('token', runtimeToken)
-  return url.toString()
 }
 
 async function copyUrl(label: string, url: string) {
@@ -852,27 +835,16 @@ function openPublishedApp() {
 }
 
 function openPrivateApp() {
-  void (async () => {
-    try {
-      const privateUrl = await getPrivateAppLaunchUrl()
-      if (!privateUrl) {
-        return
-      }
+  const privateUrl = getPrivateAppUrl()
+  if (!privateUrl) {
+    return
+  }
 
-      window.open(privateUrl, '_blank', 'noopener')
-    } catch (err: unknown) {
-      toast.add({
-        severity: 'error',
-        summary: 'Open Failed',
-        detail: err instanceof Error ? err.message : 'Failed to open restricted runtime',
-        life: 5000,
-      })
-    }
-  })()
+  window.open(privateUrl, '_blank', 'noopener')
 }
 
 async function copyPrivateAppLink() {
-  await copyUrl('Restricted runtime URL', getPrivateAppUrl())
+  await copyUrl('Studio application URL', getPrivateAppUrl())
 }
 
 async function copyPublicAppLink() {

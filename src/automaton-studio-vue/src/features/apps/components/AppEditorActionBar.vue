@@ -50,7 +50,7 @@ const openAppLabel = computed(() => {
   }
 
   if (props.hasDeployedFrontend) {
-    return 'Open Runtime'
+    return 'Open Application'
   }
 
   return 'Open App'

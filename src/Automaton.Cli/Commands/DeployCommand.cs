@@ -294,12 +294,8 @@ public static class DeployCommand
                     ? "[yellow bold]Deploy complete with warnings.[/]"
                     : "[green bold]Deploy complete.[/]");
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[bold]Restricted runtime:[/] {Markup.Escape(result.OpenAppUrl)}");
+                AnsiConsole.MarkupLine($"[bold]Open in Studio:[/] {Markup.Escape(result.OpenAppUrl)}");
                 AnsiConsole.MarkupLine("[bold]Open now:[/] automaton open");
-                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
-                {
-                    AnsiConsole.MarkupLine($"[bold]Manage in Studio:[/] {Markup.Escape(result.StudioAppUrl)}");
-                }
             }
             else
             {
@@ -401,12 +397,8 @@ public static class DeployCommand
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
                 Console.WriteLine();
-                Console.WriteLine($"Restricted runtime: {result.OpenAppUrl}");
+                Console.WriteLine($"Open in Studio: {result.OpenAppUrl}");
                 Console.WriteLine("Open now: automaton open");
-                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
-                {
-                    Console.WriteLine($"Manage in Studio: {result.StudioAppUrl}");
-                }
             }
             else
             {

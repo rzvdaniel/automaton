@@ -20,7 +20,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
-import { getDeployedAppUrl, getPublishedAppUrl, getPublishedAppsUrlPrefix } from '../utils/public-app-url'
+import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -169,9 +169,9 @@ const fullPublicUrl = computed(() => {
   return getPublishedAppUrl(publicUrl.value)
 })
 
-const fullPrivateUrl = computed(() => {
+const studioApplicationUrl = computed(() => {
   if (!app.value?.id) return ''
-  return getDeployedAppUrl(app.value.id)
+  return getStudioApplicationUrl(app.value.id)
 })
 
 // Initialize form from app data
@@ -243,13 +243,13 @@ async function copyPublicUrl() {
 }
 
 async function copyPrivateUrl() {
-  if (!fullPrivateUrl.value) return
+  if (!studioApplicationUrl.value) return
   try {
-    await navigator.clipboard.writeText(fullPrivateUrl.value)
+    await navigator.clipboard.writeText(studioApplicationUrl.value)
     toast.add({
       severity: 'success',
       summary: 'Copied',
-      detail: 'Private URL copied to clipboard',
+      detail: 'Studio application URL copied to clipboard',
       life: 2000,
     })
   } catch {
@@ -270,20 +270,8 @@ function openPublicUrl() {
 }
 
 async function openPrivateUrl() {
-  if (fullPrivateUrl.value) {
-    try {
-      const { runtimeToken } = await appsService.createRuntimeLaunch(app.value!.id)
-      const url = new URL(fullPrivateUrl.value, window.location.origin)
-      url.searchParams.set('token', runtimeToken)
-      window.open(url.toString(), '_blank')
-    } catch (err: unknown) {
-      toast.add({
-        severity: 'error',
-        summary: 'Open Failed',
-        detail: err instanceof Error ? err.message : 'Failed to open restricted runtime',
-        life: 5000,
-      })
-    }
+  if (studioApplicationUrl.value) {
+    window.open(studioApplicationUrl.value, '_blank')
   }
 }
 
@@ -733,9 +721,9 @@ async function handleSaveTemplateStatus() {
               </div>
 
               <div v-if="isPublished && publicUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Private URL</label>
+                <label class="font-medium">Studio Application URL</label>
                 <div class="p-inputgroup url-inputgroup">
-                  <InputText :model-value="fullPrivateUrl" readonly />
+                  <InputText :model-value="studioApplicationUrl" readonly />
                   <Button
                     v-tooltip="'Copy URL'"
                     icon="pi pi-copy"
@@ -752,14 +740,14 @@ async function handleSaveTemplateStatus() {
                   />
                 </div>
                 <small class="text-color-secondary">
-                  Owner/developer endpoint for testing and operating the app from Studio.
+                  Opens the unpublished application inside Studio using your authenticated session.
                 </small>
               </div>
 
-              <div v-else-if="fullPrivateUrl" class="flex flex-column gap-2">
-                <label class="font-medium">Private URL</label>
+              <div v-else-if="studioApplicationUrl" class="flex flex-column gap-2">
+                <label class="font-medium">Studio Application URL</label>
                 <div class="p-inputgroup url-inputgroup">
-                  <InputText :model-value="fullPrivateUrl" readonly />
+                  <InputText :model-value="studioApplicationUrl" readonly />
                   <Button
                     v-tooltip="'Copy URL'"
                     icon="pi pi-copy"
@@ -776,7 +764,7 @@ async function handleSaveTemplateStatus() {
                   />
                 </div>
                 <small class="text-color-secondary">
-                  Always available to you, even before publish.
+                  Unpublished apps are accessible only inside Studio.
                 </small>
               </div>
 

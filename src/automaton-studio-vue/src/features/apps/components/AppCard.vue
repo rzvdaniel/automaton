@@ -13,7 +13,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
-import { getDeployedAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 
 interface Props {
   app: App
@@ -87,10 +87,10 @@ const openAppUrl = computed(() => {
     return getPublishedAppUrl(props.app.publicUrl)
   }
 
-  return getDeployedAppUrl(props.app.id)
+  return getStudioApplicationUrl(props.app.id)
 })
 const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
-const privateAppUrl = computed(() => getDeployedAppUrl(props.app.id))
+const studioApplicationUrl = computed(() => getStudioApplicationUrl(props.app.id))
 
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
@@ -118,24 +118,11 @@ const handleOpenPublicApp = async (): Promise<void> => {
 }
 
 const handleOpenPrivateApp = async () => {
-  if (!canOpenPrivateApp.value || !privateAppUrl.value) {
+  if (!canOpenPrivateApp.value || !studioApplicationUrl.value) {
     return
   }
 
-  try {
-    const { runtimeToken } = await appsService.createRuntimeLaunch(props.app.id)
-    const url = new URL(privateAppUrl.value, window.location.origin)
-    url.searchParams.set('token', runtimeToken)
-    window.open(url.toString(), '_blank', 'noopener')
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to open restricted runtime'
-    toast.add({
-      severity: 'error',
-      summary: 'Open Failed',
-      detail: message,
-      life: 5000,
-    })
-  }
+  window.open(studioApplicationUrl.value, '_blank', 'noopener')
 }
 
 const handleUnpublish = async () => {
@@ -274,7 +261,7 @@ const menuItems = computed(() => {
 
   if (canOpenPrivateApp.value) {
     items.unshift({
-      label: canOpenPublicApp.value ? 'Open Restricted Runtime' : 'Open Runtime',
+      label: canOpenPublicApp.value ? 'Open in Studio' : 'Open Application',
       icon: 'pi pi-lock',
       command: handleOpenPrivateApp,
     })

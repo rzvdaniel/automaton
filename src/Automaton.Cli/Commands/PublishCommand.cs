@@ -129,10 +129,6 @@ public static class PublishCommand
                 Console.WriteLine("Publish complete.");
                 Console.WriteLine();
                 Console.WriteLine($"Public app: {result.Url}");
-                if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
-                {
-                    Console.WriteLine($"Manage in Studio: {result.StudioAppUrl}");
-                }
             }
             return;
         }
@@ -142,10 +138,6 @@ public static class PublishCommand
             AnsiConsole.MarkupLine("[green bold]Publish complete.[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine($"[bold]Public app:[/] {result.Url}");
-            if (!string.IsNullOrWhiteSpace(result.StudioAppUrl))
-            {
-                AnsiConsole.MarkupLine($"[bold]Manage in Studio:[/] {result.StudioAppUrl}");
-            }
         }
     }
 }

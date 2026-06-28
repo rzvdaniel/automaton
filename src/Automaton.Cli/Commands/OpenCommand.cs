@@ -9,7 +9,7 @@ public static class OpenCommand
     public static Command Build(ConfigService config)
     {
         var publicOption = new Option<bool>("--public", "Open the published public app URL");
-        var privateOption = new Option<bool>("--private", "Open the private deployed app URL");
+        var privateOption = new Option<bool>("--private", "Open the app in Studio (legacy alias)");
 
         var cmd = new Command("open", "Open the current app in the browser")
         {
@@ -67,8 +67,7 @@ public static class OpenCommand
                 }
                 else
                 {
-                    var launchCode = await client.CreateRuntimeLaunchAsync(appConfig.AppId);
-                    url = CliAppUrlBuilder.BuildRuntimeLaunchUrl(server!, appConfig.AppId, launchCode);
+                    url = CliAppUrlBuilder.BuildStudioApplicationUrl(server!, appConfig.AppId);
                 }
 
                 CliBrowserService.OpenUrl(url);
