@@ -114,6 +114,22 @@ export const AppRuntimeSource = {
 
 export type AppRuntimeSource = (typeof AppRuntimeSource)[keyof typeof AppRuntimeSource]
 
+export const AppFrontendDeployMode = {
+  None: 'none',
+  StaticCopy: 'static-copy',
+  BuildRequired: 'build-required',
+} as const
+
+export type AppFrontendDeployMode = (typeof AppFrontendDeployMode)[keyof typeof AppFrontendDeployMode]
+
+export interface AppDeployCapabilities {
+  canDeployAppFromStudio: boolean
+  canDeployFrontendFromStudio: boolean
+  canDeployBackendFromStudio: boolean
+  frontendDeployMode: AppFrontendDeployMode
+  frontendDeployBlockReason?: string | null
+}
+
 /**
  * Request to create a new app
  * Matches src/Automaton.Api/Models/NewApp.cs

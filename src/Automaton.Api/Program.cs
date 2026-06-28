@@ -330,6 +330,7 @@ services.AddSingleton<TunnelRequestRegistry>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
+services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();

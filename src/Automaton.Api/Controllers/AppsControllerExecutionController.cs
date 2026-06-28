@@ -6,6 +6,7 @@ using System.Text.Json;
 using Automaton.Api.Services;
 using Automaton.Api.Constants;
 using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 
 namespace Automaton.Api.Controllers;
 
@@ -22,6 +23,7 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly Serilog.ILogger logger;
     private readonly PrivateAppLaunchService privateAppLaunchService;
+    private readonly IAppDeployCapabilityService appDeployCapabilityService;
 
     public AppsControllerExecutionController(
         AppsService appsService,
@@ -29,7 +31,8 @@ public class AppsControllerExecutionController : ControllerBase
         UserContextService userContextService,
         IAppExecutionLogService executionLogService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
-        PrivateAppLaunchService privateAppLaunchService)
+        PrivateAppLaunchService privateAppLaunchService,
+        IAppDeployCapabilityService appDeployCapabilityService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
@@ -37,6 +40,7 @@ public class AppsControllerExecutionController : ControllerBase
         this.executionLogService = executionLogService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.privateAppLaunchService = privateAppLaunchService;
+        this.appDeployCapabilityService = appDeployCapabilityService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -52,6 +56,23 @@ public class AppsControllerExecutionController : ControllerBase
     {
         var userId = userContextService.GetUserId();
         var result = await controllerExecutionService.GetDeployInfoAsync(appId, userId);
+        return Ok(result);
+    }
+
+    [HttpGet("api/apps/{appId:guid}/deploy-capabilities")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<AppDeployCapabilitiesResponse>> GetDeployCapabilities(
+        Guid appId,
+        CancellationToken cancellationToken)
+    {
+        var appInfo = await appsService.GetAccessibleAppInfoByIdAsync(appId, cancellationToken);
+        if (appInfo == null)
+        {
+            return NotFound(new { message = "App not found" });
+        }
+
+        var ownerId = appInfo.OwnerId ?? userContextService.GetUserId();
+        var result = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
         return Ok(result);
     }
 

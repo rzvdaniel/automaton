@@ -14,6 +14,22 @@ public class DeployInfoResponse
     public bool HasRequirements { get; set; }
 }
 
+public static class AppFrontendDeployModes
+{
+    public const string None = "none";
+    public const string StaticCopy = "static-copy";
+    public const string BuildRequired = "build-required";
+}
+
+public class AppDeployCapabilitiesResponse
+{
+    public bool CanDeployAppFromStudio { get; set; }
+    public bool CanDeployFrontendFromStudio { get; set; }
+    public bool CanDeployBackendFromStudio { get; set; }
+    public string FrontendDeployMode { get; set; } = AppFrontendDeployModes.None;
+    public string? FrontendDeployBlockReason { get; set; }
+}
+
 public class DeployBackendResponse
 {
     public bool Success { get; set; }

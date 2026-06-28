@@ -3,6 +3,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
+using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,7 @@ public class AppsControllerExecutionService
     private readonly FileUploadRegistry uploadRegistry;
     private readonly AppsTunnelConfig tunnelConfig;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
+    private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -35,7 +37,8 @@ public class AppsControllerExecutionService
         TunnelRequestRegistry tunnelRegistry,
         FileUploadRegistry uploadRegistry,
         IOptions<AppsTunnelConfig> tunnelConfig,
-        ApiInstanceIdentityService apiInstanceIdentityService)
+        ApiInstanceIdentityService apiInstanceIdentityService,
+        IAppDeployCapabilityService appDeployCapabilityService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -44,6 +47,7 @@ public class AppsControllerExecutionService
         this.uploadRegistry = uploadRegistry;
         this.tunnelConfig = tunnelConfig.Value;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
+        this.appDeployCapabilityService = appDeployCapabilityService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -209,6 +213,18 @@ public class AppsControllerExecutionService
         Guid ownerId,
         CancellationToken cancellationToken)
     {
+        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
+        if (!capabilities.CanDeployAppFromStudio)
+        {
+            // Keep execution aligned with the capability contract. Even if a caller
+            // bypasses the toolbar state, the backend must reject deploy-all when the
+            // current Studio deploy implementation cannot fulfill it.
+            // Keep server enforcement aligned with the Studio toolbar state. Even if a
+            // caller bypasses the UI, the backend remains the source of truth for what
+            // the current Studio deploy strategy can safely execute.
+            throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this app.");
+        }
+
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
         var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var deployedAtUtc = DateTime.UtcNow;
@@ -248,6 +264,12 @@ public class AppsControllerExecutionService
 
     public async Task<DeployAppResponse> DeployFrontendAsync(Guid appId, Guid ownerId)
     {
+        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId);
+        if (!capabilities.CanDeployFrontendFromStudio)
+        {
+            throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this frontend.");
+        }
+
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
         var deployedAtUtc = DateTime.UtcNow;
 
@@ -276,6 +298,12 @@ public class AppsControllerExecutionService
 
     public async Task<DeployAppResponse> DeployBackendComponentAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
     {
+        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
+        if (!capabilities.CanDeployBackendFromStudio)
+        {
+            throw new InvalidOperationException("Backend source is not available in Studio.");
+        }
+
         var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var deployedAtUtc = DateTime.UtcNow;
 

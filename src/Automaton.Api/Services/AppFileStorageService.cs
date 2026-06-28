@@ -897,6 +897,19 @@ public class AppFileStorageService
         return HasAnyEntries(GetSourceFrontendPath(userId, appId));
     }
 
+    public string GetFrontendStudioDeployMode(Guid userId, Guid appId)
+    {
+        var sourceFrontendPath = GetSourceFrontendPath(userId, appId);
+        if (!HasAnyEntries(sourceFrontendPath))
+        {
+            return Models.AppFrontendDeployModes.None;
+        }
+
+        return IsBuildBasedFrontendSourcePath(sourceFrontendPath)
+            ? Models.AppFrontendDeployModes.BuildRequired
+            : Models.AppFrontendDeployModes.StaticCopy;
+    }
+
     public bool HasBackendSourceEntries(Guid userId, Guid appId)
     {
         return HasAnyEntries(GetSourceBackendPath(userId, appId));

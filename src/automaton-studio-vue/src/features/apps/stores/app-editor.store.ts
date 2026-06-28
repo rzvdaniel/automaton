@@ -9,6 +9,7 @@ import { runnersService } from '@/features/runners/services/runners.service'
 import { RunnerStatus } from '@/features/runners/types/runners.types'
 import type {
   App,
+  AppDeployCapabilities,
   AppFileSystemScope,
   FileNode,
   OpenFile,
@@ -18,6 +19,7 @@ import type {
 } from '../types/apps.types'
 import {
   AppDevelopmentMode as DevelopmentMode,
+  AppFrontendDeployMode,
   AppFileSystemScope as FileSystemScope,
   getLanguageFromExtension,
   PendingFileChangeType as PendingChangeType,
@@ -59,6 +61,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const sourceChangedSinceDeploy = ref(false)
   const localDeployBaseline = ref<{ frontend: string | null; backend: string | null } | null>(null)
   const pendingDeployChanges = ref<Record<string, PendingFileChangeType>>({})
+  const deployCapabilities = ref<AppDeployCapabilities | null>(null)
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
 
@@ -168,9 +171,20 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const defaultEditorScope = computed<AppFileSystemScope>(() => {
     return FileSystemScope.Source
   })
-  const canDeployFrontendFromStudio = computed(() => currentApp.value?.frontend.sourceAvailable ?? false)
-  const canDeployBackendFromStudio = computed(() => currentApp.value?.backend.sourceAvailable ?? false)
-  const canDeployFromStudio = computed(() => canDeployFrontendFromStudio.value || canDeployBackendFromStudio.value)
+  const frontendDeployMode = computed(() =>
+    deployCapabilities.value?.frontendDeployMode
+      ?? (currentApp.value?.frontend.sourceAvailable ? AppFrontendDeployMode.StaticCopy : AppFrontendDeployMode.None),
+  )
+  const canDeployFrontendFromStudio = computed(() =>
+    deployCapabilities.value?.canDeployFrontendFromStudio ?? false,
+  )
+  const canDeployBackendFromStudio = computed(() =>
+    deployCapabilities.value?.canDeployBackendFromStudio ?? (currentApp.value?.backend.sourceAvailable ?? false),
+  )
+  const canDeployFromStudio = computed(() =>
+    deployCapabilities.value?.canDeployAppFromStudio ?? false,
+  )
+  const deployBlockedReason = computed(() => deployCapabilities.value?.frontendDeployBlockReason ?? null)
   const runnerOffline = computed(() => !!currentApp.value?.executionRunnerId && assignedRunnerOnline.value === false)
   const applicationState = computed(() => {
     if (lastDeployError.value) return 'Build failed'
@@ -204,6 +218,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     return `You are editing source files. Frontend source ${currentApp.value.frontend.sourceAvailable ? 'will update live/frontend' : 'is empty, so live/frontend will be preserved'}. Backend source ${currentApp.value.backend.sourceAvailable ? 'will update live/backend' : 'is empty, so live/backend will be preserved'}.`
   })
+
+  const hasPendingFrontendSourceChanges = computed(() => hasComponentChangedSinceDeploy('frontend'))
+  const hasPendingBackendSourceChanges = computed(() => hasComponentChangedSinceDeploy('backend'))
 
   function toUtcMillis(value?: string | null): number | null {
     if (!value) return null
@@ -294,6 +311,20 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     if (leftMillis == null) return -1
     if (rightMillis == null) return 1
     return leftMillis - rightMillis
+  }
+
+  function hasComponentChangedSinceDeploy(component: 'frontend' | 'backend'): boolean {
+    if (!currentApp.value) {
+      return false
+    }
+
+    const componentState = currentApp.value[component]
+    if (!componentState.sourceAvailable) {
+      return false
+    }
+
+    const baselineTimestamp = localDeployBaseline.value?.[component] ?? componentState.runtimeDeployedAtUtc ?? null
+    return compareTimestamps(componentState.sourceModifiedAtUtc, baselineTimestamp) > 0
   }
 
   function syncSourceChangeStateFromMetadata(): void {
@@ -396,6 +427,19 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
+  async function refreshDeployCapabilities(): Promise<void> {
+    if (!currentApp.value) {
+      deployCapabilities.value = null
+      return
+    }
+
+    try {
+      deployCapabilities.value = await appsService.getDeployCapabilities(currentApp.value.id)
+    } catch {
+      deployCapabilities.value = null
+    }
+  }
+
   async function refreshCurrentAppMetadata(): Promise<void> {
     if (!currentApp.value) {
       return
@@ -403,6 +447,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
     currentApp.value = await appsService.get(currentApp.value.id)
     await refreshAssignedRunnerStatus()
+    await refreshDeployCapabilities()
     syncLocalDeployBaselineFromMetadata()
     syncSourceChangeStateFromMetadata()
   }
@@ -422,6 +467,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       // Load app metadata
       currentApp.value = await appsService.get(appId)
       await refreshAssignedRunnerStatus()
+      await refreshDeployCapabilities()
 
       // Load file tree
       currentFileScope.value = defaultEditorScope.value
@@ -874,7 +920,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }> {
     if (!currentApp.value) throw new Error('No app loaded')
     if (!canDeployFromStudio.value) {
-      throw new Error('This app is managed locally. Use automaton deploy from your local project or upload source files first.')
+      throw new Error(deployBlockedReason.value || 'This app cannot be fully deployed from Studio.')
     }
 
     isDeployingApp.value = true
@@ -911,7 +957,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }> {
     if (!currentApp.value) throw new Error('No app loaded')
     if (!canDeployFrontendFromStudio.value) {
-      throw new Error('Frontend source is not available in Studio. Existing live/frontend will be preserved.')
+      throw new Error(deployBlockedReason.value || 'Frontend cannot be deployed from Studio.')
     }
 
     isDeployingApp.value = true
@@ -948,13 +994,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     message?: string
   }> {
     if (!currentApp.value) throw new Error('No app loaded')
+    if (!canDeployBackendFromStudio.value) {
+      throw new Error('Backend cannot be deployed from Studio.')
+    }
 
     isDeployingBackend.value = true
-    deployStatusMessage.value = canDeployBackendFromStudio.value
-      ? 'Syncing backend source to live...'
-      : 'Redeploying existing live backend...'
+    deployStatusMessage.value = 'Syncing backend source to live...'
     try {
-      if (hasUnsavedChanges.value && canDeployBackendFromStudio.value) {
+      if (hasUnsavedChanges.value) {
         deployStatusMessage.value = 'Saving source files...'
         await saveAllFiles()
         deployStatusMessage.value = 'Syncing backend source to live...'
@@ -1219,6 +1266,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     applicationUrl.value = ''
     localDeployBaseline.value = null
     clearPendingDeployChanges()
+    deployCapabilities.value = null
     sourceChangedSinceDeploy.value = false
     lastDeployError.value = null
     assignedRunnerOnline.value = null
@@ -1291,9 +1339,14 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     hasBackendFolder,
     currentScopeEditable,
     defaultEditorScope,
+    deployCapabilities,
+    frontendDeployMode,
     canDeployFrontendFromStudio,
     canDeployBackendFromStudio,
     canDeployFromStudio,
+    deployBlockedReason,
+    hasPendingFrontendSourceChanges,
+    hasPendingBackendSourceChanges,
     runnerOffline,
     applicationState,
     isLocalManagedApp,

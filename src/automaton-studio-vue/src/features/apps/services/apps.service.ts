@@ -6,6 +6,7 @@ import apiClient from '@/shared/services/api/axios-instance'
 import type {
   App,
   AppScreenshot,
+  AppDeployCapabilities,
   CreateAppRequest,
   PublishAppRequest,
   ExportAppResponse,
@@ -187,6 +188,11 @@ class AppsService {
    */
   async getDeployInfo(id: string): Promise<{ scriptCount: number; hasRequirements: boolean }> {
     const { data } = await apiClient.get(`/api/apps/${id}/backend/deploy-info`)
+    return data
+  }
+
+  async getDeployCapabilities(id: string): Promise<AppDeployCapabilities> {
+    const { data } = await apiClient.get<AppDeployCapabilities>(`/api/apps/${id}/deploy-capabilities`)
     return data
   }
 

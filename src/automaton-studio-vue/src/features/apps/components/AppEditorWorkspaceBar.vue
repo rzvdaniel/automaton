@@ -5,7 +5,6 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
-import type { MenuItem } from 'primevue/menuitem'
 import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 
@@ -23,10 +22,15 @@ const props = defineProps<{
   hasUnsavedChanges: boolean
   canDeployFromStudio: boolean
   canDeployFrontendFromStudio: boolean
+  canDeployBackendFromStudio: boolean
+  deployBlockedReason: string | null
+  frontendDeployMode: 'none' | 'static-copy' | 'build-required'
   isDeployingApp: boolean
   isDeployingBackend: boolean
   applicationState: 'Deployed' | 'Source changed' | 'Build failed' | 'Runner offline' | 'Not deployed'
   sourceChangedSinceDeploy: boolean
+  hasPendingFrontendChanges: boolean
+  hasPendingBackendChanges: boolean
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +50,6 @@ const emit = defineEmits<{
   unpublish: []
 }>()
 
-const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
 const statusPopover = ref<InstanceType<typeof Popover> | null>(null)
 const isStatusDetailsOpen = ref(false)
@@ -55,23 +58,6 @@ let statusAutoCollapseTimer: number | null = null
 const showsEditorActions = computed(() =>
   props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
 )
-
-const actionMenuItems = computed<MenuItem[]>(() => {
-  const items: MenuItem[] = []
-
-  items.push({
-    label: 'Deploy Frontend Only',
-    disabled: props.isDeployingApp || !props.canDeployFrontendFromStudio,
-    command: () => emit('deployFrontend'),
-  })
-  items.push({
-    label: 'Deploy Backend Only',
-    disabled: props.isDeployingBackend,
-    command: () => emit('deployBackend'),
-  })
-
-  return items
-})
 
 const isPrimaryActionDisabled = computed(() => {
   return !props.canDeployFromStudio || props.isDeployingApp
@@ -107,6 +93,10 @@ const statusSummary = computed(() => {
   }
 
   if (props.applicationState === 'Source changed') {
+    if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Frontend requires build' }
+    }
+
     return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Ready to deploy' }
   }
 
@@ -135,6 +125,10 @@ const deploymentStatus = computed(() => {
   }
 
   if (props.applicationState === 'Source changed') {
+    if (props.frontendDeployMode === 'build-required' && props.hasPendingFrontendChanges) {
+      return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Frontend changes require CLI deploy' }
+    }
+
     return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Source changes pending deployment' }
   }
 
@@ -147,6 +141,34 @@ const deploymentStatus = computed(() => {
   }
 
   return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'No pending changes' }
+})
+
+const frontendStatus = computed(() => {
+  if (!props.hasPendingFrontendChanges) {
+    return null
+  }
+
+  if (props.frontendDeployMode === 'build-required') {
+    return { icon: 'pi pi-exclamation-triangle', severity: 'warn' as const, label: 'Requires CLI build' }
+  }
+
+  if (props.canDeployFrontendFromStudio) {
+    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Can be deployed from Studio' }
+  }
+
+  return null
+})
+
+const backendStatus = computed(() => {
+  if (!props.hasPendingBackendChanges) {
+    return null
+  }
+
+  if (props.canDeployBackendFromStudio) {
+    return { icon: 'pi pi-check-circle', severity: 'success' as const, label: 'Can be deployed from Studio' }
+  }
+
+  return { icon: 'pi pi-info-circle', severity: 'secondary' as const, label: 'No Studio deploy available' }
 })
 
 const publishingStatus = computed(() => {
@@ -217,24 +239,16 @@ function scheduleStatusAutoCollapse() {
   }, 4000)
 }
 
-function getGroupedMenuEvent(event: Event, selector: string) {
+function togglePublishedMenu(event: Event) {
   const trigger = event.currentTarget instanceof HTMLElement
-    ? event.currentTarget.closest(selector) ?? event.currentTarget
+    ? event.currentTarget.closest('.published-actions') ?? event.currentTarget
     : event.currentTarget
 
-  return {
+  publishedMenu.value?.toggle({
     ...event,
     currentTarget: trigger,
     target: trigger,
-  }
-}
-
-function toggleActionMenu(event: Event) {
-  actionMenu.value?.toggle(getGroupedMenuEvent(event, '.deploy-actions'))
-}
-
-function togglePublishedMenu(event: Event) {
-  publishedMenu.value?.toggle(getGroupedMenuEvent(event, '.published-actions'))
+  })
 }
 
 function toggleStatusPopover(event: Event) {
@@ -251,6 +265,34 @@ function toggleStatusDetails() {
 function handlePrimaryAction() {
   emit('deployApp')
 }
+
+const statusPrimaryAction = computed(() => {
+  if (props.applicationState === 'Deployed') {
+    return null
+  }
+
+  if (props.canDeployFromStudio) {
+    return {
+      label: 'Deploy',
+      icon: 'pi pi-cloud-upload',
+      loading: props.isDeployingApp,
+      disabled: props.isDeployingApp,
+      command: () => emit('deployApp'),
+    }
+  }
+
+  if (props.hasPendingBackendChanges && props.canDeployBackendFromStudio) {
+    return {
+      label: 'Deploy Backend',
+      icon: 'pi pi-server',
+      loading: props.isDeployingBackend,
+      disabled: props.isDeployingBackend,
+      command: () => emit('deployBackend'),
+    }
+  }
+
+  return null
+})
 
 watch(
   () => statusSummary.value.label,
@@ -350,6 +392,20 @@ onBeforeUnmount(() => {
                   <span>{{ deploymentStatus.label }}</span>
                 </div>
               </div>
+              <div v-if="frontendStatus" class="status-popover__section">
+                <div class="status-popover__section-label">Frontend</div>
+                <div class="status-popover__item">
+                  <i :class="[frontendStatus.icon, `status-popover__icon status-popover__icon--${frontendStatus.severity}`]"></i>
+                  <span>{{ frontendStatus.label }}</span>
+                </div>
+              </div>
+              <div v-if="backendStatus" class="status-popover__section">
+                <div class="status-popover__section-label">Backend</div>
+                <div class="status-popover__item">
+                  <i :class="[backendStatus.icon, `status-popover__icon status-popover__icon--${backendStatus.severity}`]"></i>
+                  <span>{{ backendStatus.label }}</span>
+                </div>
+              </div>
               <div class="status-popover__section">
                 <div class="status-popover__section-label">Publishing</div>
                 <div class="status-popover__item">
@@ -359,14 +415,17 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <Button
-              v-if="props.applicationState !== 'Deployed'"
-              label="Deploy"
-              icon="pi pi-cloud-upload"
+              v-if="statusPrimaryAction"
+              :label="statusPrimaryAction.label"
+              :icon="statusPrimaryAction.icon"
               size="small"
-              :loading="props.isDeployingApp"
-              :disabled="!props.canDeployFromStudio || props.isDeployingApp"
-              @click="handlePrimaryAction"
+              :loading="statusPrimaryAction.loading"
+              :disabled="statusPrimaryAction.disabled"
+              @click="statusPrimaryAction.command"
             />
+            <div v-else-if="deployBlockedReason" class="status-popover__summary-line">
+              {{ deployBlockedReason }}
+            </div>
           </div>
         </Popover>
       </div>
@@ -391,16 +450,9 @@ onBeforeUnmount(() => {
           severity="success"
           :disabled="isPrimaryActionDisabled"
           :loading="isDeployingApp"
+          v-tooltip.bottom="!canDeployFromStudio && deployBlockedReason ? deployBlockedReason : undefined"
           @click="handlePrimaryAction"
         />
-        <Button
-          icon="pi pi-chevron-down"
-          class="deploy-menu-button"
-          severity="success"
-          aria-label="More deploy actions"
-          @click="toggleActionMenu"
-        />
-        <Menu ref="actionMenu" class="deploy-menu" :model="actionMenuItems" :popup="true" />
       </div>
 
       <Button
@@ -723,7 +775,6 @@ onBeforeUnmount(() => {
 .deploy-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0;
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   overflow: hidden;
@@ -736,18 +787,6 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   overflow: hidden;
-}
-
-.deploy-actions :deep(.deploy-main-button) {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.deploy-actions :deep(.deploy-menu-button) {
-  min-width: 2.5rem;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid color-mix(in srgb, white 26%, transparent);
 }
 
 .published-actions :deep(.published-main-button) {
@@ -767,16 +806,8 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
 }
 
-.deploy-actions :deep(.deploy-menu-button .p-button-icon) {
-  font-size: 0.8rem;
-}
-
 :global(.app-dark) .deploy-actions {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-}
-
-:global(.app-dark) .deploy-actions .deploy-menu-button {
-  border-left-color: color-mix(in srgb, white 14%, transparent);
 }
 
 :global(.app-dark) .published-actions {
