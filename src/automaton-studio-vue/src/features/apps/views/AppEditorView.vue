@@ -314,6 +314,20 @@ function getFileTabIndex(path: string): number {
   return editorStore.openFiles.findIndex((f) => f.path === path)
 }
 
+function getPendingChangeMarker(path: string): string | null {
+  const changeType = editorStore.pendingDeployChanges[path]
+  switch (changeType) {
+    case 'modified':
+      return '●'
+    case 'added':
+      return '+'
+    case 'deleted':
+      return '-'
+    default:
+      return null
+  }
+}
+
 // Update active tab when active file changes
 watch(
   () => editorStore.activeFilePath,
@@ -1235,6 +1249,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       <div class="file-panel">
                         <FileTree
                           title="App Files"
+                          :pending-changes="editorStore.pendingDeployChanges"
                           :show-create="editorStore.currentScopeEditable"
                           :allow-delete="editorStore.currentScopeEditable"
                           empty-message="No app files yet"
@@ -1261,6 +1276,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                             <span class="tab-name">
                               <i v-if="file.isBackendStep" class="pi pi-server mr-1" style="font-size: 0.7rem;"></i>
                               {{ file.isBackendStep ? file.stepName : file.path }}
+                              <span v-if="getPendingChangeMarker(file.path)" class="deploy-change-indicator">{{ getPendingChangeMarker(file.path) }}</span>
                               <span v-if="file.isDirty" class="dirty-indicator">*</span>
                             </span>
                             <Button
@@ -1363,6 +1379,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                   <div class="file-panel">
                     <FileTree
                       title="App Files"
+                      :pending-changes="editorStore.pendingDeployChanges"
                       :show-create="editorStore.currentScopeEditable"
                       :allow-delete="editorStore.currentScopeEditable"
                       empty-message="No app files yet"
@@ -1391,6 +1408,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                             style="font-size: 0.7rem;"
                           ></i>
                           {{ file.isBackendStep ? file.stepName : file.path }}
+                          <span v-if="getPendingChangeMarker(file.path)" class="deploy-change-indicator">{{ getPendingChangeMarker(file.path) }}</span>
                           <span v-if="file.isDirty" class="dirty-indicator">*</span>
                         </span>
                         <Button
@@ -1760,6 +1778,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 .dirty-indicator {
   color: var(--p-orange-500);
   margin-left: 0.25rem;
+}
+
+.deploy-change-indicator {
+  color: var(--p-orange-500);
+  font-weight: 700;
+  margin-left: 0.35rem;
 }
 
 .tab-close {

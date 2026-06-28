@@ -14,11 +14,13 @@ import type {
   OpenFile,
   ApplicationViewportMode,
   PublishAppRequest,
+  PendingFileChangeType,
 } from '../types/apps.types'
 import {
   AppDevelopmentMode as DevelopmentMode,
   AppFileSystemScope as FileSystemScope,
   getLanguageFromExtension,
+  PendingFileChangeType as PendingChangeType,
 } from '../types/apps.types'
 import type { ConsoleEntry } from '../types/console.types'
 import type { UiLogEntry } from '../types/console.types'
@@ -56,6 +58,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const applicationUrl = ref('')
   const sourceChangedSinceDeploy = ref(false)
   const localDeployBaseline = ref<{ frontend: string | null; backend: string | null } | null>(null)
+  const pendingDeployChanges = ref<Record<string, PendingFileChangeType>>({})
   const lastDeployError = ref<string | null>(null)
   const assignedRunnerOnline = ref<boolean | null>(null)
 
@@ -114,6 +117,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   const unsavedFilesCount = computed(() => {
     return openFiles.value.filter((f) => f.isDirty).length
   })
+  const pendingDeployChangeEntries = computed(() =>
+    Object.entries(pendingDeployChanges.value).map(([path, type]) => ({ path, type })),
+  )
 
   /**
    * Main HTML file (index.html)
@@ -268,6 +274,18 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     sourceChangedSinceDeploy.value = true
   }
 
+  function markPendingDeployChange(path: string, type: PendingFileChangeType): void {
+    const normalizedPath = path.replace(/\\/g, '/')
+    pendingDeployChanges.value = {
+      ...pendingDeployChanges.value,
+      [normalizedPath]: type,
+    }
+  }
+
+  function clearPendingDeployChanges(): void {
+    pendingDeployChanges.value = {}
+  }
+
   function compareTimestamps(left?: string | null, right?: string | null): number {
     const leftMillis = toUtcMillis(left)
     const rightMillis = toUtcMillis(right)
@@ -303,6 +321,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       backend: currentApp.value?.backend.sourceModifiedAtUtc ?? null,
     }
     sourceChangedSinceDeploy.value = false
+    clearPendingDeployChanges()
     lastDeployError.value = null
 
     await refreshCurrentAppMetadata()
@@ -565,6 +584,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       file.isDirty = false
       file.originalContent = file.content
       markSourceChangedAfterDeploy()
+      markPendingDeployChange(filePath, PendingChangeType.Modified)
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
       await refreshApplication()
@@ -598,6 +618,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
       if (dirtyFiles.length > 0) {
         markSourceChangedAfterDeploy()
+        for (const dirtyFile of dirtyFiles) {
+          if (pendingDeployChanges.value[dirtyFile.path] !== PendingChangeType.Added) {
+            markPendingDeployChange(dirtyFile.path, PendingChangeType.Modified)
+          }
+        }
       }
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
@@ -630,6 +655,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
       await loadUnifiedFileTree(currentApp.value.id)
       markSourceChangedAfterDeploy()
+      markPendingDeployChange(filePath, PendingChangeType.Added)
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
 
@@ -665,6 +691,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       // Refresh file tree
       await loadUnifiedFileTree(currentApp.value.id)
       markSourceChangedAfterDeploy()
+      markPendingDeployChange(filePath, PendingChangeType.Deleted)
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -696,8 +723,12 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         closeFile(openFilePath, true)
       }
 
+      const deletedPaths = collectContainedFilePaths(fileTree.value, folderPath)
       await loadUnifiedFileTree(currentApp.value.id)
       markSourceChangedAfterDeploy()
+      for (const deletedPath of deletedPaths) {
+        markPendingDeployChange(deletedPath, PendingChangeType.Deleted)
+      }
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
     } catch (err: unknown) {
@@ -996,6 +1027,27 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
+  function collectContainedFilePaths(nodes: FileNode[], folderPath: string): string[] {
+    const normalizedFolderPath = folderPath.replace(/\\/g, '/').replace(/\/+$/, '')
+    const matches: string[] = []
+
+    function walk(currentNodes: FileNode[]) {
+      for (const node of currentNodes) {
+        const normalizedNodePath = node.path.replace(/\\/g, '/')
+        if (node.type === 'file' && normalizedNodePath.startsWith(`${normalizedFolderPath}/`)) {
+          matches.push(normalizedNodePath)
+        }
+
+        if (node.children?.length) {
+          walk(node.children)
+        }
+      }
+    }
+
+    walk(nodes)
+    return matches
+  }
+
   /**
    * Reload a specific file from the server (updates content if file is open)
    */
@@ -1090,6 +1142,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
 
       markSourceChangedAfterDeploy()
+      for (const filePath of affectedFiles ?? []) {
+        if (pendingDeployChanges.value[filePath] !== PendingChangeType.Added) {
+          markPendingDeployChange(filePath, PendingChangeType.Modified)
+        }
+      }
       await refreshCurrentAppMetadata()
       lastDeployError.value = null
       await refreshApplication()
@@ -1161,6 +1218,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     activeFilePath.value = null
     applicationUrl.value = ''
     localDeployBaseline.value = null
+    clearPendingDeployChanges()
     sourceChangedSinceDeploy.value = false
     lastDeployError.value = null
     assignedRunnerOnline.value = null
@@ -1203,6 +1261,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     activeFilePath,
     applicationUrl,
     sourceChangedSinceDeploy,
+    pendingDeployChanges,
+    pendingDeployChangeEntries,
     lastDeployError,
     applicationWarning,
     applicationViewportMode,

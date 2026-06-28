@@ -8,13 +8,14 @@ import { ref, computed } from 'vue'
 import Tree from 'primevue/tree'
 import Button from 'primevue/button'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import type { FileNode } from '../types/apps.types'
+import type { FileNode, PendingFileChangeType } from '../types/apps.types'
 
 const props = withDefaults(defineProps<{
   title?: string
   nodes?: FileNode[]
   activePath?: string | null
   dirtyPaths?: string[]
+  pendingChanges?: Record<string, PendingFileChangeType>
   showCreate?: boolean
   allowDelete?: boolean
   emptyMessage?: string
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<{
   nodes: undefined,
   activePath: undefined,
   dirtyPaths: undefined,
+  pendingChanges: undefined,
   showCreate: true,
   allowDelete: true,
   emptyMessage: 'No files yet',
@@ -157,6 +159,45 @@ function isDirty(path: string): boolean {
   return editorStore.openFiles.some((f) => f.path === path && f.isDirty)
 }
 
+function getPendingChangeType(path: string | undefined): PendingFileChangeType | null {
+  if (!path || !props.pendingChanges) {
+    return null
+  }
+
+  return props.pendingChanges[path] ?? null
+}
+
+const pendingChangeEntries = computed(() => {
+  if (!props.pendingChanges) {
+    return []
+  }
+
+  return Object.entries(props.pendingChanges).map(([path, type]) => ({ path, type }))
+})
+
+const pendingChangeCount = computed(() => pendingChangeEntries.value.length)
+const pendingModifiedEntries = computed(() => pendingChangeEntries.value.filter((entry) => entry.type === 'modified'))
+const pendingAddedEntries = computed(() => pendingChangeEntries.value.filter((entry) => entry.type === 'added'))
+const pendingDeletedEntries = computed(() => pendingChangeEntries.value.filter((entry) => entry.type === 'deleted'))
+const isPendingChangesOpen = ref(false)
+
+function getChangeMarker(type: PendingFileChangeType | null): string | null {
+  switch (type) {
+    case 'modified':
+      return '●'
+    case 'added':
+      return '+'
+    case 'deleted':
+      return '-'
+    default:
+      return null
+  }
+}
+
+function getPathLabel(path: string): string {
+  return path.replace(/^source\//, '')
+}
+
 function canDeleteFile(path: string | undefined): boolean {
   if (!props.allowDelete) return false
   if (!path) return false
@@ -236,6 +277,36 @@ function canDeleteFolder(path: string | undefined): boolean {
       </div>
     </div>
 
+    <div v-if="pendingChangeCount > 0" class="file-tree-pending">
+      <button type="button" class="file-tree-pending__summary" @click="isPendingChangesOpen = !isPendingChangesOpen">
+        <span>{{ pendingChangeCount }} pending {{ pendingChangeCount === 1 ? 'change' : 'changes' }}</span>
+        <i :class="['pi', isPendingChangesOpen ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
+      </button>
+      <div v-if="isPendingChangesOpen" class="file-tree-pending__details">
+        <div v-if="pendingModifiedEntries.length > 0" class="file-tree-pending__group">
+          <div class="file-tree-pending__label">Modified ({{ pendingModifiedEntries.length }})</div>
+          <div v-for="entry in pendingModifiedEntries" :key="`modified-${entry.path}`" class="file-tree-pending__entry">
+            <span class="file-tree-pending__marker file-tree-pending__marker--modified">●</span>
+            <span>{{ getPathLabel(entry.path) }}</span>
+          </div>
+        </div>
+        <div v-if="pendingAddedEntries.length > 0" class="file-tree-pending__group">
+          <div class="file-tree-pending__label">Added ({{ pendingAddedEntries.length }})</div>
+          <div v-for="entry in pendingAddedEntries" :key="`added-${entry.path}`" class="file-tree-pending__entry">
+            <span class="file-tree-pending__marker file-tree-pending__marker--added">+</span>
+            <span>{{ getPathLabel(entry.path) }}</span>
+          </div>
+        </div>
+        <div v-if="pendingDeletedEntries.length > 0" class="file-tree-pending__group">
+          <div class="file-tree-pending__label">Deleted ({{ pendingDeletedEntries.length }})</div>
+          <div v-for="entry in pendingDeletedEntries" :key="`deleted-${entry.path}`" class="file-tree-pending__entry">
+            <span class="file-tree-pending__marker file-tree-pending__marker--deleted">-</span>
+            <span>{{ getPathLabel(entry.path) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tree -->
     <div class="file-tree-content">
       <Tree
@@ -251,10 +322,18 @@ function canDeleteFolder(path: string | undefined): boolean {
             :class="{
               'tree-node-active': isActive(node.data?.path),
               'tree-node-dirty': isDirty(node.data?.path),
+              'tree-node-pending': getPendingChangeType(node.data?.path),
             }"
           >
             <span class="tree-node-label">{{ node.label }}</span>
             <div class="tree-node-actions">
+              <span
+                v-if="getPendingChangeType(node.data?.path)"
+                class="change-indicator"
+                :class="`change-indicator--${getPendingChangeType(node.data?.path)}`"
+              >
+                {{ getChangeMarker(getPendingChangeType(node.data?.path)) }}
+              </span>
               <span v-if="isDirty(node.data?.path)" class="dirty-indicator">*</span>
               <Button
                 v-if="node.data?.type === 'file' && canDeleteFile(node.data?.path)"
@@ -324,6 +403,74 @@ function canDeleteFolder(path: string | undefined): boolean {
   min-height: 0;
 }
 
+.file-tree-pending {
+  padding: 0.65rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--p-surface-200);
+}
+
+.file-tree-pending__summary {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--p-text-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-tree-pending__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+}
+
+.file-tree-pending__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.file-tree-pending__label {
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.file-tree-pending__entry {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+.file-tree-pending__marker {
+  display: inline-flex;
+  width: 0.9rem;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.file-tree-pending__marker--modified {
+  color: var(--p-orange-500);
+}
+
+.file-tree-pending__marker--added {
+  color: var(--p-green-500);
+}
+
+.file-tree-pending__marker--deleted {
+  color: var(--p-red-500);
+}
+
 .file-tree-component {
   flex: 1;
   overflow-y: auto;
@@ -376,9 +523,28 @@ function canDeleteFolder(path: string | undefined): boolean {
 .tree-node-actions {
   display: flex;
   align-items: center;
-  gap: 0.125rem;
+  gap: 0.25rem;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.change-indicator {
+  display: inline-flex;
+  width: 0.9rem;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.change-indicator--modified {
+  color: var(--p-orange-500);
+}
+
+.change-indicator--added {
+  color: var(--p-green-500);
+}
+
+.change-indicator--deleted {
+  color: var(--p-red-500);
 }
 
 .delete-file-button {
@@ -441,6 +607,10 @@ function canDeleteFolder(path: string | undefined): boolean {
 
 /* Dark mode */
 :global(.app-dark) .file-tree-header {
+  border-color: var(--p-surface-700);
+}
+
+:global(.app-dark) .file-tree-pending {
   border-color: var(--p-surface-700);
 }
 

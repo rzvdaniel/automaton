@@ -280,6 +280,14 @@ export interface FileNode {
   isOpen?: boolean
 }
 
+export const PendingFileChangeType = {
+  Modified: 'modified',
+  Added: 'added',
+  Deleted: 'deleted',
+} as const
+
+export type PendingFileChangeType = (typeof PendingFileChangeType)[keyof typeof PendingFileChangeType]
+
 /**
  * Open file in editor with content and state
  */
