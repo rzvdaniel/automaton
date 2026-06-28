@@ -65,8 +65,6 @@ function clearConsole(): void {
     <!-- Header -->
     <div class="console-header">
       <div class="flex align-items-center gap-2">
-        <i class="pi pi-terminal text-color-secondary"></i>
-        <span class="font-semibold">Backend Runtime</span>
         <Tag v-if="hasEntries" :value="entries.length.toString()" severity="secondary" rounded />
       </div>
       <Button
@@ -84,9 +82,9 @@ function clearConsole(): void {
     <div class="console-entries">
       <div v-if="!hasEntries" class="empty-state">
         <i class="pi pi-inbox text-4xl text-color-secondary mb-3"></i>
-        <p class="text-color-secondary m-0">No backend calls yet</p>
+        <p class="text-color-secondary m-0">No backend messages yet.</p>
         <p class="text-color-secondary text-sm m-0 mt-1">
-          Interact with the application to trigger backend controller calls
+          Messages from your application's backend will appear here while it is running.
         </p>
       </div>
 

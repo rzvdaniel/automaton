@@ -102,7 +102,7 @@ const appEditorNavGroups = [
       { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
       { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
       { key: 'services', label: 'Services', icon: 'pi pi-server', disabled: true },
-      { key: 'logs', label: 'Runtime Logs', icon: 'pi pi-list' },
+      { key: 'logs', label: 'Application Logs', icon: 'pi pi-list' },
     ],
   },
   {

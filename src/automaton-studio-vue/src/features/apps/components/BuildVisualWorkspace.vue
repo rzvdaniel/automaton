@@ -409,14 +409,13 @@ async function refreshApplication(): Promise<void> {
           @click="isAdvancedExpanded = false"
         >
           <i class="pi pi-chevron-down"></i>
-          <span>Logs</span>
+          <span>Console</span>
         </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
           <span class="text-sm text-color-secondary">Resizing logs...</span>
         </div>
         <div v-else class="logs-tabbed-container">
-          <div class="logs-console-title">Runtime Console</div>
           <div class="logs-tab-bar">
             <button
               class="logs-tab"
@@ -839,16 +838,6 @@ async function refreshApplication(): Promise<void> {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.logs-console-title {
-  padding: 0.45rem 0.85rem 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--p-text-muted-color);
-  flex-shrink: 0;
 }
 
 .logs-tab-bar {

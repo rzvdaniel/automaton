@@ -3,28 +3,30 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import SelectButton from 'primevue/selectbutton'
-import { UiLogFilter, useAppEditorStore } from '../stores/app-editor.store'
+import { useAppEditorStore } from '../stores/app-editor.store'
 
 const editorStore = useAppEditorStore()
+const levelFilter = ref<'all' | 'info' | 'warn' | 'error'>('all')
 
 const filterOptions = [
-  { label: 'All', value: UiLogFilter.All },
-  { label: 'Errors', value: UiLogFilter.Errors },
-  { label: 'Frontend', value: UiLogFilter.Console },
-  { label: 'Runtime', value: UiLogFilter.Runtime },
+  { label: 'All', value: 'all' },
+  { label: 'Info', value: 'info' },
+  { label: 'Warnings', value: 'warn' },
+  { label: 'Errors', value: 'error' },
 ]
 
 const entries = computed(() => {
-  const all = editorStore.uiLogEntries
-  switch (editorStore.uiLogFilter) {
-    case UiLogFilter.Errors:
-      return all.filter((entry) => entry.level === 'error')
-    case UiLogFilter.Console:
-      return all.filter((entry) => entry.source === 'application-console')
-    case UiLogFilter.Runtime:
-      return all.filter((entry) => entry.source !== 'application-console')
+  const frontendEntries = editorStore.uiLogEntries.filter((entry) => entry.source === 'application-console')
+
+  switch (levelFilter.value) {
+    case 'info':
+      return frontendEntries.filter((entry) => entry.level === 'info' || entry.level === 'debug')
+    case 'warn':
+      return frontendEntries.filter((entry) => entry.level === 'warn')
+    case 'error':
+      return frontendEntries.filter((entry) => entry.level === 'error')
     default:
-      return all
+      return frontendEntries
   }
 })
 const compactMode = ref(true)
@@ -37,18 +39,6 @@ function formatTime(date: Date): string {
     minute: '2-digit',
     second: '2-digit',
   })
-}
-
-function sourceLabel(source: string): string {
-  if (source === 'application-console') return 'Frontend'
-  if (source === 'application-network') return 'Network'
-  return 'Runtime'
-}
-
-function sourceSeverity(source: string): 'secondary' | 'info' | 'warn' {
-  if (source === 'application-network') return 'warn'
-  if (source === 'application-runtime') return 'info'
-  return 'secondary'
 }
 
 function levelClass(level: string): string {
@@ -66,8 +56,9 @@ function downloadLogsAsJson(): void {
   const payload = {
     exportedAt: new Date().toISOString(),
     totalEntries: entries.value.length,
-    filter: editorStore.uiLogFilter,
-    logs: entries.value.map((entry) => ({
+      filter: editorStore.uiLogFilter,
+      levelFilter: levelFilter.value,
+      logs: entries.value.map((entry) => ({
       id: entry.id,
       timestamp: formatIso(entry.timestamp),
       level: entry.level,
@@ -92,9 +83,7 @@ function downloadLogsAsJson(): void {
   <div class="live-logs">
     <div class="live-logs-header">
       <div class="flex align-items-center gap-2">
-        <i class="pi pi-wave-pulse text-color-secondary"></i>
-        <span class="font-semibold">Frontend Runtime</span>
-        <Tag :value="editorStore.uiLogEntries.length.toString()" severity="secondary" rounded />
+        <Tag :value="entries.length.toString()" severity="secondary" rounded />
       </div>
       <div class="flex align-items-center gap-2">
         <Button
@@ -115,13 +104,13 @@ function downloadLogsAsJson(): void {
           @click="downloadLogsAsJson"
         />
         <SelectButton
-          :model-value="editorStore.uiLogFilter"
+          :model-value="levelFilter"
           :options="filterOptions"
           option-value="value"
           option-label="label"
           size="small"
           :allow-empty="false"
-          @update:model-value="editorStore.setUiLogFilter"
+          @update:model-value="levelFilter = $event"
         />
         <Button
           v-if="editorStore.uiLogEntries.length > 0"
@@ -136,7 +125,11 @@ function downloadLogsAsJson(): void {
 
     <div class="live-logs-content">
       <div v-if="entries.length === 0" class="empty-state">
-        <span class="text-color-secondary text-sm">No frontend runtime logs yet</span>
+        <div class="empty-state-copy">
+          <i class="pi pi-inbox text-4xl text-color-secondary"></i>
+          <span class="text-color-secondary">No frontend messages.</span>
+          <span class="text-color-secondary text-sm">Use your browser's Developer Tools for advanced debugging.</span>
+        </div>
       </div>
       <div v-else class="entries">
         <div
@@ -147,7 +140,7 @@ function downloadLogsAsJson(): void {
         >
           <div v-if="!compactMode" class="entry-meta">
             <span class="entry-time">{{ formatTime(entry.timestamp) }}</span>
-            <Tag :value="sourceLabel(entry.source)" :severity="sourceSeverity(entry.source)" size="small" />
+            <Tag :value="entry.level.toUpperCase()" :severity="entry.level === 'error' ? 'danger' : entry.level === 'warn' ? 'warn' : 'info'" size="small" />
           </div>
           <div class="entry-message" :class="levelClass(entry.level)">
             {{ entry.message }}
@@ -186,6 +179,14 @@ function downloadLogsAsJson(): void {
   align-items: center;
   justify-content: center;
   height: 100%;
+}
+
+.empty-state-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  text-align: center;
 }
 
 .entries {

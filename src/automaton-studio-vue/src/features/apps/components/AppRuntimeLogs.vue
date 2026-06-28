@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * AppRuntimeLogs.vue
- * Shows backend runtime action logs for the current app.
+ * Shows historical application/backend execution records for the current app.
  */
 import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
@@ -93,6 +93,34 @@ function formatRuntimeEvent(event: { level: string; message: string }): string {
   return `${event.level.toUpperCase()} ${event.message}`
 }
 
+function getPrimarySummary(log: AppExecutionLog): string {
+  const firstEvent = log.runtimeEvents[0]
+  if (firstEvent) {
+    return formatRuntimeEvent(firstEvent)
+  }
+
+  if (log.errorMessage?.trim()) {
+    return log.errorMessage.trim()
+  }
+
+  return `${log.controllerName}.${log.actionName}()`
+}
+
+function getSecondarySummary(log: AppExecutionLog): string {
+  const parts = [`${log.controllerName}.${log.actionName}()`]
+  parts.push(log.success ? 'Success' : 'Failed')
+  parts.push(formatDuration(log.durationMs))
+  return parts.join(' • ')
+}
+
+function getOutputCountLabel(log: AppExecutionLog): string | null {
+  if (log.runtimeEvents.length === 0) {
+    return null
+  }
+
+  return `${log.runtimeEvents.length} ${log.runtimeEvents.length === 1 ? 'entry' : 'entries'}`
+}
+
 onMounted(loadLogs)
 watch(() => props.appId, loadLogs)
 
@@ -157,30 +185,43 @@ defineExpose({ loadLogs })
     </div>
 
     <!-- Log list -->
-    <div v-else class="logs-list">
-      <div
-        v-for="log in logs"
-        :key="log.id"
-        class="log-row"
-        :class="{ 'log-error': !log.success, expanded: expandedLogId === log.id }"
+      <div v-else class="logs-list">
+        <div
+          v-for="log in logs"
+          :key="log.id"
+          class="log-row"
+          :class="{ 'log-error': !log.success, expanded: expandedLogId === log.id }"
         @click="toggleLog(log.id)"
       >
         <!-- Summary row -->
         <div class="log-summary">
-          <i
-            class="pi"
-            :class="expandedLogId === log.id ? 'pi-chevron-down' : 'pi-chevron-right'"
-            style="font-size: 0.7rem; flex-shrink: 0"
-          ></i>
-          <Tag
-            :value="log.success ? 'OK' : 'ERR'"
-            :severity="log.success ? 'success' : 'danger'"
-            style="font-size: 0.65rem; flex-shrink: 0"
-          />
-          <span class="log-controller">{{ log.controllerName }}</span>
-          <span class="log-action">.{{ log.actionName }}</span>
-          <span class="log-duration">{{ formatDuration(log.durationMs) }}</span>
-          <span class="log-date text-color-secondary">{{ formatDate(log.createdAt) }}</span>
+          <div class="summary-main">
+            <i
+              class="pi"
+              :class="expandedLogId === log.id ? 'pi-chevron-down' : 'pi-chevron-right'"
+              style="font-size: 0.7rem; flex-shrink: 0"
+            ></i>
+            <Tag
+              :value="log.success ? 'OK' : 'ERR'"
+              :severity="log.success ? 'success' : 'danger'"
+              style="font-size: 0.65rem; flex-shrink: 0"
+            />
+            <span class="log-primary">{{ getPrimarySummary(log) }}</span>
+          </div>
+          <div class="summary-meta">
+            <Tag
+              v-if="getOutputCountLabel(log)"
+              :value="getOutputCountLabel(log)!"
+              severity="secondary"
+              rounded
+              style="font-size: 0.65rem; flex-shrink: 0"
+            />
+            <span class="log-date text-color-secondary">{{ formatDate(log.createdAt) }}</span>
+          </div>
+        </div>
+
+        <div class="log-secondary">
+          {{ getSecondarySummary(log) }}
         </div>
 
         <!-- Error line (collapsed) -->
@@ -190,9 +231,26 @@ defineExpose({ loadLogs })
 
         <!-- Expanded detail -->
         <div v-if="expandedLogId === log.id" class="log-detail" @click.stop>
+          <div v-if="log.runtimeEvents.length > 0" class="detail-section">
+            <div class="detail-label">Backend Output</div>
+            <pre class="detail-code detail-output">{{ log.runtimeEvents.map(formatRuntimeEvent).join('\n') }}</pre>
+          </div>
           <div v-if="log.errorMessage" class="detail-section error-section">
             <div class="detail-label">Error</div>
             <pre class="detail-code">{{ log.errorMessage }}</pre>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Execution</div>
+            <div class="detail-grid">
+              <span class="detail-grid-label">Action</span>
+              <span>{{ log.controllerName }}.{{ log.actionName }}()</span>
+              <span class="detail-grid-label">Status</span>
+              <span>{{ log.success ? 'Success' : 'Failed' }}</span>
+              <span class="detail-grid-label">Duration</span>
+              <span>{{ formatDuration(log.durationMs) }}</span>
+              <span class="detail-grid-label">Recorded</span>
+              <span>{{ formatDate(log.createdAt) }}</span>
+            </div>
           </div>
           <div v-if="log.requestPayload" class="detail-section">
             <div class="detail-label">Request</div>
@@ -201,10 +259,6 @@ defineExpose({ loadLogs })
           <div v-if="log.responsePayload" class="detail-section">
             <div class="detail-label">Response</div>
             <pre class="detail-code">{{ tryFormatJson(log.responsePayload) }}</pre>
-          </div>
-          <div v-if="log.runtimeEvents.length > 0" class="detail-section">
-            <div class="detail-label">Backend Output</div>
-            <pre class="detail-code">{{ log.runtimeEvents.map(formatRuntimeEvent).join('\n') }}</pre>
           </div>
           <div class="detail-meta">
             <span v-if="log.ipAddress">IP: {{ log.ipAddress }}</span>
@@ -305,7 +359,7 @@ defineExpose({ loadLogs })
 .log-row {
   border-bottom: 1px solid var(--p-surface-100);
   cursor: pointer;
-  padding: 0.35rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   transition: background 0.15s;
 }
 
@@ -319,33 +373,44 @@ defineExpose({ loadLogs })
 
 .log-summary {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   min-width: 0;
 }
 
-.log-controller {
-  font-family: monospace;
-  font-size: 0.8rem;
-  font-weight: 600;
+.summary-main {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
-.log-action {
-  font-family: monospace;
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
-}
-
-.log-duration {
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-  margin-left: auto;
+.summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.log-primary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .log-date {
   font-size: 0.72rem;
   flex-shrink: 0;
+}
+
+.log-secondary {
+  font-size: 0.74rem;
+  color: var(--p-text-muted-color);
+  padding: 0.15rem 0 0 1.55rem;
 }
 
 .log-error-hint {
@@ -387,6 +452,22 @@ defineExpose({ loadLogs })
   max-height: 200px;
   overflow-y: auto;
   margin: 0;
+}
+
+.detail-output {
+  max-height: 260px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.detail-grid-label {
+  color: var(--p-text-muted-color);
+  font-weight: 600;
 }
 
 .detail-meta {
