@@ -155,16 +155,16 @@ const previewViewportStyle = computed(() => {
     <div v-if="!isAdvancedExpanded" class="preview-only">
       <div class="preview-content">
         <div
-          class="preview-viewport"
+          class="application-viewport"
           :class="editorStore.applicationViewportMode"
           :style="previewViewportStyle"
         >
-          <div v-if="isHeavyRenderingSuspended" class="preview-loading">
+          <div v-if="isHeavyRenderingSuspended" class="application-loading">
             <iframe
               v-if="editorStore.applicationUrl"
               :key="editorStore.applicationUrl"
               :src="editorStore.applicationUrl"
-              class="preview-iframe"
+              class="application-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="Running Application"
             />
@@ -173,11 +173,11 @@ const previewViewportStyle = computed(() => {
               <p class="mt-2 text-color-secondary">Resizing application...</p>
             </div>
           </div>
-          <div v-else-if="editorStore.isLoadingApplication" class="preview-loading">
+          <div v-else-if="editorStore.isLoadingApplication" class="application-loading">
             <i class="pi pi-spin pi-spinner text-3xl"></i>
             <p class="mt-2">Loading application...</p>
           </div>
-          <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
+          <div v-else-if="!editorStore.applicationUrl" class="application-empty">
             <i class="pi pi-desktop text-3xl text-color-secondary"></i>
             <p class="mt-2 text-color-secondary">No deployed application available</p>
           </div>
@@ -185,8 +185,8 @@ const previewViewportStyle = computed(() => {
               v-else
               :key="editorStore.applicationUrl"
               :src="editorStore.applicationUrl"
-              class="preview-iframe"
-              :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
+              class="application-iframe"
+              :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="Running Application"
             />
@@ -251,16 +251,16 @@ const previewViewportStyle = computed(() => {
       <SplitterPanel :size="splitterSizes[0]" :min-size="30" class="splitter-panel">
         <div class="preview-content">
           <div
-            class="preview-viewport"
+            class="application-viewport"
             :class="editorStore.applicationViewportMode"
             :style="previewViewportStyle"
           >
-            <div v-if="isHeavyRenderingSuspended" class="preview-loading">
+            <div v-if="isHeavyRenderingSuspended" class="application-loading">
               <iframe
                 v-if="editorStore.applicationUrl"
                 :key="editorStore.applicationUrl"
                 :src="editorStore.applicationUrl"
-                class="preview-iframe"
+                class="application-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
                 title="Running Application"
               />
@@ -269,11 +269,11 @@ const previewViewportStyle = computed(() => {
                 <p class="mt-2 text-color-secondary">Resizing application...</p>
               </div>
             </div>
-            <div v-else-if="editorStore.isLoadingApplication" class="preview-loading">
+            <div v-else-if="editorStore.isLoadingApplication" class="application-loading">
               <i class="pi pi-spin pi-spinner text-3xl"></i>
               <p class="mt-2">Loading application...</p>
             </div>
-            <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
+            <div v-else-if="!editorStore.applicationUrl" class="application-empty">
               <i class="pi pi-desktop text-3xl text-color-secondary"></i>
               <p class="mt-2 text-color-secondary">No deployed application available</p>
             </div>
@@ -281,8 +281,8 @@ const previewViewportStyle = computed(() => {
               v-else
               :key="editorStore.applicationUrl"
               :src="editorStore.applicationUrl"
-              class="preview-iframe"
-              :class="{ 'preview-iframe--no-pointer': isHeavyRenderingSuspended }"
+              class="application-iframe"
+              :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="Running Application"
             />
@@ -633,7 +633,7 @@ const previewViewportStyle = computed(() => {
   height: 100%;
 }
 
-.preview-viewport {
+.application-viewport {
   border: none;
   border-radius: 0;
   overflow: hidden;
@@ -644,18 +644,18 @@ const previewViewportStyle = computed(() => {
   position: relative;
 }
 
-.preview-iframe {
+.application-iframe {
   width: 100%;
   height: 100%;
   border: none;
 }
 
-.preview-iframe--no-pointer {
+.application-iframe--no-pointer {
   pointer-events: none;
 }
 
-.preview-loading,
-.preview-empty {
+.application-loading,
+.application-empty {
   width: 100%;
   height: 100%;
   display: flex;
@@ -665,7 +665,7 @@ const previewViewportStyle = computed(() => {
   position: relative;
 }
 
-.preview-loading::after {
+.application-loading::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -754,7 +754,7 @@ const previewViewportStyle = computed(() => {
   border-top: 1px solid var(--p-surface-200);
 }
 
-:global(.app-dark) .preview-viewport {
+:global(.app-dark) .application-viewport {
   background: var(--p-surface-900);
 }
 

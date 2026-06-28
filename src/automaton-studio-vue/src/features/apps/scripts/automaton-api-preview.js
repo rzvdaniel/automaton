@@ -1,11 +1,11 @@
 /**
- * automatonApi — injected into every preview-mode app iframe.
+ * automatonApi — injected into every running application iframe.
  *
  * Placeholder tokens are substituted at runtime by buildPreviewApiScript() before
  * the script is written into the iframe document:
  *   __APP_ID__     → the app's UUID
  *   __BASE_URL__   → VITE_API_BASE_URL (e.g. https://localhost:7091)
- *   __AUTH_TOKEN__ → JWT bearer token (always present in preview mode)
+ *   __AUTH_TOKEN__ → JWT bearer token (always present in application mode)
  */
 'use strict';
 
@@ -17,7 +17,7 @@ const TEST_RUN_ID = '__TEST_RUN_ID__';
 const TEST_RUN_HEADER = 'X-Automaton-Test-Run-Id';
 let USE_MOCK_BACKEND = __USE_MOCK_BACKEND__;
 
-console.log('[AutomatonAPI] Preview mode initialized for app:', APP_ID);
+console.log('[AutomatonAPI] Application mode initialized for app:', APP_ID);
 
 function safeSerialize(value) {
   if (typeof value === 'string') return value;
@@ -28,14 +28,14 @@ function safeSerialize(value) {
   }
 }
 
-function emitPreviewConsoleEvent(level, source, args) {
+function emitApplicationConsoleEvent(level, source, args) {
   try {
     const message = Array.isArray(args)
       ? args.map((item) => safeSerialize(item)).join(' ')
       : safeSerialize(args);
 
     window.parent.postMessage({
-      type: 'previewConsoleEvent',
+      type: 'applicationConsoleEvent',
       data: {
         level,
         message,
@@ -44,7 +44,7 @@ function emitPreviewConsoleEvent(level, source, args) {
       }
     }, '*');
   } catch {
-    // Do not break preview execution if telemetry emit fails
+    // Do not break application execution if telemetry emit fails
   }
 }
 
@@ -57,28 +57,28 @@ const originalConsole = {
 
 console.debug = (...args) => {
   originalConsole.debug(...args);
-  emitPreviewConsoleEvent('debug', 'preview-console', args);
+  emitApplicationConsoleEvent('debug', 'application-console', args);
 };
 
 console.log = (...args) => {
   originalConsole.log(...args);
-  emitPreviewConsoleEvent('info', 'preview-console', args);
+  emitApplicationConsoleEvent('info', 'application-console', args);
 };
 
 console.warn = (...args) => {
   originalConsole.warn(...args);
-  emitPreviewConsoleEvent('warn', 'preview-console', args);
+  emitApplicationConsoleEvent('warn', 'application-console', args);
 };
 
 console.error = (...args) => {
   originalConsole.error(...args);
-  emitPreviewConsoleEvent('error', 'preview-console', args);
+  emitApplicationConsoleEvent('error', 'application-console', args);
 };
 
-// Notify the parent that a new preview session is starting.
+// Notify the parent that a new application session is starting.
 // The parent clears its log buffer on this message so stale errors from the
 // previous session are never visible after a page reload or navigation.
-window.parent.postMessage({ type: 'previewConsoleClear' }, '*');
+window.parent.postMessage({ type: 'applicationConsoleClear' }, '*');
 
 // ── Network request capture (for ui_network_log) ──────────────────────────
 // Intercept fetch and XHR before any app code runs so all requests are captured.
@@ -204,7 +204,7 @@ function sendResultToConsole(type, name, inputs, result, duration, success) {
         result,
         duration,
         timestamp: new Date().toISOString(),
-        source: 'preview'
+        source: 'application'
       }
     }, '*');
   } catch (e) {
@@ -672,19 +672,19 @@ window.addEventListener('error', (event) => {
     if (!url) return;
 
     window.parent.postMessage({
-      type: 'previewResourceError',
+      type: 'applicationResourceError',
       data: {
         url,
         tagName: (target.tagName || '').toLowerCase()
       }
     }, '*');
   } catch (e) {
-    // Ignore preview error reporting failures
+    // Ignore application error reporting failures
   }
 }, true);
 
 window.addEventListener('error', (event) => {
-  emitPreviewConsoleEvent('error', 'preview-runtime', [
+  emitApplicationConsoleEvent('error', 'application-runtime', [
     event.message || 'Runtime error',
     event.filename ? `at ${event.filename}:${event.lineno || 0}:${event.colno || 0}` : ''
   ]);
@@ -692,19 +692,19 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason?.message || event.reason || 'Unhandled promise rejection';
-  emitPreviewConsoleEvent('error', 'preview-runtime', [reason]);
+  emitApplicationConsoleEvent('error', 'application-runtime', [reason]);
 });
 
 window.addEventListener('message', async (event) => {
   const payload = event.data || {};
-  if (payload.type !== 'previewAutomationRequest' || !payload.requestId) {
+  if (payload.type !== 'applicationAutomationRequest' || !payload.requestId) {
     return;
   }
 
   const result = await executePreviewAutomationAction(payload.action, payload.args || {});
 
   window.parent.postMessage({
-    type: 'previewAutomationResponse',
+    type: 'applicationAutomationResponse',
     requestId: payload.requestId,
     result
   }, '*');

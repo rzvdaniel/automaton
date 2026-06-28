@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * ConsolePanel.vue
- * Displays step execution results from preview and AI testing
+ * Displays step execution results from the running application and AI testing
  */
 import { computed } from 'vue'
 import Button from 'primevue/button'
@@ -37,12 +37,12 @@ function getStatusClass(entry: ConsoleEntry): string {
   return entry.result.success ? 'text-green-500' : 'text-red-500'
 }
 
-function getSourceSeverity(source: 'preview' | 'ai-test'): 'info' | 'warning' {
+function getSourceSeverity(source: 'application' | 'ai-test'): 'info' | 'warning' {
   return source === 'ai-test' ? 'warning' : 'info'
 }
 
-function getSourceLabel(source: 'preview' | 'ai-test'): string {
-  return source === 'ai-test' ? 'AI Test' : 'Preview'
+function getSourceLabel(source: 'application' | 'ai-test'): string {
+  return source === 'ai-test' ? 'AI Test' : 'Application'
 }
 
 function formatInputs(inputs: Record<string, unknown>): string {
@@ -86,7 +86,7 @@ function clearConsole(): void {
         <i class="pi pi-inbox text-4xl text-color-secondary mb-3"></i>
         <p class="text-color-secondary m-0">No backend calls yet</p>
         <p class="text-color-secondary text-sm m-0 mt-1">
-          Interact with the preview to trigger backend controller calls
+          Interact with the application to trigger backend controller calls
         </p>
       </div>
 

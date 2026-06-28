@@ -145,8 +145,8 @@ function truncateLogMessage(message: string, maxChars: number): string {
 
 function getApplicationIframe(): HTMLIFrameElement | null {
   return (
-    document.querySelector<HTMLIFrameElement>('.build-visual-workspace .preview-iframe')
-    ?? document.querySelector<HTMLIFrameElement>('.preview-overlay .preview-iframe')
+    document.querySelector<HTMLIFrameElement>('.build-visual-workspace .application-iframe')
+    ?? document.querySelector<HTMLIFrameElement>('.application-overlay .application-iframe')
   )
 }
 
@@ -183,7 +183,7 @@ async function executeViaPostMessageBridge(
         result?: UiAutomationResult
       }
 
-      if (data?.type !== 'previewAutomationResponse' || data.requestId !== requestId) {
+      if (data?.type !== 'applicationAutomationResponse' || data.requestId !== requestId) {
         return
       }
 
@@ -202,7 +202,7 @@ async function executeViaPostMessageBridge(
 
     targetWindow.postMessage(
       {
-        type: 'previewAutomationRequest',
+        type: 'applicationAutomationRequest',
         requestId,
         action,
         args,
@@ -285,9 +285,9 @@ export async function executeUiAutomationAction(
     return { success: true, action, details: 'Reloaded application' }
   }
 
-  // All other actions are implemented in automaton-api-preview.js inside the iframe.
+  // All other actions are implemented in the injected application runtime script inside the iframe.
   // Routing everything through the postMessage bridge means a single implementation
   // covers both same-origin and cross-origin frames — adding a new action only
-  // requires adding it to UiAutomationAction and implementing it in automaton-api-preview.js.
+  // requires adding it to UiAutomationAction and implementing it in the runtime script.
   return executeViaPostMessageBridge(action, args)
 }

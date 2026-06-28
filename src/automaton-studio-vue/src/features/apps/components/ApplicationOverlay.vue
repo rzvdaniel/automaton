@@ -84,9 +84,9 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div class="preview-overlay" @click.self="handleClose">
+    <div class="application-overlay" @click.self="handleClose">
       <!-- Header -->
-      <div class="preview-overlay-header">
+      <div class="application-overlay-header">
         <div class="header-left">
           <Button
             v-tooltip.bottom="'Back to Editor (Esc)'"
@@ -139,7 +139,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Preview Content -->
-      <div class="preview-overlay-content">
+      <div class="application-overlay-content">
           <div class="install-notice">
             <i class="pi pi-mobile"></i>
             <span>{{ installMessage }}</span>
@@ -153,7 +153,7 @@ onUnmounted(() => {
               @click="openPublishedApp"
             />
           </div>
-          <div v-if="editorStore.applicationWarning" class="preview-warning">
+          <div v-if="editorStore.applicationWarning" class="application-warning">
             <i class="pi pi-exclamation-triangle"></i>
             <span>{{ editorStore.applicationWarning }}</span>
             <Button
@@ -167,7 +167,7 @@ onUnmounted(() => {
             />
           </div>
         <div
-          class="preview-viewport"
+          class="application-viewport"
           :class="editorStore.applicationViewportMode"
           :style="{
             width: currentSize.width,
@@ -175,13 +175,13 @@ onUnmounted(() => {
           }"
         >
           <!-- Loading state -->
-          <div v-if="editorStore.isLoadingApplication" class="preview-loading">
+          <div v-if="editorStore.isLoadingApplication" class="application-loading">
             <i class="pi pi-spin pi-spinner text-4xl"></i>
             <p class="mt-2">Loading application...</p>
           </div>
 
           <!-- Empty state -->
-          <div v-else-if="!editorStore.applicationUrl" class="preview-empty">
+          <div v-else-if="!editorStore.applicationUrl" class="application-empty">
             <i class="pi pi-desktop text-4xl text-color-secondary"></i>
             <p class="mt-2 text-color-secondary">No deployed application available</p>
             <Button
@@ -199,7 +199,7 @@ onUnmounted(() => {
             ref="iframeRef"
             :key="editorStore.applicationUrl"
             :src="editorStore.applicationUrl"
-            class="preview-iframe"
+            class="application-iframe"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
             title="Running Application"
           />
@@ -210,7 +210,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.preview-overlay {
+.application-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -222,7 +222,7 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-.preview-overlay-header {
+.application-overlay-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -269,7 +269,7 @@ onUnmounted(() => {
   gap: 0.5rem;
 }
 
-.preview-overlay-content {
+.application-overlay-content {
   flex: 1;
   overflow: auto;
   display: flex;
@@ -280,7 +280,7 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-.preview-warning {
+.application-warning {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -316,13 +316,13 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
-.preview-warning > span {
+.application-warning > span {
   flex: 1;
   min-width: 0;
   word-break: break-word;
 }
 
-.preview-viewport {
+.application-viewport {
   background-color: var(--p-surface-0);
   border: 1px solid var(--p-surface-300);
   border-radius: var(--p-border-radius);
@@ -332,34 +332,34 @@ onUnmounted(() => {
   position: relative;
 }
 
-.preview-viewport.desktop {
+.application-viewport.desktop {
   width: 100%;
   height: 100%;
   max-width: none;
   max-height: none;
 }
 
-.preview-viewport.tablet {
+.application-viewport.tablet {
   width: 768px;
   height: calc(100% - 2rem);
   max-height: 1024px;
 }
 
-.preview-viewport.mobile {
+.application-viewport.mobile {
   width: 375px;
   height: calc(100% - 2rem);
   max-height: 812px;
 }
 
-.preview-iframe {
+.application-iframe {
   width: 100%;
   height: 100%;
   border: none;
   display: block;
 }
 
-.preview-loading,
-.preview-empty {
+.application-loading,
+.application-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -371,11 +371,11 @@ onUnmounted(() => {
 }
 
 /* Dark mode */
-:global(.app-dark) .preview-overlay {
+:global(.app-dark) .application-overlay {
   background-color: var(--p-surface-900);
 }
 
-:global(.app-dark) .preview-overlay-header {
+:global(.app-dark) .application-overlay-header {
   background-color: var(--p-surface-800);
   border-color: var(--p-surface-700);
 }
@@ -391,11 +391,11 @@ onUnmounted(() => {
   border-color: var(--p-blue-700);
 }
 
-:global(.app-dark) .preview-overlay-content {
+:global(.app-dark) .application-overlay-content {
   background-color: var(--p-surface-800);
 }
 
-:global(.app-dark) .preview-viewport {
+:global(.app-dark) .application-viewport {
   background-color: var(--p-surface-0);
   border-color: var(--p-surface-600);
 }

@@ -20,9 +20,9 @@ const entries = computed(() => {
     case UiLogFilter.Errors:
       return all.filter((entry) => entry.level === 'error')
     case UiLogFilter.Console:
-      return all.filter((entry) => entry.source === 'preview-console')
+      return all.filter((entry) => entry.source === 'application-console')
     case UiLogFilter.Runtime:
-      return all.filter((entry) => entry.source !== 'preview-console')
+      return all.filter((entry) => entry.source !== 'application-console')
     default:
       return all
   }
@@ -40,14 +40,14 @@ function formatTime(date: Date): string {
 }
 
 function sourceLabel(source: string): string {
-  if (source === 'preview-console') return 'Console'
-  if (source === 'preview-network') return 'Network'
+  if (source === 'application-console') return 'Console'
+  if (source === 'application-network') return 'Network'
   return 'Runtime'
 }
 
 function sourceSeverity(source: string): 'secondary' | 'info' | 'warn' {
-  if (source === 'preview-network') return 'warn'
-  if (source === 'preview-runtime') return 'info'
+  if (source === 'application-network') return 'warn'
+  if (source === 'application-runtime') return 'info'
   return 'secondary'
 }
 

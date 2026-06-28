@@ -25,11 +25,11 @@ export interface ConsoleEntry {
   result: StepExecutionResult
   duration?: number
   /** Where the execution originated from */
-  source: 'preview' | 'ai-test'
+  source: 'application' | 'ai-test'
 }
 
 /**
- * Message sent from preview iframe to parent window
+ * Message sent from application iframe to parent window
  */
 export interface StepResultMessage {
   type: 'automatonStepResult'
@@ -39,7 +39,7 @@ export interface StepResultMessage {
     result: StepExecutionResult
     duration: number
     timestamp: string
-    source: 'preview' | 'ai-test'
+    source: 'application' | 'ai-test'
   }
 }
 
@@ -57,15 +57,15 @@ export interface UiLogEntry {
   timestamp: Date
   level: UiLogLevel
   message: string
-  source: 'preview-console' | 'preview-runtime' | 'preview-network'
+  source: 'application-console' | 'application-runtime' | 'application-network'
 }
 
-export interface PreviewConsoleMessage {
-  type: 'previewConsoleEvent'
+export interface ApplicationConsoleMessage {
+  type: 'applicationConsoleEvent'
   data: {
     level: UiLogLevel
     message: string
     timestamp: string
-    source: 'preview-console' | 'preview-runtime' | 'preview-network'
+    source: 'application-console' | 'application-runtime' | 'application-network'
   }
 }

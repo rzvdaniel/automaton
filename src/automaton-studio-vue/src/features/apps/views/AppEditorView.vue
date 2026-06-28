@@ -37,7 +37,7 @@ import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import type { PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
-import type { PreviewConsoleMessage, StepResultMessage } from '../types/console.types'
+import type { ApplicationConsoleMessage, StepResultMessage } from '../types/console.types'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import {
   executeUiAutomationAction,
@@ -519,9 +519,9 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
-// Handle preview iframe postMessage for console logging
-function handlePreviewMessage(event: MessageEvent) {
-  // Token refresh request from preview iframe — reply with a fresh access token
+// Handle application iframe postMessage for console logging
+function handleApplicationMessage(event: MessageEvent) {
+  // Token refresh request from application iframe — reply with a fresh access token
   if (event.data?.type === 'requestToken') {
     void handleTokenRequest(event)
     return
@@ -542,7 +542,7 @@ function handlePreviewMessage(event: MessageEvent) {
     })
   }
 
-  if (event.data?.type === 'previewResourceError') {
+  if (event.data?.type === 'applicationResourceError') {
     const url = event.data?.data?.url as string | undefined
     const tagName = event.data?.data?.tagName as string | undefined
     if (url) {
@@ -553,21 +553,21 @@ function handlePreviewMessage(event: MessageEvent) {
     }
   }
 
-  // A new preview page started loading — clear stale logs from the previous session
+  // A new application page started loading — clear stale logs from the previous session
   // immediately, before the app's own scripts have a chance to emit new entries.
-  if (event.data?.type === 'previewConsoleClear') {
+  if (event.data?.type === 'applicationConsoleClear') {
     editorStore.clearUiLogs()
     editorStore.addUiLogEntry({
       id: crypto.randomUUID(),
       timestamp: new Date(),
       level: 'info',
-      source: 'preview-runtime',
-      message: '[Automaton] Preview restarted — log window reset',
+      source: 'application-runtime',
+      message: '[Automaton] Application restarted — log window reset',
     })
   }
 
-  if (event.data?.type === 'previewConsoleEvent') {
-    const message = event.data as PreviewConsoleMessage
+  if (event.data?.type === 'applicationConsoleEvent') {
+    const message = event.data as ApplicationConsoleMessage
     const level = message.data.level
     const content = message.data.message
 
@@ -584,14 +584,14 @@ function handlePreviewMessage(event: MessageEvent) {
 // Add beforeunload listener, fullscreen class, and message listener
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
-  window.addEventListener('message', handlePreviewMessage)
+  window.addEventListener('message', handleApplicationMessage)
   // Add class to app-main for fullscreen editor mode
   document.querySelector('.app-main')?.classList.add('app-main--fullscreen')
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
-  window.removeEventListener('message', handlePreviewMessage)
+  window.removeEventListener('message', handleApplicationMessage)
   // Remove fullscreen class
   document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
 })
@@ -1195,7 +1195,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       id: crypto.randomUUID(),
       timestamp: new Date(),
       level,
-      source: 'preview-runtime',
+      source: 'application-runtime',
       message: `${summary}${detailsParts.length > 0 ? ` — ${detailsParts.join(' | ')}` : ''}`,
     })
 
