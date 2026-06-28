@@ -16,9 +16,6 @@ const props = defineProps<{
   isEditingName: boolean
   editingName: string
   isPublished: boolean
-  hasDeployedFrontend: boolean
-  canOpenPrivateApp: boolean
-  canOpenPublicApp: boolean
   hasRunners: boolean | null
   selectedRunnerId: string | null
   isSaving: boolean
@@ -38,66 +35,20 @@ const emit = defineEmits<{
   'update:selectedRunnerId': [value: string | null]
   runnersLoaded: [count: number]
   saveAll: []
-  preview: []
   deployApp: []
   deployFrontend: []
   deployBackend: []
   publish: []
-  openPrivateApp: []
-  openPublicApp: []
-  copyPrivateLink: []
-  copyPublicLink: []
   openPublishingSettings: []
   unpublish: []
 }>()
 
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
-const openAppMenu = ref<InstanceType<typeof Menu> | null>(null)
 const publishedMenu = ref<InstanceType<typeof Menu> | null>(null)
-
-const openAppLabel = computed(() => {
-  if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
-    return 'Open Application'
-  }
-
-  return 'Open App'
-})
 
 const showsEditorActions = computed(() =>
   props.activeTab === 'build' || props.activeTab === 'files' || props.activeTab === 'services',
 )
-
-const canShowOpenApp = computed(() => props.canOpenPrivateApp || props.canOpenPublicApp)
-
-const openAppMenuItems = computed<MenuItem[]>(() => {
-  if (!props.canOpenPublicApp && props.canOpenPrivateApp) {
-    return [
-      { label: 'Open in Studio', command: () => emit('openPrivateApp') },
-      { label: 'Copy Studio Link', command: () => emit('copyPrivateLink') },
-    ]
-  }
-
-  const items: MenuItem[] = []
-
-  if (props.canOpenPrivateApp) {
-    items.push(
-      { label: 'Open in Studio', command: () => emit('openPrivateApp') },
-      { label: 'Copy Studio Link', command: () => emit('copyPrivateLink') },
-    )
-  }
-
-  if (props.canOpenPublicApp) {
-    if (items.length > 0) {
-      items.push({ separator: true })
-    }
-    items.push(
-      { label: 'Open Public App', command: () => emit('openPublicApp') },
-      { label: 'Copy Public Link', command: () => emit('copyPublicLink') },
-    )
-  }
-
-  return items
-})
 
 const actionMenuItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
@@ -136,10 +87,6 @@ function toggleActionMenu(event: Event) {
   actionMenu.value?.toggle(getGroupedMenuEvent(event, '.deploy-actions'))
 }
 
-function toggleOpenAppMenu(event: Event) {
-  openAppMenu.value?.toggle(getGroupedMenuEvent(event, '.open-app-actions'))
-}
-
 function togglePublishedMenu(event: Event) {
   publishedMenu.value?.toggle(getGroupedMenuEvent(event, '.published-actions'))
 }
@@ -176,25 +123,6 @@ function handlePrimaryAction() {
         />
         <Tag v-if="isPublished" value="Published" severity="success" />
         <Tag v-else value="Draft" severity="warn" />
-        <div v-if="canShowOpenApp" class="open-app-actions">
-          <Button
-            icon="pi pi-external-link"
-            :label="openAppLabel"
-            text
-            severity="secondary"
-            class="open-app-main-button"
-            @click="props.canOpenPrivateApp ? emit('openPrivateApp') : emit('openPublicApp')"
-          />
-          <Button
-            icon="pi pi-chevron-down"
-            text
-            severity="secondary"
-            class="open-app-menu-button"
-            aria-label="Open app actions"
-            @click="toggleOpenAppMenu"
-          />
-          <Menu ref="openAppMenu" class="deploy-menu" :model="openAppMenuItems" :popup="true" />
-        </div>
       </div>
 
     </div>
@@ -208,15 +136,6 @@ function handlePrimaryAction() {
           @runners-loaded="emit('runnersLoaded', $event)"
         />
       </div>
-
-      <Button
-        v-if="showsEditorActions && activeTab !== 'services'"
-        icon="pi pi-desktop"
-        label="Application"
-        text
-        severity="secondary"
-        @click="emit('preview')"
-      />
 
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
@@ -412,16 +331,6 @@ function handlePrimaryAction() {
   overflow: hidden;
 }
 
-.open-app-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  margin-left: 0.25rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--p-surface-100) 88%, transparent);
-  overflow: hidden;
-}
-
 .published-actions {
   display: inline-flex;
   align-items: center;
@@ -429,18 +338,6 @@ function handlePrimaryAction() {
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   overflow: hidden;
-}
-
-.open-app-actions :deep(.open-app-main-button) {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.open-app-actions :deep(.open-app-menu-button) {
-  min-width: 2.25rem;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid color-mix(in srgb, var(--p-surface-300) 75%, transparent);
 }
 
 .deploy-actions :deep(.deploy-main-button) {
@@ -478,14 +375,6 @@ function handlePrimaryAction() {
 
 :global(.app-dark) .deploy-actions {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-}
-
-:global(.app-dark) .open-app-actions {
-  background: color-mix(in srgb, var(--p-surface-800) 88%, transparent);
-}
-
-:global(.app-dark) .open-app-actions .open-app-menu-button {
-  border-left-color: color-mix(in srgb, var(--p-surface-600) 70%, transparent);
 }
 
 :global(.app-dark) .deploy-actions .deploy-menu-button {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
+import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppEditorStore } from '../stores/app-editor.store'
@@ -8,6 +9,7 @@ import { APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
 import LiveUiLogPanel from './LiveUiLogPanel.vue'
+import { getOpenAppUrl } from '../utils/public-app-url'
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +24,7 @@ const props = withDefaults(
 
 const editorStore = useAppEditorStore()
 const router = useRouter()
+const toast = useToast()
 const { isDark } = useUserSettings()
 
 const currentSize = computed(() => APPLICATION_VIEWPORT_SIZES[editorStore.applicationViewportMode] ?? APPLICATION_VIEWPORT_SIZES.desktop)
@@ -147,10 +150,83 @@ const previewViewportStyle = computed(() => {
     maxHeight: '100%',
   }
 })
+
+const canOpenApplication = computed(() => editorStore.hasDeployedFrontend && !!editorStore.currentApp)
+
+function getOpenApplicationUrl(): string {
+  return editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
+}
+
+function openApplicationInNewTab(): void {
+  const url = getOpenApplicationUrl()
+  if (!url) return
+  window.open(url, '_blank', 'noopener')
+}
+
+async function copyApplicationLink(): Promise<void> {
+  const url = getOpenApplicationUrl()
+  if (!url) return
+
+  try {
+    await navigator.clipboard.writeText(url)
+    toast.add({
+      severity: 'success',
+      summary: 'Copied',
+      detail: 'Authenticated application URL copied to clipboard',
+      life: 2500,
+    })
+  } catch {
+    toast.add({
+      severity: 'error',
+      summary: 'Copy failed',
+      detail: 'Unable to copy the application URL',
+      life: 3000,
+    })
+  }
+}
+
+async function refreshApplication(): Promise<void> {
+  await editorStore.refreshApplication()
+}
 </script>
 
 <template>
   <div class="build-visual-workspace">
+    <div class="application-shell-header">
+      <div class="application-shell-header__title">
+        <span class="application-shell-header__label">Running Application</span>
+      </div>
+      <div class="application-shell-header__actions">
+        <button
+          class="application-shell-action"
+          type="button"
+          :disabled="!canOpenApplication"
+          @click="openApplicationInNewTab"
+        >
+          <i class="pi pi-external-link"></i>
+          <span>Open in new tab</span>
+        </button>
+        <button
+          class="application-shell-action"
+          type="button"
+          :disabled="!canOpenApplication"
+          @click="copyApplicationLink"
+        >
+          <i class="pi pi-copy"></i>
+          <span>Copy link</span>
+        </button>
+        <button
+          class="application-shell-action"
+          type="button"
+          :disabled="editorStore.isLoadingApplication"
+          @click="refreshApplication"
+        >
+          <i class="pi pi-refresh"></i>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Collapsed: application fills all space -->
     <div v-if="!isAdvancedExpanded" class="preview-only">
       <div class="preview-content">
@@ -373,6 +449,72 @@ const previewViewportStyle = computed(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+
+.application-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--p-surface-200);
+  background: color-mix(in srgb, var(--p-surface-0) 96%, transparent);
+  flex-shrink: 0;
+}
+
+.application-shell-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.application-shell-header__label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+}
+
+.application-shell-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.application-shell-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.application-shell-action:hover:not(:disabled) {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
+}
+
+.application-shell-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.application-shell-action i {
+  font-size: 0.85rem;
+}
+
+.application-shell-action span {
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .visual-splitter {
@@ -758,6 +900,15 @@ const previewViewportStyle = computed(() => {
   background: var(--p-surface-900);
 }
 
+:global(.app-dark) .application-shell-header {
+  border-color: var(--p-surface-700);
+  background: color-mix(in srgb, var(--p-surface-900) 94%, transparent);
+}
+
+:global(.app-dark) .application-shell-action:hover:not(:disabled) {
+  background: var(--p-surface-800);
+}
+
 
 :global(.app-dark) .logs-placeholder {
   border-color: var(--p-surface-700);
@@ -785,5 +936,17 @@ const previewViewportStyle = computed(() => {
 
 :global(.app-dark .build-visual-workspace .p-splitter-gutter:hover) {
   background-color: var(--p-primary-600);
+}
+
+@media (max-width: 900px) {
+  .application-shell-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .application-shell-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

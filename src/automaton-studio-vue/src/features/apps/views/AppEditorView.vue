@@ -645,27 +645,6 @@ function getOpenAppLabel(): string {
   return 'Open App'
 }
 
-function getPrivateAppUrl(): string {
-  return editorStore.currentApp ? getOpenAppUrl({
-    id: editorStore.currentApp.id,
-    isPublished: false,
-    publicUrl: null,
-  }) : ''
-}
-
-function getPublicAppUrl(): string {
-  return editorStore.publicUrl ? getPublishedAppUrl(editorStore.publicUrl) : ''
-}
-
-function openApplicationInNewTab(): void {
-  const url = getPrivateAppUrl()
-  if (!url) {
-    return
-  }
-
-  window.open(url, '_blank', 'noopener')
-}
-
 function openAssistantPanel(): void {
   if (activeTab.value === 'services') {
     return
@@ -674,29 +653,6 @@ function openAssistantPanel(): void {
   rightPanelMode.value = 'aiAssistant'
   isRightPanelOpen.value = true
   saveRightPanelOpen(true)
-}
-
-async function copyUrl(label: string, url: string) {
-  if (!url) {
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(url)
-    toast.add({
-      severity: 'success',
-      summary: 'Link Copied',
-      detail: `${label}: ${url}`,
-      life: 4000,
-    })
-  } catch {
-    toast.add({
-      severity: 'error',
-      summary: 'Copy Failed',
-      detail: 'Unable to copy the link to your clipboard',
-      life: 4000,
-    })
-  }
 }
 
 // Handle save all
@@ -862,32 +818,6 @@ async function handlePublish(request: PublishAppRequest) {
 function openPublishingSettings() {
   activeTab.value = 'settings'
   void router.replace({ query: { ...route.query, settings: 'publishing' } })
-}
-
-function openPublishedApp() {
-  const publicUrl = getPublicAppUrl()
-  if (!publicUrl) {
-    return
-  }
-
-  window.open(publicUrl, '_blank', 'noopener')
-}
-
-function openPrivateApp() {
-  const privateUrl = getPrivateAppUrl()
-  if (!privateUrl) {
-    return
-  }
-
-  window.open(privateUrl, '_blank', 'noopener')
-}
-
-async function copyPrivateAppLink() {
-  await copyUrl('Authenticated application URL', getPrivateAppUrl())
-}
-
-async function copyPublicAppLink() {
-  await copyUrl('Public URL', getPublicAppUrl())
 }
 
 // Handle unpublish
@@ -1284,9 +1214,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-editing-name="isEditingName"
         :editing-name="editingName"
         :is-published="editorStore.isPublished"
-        :has-deployed-frontend="editorStore.hasDeployedFrontend"
-        :can-open-private-app="editorStore.hasDeployedFrontend"
-        :can-open-public-app="editorStore.isPublished"
         :has-runners="hasRunners"
         :selected-runner-id="selectedRunnerId"
         :is-saving="editorStore.isSaving"
@@ -1303,15 +1230,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @update:selected-runner-id="selectedRunnerId = $event"
         @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
-        @preview="openApplicationInNewTab()"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"
         @deploy-backend="handleDeployBackend"
         @publish="showPublishDialog = true"
-        @open-private-app="openPrivateApp"
-        @open-public-app="openPublishedApp"
-        @copy-private-link="copyPrivateAppLink"
-        @copy-public-link="copyPublicAppLink"
         @open-publishing-settings="openPublishingSettings"
         @unpublish="handleUnpublish"
       />
