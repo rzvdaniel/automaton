@@ -194,7 +194,7 @@ async function refreshApplication(): Promise<void> {
   <div class="build-visual-workspace">
     <div class="application-shell-header">
       <div class="application-shell-header__title">
-        <span class="application-shell-header__label">Running Application</span>
+        <span class="application-shell-header__label">Application</span>
       </div>
       <div class="application-shell-header__actions">
         <button
@@ -204,7 +204,7 @@ async function refreshApplication(): Promise<void> {
           @click="openApplicationInNewTab"
         >
           <i class="pi pi-external-link"></i>
-          <span>Open in new tab</span>
+          <span>Open</span>
         </button>
         <button
           class="application-shell-action"
@@ -213,7 +213,7 @@ async function refreshApplication(): Promise<void> {
           @click="copyApplicationLink"
         >
           <i class="pi pi-copy"></i>
-          <span>Copy link</span>
+          <span>Copy</span>
         </button>
         <button
           class="application-shell-action"
@@ -310,7 +310,7 @@ async function refreshApplication(): Promise<void> {
         @click="isAdvancedExpanded = true"
       >
         <i class="pi pi-chevron-up"></i>
-        <span>Console</span>
+        <span>Logs</span>
       </button>
     </div>
 
@@ -409,7 +409,7 @@ async function refreshApplication(): Promise<void> {
           @click="isAdvancedExpanded = false"
         >
           <i class="pi pi-chevron-down"></i>
-          <span>Console</span>
+          <span>Logs</span>
         </button>
         <div v-if="isHeavyRenderingSuspended" class="logs-placeholder">
           <i class="pi pi-arrows-v text-color-secondary"></i>
@@ -720,19 +720,20 @@ async function refreshApplication(): Promise<void> {
   justify-content: center;
   gap: 0.375rem;
   align-self: center;
-  min-width: 6rem;
-  height: 1.75rem;
-  margin: 0.35rem 0 0;
-  padding: 0 0.75rem;
+  min-width: 4.5rem;
+  height: 1.25rem;
+  margin: 0.2rem 0 0;
+  padding: 0 0.55rem;
   border: none;
   border-radius: 999px;
   background: color-mix(in srgb, var(--p-surface-100) 80%, transparent);
   color: var(--p-text-muted-color);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  opacity: 0.9;
 }
 
 .advanced-toggle-handle:hover {
@@ -741,11 +742,11 @@ async function refreshApplication(): Promise<void> {
 }
 
 .advanced-toggle-handle i {
-  font-size: 0.65rem;
+  font-size: 0.55rem;
 }
 
 .advanced-toggle-handle-expanded {
-  margin: 0.45rem auto 0.35rem;
+  margin: 0.3rem auto 0.2rem;
 }
 
 .advanced-toggle-handle-dark {
