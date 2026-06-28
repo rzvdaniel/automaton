@@ -211,7 +211,6 @@ watch(activeTab, (tab) => {
 
 // Right panel mode
 const rightPanelMode = ref<'aiAssistant'>('aiAssistant')
-const isRightPanelOpen = ref(false)
 
 // Ref to version history component for manual refresh
 const versionHistoryRef = ref<any>(null)
@@ -235,6 +234,7 @@ const defaultSizes = [15, 60, 25] // 15% tree, 60% editor, 25% AI
 // Right panel (AI/History) width - stored separately so it applies to both build modes
 const RIGHT_PANEL_SIZE_KEY = 'app-editor-right-panel-size'
 const DEFAULT_RIGHT_PANEL_SIZE = 24
+const RIGHT_PANEL_OPEN_KEY = 'app-editor-right-panel-open'
 
 function loadRightPanelSize(): number {
   try {
@@ -257,7 +257,28 @@ function saveRightPanelSize(size: number) {
   }
 }
 
+function loadRightPanelOpen(): boolean {
+  try {
+    const stored = localStorage.getItem(RIGHT_PANEL_OPEN_KEY)
+    if (stored === 'false') return false
+    if (stored === 'true') return true
+  } catch {
+    // ignore
+  }
+
+  return true
+}
+
+function saveRightPanelOpen(isOpen: boolean) {
+  try {
+    localStorage.setItem(RIGHT_PANEL_OPEN_KEY, String(isOpen))
+  } catch {
+    // ignore
+  }
+}
+
 const rightPanelSize = ref<number>(loadRightPanelSize())
+const isRightPanelOpen = ref<boolean>(loadRightPanelOpen())
 
 function handleRightPanelSplitterResize(event: any) {
   isResizing.value = false
@@ -278,6 +299,7 @@ function toggleAssistantPanel() {
   }
 
   isRightPanelOpen.value = !isRightPanelOpen.value
+  saveRightPanelOpen(isRightPanelOpen.value)
 }
 
 function handleSideNavSelect(target: string) {
@@ -642,6 +664,16 @@ function openApplicationInNewTab(): void {
   }
 
   window.open(url, '_blank', 'noopener')
+}
+
+function openAssistantPanel(): void {
+  if (activeTab.value === 'services') {
+    return
+  }
+
+  rightPanelMode.value = 'aiAssistant'
+  isRightPanelOpen.value = true
+  saveRightPanelOpen(true)
 }
 
 async function copyUrl(label: string, url: string) {
@@ -1463,6 +1495,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       <i class="pi pi-sparkles"></i>
                       <span>AI Assistant</span>
                     </button>
+                    <button class="right-panel-close" type="button" aria-label="Collapse AI Assistant" @click="toggleAssistantPanel">
+                      <i class="pi pi-angle-right"></i>
+                    </button>
                   </div>
                   <div class="ai-sidebar">
                     <AiAssistant
@@ -1486,7 +1521,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               </SplitterPanel>
             </Splitter>
 
-            <div v-else class="build-main-content build-main-content--full">
+            <div v-else class="build-main-content build-main-content--full build-main-content--collapsed">
+              <div class="build-main-surface">
               <!-- Visual mode workspace - shown in Build tab -->
               <div v-show="activeTab === 'build'" class="build-visual-view">
                 <BuildVisualWorkspace
@@ -1573,29 +1609,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                   </div>
                 </SplitterPanel>
               </Splitter>
-
-              <div class="assistant-collapsed-card">
-                <div class="assistant-collapsed-copy">
-                  <div class="assistant-collapsed-title">AI Assistant (Experimental)</div>
-                  <div class="assistant-collapsed-text">
-                    Bring your own AI provider to generate code, edit files, and help ship this app.
-                  </div>
-                </div>
-                <div class="assistant-collapsed-actions">
-                  <Button
-                    label="Open Assistant"
-                    icon="pi pi-sparkles"
-                    @click="toggleAssistantPanel"
-                  />
-                  <Button
-                    label="Configure AI"
-                    icon="pi pi-cog"
-                    severity="secondary"
-                    outlined
-                    @click="router.push('/ai-keys')"
-                  />
-                </div>
               </div>
+
+              <button class="assistant-collapsed-rail" type="button" aria-label="Open AI Assistant" @click="openAssistantPanel">
+                <i class="pi pi-sparkles"></i>
+                <span>Assistant</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1706,9 +1725,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 .right-panel-header {
   display: flex;
-  gap: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   border-bottom: 1px solid var(--p-surface-200);
   flex-shrink: 0;
+  padding-right: 0.5rem;
 }
 
 .right-panel-tab {
@@ -1739,6 +1761,25 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 .right-panel-tab i {
   font-size: 0.8rem;
+}
+
+.right-panel-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.right-panel-close:hover {
+  background: var(--p-surface-100);
+  color: var(--p-text-color);
 }
 
 .ai-sidebar {
@@ -1841,6 +1882,18 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
 .build-main-content--full {
   width: 100%;
+}
+
+.build-main-content--collapsed {
+  flex-direction: row;
+}
+
+.build-main-surface {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .build-visual-view {
@@ -1957,40 +2010,42 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   flex-direction: column;
 }
 
-.assistant-collapsed-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border-top: 1px solid var(--p-surface-200);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--p-cyan-500) 7%, transparent), transparent 70%),
-    var(--p-surface-0);
-  flex-shrink: 0;
-}
-
-.assistant-collapsed-copy {
-  display: flex;
+.assistant-collapsed-rail {
+  display: inline-flex;
   flex-direction: column;
-  gap: 0.2rem;
-}
-
-.assistant-collapsed-title {
-  font-weight: 700;
-}
-
-.assistant-collapsed-text {
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.assistant-collapsed-actions {
-  display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  border: 0;
+  border-left: 1px solid var(--p-surface-200);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--p-cyan-500) 9%, transparent), transparent 55%),
+    var(--p-surface-0);
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.assistant-collapsed-rail:hover {
+  color: var(--p-text-color);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--p-cyan-500) 14%, transparent), transparent 55%),
+    var(--p-surface-50);
+}
+
+.assistant-collapsed-rail i {
+  font-size: 1rem;
+}
+
+.assistant-collapsed-rail span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* Dark mode */
@@ -2026,10 +2081,14 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
   color: var(--p-orange-100);
 }
 
-:global(.app-dark) .assistant-collapsed-card {
+:global(.app-dark) .right-panel-close:hover {
+  background: var(--p-surface-800);
+}
+
+:global(.app-dark) .assistant-collapsed-rail {
   border-color: var(--p-surface-700);
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--p-cyan-500) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--p-cyan-500) 14%, transparent), transparent 55%),
     var(--p-surface-900);
 }
 
@@ -2087,9 +2146,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 }
 
 @media (max-width: 1100px) {
-  .assistant-collapsed-card {
-    flex-direction: column;
-    align-items: flex-start;
+  .assistant-collapsed-rail {
+    width: 2.5rem;
+    min-width: 2.5rem;
   }
 }
 

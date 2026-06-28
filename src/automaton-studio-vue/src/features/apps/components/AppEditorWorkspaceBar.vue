@@ -222,10 +222,12 @@ function handlePrimaryAction() {
 
       <Button
         v-if="showsEditorActions"
-        :label="isAssistantOpen ? 'Hide Assistant' : 'Assistant'"
         icon="pi pi-sparkles"
         text
-        severity="secondary"
+        :severity="isAssistantOpen ? 'contrast' : 'secondary'"
+        rounded
+        aria-label="Toggle AI Assistant"
+        v-tooltip.bottom="isAssistantOpen ? 'Hide AI Assistant' : 'Show AI Assistant'"
         @click="emit('toggleAssistant')"
       />
 
