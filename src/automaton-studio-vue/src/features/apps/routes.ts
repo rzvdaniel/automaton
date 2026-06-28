@@ -19,6 +19,7 @@ export const appsRoutes: RouteRecordRaw[] = [
   },
   {
     path: '/apps/:id',
+    alias: '/apps/:id/application',
     name: 'app-editor',
     component: () => import('./views/AppEditorView.vue'),
   },
