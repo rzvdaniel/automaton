@@ -19,7 +19,6 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly AppsService appsService;
     private readonly AppsControllerExecutionService controllerExecutionService;
     private readonly UserContextService userContextService;
-    private readonly IAppExecutionLogService executionLogService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly Serilog.ILogger logger;
     private readonly PrivateAppLaunchService privateAppLaunchService;
@@ -29,7 +28,6 @@ public class AppsControllerExecutionController : ControllerBase
         AppsService appsService,
         AppsControllerExecutionService controllerExecutionService,
         UserContextService userContextService,
-        IAppExecutionLogService executionLogService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         PrivateAppLaunchService privateAppLaunchService,
         IAppDeployCapabilityService appDeployCapabilityService)
@@ -37,7 +35,6 @@ public class AppsControllerExecutionController : ControllerBase
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
         this.userContextService = userContextService;
-        this.executionLogService = executionLogService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.privateAppLaunchService = privateAppLaunchService;
         this.appDeployCapabilityService = appDeployCapabilityService;
@@ -266,28 +263,12 @@ public class AppsControllerExecutionController : ControllerBase
 
             sw.Stop();
 
-            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
-            {
-                AppId = app.Id,
-                ControllerName = controllerName,
-                ActionName = actionName,
-                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
-                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
-                Success = result.Success,
-                ErrorMessage = result.Error,
-                DurationMs = sw.ElapsedMilliseconds,
-                UserId = User.Identity?.IsAuthenticated == true ? userContextService.GetUserId() : (Guid?)null,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            });
-
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
             sw.Stop();
             logger.Warning(ex, "Invalid controller action: {ControllerName}.{ActionName}", controllerName, actionName);
-
-            await LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
 
             return BadRequest(new { error = ex.Message });
         }
@@ -297,36 +278,7 @@ public class AppsControllerExecutionController : ControllerBase
             logger.Error(ex, "Controller action failed: App={AppSlug}, Controller={ControllerName}, Action={ActionName}",
                 appSlug, controllerName, actionName);
 
-            _ = LogFailedExecutionAsync(appSlug, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
-
             return StatusCode(500, new { error = "Internal server error during controller action execution" });
-        }
-    }
-
-    private async Task LogFailedExecutionAsync(
-        string appSlug, string controllerName, string actionName,
-        AppControllerActionRequest request, long durationMs, string errorMessage)
-    {
-        try
-        {
-            var app = await appsService.GetPublishedAppInfoAsync(appSlug, CancellationToken.None);
-            if (app == null) return;
-
-            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
-            {
-                AppId = app.Id,
-                ControllerName = controllerName,
-                ActionName = actionName,
-                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
-                Success = false,
-                ErrorMessage = errorMessage,
-                DurationMs = durationMs,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            });
-        }
-        catch
-        {
-            // Best-effort; don't rethrow
         }
     }
 
@@ -379,28 +331,12 @@ public class AppsControllerExecutionController : ControllerBase
 
             sw.Stop();
 
-            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
-            {
-                AppId = appId,
-                ControllerName = controllerName,
-                ActionName = actionName,
-                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
-                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
-                Success = result.Success,
-                ErrorMessage = result.Error,
-                DurationMs = sw.ElapsedMilliseconds,
-                UserId = userContextService.GetUserId(),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            });
-
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
             sw.Stop();
             logger.Warning(ex, "Invalid preview controller action: {ControllerName}.{ActionName}", controllerName, actionName);
-
-            _ = LogFailedPreviewAsync(appId, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
 
             return BadRequest(new { error = ex.Message });
         }
@@ -409,8 +345,6 @@ public class AppsControllerExecutionController : ControllerBase
             sw.Stop();
             logger.Error(ex, "Preview controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
-
-            _ = LogFailedPreviewAsync(appId, controllerName, actionName, request, sw.ElapsedMilliseconds, ex.Message);
 
             return StatusCode(500, new { error = "Internal server error during controller action execution" });
         }
@@ -470,20 +404,6 @@ public class AppsControllerExecutionController : ControllerBase
 
             sw.Stop();
 
-            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
-            {
-                AppId = appId,
-                ControllerName = controllerName,
-                ActionName = actionName,
-                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
-                ResponsePayload = result != null ? JsonSerializer.Serialize(result) : null,
-                Success = result.Success,
-                ErrorMessage = result.Error,
-                DurationMs = sw.ElapsedMilliseconds,
-                UserId = userContextService.GetUserId(),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            });
-
             return Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -498,30 +418,6 @@ public class AppsControllerExecutionController : ControllerBase
             logger.Error(ex, "Private deployed controller action failed: AppId={AppId}, Controller={ControllerName}, Action={ActionName}",
                 appId, controllerName, actionName);
             return StatusCode(500, new { error = "Internal server error during controller action execution" });
-        }
-    }
-
-    private async Task LogFailedPreviewAsync(
-        Guid appId, string controllerName, string actionName,
-        AppControllerActionRequest request, long durationMs, string errorMessage)
-    {
-        try
-        {
-            await executionLogService.LogExecutionAsync(new AppExecutionLogRequest
-            {
-                AppId = appId,
-                ControllerName = controllerName,
-                ActionName = actionName,
-                RequestPayload = request.Inputs != null ? JsonSerializer.Serialize(request.Inputs) : null,
-                Success = false,
-                ErrorMessage = errorMessage,
-                DurationMs = durationMs,
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            });
-        }
-        catch
-        {
-            // Best-effort; don't rethrow
         }
     }
 

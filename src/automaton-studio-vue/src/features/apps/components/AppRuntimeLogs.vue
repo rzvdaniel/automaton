@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * AppRuntimeLogs.vue
- * Shows historical application/backend execution records for the current app.
+ * Placeholder for persisted application/platform lifecycle events.
  */
 import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
-import InputText from 'primevue/inputtext'
 import { appExecutionLogService } from '@/shared/services/api/app-execution-log.service'
 import type { AppExecutionLog, AppExecutionLogFilter } from '@/shared/types/ai.types'
 
@@ -25,19 +24,12 @@ const filter = ref<AppExecutionLogFilter>({
   page: 1,
   pageSize: 50,
 })
-const controllerFilter = ref('')
-const statusFilter = ref<'all' | 'success' | 'error'>('all')
 
 async function loadLogs() {
   if (!props.appId) return
   isLoading.value = true
   try {
-    const f: AppExecutionLogFilter = {
-      ...filter.value,
-      controllerName: controllerFilter.value || undefined,
-      success: statusFilter.value === 'all' ? undefined : statusFilter.value === 'success',
-    }
-    const result = await appExecutionLogService.getLogs(props.appId, f)
+    const result = await appExecutionLogService.getLogs(props.appId, filter.value)
     logs.value = result.items
     totalCount.value = result.totalCount
     totalPages.value = result.totalPages
@@ -46,11 +38,6 @@ async function loadLogs() {
   } finally {
     isLoading.value = false
   }
-}
-
-function applyFilter() {
-  filter.value.page = 1
-  loadLogs()
 }
 
 function prevPage() {
@@ -80,25 +67,7 @@ function formatDuration(ms: number) {
   return `${ms}ms`
 }
 
-function tryFormatJson(raw?: string): string {
-  if (!raw) return ''
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
-  } catch {
-    return raw
-  }
-}
-
-function formatRuntimeEvent(event: { level: string; message: string }): string {
-  return `${event.level.toUpperCase()} ${event.message}`
-}
-
 function getPrimarySummary(log: AppExecutionLog): string {
-  const firstEvent = log.runtimeEvents[0]
-  if (firstEvent) {
-    return formatRuntimeEvent(firstEvent)
-  }
-
   if (log.errorMessage?.trim()) {
     return log.errorMessage.trim()
   }
@@ -113,14 +82,6 @@ function getSecondarySummary(log: AppExecutionLog): string {
   return parts.join(' • ')
 }
 
-function getOutputCountLabel(log: AppExecutionLog): string | null {
-  if (log.runtimeEvents.length === 0) {
-    return null
-  }
-
-  return `${log.runtimeEvents.length} ${log.runtimeEvents.length === 1 ? 'entry' : 'entries'}`
-}
-
 onMounted(loadLogs)
 watch(() => props.appId, loadLogs)
 
@@ -129,33 +90,9 @@ defineExpose({ loadLogs })
 
 <template>
   <div class="app-runtime-logs">
-    <!-- Filter bar -->
     <div class="filter-bar">
       <div class="filter-left">
-        <InputText
-          v-model="controllerFilter"
-          placeholder="Controller name"
-          size="small"
-          class="filter-input"
-          @keyup.enter="applyFilter"
-        />
-        <div class="status-buttons">
-          <button
-            class="status-btn"
-            :class="{ active: statusFilter === 'all' }"
-            @click="statusFilter = 'all'; applyFilter()"
-          >All</button>
-          <button
-            class="status-btn success"
-            :class="{ active: statusFilter === 'success' }"
-            @click="statusFilter = 'success'; applyFilter()"
-          >Success</button>
-          <button
-            class="status-btn error"
-            :class="{ active: statusFilter === 'error' }"
-            @click="statusFilter = 'error'; applyFilter()"
-          >Error</button>
-        </div>
+        <span class="text-color-secondary text-sm">Platform lifecycle history</span>
       </div>
       <div class="filter-right">
         <span class="text-color-secondary text-sm">{{ totalCount }} records</span>
@@ -180,8 +117,8 @@ defineExpose({ loadLogs })
     <!-- Empty -->
     <div v-else-if="logs.length === 0" class="empty-state">
       <i class="pi pi-server text-4xl text-color-secondary mb-2"></i>
-      <p class="text-color-secondary">No runtime logs yet.</p>
-      <p class="text-color-secondary text-sm">Logs appear after the running application triggers backend actions.</p>
+      <p class="text-color-secondary">No application logs yet.</p>
+      <p class="text-color-secondary text-sm">Application Logs will show persisted platform lifecycle events such as deploy, publish, runner connection, and runtime failures.</p>
     </div>
 
     <!-- Log list -->
@@ -209,13 +146,6 @@ defineExpose({ loadLogs })
             <span class="log-primary">{{ getPrimarySummary(log) }}</span>
           </div>
           <div class="summary-meta">
-            <Tag
-              v-if="getOutputCountLabel(log)"
-              :value="getOutputCountLabel(log)!"
-              severity="secondary"
-              rounded
-              style="font-size: 0.65rem; flex-shrink: 0"
-            />
             <span class="log-date text-color-secondary">{{ formatDate(log.createdAt) }}</span>
           </div>
         </div>
@@ -231,10 +161,6 @@ defineExpose({ loadLogs })
 
         <!-- Expanded detail -->
         <div v-if="expandedLogId === log.id" class="log-detail" @click.stop>
-          <div v-if="log.runtimeEvents.length > 0" class="detail-section">
-            <div class="detail-label">Backend Output</div>
-            <pre class="detail-code detail-output">{{ log.runtimeEvents.map(formatRuntimeEvent).join('\n') }}</pre>
-          </div>
           <div v-if="log.errorMessage" class="detail-section error-section">
             <div class="detail-label">Error</div>
             <pre class="detail-code">{{ log.errorMessage }}</pre>
@@ -251,14 +177,6 @@ defineExpose({ loadLogs })
               <span class="detail-grid-label">Recorded</span>
               <span>{{ formatDate(log.createdAt) }}</span>
             </div>
-          </div>
-          <div v-if="log.requestPayload" class="detail-section">
-            <div class="detail-label">Request</div>
-            <pre class="detail-code">{{ tryFormatJson(log.requestPayload) }}</pre>
-          </div>
-          <div v-if="log.responsePayload" class="detail-section">
-            <div class="detail-label">Response</div>
-            <pre class="detail-code">{{ tryFormatJson(log.responsePayload) }}</pre>
           </div>
           <div class="detail-meta">
             <span v-if="log.ipAddress">IP: {{ log.ipAddress }}</span>
@@ -304,41 +222,6 @@ defineExpose({ loadLogs })
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.filter-input {
-  width: 150px;
-  font-size: 0.8rem;
-}
-
-.status-buttons {
-  display: flex;
-  gap: 2px;
-}
-
-.status-btn {
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  border: 1px solid var(--p-surface-300);
-  border-radius: 4px;
-  background: transparent;
-  cursor: pointer;
-  color: var(--p-text-color);
-}
-
-.status-btn:hover,
-.status-btn.active {
-  background: var(--p-surface-100);
-}
-
-.status-btn.success.active {
-  border-color: var(--p-green-500);
-  color: var(--p-green-500);
-}
-
-.status-btn.error.active {
-  border-color: var(--p-red-500);
-  color: var(--p-red-500);
 }
 
 .empty-state {
@@ -452,10 +335,6 @@ defineExpose({ loadLogs })
   max-height: 200px;
   overflow-y: auto;
   margin: 0;
-}
-
-.detail-output {
-  max-height: 260px;
 }
 
 .detail-grid {
