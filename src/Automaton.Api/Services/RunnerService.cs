@@ -294,7 +294,7 @@ public class RunnerService
             ApplicationEventLevels.Info,
             ApplicationEventCategories.Runtime,
             ApplicationEventTypes.RunnerConnected,
-            "Assigned runner connected.",
+            "Runner connected.",
             new
             {
                 runner.Name,
@@ -367,7 +367,7 @@ public class RunnerService
             ApplicationEventLevels.Warning,
             ApplicationEventCategories.Runtime,
             ApplicationEventTypes.RunnerDisconnected,
-            "Assigned runner disconnected.",
+            "Runner disconnected.",
             new
             {
                 runner.Name,
@@ -438,7 +438,7 @@ public class RunnerService
                     ApplicationEventLevels.Error,
                     ApplicationEventCategories.Runtime,
                     ApplicationEventTypes.RunnerDisconnected,
-                    "Assigned runner disconnected after heartbeat timeout.",
+                    "Runner disconnected after heartbeat timeout.",
                     new
                     {
                         runner.Name,

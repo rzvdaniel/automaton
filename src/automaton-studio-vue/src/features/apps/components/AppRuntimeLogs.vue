@@ -1,8 +1,4 @@
 <script setup lang="ts">
-/**
- * AppRuntimeLogs.vue
- * Placeholder for persisted application/platform lifecycle events.
- */
 import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -88,13 +84,67 @@ function formatLevel(level: string) {
   }
 }
 
-function tryFormatJson(raw?: string) {
-  if (!raw) return ''
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
-  } catch {
-    return raw
+function getMetadataEntries(log: ApplicationEvent) {
+  if (!log.metadataJson) {
+    return [] as Array<{ label: string; value: string }>
   }
+
+  try {
+    const parsed = JSON.parse(log.metadataJson) as Record<string, unknown>
+    return Object.entries(parsed)
+      .filter(([, value]) => value !== null && value !== undefined && value !== '')
+      .map(([key, value]) => ({
+        label: humanizeMetadataKey(key),
+        value: humanizeMetadataValue(key, value),
+      }))
+  } catch {
+    return [{ label: 'Details', value: log.metadataJson }]
+  }
+}
+
+function humanizeMetadataKey(key: string) {
+  switch (key) {
+    case 'Name':
+      return 'Runner'
+    case 'MachineName':
+      return 'Machine'
+    case 'Reason':
+      return 'Disconnect reason'
+    case 'RunnerId':
+      return 'Runner'
+    case 'VersionNumber':
+      return 'Version'
+    default:
+      return key.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  }
+}
+
+function humanizeMetadataValue(key: string, value: unknown) {
+  if (typeof value !== 'string') {
+    return JSON.stringify(value)
+  }
+
+  if (key === 'Reason') {
+    switch (value) {
+      case 'graceful_disconnect':
+        return 'Disconnected normally'
+      case 'heartbeat_timeout':
+        return 'Heartbeat timeout'
+      default:
+        return value.replace(/_/g, ' ')
+    }
+  }
+
+  return value
+}
+
+function formatMetadataBlock(log: ApplicationEvent) {
+  const entries = getMetadataEntries(log)
+  if (entries.length === 0) {
+    return ''
+  }
+
+  return `{\n${entries.map(entry => `  "${entry.label}": "${entry.value}"`).join('\n')}\n}`
 }
 
 onMounted(loadLogs)
@@ -110,7 +160,7 @@ defineExpose({ loadLogs })
         <span class="text-color-secondary text-sm">Platform lifecycle history</span>
       </div>
       <div class="filter-right">
-        <span class="text-color-secondary text-sm">{{ totalCount }} records</span>
+        <span class="text-color-secondary text-sm">{{ totalCount }} events</span>
         <Button
           v-tooltip.bottom="'Refresh'"
           icon="pi pi-refresh"
@@ -132,20 +182,18 @@ defineExpose({ loadLogs })
     <!-- Empty -->
     <div v-else-if="logs.length === 0" class="empty-state">
       <i class="pi pi-server text-4xl text-color-secondary mb-2"></i>
-      <p class="text-color-secondary">No application logs yet.</p>
-      <p class="text-color-secondary text-sm">Application Logs will show persisted platform lifecycle events such as deploy, publish, runner connection, and restore history.</p>
+      <p class="text-color-secondary">No activity yet.</p>
+      <p class="text-color-secondary text-sm">Activity will show recent events such as deployments, publishing, runner connection changes, and restore history.</p>
     </div>
 
-    <!-- Log list -->
-      <div v-else class="logs-list">
-        <div
-          v-for="log in logs"
-          :key="log.id"
-          class="log-row"
-          :class="{ 'log-error': log.level === 'error', expanded: expandedLogId === log.id }"
+    <div v-else class="logs-list">
+      <div
+        v-for="log in logs"
+        :key="log.id"
+        class="log-row"
+        :class="{ expanded: expandedLogId === log.id }"
         @click="toggleLog(log.id)"
       >
-        <!-- Summary row -->
         <div class="log-summary">
           <div class="summary-main">
             <i
@@ -170,31 +218,23 @@ defineExpose({ loadLogs })
           </div>
         </div>
 
-        <div class="log-secondary">
-          {{ log.eventType }}
-        </div>
-
-        <div v-if="log.level === 'error' && expandedLogId !== log.id" class="log-error-hint">
-          Requires attention
-        </div>
-
         <div v-if="expandedLogId === log.id" class="log-detail" @click.stop>
           <div class="detail-section">
             <div class="detail-label">Event</div>
             <div class="detail-grid">
+              <span class="detail-grid-label">Type</span>
+              <span>{{ log.eventType }}</span>
               <span class="detail-grid-label">Level</span>
               <span>{{ formatLevel(log.level) }}</span>
               <span class="detail-grid-label">Category</span>
               <span>{{ formatCategory(log.category) }}</span>
-              <span class="detail-grid-label">Type</span>
-              <span>{{ log.eventType }}</span>
               <span class="detail-grid-label">Recorded</span>
               <span>{{ formatDate(log.createdAtUtc) }}</span>
             </div>
           </div>
-          <div v-if="log.metadataJson" class="detail-section">
+          <div v-if="getMetadataEntries(log).length > 0" class="detail-section">
             <div class="detail-label">Metadata</div>
-            <pre class="detail-code">{{ tryFormatJson(log.metadataJson) }}</pre>
+            <pre class="detail-code">{{ formatMetadataBlock(log) }}</pre>
           </div>
         </div>
       </div>
@@ -265,10 +305,6 @@ defineExpose({ loadLogs })
   background: var(--p-surface-50);
 }
 
-.log-row.log-error {
-  border-left: 3px solid var(--p-red-400);
-}
-
 .log-summary {
   display: flex;
   align-items: flex-start;
@@ -311,12 +347,6 @@ defineExpose({ loadLogs })
   padding: 0.15rem 0 0 1.55rem;
 }
 
-.log-error-hint {
-  font-size: 0.72rem;
-  color: var(--p-red-400);
-  padding: 0.1rem 1.5rem 0.2rem;
-}
-
 .log-detail {
   padding: 0.5rem 1.5rem 0.5rem;
   background: var(--p-surface-50);
@@ -324,10 +354,6 @@ defineExpose({ loadLogs })
 
 .detail-section {
   margin-bottom: 0.5rem;
-}
-
-.error-section .detail-code {
-  color: var(--p-red-400);
 }
 
 .detail-label {
@@ -362,11 +388,6 @@ defineExpose({ loadLogs })
 .detail-grid-label {
   color: var(--p-text-muted-color);
   font-weight: 600;
-}
-
-.detail-meta {
-  font-size: 0.7rem;
-  color: var(--p-text-muted-color);
 }
 
 .pagination {
