@@ -16,18 +16,29 @@ Rules:
 - Shared helpers go in `backend/shared/`.
 - Extra Python packages go in `backend/requirements.txt`.
 - Local mock responses go in `backend/mocks/{controller}.{action}.json`.
+- For Python diagnostics, prefer the standard `logging` module over `print(...)`.
+- Use a module-level logger with `logger.info(...)`, `logger.warning(...)`, and `logger.exception(...)` for meaningful backend runtime messages.
+- `print(...)` is still compatible because Automaton captures stdout, but it should not be the default recommendation in generated apps.
 
 Recommended pattern:
 
 ```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("todos")
+
 class TodosController:
     def list(self, inputs: dict) -> dict:
+        logger.info("Listing todos")
         return {"success": True, "data": {"items": []}, "error": ""}
 
     def create(self, inputs: dict) -> dict:
         title = inputs.get("title", "").strip()
         if not title:
+            logger.warning("Todo creation rejected because title is missing")
             return {"success": False, "data": None, "error": "title is required"}
+        logger.info("Creating todo")
         return {"success": True, "data": {"title": title}, "error": ""}
 
 _controller = TodosController()

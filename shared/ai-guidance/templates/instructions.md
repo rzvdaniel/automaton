@@ -30,7 +30,9 @@ Before making app bootstrap decisions, check whether `automaton.json` exists in 
 - Frontend source normally lives in `frontend/`.
 - Backend source, when needed, normally lives in `backend/`.
 - Default to frontend-only unless the requested feature truly requires backend execution.
-- When generating backend code, add a small amount of useful diagnostics around meaningful actions and errors. For simple Python controllers, plain `print(...)` is acceptable because Automaton captures stdout in Studio.
+- When generating backend code, add a small amount of useful diagnostics around meaningful actions and errors.
+- For Python controllers, prefer the standard `logging` module with a module-level logger and `logger.info(...)`, `logger.warning(...)`, and `logger.exception(...)`.
+- `print(...)` is still compatible because Automaton captures stdout in Studio, but it should not be the default recommendation.
 - Keep frontend console logging minimal. Prefer `console.warn(...)` and `console.error(...)` for real issues, and never log secrets or sensitive user data.
 - Use `automaton validate` to inspect the local contract before deploy when needed.
 - Treat `automaton deploy` success as the completion gate for app work.

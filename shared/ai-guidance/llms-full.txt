@@ -247,7 +247,9 @@ Each action must return the standard envelope:
 
 Generated apps should include a small amount of useful backend logging so Studio's Backend Runtime helps users debug behavior.
 
-- Use normal language logging where appropriate. For simple Python controller apps, plain `print(...)` is acceptable because Automaton captures stdout.
+- For Python backends, prefer the standard `logging` module over `print(...)`.
+- Create a module-level logger and use `logger.info(...)`, `logger.warning(...)`, and `logger.exception(...)` for meaningful diagnostics.
+- For tiny throwaway examples, `print(...)` is still compatible because Automaton captures stdout, but it should not be the default recommendation.
 - Log meaningful events such as startup/setup, important create/update/delete actions, validation failures, external API failures, database failures, and unexpected exceptions.
 - Do not log secrets, tokens, passwords, API keys, cookies, session values, or full sensitive payloads.
 - Do not add noisy logs for every tiny internal step or every successful read unless they materially help debugging.
@@ -319,9 +321,13 @@ try {
 `backend/todos.py`
 
 ```python
+import logging
 import os
 import sqlite3
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("todos")
 
 DATA_DIR = Path(os.environ["AUTOMATON_APP_DATA_DIR"])
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -348,6 +354,7 @@ def init_db():
 class TodosController:
     def list(self, inputs: dict) -> dict:
         init_db()
+        logger.info("Listing todos")
         with get_connection() as conn:
             rows = conn.execute(
                 "SELECT id, title, done FROM todos ORDER BY id DESC"
@@ -367,6 +374,7 @@ class TodosController:
     def create(self, inputs: dict) -> dict:
         title = str(inputs.get("title", "")).strip()
         if not title:
+            logger.warning("Todo creation rejected because title is missing")
             return {"success": False, "data": None, "error": "title is required"}
 
         init_db()
@@ -376,6 +384,7 @@ class TodosController:
                 (title,)
             )
             todo_id = cursor.lastrowid
+        logger.info("Created todo %s", todo_id)
 
         return {
             "success": True,

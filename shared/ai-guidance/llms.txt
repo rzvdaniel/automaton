@@ -226,7 +226,9 @@ Every action must return exactly:
 Backend diagnostics guidance for AI-generated apps:
 
 - Add a small amount of useful backend logging around meaningful actions and error paths so Backend Runtime in Studio helps users understand what the app is doing.
-- Use normal language logging where appropriate; for simple Python controller apps, plain `print(...)` is acceptable because Automaton captures stdout.
+- For Python backends, prefer the standard `logging` module over `print(...)`.
+- Create a module-level logger and use `logger.info(...)`, `logger.warning(...)`, and `logger.exception(...)` for meaningful diagnostics.
+- For very small throwaway controller examples, `print(...)` is still compatible because Automaton captures stdout, but it should not be the default recommendation.
 - Log startup/setup, important create/update/delete actions, validation failures, external API failures, database failures, and unexpected exceptions.
 - Do not log secrets, tokens, passwords, API keys, cookies, session values, or full sensitive payloads.
 - Do not log every tiny internal step or every successful read unless it materially helps debugging.
