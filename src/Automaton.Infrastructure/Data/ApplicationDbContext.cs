@@ -75,7 +75,6 @@ namespace Automaton.Api.Data
         public virtual DbSet<AiChatSession> AiChatSessions { get; set; }
         public virtual DbSet<AiChatMessage> AiChatMessages { get; set; }
         public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
-        public virtual DbSet<AppExecutionLog> AppExecutionLogs { get; set; }
         public virtual DbSet<ApplicationEvent> ApplicationEvents { get; set; }
 
         // User Settings

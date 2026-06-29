@@ -484,52 +484,6 @@ namespace Automaton.Api.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
-            modelBuilder.Entity("Automaton.Api.Entities.AppExecutionLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("ActionName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<Guid>("AppId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("ControllerName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("IpAddress")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("RequestPayload")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ResponsePayload")
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("char(36)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AppExecutionLogs");
-                });
-
             modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
                 {
                     b.Property<Guid>("Id")
