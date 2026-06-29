@@ -22,6 +22,7 @@ public class RunnerService
     private readonly ResourceAuthorizationService authorizationService;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly IAuditEventService auditEventService;
+    private readonly IApplicationEventService applicationEventService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -32,7 +33,8 @@ public class RunnerService
         IHubContext<AutomatonHub> automatonHub,
         ResourceAuthorizationService authorizationService,
         ApiInstanceIdentityService apiInstanceIdentityService,
-        IAuditEventService auditEventService)
+        IAuditEventService auditEventService,
+        IApplicationEventService applicationEventService)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
@@ -40,6 +42,7 @@ public class RunnerService
         this.authorizationService = authorizationService;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.auditEventService = auditEventService;
+        this.applicationEventService = applicationEventService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
@@ -285,6 +288,22 @@ public class RunnerService
 
         LinkHostedRunnerAfterReconnect(runner, userId);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await WriteRunnerApplicationEventsAsync(
+            runner.Id,
+            ApplicationEventLevels.Info,
+            ApplicationEventCategories.Runtime,
+            ApplicationEventTypes.RunnerConnected,
+            "Assigned runner connected.",
+            new
+            {
+                runner.Name,
+                runner.ConnectionId,
+                runner.MachineName,
+                runner.ApiInstanceId
+            },
+            userId,
+            cancellationToken);
     }
 
     public async Task RecordHeartbeatAsync(Guid runnerId, Guid userId, RunnerDetails runnerHeartbeat, CancellationToken cancellationToken)
@@ -342,6 +361,21 @@ public class RunnerService
             RunnerSessionDisconnectReasons.GracefulDisconnect,
             cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await WriteRunnerApplicationEventsAsync(
+            runner.Id,
+            ApplicationEventLevels.Warning,
+            ApplicationEventCategories.Runtime,
+            ApplicationEventTypes.RunnerDisconnected,
+            "Assigned runner disconnected.",
+            new
+            {
+                runner.Name,
+                runner.MachineName,
+                Reason = RunnerSessionDisconnectReasons.GracefulDisconnect
+            },
+            UserId,
+            cancellationToken);
     }
 
     public async Task<int> CloseStaleConnectionSessionsAsync(CancellationToken cancellationToken)
@@ -396,6 +430,23 @@ public class RunnerService
         {
             await dbContext.SaveChangesAsync(cancellationToken);
             logger.Warning("Closed {SessionCount} stale runner connection session(s) after heartbeat timeout", closedCount);
+
+            foreach (var runner in staleRunners)
+            {
+                await WriteRunnerApplicationEventsAsync(
+                    runner.Id,
+                    ApplicationEventLevels.Error,
+                    ApplicationEventCategories.Runtime,
+                    ApplicationEventTypes.RunnerDisconnected,
+                    "Assigned runner disconnected after heartbeat timeout.",
+                    new
+                    {
+                        runner.Name,
+                        Reason = RunnerSessionDisconnectReasons.HeartbeatTimeout
+                    },
+                    UserId,
+                    cancellationToken);
+            }
         }
 
         return closedCount;
@@ -954,4 +1005,35 @@ public class RunnerService
         Guid RunnerId,
         string? ConnectionId,
         DateTime? LastHeartbeatAtUtc);
+
+    private async Task WriteRunnerApplicationEventsAsync(
+        Guid runnerId,
+        string level,
+        string category,
+        string eventType,
+        string message,
+        object? metadata,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        var appIds = await dbContext.WebApps
+            .AsNoTracking()
+            .Where(x => x.ExecutionRunnerId == runnerId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var appId in appIds)
+        {
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = appId,
+                Level = level,
+                Category = category,
+                EventType = eventType,
+                Message = message,
+                Metadata = metadata,
+                ActorUserId = actorUserId
+            }, cancellationToken);
+        }
+    }
 }

@@ -21,6 +21,7 @@ public class AppsService
     private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly IAuditEventService auditEventService;
+    private readonly IApplicationEventService applicationEventService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -34,7 +35,8 @@ public class AppsService
         AppFileStorageService fileStorageService,
         PublishedAppStorageService publishedAppStorageService,
         IWebHostEnvironment webHostEnvironment,
-        IAuditEventService auditEventService
+        IAuditEventService auditEventService,
+        IApplicationEventService applicationEventService
     )
     {
         this.dataContext = dataContext;
@@ -45,6 +47,7 @@ public class AppsService
         this.publishedAppStorageService = publishedAppStorageService;
         this.webHostEnvironment = webHostEnvironment;
         this.auditEventService = auditEventService;
+        this.applicationEventService = applicationEventService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -624,6 +627,24 @@ public class AppsService
             }
         });
 
+        await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+        {
+            AppId = id,
+            Level = ApplicationEventLevels.Info,
+            Category = ApplicationEventCategories.Publishing,
+            EventType = ApplicationEventTypes.AppPublished,
+            Message = "Application published.",
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                Slug = publicUrl,
+                entity.Version,
+                RequiresAuthentication = requiresAuthentication,
+                RunnerId = entity.ExecutionRunnerId,
+                IsForkable = isForkable
+            }
+        });
+
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
@@ -661,6 +682,21 @@ public class AppsService
             EventType = AuditEventTypes.AppUnpublished,
             Message = $"App '{entity.Name}' was unpublished",
             Outcome = AuditOutcomes.Success,
+            ActorUserId = UserId,
+            Metadata = new
+            {
+                entity.PublicUrl,
+                entity.Version
+            }
+        });
+
+        await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+        {
+            AppId = id,
+            Level = ApplicationEventLevels.Info,
+            Category = ApplicationEventCategories.Publishing,
+            EventType = ApplicationEventTypes.AppUnpublished,
+            Message = "Application unpublished.",
             ActorUserId = UserId,
             Metadata = new
             {

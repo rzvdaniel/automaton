@@ -423,3 +423,61 @@ export interface AppExecutionLogFilter {
   page?: number
   pageSize?: number
 }
+
+export interface ApplicationEvent {
+  id: string
+  appId: string
+  level: string
+  category: string
+  eventType: string
+  message: string
+  metadataJson?: string
+  actorUserId?: string
+  createdAtUtc: string
+}
+
+export interface ApplicationEventPage {
+  items: ApplicationEvent[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface ApplicationEventFilter {
+  category?: string
+  level?: string
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface ApplicationEvent {
+  id: string
+  appId: string
+  level: string
+  category: string
+  eventType: string
+  message: string
+  metadataJson?: string
+  actorUserId?: string
+  createdAtUtc: string
+}
+
+export interface ApplicationEventPage {
+  items: ApplicationEvent[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface ApplicationEventFilter {
+  category?: string
+  level?: string
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
+}

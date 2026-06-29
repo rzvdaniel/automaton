@@ -637,6 +637,57 @@ namespace Automaton.Api.Migrations
                     b.ToTable("AppVersionSteps");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ApplicationEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("AppId", "CreatedAtUtc");
+
+                    b.HasIndex("AppId", "Category", "CreatedAtUtc");
+
+                    b.HasIndex("AppId", "Level", "CreatedAtUtc");
+
+                    b.ToTable("ApplicationEvents");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")

@@ -7,20 +7,20 @@ import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Tag from 'primevue/tag'
-import { appExecutionLogService } from '@/shared/services/api/app-execution-log.service'
-import type { AppExecutionLog, AppExecutionLogFilter } from '@/shared/types/ai.types'
+import { applicationEventsService } from '@/shared/services/api/application-events.service'
+import type { ApplicationEvent, ApplicationEventFilter } from '@/shared/types/ai.types'
 
 const props = defineProps<{
   appId: string
 }>()
 
-const logs = ref<AppExecutionLog[]>([])
+const logs = ref<ApplicationEvent[]>([])
 const totalCount = ref(0)
 const totalPages = ref(0)
 const isLoading = ref(false)
 const expandedLogId = ref<string | null>(null)
 
-const filter = ref<AppExecutionLogFilter>({
+const filter = ref<ApplicationEventFilter>({
   page: 1,
   pageSize: 50,
 })
@@ -29,12 +29,12 @@ async function loadLogs() {
   if (!props.appId) return
   isLoading.value = true
   try {
-    const result = await appExecutionLogService.getLogs(props.appId, filter.value)
+    const result = await applicationEventsService.getEvents(props.appId, filter.value)
     logs.value = result.items
     totalCount.value = result.totalCount
     totalPages.value = result.totalPages
   } catch (err) {
-    console.error('Failed to load execution logs', err)
+    console.error('Failed to load application events', err)
   } finally {
     isLoading.value = false
   }
@@ -62,24 +62,39 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString()
 }
 
-function formatDuration(ms: number) {
-  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`
-  return `${ms}ms`
+function formatCategory(category: string) {
+  return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-function getPrimarySummary(log: AppExecutionLog): string {
-  if (log.errorMessage?.trim()) {
-    return log.errorMessage.trim()
+function getLevelSeverity(level: string) {
+  switch (level) {
+    case 'error':
+      return 'danger'
+    case 'warning':
+      return 'warn'
+    default:
+      return 'success'
   }
-
-  return `${log.controllerName}.${log.actionName}()`
 }
 
-function getSecondarySummary(log: AppExecutionLog): string {
-  const parts = [`${log.controllerName}.${log.actionName}()`]
-  parts.push(log.success ? 'Success' : 'Failed')
-  parts.push(formatDuration(log.durationMs))
-  return parts.join(' • ')
+function formatLevel(level: string) {
+  switch (level) {
+    case 'error':
+      return 'Error'
+    case 'warning':
+      return 'Warning'
+    default:
+      return 'Info'
+  }
+}
+
+function tryFormatJson(raw?: string) {
+  if (!raw) return ''
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
 }
 
 onMounted(loadLogs)
@@ -118,7 +133,7 @@ defineExpose({ loadLogs })
     <div v-else-if="logs.length === 0" class="empty-state">
       <i class="pi pi-server text-4xl text-color-secondary mb-2"></i>
       <p class="text-color-secondary">No application logs yet.</p>
-      <p class="text-color-secondary text-sm">Application Logs will show persisted platform lifecycle events such as deploy, publish, runner connection, and runtime failures.</p>
+      <p class="text-color-secondary text-sm">Application Logs will show persisted platform lifecycle events such as deploy, publish, runner connection, and restore history.</p>
     </div>
 
     <!-- Log list -->
@@ -127,7 +142,7 @@ defineExpose({ loadLogs })
           v-for="log in logs"
           :key="log.id"
           class="log-row"
-          :class="{ 'log-error': !log.success, expanded: expandedLogId === log.id }"
+          :class="{ 'log-error': log.level === 'error', expanded: expandedLogId === log.id }"
         @click="toggleLog(log.id)"
       >
         <!-- Summary row -->
@@ -139,47 +154,47 @@ defineExpose({ loadLogs })
               style="font-size: 0.7rem; flex-shrink: 0"
             ></i>
             <Tag
-              :value="log.success ? 'OK' : 'ERR'"
-              :severity="log.success ? 'success' : 'danger'"
+              :value="formatLevel(log.level)"
+              :severity="getLevelSeverity(log.level)"
               style="font-size: 0.65rem; flex-shrink: 0"
             />
-            <span class="log-primary">{{ getPrimarySummary(log) }}</span>
+            <Tag
+              :value="formatCategory(log.category)"
+              severity="secondary"
+              style="font-size: 0.65rem; flex-shrink: 0"
+            />
+            <span class="log-primary">{{ log.message }}</span>
           </div>
           <div class="summary-meta">
-            <span class="log-date text-color-secondary">{{ formatDate(log.createdAt) }}</span>
+            <span class="log-date text-color-secondary">{{ formatDate(log.createdAtUtc) }}</span>
           </div>
         </div>
 
         <div class="log-secondary">
-          {{ getSecondarySummary(log) }}
+          {{ log.eventType }}
         </div>
 
-        <!-- Error line (collapsed) -->
-        <div v-if="!log.success && expandedLogId !== log.id && log.errorMessage" class="log-error-hint">
-          {{ log.errorMessage.slice(0, 150) }}{{ log.errorMessage.length > 150 ? '…' : '' }}
+        <div v-if="log.level === 'error' && expandedLogId !== log.id" class="log-error-hint">
+          Requires attention
         </div>
 
-        <!-- Expanded detail -->
         <div v-if="expandedLogId === log.id" class="log-detail" @click.stop>
-          <div v-if="log.errorMessage" class="detail-section error-section">
-            <div class="detail-label">Error</div>
-            <pre class="detail-code">{{ log.errorMessage }}</pre>
-          </div>
           <div class="detail-section">
-            <div class="detail-label">Execution</div>
+            <div class="detail-label">Event</div>
             <div class="detail-grid">
-              <span class="detail-grid-label">Action</span>
-              <span>{{ log.controllerName }}.{{ log.actionName }}()</span>
-              <span class="detail-grid-label">Status</span>
-              <span>{{ log.success ? 'Success' : 'Failed' }}</span>
-              <span class="detail-grid-label">Duration</span>
-              <span>{{ formatDuration(log.durationMs) }}</span>
+              <span class="detail-grid-label">Level</span>
+              <span>{{ formatLevel(log.level) }}</span>
+              <span class="detail-grid-label">Category</span>
+              <span>{{ formatCategory(log.category) }}</span>
+              <span class="detail-grid-label">Type</span>
+              <span>{{ log.eventType }}</span>
               <span class="detail-grid-label">Recorded</span>
-              <span>{{ formatDate(log.createdAt) }}</span>
+              <span>{{ formatDate(log.createdAtUtc) }}</span>
             </div>
           </div>
-          <div class="detail-meta">
-            <span v-if="log.ipAddress">IP: {{ log.ipAddress }}</span>
+          <div v-if="log.metadataJson" class="detail-section">
+            <div class="detail-label">Metadata</div>
+            <pre class="detail-code">{{ tryFormatJson(log.metadataJson) }}</pre>
           </div>
         </div>
       </div>

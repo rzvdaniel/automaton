@@ -23,6 +23,7 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly Serilog.ILogger logger;
     private readonly PrivateAppLaunchService privateAppLaunchService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
+    private readonly IApplicationEventService applicationEventService;
 
     public AppsControllerExecutionController(
         AppsService appsService,
@@ -30,7 +31,8 @@ public class AppsControllerExecutionController : ControllerBase
         UserContextService userContextService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         PrivateAppLaunchService privateAppLaunchService,
-        IAppDeployCapabilityService appDeployCapabilityService)
+        IAppDeployCapabilityService appDeployCapabilityService,
+        IApplicationEventService applicationEventService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
@@ -38,6 +40,7 @@ public class AppsControllerExecutionController : ControllerBase
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.privateAppLaunchService = privateAppLaunchService;
         this.appDeployCapabilityService = appDeployCapabilityService;
+        this.applicationEventService = applicationEventService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
     }
 
@@ -93,15 +96,50 @@ public class AppsControllerExecutionController : ControllerBase
         {
             var userId = userContextService.GetUserId();
             logger.Debug("Deploy backend request: AppId={AppId}, UserId={UserId}", appId, userId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Info,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.BackendDeployStarted,
+                "Backend deployment started.",
+                new { request?.RunnerNames },
+                userId,
+                cancellationToken);
 
             var result = await controllerExecutionService.DeployBackendToRunnersAsync(
                 appId, userId, request?.RunnerNames, cancellationToken);
+
+            await WriteApplicationEventAsync(
+                appId,
+                result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
+                ApplicationEventCategories.Deployment,
+                result.Success ? ApplicationEventTypes.BackendDeployCompleted : ApplicationEventTypes.BackendDeployFailed,
+                result.Success ? "Backend deployment completed." : "Backend deployment completed with issues.",
+                new
+                {
+                    result.DeployedCount,
+                    result.TotalScripts,
+                    result.RunnerCount,
+                    result.HasRequirements,
+                    result.Message
+                },
+                userId,
+                cancellationToken);
 
             return Ok(result);
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Deploy backend failed: AppId={AppId}", appId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Error,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.BackendDeployFailed,
+                "Backend deployment failed.",
+                new { Error = ex.Message },
+                userContextService.GetUserId(),
+                cancellationToken);
             return StatusCode(500, new { error = "Deploy failed: " + ex.Message });
         }
     }
@@ -147,13 +185,55 @@ public class AppsControllerExecutionController : ControllerBase
         {
             var userId = userContextService.GetUserId();
             logger.Debug("Deploy app request: AppId={AppId}, UserId={UserId}", appId, userId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Info,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.AppDeployStarted,
+                "Application deployment started.",
+                null,
+                userId,
+                cancellationToken);
 
             var result = await controllerExecutionService.DeployStudioAppAsync(appId, userId, cancellationToken);
+            await WriteApplicationEventAsync(
+                appId,
+                result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
+                ApplicationEventCategories.Deployment,
+                result.Success ? ApplicationEventTypes.AppDeployCompleted : ApplicationEventTypes.AppDeployFailed,
+                result.Success ? "Application deployment completed." : "Application deployment completed with issues.",
+                new
+                {
+                    result.FrontendFilesSynced,
+                    result.BackendFilesSynced,
+                    result.FrontendAction,
+                    result.BackendAction,
+                    result.Message,
+                    BackendDeploy = result.BackendDeploy == null ? null : new
+                    {
+                        result.BackendDeploy.Success,
+                        result.BackendDeploy.DeployedCount,
+                        result.BackendDeploy.TotalScripts,
+                        result.BackendDeploy.RunnerCount,
+                        result.BackendDeploy.Message
+                    }
+                },
+                userId,
+                cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Deploy app failed: AppId={AppId}", appId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Error,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.AppDeployFailed,
+                "Application deployment failed.",
+                new { Error = ex.Message },
+                userContextService.GetUserId(),
+                cancellationToken);
             return StatusCode(500, new { error = "Deploy app failed: " + ex.Message });
         }
     }
@@ -171,13 +251,45 @@ public class AppsControllerExecutionController : ControllerBase
         {
             var userId = userContextService.GetUserId();
             logger.Debug("Deploy frontend request: AppId={AppId}, UserId={UserId}", appId, userId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Info,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.FrontendDeployStarted,
+                "Frontend deployment started.",
+                null,
+                userId,
+                CancellationToken.None);
 
             var result = await controllerExecutionService.DeployFrontendAsync(appId, userId);
+            await WriteApplicationEventAsync(
+                appId,
+                result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
+                ApplicationEventCategories.Deployment,
+                result.Success ? ApplicationEventTypes.FrontendDeployCompleted : ApplicationEventTypes.FrontendDeployFailed,
+                result.Success ? "Frontend deployment completed." : "Frontend deployment completed with issues.",
+                new
+                {
+                    result.FrontendFilesSynced,
+                    result.FrontendAction,
+                    result.Message
+                },
+                userId,
+                CancellationToken.None);
             return Ok(result);
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Deploy frontend failed: AppId={AppId}", appId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Error,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.FrontendDeployFailed,
+                "Frontend deployment failed.",
+                new { Error = ex.Message },
+                userContextService.GetUserId(),
+                CancellationToken.None);
             return StatusCode(500, new { error = "Deploy frontend failed: " + ex.Message });
         }
     }
@@ -197,15 +309,77 @@ public class AppsControllerExecutionController : ControllerBase
         {
             var userId = userContextService.GetUserId();
             logger.Debug("Deploy backend component request: AppId={AppId}, UserId={UserId}", appId, userId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Info,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.BackendDeployStarted,
+                "Backend deployment started.",
+                null,
+                userId,
+                cancellationToken);
 
             var result = await controllerExecutionService.DeployBackendComponentAsync(appId, userId, cancellationToken);
+            await WriteApplicationEventAsync(
+                appId,
+                result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
+                ApplicationEventCategories.Deployment,
+                result.Success ? ApplicationEventTypes.BackendDeployCompleted : ApplicationEventTypes.BackendDeployFailed,
+                result.Success ? "Backend deployment completed." : "Backend deployment completed with issues.",
+                new
+                {
+                    result.BackendFilesSynced,
+                    result.BackendAction,
+                    result.Message,
+                    BackendDeploy = result.BackendDeploy == null ? null : new
+                    {
+                        result.BackendDeploy.Success,
+                        result.BackendDeploy.DeployedCount,
+                        result.BackendDeploy.TotalScripts,
+                        result.BackendDeploy.RunnerCount,
+                        result.BackendDeploy.Message
+                    }
+                },
+                userId,
+                cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
         {
             logger.Error(ex, "Deploy backend component failed: AppId={AppId}", appId);
+            await WriteApplicationEventAsync(
+                appId,
+                ApplicationEventLevels.Error,
+                ApplicationEventCategories.Deployment,
+                ApplicationEventTypes.BackendDeployFailed,
+                "Backend deployment failed.",
+                new { Error = ex.Message },
+                userContextService.GetUserId(),
+                cancellationToken);
             return StatusCode(500, new { error = "Deploy backend component failed: " + ex.Message });
         }
+    }
+
+    private Task WriteApplicationEventAsync(
+        Guid appId,
+        string level,
+        string category,
+        string eventType,
+        string message,
+        object? metadata,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        return applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+        {
+            AppId = appId,
+            Level = level,
+            Category = category,
+            EventType = eventType,
+            Message = message,
+            Metadata = metadata,
+            ActorUserId = actorUserId
+        }, cancellationToken);
     }
 
     /// <summary>

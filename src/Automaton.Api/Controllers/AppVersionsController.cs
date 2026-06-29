@@ -1,3 +1,4 @@
+using Automaton.Api.Constants;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
@@ -17,15 +18,18 @@ public class AppVersionsController : BaseController
 {
     private readonly AppVersionService appVersionService;
     private readonly AppsService appsService;
+    private readonly IApplicationEventService applicationEventService;
     private readonly ILogger<AppVersionsController> logger;
 
     public AppVersionsController(
         AppVersionService appVersionService,
         AppsService appsService,
+        IApplicationEventService applicationEventService,
         ILogger<AppVersionsController> logger)
     {
         this.appVersionService = appVersionService;
         this.appsService = appsService;
+        this.applicationEventService = applicationEventService;
         this.logger = logger;
     }
 
@@ -223,6 +227,17 @@ public class AppVersionsController : BaseController
             // Perform the restore
             await appVersionService.RestoreVersionAsync(appId, versionNumber, userId);
 
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = appId,
+                Level = ApplicationEventLevels.Info,
+                Category = ApplicationEventCategories.Restore,
+                EventType = ApplicationEventTypes.RestoreApplied,
+                Message = $"Restored application to version {versionNumber}.",
+                ActorUserId = userId,
+                Metadata = new { VersionNumber = versionNumber }
+            });
+
             var response = new RestoreVersionResponse
             {
                 AppId = appId,
@@ -235,11 +250,31 @@ public class AppVersionsController : BaseController
         catch (InvalidOperationException ex)
         {
             logger.LogWarning(ex, "[AppVersionsController] Invalid restore request for app {AppId} version {Version}", appId, versionNumber);
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = appId,
+                Level = ApplicationEventLevels.Error,
+                Category = ApplicationEventCategories.Restore,
+                EventType = ApplicationEventTypes.RestoreFailed,
+                Message = $"Restore to version {versionNumber} failed.",
+                ActorUserId = GetUserId(),
+                Metadata = new { VersionNumber = versionNumber, Error = ex.Message }
+            });
             return NotFound(new { message = ex.Message });
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "[AppVersionsController] Error restoring app {AppId} to version {Version}", appId, versionNumber);
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = appId,
+                Level = ApplicationEventLevels.Error,
+                Category = ApplicationEventCategories.Restore,
+                EventType = ApplicationEventTypes.RestoreFailed,
+                Message = $"Restore to version {versionNumber} failed.",
+                ActorUserId = GetUserId(),
+                Metadata = new { VersionNumber = versionNumber, Error = ex.Message }
+            });
             return StatusCode(500, new { message = "Failed to restore version" });
         }
     }

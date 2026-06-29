@@ -22,6 +22,7 @@ public class AppsController : BaseController
     private readonly SettingsService settingsService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly PrivateAppLaunchService privateAppLaunchService;
+    private readonly IApplicationEventService applicationEventService;
 
     public AppsController(
         AppsService appsService,
@@ -35,6 +36,7 @@ public class AppsController : BaseController
         SettingsService settingsService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         PrivateAppLaunchService privateAppLaunchService,
+        IApplicationEventService applicationEventService,
         GitHubService? githubService = null)
     {
         this.appsService = appsService;
@@ -49,6 +51,7 @@ public class AppsController : BaseController
         this.settingsService = settingsService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.privateAppLaunchService = privateAppLaunchService;
+        this.applicationEventService = applicationEventService;
     }
 
     [HttpGet]
@@ -314,6 +317,16 @@ public class AppsController : BaseController
         }
         catch (InvalidOperationException ex)
         {
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = id,
+                Level = ApplicationEventLevels.Error,
+                Category = ApplicationEventCategories.Publishing,
+                EventType = ApplicationEventTypes.AppPublishFailed,
+                Message = "Application publish failed.",
+                ActorUserId = userContextService.GetUserId(),
+                Metadata = new { Error = ex.Message, request.PublicUrl }
+            });
             return BadRequest(new { message = ex.Message });
         }
 
@@ -329,7 +342,24 @@ public class AppsController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        await appsService.Unpublish(id);
+        try
+        {
+            await appsService.Unpublish(id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await applicationEventService.WriteAsync(new ApplicationEventWriteRequest
+            {
+                AppId = id,
+                Level = ApplicationEventLevels.Error,
+                Category = ApplicationEventCategories.Publishing,
+                EventType = ApplicationEventTypes.AppUnpublishFailed,
+                Message = "Application unpublish failed.",
+                ActorUserId = userContextService.GetUserId(),
+                Metadata = new { Error = ex.Message }
+            });
+            return BadRequest(new { message = ex.Message });
+        }
 
         return NoContent();
     }

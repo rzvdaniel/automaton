@@ -76,6 +76,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<AiChatMessage> AiChatMessages { get; set; }
         public virtual DbSet<AiChatSessionUser> AiChatSessionUsers { get; set; }
         public virtual DbSet<AppExecutionLog> AppExecutionLogs { get; set; }
+        public virtual DbSet<ApplicationEvent> ApplicationEvents { get; set; }
 
         // User Settings
         public virtual DbSet<UserSetting> UserSettings { get; set; }
@@ -154,6 +155,22 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.EntityType, e.EntityId });
                 entity.HasIndex(e => new { e.UserId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.TargetUserId, e.CreatedAtUtc });
+                entity.HasIndex(e => e.EventType);
+            });
+
+            modelBuilder.Entity<ApplicationEvent>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Level).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.Category).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.MetadataJson).HasColumnType("longtext");
+                entity.Property(e => e.CreatedAtUtc).IsRequired();
+
+                entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.AppId, e.Category, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.AppId, e.Level, e.CreatedAtUtc });
                 entity.HasIndex(e => e.EventType);
             });
 
