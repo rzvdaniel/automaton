@@ -17,6 +17,7 @@ public class AutomatonHub : Hub
     private const string RunnerMachineNameHeader = "RunnerMachineName";
 
     private readonly RunnerService runnerService;
+    private readonly AppsService appsService;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly TunnelRequestRegistry tunnelRegistry;
     private readonly FileUploadRegistry fileUploadRegistry;
@@ -25,6 +26,7 @@ public class AutomatonHub : Hub
 
     public AutomatonHub(
         RunnerService runnerService,
+        AppsService appsService,
         ApiInstanceIdentityService apiInstanceIdentityService,
         TunnelRequestRegistry tunnelRegistry,
         FileUploadRegistry fileUploadRegistry,
@@ -32,6 +34,7 @@ public class AutomatonHub : Hub
         ILogger<AutomatonHub> logger)
     {
         this.runnerService = runnerService;
+        this.appsService = appsService;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.tunnelRegistry = tunnelRegistry;
         this.fileUploadRegistry = fileUploadRegistry;
@@ -41,7 +44,12 @@ public class AutomatonHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var runner = GetRunner();
+        var runner = GetRunnerOrNull();
+        if (runner == null)
+        {
+            await base.OnConnectedAsync();
+            return;
+        }
 
         try
         {
@@ -119,9 +127,15 @@ public class AutomatonHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        var runner = GetRunnerOrNull();
+        if (runner == null)
+        {
+            await base.OnDisconnectedAsync(exception);
+            return;
+        }
+
         try
         {
-            var runner = GetRunner();
             await runnerService.MarkDisconnectedAsync(runner.Id, Context.ConnectionId, CancellationToken.None);
         }
         catch (Exception ex)
@@ -136,6 +150,30 @@ public class AutomatonHub : Hub
     {
         return !string.IsNullOrEmpty(runnerName);
     }
+
+    public async Task JoinAppRuntimeLogs(Guid appId)
+    {
+        if (GetRunnerOrNull() != null)
+        {
+            throw new HubException("Runner connections cannot subscribe to app runtime logs.");
+        }
+
+        var userId = GetUserId();
+        var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, CancellationToken.None);
+        if (app == null)
+        {
+            throw new HubException("App not found or access denied.");
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GetAppRuntimeLogsGroupName(appId));
+    }
+
+    public Task LeaveAppRuntimeLogs(Guid appId)
+    {
+        return Groups.RemoveFromGroupAsync(Context.ConnectionId, GetAppRuntimeLogsGroupName(appId));
+    }
+
+    public static string GetAppRuntimeLogsGroupName(Guid appId) => $"app-runtime-logs:{appId:D}";
 
     public async Task Heartbeat()
     {
@@ -160,14 +198,30 @@ public class AutomatonHub : Hub
 
     private RunnerDetails GetRunner()
     {
+        var runner = GetRunnerOrNull();
+        if (runner == null)
+        {
+            throw new InvalidOperationException("SignalR connection does not include runner headers.");
+        }
+
+        return runner;
+    }
+
+    private RunnerDetails? GetRunnerOrNull()
+    {
         var httpContext = Context.GetHttpContext();
         var runnerId = httpContext.Request.Headers[RunnerIdHeader].ToString();
         var runnerName = httpContext.Request.Headers[RunnerNameHeader].ToString();
         var connectionId = Context.ConnectionId;
 
-        var runner = new Models.RunnerDetails
-        { 
-            Id = Guid.Parse(runnerId),
+        if (string.IsNullOrWhiteSpace(runnerId) || !Guid.TryParse(runnerId, out var parsedRunnerId))
+        {
+            return null;
+        }
+
+        return new Models.RunnerDetails
+        {
+            Id = parsedRunnerId,
             Name = runnerName,
             ConnectionId = connectionId,
             Version = httpContext.Request.Headers[RunnerVersionHeader].ToString(),
@@ -176,8 +230,6 @@ public class AutomatonHub : Hub
             ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
             ApiColor = apiInstanceIdentityService.ApiColor,
         };
-
-        return runner;
     }
 
     private Guid GetUserId()

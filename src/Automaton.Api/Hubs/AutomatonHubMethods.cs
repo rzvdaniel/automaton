@@ -2,6 +2,9 @@
 {
     public static class AutomatonHubMethods
     {
+        public const string JoinAppRuntimeLogs = "JoinAppRuntimeLogs";
+        public const string LeaveAppRuntimeLogs = "LeaveAppRuntimeLogs";
+        public const string BackendRuntimeLogEvent = "BackendRuntimeLogEvent";
         public const string RunWorkflow = "RunWorkflow";
         public const string RunCustomStep = "RunCustomStep";
         public const string UploadControllerScript = "UploadControllerScript";

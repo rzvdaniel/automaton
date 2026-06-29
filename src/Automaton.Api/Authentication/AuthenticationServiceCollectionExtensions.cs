@@ -58,10 +58,16 @@ namespace Automaton.Api.Authentication
                         {
                             var path = messageReceivedContext.HttpContext.Request.Path;
                             var runtimeToken = messageReceivedContext.Request.Query["token"].FirstOrDefault();
+                            var hubAccessToken = messageReceivedContext.Request.Query["access_token"].FirstOrDefault();
                             if (!string.IsNullOrWhiteSpace(runtimeToken) &&
                                 (path.StartsWithSegments("/a") || path.StartsWithSegments("/api/web-apps/app")))
                             {
                                 messageReceivedContext.Token = runtimeToken;
+                            }
+                            else if (!string.IsNullOrWhiteSpace(hubAccessToken) &&
+                                     path.StartsWithSegments("/api/workflow/hub"))
+                            {
+                                messageReceivedContext.Token = hubAccessToken;
                             }
 
                             return Task.CompletedTask;

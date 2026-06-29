@@ -10,6 +10,7 @@ export interface StepExecutionResult {
   status: string
   outputVariables?: Record<string, string>
   logs?: string[]
+  output?: string
   error?: string
 }
 
@@ -19,13 +20,15 @@ export interface StepExecutionResult {
 export interface ConsoleEntry {
   id: string
   timestamp: Date
-  type: 'step-execution' | 'error' | 'info'
+  type: 'step-execution' | 'runtime-log' | 'error' | 'info'
   stepName: string
   inputs: Record<string, unknown>
   result: StepExecutionResult
   duration?: number
   /** Where the execution originated from */
   source: 'application' | 'ai-test'
+  level?: 'info' | 'warn' | 'error'
+  runnerName?: string
 }
 
 /**
@@ -68,4 +71,16 @@ export interface ApplicationConsoleMessage {
     timestamp: string
     source: 'application-console' | 'application-runtime' | 'application-network'
   }
+}
+
+export interface BackendRuntimeLogEvent {
+  appId: string
+  timestamp: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+  source: 'backend'
+  stream: 'stdout' | 'stderr'
+  controllerName?: string | null
+  actionName?: string | null
+  runnerName?: string | null
 }

@@ -99,6 +99,20 @@ public class AppControllerActionResponse
     public string? Error { get; set; }
     public System.Text.Json.JsonElement? Data { get; set; }
     public List<string>? Logs { get; set; }
+    public string? Output { get; set; }
+}
+
+public class BackendRuntimeLogEvent
+{
+    public Guid AppId { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string Level { get; set; } = "info";
+    public string Message { get; set; } = string.Empty;
+    public string Source { get; set; } = "backend";
+    public string Stream { get; set; } = "stdout";
+    public string? ControllerName { get; set; }
+    public string? ActionName { get; set; }
+    public string? RunnerName { get; set; }
 }
 
 // ── Internal runner result ────────────────────────────────────────────────────
@@ -106,7 +120,9 @@ public class AppControllerActionResponse
 public class RunnerAppControllerResult
 {
     public Guid RunnerId { get; set; }
+    public string? RunnerName { get; set; }
     public bool Success { get; set; }
     public string? Error { get; set; }
     public System.Text.Json.JsonElement? Data { get; set; }
+    public string? Output { get; set; }
 }

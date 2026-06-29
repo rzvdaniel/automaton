@@ -12,6 +12,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using System.Text;
 using System.IO.Compression;
+using static Automaton.Api.Hubs.AutomatonHub;
 
 namespace Automaton.Api.Services;
 
@@ -20,6 +21,9 @@ namespace Automaton.Api.Services;
 /// </summary>
 public class AppsControllerExecutionService
 {
+    private const string BackendRuntimeLevelInfo = "info";
+    private const string BackendRuntimeLevelWarn = "warn";
+    private const string BackendRuntimeLevelError = "error";
     private readonly ApplicationDbContext dataContext;
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
@@ -473,6 +477,7 @@ public class AppsControllerExecutionService
                 CompletedAt = DateTime.UtcNow,
                 Data = firstSuccess?.Data,
                 Logs = logs,
+                Output = firstSuccess?.Output,
                 Error = errors.Any() ? string.Join("; ", errors) : null
             };
         }
@@ -489,6 +494,7 @@ public class AppsControllerExecutionService
                 ExecutedAt = startTime,
                 CompletedAt = DateTime.UtcNow,
                 Logs = logs,
+                Output = null,
                 Error = ex.Message
             };
         }
@@ -554,6 +560,7 @@ public class AppsControllerExecutionService
             CompletedAt = DateTime.UtcNow,
             Data = mockData,
             Logs = logs,
+            Output = null,
             Error = error
         };
     }
@@ -736,6 +743,14 @@ public class AppsControllerExecutionService
                     {
                         foreach (var line in payload.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                             logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] {line.TrimEnd()}");
+
+                        await PublishBackendRuntimeOutputAsync(
+                            appId,
+                            controllerName,
+                            actionName,
+                            runner.Name,
+                            payload.Output,
+                            cancellationToken);
                     }
 
                     if (payload?.Success == true)
@@ -748,9 +763,11 @@ public class AppsControllerExecutionService
                     results.Add(new RunnerAppControllerResult
                     {
                         RunnerId = runner.Id,
+                        RunnerName = runner.Name,
                         Success = payload?.Success ?? false,
                         Data = payload?.Data,
-                        Error = payload?.Error
+                        Error = payload?.Error,
+                        Output = payload?.Output
                     });
                 }
                 else
@@ -760,10 +777,18 @@ public class AppsControllerExecutionService
                         appId, controllerName, actionName, runner.Name, tunnelResponse.StatusCode, errorDetail);
 
                     logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {errorDetail}");
+                    await PublishBackendRuntimeOutputAsync(
+                        appId,
+                        controllerName,
+                        actionName,
+                        runner.Name,
+                        errorDetail,
+                        cancellationToken);
 
                     results.Add(new RunnerAppControllerResult
                     {
                         RunnerId = runner.Id,
+                        RunnerName = runner.Name,
                         Success = false,
                         Error = errorDetail
                     });
@@ -772,12 +797,20 @@ public class AppsControllerExecutionService
             catch (Exception ex)
             {
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {ex.Message}");
+                await PublishBackendRuntimeOutputAsync(
+                    appId,
+                    controllerName,
+                    actionName,
+                    runner.Name,
+                    ex.Message,
+                    cancellationToken);
                 logger.Error(ex, "Tunnel exception: AppId={AppId} Controller={ControllerName} Action={ActionName} Runner={RunnerName}",
                     appId, controllerName, actionName, runner.Name);
 
                 results.Add(new RunnerAppControllerResult
                 {
                     RunnerId = runner.Id,
+                    RunnerName = runner.Name,
                     Success = false,
                     Error = ex.Message
                 });
@@ -838,6 +871,79 @@ public class AppsControllerExecutionService
             .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
 
         return await responseTask;
+    }
+
+    private async Task PublishBackendRuntimeOutputAsync(
+        Guid appId,
+        string controllerName,
+        string actionName,
+        string runnerName,
+        string output,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return;
+        }
+
+        var lines = output
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.TrimEnd())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToList();
+
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var line in lines)
+        {
+            var normalizedLevel = ClassifyBackendRuntimeLine(line);
+            await automatonHub.Clients.Group(GetAppRuntimeLogsGroupName(appId)).SendAsync(
+                AutomatonHubMethods.BackendRuntimeLogEvent,
+                new BackendRuntimeLogEvent
+                {
+                    AppId = appId,
+                    Timestamp = DateTime.UtcNow,
+                    Level = normalizedLevel,
+                    Message = line,
+                    Source = "backend",
+                    Stream = normalizedLevel == BackendRuntimeLevelError ? "stderr" : "stdout",
+                    ControllerName = controllerName,
+                    ActionName = actionName,
+                    RunnerName = runnerName
+                },
+                cancellationToken);
+        }
+    }
+
+    private static string ClassifyBackendRuntimeLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return BackendRuntimeLevelInfo;
+        }
+
+        var trimmed = line.TrimStart();
+        if (trimmed.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Traceback", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Exception", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Unhandled exception", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("Error:", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("Exception:", StringComparison.OrdinalIgnoreCase))
+        {
+            return BackendRuntimeLevelError;
+        }
+
+        if (trimmed.StartsWith("WARN", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("Warning:", StringComparison.OrdinalIgnoreCase))
+        {
+            return BackendRuntimeLevelWarn;
+        }
+
+        return BackendRuntimeLevelInfo;
     }
 
     private sealed class RunnerRuntimeFileResponse

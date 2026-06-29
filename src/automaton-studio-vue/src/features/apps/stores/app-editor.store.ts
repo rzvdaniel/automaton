@@ -24,7 +24,7 @@ import {
   getLanguageFromExtension,
   PendingFileChangeType as PendingChangeType,
 } from '../types/apps.types'
-import type { ConsoleEntry } from '../types/console.types'
+import type { BackendRuntimeLogEvent, ConsoleEntry } from '../types/console.types'
 import type { UiLogEntry } from '../types/console.types'
 
 export const UiLogFilter = {
@@ -1213,6 +1213,24 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
+  function addBackendRuntimeLogEntry(event: BackendRuntimeLogEvent): void {
+    addConsoleEntry({
+      id: crypto.randomUUID(),
+      timestamp: new Date(event.timestamp),
+      type: 'runtime-log',
+      stepName: event.actionName || event.controllerName || 'backend',
+      inputs: {},
+      result: {
+        success: event.level !== 'error',
+        status: event.level === 'error' ? 'Error' : event.level === 'warn' ? 'Warning' : 'Output',
+        output: event.message,
+      },
+      source: 'application',
+      level: event.level,
+      runnerName: event.runnerName ?? undefined,
+    })
+  }
+
   /**
    * Clear all console entries
    */
@@ -1384,6 +1402,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     reloadActiveFile,
     refreshFilesAfterAiUpdate,
     addConsoleEntry,
+    addBackendRuntimeLogEntry,
     clearConsole,
     addUiLogEntry,
     clearUiLogs,

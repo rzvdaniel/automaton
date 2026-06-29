@@ -32,6 +32,7 @@ const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.v
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
+import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import type { PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
 import type { ApplicationConsoleMessage, StepResultMessage } from '../types/console.types'
@@ -128,6 +129,7 @@ watch(
 
 // Ref to runtime logs component for programmatic refresh
 const runtimeLogsRef = ref<{ loadLogs: () => void } | null>(null)
+let unsubscribeBackendRuntimeLogs: (() => void) | null = null
 watch(activeTab, (tab) => {
   if (tab === 'logs') {
     nextTick(() => runtimeLogsRef.value?.loadLogs())
@@ -368,6 +370,14 @@ const existingFilePaths = computed(() => {
 
 // Load app on mount
 onMounted(async () => {
+  unsubscribeBackendRuntimeLogs = backendRuntimeLogClient.onLog((event) => {
+    if (event.appId !== resolvedAppId.value) {
+      return
+    }
+
+    editorStore.addBackendRuntimeLogEntry(event)
+  })
+
   closeMobile()
   setHovered(false)
 
@@ -380,6 +390,7 @@ onMounted(async () => {
   if (appId.value) {
     try {
       await editorStore.loadApp(appId.value)
+      await backendRuntimeLogClient.subscribe(appId.value)
       // Load the execution runner ID from the app
       if (editorStore.currentApp?.executionRunnerId) {
         selectedRunnerId.value = editorStore.currentApp.executionRunnerId
@@ -418,6 +429,9 @@ watch(selectedRunnerId, async (newRunnerId) => {
 
 // Cleanup on unmount
 onUnmounted(() => {
+  void backendRuntimeLogClient.unsubscribe(appId.value)
+  unsubscribeBackendRuntimeLogs?.()
+  unsubscribeBackendRuntimeLogs = null
   editorStore.reset()
 })
 
