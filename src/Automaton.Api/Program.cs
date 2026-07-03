@@ -376,6 +376,7 @@ services.AddTransient<ScheduleService>();
 services.AddScoped<ApiKeyService>();
 services.AddScoped<AiApiKeyService>();
 services.AddScoped<AiProviderMetadataService>();
+services.AddScoped<IAiGuidanceRuntimeService, AiGuidanceRuntimeService>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<HostedRunnerManagementService>();

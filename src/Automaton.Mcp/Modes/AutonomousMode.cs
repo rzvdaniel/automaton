@@ -13,7 +13,7 @@ namespace Automaton.Mcp.Modes;
 /// </summary>
 public sealed class AutonomousMode : IConversationMode
 {
-    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.ModePrompts.autonomous.md";
+    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.Assets.Mode.autonomous.md";
     private static readonly Lazy<string> CachedPrompt = new(LoadPrompt, LazyThreadSafetyMode.ExecutionAndPublication);
 
     public string Name => ConversationModes.Autonomous;

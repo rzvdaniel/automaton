@@ -23,14 +23,30 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="SystemPrompts\StepSystemPrompt.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-simple.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-medium.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-large.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-enterprise.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-planning.md" />
-    <EmbeddedResource Include="SystemPrompts\ModePrompts\human-in-the-middle.md" />
-    <EmbeddedResource Include="SystemPrompts\ModePrompts\autonomous.md" />
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\step\StepSystemPrompt.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.Step.StepSystemPrompt.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\app\app-simple.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.App.app-simple.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\app\app-medium.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.App.app-medium.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\app\app-large.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.App.app-large.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\app\app-enterprise.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.App.app-enterprise.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\app\app-planning.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.App.app-planning.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\mode\human-in-the-middle.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.Mode.human-in-the-middle.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\system-prompts\mode\autonomous.md">
+      <LogicalName>Automaton.Mcp.SystemPrompts.Assets.Mode.autonomous.md</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

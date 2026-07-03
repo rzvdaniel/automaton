@@ -11,7 +11,7 @@ namespace Automaton.Mcp.Modes;
 /// </summary>
 public sealed class HumanInTheMiddleMode : IConversationMode
 {
-    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.ModePrompts.human-in-the-middle.md";
+    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.Assets.Mode.human-in-the-middle.md";
     private static readonly Lazy<string> CachedPrompt = new(LoadPrompt, LazyThreadSafetyMode.ExecutionAndPublication);
 
     public string Name => ConversationModes.HumanInTheMiddle;

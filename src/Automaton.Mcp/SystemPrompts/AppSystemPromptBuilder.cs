@@ -17,23 +17,23 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     private const string ExecutionPolicyEnvVar = "AUTOMATON_APP_EXECUTION_POLICY";
 
     private static readonly Lazy<string> SimplePrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-simple.md"),
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-simple.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<string> MediumPrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-medium.md"),
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-medium.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<string> LargePrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-large.md"),
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-large.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<string> EnterprisePrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-enterprise.md"),
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-enterprise.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<string> PlanningPrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-planning.md"),
+        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-planning.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private readonly IAutomatonGuidanceProvider _guidanceProvider;

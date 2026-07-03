@@ -10,7 +10,7 @@ namespace Automaton.Mcp.SystemPrompts;
 /// </summary>
 public class StepSystemPromptBuilder : IStepSystemPromptBuilder
 {
-    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.StepSystemPrompt.md";
+    private const string PromptResourceName = "Automaton.Mcp.SystemPrompts.Assets.Step.StepSystemPrompt.md";
     private static readonly Lazy<string> CachedPrompt = new(LoadPrompt, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
