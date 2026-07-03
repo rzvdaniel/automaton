@@ -19,67 +19,6 @@ let USE_MOCK_BACKEND = __USE_MOCK_BACKEND__;
 
 console.log('[AutomatonAPI] Application mode initialized for app:', APP_ID);
 
-function safeSerialize(value) {
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function emitApplicationConsoleEvent(level, source, args) {
-  try {
-    const message = Array.isArray(args)
-      ? args.map((item) => safeSerialize(item)).join(' ')
-      : safeSerialize(args);
-
-    window.parent.postMessage({
-      type: 'applicationConsoleEvent',
-      data: {
-        level,
-        message,
-        timestamp: new Date().toISOString(),
-        source
-      }
-    }, '*');
-  } catch {
-    // Do not break application execution if telemetry emit fails
-  }
-}
-
-const originalConsole = {
-  debug: console.debug.bind(console),
-  log: console.log.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console)
-};
-
-console.debug = (...args) => {
-  originalConsole.debug(...args);
-  emitApplicationConsoleEvent('debug', 'application-console', args);
-};
-
-console.log = (...args) => {
-  originalConsole.log(...args);
-  emitApplicationConsoleEvent('info', 'application-console', args);
-};
-
-console.warn = (...args) => {
-  originalConsole.warn(...args);
-  emitApplicationConsoleEvent('warn', 'application-console', args);
-};
-
-console.error = (...args) => {
-  originalConsole.error(...args);
-  emitApplicationConsoleEvent('error', 'application-console', args);
-};
-
-// Notify the parent that a new application session is starting.
-// The parent clears its log buffer on this message so stale errors from the
-// previous session are never visible after a page reload or navigation.
-window.parent.postMessage({ type: 'applicationConsoleClear' }, '*');
-
 // ── Network request capture (for ui_network_log) ──────────────────────────
 // Intercept fetch and XHR before any app code runs so all requests are captured.
 const _networkLog = [];
@@ -682,18 +621,6 @@ window.addEventListener('error', (event) => {
     // Ignore application error reporting failures
   }
 }, true);
-
-window.addEventListener('error', (event) => {
-  emitApplicationConsoleEvent('error', 'application-runtime', [
-    event.message || 'Runtime error',
-    event.filename ? `at ${event.filename}:${event.lineno || 0}:${event.colno || 0}` : ''
-  ]);
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  const reason = event.reason?.message || event.reason || 'Unhandled promise rejection';
-  emitApplicationConsoleEvent('error', 'application-runtime', [reason]);
-});
 
 window.addEventListener('message', async (event) => {
   const payload = event.data || {};

@@ -35,7 +35,7 @@ import { aiConversationClient } from '@/shared/services/ai/ai-conversation-clien
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
 import type { PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
-import type { ApplicationConsoleMessage, StepResultMessage } from '../types/console.types'
+import type { StepResultMessage } from '../types/console.types'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
 import {
   executeUiAutomationAction,
@@ -525,32 +525,6 @@ function handleApplicationMessage(event: MessageEvent) {
     }
   }
 
-  // A new application page started loading — clear stale logs from the previous session
-  // immediately, before the app's own scripts have a chance to emit new entries.
-  if (event.data?.type === 'applicationConsoleClear') {
-    editorStore.clearUiLogs()
-    editorStore.addUiLogEntry({
-      id: crypto.randomUUID(),
-      timestamp: new Date(),
-      level: 'info',
-      source: 'application-runtime',
-      message: '[Automaton] Application restarted — log window reset',
-    })
-  }
-
-  if (event.data?.type === 'applicationConsoleEvent') {
-    const message = event.data as ApplicationConsoleMessage
-    const level = message.data.level
-    const content = message.data.message
-
-    editorStore.addUiLogEntry({
-      id: crypto.randomUUID(),
-      timestamp: new Date(message.data.timestamp),
-      level,
-      message: content,
-      source: message.data.source,
-    })
-  }
 }
 
 // Add beforeunload listener, fullscreen class, and message listener
@@ -1060,38 +1034,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         ? (envelope.arguments as Record<string, unknown>)
         : ((args ?? {}) as Record<string, unknown>)
 
-    // New navigation starts a fresh diagnostic window.
-    // This keeps AI context focused on current-run errors after preview refresh.
-    if (toolName === UiAutomationAction.Navigate) {
-      editorStore.clearUiLogs()
-    }
-
     const actionResult: UiAutomationResult = await executeUiAutomationAction(
       toolName as UiAutomationAction,
       actionArgs,
-      () => editorStore.uiLogEntries,
     )
-
-    const level = actionResult.success ? 'info' : 'error'
-    const summary = actionResult.success
-      ? `[AI UI Test] ${toolName} OK`
-      : `[AI UI Test] ${toolName} FAILED`
-
-    const detailsParts = [
-      actionResult.details,
-      actionResult.value ? `Value: ${actionResult.value}` : undefined,
-      actionResult.snapshot ? `Snapshot: "${actionResult.snapshot.title}"` : undefined,
-      actionResult.logs ? `Logs: ${actionResult.logs.length}` : undefined,
-      actionResult.error ? `Error: ${actionResult.error}` : undefined,
-    ].filter(Boolean)
-
-    editorStore.addUiLogEntry({
-      id: crypto.randomUUID(),
-      timestamp: new Date(),
-      level,
-      source: 'application-runtime',
-      message: `${summary}${detailsParts.length > 0 ? ` — ${detailsParts.join(' | ')}` : ''}`,
-    })
 
     if (toolCallId) {
       try {
@@ -1107,7 +1053,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       details: actionResult.details,
       value: actionResult.value,
       error: actionResult.error,
-      logCount: actionResult.logs?.length,
       snapshotTitle: actionResult.snapshot?.title,
       toolResult: actionResult,
     }
@@ -1364,7 +1309,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                       :initial-model="initialModel"
                       :system-prompt="aiSystemPrompt"
                       :suggestions="aiSuggestions"
-                      :ui-logs="editorStore.uiLogEntries"
                       :tool-execution-handler="handleAiToolExecuted"
                       @session-created="handleVersionCreated"
                       @session-name-generated="handleSessionNameGenerated"

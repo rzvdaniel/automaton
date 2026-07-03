@@ -8,7 +8,6 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 import { APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
-import LiveUiLogPanel from './LiveUiLogPanel.vue'
 import { getOpenAppUrl } from '../utils/public-app-url'
 
 const props = withDefaults(
@@ -95,7 +94,6 @@ function handleSplitterResizing(): void {
 
 const isHeavyRenderingSuspended = computed(() => props.suspendHeavyRendering || isLocalResizing.value)
 const isAdvancedExpanded = ref(true)
-const activeLogTab = ref<'ui-logs' | 'backend-logs'>('backend-logs')
 
 // Backend connection status
 const backendConnected = computed(() => !!props.runnerId)
@@ -417,26 +415,13 @@ async function refreshApplication(): Promise<void> {
         </div>
         <div v-else class="logs-tabbed-container">
           <div class="logs-tab-bar">
-            <button
-              class="logs-tab"
-              :class="{ active: activeLogTab === 'ui-logs' }"
-              @click="activeLogTab = 'ui-logs'"
-            >
-              <i class="pi pi-desktop"></i>
-              Frontend
-            </button>
-            <button
-              class="logs-tab"
-              :class="{ active: activeLogTab === 'backend-logs' }"
-              @click="activeLogTab = 'backend-logs'"
-            >
+            <div class="logs-tab logs-tab--static active">
               <i class="pi pi-server"></i>
               Backend
               <span v-if="editorStore.consoleEntries.length > 0" class="logs-tab-badge">{{ editorStore.consoleEntries.length }}</span>
-            </button>
+            </div>
           </div>
-          <LiveUiLogPanel v-show="activeLogTab === 'ui-logs'" class="logs-panel" />
-          <ConsolePanel v-show="activeLogTab === 'backend-logs'" class="logs-panel" />
+          <ConsolePanel class="logs-panel" />
         </div>
       </SplitterPanel>
     </Splitter>
@@ -862,6 +847,10 @@ async function refreshApplication(): Promise<void> {
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
+}
+
+.logs-tab--static {
+  cursor: default;
 }
 
 .logs-tab:hover {

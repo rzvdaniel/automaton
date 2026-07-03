@@ -46,33 +46,6 @@ export interface StepResultMessage {
   }
 }
 
-export const UiLogLevel = {
-  Debug: 'debug',
-  Info: 'info',
-  Warn: 'warn',
-  Error: 'error',
-} as const
-
-export type UiLogLevel = typeof UiLogLevel[keyof typeof UiLogLevel]
-
-export interface UiLogEntry {
-  id: string
-  timestamp: Date
-  level: UiLogLevel
-  message: string
-  source: 'application-console' | 'application-runtime' | 'application-network'
-}
-
-export interface ApplicationConsoleMessage {
-  type: 'applicationConsoleEvent'
-  data: {
-    level: UiLogLevel
-    message: string
-    timestamp: string
-    source: 'application-console' | 'application-runtime' | 'application-network'
-  }
-}
-
 export interface BackendRuntimeLogEvent {
   appId: string
   timestamp: string

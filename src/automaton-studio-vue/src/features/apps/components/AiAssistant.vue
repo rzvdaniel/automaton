@@ -20,7 +20,6 @@ import ToolOperationsGroup from './ToolOperationsGroup.vue'
 import ReasoningBlock from './ReasoningBlock.vue'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { ChatSession, ChatMessage } from '@/shared/types/ai.types'
-import type { UiLogEntry } from '../types/console.types'
 import { UiAutomationAction } from '../services/application-automation-bridge'
 
 // Props
@@ -34,7 +33,6 @@ const props = withDefaults(
     initialModel?: string
     systemPrompt?: string
     suggestions?: string[]
-    uiLogs?: UiLogEntry[]
     toolExecutionHandler?: (
       toolName: string,
       args: any,
@@ -49,7 +47,6 @@ const props = withDefaults(
     initialModel: undefined,
     systemPrompt: undefined,
     suggestions: () => [],
-    uiLogs: () => [],
     toolExecutionHandler: undefined,
   },
 )
@@ -592,17 +589,6 @@ function handleSuggestion(suggestion: string) {
   userInput.value = suggestion
 }
 
-function parseJsonMaybe(value: unknown): unknown {
-  if (typeof value !== 'string') return value
-  const trimmed = value.trim()
-  if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) return value
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    return value
-  }
-}
-
 function buildUiAutomationContext() {
   const recentUiResults = [...messages.value]
     .filter((message) => message.type === 'uiTestResult' && message.uiTestResult)
@@ -615,46 +601,9 @@ function buildUiAutomationContext() {
       timestamp: message.timestamp.toISOString(),
     }))
 
-  const recentConsoleLogToolResults = [...messages.value]
-    .filter((message) => message.type === 'toolExecution' && message.toolName === UiAutomationAction.GetConsoleLogs && message.toolResult)
-    .slice(-3)
-    .map((message) => {
-      const parsed = parseJsonMaybe(message.toolResult)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return {
-          details: typeof message.toolResult === 'string' ? message.toolResult : '',
-          logs: [],
-          timestamp: message.timestamp.toISOString(),
-        }
-      }
-
-      const result = parsed as { details?: string; logs?: Array<{ timestamp?: string; level?: string; source?: string; message?: string }> }
-      return {
-        details: result.details ?? '',
-        logs: Array.isArray(result.logs) ? result.logs.slice(0, 50) : [],
-        timestamp: message.timestamp.toISOString(),
-      }
-    })
-
-  const recentPreviewConsoleLogs = [...(props.uiLogs || [])]
-    .slice(0, 40)
-    .map((entry) => ({
-      timestamp: entry.timestamp?.toISOString?.() ?? String(entry.timestamp),
-      level: entry.level,
-      source: entry.source,
-      message: entry.message,
-    }))
-
-  const recentPreviewConsoleErrors = recentPreviewConsoleLogs
-    .filter((entry) => entry.level === 'error' || entry.level === 'warn')
-    .slice(0, 20)
-
   return {
     availableUiAutomationTools: Object.values(UiAutomationAction),
     recentUiAutomationResults: recentUiResults,
-    recentConsoleLogToolResults,
-    recentPreviewConsoleLogs,
-    recentPreviewConsoleErrors,
   }
 }
 

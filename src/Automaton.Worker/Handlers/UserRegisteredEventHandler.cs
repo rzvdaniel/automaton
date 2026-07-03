@@ -12,8 +12,6 @@ public sealed class UserRegisteredEventHandler(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-
-
         try
         {
             await userRegistrationNotificationService.SendRegistrationNotificationsAsync(

@@ -67,7 +67,7 @@ const cliLoginCommand = computed(() =>
 )
 
 const starterPrompt = computed(() =>
-  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst fetch and read:\nhttps://automaton.monster/llms.txt\n\nFollow the instructions and references found there.'
+  'Build [APP IDEA] as an Automaton Monster app.\n\nFirst read:\nhttps://automaton.monster/llms.txt\n\nFollow that contract as the source of truth. Default to a Vite app in frontend/ with build output in frontend/dist, add backend/ only when the feature truly needs server-side behavior, and store durable backend data under AUTOMATON_APP_DATA_DIR.'
 )
 
 // Local form state
@@ -1105,12 +1105,12 @@ automaton deploy</pre>
                 <div class="font-semibold mb-1">Required file structure</div>
                 <div class="connect-tree">
                   <div><span class="ct-file">automaton.json</span> <span class="ct-comment">← app link written by CLI</span></div>
-                  <div><span class="ct-file">index.html</span> <span class="ct-comment">← preferred root entry for plain static apps</span></div>
-                  <div><span class="ct-file">*.css / *.js</span> <span class="ct-comment">← root-level plain app assets</span></div>
-                  <div><span class="ct-dir">assets/</span> <span class="ct-comment">← images, icons, local media</span></div>
-                  <div><span class="ct-dir">frontend/</span> <span class="ct-comment">← optional split static source, only when intentional</span></div>
-                  <div><span class="ct-dir">src/</span> <span class="ct-comment">← framework source code can stay in the repo</span></div>
-                  <div><span class="ct-dir">dist/</span> <span class="ct-comment">← common build output; use build + deployDir</span></div>
+                  <div><span class="ct-dir">frontend/</span> <span class="ct-comment">← default frontend source root</span></div>
+                  <div class="pl-3"><span class="ct-file">package.json</span></div>
+                  <div class="pl-3"><span class="ct-file">vite.config.ts</span> <span class="ct-comment">← use <code>base: './'</code></span></div>
+                  <div class="pl-3"><span class="ct-dir">public/</span> <span class="ct-comment">← bundled static assets only</span></div>
+                  <div class="pl-3"><span class="ct-dir">src/</span> <span class="ct-comment">← app source files</span></div>
+                  <div class="pl-3"><span class="ct-dir">dist/</span> <span class="ct-comment">← build output deployed publicly</span></div>
                   <div><span class="ct-dir">backend/</span></div>
                   <div class="pl-3"><span class="ct-file">controller.py</span> <span class="ct-comment">← exports handle(action_name, inputs)</span></div>
                   <div class="pl-3"><span class="ct-file">requirements.txt</span> <span class="ct-comment">← optional pip deps</span></div>
@@ -1120,6 +1120,9 @@ automaton deploy</pre>
                 <p class="text-color-secondary text-sm mt-2 mb-0">
                   Frontend code should call backend actions with <code class="connect-code">window.automatonApi.callController(controller, action, inputs)</code>.
                   The call returns the backend data payload directly and throws on error, so use <code class="connect-code">try/catch</code>.
+                </p>
+                <p class="text-color-secondary text-sm mt-2 mb-0">
+                  Durable backend files such as SQLite databases, uploads, and generated exports belong under <code class="connect-code">AUTOMATON_APP_DATA_DIR</code>, typically in <code class="connect-code">db/</code>, <code class="connect-code">media/</code>, or <code class="connect-code">generated/</code>.
                 </p>
               </div>
             </div>

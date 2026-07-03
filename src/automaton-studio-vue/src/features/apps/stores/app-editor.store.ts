@@ -25,16 +25,6 @@ import {
   PendingFileChangeType as PendingChangeType,
 } from '../types/apps.types'
 import type { BackendRuntimeLogEvent, ConsoleEntry } from '../types/console.types'
-import type { UiLogEntry } from '../types/console.types'
-
-export const UiLogFilter = {
-  All: 'all',
-  Errors: 'errors',
-  Console: 'console',
-  Runtime: 'runtime',
-} as const
-
-export type UiLogFilter = typeof UiLogFilter[keyof typeof UiLogFilter]
 
 export const useAppEditorStore = defineStore('appEditor', () => {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
@@ -85,15 +75,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
 
   // Console entries for step execution results
   const consoleEntries = ref<ConsoleEntry[]>([])
-  const uiLogEntries = ref<UiLogEntry[]>([])
-  const uiLogFilter = ref<UiLogFilter>(UiLogFilter.All)
-  const uiLogFingerprintWindow = ref<string[]>([])
-
-  const UI_LOG_FINGERPRINT_WINDOW_SIZE = 120
-
-  function buildUiLogFingerprint(entry: UiLogEntry): string {
-    return `${entry.source}|${entry.level}|${entry.message.trim()}`
-  }
 
   // ============================================
   // Computed
@@ -1238,33 +1219,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     consoleEntries.value = []
   }
 
-  function addUiLogEntry(entry: UiLogEntry): void {
-    // De-duplicate repeated messages by content fingerprint (more reliable than timestamp heuristics)
-    const fingerprint = buildUiLogFingerprint(entry)
-    if (uiLogFingerprintWindow.value.includes(fingerprint)) {
-      return
-    }
-
-    uiLogFingerprintWindow.value.unshift(fingerprint)
-    if (uiLogFingerprintWindow.value.length > UI_LOG_FINGERPRINT_WINDOW_SIZE) {
-      uiLogFingerprintWindow.value = uiLogFingerprintWindow.value.slice(0, UI_LOG_FINGERPRINT_WINDOW_SIZE)
-    }
-
-    uiLogEntries.value.unshift(entry)
-    if (uiLogEntries.value.length > 200) {
-      uiLogEntries.value = uiLogEntries.value.slice(0, 200)
-    }
-  }
-
-  function clearUiLogs(): void {
-    uiLogEntries.value = []
-    uiLogFingerprintWindow.value = []
-  }
-
-  function setUiLogFilter(filter: UiLogFilter): void {
-    uiLogFilter.value = filter
-  }
-
   /**
    * Clear error
    */
@@ -1294,9 +1248,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isLoadingApplication.value = false
     error.value = null
     consoleEntries.value = []
-    uiLogEntries.value = []
-    uiLogFingerprintWindow.value = []
-    uiLogFilter.value = UiLogFilter.All
   }
 
   /**
@@ -1339,8 +1290,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     isDeployingBackend,
     error,
     consoleEntries,
-    uiLogEntries,
-    uiLogFilter,
 
     // Computed
     activeFile,
@@ -1404,9 +1353,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     addConsoleEntry,
     addBackendRuntimeLogEntry,
     clearConsole,
-    addUiLogEntry,
-    clearUiLogs,
-    setUiLogFilter,
     clearError,
     reset,
   }
