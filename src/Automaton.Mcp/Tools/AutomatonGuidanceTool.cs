@@ -13,6 +13,20 @@ public sealed class AutomatonGuidanceTool : IMcpTool
     public const string GetGuidanceName = "get_automaton_guidance";
 
     private static readonly HashSet<string> HandledTools = [ListGuidanceName, GetGuidanceName];
+    private static readonly IReadOnlyDictionary<string, GuidanceCatalogEntry> GuidanceCatalog =
+        new Dictionary<string, GuidanceCatalogEntry>(StringComparer.Ordinal)
+        {
+            ["llms/automaton-app-contract-compact.md"] = new("shared", "contract", "Compact always-on Automaton app contract for Studio editing."),
+            ["llms/automaton-studio-editor.md"] = new("studio", "editor", "Studio editor behavior, file editing rules, and verification expectations."),
+            ["llms/automaton-backend-controllers.md"] = new("shared", "backend", "Python controller rules, response envelope, and backend structure guidance."),
+            ["llms/automaton-media-assets.md"] = new("shared", "media", "Bundled assets versus runtime media, uploads, and public/static asset handling."),
+            ["llms/automaton-frontend-structure.md"] = new("shared", "frontend", "Frontend structure, relative URLs, PWA rules, and installable app patterns."),
+            ["llms/automaton-starter-prompts.md"] = new("cli", "starter", "Starter app prompts and initial app creation guidance."),
+            ["llms/automaton-cli-deploy.md"] = new("cli", "deploy", "Deploy and runtime troubleshooting guidance for Automaton apps."),
+            ["llms/automaton-cli-install.md"] = new("cli", "install", "Automaton CLI installation and bootstrap guidance."),
+            ["llms/automaton-examples.md"] = new("shared", "examples", "Longer examples and reference app patterns."),
+            ["llms/automaton-mcp.md"] = new("mcp", "protocol", "Guidance for MCP-related workflows and integrations.")
+        };
 
     private readonly IAutomatonGuidanceProvider _guidanceProvider;
 
@@ -71,8 +85,18 @@ public sealed class AutomatonGuidanceTool : IMcpTool
     {
         var references = _guidanceProvider.GetReferenceSources()
             .Where(source => source.RelativePath.StartsWith("llms/", StringComparison.Ordinal))
-            .Select(source => source.RelativePath)
-            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(source =>
+            {
+                var metadata = ResolveCatalogEntry(source.RelativePath);
+                return new
+                {
+                    path = source.RelativePath,
+                    surface = metadata.Surface,
+                    category = metadata.Category,
+                    description = metadata.Description
+                };
+            })
+            .OrderBy(entry => entry.path, StringComparer.Ordinal)
             .ToArray();
 
         return new McpToolResult
@@ -112,4 +136,11 @@ public sealed class AutomatonGuidanceTool : IMcpTool
             return new McpToolResult { Success = false, Error = ex.Message };
         }
     }
+
+    private static GuidanceCatalogEntry ResolveCatalogEntry(string relativePath) =>
+        GuidanceCatalog.TryGetValue(relativePath, out var entry)
+            ? entry
+            : new GuidanceCatalogEntry("shared", "reference", "Focused Automaton guidance reference.");
+
+    private sealed record GuidanceCatalogEntry(string Surface, string Category, string Description);
 }

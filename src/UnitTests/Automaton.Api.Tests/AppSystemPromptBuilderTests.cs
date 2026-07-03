@@ -96,8 +96,14 @@ public class AppSystemPromptBuilderTests
             null);
 
         Assert.That(result.Success, Is.True);
-        Assert.That(result.Content, Does.Contain("llms/automaton-backend-controllers.md"));
-        Assert.That(result.Content, Does.Contain("llms/automaton-studio-editor.md"));
+        using var json = JsonDocument.Parse(result.Content!);
+        var references = json.RootElement.GetProperty("references").EnumerateArray().ToList();
+        var studioEditor = references.Single(item => item.GetProperty("path").GetString() == "llms/automaton-studio-editor.md");
+
+        Assert.That(references.Any(item => item.GetProperty("path").GetString() == "llms/automaton-backend-controllers.md"), Is.True);
+        Assert.That(studioEditor.GetProperty("surface").GetString(), Is.EqualTo("studio"));
+        Assert.That(studioEditor.GetProperty("category").GetString(), Is.EqualTo("editor"));
+        Assert.That(studioEditor.GetProperty("description").GetString(), Does.Contain("Studio editor"));
     }
 
     [Test]
