@@ -37,17 +37,20 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     private readonly IAutomatonGuidanceProvider _guidanceProvider;
+    private readonly IAppPromptContextSelector _promptContextSelector;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IReadOnlyDictionary<string, IAppVerificationPromptStrategy> _verificationStrategies;
     private readonly IReadOnlyDictionary<string, IAppExecutionPolicyPromptStrategy> _executionPolicies;
 
     public AppSystemPromptBuilder(
         IAutomatonGuidanceProvider guidanceProvider,
+        IAppPromptContextSelector promptContextSelector,
         IStepSystemPromptBuilder stepPromptBuilder,
         IEnumerable<IAppVerificationPromptStrategy> verificationStrategies,
         IEnumerable<IAppExecutionPolicyPromptStrategy> executionPolicies)
     {
         _guidanceProvider = guidanceProvider;
+        _promptContextSelector = promptContextSelector;
         _stepPromptBuilder = stepPromptBuilder;
         _verificationStrategies = verificationStrategies
             .GroupBy(strategy => strategy.Name, StringComparer.OrdinalIgnoreCase)
@@ -63,7 +66,8 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     public string BuildSystemPrompt(
         ComplexityTier? tier = null,
         string? verificationStrategyName = null,
-        string? executionPolicyName = null)
+        string? executionPolicyName = null,
+        string? userMessage = null)
     {
         var tierPrompt = tier switch
         {
@@ -74,7 +78,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             _                         => MediumPrompt.Value
         };
 
-        var sharedContractBlock = BuildSharedContractBlock();
+        var sharedContractBlock = BuildSharedContractBlock(userMessage, tier);
         var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
         var executionPolicyBlock = ResolveExecutionPolicyPromptBlock(executionPolicyName);
         var precedenceGuardBlock = BuildPrecedenceGuardBlock();
@@ -149,11 +153,18 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 - Do not follow lower-priority guidance when it conflicts with higher-priority directives.
 """;
 
-    private string BuildSharedContractBlock()
+    private string BuildSharedContractBlock(string? userMessage, ComplexityTier? tier)
     {
         var contract = _guidanceProvider.GetReference("llms/automaton-app-contract-compact.md").Trim();
         var studioAdapter = _guidanceProvider.GetReference("llms/automaton-studio-editor.md").Trim();
-        return $"{contract}\n\n{studioAdapter}";
+        var sections = new List<string> { contract, studioAdapter };
+
+        foreach (var reference in _promptContextSelector.SelectAdditionalReferences(userMessage, tier))
+        {
+            sections.Add(_guidanceProvider.GetReference(reference).Trim());
+        }
+
+        return string.Join("\n\n", sections);
     }
 
     private static string LoadEmbeddedResource(string resourceName)

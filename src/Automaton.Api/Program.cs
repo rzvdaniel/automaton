@@ -388,6 +388,7 @@ services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, A
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppExecutionPolicyPromptStrategy, Automaton.Mcp.SystemPrompts.DefaultExecutionPolicyPromptStrategy>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppExecutionPolicyPromptStrategy, Automaton.Mcp.SystemPrompts.LeanToolsExecutionPolicyPromptStrategy>();
 services.AddSingleton<IAutomatonGuidanceProvider, EmbeddedAutomatonGuidanceProvider>();
+services.AddSingleton<Automaton.Mcp.SystemPrompts.IAppPromptContextSelector, Automaton.Mcp.SystemPrompts.KeywordAppPromptContextSelector>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
 // MCP Tool Providers for AI Chat
@@ -406,6 +407,9 @@ services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
 // Instructions tool group — read_instruction, write_instruction, list_instructions
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.InstructionsTool>();
+// Embedded Automaton guidance tool group — list_automaton_guidance, get_automaton_guidance
+services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
+                   Automaton.Mcp.Tools.AutomatonGuidanceTool>();
 // UI automation tool group — emits client-action envelopes for preview interactions
 services.AddScoped<Automaton.Mcp.Tools.IMcpTool,
                    Automaton.Mcp.Tools.UiAutomationTool>();

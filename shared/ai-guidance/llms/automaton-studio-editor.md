@@ -25,6 +25,7 @@ Use this guidance when the AI is editing an app inside Automaton Studio rather t
 - Prefer fewer tool calls and larger, intentional edits.
 - When changing an existing app, inspect the relevant files first rather than guessing the current shape.
 - Use Studio preview, UI verification, and backend runtime tools when available.
+- When you need deeper Automaton-specific guidance, use `list_automaton_guidance` to discover available focused references and `get_automaton_guidance` to load the exact one you need instead of guessing.
 - When backend files change, remind the user to deploy the backend/runtime so the new controller code is running.
 - Ask before publishing a deployed app publicly.
 - Use Studio/App Editor concepts first when describing what to do inside Studio.

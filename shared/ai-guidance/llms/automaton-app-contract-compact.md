@@ -5,11 +5,26 @@ Use this compact contract for in-product app editing where linked documents are 
 ## Required app shape
 
 - Keep `automaton.json` in the app root when it exists.
+- In Studio, file tools edit the app source surfaces rather than the local CLI scaffold directly.
+- Studio-backed app source is organized around frontend and backend source roots.
 - Frontend source normally lives in `frontend/`.
 - Frontend build output normally lives in `frontend/dist/`.
 - Backend source, when needed, lives in `backend/`.
 - Treat frontend and backend as separate surfaces.
 - Do not invent alternative top-level folders unless the existing app already uses them.
+
+Minimum expected source shape:
+
+```text
+frontend/
+  package.json
+  src/
+  public/
+  dist/
+
+backend/
+  *.py
+```
 
 ## Frontend rules
 

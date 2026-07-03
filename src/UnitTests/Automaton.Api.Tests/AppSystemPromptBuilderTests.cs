@@ -1,5 +1,7 @@
 using Automaton.AiGuidance;
 using Automaton.Mcp.SystemPrompts;
+using Automaton.Mcp.Tools;
+using System.Text.Json;
 
 namespace Automaton.Api.Tests;
 
@@ -11,6 +13,7 @@ public class AppSystemPromptBuilderTests
     {
         var builder = new AppSystemPromptBuilder(
             new EmbeddedAutomatonGuidanceProvider(),
+            new KeywordAppPromptContextSelector(),
             new StubStepSystemPromptBuilder(),
             [new StubVerificationStrategy()],
             [new StubExecutionPolicy()]);
@@ -18,7 +21,8 @@ public class AppSystemPromptBuilderTests
         var prompt = builder.BuildSystemPrompt(
             ComplexityTier.Medium,
             AppVerificationStrategyNames.Balanced,
-            AppExecutionPolicyNames.Default);
+            AppExecutionPolicyNames.Default,
+            "Tighten the dashboard layout.");
 
         Assert.That(prompt, Does.Contain("# Automaton App Contract (Compact)"));
         Assert.That(prompt, Does.Contain("frontend/dist"));
@@ -29,6 +33,89 @@ public class AppSystemPromptBuilderTests
         Assert.That(prompt, Does.Not.Contain("automaton new"));
         Assert.That(prompt, Does.Not.Contain("## AI shortest path"));
         Assert.That(prompt, Does.Not.Contain("## Full-stack todo example"));
+    }
+
+    [Test]
+    public void BuildSystemPrompt_IncludesFocusedBackendGuidance_WhenRequestNeedsPersistence()
+    {
+        var builder = new AppSystemPromptBuilder(
+            new EmbeddedAutomatonGuidanceProvider(),
+            new KeywordAppPromptContextSelector(),
+            new StubStepSystemPromptBuilder(),
+            [new StubVerificationStrategy()],
+            [new StubExecutionPolicy()]);
+
+        var prompt = builder.BuildSystemPrompt(
+            ComplexityTier.Medium,
+            AppVerificationStrategyNames.Balanced,
+            AppExecutionPolicyNames.Default,
+            "Add a backend controller with sqlite persistence for todos.");
+
+        Assert.That(prompt, Does.Contain("# Automaton Backend Controllers"));
+    }
+
+    [Test]
+    public void ContextSelector_AddsFrontendAndStarterGuidance_ForNewAppRequests()
+    {
+        var selector = new KeywordAppPromptContextSelector();
+
+        var references = selector.SelectAdditionalReferences("Create a new app from scratch with an installable PWA.");
+
+        Assert.That(references, Does.Contain("llms/automaton-frontend-structure.md"));
+        Assert.That(references, Does.Contain("llms/automaton-starter-prompts.md"));
+    }
+
+    [Test]
+    public void ContextSelector_DoesNotTreatGenericApiMention_AsBackendWork()
+    {
+        var selector = new KeywordAppPromptContextSelector();
+
+        var references = selector.SelectAdditionalReferences("Use the browser API and the OpenAI API from the frontend.");
+
+        Assert.That(references, Does.Not.Contain("llms/automaton-backend-controllers.md"));
+    }
+
+    [Test]
+    public void ContextSelector_AddsDeployGuidance_ForPublishedAppFailures()
+    {
+        var selector = new KeywordAppPromptContextSelector();
+
+        var references = selector.SelectAdditionalReferences("The published app shows a blank screen and a 404 after publishing.");
+
+        Assert.That(references, Does.Contain("llms/automaton-cli-deploy.md"));
+    }
+
+    [Test]
+    public async Task AutomatonGuidanceTool_ListsFocusedGuidanceReferences()
+    {
+        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceProvider());
+
+        var result = await tool.ExecuteToolAsync(
+            AutomatonGuidanceTool.ListGuidanceName,
+            JsonDocument.Parse("{}").RootElement,
+            null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.Content, Does.Contain("llms/automaton-backend-controllers.md"));
+        Assert.That(result.Content, Does.Contain("llms/automaton-studio-editor.md"));
+    }
+
+    [Test]
+    public async Task AutomatonGuidanceTool_ReturnsRequestedGuidanceContent()
+    {
+        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceProvider());
+
+        var result = await tool.ExecuteToolAsync(
+            AutomatonGuidanceTool.GetGuidanceName,
+            JsonDocument.Parse("""
+                {
+                  "referenceName": "llms/automaton-media-assets.md"
+                }
+                """).RootElement,
+            null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.Content, Does.Contain("# Automaton Media and Static Asset Rules"));
     }
 
     private sealed class StubStepSystemPromptBuilder : IStepSystemPromptBuilder

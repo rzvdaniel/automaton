@@ -220,7 +220,7 @@ public class AiAppConversationController : AiConversationControllerBase
             CancellationToken.None);
         _effectiveVerificationStrategy = strategyName;
         _effectiveExecutionPolicy = executionPolicyName;
-        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName, executionPolicyName);
+        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName, executionPolicyName, request.Message);
 
         // Inject user instructions from .instructions/ folder (configurable token budget)
         string? instructionBlock = null;

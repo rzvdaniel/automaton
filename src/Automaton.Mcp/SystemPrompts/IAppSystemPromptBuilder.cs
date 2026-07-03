@@ -12,7 +12,8 @@ public interface IAppSystemPromptBuilder
     string BuildSystemPrompt(
         ComplexityTier? tier = null,
         string? verificationStrategyName = null,
-        string? executionPolicyName = null);
+        string? executionPolicyName = null,
+        string? userMessage = null);
 
     /// <summary>
     /// Wraps <paramref name="baseSystemPrompt"/> with the planning-phase instruction block.
