@@ -30,45 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Core\Automaton.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms.txt">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.txt</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-cli-install.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-cli-install.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-backend-controllers.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-backend-controllers.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-cli-deploy.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-cli-deploy.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-frontend-structure.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-frontend-structure.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\automaton-starter-prompts.md">
-      <LogicalName>Automaton.Cli.AiGuidance.llms.automaton-starter-prompts.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\AGENTS.md">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.AGENTS.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\instructions.md">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.instructions.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\SKILL.md">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.SKILL.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\adapter.md">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.adapter.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\github-skill.md">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.github-skill.md</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\gitignore">
-      <LogicalName>Automaton.Cli.AiGuidance.templates.gitignore</LogicalName>
-    </EmbeddedResource>
+    <ProjectReference Include="..\Automaton.AiGuidance\Automaton.AiGuidance.csproj" />
   </ItemGroup>
 
   <ItemGroup>

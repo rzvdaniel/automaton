@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Automaton.Ai\Automaton.Ai.csproj" />
+    <ProjectReference Include="..\Automaton.AiGuidance\Automaton.AiGuidance.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,7 +24,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="SystemPrompts\StepSystemPrompt.md" />
-    <EmbeddedResource Include="SystemPrompts\AppPrompts\app-base.md" />
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-simple.md" />
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-medium.md" />
     <EmbeddedResource Include="SystemPrompts\AppPrompts\app-large.md" />

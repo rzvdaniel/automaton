@@ -402,3 +402,6 @@ https://automaton.monster/llms/automaton-starter-prompts.md
 
 If MCP integration is required:
 https://automaton.monster/llms/automaton-mcp.md
+
+If edit is done inside Automaton Studio:
+https://automaton.monster/llms/automaton-studio-editor.md

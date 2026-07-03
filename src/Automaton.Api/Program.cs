@@ -1,5 +1,6 @@
 ﻿using Automaton.Core.Scripting;
 using Automaton.Ai.Extensions;
+using Automaton.AiGuidance;
 using Automaton.Mcp.Client.Extensions;
 using Destructurama;
 using FluentValidation.AspNetCore;
@@ -386,6 +387,7 @@ services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, A
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppVerificationPromptStrategy, Automaton.Mcp.SystemPrompts.FinalGateVerificationPromptStrategy>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppExecutionPolicyPromptStrategy, Automaton.Mcp.SystemPrompts.DefaultExecutionPolicyPromptStrategy>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppExecutionPolicyPromptStrategy, Automaton.Mcp.SystemPrompts.LeanToolsExecutionPolicyPromptStrategy>();
+services.AddSingleton<IAutomatonGuidanceProvider, EmbeddedAutomatonGuidanceProvider>();
 services.AddScoped<Automaton.Mcp.SystemPrompts.IAppSystemPromptBuilder, Automaton.Mcp.SystemPrompts.AppSystemPromptBuilder>();
 
 // MCP Tool Providers for AI Chat

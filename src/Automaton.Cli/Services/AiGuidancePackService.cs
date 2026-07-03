@@ -1,3 +1,4 @@
+using Automaton.AiGuidance;
 using Automaton.Cli.Models;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -8,27 +9,18 @@ namespace Automaton.Cli.Services;
 
 public sealed class AiGuidancePackService
 {
-    private const string ResourcePrefix = "Automaton.Cli.AiGuidance.";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private readonly IAutomatonGuidanceProvider _guidanceProvider;
 
-    private static readonly IReadOnlyDictionary<string, string> ResourceMap = new Dictionary<string, string>(StringComparer.Ordinal)
+    public AiGuidancePackService()
+        : this(new EmbeddedAutomatonGuidanceProvider())
     {
-        ["llms.txt"] = "llms.txt",
-        ["llms.automaton-cli-install.md"] = "llms/automaton-cli-install.md",
-        ["llms.automaton-backend-controllers.md"] = "llms/automaton-backend-controllers.md",
-        ["llms.automaton-cli-deploy.md"] = "llms/automaton-cli-deploy.md",
-        ["llms.automaton-frontend-structure.md"] = "llms/automaton-frontend-structure.md",
-        ["llms.automaton-starter-prompts.md"] = "llms/automaton-starter-prompts.md"
-    };
+    }
 
-    private static readonly IReadOnlyDictionary<string, string> TemplateMap = new Dictionary<string, string>(StringComparer.Ordinal)
+    public AiGuidancePackService(IAutomatonGuidanceProvider guidanceProvider)
     {
-        ["templates.AGENTS.md"] = "AGENTS.md",
-        ["templates.instructions.md"] = "instructions.md",
-        ["templates.SKILL.md"] = "SKILL.md",
-        ["templates.adapter.md"] = "adapter.md",
-        ["templates.github-skill.md"] = "github-skill.md"
-    };
+        _guidanceProvider = guidanceProvider;
+    }
 
     public AiGuidanceSyncResult Sync(string directory, string adapter = AiGuidanceAdapters.None)
     {
@@ -44,8 +36,8 @@ public sealed class AiGuidancePackService
         Directory.CreateDirectory(agentsRoot);
         Directory.CreateDirectory(referencesRoot);
 
-        var sources = LoadSources(ResourceMap);
-        var templates = LoadSources(TemplateMap);
+        var sources = _guidanceProvider.GetReferenceSources();
+        var templates = _guidanceProvider.GetTemplateSources();
         var variables = BuildTemplateVariables(mode);
         foreach (var source in sources)
         {
@@ -115,21 +107,6 @@ public sealed class AiGuidancePackService
         return AiGuidanceModes.Project;
     }
 
-    private static IReadOnlyList<(string RelativePath, string Content)> LoadSources(IReadOnlyDictionary<string, string> resourceMap)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        return resourceMap
-            .Select(entry =>
-            {
-                var resourceName = ResourcePrefix + entry.Key;
-                using var stream = assembly.GetManifestResourceStream(resourceName)
-                    ?? throw new InvalidOperationException($"Embedded AI guidance resource '{resourceName}' was not found.");
-                using var reader = new StreamReader(stream, Encoding.UTF8);
-                return (entry.Value, reader.ReadToEnd());
-            })
-            .ToList();
-    }
-
     private static IReadOnlyDictionary<string, string> BuildTemplateVariables(string mode)
     {
         var scopeLine = mode switch
@@ -167,12 +144,12 @@ public sealed class AiGuidancePackService
     }
 
     private static string RenderTemplate(
-        IReadOnlyList<(string RelativePath, string Content)> templates,
+        IReadOnlyList<GuidanceSource> templates,
         string relativePath,
         IReadOnlyDictionary<string, string> variables)
     {
         var template = templates.FirstOrDefault(source => string.Equals(source.RelativePath, relativePath, StringComparison.Ordinal));
-        if (string.IsNullOrEmpty(template.RelativePath))
+        if (template is null)
         {
             throw new InvalidOperationException($"Embedded AI guidance template '{relativePath}' was not found.");
         }
@@ -208,7 +185,7 @@ public sealed class AiGuidancePackService
         string directory,
         string adapter,
         ICollection<string> generatedFiles,
-        IReadOnlyList<(string RelativePath, string Content)> templates,
+        IReadOnlyList<GuidanceSource> templates,
         IReadOnlyDictionary<string, string> variables)
     {
         if (string.Equals(adapter, AiGuidanceAdapters.None, StringComparison.OrdinalIgnoreCase))
@@ -266,7 +243,7 @@ public sealed class AiGuidancePackService
         TryDeleteEmptyDirectory(Path.Combine(directory, ".github"));
     }
 
-    private static void DeleteLegacyAiGuidance(string directory)
+    private void DeleteLegacyAiGuidance(string directory)
     {
         var legacyRoot = Path.Combine(directory, ".automaton", "ai-guidance");
         if (!Directory.Exists(legacyRoot))
@@ -274,9 +251,9 @@ public sealed class AiGuidancePackService
             return;
         }
 
-        foreach (var source in ResourceMap.Values)
+        foreach (var source in _guidanceProvider.GetReferenceSources())
         {
-            var path = Path.Combine(legacyRoot, source.Replace('/', Path.DirectorySeparatorChar));
+            var path = Path.Combine(legacyRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -335,7 +312,7 @@ public sealed class AiGuidancePackService
 
     private static string BuildCanonicalManifest(
         string mode,
-        IReadOnlyList<(string RelativePath, string Content)> sources,
+        IReadOnlyList<GuidanceSource> sources,
         IReadOnlyList<string> generatedFiles)
     {
         var manifest = new

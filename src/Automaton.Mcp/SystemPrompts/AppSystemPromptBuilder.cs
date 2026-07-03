@@ -1,3 +1,4 @@
+using Automaton.AiGuidance;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,11 +15,6 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 {
     private const string VerificationStrategyEnvVar = "AUTOMATON_APP_VERIFICATION_STRATEGY";
     private const string ExecutionPolicyEnvVar = "AUTOMATON_APP_EXECUTION_POLICY";
-
-    // Tiered prompts — base is always prepended to each tier
-    private static readonly Lazy<string> BasePrompt = new(
-        () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-base.md"),
-        LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<string> SimplePrompt = new(
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-simple.md"),
@@ -40,15 +36,18 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.AppPrompts.app-planning.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
+    private readonly IAutomatonGuidanceProvider _guidanceProvider;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IReadOnlyDictionary<string, IAppVerificationPromptStrategy> _verificationStrategies;
     private readonly IReadOnlyDictionary<string, IAppExecutionPolicyPromptStrategy> _executionPolicies;
 
     public AppSystemPromptBuilder(
+        IAutomatonGuidanceProvider guidanceProvider,
         IStepSystemPromptBuilder stepPromptBuilder,
         IEnumerable<IAppVerificationPromptStrategy> verificationStrategies,
         IEnumerable<IAppExecutionPolicyPromptStrategy> executionPolicies)
     {
+        _guidanceProvider = guidanceProvider;
         _stepPromptBuilder = stepPromptBuilder;
         _verificationStrategies = verificationStrategies
             .GroupBy(strategy => strategy.Name, StringComparer.OrdinalIgnoreCase)
@@ -75,10 +74,11 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             _                         => MediumPrompt.Value
         };
 
+        var sharedContractBlock = BuildSharedContractBlock();
         var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
         var executionPolicyBlock = ResolveExecutionPolicyPromptBlock(executionPolicyName);
         var precedenceGuardBlock = BuildPrecedenceGuardBlock();
-        return $"{BasePrompt.Value}\n\n{tierPrompt}\n\n{precedenceGuardBlock}\n\n{verificationBlock}\n\n{executionPolicyBlock}";
+        return $"{sharedContractBlock}\n\n{tierPrompt}\n\n{precedenceGuardBlock}\n\n{verificationBlock}\n\n{executionPolicyBlock}";
     }
 
     /// <summary>
@@ -145,9 +145,16 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     private static string BuildPrecedenceGuardBlock() =>
         """
 ## INSTRUCTION PRECEDENCE
-- Resolve conflicts by priority: explicit user request > verification strategy block > execution policy block > tier/base guidance.
+- Resolve conflicts by priority: explicit user request > Studio/editor operating rules > verification strategy block > execution policy block > shared Automaton app contract > tier guidance.
 - Do not follow lower-priority guidance when it conflicts with higher-priority directives.
 """;
+
+    private string BuildSharedContractBlock()
+    {
+        var contract = _guidanceProvider.GetReference("llms/automaton-app-contract-compact.md").Trim();
+        var studioAdapter = _guidanceProvider.GetReference("llms/automaton-studio-editor.md").Trim();
+        return $"{contract}\n\n{studioAdapter}";
+    }
 
     private static string LoadEmbeddedResource(string resourceName)
     {
