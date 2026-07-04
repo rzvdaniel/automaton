@@ -16,9 +16,15 @@ import { renderMarkdown } from '@/shared/utils/markdown'
 type GuidanceForm = UpsertAiGuidanceRequest
 
 interface GuidanceGroup {
-  surface: string
-  label: string
+  id: string
+  surfaceLabel: string
+  sectionLabel: string
   items: AiGuidanceAdmin[]
+}
+
+interface DocumentBadge {
+  label: string
+  className: string
 }
 
 const SURFACE_OPTIONS = [
@@ -26,6 +32,12 @@ const SURFACE_OPTIONS = [
   { label: 'Shared', value: 'shared' },
   { label: 'CLI', value: 'cli' },
   { label: 'MCP', value: 'mcp' },
+]
+
+const DOCUMENT_KIND_OPTIONS = [
+  { label: 'Base Prompt', value: 'BasePrompt' },
+  { label: 'System Prompt', value: 'SystemPrompt' },
+  { label: 'Guidance', value: 'Guidance' },
 ]
 
 const EDITOR_TABS = [
@@ -43,6 +55,12 @@ const SURFACE_LABELS: Record<string, string> = {
   shared: 'Shared',
   cli: 'CLI',
   mcp: 'MCP',
+}
+
+const DOCUMENT_KIND_LABELS: Record<string, string> = {
+  BasePrompt: 'Base Prompt',
+  SystemPrompt: 'System Prompt',
+  Guidance: 'Guidance',
 }
 
 const toast = useToast()
@@ -64,12 +82,34 @@ const selectedDocument = computed(() =>
   documents.value.find(item => item.id === selectedId.value) ?? null
 )
 
+const displayDocument = computed<AiGuidanceAdmin>(() => ({
+  id: selectedDocument.value?.id ?? 'new',
+  key: form.value.key,
+  relativePath: generatedRelativePath.value,
+  title: form.value.title,
+  surface: form.value.surface,
+  documentKind: form.value.documentKind,
+  description: form.value.description,
+  tagsJson: form.value.tagsJson,
+  contentMarkdown: form.value.contentMarkdown,
+  isEnabled: form.value.isEnabled,
+  requiredByDefault: form.value.requiredByDefault,
+  isModelLoadable: form.value.isModelLoadable,
+  sortOrder: form.value.sortOrder,
+  version: selectedDocument.value?.version ?? 1,
+  createdAt: selectedDocument.value?.createdAt ?? '',
+  updatedAt: selectedDocument.value?.updatedAt,
+  hasEmbeddedDefault: selectedDocument.value?.hasEmbeddedDefault ?? false,
+}))
+
 const isNewDocument = computed(() => selectedId.value === null)
 
 const filteredDocuments = computed(() => {
   const normalizedQuery = query.value.trim().toLowerCase()
   const base = [...documents.value].sort((a, b) => {
     if (a.surface !== b.surface) return a.surface.localeCompare(b.surface)
+    if (a.documentKind !== b.documentKind) return getDocumentKindRank(a.documentKind) - getDocumentKindRank(b.documentKind)
+    if (a.requiredByDefault !== b.requiredByDefault) return Number(b.requiredByDefault) - Number(a.requiredByDefault)
     return a.title.localeCompare(b.title)
   })
 
@@ -87,24 +127,31 @@ const filteredDocuments = computed(() => {
 })
 
 const groupedDocuments = computed<GuidanceGroup[]>(() => {
-  const groups = new Map<string, AiGuidanceAdmin[]>()
+  const groups = new Map<string, GuidanceGroup>()
 
   for (const document of filteredDocuments.value) {
-    const existing = groups.get(document.surface) ?? []
-    existing.push(document)
-    groups.set(document.surface, existing)
+    const groupKey = `${document.surface}:${getTreeSectionKey(document)}`
+    const existing = groups.get(groupKey)
+    if (existing) {
+      existing.items.push(document)
+      continue
+    }
+
+    groups.set(groupKey, {
+      id: groupKey,
+      surfaceLabel: SURFACE_LABELS[document.surface] ?? document.surface,
+      sectionLabel: getTreeSectionLabel(document),
+      items: [document],
+    })
   }
 
-  return Array.from(groups.entries()).map(([surface, items]) => ({
-    surface,
-    label: SURFACE_LABELS[surface] ?? surface,
-    items,
-  }))
+  return Array.from(groups.values())
 })
 
 const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidance document')
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
 const inspectorTitle = computed(() => inspectorTab.value === 'history' ? 'History' : 'Properties')
+const headerBadges = computed(() => buildDocumentBadges(displayDocument.value))
 
 const generatedRelativePath = computed(() => {
   if (selectedDocument.value) {
@@ -187,10 +234,14 @@ function cloneDocument() {
     relativePath: '',
     title: `${source.title} Copy`,
     surface: source.surface,
+    documentKind: source.documentKind,
     description: source.description ?? '',
     tagsJson: source.tagsJson ?? '',
     contentMarkdown: source.contentMarkdown,
     isEnabled: false,
+    requiredByDefault: source.requiredByDefault,
+    isModelLoadable: source.isModelLoadable,
+    sortOrder: source.sortOrder,
   }
   form.value.relativePath = generatedRelativePath.value
   activeTab.value = 'markdown'
@@ -212,10 +263,14 @@ async function saveDocument() {
       relativePath: generatedRelativePath.value.trim(),
       title: form.value.title.trim(),
       surface: form.value.surface.trim(),
+      documentKind: form.value.documentKind.trim(),
       description: normalizeOptional(form.value.description),
       tagsJson: normalizeOptional(form.value.tagsJson),
       contentMarkdown: form.value.contentMarkdown,
       isEnabled: form.value.isEnabled,
+      requiredByDefault: form.value.requiredByDefault,
+      isModelLoadable: form.value.isModelLoadable,
+      sortOrder: form.value.sortOrder,
     }
 
     const wasEditingExisting = !!selectedId.value
@@ -320,10 +375,14 @@ function applyDocumentToForm(document: AiGuidanceAdmin) {
     relativePath: document.relativePath,
     title: document.title,
     surface: document.surface,
+    documentKind: document.documentKind,
     description: document.description ?? '',
     tagsJson: document.tagsJson ?? '',
     contentMarkdown: document.contentMarkdown,
     isEnabled: document.isEnabled,
+    requiredByDefault: document.requiredByDefault,
+    isModelLoadable: document.isModelLoadable,
+    sortOrder: document.sortOrder,
   }
 }
 
@@ -333,11 +392,55 @@ function createEmptyForm(): GuidanceForm {
     relativePath: 'llms/new-guidance.md',
     title: '',
     surface: 'studio',
+    documentKind: 'Guidance',
     description: '',
     tagsJson: '',
     contentMarkdown: '',
     isEnabled: true,
+    requiredByDefault: false,
+    isModelLoadable: true,
+    sortOrder: 100,
   }
+}
+
+function getDocumentKindLabel(kind: string) {
+  return DOCUMENT_KIND_LABELS[kind] ?? kind
+}
+
+function getDocumentKindRank(kind: string) {
+  switch (kind) {
+    case 'BasePrompt':
+      return 0
+    case 'SystemPrompt':
+      return 1
+    default:
+      return 2
+  }
+}
+
+function getTreeSectionKey(document: AiGuidanceAdmin) {
+  return document.documentKind === 'BasePrompt' ? 'base' : 'guidance'
+}
+
+function getTreeSectionLabel(document: AiGuidanceAdmin) {
+  return document.documentKind === 'BasePrompt' ? 'Base Prompt' : 'Guidance'
+}
+
+function buildDocumentBadges(document: AiGuidanceAdmin): DocumentBadge[] {
+  const badges: DocumentBadge[] = [
+    { label: getDocumentKindLabel(document.documentKind), className: `doc-badge-kind-${document.documentKind.toLowerCase()}` },
+    { label: SURFACE_LABELS[document.surface] ?? document.surface, className: 'doc-badge-surface' },
+  ]
+
+  if (document.requiredByDefault) {
+    badges.push({ label: 'Always Loaded', className: 'doc-badge-required' })
+  }
+
+  if (document.isModelLoadable) {
+    badges.push({ label: 'Discoverable', className: 'doc-badge-loadable' })
+  }
+
+  return badges
 }
 
 function normalizeOptional(value?: string) {
@@ -387,23 +490,30 @@ function extractErrorMessage(error: unknown, fallback: string) {
                 <span>No AI guidance documents found.</span>
               </div>
 
-              <div v-else class="document-groups">
-                <section v-for="group in groupedDocuments" :key="group.surface" class="document-group">
-                  <div class="document-group-label">{{ group.label }} <span class="document-group-count">({{ group.items.length }})</span></div>
+                <div v-else class="document-groups">
+                  <section v-for="group in groupedDocuments" :key="group.id" class="document-group">
+                    <div class="document-group-label">{{ group.surfaceLabel }}</div>
+                    <div class="document-group-sublabel">{{ group.sectionLabel }} <span class="document-group-count">({{ group.items.length }})</span></div>
 
-                  <button
-                    v-for="document in group.items"
-                    :key="document.id"
+                    <button
+                      v-for="document in group.items"
+                      :key="document.id"
                     type="button"
                     class="document-item"
                     :class="{ 'document-item-active': selectedId === document.id }"
-                    @click="selectDocument(document)"
-                  >
-                    <span class="document-item-icon">📄</span>
-                    <span class="document-item-title">{{ document.title }}</span>
-                    <span
-                      class="document-item-state-inline"
-                      :class="{ 'document-item-state-inline-disabled': !document.isEnabled }"
+                      @click="selectDocument(document)"
+                    >
+                      <span class="document-item-icon">📄</span>
+                      <span class="document-item-copy">
+                        <span class="document-item-title">{{ document.title }}</span>
+                        <span class="document-item-badges">
+                          <span v-if="document.requiredByDefault" class="document-mini-badge">Always Loaded</span>
+                          <span v-if="document.isModelLoadable" class="document-mini-badge document-mini-badge-outline">Discoverable</span>
+                        </span>
+                      </span>
+                      <span
+                        class="document-item-state-inline"
+                        :class="{ 'document-item-state-inline-disabled': !document.isEnabled }"
                     >
                       {{ document.isEnabled ? '✓' : '○' }}
                     </span>
@@ -438,10 +548,20 @@ function extractErrorMessage(error: unknown, fallback: string) {
                     @blur="editingTitle = false"
                     @keyup.enter="editingTitle = false"
                     autofocus
-                  />
-                </div>
-                <div class="editor-meta">
-                  <span>{{ form.key || 'new-guidance' }}</span>
+                    />
+                  </div>
+                  <div class="editor-badges">
+                    <span
+                      v-for="badge in headerBadges"
+                      :key="badge.label"
+                      class="doc-badge"
+                      :class="badge.className"
+                    >
+                      {{ badge.label }}
+                    </span>
+                  </div>
+                  <div class="editor-meta">
+                    <span>{{ form.key || 'new-guidance' }}</span>
                   <button type="button" class="editor-meta-link" @click="openInspector('history')">
                     Version {{ selectedDocument?.version ?? 1 }} ▼
                   </button>
@@ -552,8 +672,31 @@ function extractErrorMessage(error: unknown, fallback: string) {
           </div>
 
           <div class="field">
+            <label for="guidance-document-kind">Type</label>
+            <Dropdown
+              id="guidance-document-kind"
+              v-model="form.documentKind"
+              :options="DOCUMENT_KIND_OPTIONS"
+              option-label="label"
+              option-value="value"
+              class="w-full"
+            />
+          </div>
+
+          <div class="field">
             <label for="guidance-tags">Tags</label>
             <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
+          </div>
+
+          <div class="property-facts property-facts-tight">
+            <div class="property-fact">
+              <span class="property-fact-label">Always Loaded</span>
+              <span class="property-fact-value">{{ form.requiredByDefault ? 'Yes' : 'No' }}</span>
+            </div>
+            <div class="property-fact">
+              <span class="property-fact-label">Discoverable</span>
+              <span class="property-fact-value">{{ form.isModelLoadable ? 'Yes' : 'No' }}</span>
+            </div>
           </div>
 
           <div class="property-facts property-facts-tight">
@@ -603,8 +746,10 @@ function extractErrorMessage(error: unknown, fallback: string) {
 
 <style scoped>
 .admin-ai-guidance-view {
+  box-sizing: border-box;
   flex: 1;
   height: 100%;
+  max-height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -702,7 +847,8 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .documents-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: scroll;
+  overflow-x: hidden;
   padding: 1rem 0.1rem 0 0;
   overscroll-behavior: contain;
 }
@@ -734,9 +880,17 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .document-group-label {
   padding: 0 0.25rem;
   letter-spacing: 0.03em;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 800;
   color: #5f7598;
+  text-transform: uppercase;
+}
+
+.document-group-sublabel {
+  padding: 0 0.25rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #17325b;
 }
 
 .document-group-count {
@@ -780,6 +934,35 @@ function extractErrorMessage(error: unknown, fallback: string) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.document-item-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.document-item-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.document-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #e9f4ec;
+  color: #21583b;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.document-mini-badge-outline {
+  background: #edf4fb;
+  color: #35527f;
 }
 
 .document-item-state-inline {
@@ -858,6 +1041,53 @@ function extractErrorMessage(error: unknown, fallback: string) {
   flex-wrap: wrap;
   color: var(--text-color-secondary);
   font-size: 0.88rem;
+}
+
+.editor-badges {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.doc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.doc-badge-kind-baseprompt {
+  background: #fff3d9;
+  color: #8a5a00;
+}
+
+.doc-badge-kind-systemprompt {
+  background: #f3e8ff;
+  color: #6f3eb2;
+}
+
+.doc-badge-kind-guidance {
+  background: #e8f0ff;
+  color: #234f8e;
+}
+
+.doc-badge-surface {
+  background: #eef3fb;
+  color: #35527f;
+}
+
+.doc-badge-required {
+  background: #e9f4ec;
+  color: #21583b;
+}
+
+.doc-badge-loadable {
+  background: #edf4fb;
+  color: #35527f;
 }
 
 .editor-meta-link {

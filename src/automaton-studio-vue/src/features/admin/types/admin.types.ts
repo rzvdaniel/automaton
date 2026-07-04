@@ -186,10 +186,14 @@ export interface AiGuidanceAdmin {
   relativePath: string
   title: string
   surface: string
+  documentKind: string
   description?: string
   tagsJson?: string
   contentMarkdown: string
   isEnabled: boolean
+  requiredByDefault: boolean
+  isModelLoadable: boolean
+  sortOrder: number
   version: number
   createdAt: string
   updatedAt?: string
@@ -201,10 +205,14 @@ export interface UpsertAiGuidanceRequest {
   relativePath: string
   title: string
   surface: string
+  documentKind: string
   description?: string
   tagsJson?: string
   contentMarkdown: string
   isEnabled: boolean
+  requiredByDefault: boolean
+  isModelLoadable: boolean
+  sortOrder: number
 }
 
 export interface AppDeployRulesSettings {
