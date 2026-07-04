@@ -10,6 +10,7 @@ import AdminProviderDetailView from './views/AdminProviderDetailView.vue'
 import AdminModelsView from './views/AdminModelsView.vue'
 import AdminModelDetailView from './views/AdminModelDetailView.vue'
 import AdminAiSettingsView from './views/AdminAiSettingsView.vue'
+import AdminAiGuidanceView from './views/AdminAiGuidanceView.vue'
 import AdminDashboardView from './views/AdminDashboardView.vue'
 import AdminLogsView from './views/AdminLogsView.vue'
 import AdminSubscriptionPlansView from './views/AdminSubscriptionPlansView.vue'
@@ -74,6 +75,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: AdminAiSettingsView,
         meta: {
           title: 'AI Settings',
+        },
+      },
+      {
+        path: 'ai-guidance',
+        name: 'admin-ai-guidance',
+        component: AdminAiGuidanceView,
+        meta: {
+          title: 'AI Guidance',
         },
       },
       {

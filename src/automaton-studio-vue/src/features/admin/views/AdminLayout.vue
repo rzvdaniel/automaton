@@ -33,6 +33,12 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/ai-providers',
   },
   {
+    label: 'AI Guidance',
+    icon: 'pi pi-file-edit',
+    to: '/admin/ai-guidance',
+    routePrefix: '/admin/ai-guidance',
+  },
+  {
     label: 'AI Settings',
     icon: 'pi pi-sliders-h',
     to: '/admin/ai-settings',

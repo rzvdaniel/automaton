@@ -53,4 +53,9 @@ public static class AuditEventTypes
     public const string AiApiKeyUpdated = "AiApiKeyUpdated";
     public const string AiApiKeyDeleted = "AiApiKeyDeleted";
     public const string AiOperationalSettingsUpdated = "AiOperationalSettingsUpdated";
+    public const string AiGuidanceCreated = "AiGuidanceCreated";
+    public const string AiGuidanceUpdated = "AiGuidanceUpdated";
+    public const string AiGuidanceEnabled = "AiGuidanceEnabled";
+    public const string AiGuidanceDisabled = "AiGuidanceDisabled";
+    public const string AiGuidanceResetToDefault = "AiGuidanceResetToDefault";
 }

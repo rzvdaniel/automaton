@@ -13,4 +13,5 @@ public static class AuditEntityTypes
     public const string AiModel = "AiModel";
     public const string AiApiKey = "AiApiKey";
     public const string AiSettings = "AiSettings";
+    public const string AiGuidance = "AiGuidance";
 }

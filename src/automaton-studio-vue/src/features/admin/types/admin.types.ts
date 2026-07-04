@@ -180,6 +180,35 @@ export interface AiProvidersOperationalConfig {
   historyCompaction: HistoryCompactionConfig
 }
 
+export interface AiGuidanceAdmin {
+  id: string
+  key: string
+  relativePath: string
+  title: string
+  surface: string
+  category: string
+  description?: string
+  tagsJson?: string
+  contentMarkdown: string
+  isEnabled: boolean
+  version: number
+  createdAt: string
+  updatedAt?: string
+  hasEmbeddedDefault: boolean
+}
+
+export interface UpsertAiGuidanceRequest {
+  key: string
+  relativePath: string
+  title: string
+  surface: string
+  category: string
+  description?: string
+  tagsJson?: string
+  contentMarkdown: string
+  isEnabled: boolean
+}
+
 export interface AppDeployRulesSettings {
   sourceExclude: string[]
   frontendExclude: string[]

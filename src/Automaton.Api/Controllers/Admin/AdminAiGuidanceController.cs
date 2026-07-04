@@ -1,0 +1,190 @@
+using System.ComponentModel.DataAnnotations;
+using Automaton.Api.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Automaton.Api.Controllers.Admin;
+
+[ApiController]
+[Route("api/admin/ai-guidance")]
+[Authorize(Policy = "Administrators")]
+public sealed class AdminAiGuidanceController : ControllerBase
+{
+    private readonly AdminAiGuidanceService _service;
+
+    public AdminAiGuidanceController(AdminAiGuidanceService service)
+    {
+        _service = service;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<AiGuidanceAdminResponse>>> GetAll(CancellationToken cancellationToken)
+    {
+        var documents = await _service.ListAsync(cancellationToken);
+        return Ok(documents.Select(Map));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var document = await _service.GetAsync(id, cancellationToken);
+        if (document is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(Map(document));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Create(
+        [FromBody] UpsertAiGuidanceRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var document = await _service.CreateAsync(
+                request.Key,
+                request.RelativePath,
+                request.Title,
+                request.Surface,
+                request.Category,
+                request.Description,
+                request.TagsJson,
+                request.ContentMarkdown,
+                request.IsEnabled,
+                cancellationToken);
+
+            return CreatedAtAction(nameof(Get), new { id = document.Id }, Map(document));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Update(
+        Guid id,
+        [FromBody] UpsertAiGuidanceRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var document = await _service.UpdateAsync(
+                id,
+                request.Key,
+                request.RelativePath,
+                request.Title,
+                request.Surface,
+                request.Category,
+                request.Description,
+                request.TagsJson,
+                request.ContentMarkdown,
+                request.IsEnabled,
+                cancellationToken);
+
+            if (document is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(Map(document));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/enable")]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Enable(Guid id, CancellationToken cancellationToken)
+    {
+        var document = await _service.SetEnabledAsync(id, true, cancellationToken);
+        return document is null ? NotFound() : Ok(Map(document));
+    }
+
+    [HttpPost("{id:guid}/disable")]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Disable(Guid id, CancellationToken cancellationToken)
+    {
+        var document = await _service.SetEnabledAsync(id, false, cancellationToken);
+        return document is null ? NotFound() : Ok(Map(document));
+    }
+
+    [HttpPost("{id:guid}/reset")]
+    public async Task<ActionResult<AiGuidanceAdminResponse>> Reset(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var document = await _service.ResetToEmbeddedDefaultAsync(id, cancellationToken);
+            return document is null ? NotFound() : Ok(Map(document));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private AiGuidanceAdminResponse Map(Automaton.Api.Entities.AiGuidanceDocument document) => new()
+    {
+        Id = document.Id,
+        Key = document.Key,
+        RelativePath = document.RelativePath,
+        Title = document.Title,
+        Surface = document.Surface,
+        Category = document.Category,
+        Description = document.Description,
+        TagsJson = document.TagsJson,
+        ContentMarkdown = document.ContentMarkdown,
+        IsEnabled = document.IsEnabled,
+        Version = document.Version,
+        CreatedAt = document.CreatedAt,
+        UpdatedAt = document.UpdatedAt,
+        HasEmbeddedDefault = _service.HasEmbeddedDefault(document.RelativePath)
+    };
+}
+
+public sealed class AiGuidanceAdminResponse
+{
+    public Guid Id { get; set; }
+    public string Key { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Surface { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? TagsJson { get; set; }
+    public string ContentMarkdown { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; }
+    public int Version { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool HasEmbeddedDefault { get; set; }
+}
+
+public sealed class UpsertAiGuidanceRequest
+{
+    [Required]
+    public string Key { get; set; } = string.Empty;
+
+    [Required]
+    public string RelativePath { get; set; } = string.Empty;
+
+    [Required]
+    public string Title { get; set; } = string.Empty;
+
+    [Required]
+    public string Surface { get; set; } = string.Empty;
+
+    [Required]
+    public string Category { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public string? TagsJson { get; set; }
+
+    [Required]
+    public string ContentMarkdown { get; set; } = string.Empty;
+
+    public bool IsEnabled { get; set; } = true;
+}
