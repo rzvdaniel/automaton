@@ -19,7 +19,7 @@ public class AutomatonMcpClientToolExposureTests
         var registry = new FakeAiProviderRegistry(fakeProvider);
         var toolProvider = new AppMcpToolProvider(
             NullLogger<AppMcpToolProvider>.Instance,
-            [new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceProvider())]);
+            [new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()))]);
 
         var client = new AutomatonMcpClient(
             NullLogger<AutomatonMcpClient>.Instance,
