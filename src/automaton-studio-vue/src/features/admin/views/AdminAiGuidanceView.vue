@@ -401,14 +401,14 @@ function extractErrorMessage(error: unknown, fallback: string) {
                     :class="{ 'document-item-active': selectedId === document.id }"
                     @click="selectDocument(document)"
                   >
-                    <div class="document-item-title-row">
-                      <span class="document-item-icon">📄</span>
-                      <span class="document-item-title">{{ document.title }}</span>
-                    </div>
-                    <div class="document-item-meta">{{ document.key }}</div>
-                    <div class="document-item-state" :class="{ 'document-item-state-disabled': !document.isEnabled }">
-                      {{ document.isEnabled ? 'Enabled' : 'Disabled' }}
-                    </div>
+                    <span class="document-item-icon">📄</span>
+                    <span class="document-item-title">{{ document.title }}</span>
+                    <span
+                      class="document-item-state-inline"
+                      :class="{ 'document-item-state-inline-disabled': !document.isEnabled }"
+                    >
+                      {{ document.isEnabled ? '✓' : '○' }}
+                    </span>
                   </button>
                 </section>
               </div>
@@ -752,13 +752,13 @@ function extractErrorMessage(error: unknown, fallback: string) {
 
 .document-item {
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
-  padding: 0.55rem 0.65rem 0.55rem 1rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.85rem;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   text-align: left;
@@ -776,49 +776,27 @@ function extractErrorMessage(error: unknown, fallback: string) {
   border-color: #cfe4d8;
 }
 
-.document-item-title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .document-item-icon {
   line-height: 1;
+  font-size: 0.95rem;
 }
 
 .document-item-title {
   font-weight: 600;
   color: #19325f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.document-item-meta {
-  font-size: 0.8rem;
-  color: var(--text-color-secondary);
-}
-
-.document-item-state {
-  margin-top: 0.25rem;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.14rem 0.5rem;
-  border-radius: 999px;
-  background: #e9f8ef;
+.document-item-state-inline {
+  font-size: 0.85rem;
+  font-weight: 800;
   color: #127247;
-  font-size: 0.76rem;
-  font-weight: 700;
 }
 
-.document-item-state::before {
-  content: '✓ ';
-}
-
-.document-item-state-disabled {
-  background: #edf1f5;
-  color: #5f6f82;
-}
-
-.document-item-state-disabled::before {
-  content: '○ ';
+.document-item-state-inline-disabled {
+  color: #7b8796;
 }
 
 .editor-header {
