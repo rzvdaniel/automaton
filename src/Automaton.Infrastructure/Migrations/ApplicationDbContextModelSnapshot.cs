@@ -257,11 +257,6 @@ namespace Automaton.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
                     b.Property<string>("ContentMarkdown")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -320,7 +315,7 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RelativePath")
                         .IsUnique();
 
-                    b.HasIndex("Surface", "Category");
+                    b.HasIndex("Surface");
 
                     b.ToTable("AiGuidanceDocuments");
                 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
@@ -33,6 +33,11 @@ const EDITOR_TABS = [
   { label: 'Preview', value: 'preview' },
 ]
 
+const INSPECTOR_TABS = [
+  { label: 'Properties', value: 'properties' },
+  { label: 'History', value: 'history' },
+]
+
 const SURFACE_LABELS: Record<string, string> = {
   studio: 'Studio',
   shared: 'Shared',
@@ -50,6 +55,7 @@ const saving = ref(false)
 const query = ref('')
 const activeTab = ref<'markdown' | 'preview'>('markdown')
 const propertiesOpen = ref(false)
+const inspectorTab = ref<'properties' | 'history'>('properties')
 const editingTitle = ref(false)
 
 const form = ref<GuidanceForm>(createEmptyForm())
@@ -98,26 +104,7 @@ const groupedDocuments = computed<GuidanceGroup[]>(() => {
 
 const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidance document')
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
-
-const hasUnsavedChanges = computed(() => {
-  if (isNewDocument.value) {
-    return !!(form.value.title.trim() || form.value.contentMarkdown.trim())
-  }
-
-  if (!selectedDocument.value) {
-    return false
-  }
-
-  return (
-    form.value.key !== selectedDocument.value.key ||
-    form.value.title !== selectedDocument.value.title ||
-    form.value.surface !== selectedDocument.value.surface ||
-    (form.value.description ?? '') !== (selectedDocument.value.description ?? '') ||
-    (form.value.tagsJson ?? '') !== (selectedDocument.value.tagsJson ?? '') ||
-    form.value.contentMarkdown !== selectedDocument.value.contentMarkdown ||
-    form.value.isEnabled !== selectedDocument.value.isEnabled
-  )
-})
+const inspectorTitle = computed(() => inspectorTab.value === 'history' ? 'History' : 'Properties')
 
 const generatedRelativePath = computed(() => {
   if (selectedDocument.value) {
@@ -144,6 +131,14 @@ watch(
 
 onMounted(loadDocuments)
 
+onMounted(() => {
+  document.querySelector('.app-main')?.classList.add('app-main--fullscreen')
+})
+
+onUnmounted(() => {
+  document.querySelector('.app-main')?.classList.remove('app-main--fullscreen')
+})
+
 async function loadDocuments() {
   loading.value = true
   try {
@@ -166,6 +161,7 @@ function selectDocument(document: AiGuidanceAdmin) {
   applyDocumentToForm(document)
   activeTab.value = 'markdown'
   propertiesOpen.value = false
+  inspectorTab.value = 'properties'
   editingTitle.value = false
 }
 
@@ -175,6 +171,7 @@ function startCreate() {
   form.value.relativePath = generatedRelativePath.value
   activeTab.value = 'markdown'
   propertiesOpen.value = true
+  inspectorTab.value = 'properties'
   editingTitle.value = true
 }
 
@@ -198,7 +195,13 @@ function cloneDocument() {
   form.value.relativePath = generatedRelativePath.value
   activeTab.value = 'markdown'
   propertiesOpen.value = true
+  inspectorTab.value = 'properties'
   editingTitle.value = true
+}
+
+function openInspector(tab: 'properties' | 'history') {
+  inspectorTab.value = tab
+  propertiesOpen.value = true
 }
 
 async function saveDocument() {
@@ -439,7 +442,9 @@ function extractErrorMessage(error: unknown, fallback: string) {
                 </div>
                 <div class="editor-meta">
                   <span>{{ form.key || 'new-guidance' }}</span>
-                  <span>Version {{ selectedDocument?.version ?? 1 }}</span>
+                  <button type="button" class="editor-meta-link" @click="openInspector('history')">
+                    Version {{ selectedDocument?.version ?? 1 }} ▼
+                  </button>
                   <span v-if="selectedDocument?.updatedAt">Updated {{ new Date(selectedDocument.updatedAt).toLocaleString() }}</span>
                 </div>
               </div>
@@ -491,7 +496,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
                       icon="pi pi-cog"
                       severity="secondary"
                       outlined
-                      @click="propertiesOpen = true"
+                      @click="openInspector('properties')"
                     />
                   </div>
                 </div>
@@ -519,82 +524,78 @@ function extractErrorMessage(error: unknown, fallback: string) {
       </Card>
     </div>
 
-    <Drawer v-model:visible="propertiesOpen" position="right" header="Properties" class="guidance-properties-drawer">
+    <Drawer v-model:visible="propertiesOpen" position="right" :header="inspectorTitle" class="guidance-properties-drawer">
       <div class="properties-shell">
-        <div class="field">
-          <label class="property-section-label">General</label>
-        </div>
-
-        <div class="field">
-          <label for="guidance-key">Key</label>
-          <InputText id="guidance-key" v-model="form.key" class="w-full" />
-        </div>
-
-        <div class="field">
-          <label for="guidance-surface">Surface</label>
-          <Dropdown
-            id="guidance-surface"
-            v-model="form.surface"
-            :options="SURFACE_OPTIONS"
+        <div class="inspector-tabs">
+          <SelectButton
+            v-model="inspectorTab"
+            :options="INSPECTOR_TABS"
             option-label="label"
             option-value="value"
-            class="w-full"
+            aria-label="Inspector section"
           />
         </div>
 
-        <div class="field">
-          <label for="guidance-tags">Tags</label>
-          <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
-        </div>
+        <template v-if="inspectorTab === 'properties'">
+          <div class="property-section">General</div>
 
-        <div class="field">
-          <label for="guidance-description">Description</label>
-          <InputText
-            id="guidance-description"
-            v-model="form.description"
-            class="w-full"
-            placeholder="Add a short description"
-          />
-        </div>
-
-        <div class="field">
-          <label class="property-section-label">Storage</label>
-        </div>
-
-        <div class="field">
-          <label for="guidance-path">Relative Path</label>
-          <InputText id="guidance-path" :model-value="generatedRelativePath" readonly class="w-full" />
-        </div>
-
-        <div class="field">
-          <label class="property-section-label">Runtime</label>
-        </div>
-
-        <div class="property-facts">
-          <div class="property-fact">
-            <span class="property-fact-label">Enabled</span>
-            <span class="property-fact-value">{{ form.isEnabled ? 'Yes' : 'No' }}</span>
+          <div class="field">
+            <label for="guidance-surface">Surface</label>
+            <Dropdown
+              id="guidance-surface"
+              v-model="form.surface"
+              :options="SURFACE_OPTIONS"
+              option-label="label"
+              option-value="value"
+              class="w-full"
+            />
           </div>
-        </div>
 
-        <div class="field">
-          <label class="property-section-label">History</label>
-        </div>
+          <div class="field">
+            <label for="guidance-tags">Tags</label>
+            <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
+          </div>
 
-        <div class="property-facts property-facts-tight">
-          <div class="property-fact">
-            <span class="property-fact-label">Version</span>
-            <span class="property-fact-value">{{ selectedDocument?.version ?? 1 }}</span>
+          <div class="property-facts property-facts-tight">
+            <div class="property-fact">
+              <span class="property-fact-label">Key</span>
+              <span class="property-fact-value">{{ form.key || 'Not set' }}</span>
+            </div>
+            <div class="property-fact">
+              <span class="property-fact-label">Version</span>
+              <span class="property-fact-value">{{ selectedDocument?.version ?? 1 }}</span>
+            </div>
+            <div class="property-fact">
+              <span class="property-fact-label">Updated</span>
+              <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
+            </div>
           </div>
-          <div class="property-fact">
-            <span class="property-fact-label">Created</span>
-            <span class="property-fact-value">{{ selectedDocument ? new Date(selectedDocument.createdAt).toLocaleString() : 'Not saved yet' }}</span>
+        </template>
+
+        <template v-else-if="inspectorTab === 'history'">
+          <div class="property-section">History</div>
+
+          <div class="property-facts property-facts-tight">
+            <div class="property-fact">
+              <span class="property-fact-label">Current Version</span>
+              <span class="property-fact-value">Version {{ selectedDocument?.version ?? 1 }}</span>
+            </div>
+            <div class="property-fact">
+              <span class="property-fact-label">Created</span>
+              <span class="property-fact-value">{{ selectedDocument ? new Date(selectedDocument.createdAt).toLocaleString() : 'Not saved yet' }}</span>
+            </div>
+            <div class="property-fact">
+              <span class="property-fact-label">Updated</span>
+              <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
+            </div>
           </div>
-          <div class="property-fact">
-            <span class="property-fact-label">Updated</span>
-            <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
+
+          <div class="inspector-empty-state">
+            <strong>Version history is not available yet.</strong>
+            <span>Future versions will show timeline entries, diff, and restore actions here.</span>
           </div>
-        </div>
+        </template>
+
       </div>
     </Drawer>
   </div>
@@ -608,6 +609,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 1.5rem;
 }
 
 .page-header {
@@ -858,6 +860,17 @@ function extractErrorMessage(error: unknown, fallback: string) {
   font-size: 0.88rem;
 }
 
+.editor-meta-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .editor-primary-action {
   display: flex;
   align-items: center;
@@ -885,7 +898,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .content-section {
@@ -946,7 +959,20 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .properties-shell {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.6rem;
+}
+
+.property-section {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f7598;
+}
+
+.inspector-tabs {
+  margin-bottom: 0.15rem;
 }
 
 .property-section-label {
@@ -960,9 +986,9 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .property-facts {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding-top: 1rem;
+  gap: 0.65rem;
+  margin-top: 0.15rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--surface-border);
 }
 
@@ -987,6 +1013,17 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .property-fact-value {
   color: #19325f;
   word-break: break-word;
+}
+
+.inspector-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem;
+  border: 1px dashed var(--surface-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-card) 94%, #eef3fb 6%);
+  color: var(--text-color-secondary);
 }
 
 .markdown-preview :deep(h1),
@@ -1028,6 +1065,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
   .admin-ai-guidance-view {
     height: auto;
     overflow: visible;
+    padding: 1rem;
   }
 
   .workspace-shell {

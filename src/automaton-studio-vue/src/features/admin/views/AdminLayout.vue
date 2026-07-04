@@ -126,14 +126,21 @@ const navigate = (to: string) => {
 .admin-layout {
   display: flex;
   gap: 1.5rem;
-  height: calc(100vh - 64px - 3rem);
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
 .admin-sidebar {
   width: 220px;
   flex-shrink: 0;
+  min-height: 0;
+}
+
+.admin-sidebar :deep(.p-card),
+.admin-sidebar :deep(.p-card-body),
+.admin-sidebar :deep(.p-card-content) {
+  height: 100%;
   min-height: 0;
 }
 
