@@ -99,20 +99,16 @@ const groupedDocuments = computed<GuidanceGroup[]>(() => {
 const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidance document')
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
 
-const saveState = computed(() => {
-  if (saving.value) {
-    return 'Saving...'
-  }
-
+const hasUnsavedChanges = computed(() => {
   if (isNewDocument.value) {
-    return form.value.title.trim() || form.value.contentMarkdown.trim() ? 'Unsaved changes' : 'New document'
+    return !!(form.value.title.trim() || form.value.contentMarkdown.trim())
   }
 
   if (!selectedDocument.value) {
-    return 'Saved'
+    return false
   }
 
-  const hasChanges =
+  return (
     form.value.key !== selectedDocument.value.key ||
     form.value.title !== selectedDocument.value.title ||
     form.value.surface !== selectedDocument.value.surface ||
@@ -120,8 +116,7 @@ const saveState = computed(() => {
     (form.value.tagsJson ?? '') !== (selectedDocument.value.tagsJson ?? '') ||
     form.value.contentMarkdown !== selectedDocument.value.contentMarkdown ||
     form.value.isEnabled !== selectedDocument.value.isEnabled
-
-  return hasChanges ? 'Unsaved changes' : 'Saved'
+  )
 })
 
 const generatedRelativePath = computed(() => {
@@ -423,7 +418,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
             <div class="editor-header">
               <div class="editor-header-text">
                 <div class="editor-header-title-row">
-                  <span class="editor-title-icon">📄</span>
                   <button
                     v-if="!editingTitle"
                     type="button"
@@ -476,9 +470,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
                   @click="confirmToggleEnabled(selectedDocument)"
                 />
                 <div class="editor-primary-action">
-                  <span class="editor-save-state" :class="{ 'editor-save-state-dirty': saveState === 'Unsaved changes' }">
-                    {{ saveState === 'Saved' ? 'Saved' : saveState }}
-                  </span>
                   <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
                 </div>
               </div>
@@ -820,11 +811,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
   flex-wrap: wrap;
 }
 
-.editor-title-icon {
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
 .editor-title-display {
   padding: 0;
   border: 0;
@@ -876,16 +862,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.editor-save-state {
-  font-weight: 700;
-  color: #127247;
-  white-space: nowrap;
-}
-
-.editor-save-state-dirty {
-  color: #c17a00;
 }
 
 .editor-actions {
