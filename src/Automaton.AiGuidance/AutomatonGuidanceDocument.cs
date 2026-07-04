@@ -5,7 +5,7 @@ public sealed record AutomatonGuidanceDocument(
     string RelativePath,
     string Title,
     string Surface,
-    string Category,
+    string? TagsJson,
     string? Description,
     string ContentMarkdown,
     int Version,

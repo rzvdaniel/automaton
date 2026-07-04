@@ -3,19 +3,23 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Tag from 'primevue/tag'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import SelectButton from 'primevue/selectbutton'
 import Dropdown from 'primevue/dropdown'
+import Drawer from 'primevue/drawer'
 import type { AiGuidanceAdmin, UpsertAiGuidanceRequest } from '../types/admin.types'
 import { adminAiGuidanceService } from '../services/adminAiGuidanceService'
 import { renderMarkdown } from '@/shared/utils/markdown'
 
 type GuidanceForm = UpsertAiGuidanceRequest
+
+interface GuidanceGroup {
+  surface: string
+  label: string
+  items: AiGuidanceAdmin[]
+}
 
 const SURFACE_OPTIONS = [
   { label: 'Studio', value: 'studio' },
@@ -24,23 +28,17 @@ const SURFACE_OPTIONS = [
   { label: 'MCP', value: 'mcp' },
 ]
 
-const CATEGORY_OPTIONS = [
-  { label: 'Editor', value: 'editor' },
-  { label: 'Contract', value: 'contract' },
-  { label: 'Backend', value: 'backend' },
-  { label: 'Frontend', value: 'frontend' },
-  { label: 'Media', value: 'media' },
-  { label: 'Deploy', value: 'deploy' },
-  { label: 'Starter', value: 'starter' },
-  { label: 'Examples', value: 'examples' },
-  { label: 'Protocol', value: 'protocol' },
-  { label: 'Reference', value: 'reference' },
-]
-
 const EDITOR_TABS = [
   { label: 'Markdown', value: 'markdown' },
   { label: 'Preview', value: 'preview' },
 ]
+
+const SURFACE_LABELS: Record<string, string> = {
+  studio: 'Studio',
+  shared: 'Shared',
+  cli: 'CLI',
+  mcp: 'MCP',
+}
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -51,7 +49,8 @@ const loading = ref(false)
 const saving = ref(false)
 const query = ref('')
 const activeTab = ref<'markdown' | 'preview'>('markdown')
-const advancedOpen = ref(false)
+const propertiesOpen = ref(false)
+const editingTitle = ref(false)
 
 const form = ref<GuidanceForm>(createEmptyForm())
 
@@ -65,7 +64,6 @@ const filteredDocuments = computed(() => {
   const normalizedQuery = query.value.trim().toLowerCase()
   const base = [...documents.value].sort((a, b) => {
     if (a.surface !== b.surface) return a.surface.localeCompare(b.surface)
-    if (a.category !== b.category) return a.category.localeCompare(b.category)
     return a.title.localeCompare(b.title)
   })
 
@@ -78,11 +76,53 @@ const filteredDocuments = computed(() => {
     item.key.toLowerCase().includes(normalizedQuery) ||
     item.relativePath.toLowerCase().includes(normalizedQuery) ||
     item.surface.toLowerCase().includes(normalizedQuery) ||
-    item.category.toLowerCase().includes(normalizedQuery)
+    (item.tagsJson ?? '').toLowerCase().includes(normalizedQuery)
   )
 })
 
+const groupedDocuments = computed<GuidanceGroup[]>(() => {
+  const groups = new Map<string, AiGuidanceAdmin[]>()
+
+  for (const document of filteredDocuments.value) {
+    const existing = groups.get(document.surface) ?? []
+    existing.push(document)
+    groups.set(document.surface, existing)
+  }
+
+  return Array.from(groups.entries()).map(([surface, items]) => ({
+    surface,
+    label: SURFACE_LABELS[surface] ?? surface,
+    items,
+  }))
+})
+
+const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidance document')
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
+
+const saveState = computed(() => {
+  if (saving.value) {
+    return 'Saving...'
+  }
+
+  if (isNewDocument.value) {
+    return form.value.title.trim() || form.value.contentMarkdown.trim() ? 'Unsaved changes' : 'New document'
+  }
+
+  if (!selectedDocument.value) {
+    return 'Saved'
+  }
+
+  const hasChanges =
+    form.value.key !== selectedDocument.value.key ||
+    form.value.title !== selectedDocument.value.title ||
+    form.value.surface !== selectedDocument.value.surface ||
+    (form.value.description ?? '') !== (selectedDocument.value.description ?? '') ||
+    (form.value.tagsJson ?? '') !== (selectedDocument.value.tagsJson ?? '') ||
+    form.value.contentMarkdown !== selectedDocument.value.contentMarkdown ||
+    form.value.isEnabled !== selectedDocument.value.isEnabled
+
+  return hasChanges ? 'Unsaved changes' : 'Saved'
+})
 
 const generatedRelativePath = computed(() => {
   if (selectedDocument.value) {
@@ -130,7 +170,8 @@ function selectDocument(document: AiGuidanceAdmin) {
   selectedId.value = document.id
   applyDocumentToForm(document)
   activeTab.value = 'markdown'
-  advancedOpen.value = false
+  propertiesOpen.value = false
+  editingTitle.value = false
 }
 
 function startCreate() {
@@ -138,7 +179,8 @@ function startCreate() {
   form.value = createEmptyForm()
   form.value.relativePath = generatedRelativePath.value
   activeTab.value = 'markdown'
-  advancedOpen.value = true
+  propertiesOpen.value = true
+  editingTitle.value = true
 }
 
 function cloneDocument() {
@@ -153,7 +195,6 @@ function cloneDocument() {
     relativePath: '',
     title: `${source.title} Copy`,
     surface: source.surface,
-    category: source.category,
     description: source.description ?? '',
     tagsJson: source.tagsJson ?? '',
     contentMarkdown: source.contentMarkdown,
@@ -161,7 +202,8 @@ function cloneDocument() {
   }
   form.value.relativePath = generatedRelativePath.value
   activeTab.value = 'markdown'
-  advancedOpen.value = true
+  propertiesOpen.value = true
+  editingTitle.value = true
 }
 
 async function saveDocument() {
@@ -172,7 +214,6 @@ async function saveDocument() {
       relativePath: generatedRelativePath.value.trim(),
       title: form.value.title.trim(),
       surface: form.value.surface.trim(),
-      category: form.value.category.trim(),
       description: normalizeOptional(form.value.description),
       tagsJson: normalizeOptional(form.value.tagsJson),
       contentMarkdown: form.value.contentMarkdown,
@@ -281,7 +322,6 @@ function applyDocumentToForm(document: AiGuidanceAdmin) {
     relativePath: document.relativePath,
     title: document.title,
     surface: document.surface,
-    category: document.category,
     description: document.description ?? '',
     tagsJson: document.tagsJson ?? '',
     contentMarkdown: document.contentMarkdown,
@@ -295,7 +335,6 @@ function createEmptyForm(): GuidanceForm {
     relativePath: 'llms/new-guidance.md',
     title: '',
     surface: 'studio',
-    category: 'editor',
     description: '',
     tagsJson: '',
     contentMarkdown: '',
@@ -316,14 +355,10 @@ function extractErrorMessage(error: unknown, fallback: string) {
 <template>
   <div class="admin-ai-guidance-view">
     <div class="page-header">
-      <div class="flex align-items-center gap-2 mb-2">
-        <i class="pi pi-file-edit text-color-secondary"></i>
-        <span class="text-color-secondary text-sm">Administration</span>
-      </div>
-      <div class="flex align-items-center justify-content-between gap-3 flex-wrap">
+      <div class="page-header-main">
         <div>
-          <h1 class="text-2xl font-bold m-0">AI Guidance</h1>
-          <p class="text-color-secondary mt-1 mb-0">
+          <h1 class="page-title">AI Guidance</h1>
+          <p class="page-subtitle">
             Manage runtime prompt documents used by Studio and other Automaton AI surfaces.
           </p>
         </div>
@@ -333,44 +368,51 @@ function extractErrorMessage(error: unknown, fallback: string) {
 
     <div class="workspace-shell">
       <Card class="documents-card">
-        <template #title>Documents</template>
         <template #content>
-          <div class="documents-toolbar">
-            <InputText v-model="query" placeholder="Search documents..." class="w-full" />
-          </div>
+          <div class="documents-shell">
+            <div class="documents-header">
+              <div>
+                <h2 class="panel-title">Documents</h2>
+                <p class="panel-subtitle">Browse guidance like a prompt library.</p>
+              </div>
+              <InputText v-model="query" placeholder="Search documents..." class="documents-search" />
+            </div>
 
-          <div class="documents-scroll">
-            <DataTable
-              :value="filteredDocuments"
-              :loading="loading"
-              data-key="id"
-              selection-mode="single"
-              :selection="selectedDocument"
-              responsive-layout="scroll"
-              @row-select="selectDocument($event.data)"
-              @row-click="selectDocument($event.data)"
-            >
-              <template #empty>
-                <div class="text-center py-5 text-color-secondary">
-                  <i class="pi pi-file text-4xl mb-3 block"></i>
-                  <p class="m-0">No AI guidance documents found.</p>
-                </div>
-              </template>
+            <div class="documents-scroll">
+              <div v-if="loading" class="documents-empty">
+                <i class="pi pi-spin pi-spinner"></i>
+                <span>Loading AI guidance documents...</span>
+              </div>
 
-              <Column field="title" header="Document">
-                <template #body="{ data }">
-                  <div class="document-row" :class="{ 'document-row-active': selectedId === data.id }">
-                    <div class="document-row-title">{{ data.title }}</div>
-                    <div class="document-row-path">{{ data.relativePath }}</div>
-                    <div class="document-row-tags">
-                      <Tag :value="data.surface" severity="info" />
-                      <Tag :value="data.category" severity="contrast" />
-                      <Tag :value="data.isEnabled ? 'Enabled' : 'Disabled'" :severity="data.isEnabled ? 'success' : 'secondary'" />
+              <div v-else-if="groupedDocuments.length === 0" class="documents-empty">
+                <i class="pi pi-file"></i>
+                <span>No AI guidance documents found.</span>
+              </div>
+
+              <div v-else class="document-groups">
+                <section v-for="group in groupedDocuments" :key="group.surface" class="document-group">
+                  <div class="document-group-label">{{ group.label }} <span class="document-group-count">({{ group.items.length }})</span></div>
+
+                  <button
+                    v-for="document in group.items"
+                    :key="document.id"
+                    type="button"
+                    class="document-item"
+                    :class="{ 'document-item-active': selectedId === document.id }"
+                    @click="selectDocument(document)"
+                  >
+                    <div class="document-item-title-row">
+                      <span class="document-item-icon">📄</span>
+                      <span class="document-item-title">{{ document.title }}</span>
                     </div>
-                  </div>
-                </template>
-              </Column>
-            </DataTable>
+                    <div class="document-item-meta">{{ document.key }}</div>
+                    <div class="document-item-state" :class="{ 'document-item-state-disabled': !document.isEnabled }">
+                      {{ document.isEnabled ? 'Enabled' : 'Disabled' }}
+                    </div>
+                  </button>
+                </section>
+              </div>
+            </div>
           </div>
         </template>
       </Card>
@@ -380,10 +422,31 @@ function extractErrorMessage(error: unknown, fallback: string) {
           <div class="editor-shell">
             <div class="editor-header">
               <div class="editor-header-text">
-                <h2 class="editor-title">{{ isNewDocument ? 'New Guidance Document' : 'Edit Guidance Document' }}</h2>
-                <div v-if="selectedDocument" class="editor-meta">
-                  <span>Version {{ selectedDocument.version }}</span>
-                  <span v-if="selectedDocument.updatedAt">Updated {{ new Date(selectedDocument.updatedAt).toLocaleString() }}</span>
+                <div class="editor-header-title-row">
+                  <span class="editor-title-icon">📄</span>
+                  <button
+                    v-if="!editingTitle"
+                    type="button"
+                    class="editor-title-display"
+                    @click="editingTitle = true"
+                  >
+                    {{ documentTitle }}
+                  </button>
+                  <InputText
+                    v-else
+                    id="guidance-title"
+                    v-model="form.title"
+                    class="editor-title-input"
+                    placeholder="Untitled guidance document"
+                    @blur="editingTitle = false"
+                    @keyup.enter="editingTitle = false"
+                    autofocus
+                  />
+                </div>
+                <div class="editor-meta">
+                  <span>{{ form.key || 'new-guidance' }}</span>
+                  <span>Version {{ selectedDocument?.version ?? 1 }}</span>
+                  <span v-if="selectedDocument?.updatedAt">Updated {{ new Date(selectedDocument.updatedAt).toLocaleString() }}</span>
                 </div>
               </div>
 
@@ -412,81 +475,34 @@ function extractErrorMessage(error: unknown, fallback: string) {
                   outlined
                   @click="confirmToggleEnabled(selectedDocument)"
                 />
-                <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
+                <div class="editor-primary-action">
+                  <span class="editor-save-state" :class="{ 'editor-save-state-dirty': saveState === 'Unsaved changes' }">
+                    {{ saveState === 'Saved' ? 'Saved' : saveState }}
+                  </span>
+                  <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
+                </div>
               </div>
             </div>
 
-            <div class="editor-scroll">
-              <div class="primary-fields">
-                <div class="field">
-                  <label for="guidance-title">Title</label>
-                  <InputText id="guidance-title" v-model="form.title" class="w-full" />
-                </div>
-
-                <div class="field">
-                  <label for="guidance-key">Key</label>
-                  <InputText id="guidance-key" v-model="form.key" class="w-full" />
-                </div>
-
-                <div class="field">
-                  <label for="guidance-surface">Surface</label>
-                  <Dropdown
-                    id="guidance-surface"
-                    v-model="form.surface"
-                    :options="SURFACE_OPTIONS"
-                    option-label="label"
-                    option-value="value"
-                    class="w-full"
-                  />
-                </div>
-              </div>
-
-              <div class="field field-block">
-                <label for="guidance-description">Description</label>
-                <InputText id="guidance-description" v-model="form.description" class="w-full" />
-              </div>
-
-              <details :open="advancedOpen" class="advanced-panel" @toggle="advancedOpen = ($event.target as HTMLDetailsElement).open">
-                <summary class="advanced-summary">Metadata / Advanced</summary>
-                <div class="advanced-grid">
-                  <div class="field">
-                    <label for="guidance-category">Category</label>
-                    <Dropdown
-                      id="guidance-category"
-                      v-model="form.category"
-                      :options="CATEGORY_OPTIONS"
+            <div class="editor-body">
+              <section class="content-section">
+                <div class="content-section-header">
+                  <div class="content-toolbar">
+                    <SelectButton
+                      v-model="activeTab"
+                      :options="EDITOR_TABS"
                       option-label="label"
                       option-value="value"
-                      class="w-full"
+                      aria-label="Editor mode"
+                    />
+                    <Button
+                      label="Properties"
+                      icon="pi pi-cog"
+                      severity="secondary"
+                      outlined
+                      @click="propertiesOpen = true"
                     />
                   </div>
-
-                  <div class="field">
-                    <label for="guidance-path">Relative Path</label>
-                    <InputText id="guidance-path" :model-value="generatedRelativePath" readonly class="w-full" />
-                  </div>
-
-                  <div class="field field-span-2">
-                    <label for="guidance-tags">Tags</label>
-                    <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
-                  </div>
-                </div>
-              </details>
-
-              <div class="content-section">
-                <div class="content-section-header">
-                  <div>
-                    <h3 class="content-title">Content Markdown</h3>
-                    <p class="content-subtitle">The guidance content is the primary artifact on this screen.</p>
-                  </div>
-
-                  <SelectButton
-                    v-model="activeTab"
-                    :options="EDITOR_TABS"
-                    option-label="label"
-                    option-value="value"
-                    aria-label="Editor mode"
-                  />
                 </div>
 
                 <div class="editor-pane">
@@ -505,33 +521,135 @@ function extractErrorMessage(error: unknown, fallback: string) {
                     </div>
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </template>
       </Card>
     </div>
+
+    <Drawer v-model:visible="propertiesOpen" position="right" header="Properties" class="guidance-properties-drawer">
+      <div class="properties-shell">
+        <div class="field">
+          <label class="property-section-label">General</label>
+        </div>
+
+        <div class="field">
+          <label for="guidance-key">Key</label>
+          <InputText id="guidance-key" v-model="form.key" class="w-full" />
+        </div>
+
+        <div class="field">
+          <label for="guidance-surface">Surface</label>
+          <Dropdown
+            id="guidance-surface"
+            v-model="form.surface"
+            :options="SURFACE_OPTIONS"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+          />
+        </div>
+
+        <div class="field">
+          <label for="guidance-tags">Tags</label>
+          <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
+        </div>
+
+        <div class="field">
+          <label for="guidance-description">Description</label>
+          <InputText
+            id="guidance-description"
+            v-model="form.description"
+            class="w-full"
+            placeholder="Add a short description"
+          />
+        </div>
+
+        <div class="field">
+          <label class="property-section-label">Storage</label>
+        </div>
+
+        <div class="field">
+          <label for="guidance-path">Relative Path</label>
+          <InputText id="guidance-path" :model-value="generatedRelativePath" readonly class="w-full" />
+        </div>
+
+        <div class="field">
+          <label class="property-section-label">Runtime</label>
+        </div>
+
+        <div class="property-facts">
+          <div class="property-fact">
+            <span class="property-fact-label">Enabled</span>
+            <span class="property-fact-value">{{ form.isEnabled ? 'Yes' : 'No' }}</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="property-section-label">History</label>
+        </div>
+
+        <div class="property-facts property-facts-tight">
+          <div class="property-fact">
+            <span class="property-fact-label">Version</span>
+            <span class="property-fact-value">{{ selectedDocument?.version ?? 1 }}</span>
+          </div>
+          <div class="property-fact">
+            <span class="property-fact-label">Created</span>
+            <span class="property-fact-value">{{ selectedDocument ? new Date(selectedDocument.createdAt).toLocaleString() : 'Not saved yet' }}</span>
+          </div>
+          <div class="property-fact">
+            <span class="property-fact-label">Updated</span>
+            <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
+          </div>
+        </div>
+      </div>
+    </Drawer>
   </div>
 </template>
 
 <style scoped>
 .admin-ai-guidance-view {
-  min-height: calc(100vh - 10rem);
+  flex: 1;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
-  margin-bottom: 1rem;
   flex-shrink: 0;
+  padding-bottom: 1rem;
+}
+
+.page-header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 2rem;
+  color: #14315d;
+}
+
+.page-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-color-secondary);
 }
 
 .workspace-shell {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(18rem, 21rem) minmax(0, 1fr);
   gap: 1rem;
+  overflow: hidden;
 }
 
 .documents-card,
@@ -539,69 +657,177 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .documents-card :deep(.p-card),
 .editor-card :deep(.p-card) {
   height: 100%;
+  min-height: 0;
 }
 
 .documents-card :deep(.p-card-body),
-.editor-card :deep(.p-card-body) {
+.editor-card :deep(.p-card-body),
+.documents-card :deep(.p-card-content),
+.editor-card :deep(.p-card-content) {
   height: 100%;
+  min-height: 0;
 }
 
 .documents-card :deep(.p-card-content),
 .editor-card :deep(.p-card-content) {
-  height: 100%;
   padding-top: 0;
 }
 
-.documents-toolbar {
-  margin-bottom: 0.75rem;
+.documents-shell,
+.editor-shell {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.documents-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--surface-border);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #17325b;
+}
+
+.panel-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--text-color-secondary);
+  font-size: 0.92rem;
+}
+
+.documents-search {
+  width: 100%;
 }
 
 .documents-scroll {
-  height: calc(100% - 3.25rem);
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  padding: 1rem 0.1rem 0 0;
+  overscroll-behavior: contain;
 }
 
-.document-row {
+.documents-empty {
+  height: 100%;
+  min-height: 18rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.15rem 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  color: var(--text-color-secondary);
+  text-align: center;
 }
 
-.document-row-title {
-  font-weight: 700;
+.document-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.document-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.document-group-label {
+  padding: 0 0.25rem;
+  letter-spacing: 0.03em;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #5f7598;
+}
+
+.document-group-count {
+  font-weight: 600;
+}
+
+.document-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.55rem 0.65rem 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.document-item:hover {
+  background: #f7fbff;
+  border-color: #e2ebf8;
+}
+
+.document-item-active {
+  background: linear-gradient(180deg, #f2fbf7 0%, #f7fbff 100%);
+  border-color: #cfe4d8;
+}
+
+.document-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-item-icon {
+  line-height: 1;
+}
+
+.document-item-title {
+  font-weight: 600;
   color: #19325f;
 }
 
-.document-row-path {
-  font-size: 0.9rem;
+.document-item-meta {
+  font-size: 0.8rem;
   color: var(--text-color-secondary);
 }
 
-.document-row-tags {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+.document-item-state {
+  margin-top: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: #e9f8ef;
+  color: #127247;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
-.editor-shell {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+.document-item-state::before {
+  content: '✓ ';
+}
+
+.document-item-state-disabled {
+  background: #edf1f5;
+  color: #5f6f82;
+}
+
+.document-item-state-disabled::before {
+  content: '○ ';
 }
 
 .editor-header {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding-bottom: 0.9rem;
-  margin-bottom: 1rem;
-  background: var(--surface-card);
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--surface-border);
 }
 
@@ -609,20 +835,79 @@ function extractErrorMessage(error: unknown, fallback: string) {
   min-width: 0;
 }
 
-.editor-title {
-  margin: 0;
-  font-size: 1.85rem;
-  line-height: 1.1;
+.editor-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.editor-title-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.editor-title-display {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 1.95rem;
+  font-weight: 800;
   color: #14315d;
+  text-align: left;
+  cursor: text;
+}
+
+.editor-title-input {
+  flex: 1;
+  min-width: 18rem;
+}
+
+.editor-title-input :deep(.p-inputtext) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #14315d;
+  box-shadow: none;
+}
+
+.editor-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #eef3fb;
+  color: #35527f;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .editor-meta {
+  margin-top: 0.35rem;
   display: flex;
   gap: 0.9rem;
   flex-wrap: wrap;
-  margin-top: 0.45rem;
-  font-size: 0.9rem;
   color: var(--text-color-secondary);
+  font-size: 0.88rem;
+}
+
+.editor-primary-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.editor-save-state {
+  font-weight: 700;
+  color: #127247;
+  white-space: nowrap;
+}
+
+.editor-save-state-dirty {
+  color: #c17a00;
 }
 
 .editor-actions {
@@ -633,18 +918,14 @@ function extractErrorMessage(error: unknown, fallback: string) {
   flex-shrink: 0;
 }
 
-.editor-scroll {
+.editor-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding-right: 0.25rem;
-}
-
-.primary-fields {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr 0.8fr;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
-  margin-bottom: 1rem;
+  padding-top: 1rem;
+  overflow: hidden;
 }
 
 .field {
@@ -653,80 +934,33 @@ function extractErrorMessage(error: unknown, fallback: string) {
   gap: 0.35rem;
 }
 
-.field-block {
-  margin-bottom: 1rem;
-}
-
-.advanced-panel {
-  margin-bottom: 1.2rem;
-  border: 1px solid var(--surface-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-card) 92%, #eef3fb 8%);
-}
-
-.advanced-summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 0.9rem 1rem;
-  font-weight: 700;
-  color: #36517e;
-}
-
-.advanced-summary::-webkit-details-marker {
-  display: none;
-}
-
-.advanced-summary::before {
-  content: '▸';
-  display: inline-block;
-  margin-right: 0.5rem;
-  transition: transform 0.18s ease;
-}
-
-.advanced-panel[open] .advanced-summary::before {
-  transform: rotate(90deg);
-}
-
-.advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 0 1rem 1rem;
-}
-
-.field-span-2 {
-  grid-column: 1 / -1;
-}
-
 .content-section {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  gap: 0.8rem;
 }
 
 .content-section-header {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-end;
   gap: 1rem;
-  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
-.content-title {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #19325f;
-}
-
-.content-subtitle {
-  margin: 0.2rem 0 0;
-  color: var(--text-color-secondary);
-  font-size: 0.92rem;
+.content-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .editor-pane {
-  min-height: 34rem;
-  height: calc(100vh - 24rem);
+  flex: 1;
+  min-height: 22rem;
   border: 1px solid var(--surface-border);
   border-radius: 14px;
   background: var(--surface-ground);
@@ -753,6 +987,52 @@ function extractErrorMessage(error: unknown, fallback: string) {
   overflow: auto;
   padding: 1.25rem;
   background: #fff;
+}
+
+.properties-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.property-section-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f7598;
+}
+
+.property-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.property-facts-tight {
+  margin-top: 0;
+}
+
+.property-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.property-fact-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f7598;
+}
+
+.property-fact-value {
+  color: #19325f;
+  word-break: break-word;
 }
 
 .markdown-preview :deep(h1),
@@ -782,25 +1062,35 @@ function extractErrorMessage(error: unknown, fallback: string) {
   color: var(--text-color-secondary);
 }
 
+.guidance-properties-drawer :deep(.p-drawer-header) {
+  padding-bottom: 0.5rem;
+}
+
+.guidance-properties-drawer :deep(.p-drawer-content) {
+  padding-top: 0.5rem;
+}
+
 @media (max-width: 1180px) {
+  .admin-ai-guidance-view {
+    height: auto;
+    overflow: visible;
+  }
+
   .workspace-shell {
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .documents-scroll {
-    height: 18rem;
+    max-height: 20rem;
   }
 
-  .primary-fields {
-    grid-template-columns: 1fr;
+  .editor-body {
+    overflow: visible;
   }
 
-  .advanced-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .field-span-2 {
-    grid-column: auto;
+  .editor-pane {
+    min-height: 28rem;
   }
 
   .editor-header,
@@ -813,8 +1103,8 @@ function extractErrorMessage(error: unknown, fallback: string) {
     justify-content: flex-start;
   }
 
-  .editor-pane {
-    height: 28rem;
+  .content-toolbar {
+    justify-content: space-between;
   }
 }
 </style>

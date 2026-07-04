@@ -1,3 +1,8 @@
+---
+title: "Automaton CLI Deploy"
+description: "Deploy and runtime troubleshooting guidance for Automaton apps."
+---
+
 # Automaton CLI Deploy Workflow
 
 Use this when an Automaton app already exists locally and needs to be deployed with the CLI.

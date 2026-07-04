@@ -73,7 +73,7 @@ public sealed class AutomatonGuidanceTool : IMcpTool
             {
                 path = source.RelativePath,
                 surface = source.Surface,
-                category = source.Category,
+                tagsJson = source.TagsJson,
                 description = source.Description
             })
             .OrderBy(entry => entry.path, StringComparer.Ordinal)

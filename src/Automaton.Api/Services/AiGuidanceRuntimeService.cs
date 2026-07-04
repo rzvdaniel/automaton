@@ -18,16 +18,16 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     private static readonly IReadOnlyDictionary<string, GuidanceSeedMetadata> SeedCatalog =
         new Dictionary<string, GuidanceSeedMetadata>(StringComparer.Ordinal)
         {
-            ["llms/automaton-app-contract-compact.md"] = new("automaton-app-contract-compact", "Automaton App Contract (Compact)", "shared", "contract", "Compact always-on Automaton app contract for Studio editing."),
-            ["llms/automaton-studio-editor.md"] = new("automaton-studio-editor", "Automaton Studio Editor", "studio", "editor", "Studio editor behavior, file editing rules, and verification expectations."),
-            ["llms/automaton-backend-controllers.md"] = new("automaton-backend-controllers", "Automaton Backend Controllers", "shared", "backend", "Python controller rules, response envelope, and backend structure guidance."),
-            ["llms/automaton-media-assets.md"] = new("automaton-media-assets", "Automaton Media and Static Asset Rules", "shared", "media", "Bundled assets versus runtime media, uploads, and public/static asset handling."),
-            ["llms/automaton-frontend-structure.md"] = new("automaton-frontend-structure", "Automaton Frontend Structure", "shared", "frontend", "Frontend structure, relative URLs, PWA rules, and installable app patterns."),
-            ["llms/automaton-starter-prompts.md"] = new("automaton-starter-prompts", "Automaton Starter Prompts", "cli", "starter", "Starter app prompts and initial app creation guidance."),
-            ["llms/automaton-cli-deploy.md"] = new("automaton-cli-deploy", "Automaton CLI Deploy", "cli", "deploy", "Deploy and runtime troubleshooting guidance for Automaton apps."),
-            ["llms/automaton-cli-install.md"] = new("automaton-cli-install", "Automaton CLI Install", "cli", "install", "Automaton CLI installation and bootstrap guidance."),
-            ["llms/automaton-examples.md"] = new("automaton-examples", "Automaton Examples", "shared", "examples", "Longer examples and reference app patterns."),
-            ["llms/automaton-mcp.md"] = new("automaton-mcp", "Automaton MCP", "mcp", "protocol", "Guidance for MCP-related workflows and integrations.")
+            ["llms/automaton-app-contract-compact.md"] = new("automaton-app-contract-compact", "Automaton App Contract (Compact)", "shared", "Compact always-on Automaton app contract for Studio editing.", """["contract","structure","studio"]"""),
+            ["llms/automaton-studio-editor.md"] = new("automaton-studio-editor", "Automaton Studio Editor", "studio", "Studio editor behavior, file editing rules, and verification expectations.", """["editor","files","preview","studio"]"""),
+            ["llms/automaton-backend-controllers.md"] = new("automaton-backend-controllers", "Automaton Backend Controllers", "shared", "Python controller rules, response envelope, and backend structure guidance.", """["backend","controllers","api","python"]"""),
+            ["llms/automaton-media-assets.md"] = new("automaton-media-assets", "Automaton Media and Static Asset Rules", "shared", "Bundled assets versus runtime media, uploads, and public/static asset handling.", """["assets","media","uploads","images"]"""),
+            ["llms/automaton-frontend-structure.md"] = new("automaton-frontend-structure", "Automaton Frontend Structure", "shared", "Frontend structure, relative URLs, PWA rules, and installable app patterns.", """["frontend","pwa","structure","vite"]"""),
+            ["llms/automaton-starter-prompts.md"] = new("automaton-starter-prompts", "Automaton Starter Prompts", "cli", "Starter app prompts and initial app creation guidance.", """["starter","scaffold","examples","cli"]"""),
+            ["llms/automaton-cli-deploy.md"] = new("automaton-cli-deploy", "Automaton CLI Deploy", "cli", "Deploy and runtime troubleshooting guidance for Automaton apps.", """["deploy","publish","runtime","cli"]"""),
+            ["llms/automaton-cli-install.md"] = new("automaton-cli-install", "Automaton CLI Install", "cli", "Automaton CLI installation and bootstrap guidance.", """["install","setup","bootstrap","cli"]"""),
+            ["llms/automaton-examples.md"] = new("automaton-examples", "Automaton Examples", "shared", "Longer examples and reference app patterns.", """["examples","patterns","reference"]"""),
+            ["llms/automaton-mcp.md"] = new("automaton-mcp", "Automaton MCP", "mcp", "Guidance for MCP-related workflows and integrations.", """["mcp","protocol","tools"]""")
         };
 
     private readonly ApplicationDbContext _dbContext;
@@ -57,14 +57,13 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
 
         var documents = await query
             .OrderBy(item => item.Surface)
-            .ThenBy(item => item.Category)
             .ThenBy(item => item.Title)
             .Select(item => new AiGuidanceCatalogItem(
                 item.Key,
                 item.RelativePath,
                 item.Title,
                 item.Surface,
-                item.Category,
+                item.TagsJson,
                 item.Description,
                 item.Version,
                 true))
@@ -82,7 +81,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.RelativePath,
                 item.Title,
                 item.Surface,
-                item.Category,
+                item.TagsJson,
                 item.Description,
                 item.Version,
                 item.IsDatabaseDocument))
@@ -104,7 +103,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.RelativePath,
                 item.Title,
                 item.Surface,
-                item.Category,
+                item.TagsJson,
                 item.Description,
                 item.ContentMarkdown,
                 item.Version,
@@ -124,7 +123,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 document.RelativePath,
                 document.Title,
                 document.Surface,
-                document.Category,
+                document.TagsJson,
                 document.Description,
                 document.ContentMarkdown,
                 document.Version,
@@ -146,7 +145,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.RelativePath,
                 item.Title,
                 item.Surface,
-                item.Category,
+                item.TagsJson,
                 item.Description,
                 item.ContentMarkdown,
                 item.Version,
@@ -172,7 +171,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 document.RelativePath,
                 document.Title,
                 document.Surface,
-                document.Category,
+                document.TagsJson,
                 document.Description,
                 document.ContentMarkdown,
                 document.Version,
@@ -198,16 +197,17 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             }
 
             var metadata = ResolveMetadata(source.RelativePath);
+            var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
             _dbContext.AiGuidanceDocuments.Add(new AiGuidanceDocument
             {
                 Id = Guid.NewGuid(),
                 Key = metadata.Key,
                 RelativePath = source.RelativePath,
-                Title = metadata.Title,
+                Title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title,
                 Surface = metadata.Surface,
-                Category = metadata.Category,
-                Description = metadata.Description,
-                ContentMarkdown = source.Content,
+                Description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description,
+                TagsJson = metadata.TagsJson,
+                ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(source.Content, string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title, string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description),
                 IsEnabled = true,
                 Version = 1,
                 CreatedAt = now
@@ -230,14 +230,17 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         {
             var content = _embeddedGuidanceProvider.GetReference(relativePath);
             var metadata = ResolveMetadata(relativePath);
+            var parsed = AiGuidanceMarkdownFrontMatter.Parse(content);
+            var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
+            var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
             return new AiGuidanceResolvedDocument(
                 metadata.Key,
                 relativePath,
-                metadata.Title,
+                title,
                 metadata.Surface,
-                metadata.Category,
-                metadata.Description,
-                content,
+                metadata.TagsJson,
+                description,
+                AiGuidanceMarkdownFrontMatter.Upsert(content, title, description),
                 0,
                 false);
         }
@@ -254,8 +257,8 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 relativePath.Replace("llms/", string.Empty, StringComparison.Ordinal).Replace(".md", string.Empty, StringComparison.Ordinal),
                 relativePath,
                 "shared",
-                "reference",
-                "Focused Automaton guidance reference.");
+                "Focused Automaton guidance reference.",
+                """["reference"]""");
 }
 
 public sealed record AiGuidanceCatalogItem(
@@ -263,7 +266,7 @@ public sealed record AiGuidanceCatalogItem(
     string RelativePath,
     string Title,
     string Surface,
-    string Category,
+    string? TagsJson,
     string? Description,
     int Version,
     bool IsDatabaseDocument);
@@ -273,7 +276,7 @@ public sealed record AiGuidanceResolvedDocument(
     string RelativePath,
     string Title,
     string Surface,
-    string Category,
+    string? TagsJson,
     string? Description,
     string ContentMarkdown,
     int Version,
@@ -283,5 +286,5 @@ public sealed record GuidanceSeedMetadata(
     string Key,
     string Title,
     string Surface,
-    string Category,
-    string Description);
+    string Description,
+    string? TagsJson);

@@ -1,3 +1,8 @@
+---
+title: "Automaton Backend Controllers"
+description: "Python controller rules, response envelope, and backend structure guidance."
+---
+
 # Automaton Backend Controllers
 
 Automaton backends are Python controllers stored in `backend/`.

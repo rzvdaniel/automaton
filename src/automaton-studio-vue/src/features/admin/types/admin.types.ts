@@ -186,7 +186,6 @@ export interface AiGuidanceAdmin {
   relativePath: string
   title: string
   surface: string
-  category: string
   description?: string
   tagsJson?: string
   contentMarkdown: string
@@ -202,7 +201,6 @@ export interface UpsertAiGuidanceRequest {
   relativePath: string
   title: string
   surface: string
-  category: string
   description?: string
   tagsJson?: string
   contentMarkdown: string

@@ -1,3 +1,8 @@
+---
+title: "Automaton Media and Static Asset Rules"
+description: "Bundled assets versus runtime media, uploads, and public/static asset handling."
+---
+
 # Automaton Media and Static Asset Rules
 
 Use this file when building or modifying an Automaton app that has images, documents, uploads, generated files, blog media, avatars, attachments, or other app-owned resources.

@@ -1005,7 +1005,6 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.RelativePath).IsRequired().HasMaxLength(260);
                 entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.Surface).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.TagsJson).HasMaxLength(4000);
                 entity.Property(e => e.ContentMarkdown).IsRequired();
@@ -1015,7 +1014,7 @@ namespace Automaton.Api.Data
 
                 entity.HasIndex(e => e.Key).IsUnique();
                 entity.HasIndex(e => e.RelativePath).IsUnique();
-                entity.HasIndex(e => new { e.Surface, e.Category });
+                entity.HasIndex(e => e.Surface);
                 entity.HasIndex(e => e.IsEnabled);
             });
 

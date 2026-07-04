@@ -48,7 +48,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.RelativePath,
                 request.Title,
                 request.Surface,
-                request.Category,
                 request.Description,
                 request.TagsJson,
                 request.ContentMarkdown,
@@ -77,7 +76,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.RelativePath,
                 request.Title,
                 request.Surface,
-                request.Category,
                 request.Description,
                 request.TagsJson,
                 request.ContentMarkdown,
@@ -132,7 +130,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
         RelativePath = document.RelativePath,
         Title = document.Title,
         Surface = document.Surface,
-        Category = document.Category,
         Description = document.Description,
         TagsJson = document.TagsJson,
         ContentMarkdown = document.ContentMarkdown,
@@ -151,7 +148,6 @@ public sealed class AiGuidanceAdminResponse
     public string RelativePath { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Surface { get; set; } = string.Empty;
-    public string Category { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? TagsJson { get; set; }
     public string ContentMarkdown { get; set; } = string.Empty;
@@ -175,9 +171,6 @@ public sealed class UpsertAiGuidanceRequest
 
     [Required]
     public string Surface { get; set; } = string.Empty;
-
-    [Required]
-    public string Category { get; set; } = string.Empty;
 
     public string? Description { get; set; }
 

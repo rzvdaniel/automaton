@@ -28,7 +28,6 @@ public sealed class AdminAiGuidanceService
         _dbContext.AiGuidanceDocuments
             .AsNoTracking()
             .OrderBy(x => x.Surface)
-            .ThenBy(x => x.Category)
             .ThenBy(x => x.Title)
             .ToListAsync(cancellationToken);
 
@@ -42,7 +41,6 @@ public sealed class AdminAiGuidanceService
         string relativePath,
         string title,
         string surface,
-        string category,
         string? description,
         string? tagsJson,
         string contentMarkdown,
@@ -59,10 +57,9 @@ public sealed class AdminAiGuidanceService
             RelativePath = relativePath.Trim(),
             Title = title.Trim(),
             Surface = surface.Trim(),
-            Category = category.Trim(),
             Description = NormalizeOptional(description),
             TagsJson = NormalizeOptional(tagsJson),
-            ContentMarkdown = contentMarkdown,
+            ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description),
             IsEnabled = isEnabled,
             Version = 1,
             CreatedAt = now,
@@ -88,7 +85,6 @@ public sealed class AdminAiGuidanceService
         string relativePath,
         string title,
         string surface,
-        string category,
         string? description,
         string? tagsJson,
         string contentMarkdown,
@@ -107,10 +103,9 @@ public sealed class AdminAiGuidanceService
         entity.RelativePath = relativePath.Trim();
         entity.Title = title.Trim();
         entity.Surface = surface.Trim();
-        entity.Category = category.Trim();
         entity.Description = NormalizeOptional(description);
         entity.TagsJson = NormalizeOptional(tagsJson);
-        entity.ContentMarkdown = contentMarkdown;
+        entity.ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description);
         entity.IsEnabled = isEnabled;
         entity.Version += 1;
         entity.UpdatedAt = DateTime.UtcNow;
@@ -173,7 +168,10 @@ public sealed class AdminAiGuidanceService
             throw new InvalidOperationException($"No embedded default exists for '{entity.RelativePath}'.");
         }
 
-        entity.ContentMarkdown = embedded.Content;
+        var parsed = AiGuidanceMarkdownFrontMatter.Parse(embedded.Content);
+        entity.Title = string.IsNullOrWhiteSpace(parsed.Title) ? entity.Title : parsed.Title;
+        entity.Description = string.IsNullOrWhiteSpace(parsed.Description) ? entity.Description : parsed.Description;
+        entity.ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(embedded.Content, entity.Title, entity.Description);
         entity.Version += 1;
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -234,7 +232,7 @@ public sealed class AdminAiGuidanceService
                 entity.RelativePath,
                 entity.Title,
                 entity.Surface,
-                entity.Category,
+                entity.TagsJson,
                 entity.IsEnabled,
                 entity.Version,
                 HasEmbeddedDefault = HasEmbeddedDefault(entity.RelativePath)

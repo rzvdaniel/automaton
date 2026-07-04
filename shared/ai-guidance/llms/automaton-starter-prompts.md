@@ -1,3 +1,8 @@
+---
+title: "Automaton Starter Prompts"
+description: "Starter app prompts and initial app creation guidance."
+---
+
 # Automaton Starter Prompts
 
 Use these as starter prompts for Codex, Claude Code, Copilot Chat, Cursor, and similar AI tools.

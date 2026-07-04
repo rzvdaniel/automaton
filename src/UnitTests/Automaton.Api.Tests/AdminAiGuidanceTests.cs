@@ -25,7 +25,6 @@ public class AdminAiGuidanceTests
             "llms/studio-editor-extra.md",
             "Studio Editor Extra",
             "studio",
-            "editor",
             "Extra editor guidance",
             null,
             "# Guidance",
@@ -36,6 +35,8 @@ public class AdminAiGuidanceTests
             Assert.That(document.Id, Is.Not.EqualTo(Guid.Empty));
             Assert.That(document.Version, Is.EqualTo(1));
             Assert.That(document.IsEnabled, Is.True);
+            Assert.That(document.ContentMarkdown, Does.StartWith("---"));
+            Assert.That(document.ContentMarkdown, Does.Contain("title: \"Studio Editor Extra\""));
             Assert.That(dbContext.AiGuidanceDocuments.Count(), Is.EqualTo(1));
         });
     }
@@ -53,7 +54,6 @@ public class AdminAiGuidanceTests
             entity.RelativePath,
             "Updated Title",
             entity.Surface,
-            entity.Category,
             entity.Description,
             entity.TagsJson,
             "# Updated",
@@ -64,7 +64,8 @@ public class AdminAiGuidanceTests
         {
             Assert.That(updated!.Version, Is.EqualTo(2));
             Assert.That(updated.Title, Is.EqualTo("Updated Title"));
-            Assert.That(updated.ContentMarkdown, Is.EqualTo("# Updated"));
+            Assert.That(updated.ContentMarkdown, Does.Contain("title: \"Updated Title\""));
+            Assert.That(updated.ContentMarkdown, Does.Contain("# Updated"));
         });
     }
 
@@ -125,7 +126,6 @@ public class AdminAiGuidanceTests
             RelativePath = "llms/duplicate-b.md",
             Title = "Duplicate",
             Surface = "studio",
-            Category = "editor",
             ContentMarkdown = "# Duplicate",
             IsEnabled = true
         }, CancellationToken.None);
@@ -147,7 +147,7 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/studio-a.md",
                 Title = "Studio A",
                 Surface = "studio",
-                Category = "editor",
+                TagsJson = """["editor"]""",
                 ContentMarkdown = "# A",
                 IsEnabled = true,
                 Version = 1,
@@ -160,7 +160,7 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/studio-b.md",
                 Title = "Studio B",
                 Surface = "studio",
-                Category = "editor",
+                TagsJson = """["editor"]""",
                 ContentMarkdown = "# B",
                 IsEnabled = false,
                 Version = 1,
@@ -173,7 +173,7 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/cli-a.md",
                 Title = "CLI A",
                 Surface = "cli",
-                Category = "deploy",
+                TagsJson = """["deploy"]""",
                 ContentMarkdown = "# CLI",
                 IsEnabled = true,
                 Version = 1,
@@ -198,7 +198,7 @@ public class AdminAiGuidanceTests
             RelativePath = "llms/automaton-studio-editor.md",
             Title = "Automaton Studio Editor",
             Surface = "studio",
-            Category = "editor",
+            TagsJson = """["editor"]""",
             ContentMarkdown = "# Database Override",
             IsEnabled = true,
             Version = 7,
@@ -274,7 +274,7 @@ public class AdminAiGuidanceTests
             RelativePath = relativePath,
             Title = title,
             Surface = "studio",
-            Category = "editor",
+            TagsJson = """["editor"]""",
             ContentMarkdown = contentMarkdown,
             IsEnabled = isEnabled,
             Version = 1,

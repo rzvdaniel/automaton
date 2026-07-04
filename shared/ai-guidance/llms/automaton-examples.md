@@ -1,3 +1,8 @@
+---
+title: "Automaton Examples"
+description: "Longer examples and reference app patterns."
+---
+
 # Automaton Examples
 
 Use these examples when an agent needs concrete starter files instead of prose.

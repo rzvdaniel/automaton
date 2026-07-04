@@ -1,3 +1,8 @@
+---
+title: "Automaton App Contract (Compact)"
+description: "Compact always-on Automaton app contract for Studio editing."
+---
+
 # Automaton App Contract (Compact)
 
 Use this compact contract for in-product app editing where linked documents are not automatically available as prompt context.

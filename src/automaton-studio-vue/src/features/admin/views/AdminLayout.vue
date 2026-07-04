@@ -126,11 +126,15 @@ const navigate = (to: string) => {
 .admin-layout {
   display: flex;
   gap: 1.5rem;
+  height: calc(100vh - 64px - 3rem);
+  min-height: 100%;
+  overflow: hidden;
 }
 
 .admin-sidebar {
   width: 220px;
   flex-shrink: 0;
+  min-height: 0;
 }
 
 .admin-sidebar :deep(.p-card-body) {
@@ -143,16 +147,27 @@ const navigate = (to: string) => {
 
 .admin-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .admin-layout {
     flex-direction: column;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
   }
 
   .admin-sidebar {
     width: 100%;
+  }
+
+  .admin-content {
+    overflow: visible;
   }
 }
 </style>

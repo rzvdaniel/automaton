@@ -5,7 +5,7 @@ public sealed record AutomatonGuidanceCatalogItem(
     string RelativePath,
     string Title,
     string Surface,
-    string Category,
+    string? TagsJson,
     string? Description,
     int Version,
     bool IsDatabaseDocument);
