@@ -68,13 +68,16 @@ public sealed class AutomatonGuidanceTool : IMcpTool
 
     private async Task<McpToolResult> ListGuidanceAsync()
     {
-        var references = (await _guidanceProvider.ListReferencesAsync())
+        var references = (await _guidanceProvider.ListLoadableGuidanceAsync())
             .Select(source => new
             {
                 path = source.RelativePath,
                 surface = source.Surface,
+                documentKind = source.DocumentKind,
                 tagsJson = source.TagsJson,
-                description = source.Description
+                description = source.Description,
+                requiredByDefault = source.RequiredByDefault,
+                sortOrder = source.SortOrder
             })
             .OrderBy(entry => entry.path, StringComparer.Ordinal)
             .ToArray();
@@ -102,7 +105,7 @@ public sealed class AutomatonGuidanceTool : IMcpTool
             return new McpToolResult { Success = false, Error = "Argument 'referenceName' must be a non-empty string." };
         }
 
-        var document = await _guidanceProvider.GetReferenceAsync(referenceName.Trim());
+        var document = await _guidanceProvider.GetGuidanceAsync(referenceName.Trim());
         if (document is null)
         {
             return new McpToolResult { Success = false, Error = $"Automaton guidance reference '{referenceName.Trim()}' was not found." };

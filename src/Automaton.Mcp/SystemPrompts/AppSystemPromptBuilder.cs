@@ -156,15 +156,18 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 
     private async Task<string> BuildSharedContractBlockAsync(string? userMessage, ComplexityTier? tier, CancellationToken cancellationToken)
     {
-        var contract = (await _guidanceProvider.GetReferenceAsync("llms/automaton-app-contract-compact.md", cancellationToken)
-            ?? throw new InvalidOperationException("Automaton app contract guidance was not found.")).ContentMarkdown.Trim();
-        var studioAdapter = (await _guidanceProvider.GetReferenceAsync("llms/automaton-studio-editor.md", cancellationToken)
-            ?? throw new InvalidOperationException("Automaton Studio editor guidance was not found.")).ContentMarkdown.Trim();
-        var sections = new List<string> { contract, studioAdapter };
+        var contract = (await _guidanceProvider.GetBasePromptAsync("shared", cancellationToken)
+            ?? throw new InvalidOperationException("Automaton base prompt for surface 'shared' was not found or is disabled.")).ContentMarkdown.Trim();
+        var sections = new List<string> { contract };
+
+        foreach (var requiredGuidance in (await _guidanceProvider.GetRequiredGuidanceAsync("studio", cancellationToken)).OrderBy(item => item.SortOrder))
+        {
+            sections.Add(requiredGuidance.ContentMarkdown.Trim());
+        }
 
         foreach (var reference in _promptContextSelector.SelectAdditionalReferences(userMessage, tier))
         {
-            var resolvedReference = await _guidanceProvider.GetReferenceAsync(reference, cancellationToken);
+            var resolvedReference = await _guidanceProvider.GetGuidanceAsync(reference, cancellationToken);
             if (resolvedReference is not null)
             {
                 sections.Add(resolvedReference.ContentMarkdown.Trim());

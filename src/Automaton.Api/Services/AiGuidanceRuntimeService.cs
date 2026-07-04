@@ -1,4 +1,5 @@
 using Automaton.AiGuidance;
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,11 @@ namespace Automaton.Api.Services;
 
 public interface IAiGuidanceRuntimeService
 {
-    Task<IReadOnlyList<AiGuidanceCatalogItem>> ListEnabledAsync(string? surface = null, CancellationToken cancellationToken = default);
-    Task<AiGuidanceResolvedDocument?> GetEnabledByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default);
-    Task<AiGuidanceResolvedDocument?> GetEnabledByKeyAsync(string key, CancellationToken cancellationToken = default);
+    Task<AiGuidanceResolvedDocument?> GetBasePromptAsync(string surface, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AiGuidanceCatalogItem>> ListLoadableGuidanceAsync(string? surface = null, CancellationToken cancellationToken = default);
+    Task<AiGuidanceResolvedDocument?> GetGuidanceByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default);
+    Task<AiGuidanceResolvedDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default);
     Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default);
 }
 
@@ -18,16 +21,16 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     private static readonly IReadOnlyDictionary<string, GuidanceSeedMetadata> SeedCatalog =
         new Dictionary<string, GuidanceSeedMetadata>(StringComparer.Ordinal)
         {
-            ["llms/automaton-app-contract-compact.md"] = new("automaton-app-contract-compact", "Automaton App Contract (Compact)", "shared", "Compact always-on Automaton app contract for Studio editing.", """["contract","structure","studio"]"""),
-            ["llms/automaton-studio-editor.md"] = new("automaton-studio-editor", "Automaton Studio Editor", "studio", "Studio editor behavior, file editing rules, and verification expectations.", """["editor","files","preview","studio"]"""),
-            ["llms/automaton-backend-controllers.md"] = new("automaton-backend-controllers", "Automaton Backend Controllers", "shared", "Python controller rules, response envelope, and backend structure guidance.", """["backend","controllers","api","python"]"""),
-            ["llms/automaton-media-assets.md"] = new("automaton-media-assets", "Automaton Media and Static Asset Rules", "shared", "Bundled assets versus runtime media, uploads, and public/static asset handling.", """["assets","media","uploads","images"]"""),
-            ["llms/automaton-frontend-structure.md"] = new("automaton-frontend-structure", "Automaton Frontend Structure", "shared", "Frontend structure, relative URLs, PWA rules, and installable app patterns.", """["frontend","pwa","structure","vite"]"""),
-            ["llms/automaton-starter-prompts.md"] = new("automaton-starter-prompts", "Automaton Starter Prompts", "cli", "Starter app prompts and initial app creation guidance.", """["starter","scaffold","examples","cli"]"""),
-            ["llms/automaton-cli-deploy.md"] = new("automaton-cli-deploy", "Automaton CLI Deploy", "cli", "Deploy and runtime troubleshooting guidance for Automaton apps.", """["deploy","publish","runtime","cli"]"""),
-            ["llms/automaton-cli-install.md"] = new("automaton-cli-install", "Automaton CLI Install", "cli", "Automaton CLI installation and bootstrap guidance.", """["install","setup","bootstrap","cli"]"""),
-            ["llms/automaton-examples.md"] = new("automaton-examples", "Automaton Examples", "shared", "Longer examples and reference app patterns.", """["examples","patterns","reference"]"""),
-            ["llms/automaton-mcp.md"] = new("automaton-mcp", "Automaton MCP", "mcp", "Guidance for MCP-related workflows and integrations.", """["mcp","protocol","tools"]""")
+            ["llms/automaton-app-contract-compact.md"] = new("automaton-app-contract-compact", "Automaton App Contract (Compact)", "shared", AiGuidanceDocumentKinds.BasePrompt, "Compact always-on Automaton app contract for Studio editing.", """["contract","structure","studio"]""", true, false, 0),
+            ["llms/automaton-studio-editor.md"] = new("automaton-studio-editor", "Automaton Studio Editor", "studio", AiGuidanceDocumentKinds.Guidance, "Studio editor behavior, file editing rules, and verification expectations.", """["editor","files","preview","studio"]""", true, true, 100),
+            ["llms/automaton-backend-controllers.md"] = new("automaton-backend-controllers", "Automaton Backend Controllers", "shared", AiGuidanceDocumentKinds.Guidance, "Python controller rules, response envelope, and backend structure guidance.", """["backend","controllers","api","python"]""", false, true, 200),
+            ["llms/automaton-media-assets.md"] = new("automaton-media-assets", "Automaton Media and Static Asset Rules", "shared", AiGuidanceDocumentKinds.Guidance, "Bundled assets versus runtime media, uploads, and public/static asset handling.", """["assets","media","uploads","images"]""", false, true, 200),
+            ["llms/automaton-frontend-structure.md"] = new("automaton-frontend-structure", "Automaton Frontend Structure", "shared", AiGuidanceDocumentKinds.Guidance, "Frontend structure, relative URLs, PWA rules, and installable app patterns.", """["frontend","pwa","structure","vite"]""", false, true, 200),
+            ["llms/automaton-starter-prompts.md"] = new("automaton-starter-prompts", "Automaton Starter Prompts", "cli", AiGuidanceDocumentKinds.Guidance, "Starter app prompts and initial app creation guidance.", """["starter","scaffold","examples","cli"]""", false, true, 200),
+            ["llms/automaton-cli-deploy.md"] = new("automaton-cli-deploy", "Automaton CLI Deploy", "cli", AiGuidanceDocumentKinds.Guidance, "Deploy and runtime troubleshooting guidance for Automaton apps.", """["deploy","publish","runtime","cli"]""", false, true, 200),
+            ["llms/automaton-cli-install.md"] = new("automaton-cli-install", "Automaton CLI Install", "cli", AiGuidanceDocumentKinds.Guidance, "Automaton CLI installation and bootstrap guidance.", """["install","setup","bootstrap","cli"]""", false, true, 200),
+            ["llms/automaton-examples.md"] = new("automaton-examples", "Automaton Examples", "shared", AiGuidanceDocumentKinds.Guidance, "Longer examples and reference app patterns.", """["examples","patterns","reference"]""", false, true, 200),
+            ["llms/automaton-mcp.md"] = new("automaton-mcp", "Automaton MCP", "mcp", AiGuidanceDocumentKinds.Guidance, "Guidance for MCP-related workflows and integrations.", """["mcp","protocol","tools"]""", false, true, 200)
         };
 
     private readonly ApplicationDbContext _dbContext;
@@ -44,138 +47,109 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<AiGuidanceCatalogItem>> ListEnabledAsync(string? surface = null, CancellationToken cancellationToken = default)
+    public Task<AiGuidanceResolvedDocument?> GetBasePromptAsync(string surface, CancellationToken cancellationToken = default) =>
+        ResolveSingleAsync(
+            item => item.IsEnabled
+                && item.RequiredByDefault
+                && !item.IsModelLoadable
+                && item.DocumentKind == AiGuidanceDocumentKinds.BasePrompt
+                && item.Surface == surface,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.AiGuidanceDocuments
-            .AsNoTracking()
-            .Where(item => item.IsEnabled);
+        return await QueryCatalog(item =>
+                item.IsEnabled
+                && item.IsModelLoadable
+                && item.RequiredByDefault
+                && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
+                && item.Surface == surface)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AiGuidanceCatalogItem>> ListLoadableGuidanceAsync(string? surface = null, CancellationToken cancellationToken = default)
+    {
+        var query = QueryCatalog(item =>
+            item.IsEnabled
+            && item.IsModelLoadable
+            && item.DocumentKind == AiGuidanceDocumentKinds.Guidance);
 
         if (!string.IsNullOrWhiteSpace(surface))
         {
             query = query.Where(item => item.Surface == surface);
         }
 
-        var documents = await query
-            .OrderBy(item => item.Surface)
-            .ThenBy(item => item.Title)
-            .Select(item => new AiGuidanceCatalogItem(
-                item.Key,
-                item.RelativePath,
-                item.Title,
-                item.Surface,
-                item.TagsJson,
-                item.Description,
-                item.Version,
-                true))
-            .ToListAsync(cancellationToken);
-
-        return documents;
+        return await query.ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AutomatonGuidanceCatalogItem>> ListReferencesAsync(string? surface = null, CancellationToken cancellationToken = default)
-    {
-        var documents = await ListEnabledAsync(surface, cancellationToken);
-        return documents
-            .Select(item => new AutomatonGuidanceCatalogItem(
-                item.Key,
-                item.RelativePath,
-                item.Title,
-                item.Surface,
-                item.TagsJson,
-                item.Description,
-                item.Version,
-                item.IsDatabaseDocument))
-            .ToList();
-    }
-
-    public async Task<AiGuidanceResolvedDocument?> GetEnabledByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default)
+    public Task<AiGuidanceResolvedDocument?> GetGuidanceByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {
-            return null;
+            return Task.FromResult<AiGuidanceResolvedDocument?>(null);
         }
 
-        var document = await _dbContext.AiGuidanceDocuments
-            .AsNoTracking()
-            .Where(item => item.IsEnabled && item.RelativePath == relativePath)
-            .Select(item => new AiGuidanceResolvedDocument(
-                item.Key,
-                item.RelativePath,
-                item.Title,
-                item.Surface,
-                item.TagsJson,
-                item.Description,
-                item.ContentMarkdown,
-                item.Version,
-                true))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return document ?? TryResolveEmbeddedFallback(relativePath);
+        return ResolveSingleAsync(
+            item => item.IsEnabled
+                && item.IsModelLoadable
+                && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
+                && item.RelativePath == relativePath,
+            cancellationToken);
     }
 
-    public async Task<AutomatonGuidanceDocument?> GetReferenceAsync(string relativePath, CancellationToken cancellationToken = default)
-    {
-        var document = await GetEnabledByRelativePathAsync(relativePath, cancellationToken);
-        return document is null
-            ? null
-            : new AutomatonGuidanceDocument(
-                document.Key,
-                document.RelativePath,
-                document.Title,
-                document.Surface,
-                document.TagsJson,
-                document.Description,
-                document.ContentMarkdown,
-                document.Version,
-                document.IsDatabaseDocument);
-    }
-
-    public async Task<AiGuidanceResolvedDocument?> GetEnabledByKeyAsync(string key, CancellationToken cancellationToken = default)
+    public Task<AiGuidanceResolvedDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
-            return null;
+            return Task.FromResult<AiGuidanceResolvedDocument?>(null);
         }
 
-        var document = await _dbContext.AiGuidanceDocuments
-            .AsNoTracking()
-            .Where(item => item.IsEnabled && item.Key == key)
-            .Select(item => new AiGuidanceResolvedDocument(
-                item.Key,
-                item.RelativePath,
-                item.Title,
-                item.Surface,
-                item.TagsJson,
-                item.Description,
-                item.ContentMarkdown,
-                item.Version,
-                true))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (document is not null)
-        {
-            return document;
-        }
-
-        var fallbackPath = SeedCatalog.FirstOrDefault(entry => string.Equals(entry.Value.Key, key, StringComparison.Ordinal)).Key;
-        return string.IsNullOrWhiteSpace(fallbackPath) ? null : TryResolveEmbeddedFallback(fallbackPath);
+        return ResolveSingleAsync(
+            item => item.IsEnabled
+                && item.IsModelLoadable
+                && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
+                && item.Key == key,
+            cancellationToken);
     }
 
-    public async Task<AutomatonGuidanceDocument?> GetReferenceByKeyAsync(string key, CancellationToken cancellationToken = default)
+    async Task<AutomatonGuidanceDocument?> IAutomatonGuidanceRuntimeProvider.GetBasePromptAsync(string surface, CancellationToken cancellationToken)
     {
-        var document = await GetEnabledByKeyAsync(key, cancellationToken);
-        return document is null
-            ? null
-            : new AutomatonGuidanceDocument(
-                document.Key,
-                document.RelativePath,
-                document.Title,
-                document.Surface,
-                document.TagsJson,
-                document.Description,
-                document.ContentMarkdown,
-                document.Version,
-                document.IsDatabaseDocument);
+        var document = await GetBasePromptAsync(surface, cancellationToken);
+        return document is null ? null : MapRuntimeDocument(document);
+    }
+
+    async Task<IReadOnlyList<AutomatonGuidanceDocument>> IAutomatonGuidanceRuntimeProvider.GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken)
+    {
+        var documents = await GetRequiredGuidanceAsync(surface, cancellationToken);
+        var resolved = new List<AutomatonGuidanceDocument>(documents.Count);
+        foreach (var document in documents)
+        {
+            var item = await GetGuidanceByRelativePathAsync(document.RelativePath, cancellationToken);
+            if (item is not null)
+            {
+                resolved.Add(MapRuntimeDocument(item));
+            }
+        }
+
+        return resolved;
+    }
+
+    async Task<IReadOnlyList<AutomatonGuidanceCatalogItem>> IAutomatonGuidanceRuntimeProvider.ListLoadableGuidanceAsync(string? surface, CancellationToken cancellationToken)
+    {
+        var documents = await ListLoadableGuidanceAsync(surface, cancellationToken);
+        return documents.Select(MapCatalogDocument).ToList();
+    }
+
+    public async Task<AutomatonGuidanceDocument?> GetGuidanceAsync(string relativePath, CancellationToken cancellationToken = default)
+    {
+        var document = await GetGuidanceByRelativePathAsync(relativePath, cancellationToken);
+        return document is null ? null : MapRuntimeDocument(document);
+    }
+
+    async Task<AutomatonGuidanceDocument?> IAutomatonGuidanceRuntimeProvider.GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken)
+    {
+        var document = await GetGuidanceByKeyAsync(key, cancellationToken);
+        return document is null ? null : MapRuntimeDocument(document);
     }
 
     public async Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default)
@@ -198,17 +172,24 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
 
             var metadata = ResolveMetadata(source.RelativePath);
             var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
+            var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
+            var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
+
             _dbContext.AiGuidanceDocuments.Add(new AiGuidanceDocument
             {
                 Id = Guid.NewGuid(),
                 Key = metadata.Key,
                 RelativePath = source.RelativePath,
-                Title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title,
+                Title = title,
                 Surface = metadata.Surface,
-                Description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description,
+                DocumentKind = metadata.DocumentKind,
+                Description = description,
                 TagsJson = metadata.TagsJson,
-                ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(source.Content, string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title, string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description),
+                ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(source.Content, title, description),
                 IsEnabled = true,
+                RequiredByDefault = metadata.RequiredByDefault,
+                IsModelLoadable = metadata.IsModelLoadable,
+                SortOrder = metadata.SortOrder,
                 Version = 1,
                 CreatedAt = now
             });
@@ -224,31 +205,48 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         return added;
     }
 
-    private AiGuidanceResolvedDocument? TryResolveEmbeddedFallback(string relativePath)
-    {
-        try
-        {
-            var content = _embeddedGuidanceProvider.GetReference(relativePath);
-            var metadata = ResolveMetadata(relativePath);
-            var parsed = AiGuidanceMarkdownFrontMatter.Parse(content);
-            var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
-            var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
-            return new AiGuidanceResolvedDocument(
-                metadata.Key,
-                relativePath,
-                title,
-                metadata.Surface,
-                metadata.TagsJson,
-                description,
-                AiGuidanceMarkdownFrontMatter.Upsert(content, title, description),
-                0,
-                false);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
+    private IQueryable<AiGuidanceCatalogItem> QueryCatalog(System.Linq.Expressions.Expression<Func<AiGuidanceDocument, bool>> predicate) =>
+        _dbContext.AiGuidanceDocuments
+            .AsNoTracking()
+            .Where(predicate)
+            .OrderBy(item => item.Surface)
+            .ThenBy(item => item.SortOrder)
+            .ThenBy(item => item.Title)
+            .Select(item => new AiGuidanceCatalogItem(
+                item.Key,
+                item.RelativePath,
+                item.Title,
+                item.Surface,
+                item.DocumentKind,
+                item.TagsJson,
+                item.Description,
+                item.RequiredByDefault,
+                item.IsModelLoadable,
+                item.SortOrder,
+                item.Version,
+                true));
+
+    private Task<AiGuidanceResolvedDocument?> ResolveSingleAsync(
+        System.Linq.Expressions.Expression<Func<AiGuidanceDocument, bool>> predicate,
+        CancellationToken cancellationToken) =>
+        _dbContext.AiGuidanceDocuments
+            .AsNoTracking()
+            .Where(predicate)
+            .Select(item => new AiGuidanceResolvedDocument(
+                item.Key,
+                item.RelativePath,
+                item.Title,
+                item.Surface,
+                item.DocumentKind,
+                item.TagsJson,
+                item.Description,
+                item.ContentMarkdown,
+                item.RequiredByDefault,
+                item.IsModelLoadable,
+                item.SortOrder,
+                item.Version,
+                true))
+            .FirstOrDefaultAsync(cancellationToken);
 
     private static GuidanceSeedMetadata ResolveMetadata(string relativePath) =>
         SeedCatalog.TryGetValue(relativePath, out var metadata)
@@ -257,8 +255,43 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 relativePath.Replace("llms/", string.Empty, StringComparison.Ordinal).Replace(".md", string.Empty, StringComparison.Ordinal),
                 relativePath,
                 "shared",
+                AiGuidanceDocumentKinds.Guidance,
                 "Focused Automaton guidance reference.",
-                """["reference"]""");
+                """["reference"]""",
+                false,
+                true,
+                200);
+
+    private static AutomatonGuidanceCatalogItem MapCatalogDocument(AiGuidanceCatalogItem item) =>
+        new(
+            item.Key,
+            item.RelativePath,
+            item.Title,
+            item.Surface,
+            item.DocumentKind,
+            item.TagsJson,
+            item.Description,
+            item.RequiredByDefault,
+            item.IsModelLoadable,
+            item.SortOrder,
+            item.Version,
+            item.IsDatabaseDocument);
+
+    private static AutomatonGuidanceDocument MapRuntimeDocument(AiGuidanceResolvedDocument item) =>
+        new(
+            item.Key,
+            item.RelativePath,
+            item.Title,
+            item.Surface,
+            item.DocumentKind,
+            item.TagsJson,
+            item.Description,
+            item.ContentMarkdown,
+            item.RequiredByDefault,
+            item.IsModelLoadable,
+            item.SortOrder,
+            item.Version,
+            item.IsDatabaseDocument);
 }
 
 public sealed record AiGuidanceCatalogItem(
@@ -266,8 +299,12 @@ public sealed record AiGuidanceCatalogItem(
     string RelativePath,
     string Title,
     string Surface,
+    string DocumentKind,
     string? TagsJson,
     string? Description,
+    bool RequiredByDefault,
+    bool IsModelLoadable,
+    int SortOrder,
     int Version,
     bool IsDatabaseDocument);
 
@@ -276,9 +313,13 @@ public sealed record AiGuidanceResolvedDocument(
     string RelativePath,
     string Title,
     string Surface,
+    string DocumentKind,
     string? TagsJson,
     string? Description,
     string ContentMarkdown,
+    bool RequiredByDefault,
+    bool IsModelLoadable,
+    int SortOrder,
     int Version,
     bool IsDatabaseDocument);
 
@@ -286,5 +327,9 @@ public sealed record GuidanceSeedMetadata(
     string Key,
     string Title,
     string Surface,
+    string DocumentKind,
     string Description,
-    string? TagsJson);
+    string? TagsJson,
+    bool RequiredByDefault,
+    bool IsModelLoadable,
+    int SortOrder);

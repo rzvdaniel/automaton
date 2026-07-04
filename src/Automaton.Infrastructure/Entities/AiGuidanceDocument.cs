@@ -4,7 +4,7 @@ namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Runtime-managed AI guidance document used by Studio and CLI prompt harnesses.
-/// Embedded guidance remains the seed/fallback source; database rows are the mutable runtime source.
+/// Embedded guidance remains the seed/reset source; database rows are the mutable runtime source.
 /// </summary>
 public class AiGuidanceDocument
 {
@@ -27,6 +27,10 @@ public class AiGuidanceDocument
     [MaxLength(50)]
     public string Surface { get; set; } = string.Empty;
 
+    [Required]
+    [MaxLength(50)]
+    public string DocumentKind { get; set; } = string.Empty;
+
     [MaxLength(500)]
     public string? Description { get; set; }
 
@@ -37,6 +41,9 @@ public class AiGuidanceDocument
     public string ContentMarkdown { get; set; } = string.Empty;
 
     public bool IsEnabled { get; set; } = true;
+    public bool RequiredByDefault { get; set; }
+    public bool IsModelLoadable { get; set; } = true;
+    public int SortOrder { get; set; }
 
     public int Version { get; set; } = 1;
 

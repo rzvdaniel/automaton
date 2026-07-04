@@ -41,10 +41,14 @@ public sealed class AdminAiGuidanceService
         string relativePath,
         string title,
         string surface,
+        string documentKind,
         string? description,
         string? tagsJson,
         string contentMarkdown,
         bool isEnabled,
+        bool requiredByDefault,
+        bool isModelLoadable,
+        int sortOrder,
         CancellationToken cancellationToken = default)
     {
         await EnsureUniqueAsync(key, relativePath, null, cancellationToken);
@@ -57,10 +61,14 @@ public sealed class AdminAiGuidanceService
             RelativePath = relativePath.Trim(),
             Title = title.Trim(),
             Surface = surface.Trim(),
+            DocumentKind = documentKind.Trim(),
             Description = NormalizeOptional(description),
             TagsJson = NormalizeOptional(tagsJson),
             ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description),
             IsEnabled = isEnabled,
+            RequiredByDefault = requiredByDefault,
+            IsModelLoadable = isModelLoadable,
+            SortOrder = sortOrder,
             Version = 1,
             CreatedAt = now,
             UpdatedAt = now
@@ -85,10 +93,14 @@ public sealed class AdminAiGuidanceService
         string relativePath,
         string title,
         string surface,
+        string documentKind,
         string? description,
         string? tagsJson,
         string contentMarkdown,
         bool isEnabled,
+        bool requiredByDefault,
+        bool isModelLoadable,
+        int sortOrder,
         CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.AiGuidanceDocuments.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -103,10 +115,14 @@ public sealed class AdminAiGuidanceService
         entity.RelativePath = relativePath.Trim();
         entity.Title = title.Trim();
         entity.Surface = surface.Trim();
+        entity.DocumentKind = documentKind.Trim();
         entity.Description = NormalizeOptional(description);
         entity.TagsJson = NormalizeOptional(tagsJson);
         entity.ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description);
         entity.IsEnabled = isEnabled;
+        entity.RequiredByDefault = requiredByDefault;
+        entity.IsModelLoadable = isModelLoadable;
+        entity.SortOrder = sortOrder;
         entity.Version += 1;
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -232,8 +248,12 @@ public sealed class AdminAiGuidanceService
                 entity.RelativePath,
                 entity.Title,
                 entity.Surface,
+                entity.DocumentKind,
                 entity.TagsJson,
                 entity.IsEnabled,
+                entity.RequiredByDefault,
+                entity.IsModelLoadable,
+                entity.SortOrder,
                 entity.Version,
                 HasEmbeddedDefault = HasEmbeddedDefault(entity.RelativePath)
             }

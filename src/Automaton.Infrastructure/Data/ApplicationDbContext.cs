@@ -1003,20 +1003,24 @@ namespace Automaton.Api.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Key).IsRequired().HasMaxLength(120);
                 entity.Property(e => e.RelativePath).IsRequired().HasMaxLength(260);
-                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.Surface).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.Description).HasMaxLength(500);
-                entity.Property(e => e.TagsJson).HasMaxLength(4000);
-                entity.Property(e => e.ContentMarkdown).IsRequired();
-                entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
-                entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
-                entity.Property(e => e.CreatedAt).IsRequired();
-
-                entity.HasIndex(e => e.Key).IsUnique();
-                entity.HasIndex(e => e.RelativePath).IsUnique();
-                entity.HasIndex(e => e.Surface);
-                entity.HasIndex(e => e.IsEnabled);
-            });
+                  entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                  entity.Property(e => e.Surface).IsRequired().HasMaxLength(50);
+                  entity.Property(e => e.DocumentKind).IsRequired().HasMaxLength(50);
+                  entity.Property(e => e.Description).HasMaxLength(500);
+                  entity.Property(e => e.TagsJson).HasMaxLength(4000);
+                  entity.Property(e => e.ContentMarkdown).IsRequired();
+                  entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
+                  entity.Property(e => e.RequiredByDefault).IsRequired().HasDefaultValue(false);
+                  entity.Property(e => e.IsModelLoadable).IsRequired().HasDefaultValue(true);
+                  entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(100);
+                  entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+                  entity.Property(e => e.CreatedAt).IsRequired();
+  
+                  entity.HasIndex(e => e.Key).IsUnique();
+                  entity.HasIndex(e => e.RelativePath).IsUnique();
+                  entity.HasIndex(e => new { e.Surface, e.DocumentKind });
+                  entity.HasIndex(e => e.IsEnabled);
+              });
 
             // User Settings
             modelBuilder.Entity<UserSetting>(entity =>

@@ -48,10 +48,14 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.RelativePath,
                 request.Title,
                 request.Surface,
+                request.DocumentKind,
                 request.Description,
                 request.TagsJson,
                 request.ContentMarkdown,
                 request.IsEnabled,
+                request.RequiredByDefault,
+                request.IsModelLoadable,
+                request.SortOrder,
                 cancellationToken);
 
             return CreatedAtAction(nameof(Get), new { id = document.Id }, Map(document));
@@ -76,10 +80,14 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.RelativePath,
                 request.Title,
                 request.Surface,
+                request.DocumentKind,
                 request.Description,
                 request.TagsJson,
                 request.ContentMarkdown,
                 request.IsEnabled,
+                request.RequiredByDefault,
+                request.IsModelLoadable,
+                request.SortOrder,
                 cancellationToken);
 
             if (document is null)
@@ -130,10 +138,14 @@ public sealed class AdminAiGuidanceController : ControllerBase
         RelativePath = document.RelativePath,
         Title = document.Title,
         Surface = document.Surface,
+        DocumentKind = document.DocumentKind,
         Description = document.Description,
         TagsJson = document.TagsJson,
         ContentMarkdown = document.ContentMarkdown,
         IsEnabled = document.IsEnabled,
+        RequiredByDefault = document.RequiredByDefault,
+        IsModelLoadable = document.IsModelLoadable,
+        SortOrder = document.SortOrder,
         Version = document.Version,
         CreatedAt = document.CreatedAt,
         UpdatedAt = document.UpdatedAt,
@@ -148,10 +160,14 @@ public sealed class AiGuidanceAdminResponse
     public string RelativePath { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Surface { get; set; } = string.Empty;
+    public string DocumentKind { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? TagsJson { get; set; }
     public string ContentMarkdown { get; set; } = string.Empty;
     public bool IsEnabled { get; set; }
+    public bool RequiredByDefault { get; set; }
+    public bool IsModelLoadable { get; set; }
+    public int SortOrder { get; set; }
     public int Version { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -172,6 +188,9 @@ public sealed class UpsertAiGuidanceRequest
     [Required]
     public string Surface { get; set; } = string.Empty;
 
+    [Required]
+    public string DocumentKind { get; set; } = string.Empty;
+
     public string? Description { get; set; }
 
     public string? TagsJson { get; set; }
@@ -180,4 +199,7 @@ public sealed class UpsertAiGuidanceRequest
     public string ContentMarkdown { get; set; } = string.Empty;
 
     public bool IsEnabled { get; set; } = true;
+    public bool RequiredByDefault { get; set; }
+    public bool IsModelLoadable { get; set; } = true;
+    public int SortOrder { get; set; } = 100;
 }

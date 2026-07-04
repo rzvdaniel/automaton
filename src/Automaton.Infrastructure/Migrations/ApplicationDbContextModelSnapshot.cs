@@ -268,7 +268,17 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
+                    b.Property<string>("DocumentKind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
                     b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsModelLoadable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(true);
@@ -282,6 +292,16 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(260)
                         .HasColumnType("varchar(260)");
+
+                    b.Property<bool>("RequiredByDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(100);
 
                     b.Property<string>("Surface")
                         .IsRequired()
@@ -315,7 +335,7 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RelativePath")
                         .IsUnique();
 
-                    b.HasIndex("Surface");
+                    b.HasIndex("Surface", "DocumentKind");
 
                     b.ToTable("AiGuidanceDocuments");
                 });

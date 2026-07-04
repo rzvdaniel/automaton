@@ -1,4 +1,5 @@
 using Automaton.AiGuidance;
+using Automaton.Api.Constants;
 using Automaton.Api.Controllers.Admin;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -25,10 +26,14 @@ public class AdminAiGuidanceTests
             "llms/studio-editor-extra.md",
             "Studio Editor Extra",
             "studio",
+            AiGuidanceDocumentKinds.Guidance,
             "Extra editor guidance",
             null,
             "# Guidance",
-            true);
+            true,
+            false,
+            true,
+            100);
 
         Assert.Multiple(() =>
         {
@@ -54,10 +59,14 @@ public class AdminAiGuidanceTests
             entity.RelativePath,
             "Updated Title",
             entity.Surface,
+            entity.DocumentKind,
             entity.Description,
             entity.TagsJson,
             "# Updated",
-            entity.IsEnabled);
+            entity.IsEnabled,
+            entity.RequiredByDefault,
+            entity.IsModelLoadable,
+            entity.SortOrder);
 
         Assert.That(updated, Is.Not.Null);
         Assert.Multiple(() =>
@@ -126,8 +135,11 @@ public class AdminAiGuidanceTests
             RelativePath = "llms/duplicate-b.md",
             Title = "Duplicate",
             Surface = "studio",
+            DocumentKind = AiGuidanceDocumentKinds.Guidance,
             ContentMarkdown = "# Duplicate",
-            IsEnabled = true
+            IsEnabled = true,
+            IsModelLoadable = true,
+            SortOrder = 100
         }, CancellationToken.None);
 
         Assert.That(result.Result, Is.InstanceOf<BadRequestObjectResult>());
@@ -136,7 +148,7 @@ public class AdminAiGuidanceTests
     }
 
     [Test]
-    public async Task ListEnabledAsync_ReturnsOnlyEnabledDocs_ForRequestedSurface()
+    public async Task ListLoadableGuidanceAsync_ReturnsOnlyEnabledModelLoadableGuidance_ForRequestedSurface()
     {
         await using var dbContext = CreateDbContext();
         dbContext.AiGuidanceDocuments.AddRange(
@@ -147,9 +159,12 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/studio-a.md",
                 Title = "Studio A",
                 Surface = "studio",
+                DocumentKind = AiGuidanceDocumentKinds.Guidance,
                 TagsJson = """["editor"]""",
                 ContentMarkdown = "# A",
                 IsEnabled = true,
+                IsModelLoadable = true,
+                SortOrder = 100,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow
             },
@@ -160,9 +175,12 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/studio-b.md",
                 Title = "Studio B",
                 Surface = "studio",
+                DocumentKind = AiGuidanceDocumentKinds.Guidance,
                 TagsJson = """["editor"]""",
                 ContentMarkdown = "# B",
                 IsEnabled = false,
+                IsModelLoadable = true,
+                SortOrder = 100,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow
             },
@@ -173,22 +191,41 @@ public class AdminAiGuidanceTests
                 RelativePath = "llms/cli-a.md",
                 Title = "CLI A",
                 Surface = "cli",
+                DocumentKind = AiGuidanceDocumentKinds.Guidance,
                 TagsJson = """["deploy"]""",
                 ContentMarkdown = "# CLI",
                 IsEnabled = true,
+                IsModelLoadable = true,
+                SortOrder = 100,
+                Version = 1,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AiGuidanceDocument
+            {
+                Id = Guid.NewGuid(),
+                Key = "studio-base",
+                RelativePath = "llms/studio-base.md",
+                Title = "Studio Base",
+                Surface = "studio",
+                DocumentKind = AiGuidanceDocumentKinds.BasePrompt,
+                ContentMarkdown = "# Base",
+                IsEnabled = true,
+                RequiredByDefault = true,
+                IsModelLoadable = false,
+                SortOrder = 0,
                 Version = 1,
                 CreatedAt = DateTime.UtcNow
             });
         await dbContext.SaveChangesAsync();
 
         var runtimeService = CreateRuntimeService(dbContext);
-        var documents = await runtimeService.ListEnabledAsync("studio");
+        var documents = await runtimeService.ListLoadableGuidanceAsync("studio");
 
         Assert.That(documents.Select(x => x.Key).ToArray(), Is.EqualTo(new[] { "studio-a" }));
     }
 
     [Test]
-    public async Task GetEnabledByRelativePathAsync_DatabaseDocumentWinsOverEmbeddedFallback()
+    public async Task GetGuidanceByRelativePathAsync_ReturnsDatabaseDocument_WhenEnabledAndModelLoadable()
     {
         await using var dbContext = CreateDbContext();
         dbContext.AiGuidanceDocuments.Add(new AiGuidanceDocument
@@ -198,16 +235,19 @@ public class AdminAiGuidanceTests
             RelativePath = "llms/automaton-studio-editor.md",
             Title = "Automaton Studio Editor",
             Surface = "studio",
+            DocumentKind = AiGuidanceDocumentKinds.Guidance,
             TagsJson = """["editor"]""",
             ContentMarkdown = "# Database Override",
             IsEnabled = true,
+            IsModelLoadable = true,
+            SortOrder = 100,
             Version = 7,
             CreatedAt = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync();
 
         var runtimeService = CreateRuntimeService(dbContext);
-        var document = await runtimeService.GetEnabledByRelativePathAsync("llms/automaton-studio-editor.md");
+        var document = await runtimeService.GetGuidanceByRelativePathAsync("llms/automaton-studio-editor.md");
 
         Assert.That(document, Is.Not.Null);
         Assert.Multiple(() =>
@@ -219,20 +259,14 @@ public class AdminAiGuidanceTests
     }
 
     [Test]
-    public async Task GetEnabledByRelativePathAsync_UsesEmbeddedFallback_WhenDatabaseDocMissing()
+    public async Task GetGuidanceByRelativePathAsync_ReturnsNull_WhenDatabaseDocMissing()
     {
         await using var dbContext = CreateDbContext();
         var runtimeService = CreateRuntimeService(dbContext);
 
-        var document = await runtimeService.GetEnabledByRelativePathAsync("llms/automaton-studio-editor.md");
+        var document = await runtimeService.GetGuidanceByRelativePathAsync("llms/automaton-studio-editor.md");
 
-        Assert.That(document, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(document!.IsDatabaseDocument, Is.False);
-            Assert.That(document.Version, Is.EqualTo(0));
-            Assert.That(document.ContentMarkdown, Does.Contain("# Automaton Studio App Editor"));
-        });
+        Assert.That(document, Is.Null);
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -274,9 +308,12 @@ public class AdminAiGuidanceTests
             RelativePath = relativePath,
             Title = title,
             Surface = "studio",
+            DocumentKind = AiGuidanceDocumentKinds.Guidance,
             TagsJson = """["editor"]""",
             ContentMarkdown = contentMarkdown,
             IsEnabled = isEnabled,
+            IsModelLoadable = true,
+            SortOrder = 100,
             Version = 1,
             CreatedAt = DateTime.UtcNow
         };

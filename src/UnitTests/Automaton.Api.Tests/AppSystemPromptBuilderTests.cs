@@ -102,7 +102,7 @@ public class AppSystemPromptBuilderTests
 
         Assert.That(references.Any(item => item.GetProperty("path").GetString() == "llms/automaton-backend-controllers.md"), Is.True);
         Assert.That(studioEditor.GetProperty("surface").GetString(), Is.EqualTo("studio"));
-        Assert.That(studioEditor.GetProperty("category").GetString(), Is.EqualTo("editor"));
+        Assert.That(studioEditor.GetProperty("documentKind").GetString(), Is.EqualTo("Guidance"));
         Assert.That(studioEditor.GetProperty("description").GetString(), Does.Contain("Studio editor"));
     }
 
