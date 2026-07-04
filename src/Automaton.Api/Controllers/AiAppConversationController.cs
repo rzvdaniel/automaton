@@ -206,7 +206,8 @@ public class AiAppConversationController : AiConversationControllerBase
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
-        List<ConversationMessage>? history)
+        List<ConversationMessage>? history,
+        CancellationToken cancellationToken)
     {
         var tier       = await ResolveComplexityTierAsync(request.Message, sessionId, userId, history);
         _resolvedTier  = tier;
@@ -220,7 +221,7 @@ public class AiAppConversationController : AiConversationControllerBase
             CancellationToken.None);
         _effectiveVerificationStrategy = strategyName;
         _effectiveExecutionPolicy = executionPolicyName;
-        var basePrompt = _promptBuilder.BuildSystemPrompt(tier, strategyName, executionPolicyName, request.Message);
+        var basePrompt = await _promptBuilder.BuildSystemPromptAsync(tier, strategyName, executionPolicyName, request.Message, cancellationToken);
 
         // Inject user instructions from .instructions/ folder (configurable token budget)
         string? instructionBlock = null;

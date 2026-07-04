@@ -68,7 +68,8 @@ public abstract class AiConversationControllerBase : BaseController
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
-        List<ConversationMessage>? history);
+        List<ConversationMessage>? history,
+        CancellationToken cancellationToken);
 
     /// <summary>Return the tool provider to use for this resource type.</summary>
     protected abstract IMcpToolProvider? GetToolProvider();
@@ -158,7 +159,7 @@ public abstract class AiConversationControllerBase : BaseController
                 aiConfig.HistoryCompaction);
 
             // 4. Build system prompt parts (delegated to subclass) + append mode-specific instructions
-            var promptParts = await BuildSystemPromptAsync(request, userId, resolvedSessionId, compactedHistory);
+            var promptParts = await BuildSystemPromptAsync(request, userId, resolvedSessionId, compactedHistory, cancellationToken);
             var mode = ConversationModeFactory.From(request.Mode);
             var modePromptSuffix = mode.SystemPromptSuffix;
             // Append mode suffix to the base prompt so it stays within the cached block

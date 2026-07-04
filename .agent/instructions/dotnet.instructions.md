@@ -32,7 +32,7 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 
 ## Async/Await
 
-- Every I/O operation must be `async`/`await` — no `.Result` or `.Wait()`
+- Every I/O operation must be `async`/`await` — no `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`
 - Use `CancellationToken` for all controller actions and long-running operations
 - Return `Task<IActionResult>` or `Task<ActionResult<T>>` from controllers
 
@@ -58,9 +58,10 @@ Never return EF Core entity classes from API endpoints. Always map to a DTO. Thi
 
 ## No Blocking Async at Boundaries
 
-- Do not use `.Result`, `.Wait()`, or other sync-over-async patterns in controllers or services
+- Do not use `.Result`, `.Wait()`, `.GetAwaiter().GetResult()`, or other sync-over-async patterns in controllers, services, startup code, or hosted service wiring
 - Keep controller and service flows fully async end to end when I/O is involved
 - If a synchronous method needs async data, prefer converting that method to async rather than blocking on the task
+- If startup or initialization logic needs async work, prefer an async startup path or an explicit initialization service rather than blocking on a task from `Program.cs` or extension methods
 - Treat sync-over-async in HTTP and service layers as a design smell that should be refactored, not normalized
 
 ## EF Core / Database

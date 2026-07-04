@@ -9,16 +9,16 @@ namespace Automaton.Api.Tests;
 public class AppSystemPromptBuilderTests
 {
     [Test]
-    public void BuildSystemPrompt_UsesCompactStudioContract_AndExcludesCliBootstrapPhrases()
+    public async Task BuildSystemPrompt_UsesCompactStudioContract_AndExcludesCliBootstrapPhrases()
     {
         var builder = new AppSystemPromptBuilder(
-            new EmbeddedAutomatonGuidanceProvider(),
+            new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()),
             new KeywordAppPromptContextSelector(),
             new StubStepSystemPromptBuilder(),
             [new StubVerificationStrategy()],
             [new StubExecutionPolicy()]);
 
-        var prompt = builder.BuildSystemPrompt(
+        var prompt = await builder.BuildSystemPromptAsync(
             ComplexityTier.Medium,
             AppVerificationStrategyNames.Balanced,
             AppExecutionPolicyNames.Default,
@@ -36,16 +36,16 @@ public class AppSystemPromptBuilderTests
     }
 
     [Test]
-    public void BuildSystemPrompt_IncludesFocusedBackendGuidance_WhenRequestNeedsPersistence()
+    public async Task BuildSystemPrompt_IncludesFocusedBackendGuidance_WhenRequestNeedsPersistence()
     {
         var builder = new AppSystemPromptBuilder(
-            new EmbeddedAutomatonGuidanceProvider(),
+            new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()),
             new KeywordAppPromptContextSelector(),
             new StubStepSystemPromptBuilder(),
             [new StubVerificationStrategy()],
             [new StubExecutionPolicy()]);
 
-        var prompt = builder.BuildSystemPrompt(
+        var prompt = await builder.BuildSystemPromptAsync(
             ComplexityTier.Medium,
             AppVerificationStrategyNames.Balanced,
             AppExecutionPolicyNames.Default,
@@ -88,7 +88,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ListsFocusedGuidanceReferences()
     {
-        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceProvider());
+        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()));
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.ListGuidanceName,
@@ -109,7 +109,7 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ReturnsRequestedGuidanceContent()
     {
-        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceProvider());
+        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()));
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.GetGuidanceName,

@@ -13,7 +13,7 @@ public interface IAiGuidanceRuntimeService
     Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService
+public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutomatonGuidanceRuntimeProvider
 {
     private static readonly IReadOnlyDictionary<string, GuidanceSeedMetadata> SeedCatalog =
         new Dictionary<string, GuidanceSeedMetadata>(StringComparer.Ordinal)
@@ -73,6 +73,22 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService
         return documents;
     }
 
+    public async Task<IReadOnlyList<AutomatonGuidanceCatalogItem>> ListReferencesAsync(string? surface = null, CancellationToken cancellationToken = default)
+    {
+        var documents = await ListEnabledAsync(surface, cancellationToken);
+        return documents
+            .Select(item => new AutomatonGuidanceCatalogItem(
+                item.Key,
+                item.RelativePath,
+                item.Title,
+                item.Surface,
+                item.Category,
+                item.Description,
+                item.Version,
+                item.IsDatabaseDocument))
+            .ToList();
+    }
+
     public async Task<AiGuidanceResolvedDocument?> GetEnabledByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
@@ -96,6 +112,23 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService
             .FirstOrDefaultAsync(cancellationToken);
 
         return document ?? TryResolveEmbeddedFallback(relativePath);
+    }
+
+    public async Task<AutomatonGuidanceDocument?> GetReferenceAsync(string relativePath, CancellationToken cancellationToken = default)
+    {
+        var document = await GetEnabledByRelativePathAsync(relativePath, cancellationToken);
+        return document is null
+            ? null
+            : new AutomatonGuidanceDocument(
+                document.Key,
+                document.RelativePath,
+                document.Title,
+                document.Surface,
+                document.Category,
+                document.Description,
+                document.ContentMarkdown,
+                document.Version,
+                document.IsDatabaseDocument);
     }
 
     public async Task<AiGuidanceResolvedDocument?> GetEnabledByKeyAsync(string key, CancellationToken cancellationToken = default)
@@ -127,6 +160,23 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService
 
         var fallbackPath = SeedCatalog.FirstOrDefault(entry => string.Equals(entry.Value.Key, key, StringComparison.Ordinal)).Key;
         return string.IsNullOrWhiteSpace(fallbackPath) ? null : TryResolveEmbeddedFallback(fallbackPath);
+    }
+
+    public async Task<AutomatonGuidanceDocument?> GetReferenceByKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var document = await GetEnabledByKeyAsync(key, cancellationToken);
+        return document is null
+            ? null
+            : new AutomatonGuidanceDocument(
+                document.Key,
+                document.RelativePath,
+                document.Title,
+                document.Surface,
+                document.Category,
+                document.Description,
+                document.ContentMarkdown,
+                document.Version,
+                document.IsDatabaseDocument);
     }
 
     public async Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default)

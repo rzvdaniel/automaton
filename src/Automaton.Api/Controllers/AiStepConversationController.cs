@@ -59,7 +59,8 @@ public class AiStepConversationController : AiConversationControllerBase
         BaseStreamConversationRequest request,
         Guid userId,
         Guid sessionId,
-        List<ConversationMessage>? history)
+        List<ConversationMessage>? history,
+        CancellationToken cancellationToken)
     {
         var stepRequest = (StreamStepConversationRequest)request;
         var basePrompt = _promptBuilder.BuildSystemPrompt(stepRequest.Language ?? "Python");

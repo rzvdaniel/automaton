@@ -9,11 +9,12 @@ public interface IAppSystemPromptBuilder
     /// Build a system prompt for the given complexity tier.
     /// Falls back to the legacy single prompt when tier is null.
     /// </summary>
-    string BuildSystemPrompt(
+    Task<string> BuildSystemPromptAsync(
         ComplexityTier? tier = null,
         string? verificationStrategyName = null,
         string? executionPolicyName = null,
-        string? userMessage = null);
+        string? userMessage = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Wraps <paramref name="baseSystemPrompt"/> with the planning-phase instruction block.

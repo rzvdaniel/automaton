@@ -1,15 +1,20 @@
-﻿using Automaton.Api.Data;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Extensions
 {
     public static class DataExtensions
     {
-        public static WebApplication ApplyMigrations(this WebApplication app)
+        public static async Task<WebApplication> ApplyMigrationsAsync(this WebApplication app, CancellationToken cancellationToken = default)
         {
-            using var scope = app.Services.CreateScope();
+            await using var scope = app.Services.CreateAsyncScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            dbContext.Database.Migrate();
+            await dbContext.Database.MigrateAsync(cancellationToken);
+
+            var guidanceService = scope.ServiceProvider.GetRequiredService<IAiGuidanceRuntimeService>();
+            await guidanceService.SeedMissingDefaultsAsync(cancellationToken);
+
             return app;
         }
     }

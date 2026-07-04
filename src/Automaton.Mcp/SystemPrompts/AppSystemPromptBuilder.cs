@@ -36,14 +36,14 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
         () => LoadEmbeddedResource("Automaton.Mcp.SystemPrompts.Assets.App.app-planning.md"),
         LazyThreadSafetyMode.ExecutionAndPublication);
 
-    private readonly IAutomatonGuidanceProvider _guidanceProvider;
+    private readonly IAutomatonGuidanceRuntimeProvider _guidanceProvider;
     private readonly IAppPromptContextSelector _promptContextSelector;
     private readonly IStepSystemPromptBuilder _stepPromptBuilder;
     private readonly IReadOnlyDictionary<string, IAppVerificationPromptStrategy> _verificationStrategies;
     private readonly IReadOnlyDictionary<string, IAppExecutionPolicyPromptStrategy> _executionPolicies;
 
     public AppSystemPromptBuilder(
-        IAutomatonGuidanceProvider guidanceProvider,
+        IAutomatonGuidanceRuntimeProvider guidanceProvider,
         IAppPromptContextSelector promptContextSelector,
         IStepSystemPromptBuilder stepPromptBuilder,
         IEnumerable<IAppVerificationPromptStrategy> verificationStrategies,
@@ -63,11 +63,12 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
     /// <summary>
     /// Build a system prompt for the given complexity tier.
     /// </summary>
-    public string BuildSystemPrompt(
+    public async Task<string> BuildSystemPromptAsync(
         ComplexityTier? tier = null,
         string? verificationStrategyName = null,
         string? executionPolicyName = null,
-        string? userMessage = null)
+        string? userMessage = null,
+        CancellationToken cancellationToken = default)
     {
         var tierPrompt = tier switch
         {
@@ -78,7 +79,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
             _                         => MediumPrompt.Value
         };
 
-        var sharedContractBlock = BuildSharedContractBlock(userMessage, tier);
+        var sharedContractBlock = await BuildSharedContractBlockAsync(userMessage, tier, cancellationToken);
         var verificationBlock = ResolveVerificationPromptBlock(verificationStrategyName);
         var executionPolicyBlock = ResolveExecutionPolicyPromptBlock(executionPolicyName);
         var precedenceGuardBlock = BuildPrecedenceGuardBlock();
@@ -153,15 +154,21 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 - Do not follow lower-priority guidance when it conflicts with higher-priority directives.
 """;
 
-    private string BuildSharedContractBlock(string? userMessage, ComplexityTier? tier)
+    private async Task<string> BuildSharedContractBlockAsync(string? userMessage, ComplexityTier? tier, CancellationToken cancellationToken)
     {
-        var contract = _guidanceProvider.GetReference("llms/automaton-app-contract-compact.md").Trim();
-        var studioAdapter = _guidanceProvider.GetReference("llms/automaton-studio-editor.md").Trim();
+        var contract = (await _guidanceProvider.GetReferenceAsync("llms/automaton-app-contract-compact.md", cancellationToken)
+            ?? throw new InvalidOperationException("Automaton app contract guidance was not found.")).ContentMarkdown.Trim();
+        var studioAdapter = (await _guidanceProvider.GetReferenceAsync("llms/automaton-studio-editor.md", cancellationToken)
+            ?? throw new InvalidOperationException("Automaton Studio editor guidance was not found.")).ContentMarkdown.Trim();
         var sections = new List<string> { contract, studioAdapter };
 
         foreach (var reference in _promptContextSelector.SelectAdditionalReferences(userMessage, tier))
         {
-            sections.Add(_guidanceProvider.GetReference(reference).Trim());
+            var resolvedReference = await _guidanceProvider.GetReferenceAsync(reference, cancellationToken);
+            if (resolvedReference is not null)
+            {
+                sections.Add(resolvedReference.ContentMarkdown.Trim());
+            }
         }
 
         return string.Join("\n\n", sections);

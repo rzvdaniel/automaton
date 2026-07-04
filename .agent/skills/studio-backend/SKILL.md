@@ -23,6 +23,8 @@ Use this skill when touching:
 - Keep controllers thin; put business logic in services.
 - Use async APIs consistently.
 - Preserve cancellation tokens where surrounding code uses them.
+- Do not use sync-over-async patterns such as `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`, including in startup/migration helpers.
+- If backend initialization needs async I/O, prefer an async initialization path instead of blocking from `Program.cs` or extension methods.
 - Return actionable errors.
 - Avoid leaking secrets or internal details in API responses.
 - Keep request/response DTOs compatible unless a breaking change is intentional.
