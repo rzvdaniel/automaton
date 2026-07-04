@@ -28,8 +28,8 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
                 "starter",
                 "blank app"))
         {
-            AddReference(references, "llms/automaton-frontend-structure.md");
-            AddReference(references, "llms/automaton-starter-prompts.md");
+            AddReference(references, "automaton-frontend-structure");
+            AddReference(references, "automaton-starter-prompts");
         }
 
         if (ContainsWord(normalized, "backend") ||
@@ -50,7 +50,7 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
             ContainsWord(normalized, "sqlite") ||
             ContainsWord(normalized, "sql"))
         {
-            AddReference(references, "llms/automaton-backend-controllers.md");
+            AddReference(references, "automaton-backend-controllers");
         }
 
         if (ContainsAnyPhrase(normalized,
@@ -67,7 +67,7 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
                 "gallery",
                 "screenshot"))
         {
-            AddReference(references, "llms/automaton-media-assets.md");
+            AddReference(references, "automaton-media-assets");
         }
 
         if (ContainsAnyPhrase(normalized,
@@ -80,7 +80,7 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
                 "installable",
                 "manifest"))
         {
-            AddReference(references, "llms/automaton-frontend-structure.md");
+            AddReference(references, "automaton-frontend-structure");
         }
 
         if (ContainsAnyPhrase(normalized,
@@ -103,7 +103,7 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
                 "published",
                 "404"))
         {
-            AddReference(references, "llms/automaton-cli-deploy.md");
+            AddReference(references, "automaton-cli-deploy");
         }
 
         return references;
@@ -134,11 +134,11 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
         return false;
     }
 
-    private static void AddReference(List<string> references, string relativePath)
+    private static void AddReference(List<string> references, string key)
     {
-        if (!references.Contains(relativePath, StringComparer.Ordinal))
+        if (!references.Contains(key, StringComparer.Ordinal))
         {
-            references.Add(relativePath);
+            references.Add(key);
         }
     }
 }

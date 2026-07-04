@@ -183,7 +183,6 @@ export interface AiProvidersOperationalConfig {
 export interface AiGuidanceAdmin {
   id: string
   key: string
-  relativePath: string
   title: string
   surface: string
   documentKind: string
@@ -202,7 +201,6 @@ export interface AiGuidanceAdmin {
 
 export interface UpsertAiGuidanceRequest {
   key: string
-  relativePath: string
   title: string
   surface: string
   documentKind: string

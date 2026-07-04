@@ -23,7 +23,6 @@ public class AdminAiGuidanceTests
 
         var document = await service.CreateAsync(
             "studio-editor-extra",
-            "llms/studio-editor-extra.md",
             "Studio Editor Extra",
             "studio",
             AiGuidanceDocumentKinds.Guidance,
@@ -56,7 +55,6 @@ public class AdminAiGuidanceTests
         var updated = await service.UpdateAsync(
             entity.Id,
             entity.Key,
-            entity.RelativePath,
             "Updated Title",
             entity.Surface,
             entity.DocumentKind,
@@ -86,13 +84,17 @@ public class AdminAiGuidanceTests
         var service = CreateAdminService(dbContext);
 
         var disabled = await service.SetEnabledAsync(entity.Id, false);
+        Assert.That(disabled, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(disabled!.IsEnabled, Is.False);
+            Assert.That(disabled.Version, Is.EqualTo(2));
+        });
+
         var enabled = await service.SetEnabledAsync(entity.Id, true);
 
         Assert.Multiple(() =>
         {
-            Assert.That(disabled, Is.Not.Null);
-            Assert.That(disabled!.IsEnabled, Is.False);
-            Assert.That(disabled.Version, Is.EqualTo(2));
             Assert.That(enabled, Is.Not.Null);
             Assert.That(enabled!.IsEnabled, Is.True);
             Assert.That(enabled.Version, Is.EqualTo(3));
@@ -106,7 +108,6 @@ public class AdminAiGuidanceTests
         var entity = await SeedGuidanceDocumentAsync(
             dbContext,
             key: "automaton-studio-editor",
-            relativePath: "llms/automaton-studio-editor.md",
             title: "Automaton Studio Editor",
             contentMarkdown: "# Overridden");
         var service = CreateAdminService(dbContext);
@@ -126,13 +127,12 @@ public class AdminAiGuidanceTests
     public async Task Create_DuplicateKey_ReturnsCleanValidationError()
     {
         await using var dbContext = CreateDbContext();
-        await SeedGuidanceDocumentAsync(dbContext, key: "duplicate-key", relativePath: "llms/duplicate-a.md");
+        await SeedGuidanceDocumentAsync(dbContext, key: "duplicate-key");
         var controller = CreateController(dbContext);
 
         var result = await controller.Create(new UpsertAiGuidanceRequest
         {
             Key = "duplicate-key",
-            RelativePath = "llms/duplicate-b.md",
             Title = "Duplicate",
             Surface = "studio",
             DocumentKind = AiGuidanceDocumentKinds.Guidance,
@@ -156,7 +156,6 @@ public class AdminAiGuidanceTests
             {
                 Id = Guid.NewGuid(),
                 Key = "studio-a",
-                RelativePath = "llms/studio-a.md",
                 Title = "Studio A",
                 Surface = "studio",
                 DocumentKind = AiGuidanceDocumentKinds.Guidance,
@@ -172,7 +171,6 @@ public class AdminAiGuidanceTests
             {
                 Id = Guid.NewGuid(),
                 Key = "studio-b-disabled",
-                RelativePath = "llms/studio-b.md",
                 Title = "Studio B",
                 Surface = "studio",
                 DocumentKind = AiGuidanceDocumentKinds.Guidance,
@@ -188,7 +186,6 @@ public class AdminAiGuidanceTests
             {
                 Id = Guid.NewGuid(),
                 Key = "cli-a",
-                RelativePath = "llms/cli-a.md",
                 Title = "CLI A",
                 Surface = "cli",
                 DocumentKind = AiGuidanceDocumentKinds.Guidance,
@@ -204,7 +201,6 @@ public class AdminAiGuidanceTests
             {
                 Id = Guid.NewGuid(),
                 Key = "studio-base",
-                RelativePath = "llms/studio-base.md",
                 Title = "Studio Base",
                 Surface = "studio",
                 DocumentKind = AiGuidanceDocumentKinds.BasePrompt,
@@ -225,14 +221,13 @@ public class AdminAiGuidanceTests
     }
 
     [Test]
-    public async Task GetGuidanceByRelativePathAsync_ReturnsDatabaseDocument_WhenEnabledAndModelLoadable()
+    public async Task GetGuidanceByKeyAsync_ReturnsDatabaseDocument_WhenEnabledAndModelLoadable()
     {
         await using var dbContext = CreateDbContext();
         dbContext.AiGuidanceDocuments.Add(new AiGuidanceDocument
         {
             Id = Guid.NewGuid(),
             Key = "automaton-studio-editor",
-            RelativePath = "llms/automaton-studio-editor.md",
             Title = "Automaton Studio Editor",
             Surface = "studio",
             DocumentKind = AiGuidanceDocumentKinds.Guidance,
@@ -247,7 +242,7 @@ public class AdminAiGuidanceTests
         await dbContext.SaveChangesAsync();
 
         var runtimeService = CreateRuntimeService(dbContext);
-        var document = await runtimeService.GetGuidanceByRelativePathAsync("llms/automaton-studio-editor.md");
+        var document = await runtimeService.GetGuidanceByKeyAsync("automaton-studio-editor");
 
         Assert.That(document, Is.Not.Null);
         Assert.Multiple(() =>
@@ -259,12 +254,12 @@ public class AdminAiGuidanceTests
     }
 
     [Test]
-    public async Task GetGuidanceByRelativePathAsync_ReturnsNull_WhenDatabaseDocMissing()
+    public async Task GetGuidanceByKeyAsync_ReturnsNull_WhenDatabaseDocMissing()
     {
         await using var dbContext = CreateDbContext();
         var runtimeService = CreateRuntimeService(dbContext);
 
-        var document = await runtimeService.GetGuidanceByRelativePathAsync("llms/automaton-studio-editor.md");
+        var document = await runtimeService.GetGuidanceByKeyAsync("automaton-studio-editor");
 
         Assert.That(document, Is.Null);
     }
@@ -296,7 +291,6 @@ public class AdminAiGuidanceTests
     private static async Task<AiGuidanceDocument> SeedGuidanceDocumentAsync(
         ApplicationDbContext dbContext,
         string key = "seed-key",
-        string relativePath = "llms/seed.md",
         string title = "Seed Title",
         string contentMarkdown = "# Seed",
         bool isEnabled = true)
@@ -305,7 +299,6 @@ public class AdminAiGuidanceTests
         {
             Id = Guid.NewGuid(),
             Key = key,
-            RelativePath = relativePath,
             Title = title,
             Surface = "studio",
             DocumentKind = AiGuidanceDocumentKinds.Guidance,

@@ -167,7 +167,7 @@ public class AppSystemPromptBuilder : IAppSystemPromptBuilder
 
         foreach (var reference in _promptContextSelector.SelectAdditionalReferences(userMessage, tier))
         {
-            var resolvedReference = await _guidanceProvider.GetGuidanceAsync(reference, cancellationToken);
+            var resolvedReference = await _guidanceProvider.GetGuidanceByKeyAsync(reference, cancellationToken);
             if (resolvedReference is not null)
             {
                 sections.Add(resolvedReference.ContentMarkdown.Trim());

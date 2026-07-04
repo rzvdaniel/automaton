@@ -45,7 +45,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
         {
             var document = await _service.CreateAsync(
                 request.Key,
-                request.RelativePath,
                 request.Title,
                 request.Surface,
                 request.DocumentKind,
@@ -77,7 +76,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
             var document = await _service.UpdateAsync(
                 id,
                 request.Key,
-                request.RelativePath,
                 request.Title,
                 request.Surface,
                 request.DocumentKind,
@@ -135,7 +133,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
     {
         Id = document.Id,
         Key = document.Key,
-        RelativePath = document.RelativePath,
         Title = document.Title,
         Surface = document.Surface,
         DocumentKind = document.DocumentKind,
@@ -149,7 +146,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
         Version = document.Version,
         CreatedAt = document.CreatedAt,
         UpdatedAt = document.UpdatedAt,
-        HasEmbeddedDefault = _service.HasEmbeddedDefault(document.RelativePath)
+        HasEmbeddedDefault = _service.HasEmbeddedDefault(document.Key)
     };
 }
 
@@ -157,7 +154,6 @@ public sealed class AiGuidanceAdminResponse
 {
     public Guid Id { get; set; }
     public string Key { get; set; } = string.Empty;
-    public string RelativePath { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Surface { get; set; } = string.Empty;
     public string DocumentKind { get; set; } = string.Empty;
@@ -178,9 +174,6 @@ public sealed class UpsertAiGuidanceRequest
 {
     [Required]
     public string Key { get; set; } = string.Empty;
-
-    [Required]
-    public string RelativePath { get; set; } = string.Empty;
 
     [Required]
     public string Title { get; set; } = string.Empty;

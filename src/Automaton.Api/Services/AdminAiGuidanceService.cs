@@ -38,7 +38,6 @@ public sealed class AdminAiGuidanceService
 
     public async Task<AiGuidanceDocument> CreateAsync(
         string key,
-        string relativePath,
         string title,
         string surface,
         string documentKind,
@@ -51,14 +50,13 @@ public sealed class AdminAiGuidanceService
         int sortOrder,
         CancellationToken cancellationToken = default)
     {
-        await EnsureUniqueAsync(key, relativePath, null, cancellationToken);
+        await EnsureUniqueAsync(key, null, cancellationToken);
 
         var now = DateTime.UtcNow;
         var entity = new AiGuidanceDocument
         {
             Id = Guid.NewGuid(),
             Key = key.Trim(),
-            RelativePath = relativePath.Trim(),
             Title = title.Trim(),
             Surface = surface.Trim(),
             DocumentKind = documentKind.Trim(),
@@ -90,7 +88,6 @@ public sealed class AdminAiGuidanceService
     public async Task<AiGuidanceDocument?> UpdateAsync(
         Guid id,
         string key,
-        string relativePath,
         string title,
         string surface,
         string documentKind,
@@ -109,10 +106,9 @@ public sealed class AdminAiGuidanceService
             return null;
         }
 
-        await EnsureUniqueAsync(key, relativePath, id, cancellationToken);
+        await EnsureUniqueAsync(key, id, cancellationToken);
 
         entity.Key = key.Trim();
-        entity.RelativePath = relativePath.Trim();
         entity.Title = title.Trim();
         entity.Surface = surface.Trim();
         entity.DocumentKind = documentKind.Trim();
@@ -175,13 +171,10 @@ public sealed class AdminAiGuidanceService
             return null;
         }
 
-        var embedded = _embeddedGuidanceProvider
-            .GetReferenceSources()
-            .FirstOrDefault(x => string.Equals(x.RelativePath, entity.RelativePath, StringComparison.Ordinal));
-
+        var embedded = FindEmbeddedDefault(entity.Key);
         if (embedded is null)
         {
-            throw new InvalidOperationException($"No embedded default exists for '{entity.RelativePath}'.");
+            throw new InvalidOperationException($"No embedded default exists for '{entity.Key}'.");
         }
 
         var parsed = AiGuidanceMarkdownFrontMatter.Parse(embedded.Content);
@@ -203,13 +196,16 @@ public sealed class AdminAiGuidanceService
         return entity;
     }
 
-    public bool HasEmbeddedDefault(string relativePath) =>
-        _embeddedGuidanceProvider.GetReferenceSources().Any(x => string.Equals(x.RelativePath, relativePath, StringComparison.Ordinal));
+    public bool HasEmbeddedDefault(string key) => FindEmbeddedDefault(key) is not null;
 
-    private async Task EnsureUniqueAsync(string key, string relativePath, Guid? excludeId, CancellationToken cancellationToken)
+    private GuidanceSource? FindEmbeddedDefault(string key) =>
+        _embeddedGuidanceProvider
+            .GetReferenceSources()
+            .FirstOrDefault(x => string.Equals(BuildKeyFromRelativePath(x.RelativePath), key, StringComparison.Ordinal));
+
+    private async Task EnsureUniqueAsync(string key, Guid? excludeId, CancellationToken cancellationToken)
     {
         var normalizedKey = key.Trim();
-        var normalizedPath = relativePath.Trim();
 
         var duplicateKey = await _dbContext.AiGuidanceDocuments.AnyAsync(
             x => x.Key == normalizedKey && (!excludeId.HasValue || x.Id != excludeId.Value),
@@ -217,14 +213,6 @@ public sealed class AdminAiGuidanceService
         if (duplicateKey)
         {
             throw new InvalidOperationException($"A guidance document with key '{normalizedKey}' already exists.");
-        }
-
-        var duplicatePath = await _dbContext.AiGuidanceDocuments.AnyAsync(
-            x => x.RelativePath == normalizedPath && (!excludeId.HasValue || x.Id != excludeId.Value),
-            cancellationToken);
-        if (duplicatePath)
-        {
-            throw new InvalidOperationException($"A guidance document with path '{normalizedPath}' already exists.");
         }
     }
 
@@ -245,7 +233,6 @@ public sealed class AdminAiGuidanceService
             Metadata = new
             {
                 entity.Key,
-                entity.RelativePath,
                 entity.Title,
                 entity.Surface,
                 entity.DocumentKind,
@@ -255,10 +242,14 @@ public sealed class AdminAiGuidanceService
                 entity.IsModelLoadable,
                 entity.SortOrder,
                 entity.Version,
-                HasEmbeddedDefault = HasEmbeddedDefault(entity.RelativePath)
+                HasEmbeddedDefault = HasEmbeddedDefault(entity.Key)
             }
         }, cancellationToken);
     }
+
+    private static string BuildKeyFromRelativePath(string relativePath) =>
+        relativePath.Replace("llms/", string.Empty, StringComparison.Ordinal)
+            .Replace(".md", string.Empty, StringComparison.Ordinal);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

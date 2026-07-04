@@ -16,10 +16,6 @@ public class AiGuidanceDocument
     public string Key { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(260)]
-    public string RelativePath { get; set; } = string.Empty;
-
-    [Required]
     [MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 

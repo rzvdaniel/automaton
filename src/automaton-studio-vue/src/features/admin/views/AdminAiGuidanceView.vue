@@ -50,6 +50,11 @@ const INSPECTOR_TABS = [
   { label: 'History', value: 'history' },
 ]
 
+const BOOLEAN_OPTIONS = [
+  { label: 'No', value: false },
+  { label: 'Yes', value: true },
+]
+
 const SURFACE_LABELS: Record<string, string> = {
   studio: 'Studio',
   shared: 'Shared',
@@ -75,6 +80,7 @@ const activeTab = ref<'markdown' | 'preview'>('markdown')
 const propertiesOpen = ref(false)
 const inspectorTab = ref<'properties' | 'history'>('properties')
 const editingTitle = ref(false)
+const keyTouched = ref(false)
 
 const form = ref<GuidanceForm>(createEmptyForm())
 
@@ -85,7 +91,6 @@ const selectedDocument = computed(() =>
 const displayDocument = computed<AiGuidanceAdmin>(() => ({
   id: selectedDocument.value?.id ?? 'new',
   key: form.value.key,
-  relativePath: generatedRelativePath.value,
   title: form.value.title,
   surface: form.value.surface,
   documentKind: form.value.documentKind,
@@ -103,6 +108,13 @@ const displayDocument = computed<AiGuidanceAdmin>(() => ({
 }))
 
 const isNewDocument = computed(() => selectedId.value === null)
+const isCreateFormValid = computed(() =>
+  form.value.title.trim().length > 0 &&
+  form.value.key.trim().length > 0 &&
+  form.value.surface.trim().length > 0 &&
+  form.value.documentKind.trim().length > 0 &&
+  form.value.contentMarkdown.trim().length > 0
+)
 
 const filteredDocuments = computed(() => {
   const normalizedQuery = query.value.trim().toLowerCase()
@@ -120,7 +132,6 @@ const filteredDocuments = computed(() => {
   return base.filter(item =>
     item.title.toLowerCase().includes(normalizedQuery) ||
     item.key.toLowerCase().includes(normalizedQuery) ||
-    item.relativePath.toLowerCase().includes(normalizedQuery) ||
     item.surface.toLowerCase().includes(normalizedQuery) ||
     (item.tagsJson ?? '').toLowerCase().includes(normalizedQuery)
   )
@@ -153,25 +164,20 @@ const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown
 const inspectorTitle = computed(() => inspectorTab.value === 'history' ? 'History' : 'Properties')
 const headerBadges = computed(() => buildDocumentBadges(displayDocument.value))
 
-const generatedRelativePath = computed(() => {
-  if (selectedDocument.value) {
-    return selectedDocument.value.relativePath
+watch(
+  () => form.value.title,
+  title => {
+    if (isNewDocument.value && !keyTouched.value) {
+      form.value.key = slugifyKey(title)
+    }
   }
-
-  const slug = form.value.key
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-  return slug ? `llms/${slug}.md` : 'llms/new-guidance.md'
-})
+)
 
 watch(
   () => form.value.key,
-  () => {
-    if (isNewDocument.value) {
-      form.value.relativePath = generatedRelativePath.value
+  key => {
+    if (isNewDocument.value && keyTouched.value && key.trim().length === 0 && form.value.title.trim().length === 0) {
+      keyTouched.value = false
     }
   }
 )
@@ -215,11 +221,11 @@ function selectDocument(document: AiGuidanceAdmin) {
 function startCreate() {
   selectedId.value = null
   form.value = createEmptyForm()
-  form.value.relativePath = generatedRelativePath.value
+  keyTouched.value = false
   activeTab.value = 'markdown'
-  propertiesOpen.value = true
+  propertiesOpen.value = false
   inspectorTab.value = 'properties'
-  editingTitle.value = true
+  editingTitle.value = false
 }
 
 function cloneDocument() {
@@ -231,7 +237,6 @@ function cloneDocument() {
   selectedId.value = null
   form.value = {
     key: `${source.key}-copy`,
-    relativePath: '',
     title: `${source.title} Copy`,
     surface: source.surface,
     documentKind: source.documentKind,
@@ -243,11 +248,11 @@ function cloneDocument() {
     isModelLoadable: source.isModelLoadable,
     sortOrder: source.sortOrder,
   }
-  form.value.relativePath = generatedRelativePath.value
+  keyTouched.value = true
   activeTab.value = 'markdown'
-  propertiesOpen.value = true
+  propertiesOpen.value = false
   inspectorTab.value = 'properties'
-  editingTitle.value = true
+  editingTitle.value = false
 }
 
 function openInspector(tab: 'properties' | 'history') {
@@ -256,11 +261,20 @@ function openInspector(tab: 'properties' | 'history') {
 }
 
 async function saveDocument() {
+  if (isNewDocument.value && !isCreateFormValid.value) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Missing Required Fields',
+      detail: 'Title, key, surface, type, and content are required before creating a document.',
+      life: 3500,
+    })
+    return
+  }
+
   saving.value = true
   try {
     const payload: UpsertAiGuidanceRequest = {
       key: form.value.key.trim(),
-      relativePath: generatedRelativePath.value.trim(),
       title: form.value.title.trim(),
       surface: form.value.surface.trim(),
       documentKind: form.value.documentKind.trim(),
@@ -370,9 +384,9 @@ async function applyMutationResult(document: AiGuidanceAdmin) {
 }
 
 function applyDocumentToForm(document: AiGuidanceAdmin) {
+  keyTouched.value = true
   form.value = {
     key: document.key,
-    relativePath: document.relativePath,
     title: document.title,
     surface: document.surface,
     documentKind: document.documentKind,
@@ -389,7 +403,6 @@ function applyDocumentToForm(document: AiGuidanceAdmin) {
 function createEmptyForm(): GuidanceForm {
   return {
     key: '',
-    relativePath: 'llms/new-guidance.md',
     title: '',
     surface: 'studio',
     documentKind: 'Guidance',
@@ -401,6 +414,38 @@ function createEmptyForm(): GuidanceForm {
     isModelLoadable: true,
     sortOrder: 100,
   }
+}
+
+function onKeyInput(value: string) {
+  if (isNewDocument.value) {
+    keyTouched.value = true
+  }
+
+  form.value.key = value
+}
+
+function cancelCreate() {
+  const fallback = documents.value[0] ?? null
+  if (fallback) {
+    selectDocument(fallback)
+    return
+  }
+
+  selectedId.value = null
+  form.value = createEmptyForm()
+  keyTouched.value = false
+  activeTab.value = 'markdown'
+  propertiesOpen.value = false
+  inspectorTab.value = 'properties'
+  editingTitle.value = false
+}
+
+function slugifyKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function getDocumentKindLabel(kind: string) {
@@ -448,8 +493,49 @@ function normalizeOptional(value?: string) {
 }
 
 function extractErrorMessage(error: unknown, fallback: string) {
-  const axiosError = error as { response?: { data?: { message?: string } } }
-  return axiosError?.response?.data?.message || fallback
+  const axiosError = error as {
+    response?: {
+      data?: {
+        message?: string
+        title?: string
+        errors?: Record<string, string[] | string>
+      } | string
+    }
+  }
+
+  const responseData = axiosError?.response?.data
+  if (!responseData) {
+    return fallback
+  }
+
+  if (typeof responseData === 'string' && responseData.trim().length > 0) {
+    return responseData
+  }
+
+  if (typeof responseData === 'object') {
+    if (responseData.message && responseData.message.trim().length > 0) {
+      return responseData.message
+    }
+
+    if (responseData.title && responseData.title.trim().length > 0) {
+      return responseData.title
+    }
+
+    if (responseData.errors) {
+      const messages = Object.entries(responseData.errors)
+        .flatMap(([field, value]) => {
+          const entries = Array.isArray(value) ? value : [value]
+          return entries.map(entry => `${field}: ${entry}`)
+        })
+        .filter(entry => entry.trim().length > 0)
+
+      if (messages.length > 0) {
+        return messages.join(' | ')
+      }
+    }
+  }
+
+  return fallback
 }
 </script>
 
@@ -528,7 +614,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
       <Card class="editor-card">
         <template #content>
           <div class="editor-shell">
-            <div class="editor-header">
+            <div v-if="!isNewDocument" class="editor-header">
               <div class="editor-header-text">
                 <div class="editor-header-title-row">
                   <button
@@ -569,7 +655,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
                 </div>
               </div>
 
-              <div class="editor-actions">
+                <div class="editor-actions">
                 <Button
                   v-if="selectedDocument"
                   label="Clone"
@@ -600,8 +686,78 @@ function extractErrorMessage(error: unknown, fallback: string) {
               </div>
             </div>
 
-            <div class="editor-body">
-              <section class="content-section">
+              <div class="editor-body">
+                <section v-if="isNewDocument" class="creation-panel">
+                  <div class="creation-panel-header">
+                    <h3 class="creation-panel-title">Create AI Guidance Document</h3>
+                    <p class="creation-panel-subtitle">Define the document identity, then write the markdown content.</p>
+                  </div>
+
+                  <div class="creation-grid">
+                    <div class="field">
+                      <label for="new-guidance-title">Title</label>
+                      <InputText
+                        id="new-guidance-title"
+                        v-model="form.title"
+                        class="w-full"
+                        placeholder="Document title"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label for="new-guidance-key">Key</label>
+                      <InputText
+                        id="new-guidance-key"
+                        :model-value="form.key"
+                        @update:model-value="onKeyInput"
+                        class="w-full"
+                        placeholder="studio-editor"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label for="new-guidance-document-kind">Type</label>
+                      <Dropdown
+                        id="new-guidance-document-kind"
+                        v-model="form.documentKind"
+                        :options="DOCUMENT_KIND_OPTIONS"
+                        option-label="label"
+                        option-value="value"
+                        class="w-full"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label for="new-guidance-surface">Surface</label>
+                      <Dropdown
+                        id="new-guidance-surface"
+                        v-model="form.surface"
+                        :options="SURFACE_OPTIONS"
+                        option-label="label"
+                        option-value="value"
+                        class="w-full"
+                      />
+                    </div>
+
+                    <div class="field field-span-3">
+                      <label for="new-guidance-required">Required by default</label>
+                      <div class="inline-toggle">
+                        <input id="new-guidance-required" v-model="form.requiredByDefault" type="checkbox" />
+                        <span>Inject automatically into prompt context</span>
+                      </div>
+                    </div>
+
+                    <div class="field field-span-3">
+                      <label for="new-guidance-discoverable">Discoverable</label>
+                      <div class="inline-toggle">
+                        <input id="new-guidance-discoverable" v-model="form.isModelLoadable" type="checkbox" />
+                        <span>Model can list/load this document</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="content-section">
                 <div class="content-section-header">
                   <div class="content-toolbar">
                     <SelectButton
@@ -612,12 +768,17 @@ function extractErrorMessage(error: unknown, fallback: string) {
                       aria-label="Editor mode"
                     />
                     <Button
+                      v-if="!isNewDocument"
                       label="Properties"
                       icon="pi pi-cog"
                       severity="secondary"
                       outlined
                       @click="openInspector('properties')"
                     />
+                    <div v-if="isNewDocument" class="create-actions">
+                      <Button label="Cancel" severity="secondary" outlined @click="cancelCreate" />
+                      <Button label="Create Document" icon="pi pi-save" :loading="saving" :disabled="!isCreateFormValid" @click="saveDocument" />
+                    </div>
                   </div>
                 </div>
 
@@ -688,15 +849,28 @@ function extractErrorMessage(error: unknown, fallback: string) {
             <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
           </div>
 
-          <div class="property-facts property-facts-tight">
-            <div class="property-fact">
-              <span class="property-fact-label">Always Loaded</span>
-              <span class="property-fact-value">{{ form.requiredByDefault ? 'Yes' : 'No' }}</span>
-            </div>
-            <div class="property-fact">
-              <span class="property-fact-label">Discoverable</span>
-              <span class="property-fact-value">{{ form.isModelLoadable ? 'Yes' : 'No' }}</span>
-            </div>
+          <div class="field">
+            <label for="guidance-required-by-default">Always Loaded</label>
+            <SelectButton
+              id="guidance-required-by-default"
+              v-model="form.requiredByDefault"
+              :options="BOOLEAN_OPTIONS"
+              option-label="label"
+              option-value="value"
+              aria-label="Always loaded"
+            />
+          </div>
+
+          <div class="field">
+            <label for="guidance-model-loadable">Discoverable</label>
+            <SelectButton
+              id="guidance-model-loadable"
+              v-model="form.isModelLoadable"
+              :options="BOOLEAN_OPTIONS"
+              option-label="label"
+              option-value="value"
+              aria-label="Discoverable"
+            />
           </div>
 
           <div class="property-facts property-facts-tight">
@@ -1125,10 +1299,64 @@ function extractErrorMessage(error: unknown, fallback: string) {
   overflow: hidden;
 }
 
+.creation-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #dbe6f4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.creation-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.creation-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #17325b;
+}
+
+.creation-panel-subtitle {
+  margin: 0;
+  color: var(--text-color-secondary);
+  font-size: 0.88rem;
+}
+
+.creation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.field-span-3 {
+  grid-column: 1 / -1;
+}
+
 .field {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+.inline-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.5rem;
+  padding: 0.2rem 0;
+  color: #19325f;
+}
+
+.inline-toggle input {
+  width: 1rem;
+  height: 1rem;
 }
 
 .content-section {
@@ -1151,6 +1379,13 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .content-toolbar {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.create-actions {
+  margin-left: auto;
+  display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
@@ -1319,6 +1554,16 @@ function extractErrorMessage(error: unknown, fallback: string) {
   .content-section-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .creation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .create-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .editor-actions {

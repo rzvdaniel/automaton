@@ -38,6 +38,7 @@ public class UserAppsControllerTests
             null!,
             null!,
             null!,
+            null!,
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
@@ -96,10 +97,11 @@ public class UserAppsControllerTests
             null!,
             null!,
             null!,
+            null!,
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
-            null!)
+            CreatePrivateAppLaunchService())
         {
             ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
             {
@@ -138,7 +140,8 @@ public class UserAppsControllerTests
             null!,
             null!,
             new StubWebHostEnvironment(),
-            new NoOpAuditEventService());
+            new NoOpAuditEventService(),
+            new NoOpApplicationEventService());
     }
 
     private static PrivateAppLaunchService CreatePrivateAppLaunchService()
@@ -190,5 +193,23 @@ public class UserAppsControllerTests
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class NoOpApplicationEventService : IApplicationEventService
+    {
+        public Task WriteAsync(ApplicationEventWriteRequest request, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<PagedResult<ApplicationEventDto>> GetEventsAsync(
+            Guid appId,
+            ApplicationEventQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PagedResult<ApplicationEventDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                Page = query.Page,
+                PageSize = query.PageSize
+            });
     }
 }

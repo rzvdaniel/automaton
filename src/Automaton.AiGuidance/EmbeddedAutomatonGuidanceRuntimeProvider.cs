@@ -35,7 +35,7 @@ public sealed class EmbeddedAutomatonGuidanceRuntimeProvider : IAutomatonGuidanc
 
         return reference.Source is null
             ? Task.FromResult<AutomatonGuidanceDocument?>(null)
-            : GetGuidanceAsync(reference.Source.RelativePath, cancellationToken);
+            : GetGuidanceByKeyAsync(reference.Metadata.Key, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AutomatonGuidanceDocument>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default)
@@ -45,7 +45,7 @@ public sealed class EmbeddedAutomatonGuidanceRuntimeProvider : IAutomatonGuidanc
         var documents = new List<AutomatonGuidanceDocument>(required.Count);
         foreach (var reference in required)
         {
-            var document = await GetGuidanceAsync(reference.RelativePath, cancellationToken);
+            var document = await GetGuidanceByKeyAsync(reference.Key, cancellationToken);
             if (document is not null)
             {
                 documents.Add(document);
@@ -64,7 +64,6 @@ public sealed class EmbeddedAutomatonGuidanceRuntimeProvider : IAutomatonGuidanc
                 var metadata = ResolveMetadata(source.RelativePath);
                 return new AutomatonGuidanceCatalogItem(
                     Key: metadata.Key,
-                    RelativePath: source.RelativePath,
                     Title: metadata.Title,
                     Surface: metadata.Surface,
                     DocumentKind: metadata.DocumentKind,
@@ -87,40 +86,31 @@ public sealed class EmbeddedAutomatonGuidanceRuntimeProvider : IAutomatonGuidanc
         return Task.FromResult<IReadOnlyList<AutomatonGuidanceCatalogItem>>(references);
     }
 
-    public Task<AutomatonGuidanceDocument?> GetGuidanceAsync(string relativePath, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var content = _guidanceProvider.GetReference(relativePath);
-            var metadata = ResolveMetadata(relativePath);
-            return Task.FromResult<AutomatonGuidanceDocument?>(new AutomatonGuidanceDocument(
-                Key: metadata.Key,
-                RelativePath: relativePath,
-                Title: metadata.Title,
-                Surface: metadata.Surface,
-                DocumentKind: metadata.DocumentKind,
-                TagsJson: metadata.TagsJson,
-                Description: metadata.Description,
-                ContentMarkdown: content,
-                RequiredByDefault: metadata.RequiredByDefault,
-                IsModelLoadable: metadata.IsModelLoadable,
-                SortOrder: metadata.SortOrder,
-                Version: 0,
-                IsDatabaseDocument: false));
-        }
-        catch (InvalidOperationException)
-        {
-            return Task.FromResult<AutomatonGuidanceDocument?>(null);
-        }
-    }
-
     public async Task<AutomatonGuidanceDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default)
     {
-        var reference = (await ListLoadableGuidanceAsync(cancellationToken: cancellationToken))
-            .FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.Ordinal));
-        return reference is null
-            ? null
-            : await GetGuidanceAsync(reference.RelativePath, cancellationToken);
+        var source = _guidanceProvider.GetReferenceSources()
+            .Where(item => item.RelativePath.StartsWith("llms/", StringComparison.Ordinal))
+            .Select(item => (Source: item, Metadata: ResolveMetadata(item.RelativePath)))
+            .FirstOrDefault(item => string.Equals(item.Metadata.Key, key, StringComparison.Ordinal));
+
+        if (source.Source is null)
+        {
+            return null;
+        }
+
+        return new AutomatonGuidanceDocument(
+            Key: source.Metadata.Key,
+            Title: source.Metadata.Title,
+            Surface: source.Metadata.Surface,
+            DocumentKind: source.Metadata.DocumentKind,
+            TagsJson: source.Metadata.TagsJson,
+            Description: source.Metadata.Description,
+            ContentMarkdown: source.Source.Content,
+            RequiredByDefault: source.Metadata.RequiredByDefault,
+            IsModelLoadable: source.Metadata.IsModelLoadable,
+            SortOrder: source.Metadata.SortOrder,
+            Version: 0,
+            IsDatabaseDocument: false);
     }
 
     private static EmbeddedGuidanceMetadata ResolveMetadata(string relativePath) =>

@@ -237,7 +237,8 @@ public class AppAuthorizationRegressionTests
             fileStorageService,
             null!,
             environment,
-            new NoOpAuditEventService());
+            new NoOpAuditEventService(),
+            new NoOpApplicationEventService());
     }
 
     private static void SeedProjectScopedApp(
@@ -384,5 +385,23 @@ public class AppAuthorizationRegressionTests
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class NoOpApplicationEventService : IApplicationEventService
+    {
+        public Task WriteAsync(ApplicationEventWriteRequest request, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<PagedResult<ApplicationEventDto>> GetEventsAsync(
+            Guid appId,
+            ApplicationEventQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PagedResult<ApplicationEventDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                Page = query.Page,
+                PageSize = query.PageSize
+            });
     }
 }

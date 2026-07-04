@@ -288,11 +288,6 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
-                    b.Property<string>("RelativePath")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("varchar(260)");
-
                     b.Property<bool>("RequiredByDefault")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
@@ -330,9 +325,6 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("IsEnabled");
 
                     b.HasIndex("Key")
-                        .IsUnique();
-
-                    b.HasIndex("RelativePath")
                         .IsUnique();
 
                     b.HasIndex("Surface", "DocumentKind");

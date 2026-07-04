@@ -11,7 +11,6 @@ public interface IAiGuidanceRuntimeService
     Task<AiGuidanceResolvedDocument?> GetBasePromptAsync(string surface, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AiGuidanceCatalogItem>> ListLoadableGuidanceAsync(string? surface = null, CancellationToken cancellationToken = default);
-    Task<AiGuidanceResolvedDocument?> GetGuidanceByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default);
     Task<AiGuidanceResolvedDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default);
     Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default);
 }
@@ -56,16 +55,15 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 && item.Surface == surface,
             cancellationToken);
 
-    public async Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default)
-    {
-        return await QueryCatalog(item =>
+    public Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default) =>
+        QueryCatalog(item =>
                 item.IsEnabled
                 && item.IsModelLoadable
                 && item.RequiredByDefault
                 && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
                 && item.Surface == surface)
-            .ToListAsync(cancellationToken);
-    }
+            .ToListAsync(cancellationToken)
+            .ContinueWith<IReadOnlyList<AiGuidanceCatalogItem>>(task => task.Result, cancellationToken);
 
     public async Task<IReadOnlyList<AiGuidanceCatalogItem>> ListLoadableGuidanceAsync(string? surface = null, CancellationToken cancellationToken = default)
     {
@@ -80,21 +78,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         }
 
         return await query.ToListAsync(cancellationToken);
-    }
-
-    public Task<AiGuidanceResolvedDocument?> GetGuidanceByRelativePathAsync(string relativePath, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            return Task.FromResult<AiGuidanceResolvedDocument?>(null);
-        }
-
-        return ResolveSingleAsync(
-            item => item.IsEnabled
-                && item.IsModelLoadable
-                && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
-                && item.RelativePath == relativePath,
-            cancellationToken);
     }
 
     public Task<AiGuidanceResolvedDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default)
@@ -124,7 +107,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         var resolved = new List<AutomatonGuidanceDocument>(documents.Count);
         foreach (var document in documents)
         {
-            var item = await GetGuidanceByRelativePathAsync(document.RelativePath, cancellationToken);
+            var item = await GetGuidanceByKeyAsync(document.Key, cancellationToken);
             if (item is not null)
             {
                 resolved.Add(MapRuntimeDocument(item));
@@ -140,12 +123,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         return documents.Select(MapCatalogDocument).ToList();
     }
 
-    public async Task<AutomatonGuidanceDocument?> GetGuidanceAsync(string relativePath, CancellationToken cancellationToken = default)
-    {
-        var document = await GetGuidanceByRelativePathAsync(relativePath, cancellationToken);
-        return document is null ? null : MapRuntimeDocument(document);
-    }
-
     async Task<AutomatonGuidanceDocument?> IAutomatonGuidanceRuntimeProvider.GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken)
     {
         var document = await GetGuidanceByKeyAsync(key, cancellationToken);
@@ -154,23 +131,23 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
 
     public async Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default)
     {
-        var existingPaths = await _dbContext.AiGuidanceDocuments
+        var existingKeys = await _dbContext.AiGuidanceDocuments
             .AsNoTracking()
-            .Select(item => item.RelativePath)
+            .Select(item => item.Key)
             .ToListAsync(cancellationToken);
 
-        var existingPathSet = existingPaths.ToHashSet(StringComparer.Ordinal);
+        var existingKeySet = existingKeys.ToHashSet(StringComparer.Ordinal);
         var now = DateTime.UtcNow;
         var added = 0;
 
         foreach (var source in _embeddedGuidanceProvider.GetReferenceSources().Where(source => source.RelativePath.StartsWith("llms/", StringComparison.Ordinal)))
         {
-            if (existingPathSet.Contains(source.RelativePath))
+            var metadata = ResolveMetadata(source.RelativePath);
+            if (existingKeySet.Contains(metadata.Key))
             {
                 continue;
             }
 
-            var metadata = ResolveMetadata(source.RelativePath);
             var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
             var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
             var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
@@ -179,7 +156,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             {
                 Id = Guid.NewGuid(),
                 Key = metadata.Key,
-                RelativePath = source.RelativePath,
                 Title = title,
                 Surface = metadata.Surface,
                 DocumentKind = metadata.DocumentKind,
@@ -214,7 +190,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             .ThenBy(item => item.Title)
             .Select(item => new AiGuidanceCatalogItem(
                 item.Key,
-                item.RelativePath,
                 item.Title,
                 item.Surface,
                 item.DocumentKind,
@@ -234,7 +209,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             .Where(predicate)
             .Select(item => new AiGuidanceResolvedDocument(
                 item.Key,
-                item.RelativePath,
                 item.Title,
                 item.Surface,
                 item.DocumentKind,
@@ -265,7 +239,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     private static AutomatonGuidanceCatalogItem MapCatalogDocument(AiGuidanceCatalogItem item) =>
         new(
             item.Key,
-            item.RelativePath,
             item.Title,
             item.Surface,
             item.DocumentKind,
@@ -280,7 +253,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     private static AutomatonGuidanceDocument MapRuntimeDocument(AiGuidanceResolvedDocument item) =>
         new(
             item.Key,
-            item.RelativePath,
             item.Title,
             item.Surface,
             item.DocumentKind,
@@ -296,7 +268,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
 
 public sealed record AiGuidanceCatalogItem(
     string Key,
-    string RelativePath,
     string Title,
     string Surface,
     string DocumentKind,
@@ -310,7 +281,6 @@ public sealed record AiGuidanceCatalogItem(
 
 public sealed record AiGuidanceResolvedDocument(
     string Key,
-    string RelativePath,
     string Title,
     string Surface,
     string DocumentKind,

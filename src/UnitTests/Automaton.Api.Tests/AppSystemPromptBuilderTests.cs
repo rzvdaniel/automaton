@@ -61,8 +61,8 @@ public class AppSystemPromptBuilderTests
 
         var references = selector.SelectAdditionalReferences("Create a new app from scratch with an installable PWA.");
 
-        Assert.That(references, Does.Contain("llms/automaton-frontend-structure.md"));
-        Assert.That(references, Does.Contain("llms/automaton-starter-prompts.md"));
+        Assert.That(references, Does.Contain("automaton-frontend-structure"));
+        Assert.That(references, Does.Contain("automaton-starter-prompts"));
     }
 
     [Test]
@@ -72,7 +72,7 @@ public class AppSystemPromptBuilderTests
 
         var references = selector.SelectAdditionalReferences("Use the browser API and the OpenAI API from the frontend.");
 
-        Assert.That(references, Does.Not.Contain("llms/automaton-backend-controllers.md"));
+        Assert.That(references, Does.Not.Contain("automaton-backend-controllers"));
     }
 
     [Test]
@@ -82,7 +82,7 @@ public class AppSystemPromptBuilderTests
 
         var references = selector.SelectAdditionalReferences("The published app shows a blank screen and a 404 after publishing.");
 
-        Assert.That(references, Does.Contain("llms/automaton-cli-deploy.md"));
+        Assert.That(references, Does.Contain("automaton-cli-deploy"));
     }
 
     [Test]
@@ -98,9 +98,9 @@ public class AppSystemPromptBuilderTests
         Assert.That(result.Success, Is.True);
         using var json = JsonDocument.Parse(result.Content!);
         var references = json.RootElement.GetProperty("references").EnumerateArray().ToList();
-        var studioEditor = references.Single(item => item.GetProperty("path").GetString() == "llms/automaton-studio-editor.md");
+        var studioEditor = references.Single(item => item.GetProperty("key").GetString() == "automaton-studio-editor");
 
-        Assert.That(references.Any(item => item.GetProperty("path").GetString() == "llms/automaton-backend-controllers.md"), Is.True);
+        Assert.That(references.Any(item => item.GetProperty("key").GetString() == "automaton-backend-controllers"), Is.True);
         Assert.That(studioEditor.GetProperty("surface").GetString(), Is.EqualTo("studio"));
         Assert.That(studioEditor.GetProperty("documentKind").GetString(), Is.EqualTo("Guidance"));
         Assert.That(studioEditor.GetProperty("description").GetString(), Does.Contain("Studio editor"));
@@ -115,7 +115,7 @@ public class AppSystemPromptBuilderTests
             AutomatonGuidanceTool.GetGuidanceName,
             JsonDocument.Parse("""
                 {
-                  "referenceName": "llms/automaton-media-assets.md"
+                  "key": "automaton-media-assets"
                 }
                 """).RootElement,
             null);

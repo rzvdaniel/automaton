@@ -35,17 +35,17 @@ public sealed class AutomatonGuidanceTool : IMcpTool
             {
                 Name = GetGuidanceName,
                 Capability = ToolCapability.Read,
-                Description = "Retrieve a focused Automaton guidance reference by relative path, such as 'llms/automaton-backend-controllers.md' or 'llms/automaton-media-assets.md'. Use this when a task needs deeper Automaton-specific rules than the compact baseline prompt provides.",
+                Description = "Retrieve a focused Automaton guidance reference by key, such as 'automaton-backend-controllers' or 'automaton-media-assets'. Use this when a task needs deeper Automaton-specific rules than the compact baseline prompt provides.",
                 InputSchema = JsonDocument.Parse("""
                     {
                         "type": "object",
                         "properties": {
-                            "referenceName": {
+                            "key": {
                                 "type": "string",
-                                "description": "Relative guidance path returned by list_automaton_guidance, for example 'llms/automaton-backend-controllers.md'."
+                                "description": "Guidance key returned by list_automaton_guidance, for example 'automaton-backend-controllers'."
                             }
                         },
-                        "required": ["referenceName"]
+                        "required": ["key"]
                     }
                     """)
             }
@@ -71,15 +71,17 @@ public sealed class AutomatonGuidanceTool : IMcpTool
         var references = (await _guidanceProvider.ListLoadableGuidanceAsync())
             .Select(source => new
             {
-                path = source.RelativePath,
+                key = source.Key,
+                title = source.Title,
                 surface = source.Surface,
                 documentKind = source.DocumentKind,
                 tagsJson = source.TagsJson,
                 description = source.Description,
                 requiredByDefault = source.RequiredByDefault,
+                isModelLoadable = source.IsModelLoadable,
                 sortOrder = source.SortOrder
             })
-            .OrderBy(entry => entry.path, StringComparer.Ordinal)
+            .OrderBy(entry => entry.key, StringComparer.Ordinal)
             .ToArray();
 
         return new McpToolResult
@@ -94,21 +96,21 @@ public sealed class AutomatonGuidanceTool : IMcpTool
 
     private async Task<McpToolResult> GetGuidanceAsync(JsonElement arguments)
     {
-        if (!arguments.TryGetProperty("referenceName", out var referenceElement))
+        if (!arguments.TryGetProperty("key", out var referenceElement))
         {
-            return new McpToolResult { Success = false, Error = "Missing required argument 'referenceName'." };
+            return new McpToolResult { Success = false, Error = "Missing required argument 'key'." };
         }
 
-        var referenceName = referenceElement.GetString();
-        if (string.IsNullOrWhiteSpace(referenceName))
+        var key = referenceElement.GetString();
+        if (string.IsNullOrWhiteSpace(key))
         {
-            return new McpToolResult { Success = false, Error = "Argument 'referenceName' must be a non-empty string." };
+            return new McpToolResult { Success = false, Error = "Argument 'key' must be a non-empty string." };
         }
 
-        var document = await _guidanceProvider.GetGuidanceAsync(referenceName.Trim());
+        var document = await _guidanceProvider.GetGuidanceByKeyAsync(key.Trim());
         if (document is null)
         {
-            return new McpToolResult { Success = false, Error = $"Automaton guidance reference '{referenceName.Trim()}' was not found." };
+            return new McpToolResult { Success = false, Error = $"Automaton guidance reference '{key.Trim()}' was not found." };
         }
 
         return new McpToolResult
