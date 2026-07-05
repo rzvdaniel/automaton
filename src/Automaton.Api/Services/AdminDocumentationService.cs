@@ -1,55 +1,204 @@
+using System.Text.RegularExpressions;
+
 namespace Automaton.Api.Services;
 
 public sealed class AdminDocumentationService
 {
-    private readonly IWebHostEnvironment _environment;
+    private static readonly Regex FrontMatterRegex = new(
+        @"\A---\r?\n(?<frontMatter>[\s\S]*?)\r?\n---\r?\n?",
+        RegexOptions.Compiled);
 
-    private static readonly IReadOnlyDictionary<string, DocumentationTopicDefinition> Topics =
-        new Dictionary<string, DocumentationTopicDefinition>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["ai-guidance"] = new(
-                "ai-guidance",
-                "AI Guidance Handbook",
-                Path.Combine("Documentation", "Admin", "ai-guidance.md"))
-        };
+    private readonly IWebHostEnvironment _environment;
 
     public AdminDocumentationService(IWebHostEnvironment environment)
     {
         _environment = environment;
     }
 
+    public IReadOnlyList<AdminDocumentationTopicListItemResponse> ListTopics()
+    {
+        return DiscoverTopics()
+            .Select(topic => new AdminDocumentationTopicListItemResponse
+            {
+                Key = topic.Key,
+                Title = topic.Title,
+                Category = topic.Category,
+                Group = topic.Group,
+                SortOrder = topic.SortOrder
+            })
+            .ToList();
+    }
+
     public async Task<AdminDocumentationTopicResponse?> GetTopicAsync(string key, CancellationToken cancellationToken)
     {
-        if (!Topics.TryGetValue(key, out var topic))
+        var topic = DiscoverTopics()
+            .FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+
+        if (topic is null || !File.Exists(topic.AbsolutePath))
         {
             return null;
         }
 
-        var absolutePath = Path.Combine(_environment.ContentRootPath, topic.RelativePath);
-        if (!File.Exists(absolutePath))
-        {
-            return null;
-        }
-
-        var contentMarkdown = await File.ReadAllTextAsync(absolutePath, cancellationToken);
-        var updatedAtUtc = File.GetLastWriteTimeUtc(absolutePath);
+        var contentMarkdown = await File.ReadAllTextAsync(topic.AbsolutePath, cancellationToken);
+        var parsed = ParseFrontMatter(contentMarkdown);
+        var updatedAtUtc = File.GetLastWriteTimeUtc(topic.AbsolutePath);
 
         return new AdminDocumentationTopicResponse
         {
             Key = topic.Key,
             Title = topic.Title,
-            ContentMarkdown = contentMarkdown,
+            Category = topic.Category,
+            Group = topic.Group,
+            SortOrder = topic.SortOrder,
+            ContentMarkdown = parsed.Body,
             UpdatedAtUtc = updatedAtUtc
         };
     }
 
-    private sealed record DocumentationTopicDefinition(string Key, string Title, string RelativePath);
+    private List<DocumentationTopicDefinition> DiscoverTopics()
+    {
+        var adminRoot = Path.Combine(_environment.ContentRootPath, "Documentation", "Admin");
+        if (!Directory.Exists(adminRoot))
+        {
+            return [];
+        }
+
+        var topics = new List<DocumentationTopicDefinition>();
+        foreach (var bookDirectory in Directory.GetDirectories(adminRoot))
+        {
+            var group = Path.GetFileName(bookDirectory);
+            if (string.IsNullOrWhiteSpace(group))
+            {
+                continue;
+            }
+
+            var indexPath = Path.Combine(bookDirectory, "index.md");
+            var bookMeta = ReadBookMetadata(indexPath, group);
+
+            var pageFiles = Directory
+                .GetFiles(bookDirectory, "*.md", SearchOption.TopDirectoryOnly)
+                .Where(path => !string.Equals(Path.GetFileName(path), "index.md", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var pageFile in pageFiles)
+            {
+                var pageSlug = Path.GetFileNameWithoutExtension(pageFile);
+                if (string.IsNullOrWhiteSpace(pageSlug))
+                {
+                    continue;
+                }
+
+                var parsed = ParseFrontMatter(File.ReadAllText(pageFile));
+                var pageTitle = parsed.Metadata.GetValueOrDefault("title")
+                    ?? HumanizeSlug(pageSlug);
+                var pageOrder = ParseOrder(parsed.Metadata.GetValueOrDefault("order"));
+
+                topics.Add(new DocumentationTopicDefinition(
+                    Key: $"admin.{group}.{pageSlug}",
+                    Title: pageTitle,
+                    Category: bookMeta.Title,
+                    Group: group,
+                    SortOrder: pageOrder,
+                    AbsolutePath: pageFile));
+            }
+        }
+
+        return topics
+            .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.SortOrder)
+            .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static BookMetadata ReadBookMetadata(string indexPath, string fallbackGroup)
+    {
+        if (!File.Exists(indexPath))
+        {
+            return new BookMetadata(HumanizeSlug(fallbackGroup), 0);
+        }
+
+        var parsed = ParseFrontMatter(File.ReadAllText(indexPath));
+        return new BookMetadata(
+            parsed.Metadata.GetValueOrDefault("title") ?? HumanizeSlug(fallbackGroup),
+            ParseOrder(parsed.Metadata.GetValueOrDefault("order")));
+    }
+
+    private static ParsedDocumentationFrontMatter ParseFrontMatter(string content)
+    {
+        var match = FrontMatterRegex.Match(content ?? string.Empty);
+        if (!match.Success)
+        {
+            return new ParsedDocumentationFrontMatter(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), content);
+        }
+
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rawLine in match.Groups["frontMatter"].Value.Split(["\r\n", "\n"], StringSplitOptions.None))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var separatorIndex = line.IndexOf(':');
+            if (separatorIndex < 0)
+            {
+                continue;
+            }
+
+            var key = line[..separatorIndex].Trim();
+            var value = line[(separatorIndex + 1)..].Trim().Trim('"', '\'');
+            metadata[key] = value;
+        }
+
+        return new ParsedDocumentationFrontMatter(metadata, content[match.Length..]);
+    }
+
+    private static int ParseOrder(string? rawOrder)
+    {
+        return int.TryParse(rawOrder, out var order) ? order : 0;
+    }
+
+    private static string HumanizeSlug(string value)
+    {
+        return string.Join(
+            ' ',
+            value
+                .Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
+
+    private sealed record DocumentationTopicDefinition(
+        string Key,
+        string Title,
+        string Category,
+        string Group,
+        int SortOrder,
+        string AbsolutePath);
+
+    private sealed record BookMetadata(string Title, int SortOrder);
+
+    private sealed record ParsedDocumentationFrontMatter(
+        IReadOnlyDictionary<string, string> Metadata,
+        string Body);
+}
+
+public sealed class AdminDocumentationTopicListItemResponse
+{
+    public string Key { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Group { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
 }
 
 public sealed class AdminDocumentationTopicResponse
 {
     public string Key { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string Group { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
     public string ContentMarkdown { get; set; } = string.Empty;
     public DateTime UpdatedAtUtc { get; set; }
 }

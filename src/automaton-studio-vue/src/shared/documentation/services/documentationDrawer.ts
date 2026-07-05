@@ -14,7 +14,9 @@ const state = reactive<DocumentationDrawerState>({
 
 export function useDocumentationDrawer() {
   function openDocumentation(topicKey: string, fallbackTitle = 'Help') {
-    state.topicKey = topicKey
+    if (topicKey) {
+      state.topicKey = topicKey
+    }
     state.fallbackTitle = fallbackTitle
     state.visible = true
   }
@@ -23,9 +25,14 @@ export function useDocumentationDrawer() {
     state.visible = false
   }
 
+  function setDocumentationTopic(topicKey: string) {
+    state.topicKey = topicKey
+  }
+
   return {
     state,
     openDocumentation,
     closeDocumentation,
+    setDocumentationTopic,
   }
 }

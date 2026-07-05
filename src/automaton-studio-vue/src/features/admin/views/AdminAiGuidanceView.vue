@@ -207,7 +207,7 @@ function startCreate() {
 }
 
 function openAiGuidanceHandbook() {
-  openDocumentation('ai-guidance', 'AI Guidance Handbook')
+  openDocumentation('admin.ai-guidance.overview', 'AI Guidance Handbook')
 }
 
 function cloneDocument() {

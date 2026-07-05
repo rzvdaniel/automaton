@@ -16,6 +16,12 @@ public sealed class AdminDocumentationController : ControllerBase
         _service = service;
     }
 
+    [HttpGet]
+    public ActionResult<IEnumerable<AdminDocumentationTopicListItemResponse>> ListTopics()
+    {
+        return Ok(_service.ListTopics());
+    }
+
     [HttpGet("{key}")]
     public async Task<ActionResult<AdminDocumentationTopicResponse>> GetTopic(string key, CancellationToken cancellationToken)
     {
