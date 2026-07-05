@@ -4,6 +4,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import SelectButton from 'primevue/selectbutton'
@@ -58,11 +59,6 @@ const DOCUMENT_FILTER_OPTIONS = [
   { label: 'Active', value: 'active' },
   { label: 'Disabled', value: 'disabled' },
   { label: 'All', value: 'all' },
-]
-
-const BOOLEAN_OPTIONS = [
-  { label: 'No', value: false },
-  { label: 'Yes', value: true },
 ]
 
 const SURFACE_LABELS: Record<string, string> = {
@@ -841,7 +837,13 @@ async function deleteSelectedDocument() {
       </Card>
     </div>
 
-    <Drawer v-model:visible="propertiesOpen" position="right" :header="inspectorTitle" class="guidance-properties-drawer">
+    <Drawer
+      v-model:visible="propertiesOpen"
+      position="right"
+      :header="inspectorTitle"
+      class="guidance-properties-drawer"
+      :style="{ width: '480px', maxWidth: '100vw' }"
+    >
       <div class="properties-shell">
         <div class="inspector-tabs">
           <SelectButton
@@ -856,28 +858,50 @@ async function deleteSelectedDocument() {
         <template v-if="inspectorTab === 'properties'">
           <div class="property-section">General</div>
 
-          <div class="field">
-            <label for="guidance-surface">Surface</label>
-            <Dropdown
-              id="guidance-surface"
-              v-model="form.surface"
-              :options="SURFACE_OPTIONS"
-              option-label="label"
-              option-value="value"
-              class="w-full"
-            />
+          <div class="properties-grid">
+            <div class="field">
+              <label for="guidance-surface">Surface</label>
+              <Dropdown
+                id="guidance-surface"
+                v-model="form.surface"
+                :options="SURFACE_OPTIONS"
+                option-label="label"
+                option-value="value"
+                class="w-full"
+              />
+            </div>
+
+            <div class="field">
+              <label for="guidance-document-kind">Type</label>
+              <Dropdown
+                id="guidance-document-kind"
+                v-model="form.documentKind"
+                :options="DOCUMENT_KIND_OPTIONS"
+                option-label="label"
+                option-value="value"
+                class="w-full"
+              />
+            </div>
           </div>
 
-          <div class="field">
-            <label for="guidance-document-kind">Type</label>
-            <Dropdown
-              id="guidance-document-kind"
-              v-model="form.documentKind"
-              :options="DOCUMENT_KIND_OPTIONS"
-              option-label="label"
-              option-value="value"
-              class="w-full"
-            />
+          <div class="properties-grid properties-grid-flags">
+            <label class="checkbox-field" for="guidance-required-by-default">
+              <Checkbox
+                input-id="guidance-required-by-default"
+                v-model="form.requiredByDefault"
+                binary
+              />
+              <span>Always loaded</span>
+            </label>
+
+            <label class="checkbox-field" for="guidance-model-loadable">
+              <Checkbox
+                input-id="guidance-model-loadable"
+                v-model="form.isModelLoadable"
+                binary
+              />
+              <span>Discoverable</span>
+            </label>
           </div>
 
           <div class="field">
@@ -887,7 +911,7 @@ async function deleteSelectedDocument() {
               v-model="form.description"
               class="w-full"
               auto-resize
-              rows="3"
+              rows="2"
               placeholder="Short summary used for discovery and tooling."
             />
           </div>
@@ -897,32 +921,10 @@ async function deleteSelectedDocument() {
             <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
           </div>
 
-          <div class="field">
-            <label for="guidance-required-by-default">Always Loaded</label>
-            <SelectButton
-              id="guidance-required-by-default"
-              v-model="form.requiredByDefault"
-              :options="BOOLEAN_OPTIONS"
-              option-label="label"
-              option-value="value"
-              aria-label="Always loaded"
-            />
-          </div>
-
-          <div class="field">
-            <label for="guidance-model-loadable">Discoverable</label>
-            <SelectButton
-              id="guidance-model-loadable"
-              v-model="form.isModelLoadable"
-              :options="BOOLEAN_OPTIONS"
-              option-label="label"
-              option-value="value"
-              aria-label="Discoverable"
-            />
-          </div>
+          <div class="property-section">Information</div>
 
           <div class="property-facts property-facts-tight">
-            <div class="property-fact">
+            <div class="property-fact property-fact-full">
               <span class="property-fact-label">Key</span>
               <span class="property-fact-value">{{ form.key || 'Not set' }}</span>
             </div>
@@ -930,7 +932,7 @@ async function deleteSelectedDocument() {
               <span class="property-fact-label">Version</span>
               <span class="property-fact-value">{{ selectedDocument?.version ?? 1 }}</span>
             </div>
-            <div class="property-fact">
+            <div class="property-fact property-fact-full">
               <span class="property-fact-label">Updated</span>
               <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
             </div>
@@ -1522,7 +1524,31 @@ async function deleteSelectedDocument() {
 .properties-shell {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.75rem;
+}
+
+.properties-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.properties-grid-flags {
+  gap: 0.65rem 1rem;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.15rem 0;
+  color: #19325f;
+  font-weight: 600;
+}
+
+.checkbox-field :deep(.p-checkbox) {
+  flex-shrink: 0;
 }
 
 .property-section {
@@ -1551,8 +1577,8 @@ async function deleteSelectedDocument() {
 }
 
 .property-facts {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
   margin-top: 0.15rem;
   padding-top: 0.6rem;
@@ -1567,6 +1593,10 @@ async function deleteSelectedDocument() {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+.property-fact-full {
+  grid-column: 1 / -1;
 }
 
 .property-fact-label {
@@ -1670,6 +1700,11 @@ async function deleteSelectedDocument() {
 
   .editor-surface-tabs {
     justify-content: space-between;
+  }
+
+  .properties-grid,
+  .property-facts {
+    grid-template-columns: 1fr;
   }
 }
 </style>
