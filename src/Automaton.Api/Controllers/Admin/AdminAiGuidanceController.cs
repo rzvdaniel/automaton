@@ -129,6 +129,20 @@ public sealed class AdminAiGuidanceController : ControllerBase
         }
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await _service.DeleteAsync(id, cancellationToken);
+            return deleted ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private AiGuidanceAdminResponse Map(Automaton.Api.Entities.AiGuidanceDocument document) => new()
     {
         Id = document.Id,

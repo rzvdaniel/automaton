@@ -196,6 +196,37 @@ public sealed class AdminAiGuidanceService
         return entity;
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var entity = await _dbContext.AiGuidanceDocuments.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (entity is null)
+        {
+            return false;
+        }
+
+        if (entity.IsEnabled)
+        {
+            if (entity.DocumentKind == AiGuidanceDocumentKinds.BasePrompt || entity.RequiredByDefault)
+            {
+                throw new InvalidOperationException("Disable this active base or always-loaded guidance document before deleting it permanently.");
+            }
+
+            throw new InvalidOperationException("Disable this document before deleting it permanently.");
+        }
+
+        _dbContext.AiGuidanceDocuments.Remove(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await WriteAuditAsync(
+            AuditEventTypes.AiGuidanceDeleted,
+            AuditActions.Deleted,
+            entity,
+            "AI guidance document deleted permanently",
+            cancellationToken);
+
+        return true;
+    }
+
     public bool HasEmbeddedDefault(string key) => FindEmbeddedDefault(key) is not null;
 
     private GuidanceSource? FindEmbeddedDefault(string key) =>

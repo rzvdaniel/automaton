@@ -27,6 +27,8 @@ interface DocumentBadge {
   className: string
 }
 
+type DocumentFilter = 'active' | 'disabled' | 'all'
+
 const SURFACE_OPTIONS = [
   { label: 'Studio', value: 'studio' },
   { label: 'Shared', value: 'shared' },
@@ -48,6 +50,12 @@ const EDITOR_TABS = [
 const INSPECTOR_TABS = [
   { label: 'Properties', value: 'properties' },
   { label: 'History', value: 'history' },
+]
+
+const DOCUMENT_FILTER_OPTIONS = [
+  { label: 'Active', value: 'active' },
+  { label: 'Disabled', value: 'disabled' },
+  { label: 'All', value: 'all' },
 ]
 
 const BOOLEAN_OPTIONS = [
@@ -77,6 +85,8 @@ const loading = ref(false)
 const saving = ref(false)
 const query = ref('')
 const createTitle = ref('')
+const documentFilter = ref<DocumentFilter>('active')
+const deleteConfirmKey = ref('')
 const activeTab = ref<'markdown' | 'preview'>('markdown')
 const propertiesOpen = ref(false)
 const inspectorTab = ref<'properties' | 'history'>('properties')
@@ -90,15 +100,28 @@ const selectedDocument = computed(() =>
 
 const isNewDocument = computed(() => selectedId.value === null)
 const isCreateFormValid = computed(() => createTitle.value.trim().length > 0)
+const activeDocumentCount = computed(() => documents.value.filter(item => item.isEnabled).length)
+const disabledDocumentCount = computed(() => documents.value.filter(item => !item.isEnabled).length)
+const canDeleteSelectedDocument = computed(() =>
+  !!selectedDocument.value &&
+  !selectedDocument.value.isEnabled &&
+  deleteConfirmKey.value.trim() === selectedDocument.value.key
+)
 
 const filteredDocuments = computed(() => {
   const normalizedQuery = query.value.trim().toLowerCase()
-  const base = [...documents.value].sort((a, b) => {
+  const base = documents.value
+    .filter(item => {
+      if (documentFilter.value === 'active') return item.isEnabled
+      if (documentFilter.value === 'disabled') return !item.isEnabled
+      return true
+    })
+    .sort((a, b) => {
     if (a.surface !== b.surface) return a.surface.localeCompare(b.surface)
     if (a.documentKind !== b.documentKind) return getDocumentKindRank(a.documentKind) - getDocumentKindRank(b.documentKind)
     if (a.requiredByDefault !== b.requiredByDefault) return Number(b.requiredByDefault) - Number(a.requiredByDefault)
     return a.title.localeCompare(b.title)
-  })
+    })
 
   if (!normalizedQuery) {
     return base
@@ -168,6 +191,7 @@ async function loadDocuments() {
 
 function selectDocument(document: AiGuidanceAdmin) {
   selectedId.value = document.id
+  deleteConfirmKey.value = ''
   applyDocumentToForm(document)
   activeTab.value = 'markdown'
   propertiesOpen.value = false
@@ -178,6 +202,7 @@ function selectDocument(document: AiGuidanceAdmin) {
 function startCreate() {
   selectedId.value = null
   createTitle.value = ''
+  deleteConfirmKey.value = ''
   form.value = createEmptyForm()
   activeTab.value = 'markdown'
   propertiesOpen.value = false
@@ -193,6 +218,7 @@ function cloneDocument() {
   const source = selectedDocument.value
   selectedId.value = null
   createTitle.value = `${source.title} Copy`
+  deleteConfirmKey.value = ''
   form.value = createEmptyForm()
   activeTab.value = 'markdown'
   propertiesOpen.value = false
@@ -382,6 +408,7 @@ function confirmReset(document: AiGuidanceAdmin) {
 
 async function applyMutationResult(document: AiGuidanceAdmin) {
   selectedId.value = document.id
+  deleteConfirmKey.value = ''
   applyDocumentToForm(document)
   upsertDocument(document)
 }
@@ -438,6 +465,7 @@ function cancelCreate() {
   }
 
   createTitle.value = ''
+  deleteConfirmKey.value = ''
   selectedId.value = null
   form.value = createEmptyForm()
   activeTab.value = 'markdown'
@@ -543,6 +571,46 @@ function extractErrorMessage(error: unknown, fallback: string) {
 
   return fallback
 }
+
+async function deleteSelectedDocument() {
+  if (!selectedDocument.value || saving.value || !canDeleteSelectedDocument.value) {
+    return
+  }
+
+  saving.value = true
+  try {
+    await adminAiGuidanceService.delete(selectedDocument.value.id)
+  } catch (error: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: extractErrorMessage(error, 'Failed to delete AI guidance document'),
+      life: 4000,
+    })
+    return
+  } finally {
+    saving.value = false
+  }
+
+  const deletedId = selectedDocument.value.id
+  documents.value = documents.value.filter(item => item.id !== deletedId)
+  deleteConfirmKey.value = ''
+
+  const fallback = documents.value.find(item =>
+    documentFilter.value === 'disabled' ? !item.isEnabled : documentFilter.value === 'active' ? item.isEnabled : true)
+  if (fallback) {
+    selectDocument(fallback)
+  } else {
+    startCreate()
+  }
+
+  toast.add({
+    severity: 'success',
+    summary: 'Deleted',
+    detail: 'AI guidance document deleted permanently',
+    life: 3000,
+  })
+}
 </script>
 
 <template>
@@ -568,6 +636,17 @@ function extractErrorMessage(error: unknown, fallback: string) {
                 <h2 class="panel-title">Documents</h2>
                 <p class="panel-subtitle">Browse guidance like a prompt library.</p>
               </div>
+              <SelectButton
+                v-model="documentFilter"
+                :options="[
+                  { label: `Active (${activeDocumentCount})`, value: 'active' },
+                  { label: `Disabled (${disabledDocumentCount})`, value: 'disabled' },
+                  { label: 'All', value: 'all' },
+                ]"
+                option-label="label"
+                option-value="value"
+                aria-label="Document filter"
+              />
               <InputText v-model="query" placeholder="Search documents..." class="documents-search" />
             </div>
 
@@ -592,7 +671,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
                       :key="document.id"
                     type="button"
                     class="document-item"
-                    :class="{ 'document-item-active': selectedId === document.id }"
+                    :class="{ 'document-item-active': selectedId === document.id, 'document-item-disabled': !document.isEnabled }"
                       @click="selectDocument(document)"
                     >
                       <span class="document-item-icon">📄</span>
@@ -601,6 +680,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
                         <span class="document-item-badges">
                           <span v-if="document.requiredByDefault" class="document-mini-badge">Always Loaded</span>
                           <span v-if="document.isModelLoadable" class="document-mini-badge document-mini-badge-outline">Discoverable</span>
+                          <span v-if="!document.isEnabled" class="document-mini-badge document-mini-badge-disabled">Disabled</span>
                         </span>
                       </span>
                       <span
@@ -838,6 +918,32 @@ function extractErrorMessage(error: unknown, fallback: string) {
               <span class="property-fact-value">{{ selectedDocument?.updatedAt ? new Date(selectedDocument.updatedAt).toLocaleString() : 'Not saved yet' }}</span>
             </div>
           </div>
+
+          <template v-if="selectedDocument">
+            <div class="property-section danger-section">Danger Zone</div>
+            <div class="inspector-empty-state danger-zone">
+              <strong>Delete permanently</strong>
+              <span v-if="selectedDocument.isEnabled">
+                Disable this document before deleting it permanently.
+              </span>
+              <template v-else>
+                <span>Type the document key to confirm permanent deletion.</span>
+                <InputText
+                  v-model="deleteConfirmKey"
+                  class="w-full"
+                  :placeholder="selectedDocument.key"
+                />
+                <Button
+                  label="Delete Permanently"
+                  icon="pi pi-trash"
+                  severity="danger"
+                  :loading="saving"
+                  :disabled="!canDeleteSelectedDocument"
+                  @click="deleteSelectedDocument"
+                />
+              </template>
+            </div>
+          </template>
         </template>
 
         <template v-else-if="inspectorTab === 'history'">
@@ -1048,6 +1154,10 @@ function extractErrorMessage(error: unknown, fallback: string) {
   border-color: #cfe4d8;
 }
 
+.document-item-disabled {
+  opacity: 0.72;
+}
+
 .document-item-icon {
   line-height: 1;
   font-size: 0.95rem;
@@ -1088,6 +1198,11 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .document-mini-badge-outline {
   background: #edf4fb;
   color: #35527f;
+}
+
+.document-mini-badge-disabled {
+  background: #f1f3f6;
+  color: #6f7b8b;
 }
 
 .document-item-state-inline {
@@ -1384,6 +1499,10 @@ function extractErrorMessage(error: unknown, fallback: string) {
   color: #5f7598;
 }
 
+.danger-section {
+  color: #9f2f2f;
+}
+
 .inspector-tabs {
   margin-bottom: 0.15rem;
 }
@@ -1437,6 +1556,11 @@ function extractErrorMessage(error: unknown, fallback: string) {
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface-card) 94%, #eef3fb 6%);
   color: var(--text-color-secondary);
+}
+
+.danger-zone {
+  border-color: #f2d3d3;
+  background: #fff8f8;
 }
 
 .markdown-preview :deep(h1),

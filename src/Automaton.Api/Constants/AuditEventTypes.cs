@@ -58,4 +58,5 @@ public static class AuditEventTypes
     public const string AiGuidanceEnabled = "AiGuidanceEnabled";
     public const string AiGuidanceDisabled = "AiGuidanceDisabled";
     public const string AiGuidanceResetToDefault = "AiGuidanceResetToDefault";
+    public const string AiGuidanceDeleted = "AiGuidanceDeleted";
 }

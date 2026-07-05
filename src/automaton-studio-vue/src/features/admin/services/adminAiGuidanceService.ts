@@ -36,6 +36,10 @@ class AdminAiGuidanceService {
     const { data } = await apiClient.post<AiGuidanceAdmin>(`/api/admin/ai-guidance/${id}/reset`)
     return data
   }
+
+  async delete(id: string): Promise<void> {
+    await apiClient.delete(`/api/admin/ai-guidance/${id}`)
+  }
 }
 
 export const adminAiGuidanceService = new AdminAiGuidanceService()
