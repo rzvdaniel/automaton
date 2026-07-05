@@ -45,7 +45,7 @@ public class LinkAppServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
+        Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms")), Is.True);
     }
 
     [Test]
@@ -97,10 +97,6 @@ public class LinkAppServiceTests
                 sources.Add(new GuidanceSource(metadata.OutputPath!, source.Content));
             }
         }
-
-        var basePrompt = seededSources.Single(source => source.RelativePath == "shared/base/automaton-app-contract-compact.md").Content;
-        sources.Add(new GuidanceSource(".automaton/agents/references/llms.txt", basePrompt));
-        sources.Add(new GuidanceSource(".automaton/agents/references/llms-full.txt", basePrompt));
 
         return sources;
     }

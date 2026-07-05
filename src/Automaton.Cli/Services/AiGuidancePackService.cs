@@ -241,7 +241,7 @@ public sealed class AiGuidancePackService
             {
                 root = "AGENTS.md",
                 skill = ".automaton/agents/skills/automaton-app/SKILL.md",
-                references = ".automaton/agents/references/llms.txt"
+                references = ".automaton/agents/references/llms/"
             },
             adapters = new[]
             {

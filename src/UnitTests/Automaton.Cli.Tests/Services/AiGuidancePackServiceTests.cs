@@ -39,18 +39,17 @@ public class AiGuidancePackServiceTests
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "manifest.json")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
         Assert.That(File.Exists(result.ManifestPath), Is.True);
 
         using var manifest = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
         Assert.That(manifest.RootElement.GetProperty("mode").GetString(), Is.EqualTo("app"));
         Assert.That(manifest.RootElement.GetProperty("sources").GetArrayLength(), Is.GreaterThanOrEqualTo(5));
         Assert.That(manifest.RootElement.GetProperty("entrypoints").GetProperty("root").GetString(), Is.EqualTo("AGENTS.md"));
-        Assert.That(manifest.RootElement.GetProperty("entrypoints").GetProperty("references").GetString(), Is.EqualTo(".automaton/agents/references/llms.txt"));
+        Assert.That(manifest.RootElement.GetProperty("entrypoints").GetProperty("references").GetString(), Is.EqualTo(".automaton/agents/references/llms/"));
         Assert.That(manifest.RootElement.GetProperty("adapters").GetArrayLength(), Is.EqualTo(1));
 
         var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
-        Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms.txt"));
+        Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms/"));
     }
 
     [Test]
@@ -63,7 +62,6 @@ public class AiGuidancePackServiceTests
 
         var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
         var skillContent = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "skills", "automaton-app", "SKILL.md"));
-        var llmsContent = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt"));
 
         Assert.That(agentsContent, Does.Contain("## STOP"));
         Assert.That(agentsContent, Does.Contain("Before creating files:"));
@@ -78,16 +76,12 @@ public class AiGuidancePackServiceTests
         Assert.That(agentsContent, Does.Contain("Do not run `automaton publish` unless the user explicitly requests publishing"));
         Assert.That(agentsContent, Does.Contain("Do not leave local dev logs, test databases, temp files, or generated runtime artifacts inside the app folder before deploy"));
         Assert.That(agentsContent, Does.Contain(".automaton/agents/skills/automaton-app/SKILL.md"));
+        Assert.That(agentsContent, Does.Contain(".automaton/agents/references/llms/"));
         Assert.That(skillContent, Does.Contain("Check whether `automaton.json` exists in the project root"));
         Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
         Assert.That(skillContent, Does.Contain("Use `automaton validate` when the local contract or deploy shape is unclear"));
         Assert.That(skillContent, Does.Contain("Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`"));
         Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
-        Assert.That(llmsContent, Does.Contain("Automaton App Contract (Compact)"));
-        Assert.That(llmsContent, Does.Contain("Keep `automaton.json` in the app root when it exists"));
-        Assert.That(llmsContent, Does.Contain("Do not invent alternative top-level folders unless the existing app already uses them"));
-        Assert.That(llmsContent, Does.Contain("Ask before publishing an app publicly"));
-        Assert.That(llmsContent, Does.Contain("When backend files change, remind the user that backend/runtime changes must be deployed before they take effect"));
     }
 
     [Test]
@@ -172,10 +166,6 @@ public class AiGuidancePackServiceTests
                 sources.Add(new GuidanceSource(metadata.OutputPath!, source.Content));
             }
         }
-
-        var basePrompt = seededSources.Single(source => source.RelativePath == "shared/base/automaton-app-contract-compact.md").Content;
-        sources.Add(new GuidanceSource(".automaton/agents/references/llms.txt", basePrompt));
-        sources.Add(new GuidanceSource(".automaton/agents/references/llms-full.txt", basePrompt));
 
         return sources;
     }

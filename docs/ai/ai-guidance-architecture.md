@@ -91,9 +91,9 @@ Purpose:
 
 The exported file layout is synthesized by the API:
 
-- `llms.txt`
-- `llms-full.txt`
-- `llms/{key}.md`
+- `AGENTS.md`
+- `.automaton/agents/skills/automaton-app/SKILL.md`
+- `.automaton/agents/references/llms/{key}.md`
 
 The database does not store file paths. Export layout is an API concern.
 
@@ -179,18 +179,14 @@ Current flow:
 1. CLI calls `GET /api/ai-guidance/export`
 2. API returns the current enabled guidance pack from DB
 3. CLI writes it into:
-   - `.automaton/agents/references/llms.txt`
-   - `.automaton/agents/references/llms-full.txt`
-   - `.automaton/agents/references/llms/*.md`
-4. CLI writes local wrapper/template files like:
    - `AGENTS.md`
    - `.automaton/agents/skills/automaton-app/SKILL.md`
-   - `AGENTS.md`
+   - `.automaton/agents/references/llms/*.md`
 
 So:
 
 - guidance content comes from DB
-- local wrapper/template files still come from packaged templates
+- local wrapper/project files also come from DB export
 
 ### CLI commands that use guidance
 
@@ -461,7 +457,6 @@ It does not automatically see every guidance document.
 The local agent or assistant sees:
 
 - generated wrapper files such as `AGENTS.md`
-- exported `llms.txt`
 - exported `llms/*.md`
 
 Those files reflect the current DB state at the time the CLI sync/export happened.

@@ -110,12 +110,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             .Select(document => new AiGuidanceExportFile(document.OutputPath!, document.ContentMarkdown))
             .ToList();
 
-        files.AddRange(
-        [
-            new AiGuidanceExportFile(".automaton/agents/references/llms.txt", BuildLlmsText(documents)),
-            new AiGuidanceExportFile(".automaton/agents/references/llms-full.txt", BuildLlmsFullText(documents))
-        ]);
-
         return new AiGuidanceExportPack(files);
     }
 
@@ -278,65 +272,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.Version,
             item.IsDatabaseDocument);
 
-    private static string BuildLlmsText(IReadOnlyList<AiGuidanceResolvedDocument> documents)
-    {
-        var basePrompt = documents.FirstOrDefault(item =>
-            item.DocumentKind == AiGuidanceDocumentKinds.BasePrompt
-            && string.Equals(item.Surface, "shared", StringComparison.Ordinal))
-            ?? documents.FirstOrDefault(item => item.DocumentKind == AiGuidanceDocumentKinds.BasePrompt);
-
-        var builder = new System.Text.StringBuilder();
-
-        if (basePrompt is not null)
-        {
-            builder.AppendLine(basePrompt.ContentMarkdown.Trim());
-            builder.AppendLine();
-        }
-
-        var linkedDocuments = documents
-            .Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt)
-            .Where(item => item.OutputPath?.StartsWith(".automaton/agents/references/llms/", StringComparison.Ordinal) == true)
-            .ToList();
-
-        if (linkedDocuments.Count > 0)
-        {
-            builder.AppendLine("## Linked guidance");
-            builder.AppendLine();
-            foreach (var document in linkedDocuments)
-            {
-                builder.Append("- `llms/")
-                    .Append(document.Key)
-                    .Append(".md`");
-
-                if (!string.IsNullOrWhiteSpace(document.Description))
-                {
-                    builder.Append(" - ").Append(document.Description);
-                }
-
-                builder.AppendLine();
-            }
-        }
-
-        return builder.ToString().Trim() + Environment.NewLine;
-    }
-
-    private static string BuildLlmsFullText(IReadOnlyList<AiGuidanceResolvedDocument> documents)
-    {
-        var builder = new System.Text.StringBuilder();
-        builder.AppendLine(BuildLlmsText(documents).TrimEnd());
-
-        foreach (var document in documents
-                     .Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt)
-                     .Where(item => item.OutputPath?.StartsWith(".automaton/agents/references/llms/", StringComparison.Ordinal) == true))
-        {
-            builder.AppendLine();
-            builder.AppendLine("---");
-            builder.AppendLine();
-            builder.AppendLine(document.ContentMarkdown.Trim());
-        }
-
-        return builder.ToString().Trim() + Environment.NewLine;
-    }
 }
 
 public sealed record AiGuidanceCatalogItem(
