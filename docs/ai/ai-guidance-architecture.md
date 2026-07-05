@@ -367,6 +367,50 @@ Used for:
 - search/filtering
 - model discovery hints
 
+## How to configure a guide
+
+Use these combinations as the default operating model.
+
+### Shared base prompt
+
+- `Surface = shared`
+- `DocumentKind = BasePrompt`
+- `RequiredByDefault = true`
+- `IsModelLoadable = false`
+- `OutputPath = empty`
+
+### Studio required guide
+
+- `Surface = studio`
+- `DocumentKind = Guidance`
+- `RequiredByDefault = true`
+- `IsModelLoadable = true` or `false`
+- `OutputPath = empty`
+
+### Studio optional guide
+
+- `Surface = studio` or `shared`
+- `DocumentKind = Guidance`
+- `RequiredByDefault = false`
+- `IsModelLoadable = true`
+- `OutputPath = empty`
+
+### CLI exported guide
+
+- `Surface = cli` or `shared`
+- `DocumentKind = Guidance`
+- `RequiredByDefault = false`
+- `IsModelLoadable = true`
+- `OutputPath = .automaton/agents/references/llms/{key}.md`
+
+### CLI project file
+
+- `Surface = cli`
+- `DocumentKind = Guidance`
+- `RequiredByDefault = false`
+- `IsModelLoadable = false`
+- `OutputPath = AGENTS.md` or another project path
+
 ## What admins should configure for Studio and CLI
 
 ### Shared base prompt

@@ -4,13 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n docs,site -c green,cyan \"npm:dev:docs\" \"npm:dev:site:ready\"",
-    "dev:site": "vite",
-    "dev:site:ready": "wait-on http://127.0.0.1:5175/docs/ && npm run dev:site",
-    "dev:docs": "vitepress dev docs --host 127.0.0.1 --port 5175",
+    "dev": "vite",
+    "dev:full": "concurrently -k -n docs,site -c green,cyan \"npm:docs:dev\" \"npm:dev\"",
     "build": "vue-tsc -b && vite build && vitepress build docs && node scripts/build-sitemap.mjs",
     "preview": "vite preview",
-    "docs:dev": "vitepress dev docs",
+    "docs:dev": "vitepress dev docs --host 127.0.0.1 --port 5175",
     "docs:build": "vitepress build docs && node scripts/build-sitemap.mjs",
     "docs:preview": "vitepress preview docs",
     "type-check": "vue-tsc --noEmit",
@@ -40,7 +38,6 @@
     "typescript": "~5.9.3",
     "vite": "^6.3.5",
     "vitepress": "^1.6.3",
-    "wait-on": "^8.0.5",
     "vue-tsc": "^2.2.10",
     "concurrently": "^9.2.1"
   }

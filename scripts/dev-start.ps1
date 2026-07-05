@@ -9,6 +9,11 @@
     4. Starts FastAPI backend          (new terminal window, port 8001)
     5. Starts Automaton.Runner         (new terminal window)
     6. Starts the Vue.js frontend      (new terminal window)
+    7. Starts the public website app   (new terminal window)
+
+    Documentation servers are not started by default.
+    Start them manually only when working on docs:
+      public docs:  cd src\automaton-vue && npm run docs:dev
 
     Requires Python with fastapi and uvicorn installed:
       pip install fastapi "uvicorn[standard]"

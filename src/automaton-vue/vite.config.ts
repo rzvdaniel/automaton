@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 
 const sharedAiGuidanceRoot = path.resolve(__dirname, '../../shared/ai-guidance')
+const sharedAiGuidanceSeedRoot = path.join(sharedAiGuidanceRoot, 'seed')
 const faviconAssets = [
   { url: '/logo.svg', file: path.resolve(__dirname, './src/assets/logo.svg'), type: 'image/svg+xml' },
   { url: '/favicon.svg', file: path.resolve(__dirname, './src/assets/logo.svg'), type: 'image/svg+xml' },
@@ -105,36 +106,36 @@ function stableLogoPlugin() {
 }
 
 function sharedAiGuidanceDevPlugin() {
-  const sharedRoutes = [
-    { url: '/llms.txt', file: path.join(sharedAiGuidanceRoot, 'llms.txt'), type: 'text/plain; charset=utf-8' },
-    { url: '/llms-full.txt', file: path.join(sharedAiGuidanceRoot, 'llms-full.txt'), type: 'text/plain; charset=utf-8' },
-  ]
+  const resolvePublicGuidanceFiles = () => {
+    const { llmsText, llmsFullText } = buildPublicLlmsAssets()
+    return [
+      { url: '/llms.txt', content: llmsText, type: 'text/plain; charset=utf-8' },
+      { url: '/llms-full.txt', content: llmsFullText, type: 'text/plain; charset=utf-8' },
+    ]
+  }
 
   return {
     name: 'shared-ai-guidance-dev-plugin',
     configureServer(server: any) {
-      for (const route of sharedRoutes) {
+      for (const route of resolvePublicGuidanceFiles()) {
         server.middlewares.use(route.url, (_req: any, res: any) => {
           res.setHeader('Content-Type', route.type)
-          res.end(fs.readFileSync(route.file))
+          res.end(route.content)
         })
       }
 
       server.middlewares.use((req: any, res: any, next: any) => {
         const requestPath = req.url?.split('?')[0] ?? ''
 
-        if (!requestPath.startsWith('/llms/') && !requestPath.startsWith('/templates/')) {
+        if (!requestPath.startsWith('/llms/')) {
           next()
           return
         }
 
-        const relativePath = requestPath.replace(/^\//, '')
-        const absolutePath = path.resolve(sharedAiGuidanceRoot, relativePath)
-        const allowedRoot = requestPath.startsWith('/llms/')
-          ? path.join(sharedAiGuidanceRoot, 'llms')
-          : path.join(sharedAiGuidanceRoot, 'templates')
+        const requestedFileName = path.posix.basename(requestPath)
+        const absolutePath = findSeedGuidanceFile(requestedFileName)
 
-        if (!absolutePath.startsWith(allowedRoot) || !fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+        if (!absolutePath || !fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
           next()
           return
         }
@@ -155,44 +156,84 @@ function sharedAiGuidanceDevPlugin() {
 }
 
 function emitSharedAiGuidanceAssetsPlugin() {
-  const emitDirectory = (context: any, absoluteRoot: string, relativeRoot: string) => {
-    const entries = fs.readdirSync(absoluteRoot, { withFileTypes: true })
-
-    for (const entry of entries) {
-      const absolutePath = path.join(absoluteRoot, entry.name)
-      const relativePath = path.posix.join(relativeRoot, entry.name)
-
-      if (entry.isDirectory()) {
-        emitDirectory(context, absolutePath, relativePath)
-        continue
-      }
-
-      context.emitFile({
-        type: 'asset',
-        fileName: relativePath,
-        source: fs.readFileSync(absolutePath),
-      })
-    }
-  }
-
   return {
     name: 'emit-shared-ai-guidance-assets-plugin',
     generateBundle() {
+      const { llmsText, llmsFullText } = buildPublicLlmsAssets()
+
       this.emitFile({
         type: 'asset',
         fileName: 'llms.txt',
-        source: fs.readFileSync(path.join(sharedAiGuidanceRoot, 'llms.txt')),
+        source: llmsText,
       })
 
       this.emitFile({
         type: 'asset',
         fileName: 'llms-full.txt',
-        source: fs.readFileSync(path.join(sharedAiGuidanceRoot, 'llms-full.txt')),
+        source: llmsFullText,
       })
 
-      emitDirectory(this, path.join(sharedAiGuidanceRoot, 'llms'), 'llms')
+      for (const document of listSeedGuidanceDocuments()) {
+        this.emitFile({
+          type: 'asset',
+          fileName: path.posix.join('llms', path.basename(document.filePath)),
+          source: fs.readFileSync(document.filePath, 'utf-8'),
+        })
+      }
     },
   }
+}
+
+function listSeedGuidanceDocuments() {
+  const files: Array<{ filePath: string; surface: string }> = []
+  const guidanceSurfaces = ['shared', 'studio', 'cli', 'mcp']
+
+  for (const surface of guidanceSurfaces) {
+    const guidanceRoot = path.join(sharedAiGuidanceSeedRoot, surface, 'guidance')
+    if (!fs.existsSync(guidanceRoot)) {
+      continue
+    }
+
+    for (const entry of fs.readdirSync(guidanceRoot, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        files.push({ filePath: path.join(guidanceRoot, entry.name), surface })
+      }
+    }
+  }
+
+  return files.sort((a, b) => a.filePath.localeCompare(b.filePath))
+}
+
+function readSharedBasePrompt() {
+  const basePath = path.join(sharedAiGuidanceSeedRoot, 'shared', 'base', 'automaton-app-contract-compact.md')
+  return fs.readFileSync(basePath, 'utf-8').trim()
+}
+
+function buildPublicLlmsAssets() {
+  const basePrompt = readSharedBasePrompt()
+  const guidanceDocuments = listSeedGuidanceDocuments()
+  const llmsTextLines = [
+    basePrompt,
+    '',
+    '## Linked guidance',
+    '',
+    ...guidanceDocuments.map(document => `- \`llms/${path.basename(document.filePath)}\``),
+  ]
+
+  const llmsFullSections = [
+    llmsTextLines.join('\n').trim(),
+    ...guidanceDocuments.map(document => fs.readFileSync(document.filePath, 'utf-8').trim()).flatMap(content => ['', '---', '', content]),
+  ]
+
+  return {
+    llmsText: llmsTextLines.join('\n').trim() + '\n',
+    llmsFullText: llmsFullSections.join('\n').trim() + '\n',
+  }
+}
+
+function findSeedGuidanceFile(fileName: string) {
+  const match = listSeedGuidanceDocuments().find(document => path.basename(document.filePath) === fileName)
+  return match?.filePath ?? null
 }
 
 function docsRedirectDevPlugin() {

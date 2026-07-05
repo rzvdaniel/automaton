@@ -5,6 +5,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import AppToolbar from '@/shared/components/layout/AppToolbar.vue'
 import AppSidebar from '@/shared/components/layout/AppSidebar.vue'
+import DocumentationDrawer from '@/shared/documentation/components/DocumentationDrawer.vue'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 
@@ -36,6 +37,7 @@ onMounted(async () => {
   <!-- Global PrimeVue components -->
   <Toast position="bottom-right" />
   <ConfirmDialog />
+  <DocumentationDrawer />
 
   <!-- No layout: full-screen for published apps -->
   <template v-if="isNoLayout">

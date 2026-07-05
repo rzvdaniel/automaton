@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
@@ -13,6 +13,7 @@ import Drawer from 'primevue/drawer'
 import type { AiGuidanceAdmin, UpsertAiGuidanceRequest } from '../types/admin.types'
 import { adminAiGuidanceService } from '../services/adminAiGuidanceService'
 import { renderMarkdown } from '@/shared/utils/markdown'
+import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
 
 const CodeEditor = defineAsyncComponent(() => import('@/features/apps/components/CodeEditor.vue'))
 
@@ -54,12 +55,6 @@ const INSPECTOR_TABS = [
   { label: 'History', value: 'history' },
 ]
 
-const DOCUMENT_FILTER_OPTIONS = [
-  { label: 'Active', value: 'active' },
-  { label: 'Disabled', value: 'disabled' },
-  { label: 'All', value: 'all' },
-]
-
 const SURFACE_LABELS: Record<string, string> = {
   studio: 'Studio',
   shared: 'Shared',
@@ -74,6 +69,7 @@ const DOCUMENT_KIND_LABELS: Record<string, string> = {
 
 const toast = useToast()
 const confirm = useConfirm()
+const { openDocumentation } = useDocumentationDrawer()
 
 const documents = ref<AiGuidanceAdmin[]>([])
 const selectedId = ref<string | null>(null)
@@ -208,6 +204,10 @@ function startCreate() {
   propertiesOpen.value = false
   inspectorTab.value = 'properties'
   editingTitle.value = false
+}
+
+function openAiGuidanceHandbook() {
+  openDocumentation('ai-guidance', 'AI Guidance Handbook')
 }
 
 function cloneDocument() {
@@ -596,6 +596,9 @@ async function deleteSelectedDocument() {
             Manage runtime prompt documents used by Studio and other Automaton AI surfaces.
           </p>
         </div>
+        <div class="page-header-actions">
+          <Button label="Help" icon="pi pi-book" severity="secondary" outlined @click="openAiGuidanceHandbook" />
+        </div>
       </div>
     </div>
 
@@ -604,7 +607,7 @@ async function deleteSelectedDocument() {
         <template #content>
           <div class="documents-shell">
             <div class="documents-header">
-              <div class="documents-heading">
+                <div class="documents-heading">
                 <div>
                 <h2 class="panel-title">Documents</h2>
                 </div>
@@ -832,6 +835,7 @@ async function deleteSelectedDocument() {
                 option-value="value"
                 class="w-full"
               />
+              <small class="field-help">Surface decides the primary audience.</small>
             </div>
 
             <div class="field">
@@ -844,27 +848,34 @@ async function deleteSelectedDocument() {
                 option-value="value"
                 class="w-full"
               />
+              <small class="field-help">Base Prompt defines the contract; Guidance provides focused instructions.</small>
             </div>
           </div>
 
           <div class="properties-grid properties-grid-flags">
-            <label class="checkbox-field" for="guidance-required-by-default">
-              <Checkbox
-                input-id="guidance-required-by-default"
-                v-model="form.requiredByDefault"
-                binary
-              />
-              <span>Always loaded</span>
-            </label>
+            <div class="field">
+              <label class="checkbox-field" for="guidance-required-by-default">
+                <Checkbox
+                  input-id="guidance-required-by-default"
+                  v-model="form.requiredByDefault"
+                  binary
+                />
+                <span>Always loaded</span>
+              </label>
+              <small class="field-help">Required means injected automatically.</small>
+            </div>
 
-            <label class="checkbox-field" for="guidance-model-loadable">
-              <Checkbox
-                input-id="guidance-model-loadable"
-                v-model="form.isModelLoadable"
-                binary
-              />
-              <span>Discoverable</span>
-            </label>
+            <div class="field">
+              <label class="checkbox-field" for="guidance-model-loadable">
+                <Checkbox
+                  input-id="guidance-model-loadable"
+                  v-model="form.isModelLoadable"
+                  binary
+                />
+                <span>Discoverable</span>
+              </label>
+              <small class="field-help">Discoverable means the model can list and fetch it.</small>
+            </div>
           </div>
 
           <div class="field">
@@ -892,6 +903,7 @@ async function deleteSelectedDocument() {
               class="w-full"
               placeholder=".automaton/agents/references/llms/example.md"
             />
+            <small class="field-help">Output path means exported by CLI.</small>
           </div>
 
           <div class="property-section">Information</div>
@@ -993,6 +1005,12 @@ async function deleteSelectedDocument() {
   flex-wrap: wrap;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .page-title {
   margin: 0;
   font-size: 2rem;
@@ -1068,6 +1086,14 @@ async function deleteSelectedDocument() {
   margin: 0.25rem 0 0;
   color: var(--text-color-secondary);
   font-size: 0.92rem;
+}
+
+.field-help {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-color-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .documents-search {

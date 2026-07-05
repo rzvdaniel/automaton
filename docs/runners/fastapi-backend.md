@@ -94,6 +94,8 @@ After that, just run:
 .\scripts\dev-start.ps1
 ```
 
+For the current Studio, website, and documentation command model, see [docs/dev/frontend-and-docs-local-workflow.md](/C:/Work/automaton/docs/dev/frontend-and-docs-local-workflow.md).
+
 ## Running in Docker
 
 FastAPI is started automatically by `docker-entrypoint.sh` before the .NET runner connects:

@@ -91,6 +91,10 @@
 	  <None Include="SystemPrompts\ExternalMcpInstructions.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
+    <None Include="Documentation\Admin\**\*.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Watch Remove="AppData\media\**\*" />

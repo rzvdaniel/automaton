@@ -69,7 +69,6 @@ namespace Automaton.Api.Authentication
                             {
                                 messageReceivedContext.Token = hubAccessToken;
                             }
-
                             return Task.CompletedTask;
                         },
                         OnAuthenticationFailed = authenticationFailedContext =>
