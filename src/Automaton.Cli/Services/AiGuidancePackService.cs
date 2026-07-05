@@ -239,7 +239,7 @@ public sealed class AiGuidancePackService
             generatedFiles,
             entrypoints = new
             {
-                instructions = ".automaton/agents/instructions.md",
+                root = "AGENTS.md",
                 skill = ".automaton/agents/skills/automaton-app/SKILL.md",
                 references = ".automaton/agents/references/llms.txt"
             },

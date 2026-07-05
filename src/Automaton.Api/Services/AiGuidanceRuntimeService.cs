@@ -164,14 +164,14 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         var now = DateTime.UtcNow;
         var added = 0;
 
-        foreach (var metadata in AutomatonGuidanceSeedCatalog.All)
+        foreach (var source in _embeddedGuidanceProvider.GetSeedSources())
         {
+            var metadata = AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath);
             if (existingKeySet.Contains(metadata.Key))
             {
                 continue;
             }
 
-            var source = LoadSeedSource(metadata.RelativePath);
             var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
             var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
             var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
@@ -249,14 +249,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 true))
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static AutomatonGuidanceSeedMetadata ResolveMetadata(string relativePath) =>
-        AutomatonGuidanceSeedCatalog.ResolveByRelativePath(relativePath);
-
-    private GuidanceSource LoadSeedSource(string relativePath) =>
-        relativePath.StartsWith("llms/", StringComparison.Ordinal)
-            ? new GuidanceSource(relativePath, _embeddedGuidanceProvider.GetReference(relativePath))
-            : new GuidanceSource(relativePath, _embeddedGuidanceProvider.GetTemplate(relativePath));
-
     private static AutomatonGuidanceCatalogItem MapCatalogDocument(AiGuidanceCatalogItem item) =>
         new(
             item.Key,
@@ -265,7 +257,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.DocumentKind,
             item.TagsJson,
             item.Description,
-            item.OutputPath,
             item.RequiredByDefault,
             item.IsModelLoadable,
             item.SortOrder,
@@ -280,7 +271,6 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.DocumentKind,
             item.TagsJson,
             item.Description,
-            item.OutputPath,
             item.ContentMarkdown,
             item.RequiredByDefault,
             item.IsModelLoadable,

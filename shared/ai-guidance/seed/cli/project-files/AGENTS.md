@@ -31,10 +31,10 @@ Do not invent a generic project structure before making that decision.
 ## Read first
 
 1. `.automaton/agents/references/llms.txt`
-2. `.automaton/agents/instructions.md`
-2. `.automaton/agents/references/llms/automaton-cli-deploy.md` when deploying
-3. `.automaton/agents/references/llms/automaton-cli-install.md` when installing, logging in, or resetting auth
-4. `.automaton/agents/references/llms/automaton-mcp.md` only when MCP is available or explicitly requested
+2. `.automaton/agents/skills/automaton-app/SKILL.md`
+3. `.automaton/agents/references/llms/automaton-cli-deploy.md` when deploying
+4. `.automaton/agents/references/llms/automaton-cli-install.md` when installing, logging in, or resetting auth
+5. `.automaton/agents/references/llms/automaton-mcp.md` only when MCP is available or explicitly requested
 
 ## App layout
 

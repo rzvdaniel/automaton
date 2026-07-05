@@ -7,17 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms.txt">
-      <LogicalName>Automaton.AiGuidance.references.llms.txt</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms-full.txt">
-      <LogicalName>Automaton.AiGuidance.references.llms-full.txt</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\llms\**\*">
-      <LogicalName>Automaton.AiGuidance.references.llms.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="..\..\shared\ai-guidance\templates\**\*">
-      <LogicalName>Automaton.AiGuidance.templates.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    <EmbeddedResource Include="..\..\shared\ai-guidance\seed\**\*">
+      <LogicalName>Automaton.AiGuidance.seed|%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

@@ -1,8 +1,3 @@
----
-title: "Automaton CLI Install"
-description: "Automaton CLI installation and bootstrap guidance."
----
-
 # Automaton CLI Install and Login
 
 Use this when the user wants to install the Automaton CLI, verify that it is available, or authenticate the current machine before app work begins.

@@ -24,7 +24,7 @@ public sealed class AiGuidanceController : ControllerBase
         {
             Files = pack.Files.Select(file => new AiGuidanceExportFileResponse
             {
-                TargetPath = file.TargetPath,
+                OutputPath = file.TargetPath,
                 Content = file.Content
             }).ToList()
         });

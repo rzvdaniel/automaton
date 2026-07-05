@@ -1,8 +1,3 @@
----
-title: "Automaton MCP"
-description: "Guidance for MCP-related workflows and integrations."
----
-
 # Automaton MCP (Optional)
 
 Use this only when the AI environment already supports MCP tools or the user explicitly wants to work through Automaton MCP.

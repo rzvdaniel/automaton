@@ -1,8 +1,3 @@
----
-title: "Automaton Frontend Structure"
-description: "Frontend structure, relative URLs, PWA rules, and installable app patterns."
----
-
 # Automaton Frontend Structure
 
 Automaton supports multiple frontend styles.

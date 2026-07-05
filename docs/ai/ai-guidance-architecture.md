@@ -111,7 +111,7 @@ At startup, the API calls:
 Seed behavior:
 
 1. Read packaged embedded guidance files from `EmbeddedAutomatonGuidanceProvider`.
-2. Resolve metadata from `AutomatonGuidanceSeedCatalog`.
+2. Resolve metadata from the convention-based `AutomatonGuidanceSeedCatalog`.
 3. Insert only missing keys into `AiGuidanceDocuments`.
 4. Do not overwrite existing DB rows.
 
@@ -184,8 +184,8 @@ Current flow:
    - `.automaton/agents/references/llms/*.md`
 4. CLI writes local wrapper/template files like:
    - `AGENTS.md`
-   - `.automaton/agents/instructions.md`
    - `.automaton/agents/skills/automaton-app/SKILL.md`
+   - `AGENTS.md`
 
 So:
 

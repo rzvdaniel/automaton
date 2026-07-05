@@ -1,8 +1,3 @@
----
-title: "Automaton Studio Editor"
-description: "Studio editor behavior, file editing rules, and verification expectations."
----
-
 # Automaton Studio App Editor
 
 Use this guidance when the AI is editing an app inside Automaton Studio rather than working through the local CLI workflow.

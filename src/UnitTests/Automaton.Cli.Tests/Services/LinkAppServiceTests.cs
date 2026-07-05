@@ -45,7 +45,6 @@ public class LinkAppServiceTests
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms.txt")), Is.True);
     }
 
@@ -87,20 +86,21 @@ public class LinkAppServiceTests
     private static IReadOnlyList<GuidanceSource> BuildExportSources()
     {
         var provider = new EmbeddedAutomatonGuidanceProvider();
-        var sources = new List<GuidanceSource>
-        {
-            new("AGENTS.md", provider.GetTemplate("AGENTS.md")),
-            new(".automaton/agents/instructions.md", provider.GetTemplate("instructions.md")),
-            new(".automaton/agents/skills/automaton-app/SKILL.md", provider.GetTemplate("SKILL.md")),
-            new(".automaton/agents/references/llms.txt", provider.GetReference("llms.txt")),
-            new(".automaton/agents/references/llms-full.txt", provider.GetReference("llms-full.txt")),
-        };
+        var seededSources = provider.GetSeedSources();
+        var sources = new List<GuidanceSource>();
 
-        foreach (var source in provider.GetReferenceSources().Where(item => item.RelativePath.StartsWith("llms/", StringComparison.Ordinal)))
+        foreach (var source in seededSources)
         {
-            var fileName = Path.GetFileName(source.RelativePath);
-            sources.Add(new GuidanceSource($".automaton/agents/references/llms/{fileName}", source.Content));
+            var metadata = AutomatonGuidanceSeedCatalog.Resolve(source.RelativePath);
+            if (!string.IsNullOrWhiteSpace(metadata.OutputPath))
+            {
+                sources.Add(new GuidanceSource(metadata.OutputPath!, source.Content));
+            }
         }
+
+        var basePrompt = seededSources.Single(source => source.RelativePath == "shared/base/automaton-app-contract-compact.md").Content;
+        sources.Add(new GuidanceSource(".automaton/agents/references/llms.txt", basePrompt));
+        sources.Add(new GuidanceSource(".automaton/agents/references/llms-full.txt", basePrompt));
 
         return sources;
     }
