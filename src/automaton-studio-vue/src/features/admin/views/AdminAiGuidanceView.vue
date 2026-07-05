@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
@@ -12,6 +12,8 @@ import Drawer from 'primevue/drawer'
 import type { AiGuidanceAdmin, UpsertAiGuidanceRequest } from '../types/admin.types'
 import { adminAiGuidanceService } from '../services/adminAiGuidanceService'
 import { renderMarkdown } from '@/shared/utils/markdown'
+
+const CodeEditor = defineAsyncComponent(() => import('@/features/apps/components/CodeEditor.vue'))
 
 type GuidanceForm = UpsertAiGuidanceRequest
 
@@ -161,6 +163,10 @@ const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidan
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
 const inspectorTitle = computed(() => inspectorTab.value === 'history' ? 'History' : 'Properties')
 const headerBadges = computed(() => selectedDocument.value ? buildDocumentBadges(selectedDocument.value) : [])
+const editorFilePath = computed(() => {
+  const key = form.value.key.trim() || selectedDocument.value?.key || 'untitled-guidance-document'
+  return `admin-ai-guidance/${key}.md`
+})
 
 onMounted(loadDocuments)
 
@@ -634,7 +640,6 @@ async function deleteSelectedDocument() {
               <div class="documents-heading">
                 <div>
                 <h2 class="panel-title">Documents</h2>
-                <p class="panel-subtitle">Browse guidance like a prompt library.</p>
                 </div>
                 <Button label="New" icon="pi pi-plus" size="small" @click="startCreate" />
               </div>
@@ -685,12 +690,6 @@ async function deleteSelectedDocument() {
                           <span v-if="!document.isEnabled" class="document-mini-badge document-mini-badge-disabled">Disabled</span>
                         </span>
                       </span>
-                      <span
-                        class="document-item-state-inline"
-                        :class="{ 'document-item-state-inline-disabled': !document.isEnabled }"
-                    >
-                      {{ document.isEnabled ? '✓' : '○' }}
-                    </span>
                   </button>
                 </section>
               </div>
@@ -817,10 +816,13 @@ async function deleteSelectedDocument() {
                 </div>
 
                 <div class="editor-pane">
-                  <Textarea
+                  <CodeEditor
                     v-if="activeTab === 'markdown'"
-                    id="guidance-content"
-                    v-model="form.contentMarkdown"
+                    :file-path="editorFilePath"
+                    :content="form.contentMarkdown"
+                    language="markdown"
+                    @change="value => (form.contentMarkdown = value)"
+                    @save="saveDocument"
                     class="guidance-content"
                   />
 
@@ -875,6 +877,18 @@ async function deleteSelectedDocument() {
               option-label="label"
               option-value="value"
               class="w-full"
+            />
+          </div>
+
+          <div class="field">
+            <label for="guidance-description">Description</label>
+            <Textarea
+              id="guidance-description"
+              v-model="form.description"
+              class="w-full"
+              auto-resize
+              rows="3"
+              placeholder="Short summary used for discovery and tooling."
             />
           </div>
 
@@ -1215,16 +1229,6 @@ async function deleteSelectedDocument() {
   color: #6f7b8b;
 }
 
-.document-item-state-inline {
-  font-size: 0.85rem;
-  font-weight: 800;
-  color: #127247;
-}
-
-.document-item-state-inline-disabled {
-  color: #7b8796;
-}
-
 .editor-header {
   flex-shrink: 0;
   display: flex;
@@ -1456,7 +1460,7 @@ async function deleteSelectedDocument() {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0;
 }
 
 .editor-surface-header {
@@ -1466,11 +1470,10 @@ async function deleteSelectedDocument() {
   gap: 1rem;
   flex-wrap: wrap;
   flex-shrink: 0;
-  padding: 0.8rem 1rem;
-  border: 1px solid var(--surface-border);
-  border-bottom: 0;
-  border-radius: 14px 14px 0 0;
-  background: #fff;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid #d7e2f0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-surface-tabs {
@@ -1483,33 +1486,37 @@ async function deleteSelectedDocument() {
 .editor-pane {
   flex: 1;
   min-height: 22rem;
-  border: 1px solid var(--surface-border);
-  border-top: 0;
-  border-radius: 0 0 14px 14px;
-  background: var(--surface-ground);
-  overflow: hidden;
+  background: transparent;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 .guidance-content {
   width: 100%;
   height: 100%;
-  border: 0;
-  border-radius: 0;
-  resize: none;
-  font-family: var(--font-family-monospace, monospace);
-  font-size: 0.95rem;
-  line-height: 1.55;
+  box-sizing: border-box;
 }
 
-.guidance-content:enabled {
+.guidance-content :deep(.code-editor) {
+  min-height: 100%;
+}
+
+.guidance-content :deep(.cm-editor) {
+  height: 100%;
+  background: #fff;
+  border-radius: 0;
+}
+
+.guidance-content :deep(.cm-scroller) {
   background: #fff;
 }
 
 .preview-pane {
   height: 100%;
-  overflow: auto;
-  padding: 1.25rem;
+  overflow: visible;
+  padding: 1.5rem 0 0;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .properties-shell {
