@@ -41,7 +41,6 @@ const SURFACE_OPTIONS = [
 
 const DOCUMENT_KIND_OPTIONS = [
   { label: 'Base Prompt', value: 'BasePrompt' },
-  { label: 'System Prompt', value: 'SystemPrompt' },
   { label: 'Guidance', value: 'Guidance' },
 ]
 
@@ -70,7 +69,6 @@ const SURFACE_LABELS: Record<string, string> = {
 
 const DOCUMENT_KIND_LABELS: Record<string, string> = {
   BasePrompt: 'Base Prompt',
-  SystemPrompt: 'System Prompt',
   Guidance: 'Guidance',
 }
 
@@ -463,10 +461,8 @@ function getDocumentKindRank(kind: string) {
   switch (kind) {
     case 'BasePrompt':
       return 0
-    case 'SystemPrompt':
-      return 1
     default:
-      return 2
+      return 1
   }
 }
 
@@ -1291,11 +1287,6 @@ async function deleteSelectedDocument() {
 .doc-badge-kind-baseprompt {
   background: #fff3d9;
   color: #8a5a00;
-}
-
-.doc-badge-kind-systemprompt {
-  background: #f3e8ff;
-  color: #6f3eb2;
 }
 
 .doc-badge-kind-guidance {

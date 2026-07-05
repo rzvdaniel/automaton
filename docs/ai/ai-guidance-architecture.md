@@ -6,7 +6,7 @@ This document explains how Automaton uses AI guidance documents today:
 - how Studio and CLI consume it
 - how the database is seeded
 - which document properties matter in Admin
-- how to think about `BasePrompt`, `SystemPrompt`, and `Guidance`
+- how to think about `BasePrompt` and `Guidance`
 
 ## Current model
 
@@ -234,17 +234,6 @@ Typical metadata:
 - `IsModelLoadable = false`
 - low `SortOrder` such as `0`
 
-### SystemPrompt
-
-Meaning:
-
-- reserved category for prompt documents that should behave like system-level instructions
-- currently supported in taxonomy, but not yet central in the active runtime design
-
-Use this only if you explicitly want a document that is not just optional guidance and not the single harness base contract.
-
-If introduced later, it should have a very explicit resolver story, just like `BasePrompt`.
-
 ### Guidance
 
 Meaning:
@@ -319,7 +308,6 @@ Meaning:
 Role of the document:
 
 - `BasePrompt`
-- `SystemPrompt`
 - `Guidance`
 
 This is one of the most important fields.
@@ -493,7 +481,7 @@ You can add:
 When adding a new document, decide:
 
 1. Which surface is it for?
-2. Is it a `BasePrompt`, `SystemPrompt`, or `Guidance` document?
+2. Is it a `BasePrompt` or `Guidance` document?
 3. Should it always be injected?
 4. Should the model be allowed to discover/load it?
 
@@ -545,7 +533,6 @@ Today the guidance architecture is:
 The key distinction between document categories is:
 
 - `BasePrompt` = always-injected harness foundation, normally not discoverable
-- `SystemPrompt` = reserved system-level category when needed
 - `Guidance` = focused instruction docs, either always-loaded or optional/discoverable
 
 If in doubt:
