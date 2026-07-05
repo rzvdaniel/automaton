@@ -11,16 +11,13 @@ namespace Automaton.Api.Services;
 public sealed class AdminAiGuidanceService
 {
     private readonly ApplicationDbContext _dbContext;
-    private readonly IAutomatonGuidanceProvider _embeddedGuidanceProvider;
     private readonly IAuditEventService _auditEventService;
 
     public AdminAiGuidanceService(
         ApplicationDbContext dbContext,
-        IAutomatonGuidanceProvider embeddedGuidanceProvider,
         IAuditEventService auditEventService)
     {
         _dbContext = dbContext;
-        _embeddedGuidanceProvider = embeddedGuidanceProvider;
         _auditEventService = auditEventService;
     }
 
@@ -163,39 +160,6 @@ public sealed class AdminAiGuidanceService
         return entity;
     }
 
-    public async Task<AiGuidanceDocument?> ResetToEmbeddedDefaultAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        var entity = await _dbContext.AiGuidanceDocuments.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (entity is null)
-        {
-            return null;
-        }
-
-        var embedded = FindEmbeddedDefault(entity.Key);
-        if (embedded is null)
-        {
-            throw new InvalidOperationException($"No embedded default exists for '{entity.Key}'.");
-        }
-
-        var parsed = AiGuidanceMarkdownFrontMatter.Parse(embedded.Content);
-        entity.Title = string.IsNullOrWhiteSpace(parsed.Title) ? entity.Title : parsed.Title;
-        entity.Description = string.IsNullOrWhiteSpace(parsed.Description) ? entity.Description : parsed.Description;
-        entity.ContentMarkdown = parsed.Body;
-        entity.Version += 1;
-        entity.UpdatedAt = DateTime.UtcNow;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        await WriteAuditAsync(
-            AuditEventTypes.AiGuidanceResetToDefault,
-            AuditActions.Changed,
-            entity,
-            "AI guidance document reset to embedded default",
-            cancellationToken);
-
-        return entity;
-    }
-
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _dbContext.AiGuidanceDocuments.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -227,12 +191,7 @@ public sealed class AdminAiGuidanceService
         return true;
     }
 
-    public bool HasEmbeddedDefault(string key) => FindEmbeddedDefault(key) is not null;
-
-    private GuidanceSource? FindEmbeddedDefault(string key) =>
-        _embeddedGuidanceProvider
-            .GetReferenceSources()
-            .FirstOrDefault(x => string.Equals(BuildKeyFromRelativePath(x.RelativePath), key, StringComparison.Ordinal));
+    public bool HasEmbeddedDefault(string key) => AutomatonGuidanceSeedCatalog.FindByKey(key) is not null;
 
     private async Task EnsureUniqueAsync(string key, Guid? excludeId, CancellationToken cancellationToken)
     {
@@ -277,10 +236,6 @@ public sealed class AdminAiGuidanceService
             }
         }, cancellationToken);
     }
-
-    private static string BuildKeyFromRelativePath(string relativePath) =>
-        relativePath.Replace("llms/", string.Empty, StringComparison.Ordinal)
-            .Replace(".md", string.Empty, StringComparison.Ordinal);
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

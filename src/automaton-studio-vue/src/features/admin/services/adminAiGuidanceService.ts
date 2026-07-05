@@ -32,11 +32,6 @@ class AdminAiGuidanceService {
     return data
   }
 
-  async reset(id: string): Promise<AiGuidanceAdmin> {
-    const { data } = await apiClient.post<AiGuidanceAdmin>(`/api/admin/ai-guidance/${id}/reset`)
-    return data
-  }
-
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/api/admin/ai-guidance/${id}`)
   }

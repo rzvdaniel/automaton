@@ -1,6 +1,10 @@
 using Automaton.AiGuidance;
+using Automaton.Api.Data;
+using Automaton.Api.Services;
 using Automaton.Mcp.SystemPrompts;
 using Automaton.Mcp.Tools;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 
 namespace Automaton.Api.Tests;
@@ -11,8 +15,10 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task BuildSystemPrompt_UsesCompactStudioContract_AndExcludesCliBootstrapPhrases()
     {
+        await using var dbContext = CreateDbContext();
+        var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
         var builder = new AppSystemPromptBuilder(
-            new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()),
+            runtimeProvider,
             new KeywordAppPromptContextSelector(),
             new StubStepSystemPromptBuilder(),
             [new StubVerificationStrategy()],
@@ -38,8 +44,10 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task BuildSystemPrompt_IncludesFocusedBackendGuidance_WhenRequestNeedsPersistence()
     {
+        await using var dbContext = CreateDbContext();
+        var runtimeProvider = await CreateRuntimeProviderAsync(dbContext);
         var builder = new AppSystemPromptBuilder(
-            new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()),
+            runtimeProvider,
             new KeywordAppPromptContextSelector(),
             new StubStepSystemPromptBuilder(),
             [new StubVerificationStrategy()],
@@ -88,7 +96,8 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ListsFocusedGuidanceReferences()
     {
-        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()));
+        await using var dbContext = CreateDbContext();
+        var tool = new AutomatonGuidanceTool(await CreateRuntimeProviderAsync(dbContext));
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.ListGuidanceName,
@@ -109,7 +118,8 @@ public class AppSystemPromptBuilderTests
     [Test]
     public async Task AutomatonGuidanceTool_ReturnsRequestedGuidanceContent()
     {
-        var tool = new AutomatonGuidanceTool(new EmbeddedAutomatonGuidanceRuntimeProvider(new EmbeddedAutomatonGuidanceProvider()));
+        await using var dbContext = CreateDbContext();
+        var tool = new AutomatonGuidanceTool(await CreateRuntimeProviderAsync(dbContext));
 
         var result = await tool.ExecuteToolAsync(
             AutomatonGuidanceTool.GetGuidanceName,
@@ -122,6 +132,25 @@ public class AppSystemPromptBuilderTests
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.Content, Does.Contain("# Automaton Media and Static Asset Rules"));
+    }
+
+    private static ApplicationDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new ApplicationDbContext(options);
+    }
+
+    private static async Task<AiGuidanceRuntimeService> CreateRuntimeProviderAsync(ApplicationDbContext dbContext)
+    {
+        var service = new AiGuidanceRuntimeService(
+            dbContext,
+            new EmbeddedAutomatonGuidanceProvider(),
+            NullLogger<AiGuidanceRuntimeService>.Instance);
+        await service.SeedMissingDefaultsAsync();
+        return service;
     }
 
     private sealed class StubStepSystemPromptBuilder : IStepSystemPromptBuilder

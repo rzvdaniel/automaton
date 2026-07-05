@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Automaton.AiGuidance;
 
 namespace Automaton.Cli.Services;
 
@@ -188,6 +189,34 @@ public class AutomatonApiClient : IDisposable
         await EnsureSuccessAsync(resp);
         var body = await resp.Content.ReadAsStringAsync(ct);
         return UnwrapFileContent(body);
+    }
+
+    public async Task<IReadOnlyList<GuidanceSource>> GetAiGuidanceExportAsync(CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync("api/ai-guidance/export", ct);
+        await EnsureSuccessAsync(resp);
+        var json = await ReadJsonAsync(resp, ct);
+        var files = new List<GuidanceSource>();
+
+        if (json.TryGetProperty("files", out var filesProperty) && filesProperty.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in filesProperty.EnumerateArray())
+            {
+                var targetPath = item.TryGetProperty("targetPath", out var targetPathProperty)
+                    ? targetPathProperty.GetString()
+                    : null;
+                var content = item.TryGetProperty("content", out var contentProperty)
+                    ? contentProperty.GetString()
+                    : null;
+
+                if (!string.IsNullOrWhiteSpace(targetPath) && content is not null)
+                {
+                    files.Add(new GuidanceSource(targetPath, content));
+                }
+            }
+        }
+
+        return files;
     }
 
     private static string UnwrapFileContent(string body)

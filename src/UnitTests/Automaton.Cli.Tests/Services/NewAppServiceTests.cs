@@ -1,5 +1,6 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
+using Automaton.AiGuidance;
 using NUnit.Framework;
 
 namespace Automaton.Cli.Tests.Services;
@@ -27,9 +28,11 @@ public class NewAppServiceTests
     public async Task CreateAsync_WhenNameAndCredentialsArePresent_CreatesAppAndWritesProjectFiles()
     {
         var projectRoot = CreateProjectRoot();
+        var references = GetReferenceSources();
         var service = new NewAppService(
             new ConfigService(),
-            (_, _, name, _) => Task.FromResult(((string)"app-123", name)));
+            (_, _, name, _) => Task.FromResult(((string)"app-123", name)),
+            (_, _, _) => Task.FromResult(references));
 
         var result = await service.CreateAsync(projectRoot, "My App", "https://automaton.monster", "ak_test");
 
@@ -57,9 +60,11 @@ public class NewAppServiceTests
     public async Task CreateAsync_WhenRemoteCreationFails_LeavesLocalScaffoldForLaterLinking()
     {
         var projectRoot = CreateProjectRoot();
+        var references = GetReferenceSources();
         var service = new NewAppService(
             new ConfigService(),
-            (_, _, _, _) => throw new HttpRequestException("API error 500 Internal Server Error"));
+            (_, _, _, _) => throw new HttpRequestException("API error 500 Internal Server Error"),
+            (_, _, _) => Task.FromResult(references));
 
         var result = await service.CreateAsync(projectRoot, "My App", "https://automaton.monster", "ak_test");
 
@@ -100,7 +105,8 @@ public class NewAppServiceTests
 
         var service = new NewAppService(
             configService,
-            (_, _, name, _) => Task.FromResult(((string)"app-123", name)));
+            (_, _, name, _) => Task.FromResult(((string)"app-123", name)),
+            (_, _, _) => Task.FromResult(GetReferenceSources()));
 
         var result = await service.CreateAsync(projectRoot, "Recovered App", "https://automaton.monster", "ak_test");
 
@@ -143,4 +149,7 @@ public class NewAppServiceTests
         _tempDirectories.Add(path);
         return path;
     }
+
+    private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
+        new EmbeddedAutomatonGuidanceProvider().GetReferenceSources();
 }

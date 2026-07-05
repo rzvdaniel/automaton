@@ -4,7 +4,7 @@ namespace Automaton.Api.Entities;
 
 /// <summary>
 /// Runtime-managed AI guidance document used by Studio and CLI prompt harnesses.
-/// Embedded guidance remains the seed/reset source; database rows are the mutable runtime source.
+/// Embedded guidance remains the initial seed source; database rows are the mutable runtime source.
 /// </summary>
 public class AiGuidanceDocument
 {

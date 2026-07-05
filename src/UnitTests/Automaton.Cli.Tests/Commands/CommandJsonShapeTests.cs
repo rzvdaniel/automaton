@@ -200,28 +200,18 @@ public class CommandJsonShapeTests
     }
 
     [Test]
-    public async Task SyncAiCommand_WhenInvokedWithJson_ReturnsSuccessJsonShape()
+    public async Task SyncAiCommand_WhenInvokedWithJson_ReturnsFailureJsonShape_WhenNoServerBackedGuidanceIsAvailable()
     {
         var projectRoot = CreateProjectRoot();
         var command = SyncAiCommand.Build(new ConfigService());
 
         var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
 
-        using var doc = JsonDocument.Parse(output);
-        var root = doc.RootElement;
-
-        Assert.That(root.GetProperty("success").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("summary").GetString(), Is.EqualTo("AI guidance sync complete"));
-        Assert.That(root.GetProperty("mode").GetString(), Is.EqualTo(AiGuidanceModes.Project));
-        Assert.That(root.GetProperty("manifestPath").GetString(), Does.Contain("manifest.json"));
-        Assert.That(root.GetProperty("generatedFiles").GetArrayLength(), Is.GreaterThanOrEqualTo(10));
-
-        var checks = root.GetProperty("checks").EnumerateArray().ToList();
-        Assert.That(checks.Any(check => string.Equals(check.GetProperty("name").GetString(), CommandDiagnosticCheckNames.AiGuidance, StringComparison.Ordinal)), Is.True);
+        AssertDiagnosticFailure(output, "AI guidance sync failed", CommandDiagnosticCheckNames.AiGuidance, "checks", "nextSteps");
     }
 
     [Test]
-    public async Task SyncAiCommand_WhenAdapterIsRequested_GeneratesAdapter()
+    public async Task SyncAiCommand_WhenAdapterIsRequested_ReturnsFailureJsonShape_WhenNoServerBackedGuidanceIsAvailable()
     {
         var projectRoot = CreateProjectRoot();
         var command = SyncAiCommand.Build(new ConfigService());
@@ -229,8 +219,8 @@ public class CommandJsonShapeTests
         var output = await InvokeAndCaptureAsync(command, projectRoot, ["--adapter", "claude", "--json"]);
 
         using var doc = JsonDocument.Parse(output);
-        Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
+        Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.False);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
     }
 
     private static void AssertDiagnosticFailure(string output, string expectedSummary, string expectedCheckName, params string[] requiredTopLevelProperties)

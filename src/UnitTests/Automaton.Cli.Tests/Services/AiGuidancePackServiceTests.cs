@@ -1,5 +1,6 @@
 using Automaton.Cli.Services;
 using Automaton.Cli.Models;
+using Automaton.AiGuidance;
 using NUnit.Framework;
 using System.Text.Json;
 
@@ -30,7 +31,7 @@ public class AiGuidancePackServiceTests
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-app");
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}\n");
 
-        var result = new AiGuidancePackService().Sync(projectRoot);
+        var result = new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
 
         Assert.That(result.Mode, Is.EqualTo("app"));
         Assert.That(File.Exists(Path.Combine(projectRoot, "AGENTS.md")), Is.True);
@@ -58,7 +59,7 @@ public class AiGuidancePackServiceTests
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-guardrails");
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}\n");
 
-        new AiGuidancePackService().Sync(projectRoot);
+        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
 
         var agentsContent = File.ReadAllText(Path.Combine(projectRoot, "AGENTS.md"));
         var instructionsContent = File.ReadAllText(Path.Combine(projectRoot, ".automaton", "agents", "instructions.md"));
@@ -108,7 +109,7 @@ public class AiGuidancePackServiceTests
         File.WriteAllText(Path.Combine(projectRoot, ".automaton", "ai-guidance", "llms", "automaton-cli-install.md"), "legacy install");
         File.WriteAllText(Path.Combine(projectRoot, ".automaton", "ai-guidance", "manifest.json"), """{"generator":{"name":"Automaton.Cli"}}""");
 
-        new AiGuidancePackService().Sync(projectRoot);
+        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources());
 
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
@@ -120,7 +121,7 @@ public class AiGuidancePackServiceTests
     {
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-claude");
 
-        new AiGuidancePackService().Sync(projectRoot, AiGuidanceAdapters.Claude);
+        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.Claude);
 
         var claudePath = Path.Combine(projectRoot, "CLAUDE.md");
         Assert.That(File.Exists(claudePath), Is.True);
@@ -133,7 +134,7 @@ public class AiGuidancePackServiceTests
     {
         var projectRoot = CreateTempDirectory("automaton-cli-guidance-all");
 
-        new AiGuidancePackService().Sync(projectRoot, AiGuidanceAdapters.All);
+        new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.All);
 
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
         Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.True);
@@ -147,7 +148,7 @@ public class AiGuidancePackServiceTests
         var workspaceRoot = Path.Combine(parentRoot, "apps");
         Directory.CreateDirectory(workspaceRoot);
 
-        var result = new AiGuidancePackService().Sync(workspaceRoot);
+        var result = new AiGuidancePackService().Sync(workspaceRoot, GetReferenceSources());
 
         Assert.That(result.Mode, Is.EqualTo("workspace"));
         var agentsContent = File.ReadAllText(Path.Combine(workspaceRoot, "AGENTS.md"));
@@ -161,4 +162,7 @@ public class AiGuidancePackServiceTests
         _tempDirectories.Add(root);
         return root;
     }
+
+    private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
+        new EmbeddedAutomatonGuidanceProvider().GetReferenceSources();
 }

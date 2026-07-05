@@ -10,7 +10,7 @@ namespace Automaton.Cli.Services;
 public sealed class AiGuidancePackService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private readonly IAutomatonGuidanceProvider _guidanceProvider;
+    private readonly IAutomatonGuidanceProvider _templateProvider;
 
     public AiGuidancePackService()
         : this(new EmbeddedAutomatonGuidanceProvider())
@@ -19,10 +19,13 @@ public sealed class AiGuidancePackService
 
     public AiGuidancePackService(IAutomatonGuidanceProvider guidanceProvider)
     {
-        _guidanceProvider = guidanceProvider;
+        _templateProvider = guidanceProvider;
     }
 
-    public AiGuidanceSyncResult Sync(string directory, string adapter = AiGuidanceAdapters.None)
+    public AiGuidanceSyncResult Sync(
+        string directory,
+        IReadOnlyList<GuidanceSource> references,
+        string adapter = AiGuidanceAdapters.None)
     {
         if (!AiGuidanceAdapters.IsKnown(adapter))
         {
@@ -36,8 +39,8 @@ public sealed class AiGuidancePackService
         Directory.CreateDirectory(agentsRoot);
         Directory.CreateDirectory(referencesRoot);
 
-        var sources = _guidanceProvider.GetReferenceSources();
-        var templates = _guidanceProvider.GetTemplateSources();
+        var sources = references;
+        var templates = _templateProvider.GetTemplateSources();
         var variables = BuildTemplateVariables(mode);
         foreach (var source in sources)
         {
@@ -251,7 +254,7 @@ public sealed class AiGuidancePackService
             return;
         }
 
-        foreach (var source in _guidanceProvider.GetReferenceSources())
+        foreach (var source in _templateProvider.GetReferenceSources())
         {
             var path = Path.Combine(legacyRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(path))

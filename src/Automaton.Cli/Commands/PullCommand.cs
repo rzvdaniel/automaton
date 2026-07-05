@@ -149,17 +149,38 @@ public static class PullCommand
                 : null
         });
 
-        var guidance = new AiGuidancePackService().Sync(targetDir);
+        string? guidanceWarning = null;
+        AiGuidanceSyncResult? guidance = null;
+        try
+        {
+            var guidanceReferences = await client.GetAiGuidanceExportAsync();
+            guidance = new AiGuidancePackService().Sync(targetDir, guidanceReferences);
+        }
+        catch (Exception ex)
+        {
+            guidanceWarning = $"Latest AI guidance unavailable: {ex.Message}";
+        }
 
         if (nonInteractive)
         {
-            Console.WriteLine($"Wrote automaton.json ({guidance.Mode})");
+            Console.WriteLine(guidance is null ? "Wrote automaton.json" : $"Wrote automaton.json ({guidance.Mode})");
             Console.WriteLine($"Linked app: {appId}");
+            if (!string.IsNullOrWhiteSpace(guidanceWarning))
+            {
+                Console.WriteLine($"Warning: {guidanceWarning}");
+            }
         }
         else
         {
             AnsiConsole.MarkupLine($"[green]✓[/] Wrote [bold]automaton.json[/] and linked app [cyan]{appId}[/]");
-            AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
+            if (guidance is not null)
+            {
+                AnsiConsole.MarkupLine($"[grey]Local AI guidance synced ({guidance.Mode}).[/]");
+            }
+            else if (!string.IsNullOrWhiteSpace(guidanceWarning))
+            {
+                AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(guidanceWarning)}");
+            }
         }
     }
 

@@ -12,26 +12,12 @@ public interface IAiGuidanceRuntimeService
     Task<IReadOnlyList<AiGuidanceCatalogItem>> GetRequiredGuidanceAsync(string surface, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AiGuidanceCatalogItem>> ListLoadableGuidanceAsync(string? surface = null, CancellationToken cancellationToken = default);
     Task<AiGuidanceResolvedDocument?> GetGuidanceByKeyAsync(string key, CancellationToken cancellationToken = default);
+    Task<AiGuidanceExportPack> BuildExportPackAsync(CancellationToken cancellationToken = default);
     Task<int> SeedMissingDefaultsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutomatonGuidanceRuntimeProvider
 {
-    private static readonly IReadOnlyDictionary<string, GuidanceSeedMetadata> SeedCatalog =
-        new Dictionary<string, GuidanceSeedMetadata>(StringComparer.Ordinal)
-        {
-            ["llms/automaton-app-contract-compact.md"] = new("automaton-app-contract-compact", "Automaton App Contract (Compact)", "shared", AiGuidanceDocumentKinds.BasePrompt, "Compact always-on Automaton app contract for Studio editing.", """["contract","structure","studio"]""", true, false, 0),
-            ["llms/automaton-studio-editor.md"] = new("automaton-studio-editor", "Automaton Studio Editor", "studio", AiGuidanceDocumentKinds.Guidance, "Studio editor behavior, file editing rules, and verification expectations.", """["editor","files","preview","studio"]""", true, true, 100),
-            ["llms/automaton-backend-controllers.md"] = new("automaton-backend-controllers", "Automaton Backend Controllers", "shared", AiGuidanceDocumentKinds.Guidance, "Python controller rules, response envelope, and backend structure guidance.", """["backend","controllers","api","python"]""", false, true, 200),
-            ["llms/automaton-media-assets.md"] = new("automaton-media-assets", "Automaton Media and Static Asset Rules", "shared", AiGuidanceDocumentKinds.Guidance, "Bundled assets versus runtime media, uploads, and public/static asset handling.", """["assets","media","uploads","images"]""", false, true, 200),
-            ["llms/automaton-frontend-structure.md"] = new("automaton-frontend-structure", "Automaton Frontend Structure", "shared", AiGuidanceDocumentKinds.Guidance, "Frontend structure, relative URLs, PWA rules, and installable app patterns.", """["frontend","pwa","structure","vite"]""", false, true, 200),
-            ["llms/automaton-starter-prompts.md"] = new("automaton-starter-prompts", "Automaton Starter Prompts", "cli", AiGuidanceDocumentKinds.Guidance, "Starter app prompts and initial app creation guidance.", """["starter","scaffold","examples","cli"]""", false, true, 200),
-            ["llms/automaton-cli-deploy.md"] = new("automaton-cli-deploy", "Automaton CLI Deploy", "cli", AiGuidanceDocumentKinds.Guidance, "Deploy and runtime troubleshooting guidance for Automaton apps.", """["deploy","publish","runtime","cli"]""", false, true, 200),
-            ["llms/automaton-cli-install.md"] = new("automaton-cli-install", "Automaton CLI Install", "cli", AiGuidanceDocumentKinds.Guidance, "Automaton CLI installation and bootstrap guidance.", """["install","setup","bootstrap","cli"]""", false, true, 200),
-            ["llms/automaton-examples.md"] = new("automaton-examples", "Automaton Examples", "shared", AiGuidanceDocumentKinds.Guidance, "Longer examples and reference app patterns.", """["examples","patterns","reference"]""", false, true, 200),
-            ["llms/automaton-mcp.md"] = new("automaton-mcp", "Automaton MCP", "mcp", AiGuidanceDocumentKinds.Guidance, "Guidance for MCP-related workflows and integrations.", """["mcp","protocol","tools"]""", false, true, 200)
-        };
-
     private readonly ApplicationDbContext _dbContext;
     private readonly IAutomatonGuidanceProvider _embeddedGuidanceProvider;
     private readonly ILogger<AiGuidanceRuntimeService> _logger;
@@ -93,6 +79,41 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 && item.DocumentKind == AiGuidanceDocumentKinds.Guidance
                 && item.Key == key,
             cancellationToken);
+    }
+
+    public async Task<AiGuidanceExportPack> BuildExportPackAsync(CancellationToken cancellationToken = default)
+    {
+        var documents = await _dbContext.AiGuidanceDocuments
+            .AsNoTracking()
+            .Where(item => item.IsEnabled)
+            .OrderBy(item => item.Surface)
+            .ThenBy(item => item.SortOrder)
+            .ThenBy(item => item.Title)
+            .Select(item => new AiGuidanceResolvedDocument(
+                item.Key,
+                item.Title,
+                item.Surface,
+                item.DocumentKind,
+                item.TagsJson,
+                item.Description,
+                item.ContentMarkdown,
+                item.RequiredByDefault,
+                item.IsModelLoadable,
+                item.SortOrder,
+                item.Version,
+                true))
+            .ToListAsync(cancellationToken);
+
+        var files = new List<AiGuidanceExportFile>
+        {
+            new("llms.txt", BuildLlmsText(documents)),
+            new("llms-full.txt", BuildLlmsFullText(documents))
+        };
+
+        files.AddRange(documents.Select(document =>
+            new AiGuidanceExportFile($"llms/{document.Key}.md", document.ContentMarkdown)));
+
+        return new AiGuidanceExportPack(files);
     }
 
     async Task<AutomatonGuidanceDocument?> IAutomatonGuidanceRuntimeProvider.GetBasePromptAsync(string surface, CancellationToken cancellationToken)
@@ -222,19 +243,8 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 true))
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static GuidanceSeedMetadata ResolveMetadata(string relativePath) =>
-        SeedCatalog.TryGetValue(relativePath, out var metadata)
-            ? metadata
-            : new GuidanceSeedMetadata(
-                relativePath.Replace("llms/", string.Empty, StringComparison.Ordinal).Replace(".md", string.Empty, StringComparison.Ordinal),
-                relativePath,
-                "shared",
-                AiGuidanceDocumentKinds.Guidance,
-                "Focused Automaton guidance reference.",
-                """["reference"]""",
-                false,
-                true,
-                200);
+    private static AutomatonGuidanceSeedMetadata ResolveMetadata(string relativePath) =>
+        AutomatonGuidanceSeedCatalog.ResolveByRelativePath(relativePath);
 
     private static AutomatonGuidanceCatalogItem MapCatalogDocument(AiGuidanceCatalogItem item) =>
         new(
@@ -264,6 +274,63 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.SortOrder,
             item.Version,
             item.IsDatabaseDocument);
+
+    private static string BuildLlmsText(IReadOnlyList<AiGuidanceResolvedDocument> documents)
+    {
+        var basePrompt = documents.FirstOrDefault(item =>
+            item.DocumentKind == AiGuidanceDocumentKinds.BasePrompt
+            && string.Equals(item.Surface, "shared", StringComparison.Ordinal))
+            ?? documents.FirstOrDefault(item => item.DocumentKind == AiGuidanceDocumentKinds.BasePrompt);
+
+        var builder = new System.Text.StringBuilder();
+
+        if (basePrompt is not null)
+        {
+            builder.AppendLine(basePrompt.ContentMarkdown.Trim());
+            builder.AppendLine();
+        }
+
+        var linkedDocuments = documents
+            .Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt)
+            .ToList();
+
+        if (linkedDocuments.Count > 0)
+        {
+            builder.AppendLine("## Linked guidance");
+            builder.AppendLine();
+            foreach (var document in linkedDocuments)
+            {
+                builder.Append("- `llms/")
+                    .Append(document.Key)
+                    .Append(".md`");
+
+                if (!string.IsNullOrWhiteSpace(document.Description))
+                {
+                    builder.Append(" - ").Append(document.Description);
+                }
+
+                builder.AppendLine();
+            }
+        }
+
+        return builder.ToString().Trim() + Environment.NewLine;
+    }
+
+    private static string BuildLlmsFullText(IReadOnlyList<AiGuidanceResolvedDocument> documents)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine(BuildLlmsText(documents).TrimEnd());
+
+        foreach (var document in documents.Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt))
+        {
+            builder.AppendLine();
+            builder.AppendLine("---");
+            builder.AppendLine();
+            builder.AppendLine(document.ContentMarkdown.Trim());
+        }
+
+        return builder.ToString().Trim() + Environment.NewLine;
+    }
 }
 
 public sealed record AiGuidanceCatalogItem(
@@ -293,13 +360,9 @@ public sealed record AiGuidanceResolvedDocument(
     int Version,
     bool IsDatabaseDocument);
 
-public sealed record GuidanceSeedMetadata(
-    string Key,
-    string Title,
-    string Surface,
-    string DocumentKind,
-    string Description,
-    string? TagsJson,
-    bool RequiredByDefault,
-    bool IsModelLoadable,
-    int SortOrder);
+public sealed record AiGuidanceExportPack(
+    IReadOnlyList<AiGuidanceExportFile> Files);
+
+public sealed record AiGuidanceExportFile(
+    string TargetPath,
+    string Content);

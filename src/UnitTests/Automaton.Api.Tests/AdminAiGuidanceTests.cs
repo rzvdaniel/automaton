@@ -100,28 +100,6 @@ public class AdminAiGuidanceTests
     }
 
     [Test]
-    public async Task ResetToEmbeddedDefaultAsync_RestoresEmbeddedContent_AndBumpsVersion()
-    {
-        await using var dbContext = CreateDbContext();
-        var entity = await SeedGuidanceDocumentAsync(
-            dbContext,
-            key: "automaton-studio-editor",
-            title: "Automaton Studio Editor",
-            contentMarkdown: "# Overridden");
-        var service = CreateAdminService(dbContext);
-
-        var reset = await service.ResetToEmbeddedDefaultAsync(entity.Id);
-
-        Assert.That(reset, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(reset!.Version, Is.EqualTo(2));
-            Assert.That(reset.ContentMarkdown, Does.Contain("# Automaton Studio App Editor"));
-            Assert.That(reset.ContentMarkdown, Does.Not.EqualTo("# Overridden"));
-        });
-    }
-
-    [Test]
     public async Task Create_DuplicateKey_ReturnsCleanValidationError()
     {
         await using var dbContext = CreateDbContext();
@@ -274,7 +252,6 @@ public class AdminAiGuidanceTests
     private static AdminAiGuidanceService CreateAdminService(ApplicationDbContext dbContext) =>
         new(
             dbContext,
-            new EmbeddedAutomatonGuidanceProvider(),
             new FakeAuditEventService());
 
     private static AiGuidanceRuntimeService CreateRuntimeService(ApplicationDbContext dbContext) =>

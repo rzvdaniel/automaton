@@ -379,35 +379,6 @@ function confirmToggleEnabled(document: AiGuidanceAdmin) {
   })
 }
 
-function confirmReset(document: AiGuidanceAdmin) {
-  confirm.require({
-    message: `Reset "${document.title}" back to its embedded default content?`,
-    header: 'Reset Guidance',
-    icon: 'pi pi-refresh',
-    rejectLabel: 'Cancel',
-    acceptLabel: 'Reset',
-    accept: async () => {
-      try {
-        const updated = await adminAiGuidanceService.reset(document.id)
-        await applyMutationResult(updated)
-        toast.add({
-          severity: 'success',
-          summary: 'Reset',
-          detail: 'Document restored from embedded default',
-          life: 3000,
-        })
-      } catch (error: unknown) {
-        toast.add({
-          severity: 'error',
-          summary: 'Reset Failed',
-          detail: extractErrorMessage(error, 'Failed to reset document'),
-          life: 4000,
-        })
-      }
-    },
-  })
-}
-
 async function applyMutationResult(document: AiGuidanceAdmin) {
   selectedId.value = document.id
   deleteConfirmKey.value = ''
@@ -748,14 +719,6 @@ async function deleteSelectedDocument() {
                       severity="secondary"
                       outlined
                       @click="cloneDocument"
-                    />
-                    <Button
-                      v-if="selectedDocument?.hasEmbeddedDefault"
-                      label="Reset"
-                      icon="pi pi-refresh"
-                      severity="danger"
-                      outlined
-                      @click="confirmReset(selectedDocument)"
                     />
                     <Button
                       v-if="selectedDocument"

@@ -1,4 +1,5 @@
 using Automaton.Cli.Services;
+using Automaton.AiGuidance;
 using NUnit.Framework;
 using System.Text.Json;
 
@@ -27,9 +28,11 @@ public class LinkAppServiceTests
     public async Task LinkAsync_WhenAppIdAndCredentialsArePresent_WritesProjectFiles()
     {
         var projectRoot = CreateProjectRoot();
+        var references = GetReferenceSources();
         var service = new LinkAppService(
             new ConfigService(),
-            (_, _, _, _) => Task.FromResult(ParseApp("app-456", "Linked App")));
+            (_, _, _, _) => Task.FromResult(ParseApp("app-456", "Linked App")),
+            (_, _, _) => Task.FromResult(references));
 
         var result = await service.LinkAsync(projectRoot, "app-456", "https://automaton.monster", "ak_test");
 
@@ -77,6 +80,9 @@ public class LinkAppServiceTests
         _tempDirectories.Add(path);
         return path;
     }
+
+    private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
+        new EmbeddedAutomatonGuidanceProvider().GetReferenceSources();
 
     private static JsonElement ParseApp(string id, string name)
     {

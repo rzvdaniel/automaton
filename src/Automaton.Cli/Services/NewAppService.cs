@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using Automaton.AiGuidance;
 
 namespace Automaton.Cli.Services;
 
@@ -11,15 +12,18 @@ public sealed class NewAppService
     private readonly ConfigService _config;
     private readonly AiGuidancePackService _aiGuidancePackService;
     private readonly Func<string, string, string, CancellationToken, Task<(string appId, string name)>> _createAppAsync;
+    private readonly Func<string, string, CancellationToken, Task<IReadOnlyList<GuidanceSource>>> _getGuidanceAsync;
 
     public NewAppService(
         ConfigService config,
         Func<string, string, string, CancellationToken, Task<(string appId, string name)>>? createAppAsync = null,
+        Func<string, string, CancellationToken, Task<IReadOnlyList<GuidanceSource>>>? getGuidanceAsync = null,
         AiGuidancePackService? aiGuidancePackService = null)
     {
         _config = config;
         _aiGuidancePackService = aiGuidancePackService ?? new AiGuidancePackService();
         _createAppAsync = createAppAsync ?? CreateAppAsync;
+        _getGuidanceAsync = getGuidanceAsync ?? GetGuidanceAsync;
     }
 
     public async Task<NewAppResult> CreateAsync(
@@ -69,8 +73,21 @@ public sealed class NewAppService
                 true,
                 $"local scaffold created at {Path.Combine(directory, "automaton.json")}"));
 
-            var guidance = _aiGuidancePackService.Sync(directory);
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+            try
+            {
+                var guidanceReferences = await _getGuidanceAsync(server, apiKey, cancellationToken);
+                var guidance = _aiGuidancePackService.Sync(directory, guidanceReferences);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AiGuidance, true, $"local AI guidance synced ({guidance.Mode})"));
+            }
+            catch (Exception ex)
+            {
+                checks.Add(new CommandDiagnosticCheck(
+                    CommandDiagnosticCheckNames.AiGuidance,
+                    false,
+                    $"latest AI guidance unavailable: {ex.Message}",
+                    IsWarning: true));
+                nextSteps.Add("Run automaton sync-ai later to pull the latest guidance from the server");
+            }
 
             var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
@@ -149,5 +166,11 @@ public sealed class NewAppService
     {
         using var client = new AutomatonApiClient(server, apiKey);
         return await client.CreateAppAsync(name, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<GuidanceSource>> GetGuidanceAsync(string server, string apiKey, CancellationToken cancellationToken)
+    {
+        using var client = new AutomatonApiClient(server, apiKey);
+        return await client.GetAiGuidanceExportAsync(cancellationToken);
     }
 }

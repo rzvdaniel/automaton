@@ -7,7 +7,7 @@ namespace Automaton.Cli.Commands;
 
 public static class SyncAiCommand
 {
-    public static Command Build(ConfigService _)
+    public static Command Build(ConfigService config)
     {
         var adapterOption = new Option<string>(
             "--adapter",
@@ -24,7 +24,7 @@ public static class SyncAiCommand
         cmd.SetHandler((string adapter, bool asJson) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var result = Sync(cwd, adapter);
+            var result = Sync(config, cwd, adapter);
 
             if (asJson)
             {
@@ -63,11 +63,14 @@ public static class SyncAiCommand
         return cmd;
     }
 
-    private static SyncAiResult Sync(string directory, string adapter)
+    private static SyncAiResult Sync(ConfigService config, string directory, string adapter)
     {
         try
         {
-            var syncResult = new AiGuidancePackService().Sync(directory, adapter);
+            var (server, apiKey) = config.RequireCredentials(directory: directory);
+            using var client = new AutomatonApiClient(server, apiKey);
+            var references = client.GetAiGuidanceExportAsync().GetAwaiter().GetResult();
+            var syncResult = new AiGuidancePackService().Sync(directory, references, adapter);
             return new SyncAiResult
             {
                 Success = true,

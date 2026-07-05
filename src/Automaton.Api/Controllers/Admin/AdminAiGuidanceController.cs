@@ -115,20 +115,6 @@ public sealed class AdminAiGuidanceController : ControllerBase
         return document is null ? NotFound() : Ok(Map(document));
     }
 
-    [HttpPost("{id:guid}/reset")]
-    public async Task<ActionResult<AiGuidanceAdminResponse>> Reset(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var document = await _service.ResetToEmbeddedDefaultAsync(id, cancellationToken);
-            return document is null ? NotFound() : Ok(Map(document));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
