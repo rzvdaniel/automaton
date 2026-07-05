@@ -76,11 +76,11 @@ const selectedId = ref<string | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const query = ref('')
+const createTitle = ref('')
 const activeTab = ref<'markdown' | 'preview'>('markdown')
 const propertiesOpen = ref(false)
 const inspectorTab = ref<'properties' | 'history'>('properties')
 const editingTitle = ref(false)
-const keyTouched = ref(false)
 
 const form = ref<GuidanceForm>(createEmptyForm())
 
@@ -88,33 +88,8 @@ const selectedDocument = computed(() =>
   documents.value.find(item => item.id === selectedId.value) ?? null
 )
 
-const displayDocument = computed<AiGuidanceAdmin>(() => ({
-  id: selectedDocument.value?.id ?? 'new',
-  key: form.value.key,
-  title: form.value.title,
-  surface: form.value.surface,
-  documentKind: form.value.documentKind,
-  description: form.value.description,
-  tagsJson: form.value.tagsJson,
-  contentMarkdown: form.value.contentMarkdown,
-  isEnabled: form.value.isEnabled,
-  requiredByDefault: form.value.requiredByDefault,
-  isModelLoadable: form.value.isModelLoadable,
-  sortOrder: form.value.sortOrder,
-  version: selectedDocument.value?.version ?? 1,
-  createdAt: selectedDocument.value?.createdAt ?? '',
-  updatedAt: selectedDocument.value?.updatedAt,
-  hasEmbeddedDefault: selectedDocument.value?.hasEmbeddedDefault ?? false,
-}))
-
 const isNewDocument = computed(() => selectedId.value === null)
-const isCreateFormValid = computed(() =>
-  form.value.title.trim().length > 0 &&
-  form.value.key.trim().length > 0 &&
-  form.value.surface.trim().length > 0 &&
-  form.value.documentKind.trim().length > 0 &&
-  form.value.contentMarkdown.trim().length > 0
-)
+const isCreateFormValid = computed(() => createTitle.value.trim().length > 0)
 
 const filteredDocuments = computed(() => {
   const normalizedQuery = query.value.trim().toLowerCase()
@@ -162,25 +137,7 @@ const groupedDocuments = computed<GuidanceGroup[]>(() => {
 const documentTitle = computed(() => form.value.title.trim() || 'Untitled guidance document')
 const renderedPreview = computed(() => renderMarkdown(form.value.contentMarkdown || ''))
 const inspectorTitle = computed(() => inspectorTab.value === 'history' ? 'History' : 'Properties')
-const headerBadges = computed(() => buildDocumentBadges(displayDocument.value))
-
-watch(
-  () => form.value.title,
-  title => {
-    if (isNewDocument.value && !keyTouched.value) {
-      form.value.key = slugifyKey(title)
-    }
-  }
-)
-
-watch(
-  () => form.value.key,
-  key => {
-    if (isNewDocument.value && keyTouched.value && key.trim().length === 0 && form.value.title.trim().length === 0) {
-      keyTouched.value = false
-    }
-  }
-)
+const headerBadges = computed(() => selectedDocument.value ? buildDocumentBadges(selectedDocument.value) : [])
 
 onMounted(loadDocuments)
 
@@ -220,8 +177,8 @@ function selectDocument(document: AiGuidanceAdmin) {
 
 function startCreate() {
   selectedId.value = null
+  createTitle.value = ''
   form.value = createEmptyForm()
-  keyTouched.value = false
   activeTab.value = 'markdown'
   propertiesOpen.value = false
   inspectorTab.value = 'properties'
@@ -235,20 +192,8 @@ function cloneDocument() {
 
   const source = selectedDocument.value
   selectedId.value = null
-  form.value = {
-    key: `${source.key}-copy`,
-    title: `${source.title} Copy`,
-    surface: source.surface,
-    documentKind: source.documentKind,
-    description: source.description ?? '',
-    tagsJson: source.tagsJson ?? '',
-    contentMarkdown: source.contentMarkdown,
-    isEnabled: false,
-    requiredByDefault: source.requiredByDefault,
-    isModelLoadable: source.isModelLoadable,
-    sortOrder: source.sortOrder,
-  }
-  keyTouched.value = true
+  createTitle.value = `${source.title} Copy`
+  form.value = createEmptyForm()
   activeTab.value = 'markdown'
   propertiesOpen.value = false
   inspectorTab.value = 'properties'
@@ -261,17 +206,12 @@ function openInspector(tab: 'properties' | 'history') {
 }
 
 async function saveDocument() {
-  if (isNewDocument.value && !isCreateFormValid.value) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Missing Required Fields',
-      detail: 'Title, key, surface, type, and content are required before creating a document.',
-      life: 3500,
-    })
+  if (saving.value) {
     return
   }
 
   saving.value = true
+  let saved: AiGuidanceAdmin
   try {
     const payload: UpsertAiGuidanceRequest = {
       key: form.value.key.trim(),
@@ -287,21 +227,9 @@ async function saveDocument() {
       sortOrder: form.value.sortOrder,
     }
 
-    const wasEditingExisting = !!selectedId.value
-    const saved = selectedId.value
+    saved = selectedId.value
       ? await adminAiGuidanceService.update(selectedId.value, payload)
       : await adminAiGuidanceService.create(payload)
-
-    selectedId.value = saved.id
-    applyDocumentToForm(saved)
-    await loadDocuments()
-
-    toast.add({
-      severity: 'success',
-      summary: wasEditingExisting ? 'Saved' : 'Created',
-      detail: 'AI guidance document saved',
-      life: 3000,
-    })
   } catch (error: unknown) {
     toast.add({
       severity: 'error',
@@ -309,9 +237,84 @@ async function saveDocument() {
       detail: extractErrorMessage(error, 'Failed to save AI guidance document'),
       life: 4000,
     })
+    return
   } finally {
     saving.value = false
   }
+
+  const wasEditingExisting = !!selectedId.value
+  selectedId.value = saved.id
+  applyDocumentToForm(saved)
+  upsertDocument(saved)
+
+  toast.add({
+    severity: 'success',
+    summary: wasEditingExisting ? 'Saved' : 'Created',
+    detail: 'AI guidance document saved',
+    life: 3000,
+  })
+}
+
+async function createDocumentFromTitle() {
+  if (saving.value) {
+    return
+  }
+
+  if (!isCreateFormValid.value) {
+    return
+  }
+
+  const title = createTitle.value.trim()
+  const key = slugifyKey(title)
+  if (!key) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Invalid Title',
+      detail: 'Enter a title that can generate a valid document key.',
+      life: 3500,
+    })
+    return
+  }
+
+  saving.value = true
+  let saved: AiGuidanceAdmin
+  try {
+    saved = await adminAiGuidanceService.create({
+      key,
+      title,
+      surface: 'studio',
+      documentKind: 'Guidance',
+      description: undefined,
+      tagsJson: undefined,
+      contentMarkdown: `# ${title}\n`,
+      isEnabled: true,
+      requiredByDefault: false,
+      isModelLoadable: true,
+      sortOrder: 100,
+    })
+  } catch (error: unknown) {
+    toast.add({
+      severity: 'error',
+      summary: 'Create Failed',
+      detail: extractErrorMessage(error, 'Failed to create AI guidance document'),
+      life: 4000,
+    })
+    return
+  } finally {
+    saving.value = false
+  }
+
+  selectedId.value = saved.id
+  createTitle.value = ''
+  applyDocumentToForm(saved)
+  upsertDocument(saved)
+
+  toast.add({
+    severity: 'success',
+    summary: 'Created',
+    detail: 'AI guidance document created',
+    life: 3000,
+  })
 }
 
 function confirmToggleEnabled(document: AiGuidanceAdmin) {
@@ -380,11 +383,22 @@ function confirmReset(document: AiGuidanceAdmin) {
 async function applyMutationResult(document: AiGuidanceAdmin) {
   selectedId.value = document.id
   applyDocumentToForm(document)
-  await loadDocuments()
+  upsertDocument(document)
+}
+
+function upsertDocument(document: AiGuidanceAdmin) {
+  const next = [...documents.value]
+  const index = next.findIndex(item => item.id === document.id)
+  if (index >= 0) {
+    next[index] = document
+  } else {
+    next.unshift(document)
+  }
+
+  documents.value = next
 }
 
 function applyDocumentToForm(document: AiGuidanceAdmin) {
-  keyTouched.value = true
   form.value = {
     key: document.key,
     title: document.title,
@@ -416,14 +430,6 @@ function createEmptyForm(): GuidanceForm {
   }
 }
 
-function onKeyInput(value: string) {
-  if (isNewDocument.value) {
-    keyTouched.value = true
-  }
-
-  form.value.key = value
-}
-
 function cancelCreate() {
   const fallback = documents.value[0] ?? null
   if (fallback) {
@@ -431,9 +437,9 @@ function cancelCreate() {
     return
   }
 
+  createTitle.value = ''
   selectedId.value = null
   form.value = createEmptyForm()
-  keyTouched.value = false
   activeTab.value = 'markdown'
   propertiesOpen.value = false
   inspectorTab.value = 'properties'
@@ -614,7 +620,27 @@ function extractErrorMessage(error: unknown, fallback: string) {
       <Card class="editor-card">
         <template #content>
           <div class="editor-shell">
-            <div v-if="!isNewDocument" class="editor-header">
+            <div v-if="isNewDocument" class="new-document-state">
+              <h2 class="new-document-title">New Document</h2>
+              <div class="new-document-form">
+                <InputText
+                  v-model="createTitle"
+                  class="new-document-input"
+                  placeholder="Document title"
+                  @keyup.enter="createDocumentFromTitle"
+                  autofocus
+                />
+                <p class="new-document-helper">
+                  A key will be generated automatically. You can change metadata later in Properties.
+                </p>
+                <div class="new-document-actions">
+                  <Button label="Cancel" severity="secondary" outlined @click="cancelCreate" />
+                  <Button label="Create" icon="pi pi-arrow-right" :loading="saving" :disabled="!isCreateFormValid" @click="createDocumentFromTitle" />
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="editor-header">
               <div class="editor-header-text">
                 <div class="editor-header-title-row">
                   <button
@@ -686,77 +712,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
               </div>
             </div>
 
-              <div class="editor-body">
-                <section v-if="isNewDocument" class="creation-panel">
-                  <div class="creation-panel-header">
-                    <h3 class="creation-panel-title">Create AI Guidance Document</h3>
-                    <p class="creation-panel-subtitle">Define the document identity, then write the markdown content.</p>
-                  </div>
-
-                  <div class="creation-grid">
-                    <div class="field">
-                      <label for="new-guidance-title">Title</label>
-                      <InputText
-                        id="new-guidance-title"
-                        v-model="form.title"
-                        class="w-full"
-                        placeholder="Document title"
-                      />
-                    </div>
-
-                    <div class="field">
-                      <label for="new-guidance-key">Key</label>
-                      <InputText
-                        id="new-guidance-key"
-                        :model-value="form.key"
-                        @update:model-value="onKeyInput"
-                        class="w-full"
-                        placeholder="studio-editor"
-                      />
-                    </div>
-
-                    <div class="field">
-                      <label for="new-guidance-document-kind">Type</label>
-                      <Dropdown
-                        id="new-guidance-document-kind"
-                        v-model="form.documentKind"
-                        :options="DOCUMENT_KIND_OPTIONS"
-                        option-label="label"
-                        option-value="value"
-                        class="w-full"
-                      />
-                    </div>
-
-                    <div class="field">
-                      <label for="new-guidance-surface">Surface</label>
-                      <Dropdown
-                        id="new-guidance-surface"
-                        v-model="form.surface"
-                        :options="SURFACE_OPTIONS"
-                        option-label="label"
-                        option-value="value"
-                        class="w-full"
-                      />
-                    </div>
-
-                    <div class="field field-span-3">
-                      <label for="new-guidance-required">Required by default</label>
-                      <div class="inline-toggle">
-                        <input id="new-guidance-required" v-model="form.requiredByDefault" type="checkbox" />
-                        <span>Inject automatically into prompt context</span>
-                      </div>
-                    </div>
-
-                    <div class="field field-span-3">
-                      <label for="new-guidance-discoverable">Discoverable</label>
-                      <div class="inline-toggle">
-                        <input id="new-guidance-discoverable" v-model="form.isModelLoadable" type="checkbox" />
-                        <span>Model can list/load this document</span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
+              <div v-if="!isNewDocument" class="editor-body">
                 <section class="content-section">
                 <div class="content-section-header">
                   <div class="content-toolbar">
@@ -768,17 +724,12 @@ function extractErrorMessage(error: unknown, fallback: string) {
                       aria-label="Editor mode"
                     />
                     <Button
-                      v-if="!isNewDocument"
                       label="Properties"
                       icon="pi pi-cog"
                       severity="secondary"
                       outlined
                       @click="openInspector('properties')"
                     />
-                    <div v-if="isNewDocument" class="create-actions">
-                      <Button label="Cancel" severity="secondary" outlined @click="cancelCreate" />
-                      <Button label="Create Document" icon="pi pi-save" :loading="saving" :disabled="!isCreateFormValid" @click="saveDocument" />
-                    </div>
                   </div>
                 </div>
 
@@ -1299,40 +1250,44 @@ function extractErrorMessage(error: unknown, fallback: string) {
   overflow: hidden;
 }
 
-.creation-panel {
-  flex-shrink: 0;
+.new-document-state {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid #dbe6f4;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  justify-content: flex-start;
+  gap: 1rem;
+  padding: 4rem 2rem 2rem;
 }
 
-.creation-panel-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.creation-panel-title {
+.new-document-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: #17325b;
 }
 
-.creation-panel-subtitle {
-  margin: 0;
-  color: var(--text-color-secondary);
-  font-size: 0.88rem;
+.new-document-form {
+  max-width: 38rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
-.creation-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
+.new-document-input {
+  width: 100%;
+}
+
+.new-document-helper {
+  margin: -0.15rem 0 0;
+  color: var(--text-color-secondary);
+  font-size: 0.92rem;
+}
+
+.new-document-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .field-span-3 {
@@ -1379,13 +1334,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
 .content-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.create-actions {
-  margin-left: auto;
-  display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
@@ -1554,16 +1502,6 @@ function extractErrorMessage(error: unknown, fallback: string) {
   .content-section-header {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .creation-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .create-actions {
-    margin-left: 0;
-    width: 100%;
-    justify-content: flex-start;
   }
 
   .editor-actions {

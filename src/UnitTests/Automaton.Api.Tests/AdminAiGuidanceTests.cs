@@ -39,8 +39,7 @@ public class AdminAiGuidanceTests
             Assert.That(document.Id, Is.Not.EqualTo(Guid.Empty));
             Assert.That(document.Version, Is.EqualTo(1));
             Assert.That(document.IsEnabled, Is.True);
-            Assert.That(document.ContentMarkdown, Does.StartWith("---"));
-            Assert.That(document.ContentMarkdown, Does.Contain("title: \"Studio Editor Extra\""));
+            Assert.That(document.ContentMarkdown, Is.EqualTo("# Guidance"));
             Assert.That(dbContext.AiGuidanceDocuments.Count(), Is.EqualTo(1));
         });
     }
@@ -71,8 +70,7 @@ public class AdminAiGuidanceTests
         {
             Assert.That(updated!.Version, Is.EqualTo(2));
             Assert.That(updated.Title, Is.EqualTo("Updated Title"));
-            Assert.That(updated.ContentMarkdown, Does.Contain("title: \"Updated Title\""));
-            Assert.That(updated.ContentMarkdown, Does.Contain("# Updated"));
+            Assert.That(updated.ContentMarkdown, Is.EqualTo("# Updated"));
         });
     }
 

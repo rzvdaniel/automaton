@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Automaton.Api.Services;
@@ -38,31 +37,6 @@ internal static class AiGuidanceMarkdownFrontMatter
         return new ParsedGuidanceMarkdown(title, description, body);
     }
 
-    public static string Upsert(string? markdown, string title, string? description)
-    {
-        var parsed = Parse(markdown);
-        var normalizedTitle = title.Trim();
-        var normalizedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-
-        var builder = new StringBuilder();
-        builder.AppendLine("---");
-        builder.Append("title: ").AppendLine(EscapeScalar(normalizedTitle));
-        if (!string.IsNullOrWhiteSpace(normalizedDescription))
-        {
-            builder.Append("description: ").AppendLine(EscapeScalar(normalizedDescription));
-        }
-        builder.AppendLine("---");
-
-        var body = parsed.Body.TrimStart('\r', '\n');
-        if (body.Length > 0)
-        {
-            builder.AppendLine();
-            builder.Append(body);
-        }
-
-        return builder.ToString();
-    }
-
     private static bool TryReadScalar(string line, string key, out string? value)
     {
         var prefix = key + ":";
@@ -75,12 +49,6 @@ internal static class AiGuidanceMarkdownFrontMatter
         var raw = line[prefix.Length..].Trim();
         value = UnescapeScalar(raw);
         return true;
-    }
-
-    private static string EscapeScalar(string value)
-    {
-        var escaped = value.Replace("\"", "\\\"", StringComparison.Ordinal);
-        return $"\"{escaped}\"";
     }
 
     private static string UnescapeScalar(string value)

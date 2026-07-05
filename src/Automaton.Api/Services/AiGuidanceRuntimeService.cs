@@ -161,7 +161,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 DocumentKind = metadata.DocumentKind,
                 Description = description,
                 TagsJson = metadata.TagsJson,
-                ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(source.Content, title, description),
+                ContentMarkdown = parsed.Body,
                 IsEnabled = true,
                 RequiredByDefault = metadata.RequiredByDefault,
                 IsModelLoadable = metadata.IsModelLoadable,

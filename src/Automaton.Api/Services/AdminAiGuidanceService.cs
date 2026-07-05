@@ -62,7 +62,7 @@ public sealed class AdminAiGuidanceService
             DocumentKind = documentKind.Trim(),
             Description = NormalizeOptional(description),
             TagsJson = NormalizeOptional(tagsJson),
-            ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description),
+            ContentMarkdown = contentMarkdown,
             IsEnabled = isEnabled,
             RequiredByDefault = requiredByDefault,
             IsModelLoadable = isModelLoadable,
@@ -114,7 +114,7 @@ public sealed class AdminAiGuidanceService
         entity.DocumentKind = documentKind.Trim();
         entity.Description = NormalizeOptional(description);
         entity.TagsJson = NormalizeOptional(tagsJson);
-        entity.ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(contentMarkdown, title, description);
+        entity.ContentMarkdown = contentMarkdown;
         entity.IsEnabled = isEnabled;
         entity.RequiredByDefault = requiredByDefault;
         entity.IsModelLoadable = isModelLoadable;
@@ -180,7 +180,7 @@ public sealed class AdminAiGuidanceService
         var parsed = AiGuidanceMarkdownFrontMatter.Parse(embedded.Content);
         entity.Title = string.IsNullOrWhiteSpace(parsed.Title) ? entity.Title : parsed.Title;
         entity.Description = string.IsNullOrWhiteSpace(parsed.Description) ? entity.Description : parsed.Description;
-        entity.ContentMarkdown = AiGuidanceMarkdownFrontMatter.Upsert(embedded.Content, entity.Title, entity.Description);
+        entity.ContentMarkdown = parsed.Body;
         entity.Version += 1;
         entity.UpdatedAt = DateTime.UtcNow;
 
