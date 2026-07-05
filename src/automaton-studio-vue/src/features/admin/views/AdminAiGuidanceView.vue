@@ -623,7 +623,6 @@ async function deleteSelectedDocument() {
             Manage runtime prompt documents used by Studio and other Automaton AI surfaces.
           </p>
         </div>
-        <Button label="New Document" icon="pi pi-plus" @click="startCreate" />
       </div>
     </div>
 
@@ -632,9 +631,12 @@ async function deleteSelectedDocument() {
         <template #content>
           <div class="documents-shell">
             <div class="documents-header">
-              <div>
+              <div class="documents-heading">
+                <div>
                 <h2 class="panel-title">Documents</h2>
                 <p class="panel-subtitle">Browse guidance like a prompt library.</p>
+                </div>
+                <Button label="New" icon="pi pi-plus" size="small" @click="startCreate" />
               </div>
               <SelectButton
                 v-model="documentFilter"
@@ -722,7 +724,8 @@ async function deleteSelectedDocument() {
 
             <div v-else class="editor-header">
               <div class="editor-header-text">
-                <div class="editor-header-title-row">
+                <div class="editor-header-topline">
+                  <div class="editor-header-title-row">
                   <button
                     v-if="!editingTitle"
                     type="button"
@@ -742,60 +745,60 @@ async function deleteSelectedDocument() {
                     autofocus
                     />
                   </div>
-                  <div class="editor-badges">
-                    <span
-                      v-for="badge in headerBadges"
-                      :key="badge.label"
-                      class="doc-badge"
-                      :class="badge.className"
-                    >
-                      {{ badge.label }}
-                    </span>
+                  <div class="editor-actions editor-actions-inline">
+                    <Button
+                      v-if="selectedDocument"
+                      label="Clone"
+                      icon="pi pi-copy"
+                      severity="secondary"
+                      outlined
+                      @click="cloneDocument"
+                    />
+                    <Button
+                      v-if="selectedDocument?.hasEmbeddedDefault"
+                      label="Reset"
+                      icon="pi pi-refresh"
+                      severity="danger"
+                      outlined
+                      @click="confirmReset(selectedDocument)"
+                    />
+                    <Button
+                      v-if="selectedDocument"
+                      :label="selectedDocument.isEnabled ? 'Disable' : 'Enable'"
+                      :icon="selectedDocument.isEnabled ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                      severity="secondary"
+                      outlined
+                      @click="confirmToggleEnabled(selectedDocument)"
+                    />
+                    <div class="editor-primary-action">
+                      <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
+                    </div>
                   </div>
-                  <div class="editor-meta">
+                </div>
+                <div class="editor-meta">
                     <span>{{ form.key || 'new-guidance' }}</span>
                   <button type="button" class="editor-meta-link" @click="openInspector('history')">
                     Version {{ selectedDocument?.version ?? 1 }} ▼
                   </button>
                   <span v-if="selectedDocument?.updatedAt">Updated {{ new Date(selectedDocument.updatedAt).toLocaleString() }}</span>
                 </div>
-              </div>
-
-                <div class="editor-actions">
-                <Button
-                  v-if="selectedDocument"
-                  label="Clone"
-                  icon="pi pi-copy"
-                  severity="secondary"
-                  outlined
-                  @click="cloneDocument"
-                />
-                <Button
-                  v-if="selectedDocument?.hasEmbeddedDefault"
-                  label="Reset"
-                  icon="pi pi-refresh"
-                  severity="danger"
-                  outlined
-                  @click="confirmReset(selectedDocument)"
-                />
-                <Button
-                  v-if="selectedDocument"
-                  :label="selectedDocument.isEnabled ? 'Disable' : 'Enable'"
-                  :icon="selectedDocument.isEnabled ? 'pi pi-eye-slash' : 'pi pi-eye'"
-                  severity="secondary"
-                  outlined
-                  @click="confirmToggleEnabled(selectedDocument)"
-                />
-                <div class="editor-primary-action">
-                  <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
+                <div class="editor-badges">
+                  <span
+                    v-for="badge in headerBadges"
+                    :key="badge.label"
+                    class="doc-badge"
+                    :class="badge.className"
+                  >
+                    {{ badge.label }}
+                  </span>
                 </div>
               </div>
             </div>
 
               <div v-if="!isNewDocument" class="editor-body">
                 <section class="content-section">
-                <div class="content-section-header">
-                  <div class="content-toolbar">
+                <div class="editor-surface-header">
+                  <div class="editor-surface-tabs">
                     <SelectButton
                       v-model="activeTab"
                       :options="EDITOR_TABS"
@@ -1059,6 +1062,13 @@ async function deleteSelectedDocument() {
   flex-shrink: 0;
 }
 
+.documents-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .panel-title {
   margin: 0;
   font-size: 1.35rem;
@@ -1227,6 +1237,14 @@ async function deleteSelectedDocument() {
 
 .editor-header-text {
   min-width: 0;
+  flex: 1;
+}
+
+.editor-header-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .editor-header-title-row {
@@ -1234,6 +1252,7 @@ async function deleteSelectedDocument() {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .editor-title-display {
@@ -1284,7 +1303,7 @@ async function deleteSelectedDocument() {
 }
 
 .editor-badges {
-  margin-top: 0.75rem;
+  margin-top: 0.55rem;
   display: flex;
   gap: 0.45rem;
   flex-wrap: wrap;
@@ -1351,8 +1370,11 @@ async function deleteSelectedDocument() {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
-  justify-content: flex-end;
   flex-shrink: 0;
+}
+
+.editor-actions-inline {
+  justify-content: flex-end;
 }
 
 .editor-body {
@@ -1437,16 +1459,21 @@ async function deleteSelectedDocument() {
   gap: 0.8rem;
 }
 
-.content-section-header {
+.editor-surface-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
   flex-shrink: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--surface-border);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: #fff;
 }
 
-.content-toolbar {
+.editor-surface-tabs {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -1457,7 +1484,8 @@ async function deleteSelectedDocument() {
   flex: 1;
   min-height: 22rem;
   border: 1px solid var(--surface-border);
-  border-radius: 14px;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
   background: var(--surface-ground);
   overflow: hidden;
 }
@@ -1623,7 +1651,8 @@ async function deleteSelectedDocument() {
   }
 
   .editor-header,
-  .content-section-header {
+  .editor-surface-header,
+  .editor-header-topline {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1632,7 +1661,7 @@ async function deleteSelectedDocument() {
     justify-content: flex-start;
   }
 
-  .content-toolbar {
+  .editor-surface-tabs {
     justify-content: space-between;
   }
 }
