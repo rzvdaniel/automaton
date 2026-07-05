@@ -96,6 +96,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.DocumentKind,
                 item.TagsJson,
                 item.Description,
+                item.OutputPath,
                 item.ContentMarkdown,
                 item.RequiredByDefault,
                 item.IsModelLoadable,
@@ -104,14 +105,16 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 true))
             .ToListAsync(cancellationToken);
 
-        var files = new List<AiGuidanceExportFile>
-        {
-            new("llms.txt", BuildLlmsText(documents)),
-            new("llms-full.txt", BuildLlmsFullText(documents))
-        };
+        var files = documents
+            .Where(document => !string.IsNullOrWhiteSpace(document.OutputPath))
+            .Select(document => new AiGuidanceExportFile(document.OutputPath!, document.ContentMarkdown))
+            .ToList();
 
-        files.AddRange(documents.Select(document =>
-            new AiGuidanceExportFile($"llms/{document.Key}.md", document.ContentMarkdown)));
+        files.AddRange(
+        [
+            new AiGuidanceExportFile(".automaton/agents/references/llms.txt", BuildLlmsText(documents)),
+            new AiGuidanceExportFile(".automaton/agents/references/llms-full.txt", BuildLlmsFullText(documents))
+        ]);
 
         return new AiGuidanceExportPack(files);
     }
@@ -161,14 +164,14 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         var now = DateTime.UtcNow;
         var added = 0;
 
-        foreach (var source in _embeddedGuidanceProvider.GetReferenceSources().Where(source => source.RelativePath.StartsWith("llms/", StringComparison.Ordinal)))
+        foreach (var metadata in AutomatonGuidanceSeedCatalog.All)
         {
-            var metadata = ResolveMetadata(source.RelativePath);
             if (existingKeySet.Contains(metadata.Key))
             {
                 continue;
             }
 
+            var source = LoadSeedSource(metadata.RelativePath);
             var parsed = AiGuidanceMarkdownFrontMatter.Parse(source.Content);
             var title = string.IsNullOrWhiteSpace(parsed.Title) ? metadata.Title : parsed.Title;
             var description = string.IsNullOrWhiteSpace(parsed.Description) ? metadata.Description : parsed.Description;
@@ -182,6 +185,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 DocumentKind = metadata.DocumentKind,
                 Description = description,
                 TagsJson = metadata.TagsJson,
+                OutputPath = metadata.OutputPath,
                 ContentMarkdown = parsed.Body,
                 IsEnabled = true,
                 RequiredByDefault = metadata.RequiredByDefault,
@@ -216,6 +220,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.DocumentKind,
                 item.TagsJson,
                 item.Description,
+                item.OutputPath,
                 item.RequiredByDefault,
                 item.IsModelLoadable,
                 item.SortOrder,
@@ -235,6 +240,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
                 item.DocumentKind,
                 item.TagsJson,
                 item.Description,
+                item.OutputPath,
                 item.ContentMarkdown,
                 item.RequiredByDefault,
                 item.IsModelLoadable,
@@ -246,6 +252,11 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
     private static AutomatonGuidanceSeedMetadata ResolveMetadata(string relativePath) =>
         AutomatonGuidanceSeedCatalog.ResolveByRelativePath(relativePath);
 
+    private GuidanceSource LoadSeedSource(string relativePath) =>
+        relativePath.StartsWith("llms/", StringComparison.Ordinal)
+            ? new GuidanceSource(relativePath, _embeddedGuidanceProvider.GetReference(relativePath))
+            : new GuidanceSource(relativePath, _embeddedGuidanceProvider.GetTemplate(relativePath));
+
     private static AutomatonGuidanceCatalogItem MapCatalogDocument(AiGuidanceCatalogItem item) =>
         new(
             item.Key,
@@ -254,6 +265,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.DocumentKind,
             item.TagsJson,
             item.Description,
+            item.OutputPath,
             item.RequiredByDefault,
             item.IsModelLoadable,
             item.SortOrder,
@@ -268,6 +280,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
             item.DocumentKind,
             item.TagsJson,
             item.Description,
+            item.OutputPath,
             item.ContentMarkdown,
             item.RequiredByDefault,
             item.IsModelLoadable,
@@ -292,6 +305,7 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
 
         var linkedDocuments = documents
             .Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt)
+            .Where(item => item.OutputPath?.StartsWith(".automaton/agents/references/llms/", StringComparison.Ordinal) == true)
             .ToList();
 
         if (linkedDocuments.Count > 0)
@@ -321,7 +335,9 @@ public sealed class AiGuidanceRuntimeService : IAiGuidanceRuntimeService, IAutom
         var builder = new System.Text.StringBuilder();
         builder.AppendLine(BuildLlmsText(documents).TrimEnd());
 
-        foreach (var document in documents.Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt))
+        foreach (var document in documents
+                     .Where(item => item.DocumentKind != AiGuidanceDocumentKinds.BasePrompt)
+                     .Where(item => item.OutputPath?.StartsWith(".automaton/agents/references/llms/", StringComparison.Ordinal) == true))
         {
             builder.AppendLine();
             builder.AppendLine("---");
@@ -340,6 +356,7 @@ public sealed record AiGuidanceCatalogItem(
     string DocumentKind,
     string? TagsJson,
     string? Description,
+    string? OutputPath,
     bool RequiredByDefault,
     bool IsModelLoadable,
     int SortOrder,
@@ -353,6 +370,7 @@ public sealed record AiGuidanceResolvedDocument(
     string DocumentKind,
     string? TagsJson,
     string? Description,
+    string? OutputPath,
     string ContentMarkdown,
     bool RequiredByDefault,
     bool IsModelLoadable,

@@ -33,6 +33,9 @@ public class AiGuidanceDocument
     [MaxLength(4000)]
     public string? TagsJson { get; set; }
 
+    [MaxLength(500)]
+    public string? OutputPath { get; set; }
+
     [Required]
     public string ContentMarkdown { get; set; } = string.Empty;
 

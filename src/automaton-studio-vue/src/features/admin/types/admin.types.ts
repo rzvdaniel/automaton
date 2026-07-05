@@ -188,6 +188,7 @@ export interface AiGuidanceAdmin {
   documentKind: string
   description?: string
   tagsJson?: string
+  outputPath?: string
   contentMarkdown: string
   isEnabled: boolean
   requiredByDefault: boolean
@@ -206,6 +207,7 @@ export interface UpsertAiGuidanceRequest {
   documentKind: string
   description?: string
   tagsJson?: string
+  outputPath?: string
   contentMarkdown: string
   isEnabled: boolean
   requiredByDefault: boolean

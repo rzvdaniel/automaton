@@ -151,5 +151,26 @@ public class NewAppServiceTests
     }
 
     private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
-        new EmbeddedAutomatonGuidanceProvider().GetReferenceSources();
+        BuildExportSources();
+
+    private static IReadOnlyList<GuidanceSource> BuildExportSources()
+    {
+        var provider = new EmbeddedAutomatonGuidanceProvider();
+        var sources = new List<GuidanceSource>
+        {
+            new("AGENTS.md", provider.GetTemplate("AGENTS.md")),
+            new(".automaton/agents/instructions.md", provider.GetTemplate("instructions.md")),
+            new(".automaton/agents/skills/automaton-app/SKILL.md", provider.GetTemplate("SKILL.md")),
+            new(".automaton/agents/references/llms.txt", provider.GetReference("llms.txt")),
+            new(".automaton/agents/references/llms-full.txt", provider.GetReference("llms-full.txt")),
+        };
+
+        foreach (var source in provider.GetReferenceSources().Where(item => item.RelativePath.StartsWith("llms/", StringComparison.Ordinal)))
+        {
+            var fileName = Path.GetFileName(source.RelativePath);
+            sources.Add(new GuidanceSource($".automaton/agents/references/llms/{fileName}", source.Content));
+        }
+
+        return sources;
+    }
 }

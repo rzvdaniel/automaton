@@ -124,8 +124,7 @@ public class AiGuidancePackServiceTests
         new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.Claude);
 
         var claudePath = Path.Combine(projectRoot, "CLAUDE.md");
-        Assert.That(File.Exists(claudePath), Is.True);
-        Assert.That(File.ReadAllText(claudePath), Does.Contain(".automaton/agents/instructions.md"));
+        Assert.That(File.Exists(claudePath), Is.False);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
     }
 
@@ -136,9 +135,9 @@ public class AiGuidancePackServiceTests
 
         new AiGuidancePackService().Sync(projectRoot, GetReferenceSources(), AiGuidanceAdapters.All);
 
-        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.True);
-        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "copilot-instructions.md")), Is.False);
+        Assert.That(File.Exists(Path.Combine(projectRoot, ".github", "skills", "automaton-app", "SKILL.md")), Is.False);
     }
 
     [Test]
@@ -164,5 +163,26 @@ public class AiGuidancePackServiceTests
     }
 
     private static IReadOnlyList<GuidanceSource> GetReferenceSources() =>
-        new EmbeddedAutomatonGuidanceProvider().GetReferenceSources();
+        BuildExportSources();
+
+    private static IReadOnlyList<GuidanceSource> BuildExportSources()
+    {
+        var provider = new EmbeddedAutomatonGuidanceProvider();
+        var sources = new List<GuidanceSource>
+        {
+            new("AGENTS.md", provider.GetTemplate("AGENTS.md")),
+            new(".automaton/agents/instructions.md", provider.GetTemplate("instructions.md")),
+            new(".automaton/agents/skills/automaton-app/SKILL.md", provider.GetTemplate("SKILL.md")),
+            new(".automaton/agents/references/llms.txt", provider.GetReference("llms.txt")),
+            new(".automaton/agents/references/llms-full.txt", provider.GetReference("llms-full.txt")),
+        };
+
+        foreach (var source in provider.GetReferenceSources().Where(item => item.RelativePath.StartsWith("llms/", StringComparison.Ordinal)))
+        {
+            var fileName = Path.GetFileName(source.RelativePath);
+            sources.Add(new GuidanceSource($".automaton/agents/references/llms/{fileName}", source.Content));
+        }
+
+        return sources;
+    }
 }

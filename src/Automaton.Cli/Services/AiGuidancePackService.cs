@@ -10,17 +10,6 @@ namespace Automaton.Cli.Services;
 public sealed class AiGuidancePackService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private readonly IAutomatonGuidanceProvider _templateProvider;
-
-    public AiGuidancePackService()
-        : this(new EmbeddedAutomatonGuidanceProvider())
-    {
-    }
-
-    public AiGuidancePackService(IAutomatonGuidanceProvider guidanceProvider)
-    {
-        _templateProvider = guidanceProvider;
-    }
 
     public AiGuidanceSyncResult Sync(
         string directory,
@@ -35,49 +24,29 @@ public sealed class AiGuidancePackService
         var mode = DetectMode(directory);
         var generatedFiles = new List<string>();
         var agentsRoot = Path.Combine(directory, ".automaton", "agents");
-        var referencesRoot = Path.Combine(agentsRoot, "references");
         Directory.CreateDirectory(agentsRoot);
-        Directory.CreateDirectory(referencesRoot);
 
         var sources = references;
-        var templates = _templateProvider.GetTemplateSources();
         var variables = BuildTemplateVariables(mode);
         foreach (var source in sources)
         {
-            var targetPath = Path.Combine(referencesRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            var targetPath = ResolveOutputPath(directory, source.RelativePath);
             var targetDirectory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrWhiteSpace(targetDirectory))
             {
                 Directory.CreateDirectory(targetDirectory);
             }
 
-            File.WriteAllText(targetPath, source.Content, Encoding.UTF8);
+            File.WriteAllText(targetPath, RenderVariables(source.Content, variables), Encoding.UTF8);
             generatedFiles.Add(targetPath);
         }
-
-        var canonicalInstructionsPath = Path.Combine(agentsRoot, "instructions.md");
-        File.WriteAllText(canonicalInstructionsPath, RenderTemplate(templates, "instructions.md", variables), Encoding.UTF8);
-        generatedFiles.Add(canonicalInstructionsPath);
-
-        var canonicalSkillsRoot = Path.Combine(agentsRoot, "skills", "automaton-app");
-        Directory.CreateDirectory(canonicalSkillsRoot);
-
-        var canonicalSkillPath = Path.Combine(canonicalSkillsRoot, "SKILL.md");
-        File.WriteAllText(canonicalSkillPath, RenderTemplate(templates, "SKILL.md", variables), Encoding.UTF8);
-        generatedFiles.Add(canonicalSkillPath);
-
-        var agentsPath = Path.Combine(directory, "AGENTS.md");
-        File.WriteAllText(agentsPath, RenderTemplate(templates, "AGENTS.md", variables), Encoding.UTF8);
-        generatedFiles.Add(agentsPath);
-
-        SyncOptionalAdapters(directory, adapter, generatedFiles, templates, variables);
         DeleteLegacyAiGuidance(directory);
 
         var manifestPath = Path.Combine(agentsRoot, "manifest.json");
         generatedFiles.Add(manifestPath);
         File.WriteAllText(manifestPath, BuildCanonicalManifest(
             mode,
-            sources.Concat(templates).ToList(),
+            sources,
             generatedFiles.Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToList()), Encoding.UTF8);
 
         return new AiGuidanceSyncResult
@@ -130,34 +99,14 @@ public sealed class AiGuidancePackService
         {
             ["mode"] = mode,
             ["scopeLine"] = scopeLine,
-            ["modeDescription"] = modeDescription
+            ["modeDescription"] = modeDescription,
+            ["title"] = "Automaton"
         };
     }
 
-    private static IReadOnlyDictionary<string, string> WithVariable(
-        IReadOnlyDictionary<string, string> variables,
-        string key,
-        string value)
+    private static string RenderVariables(string content, IReadOnlyDictionary<string, string> variables)
     {
-        var copy = new Dictionary<string, string>(variables, StringComparer.Ordinal)
-        {
-            [key] = value
-        };
-        return copy;
-    }
-
-    private static string RenderTemplate(
-        IReadOnlyList<GuidanceSource> templates,
-        string relativePath,
-        IReadOnlyDictionary<string, string> variables)
-    {
-        var template = templates.FirstOrDefault(source => string.Equals(source.RelativePath, relativePath, StringComparison.Ordinal));
-        if (template is null)
-        {
-            throw new InvalidOperationException($"Embedded AI guidance template '{relativePath}' was not found.");
-        }
-
-        var rendered = template.Content;
+        var rendered = content;
         foreach (var variable in variables)
         {
             rendered = rendered.Replace("{{" + variable.Key + "}}", variable.Value, StringComparison.Ordinal);
@@ -184,83 +133,18 @@ public sealed class AiGuidancePackService
         TryDeleteEmptyDirectory(Path.Combine(directory, ".github"));
     }
 
-    private static void SyncOptionalAdapters(
-        string directory,
-        string adapter,
-        ICollection<string> generatedFiles,
-        IReadOnlyList<GuidanceSource> templates,
-        IReadOnlyDictionary<string, string> variables)
+    private static void DeleteLegacyAiGuidance(string directory)
     {
-        if (string.Equals(adapter, AiGuidanceAdapters.None, StringComparison.OrdinalIgnoreCase))
-        {
-            DeleteLegacyGeneratedAdapters(directory);
-            return;
-        }
-
-        if (string.Equals(adapter, AiGuidanceAdapters.Claude, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
-        {
-            var claudePath = Path.Combine(directory, "CLAUDE.md");
-            File.WriteAllText(claudePath, RenderTemplate(
-                templates,
-                "adapter.md",
-                WithVariable(variables, "title", "CLAUDE.md")), Encoding.UTF8);
-            generatedFiles.Add(claudePath);
-        }
-        else
-        {
-            DeleteIfGenerated(Path.Combine(directory, "CLAUDE.md"));
-        }
-
-        if (string.Equals(adapter, AiGuidanceAdapters.Copilot, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
-        {
-            var copilotPath = Path.Combine(directory, ".github", "copilot-instructions.md");
-            Directory.CreateDirectory(Path.GetDirectoryName(copilotPath)!);
-            File.WriteAllText(copilotPath, RenderTemplate(
-                templates,
-                "adapter.md",
-                WithVariable(variables, "title", "GitHub Copilot")), Encoding.UTF8);
-            generatedFiles.Add(copilotPath);
-        }
-        else
-        {
-            DeleteIfGenerated(Path.Combine(directory, ".github", "copilot-instructions.md"));
-        }
-
-        if (string.Equals(adapter, AiGuidanceAdapters.GitHubSkills, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(adapter, AiGuidanceAdapters.All, StringComparison.OrdinalIgnoreCase))
-        {
-            var skillPath = Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md");
-            Directory.CreateDirectory(Path.GetDirectoryName(skillPath)!);
-            File.WriteAllText(skillPath, RenderTemplate(templates, "github-skill.md", variables), Encoding.UTF8);
-            generatedFiles.Add(skillPath);
-        }
-        else
-        {
-            DeleteIfGenerated(Path.Combine(directory, ".github", "skills", "automaton-app", "SKILL.md"));
-        }
-
-        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills", "automaton-app"));
-        TryDeleteEmptyDirectory(Path.Combine(directory, ".github", "skills"));
-        TryDeleteEmptyDirectory(Path.Combine(directory, ".github"));
-    }
-
-    private void DeleteLegacyAiGuidance(string directory)
-    {
+        DeleteLegacyGeneratedAdapters(directory);
         var legacyRoot = Path.Combine(directory, ".automaton", "ai-guidance");
         if (!Directory.Exists(legacyRoot))
         {
             return;
         }
 
-        foreach (var source in _templateProvider.GetReferenceSources())
+        foreach (var path in Directory.EnumerateFiles(legacyRoot, "*", SearchOption.AllDirectories))
         {
-            var path = Path.Combine(legacyRoot, source.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
+            File.Delete(path);
         }
 
         DeleteLegacyManifest(Path.Combine(legacyRoot, "manifest.json"));
@@ -311,6 +195,32 @@ public sealed class AiGuidancePackService
         {
             Directory.Delete(path);
         }
+    }
+
+    private static string ResolveOutputPath(string directory, string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').Trim();
+        if (string.IsNullOrWhiteSpace(normalized)
+            || Path.IsPathRooted(normalized)
+            || normalized.StartsWith("/", StringComparison.Ordinal)
+            || normalized.Contains("../", StringComparison.Ordinal)
+            || normalized.Contains("..\\", StringComparison.Ordinal)
+            || normalized.Contains(':', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"AI guidance export path '{relativePath}' is not a safe relative path.");
+        }
+
+        var fullPath = Path.GetFullPath(Path.Combine(directory, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        var fullRoot = Path.GetFullPath(directory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"AI guidance export path '{relativePath}' escapes the project root.");
+        }
+
+        return fullPath;
     }
 
     private static string BuildCanonicalManifest(

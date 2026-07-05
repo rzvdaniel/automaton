@@ -50,6 +50,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.DocumentKind,
                 request.Description,
                 request.TagsJson,
+                request.OutputPath,
                 request.ContentMarkdown,
                 request.IsEnabled,
                 request.RequiredByDefault,
@@ -81,6 +82,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
                 request.DocumentKind,
                 request.Description,
                 request.TagsJson,
+                request.OutputPath,
                 request.ContentMarkdown,
                 request.IsEnabled,
                 request.RequiredByDefault,
@@ -138,6 +140,7 @@ public sealed class AdminAiGuidanceController : ControllerBase
         DocumentKind = document.DocumentKind,
         Description = document.Description,
         TagsJson = document.TagsJson,
+        OutputPath = document.OutputPath,
         ContentMarkdown = document.ContentMarkdown,
         IsEnabled = document.IsEnabled,
         RequiredByDefault = document.RequiredByDefault,
@@ -159,6 +162,7 @@ public sealed class AiGuidanceAdminResponse
     public string DocumentKind { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? TagsJson { get; set; }
+    public string? OutputPath { get; set; }
     public string ContentMarkdown { get; set; } = string.Empty;
     public bool IsEnabled { get; set; }
     public bool RequiredByDefault { get; set; }
@@ -187,6 +191,8 @@ public sealed class UpsertAiGuidanceRequest
     public string? Description { get; set; }
 
     public string? TagsJson { get; set; }
+
+    public string? OutputPath { get; set; }
 
     [Required]
     public string ContentMarkdown { get; set; } = string.Empty;

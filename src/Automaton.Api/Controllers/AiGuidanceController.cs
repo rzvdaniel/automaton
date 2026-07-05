@@ -38,6 +38,6 @@ public sealed class AiGuidanceExportPackResponse
 
 public sealed class AiGuidanceExportFileResponse
 {
-    public string TargetPath { get; set; } = string.Empty;
+    public string OutputPath { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
 }

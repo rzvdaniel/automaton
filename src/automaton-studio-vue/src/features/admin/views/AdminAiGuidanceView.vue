@@ -246,6 +246,7 @@ async function saveDocument() {
       documentKind: form.value.documentKind.trim(),
       description: normalizeOptional(form.value.description),
       tagsJson: normalizeOptional(form.value.tagsJson),
+      outputPath: normalizeOptional(form.value.outputPath),
       contentMarkdown: form.value.contentMarkdown,
       isEnabled: form.value.isEnabled,
       requiredByDefault: form.value.requiredByDefault,
@@ -312,6 +313,7 @@ async function createDocumentFromTitle() {
       documentKind: 'Guidance',
       description: undefined,
       tagsJson: undefined,
+      outputPath: undefined,
       contentMarkdown: `# ${title}\n`,
       isEnabled: true,
       requiredByDefault: false,
@@ -404,6 +406,7 @@ function applyDocumentToForm(document: AiGuidanceAdmin) {
     documentKind: document.documentKind,
     description: document.description ?? '',
     tagsJson: document.tagsJson ?? '',
+    outputPath: document.outputPath ?? '',
     contentMarkdown: document.contentMarkdown,
     isEnabled: document.isEnabled,
     requiredByDefault: document.requiredByDefault,
@@ -420,6 +423,7 @@ function createEmptyForm(): GuidanceForm {
     documentKind: 'Guidance',
     description: '',
     tagsJson: '',
+    outputPath: '',
     contentMarkdown: '',
     isEnabled: true,
     requiredByDefault: false,
@@ -878,6 +882,16 @@ async function deleteSelectedDocument() {
           <div class="field">
             <label for="guidance-tags">Tags</label>
             <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
+          </div>
+
+          <div class="field">
+            <label for="guidance-output-path">Output Path</label>
+            <InputText
+              id="guidance-output-path"
+              v-model="form.outputPath"
+              class="w-full"
+              placeholder=".automaton/agents/references/llms/example.md"
+            />
           </div>
 
           <div class="property-section">Information</div>

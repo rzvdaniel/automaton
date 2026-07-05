@@ -202,16 +202,16 @@ public class AutomatonApiClient : IDisposable
         {
             foreach (var item in filesProperty.EnumerateArray())
             {
-                var targetPath = item.TryGetProperty("targetPath", out var targetPathProperty)
-                    ? targetPathProperty.GetString()
+                var outputPath = item.TryGetProperty("outputPath", out var outputPathProperty)
+                    ? outputPathProperty.GetString()
                     : null;
                 var content = item.TryGetProperty("content", out var contentProperty)
                     ? contentProperty.GetString()
                     : null;
 
-                if (!string.IsNullOrWhiteSpace(targetPath) && content is not null)
+                if (!string.IsNullOrWhiteSpace(outputPath) && content is not null)
                 {
-                    files.Add(new GuidanceSource(targetPath, content));
+                    files.Add(new GuidanceSource(outputPath, content));
                 }
             }
         }

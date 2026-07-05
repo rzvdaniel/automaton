@@ -288,6 +288,10 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
+                    b.Property<string>("OutputPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
                     b.Property<bool>("RequiredByDefault")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")

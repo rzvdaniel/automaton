@@ -40,6 +40,7 @@ public sealed class AdminAiGuidanceService
         string documentKind,
         string? description,
         string? tagsJson,
+        string? outputPath,
         string contentMarkdown,
         bool isEnabled,
         bool requiredByDefault,
@@ -48,6 +49,7 @@ public sealed class AdminAiGuidanceService
         CancellationToken cancellationToken = default)
     {
         await EnsureUniqueAsync(key, null, cancellationToken);
+        var normalizedOutputPath = NormalizeOutputPath(outputPath, documentKind);
 
         var now = DateTime.UtcNow;
         var entity = new AiGuidanceDocument
@@ -59,6 +61,7 @@ public sealed class AdminAiGuidanceService
             DocumentKind = documentKind.Trim(),
             Description = NormalizeOptional(description),
             TagsJson = NormalizeOptional(tagsJson),
+            OutputPath = normalizedOutputPath,
             ContentMarkdown = contentMarkdown,
             IsEnabled = isEnabled,
             RequiredByDefault = requiredByDefault,
@@ -90,6 +93,7 @@ public sealed class AdminAiGuidanceService
         string documentKind,
         string? description,
         string? tagsJson,
+        string? outputPath,
         string contentMarkdown,
         bool isEnabled,
         bool requiredByDefault,
@@ -104,6 +108,7 @@ public sealed class AdminAiGuidanceService
         }
 
         await EnsureUniqueAsync(key, id, cancellationToken);
+        var normalizedOutputPath = NormalizeOutputPath(outputPath, documentKind);
 
         entity.Key = key.Trim();
         entity.Title = title.Trim();
@@ -111,6 +116,7 @@ public sealed class AdminAiGuidanceService
         entity.DocumentKind = documentKind.Trim();
         entity.Description = NormalizeOptional(description);
         entity.TagsJson = NormalizeOptional(tagsJson);
+        entity.OutputPath = normalizedOutputPath;
         entity.ContentMarkdown = contentMarkdown;
         entity.IsEnabled = isEnabled;
         entity.RequiredByDefault = requiredByDefault;
@@ -227,6 +233,7 @@ public sealed class AdminAiGuidanceService
                 entity.Surface,
                 entity.DocumentKind,
                 entity.TagsJson,
+                entity.OutputPath,
                 entity.IsEnabled,
                 entity.RequiredByDefault,
                 entity.IsModelLoadable,
@@ -239,4 +246,31 @@ public sealed class AdminAiGuidanceService
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeOutputPath(string? outputPath, string documentKind)
+    {
+        var normalized = NormalizeOptional(outputPath);
+        if (string.Equals(documentKind?.Trim(), AiGuidanceDocumentKinds.BasePrompt, StringComparison.Ordinal)
+            && normalized is not null)
+        {
+            throw new InvalidOperationException("Base prompt documents cannot define an output path.");
+        }
+
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        var candidate = normalized.Replace('\\', '/');
+        if (candidate.StartsWith("/", StringComparison.Ordinal)
+            || candidate.Contains("../", StringComparison.Ordinal)
+            || candidate.Contains("..\\", StringComparison.Ordinal)
+            || Path.IsPathRooted(candidate)
+            || candidate.Contains(':', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("OutputPath must be a safe relative path inside the project.");
+        }
+
+        return candidate;
+    }
 }

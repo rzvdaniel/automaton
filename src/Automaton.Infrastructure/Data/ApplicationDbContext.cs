@@ -1007,6 +1007,7 @@ namespace Automaton.Api.Data
                   entity.Property(e => e.DocumentKind).IsRequired().HasMaxLength(50);
                   entity.Property(e => e.Description).HasMaxLength(500);
                   entity.Property(e => e.TagsJson).HasMaxLength(4000);
+                  entity.Property(e => e.OutputPath).HasMaxLength(500);
                   entity.Property(e => e.ContentMarkdown).IsRequired();
                   entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
                   entity.Property(e => e.RequiredByDefault).IsRequired().HasDefaultValue(false);
