@@ -27,6 +27,7 @@ Use this skill when touching:
 - If backend initialization needs async I/O, prefer an async initialization path instead of blocking from `Program.cs` or extension methods.
 - Return actionable errors.
 - Avoid leaking secrets or internal details in API responses.
+- Do not hardcode deployment-specific domains, base URLs, ports, filesystem roots, limits, or infrastructure names. Prefer existing options classes and configuration sections; if deriving values, derive them only from configured values with conservative validation.
 - Keep request/response DTOs compatible unless a breaking change is intentional.
 - Update frontend generated types when OpenAPI DTOs change and the project requires it.
 

@@ -1,9 +1,11 @@
 using Automaton.Api.Constants;
+using Automaton.Api.Config;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using System.IO.Compression;
 
 namespace Automaton.Api.Controllers;
@@ -22,6 +24,8 @@ public class AppsController : BaseController
     private readonly SettingsService settingsService;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly PrivateAppLaunchService privateAppLaunchService;
+    private readonly RuntimeCookieService runtimeCookieService;
+    private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly IApplicationEventService applicationEventService;
 
     public AppsController(
@@ -36,6 +40,8 @@ public class AppsController : BaseController
         SettingsService settingsService,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         PrivateAppLaunchService privateAppLaunchService,
+        RuntimeCookieService runtimeCookieService,
+        IOptions<PublishedAppsConfig> publishedAppsConfig,
         IApplicationEventService applicationEventService,
         GitHubService? githubService = null)
     {
@@ -51,6 +57,8 @@ public class AppsController : BaseController
         this.settingsService = settingsService;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.privateAppLaunchService = privateAppLaunchService;
+        this.runtimeCookieService = runtimeCookieService;
+        this.publishedAppsConfig = publishedAppsConfig.Value;
         this.applicationEventService = applicationEventService;
     }
 
@@ -376,6 +384,26 @@ public class AppsController : BaseController
 
         var runtimeToken = privateAppLaunchService.CreateRuntimeToken(id, userContextService.GetUserId());
         return Ok(new { runtimeToken });
+    }
+
+    [HttpGet("{id}/launch-runtime")]
+    public async Task<IActionResult> LaunchRuntime(Guid id)
+    {
+        var app = await appsService.GetAccessibleAppInfoByIdAsync(id);
+        if (app == null)
+        {
+            return NotFound(new { message = "App not found" });
+        }
+
+        var userId = userContextService.GetUserId();
+        var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
+        var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
+        Response.Cookies.Append(
+            RuntimeCookieConstants.CookieName,
+            runtimeCookie,
+            runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
+
+        return Redirect(BuildRestrictedRuntimeUrl(id));
     }
 
     [HttpPut("{id}/runner")]
@@ -2007,6 +2035,17 @@ public class AppsController : BaseController
             reason,
             ruleSource
         };
+    }
+
+    private string BuildRestrictedRuntimeUrl(Guid appId)
+    {
+        var configuredBaseUrl = publishedAppsConfig.PublicBaseUrl?.Trim().TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            return $"{configuredBaseUrl}/a/{appId}";
+        }
+
+        return $"{Request.Scheme}://{Request.Host.ToUriComponent()}/a/{appId}";
     }
 
 }

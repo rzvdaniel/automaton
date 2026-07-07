@@ -18,6 +18,7 @@ Use this file as the operational contract. For detailed patterns, read the relev
 - When fixing a bug, add or update a regression test when practical.
 - After changing code, run the smallest useful verification command.
 - If verification cannot be run, say exactly why.
+- Do not hardcode deployment-specific domains, base URLs, ports, filesystem roots, limits, or infrastructure names. Prefer existing options classes and configuration sections; if deriving values, derive them only from configured values with conservative validation.
 - If the task reveals a missing rule, repeated mistake, or unclear workflow, update the relevant skill or harness document.
 - When a session creates a reusable rule, new skill, architecture decision, safety guardrail, or durable coding convention, automatically consider the retro skill before finishing.
 
