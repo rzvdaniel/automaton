@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Automaton.Api.Controllers;
 
@@ -94,6 +96,13 @@ public class InternalRuntimeController : ControllerBase
         }
 
         var providedValue = headerValues.FirstOrDefault();
-        return string.Equals(providedValue, publishedAppsConfig.RuntimeProxyAuthKey, StringComparison.Ordinal);
+        if (providedValue is null)
+        {
+            return false;
+        }
+
+        var providedBytes = Encoding.UTF8.GetBytes(providedValue);
+        var expectedBytes = Encoding.UTF8.GetBytes(publishedAppsConfig.RuntimeProxyAuthKey);
+        return CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
     }
 }
