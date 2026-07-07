@@ -384,7 +384,34 @@ Cache expectations for Cloudflare/nginx:
 /runtime/automaton-api.js    short cache
 ```
 
-Private and unpublished apps are still not copied into `prod-published-apps`, but `apps.automaton.monster` now proxies `/private/{appId}` and `/api/web-apps/app/...` to the live API host so authenticated private runtime access works on the apps domain. Published slug apps remain static from `prod-published-apps`.
+Private and unpublished apps are still not copied into `prod-published-apps`, but `apps.automaton.monster` now proxies `/a/{appId}/...` and `/api/web-apps/app/...` to the live API host so authenticated restricted runtime access works on the apps domain. Published slug apps remain static from `prod-published-apps`.
+
+Restricted runtime proxy contract:
+
+- `/a/{appId}/...` is the browser-visible runtime path, so the `automaton_runtime` cookie is scoped to `/a/{appId}`.
+- `/internal/runtime/auth` will not receive that cookie automatically because the request path differs.
+- The runtime proxy must forward the original browser `Cookie` header explicitly when calling `/internal/runtime/auth`.
+- The runtime proxy must also send:
+  - `X-App-Id: {appId}`
+  - `X-Automaton-Runtime-Auth: {PublishedApps:RuntimeProxyAuthKey}`
+- The API rejects `/internal/runtime/auth` requests that do not include the configured shared header value.
+
+Conceptual nginx `auth_request` shape:
+
+```nginx
+location /a/ {
+    auth_request /internal/runtime/auth;
+    proxy_pass http://api_upstream;
+}
+
+location = /internal/runtime/auth {
+    internal;
+    proxy_pass http://api_upstream/internal/runtime/auth;
+    proxy_set_header X-App-Id $app_id;
+    proxy_set_header X-Automaton-Runtime-Auth $runtime_proxy_auth_key;
+    proxy_set_header Cookie $http_cookie;
+}
+```
 
 ## CI/CD Deploy Flow
 

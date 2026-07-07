@@ -47,6 +47,20 @@ public class RuntimeCookieServiceTests
     }
 
     [Test]
+    public void ValidateRuntimeCookie_WhenProtectedPayloadIsNotJson_ReturnsInvalid()
+    {
+        var provider = DataProtectionProvider.Create(Directory.CreateTempSubdirectory("automaton-runtime-cookie-invalid-"));
+        var service = CreateService(provider: provider);
+        var invalidCookie = provider
+            .CreateProtector("Automaton.RuntimeCookie.v1")
+            .Protect("not-json");
+
+        var result = service.ValidateRuntimeCookie(invalidCookie, Guid.NewGuid());
+
+        Assert.That(result.IsValid, Is.False);
+    }
+
+    [Test]
     public void BuildRuntimeCookieOptions_WhenApiAndRuntimeHostsAreSiblings_ScopesCookieToSharedParentDomain()
     {
         var service = CreateService(
@@ -118,10 +132,10 @@ public class RuntimeCookieServiceTests
 
     private static RuntimeCookieService CreateService(
         string publicBaseUrl = "http://localhost:5173",
-        string apiBaseUrl = "https://localhost:7091")
+        string apiBaseUrl = "https://localhost:7091",
+        IDataProtectionProvider? provider = null)
     {
-        var keyDirectory = Directory.CreateTempSubdirectory("automaton-runtime-cookie-test-");
-        var provider = DataProtectionProvider.Create(keyDirectory);
+        provider ??= DataProtectionProvider.Create(Directory.CreateTempSubdirectory("automaton-runtime-cookie-test-"));
         var options = Options.Create(new PublishedAppsConfig
         {
             PublicBaseUrl = publicBaseUrl,

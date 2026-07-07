@@ -11,6 +11,7 @@ public static class RuntimeCookieConstants
     public const string CookieName = "automaton_runtime";
     public const string AccessScope = "restricted-runtime";
     public const string AppIdHeader = "X-App-Id";
+    public const string ProxyAuthHeader = "X-Automaton-Runtime-Auth";
 }
 
 public sealed class RuntimeCookieValidationResult
@@ -96,11 +97,7 @@ public class RuntimeCookieService
 
             return RuntimeCookieValidationResult.Valid(payload.UserId, payload.AppId, payload.ExpiresAtUtc);
         }
-        catch (CryptographicException)
-        {
-            return RuntimeCookieValidationResult.Invalid();
-        }
-        catch (JsonException)
+        catch (Exception ex) when (IsInvalidRuntimeCookieException(ex))
         {
             return RuntimeCookieValidationResult.Invalid();
         }
@@ -193,4 +190,12 @@ public class RuntimeCookieService
         host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
         host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
         host.Equals("::1", StringComparison.OrdinalIgnoreCase);
+
+    // Cookie input is attacker-controlled. Validation must fail closed instead of surfacing parser/protection errors.
+    private static bool IsInvalidRuntimeCookieException(Exception exception) =>
+        exception is CryptographicException or
+        JsonException or
+        FormatException or
+        InvalidOperationException or
+        NotSupportedException;
 }

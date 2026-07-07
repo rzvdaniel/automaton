@@ -20,4 +20,9 @@ public class PublishedAppsConfig
     /// API base URL injected into published apps so they can call Automaton runtime APIs.
     /// </summary>
     public string ApiBaseUrl { get; set; } = "https://localhost:7091";
+
+    /// <summary>
+    /// Shared secret that the runtime proxy must send to internal runtime auth endpoints.
+    /// </summary>
+    public string RuntimeProxyAuthKey { get; set; } = string.Empty;
 }
