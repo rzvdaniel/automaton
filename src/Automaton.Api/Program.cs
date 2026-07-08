@@ -354,6 +354,7 @@ services.AddScoped<AppArchiveService>();
 services.AddScoped<AppVersionService>();
 services.AddSingleton<PrivateAppLaunchService>();
 services.AddSingleton<RuntimeCookieService>();
+services.AddScoped<BackendRouteConfigService>();
 
 // Register email service implementation based on environment and configuration.
 var useNoOpEmail = applicationBuilder.Environment.IsDevelopment() && !configurationService.EmailConfig.SendEmailsInDevelopment;

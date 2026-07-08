@@ -1186,6 +1186,10 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("RuntimeEndpoint")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)

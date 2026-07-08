@@ -23,6 +23,7 @@ public class HostedRunnerDockerCommandBuilderTests
             ServerUrl = "https://api.automaton.monster",
             DockerImage = "automaton-runner:latest",
             DockerNetwork = "automaton_runner_network",
+            RuntimeDockerNetwork = "automaton-runtime",
             DataRoot = "/opt/automaton/hosted-runners/"
         };
 
@@ -36,6 +37,7 @@ public class HostedRunnerDockerCommandBuilderTests
             Assert.That(command, Does.Contain("AUTOMATON_SERVER_URL='https://api.automaton.monster'"));
             Assert.That(command, Does.Contain("AUTOMATON_API_KEY='*** generated runner key ***'"));
             Assert.That(command, Does.Contain("docker volume create 'automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data'"));
+            Assert.That(command, Does.Contain("docker network connect 'automaton-runtime' 'automaton-hosted-runner-abc123'"));
             Assert.That(command, Does.Contain("-v 'automaton-runner-aaaaaaaabbbbccccddddeeeeeeeeeeee-data:/automaton/workspace'"));
             Assert.That(command, Does.Not.Contain("/opt/automaton/hosted-runners/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/data:/automaton/workspace"));
             Assert.That(command, Does.Not.Contain("ak_runner_"));

@@ -22,6 +22,7 @@ public class AppsService
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly IAuditEventService auditEventService;
     private readonly IApplicationEventService applicationEventService;
+    private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -36,7 +37,8 @@ public class AppsService
         PublishedAppStorageService publishedAppStorageService,
         IWebHostEnvironment webHostEnvironment,
         IAuditEventService auditEventService,
-        IApplicationEventService applicationEventService
+        IApplicationEventService applicationEventService,
+        BackendRouteConfigService backendRouteConfigService
     )
     {
         this.dataContext = dataContext;
@@ -48,6 +50,7 @@ public class AppsService
         this.webHostEnvironment = webHostEnvironment;
         this.auditEventService = auditEventService;
         this.applicationEventService = applicationEventService;
+        this.backendRouteConfigService = backendRouteConfigService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -464,6 +467,11 @@ public class AppsService
             });
         }
 
+        if (previousExecutionRunnerId != entity.ExecutionRunnerId)
+        {
+            await backendRouteConfigService.RefreshAsync();
+        }
+
     }
 
     public async Task Remove(Guid id)
@@ -523,6 +531,8 @@ public class AppsService
                 OwnerUserId = ownerId
             }
         });
+
+        await backendRouteConfigService.RefreshAsync();
 
     }
 
@@ -648,6 +658,7 @@ public class AppsService
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppPublished, entity.Name, id);
+        await backendRouteConfigService.RefreshAsync();
     }
 
     public async Task Unpublish(Guid id)
@@ -708,6 +719,7 @@ public class AppsService
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppUnpublished, entity.Name, id);
+        await backendRouteConfigService.RefreshAsync();
     }
 
     /// <summary>
@@ -754,6 +766,8 @@ public class AppsService
                 RunnerId = executionRunnerId
             }
         });
+
+        await backendRouteConfigService.RefreshAsync();
 
     }
 

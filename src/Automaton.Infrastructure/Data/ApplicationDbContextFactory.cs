@@ -24,11 +24,12 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 
         var connectionString = configuration.GetConnectionString("MySqlConnection")
             ?? throw new InvalidOperationException("Connection string 'MySqlConnection' not found.");
+        var serverVersionValue = configuration["DatabaseServerVersion"] ?? "8.0.36-mysql";
 
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
         optionsBuilder.UseMySql(
             connectionString,
-            ServerVersion.AutoDetect(connectionString),
+            ServerVersion.Parse(serverVersionValue),
             mySqlOptions => mySqlOptions.MigrationsAssembly(Assembly.GetExecutingAssembly().GetName().Name));
 
         return new ApplicationDbContext(optionsBuilder.Options);

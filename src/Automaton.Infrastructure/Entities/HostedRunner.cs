@@ -47,6 +47,9 @@ public class HostedRunner
     public string? ContainerId { get; set; }
 
     [MaxLength(2000)]
+    public string? RuntimeEndpoint { get; set; }
+
+    [MaxLength(2000)]
     public string? LastError { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

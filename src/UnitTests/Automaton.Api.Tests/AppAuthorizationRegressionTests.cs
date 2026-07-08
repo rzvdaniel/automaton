@@ -238,7 +238,8 @@ public class AppAuthorizationRegressionTests
             null!,
             environment,
             new NoOpAuditEventService(),
-            new NoOpApplicationEventService());
+            new NoOpApplicationEventService(),
+            null!);
     }
 
     private static void SeedProjectScopedApp(

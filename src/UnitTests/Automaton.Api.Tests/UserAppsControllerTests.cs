@@ -141,7 +141,8 @@ public class UserAppsControllerTests
             null!,
             new StubWebHostEnvironment(),
             new NoOpAuditEventService(),
-            new NoOpApplicationEventService());
+            new NoOpApplicationEventService(),
+            null!);
     }
 
     private static PrivateAppLaunchService CreatePrivateAppLaunchService()

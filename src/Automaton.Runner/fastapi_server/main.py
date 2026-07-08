@@ -4,8 +4,10 @@ import mimetypes
 import os
 import subprocess
 import sys
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+import tempfile
+import uuid
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
 app = FastAPI(title="Automaton Runner Backend")
@@ -102,9 +104,7 @@ def _app_data_dir(app_home: str, app_id: str) -> str:
 
 
 def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inputs: dict):
-    app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
-    backend_dir = os.path.join(app_home, "runtime", "backend")
-    data_dir = _app_data_dir(app_home, app_id)
+    app_home, backend_dir, data_dir = _resolve_app_paths(app_id)
     python_path = _venv_python_path(app_id)
     if not os.path.exists(python_path):
         raise HTTPException(
@@ -173,6 +173,44 @@ def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inp
         }
 
 
+def _resolve_app_paths(app_id: str) -> tuple[str, str, str]:
+    if not app_id:
+        raise HTTPException(status_code=400, detail="app_id is required")
+
+    app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
+    scripts_root = os.path.abspath(SCRIPTS_DIR)
+    if not app_home.startswith(scripts_root + os.sep):
+        raise HTTPException(status_code=400, detail="invalid app id")
+
+    backend_dir = os.path.join(app_home, "runtime", "backend")
+    data_dir = _app_data_dir(app_home, app_id)
+
+    if not os.path.isdir(app_home):
+        raise HTTPException(status_code=404, detail=f"unknown app '{app_id}'")
+
+    return app_home, backend_dir, data_dir
+
+
+def _temp_upload_dir(session_id: str) -> str:
+    return os.path.join(tempfile.gettempdir(), "uploads", session_id)
+
+
+def _temp_results_dir(session_id: str) -> str:
+    return os.path.join(tempfile.gettempdir(), "results", session_id)
+
+
+def _safe_download_file(session_id: str) -> str | None:
+    results_dir = _temp_results_dir(session_id)
+    if not os.path.isdir(results_dir):
+        return None
+
+    for entry in os.scandir(results_dir):
+        if entry.is_file():
+            return entry.path
+
+    return None
+
+
 @app.post("/api/controller/{controller_name}")
 async def execute_controller(controller_name: str, request: Request) -> JSONResponse:
     try:
@@ -229,6 +267,99 @@ async def read_runtime_file(request: Request) -> JSONResponse:
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/internal/apps/{app_id}/api/controllers/{controller_name}/actions/{action_name}/execute")
+async def execute_internal_controller(
+    app_id: str,
+    controller_name: str,
+    action_name: str,
+    request: Request,
+) -> JSONResponse:
+    try:
+        _resolve_app_paths(app_id)
+        body = await request.json()
+        inputs = body.get("inputs", {}) if isinstance(body, dict) else {}
+        result = _execute_in_app_env(app_id, controller_name, action_name, inputs)
+        return JSONResponse(status_code=200, content=result)
+    except HTTPException as ex:
+        return JSONResponse(status_code=ex.status_code, content={"success": False, "data": None, "error": ex.detail})
+    except Exception as ex:
+        return JSONResponse(status_code=500, content={"success": False, "data": None, "error": str(ex)})
+
+
+@app.post("/internal/apps/{app_id}/api/flows/{flow_identifier}/execute")
+async def execute_internal_flow(app_id: str, flow_identifier: str) -> JSONResponse:
+    try:
+        _resolve_app_paths(app_id)
+    except HTTPException as ex:
+        return JSONResponse(status_code=ex.status_code, content={"message": ex.detail})
+
+    return JSONResponse(
+        status_code=501,
+        content={"message": f"Managed runtime flow execution is not available for '{flow_identifier}' on this runner."},
+    )
+
+
+@app.post("/internal/apps/{app_id}/api/files/upload")
+async def upload_internal_file(
+    app_id: str,
+    file: UploadFile = File(...),
+    runnerNames: str | None = Form(default=None),
+) -> JSONResponse:
+    del runnerNames
+
+    try:
+        _resolve_app_paths(app_id)
+        session_id = uuid.uuid4().hex
+        target_dir = _temp_upload_dir(session_id)
+        os.makedirs(target_dir, exist_ok=True)
+
+        safe_name = os.path.basename(file.filename or "upload.bin")
+        target_path = os.path.join(target_dir, safe_name)
+
+        with open(target_path, "wb") as target:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                target.write(chunk)
+
+        await file.close()
+        return JSONResponse(status_code=200, content={"session_id": session_id})
+    except HTTPException as ex:
+        return JSONResponse(status_code=ex.status_code, content={"error": ex.detail})
+    except Exception as ex:
+        return JSONResponse(status_code=500, content={"error": str(ex)})
+
+
+@app.get("/internal/apps/{app_id}/api/files/{session_id}")
+async def download_internal_file(app_id: str, session_id: str):
+    try:
+        _resolve_app_paths(app_id)
+        file_path = _safe_download_file(session_id)
+        if not file_path:
+            return JSONResponse(status_code=404, content={"error": "file not found"})
+
+        file_name = os.path.basename(file_path)
+        content_type, _ = mimetypes.guess_type(file_path)
+        return FileResponse(
+            file_path,
+            media_type=content_type or "application/octet-stream",
+            filename=file_name,
+        )
+    except HTTPException as ex:
+        return JSONResponse(status_code=ex.status_code, content={"error": ex.detail})
+
+
+@app.api_route("/internal/apps/{app_id}/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
+async def unknown_internal_api(app_id: str, path: str) -> JSONResponse:
+    try:
+        _resolve_app_paths(app_id)
+    except HTTPException as ex:
+        return JSONResponse(status_code=ex.status_code, content={"error": ex.detail})
+
+    return JSONResponse(status_code=404, content={"error": f"unsupported managed runtime backend path '{path}'"})
 
 
 @app.get("/health")

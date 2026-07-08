@@ -79,6 +79,7 @@ public class HostedRunnerProvisioningService
         hostedRunner.MemoryMb = capabilities.MemoryMb;
         hostedRunner.DiskMb = capabilities.DiskMb;
         hostedRunner.MaxApps = capabilities.MaxApps;
+        hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner.ContainerName);
         hostedRunner.UpdatedAt = now;
 
         var host = await SelectHostAsync(capabilities, cancellationToken);
@@ -321,6 +322,9 @@ public class HostedRunnerProvisioningService
     private static string BuildRunnerName(Guid userId) => $"Hosted Runner {userId.ToString("N")[..8]}";
 
     private static string BuildContainerName(Guid userId) => $"automaton-hosted-runner-{userId.ToString("N")[..12]}";
+
+    private string BuildRuntimeEndpoint(string containerName)
+        => $"http://{containerName}:{options.RuntimePort}";
 
     private async Task SaveProvisioningCheckpointAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
     {

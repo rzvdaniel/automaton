@@ -16,7 +16,6 @@ NGINX_CONF_DIR="$NGINX_RUNTIME_DIR/conf.d"
 NGINX_UPSTREAMS_DIR="$NGINX_RUNTIME_DIR/upstreams"
 NGINX_APP_RUNTIME_DIR="$NGINX_RUNTIME_DIR/app-runtime"
 TRAEFIK_RUNTIME_DIR="$RUNTIME_ROOT/traefik"
-TRAEFIK_DYNAMIC_DIR="$TRAEFIK_RUNTIME_DIR/dynamic"
 STATE_DIR="$NGINX_RUNTIME_DIR/state"
 STATE_FILE="$STATE_DIR/blue-green-state.env"
 CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
@@ -28,7 +27,7 @@ LIVE_WEBSITE_COLOR_DEFAULT="blue"
 BOOTSTRAP_UPSTREAM_HOST="127.0.0.1"
 
 ensure_runtime_dirs() {
-    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$NGINX_APP_RUNTIME_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR" "$TRAEFIK_DYNAMIC_DIR"
+    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$NGINX_APP_RUNTIME_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR" "$TRAEFIK_RUNTIME_DIR"
 }
 
 ensure_env_file() {
@@ -174,9 +173,6 @@ render_nginx_runtime() {
     fi
 
     cp "$TRAEFIK_TEMPLATE_DIR/traefik.yml" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
-    cat > "$TRAEFIK_DYNAMIC_DIR/00-placeholder.yml" <<EOF
-http: {}
-EOF
 }
 
 ensure_placeholder_certificate() {

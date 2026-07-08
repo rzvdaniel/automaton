@@ -33,6 +33,7 @@ public class AppsControllerExecutionService
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly StaticRuntimeExportService staticRuntimeExportService;
+    private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -44,7 +45,8 @@ public class AppsControllerExecutionService
         IOptions<AppsTunnelConfig> tunnelConfig,
         ApiInstanceIdentityService apiInstanceIdentityService,
         IAppDeployCapabilityService appDeployCapabilityService,
-        StaticRuntimeExportService staticRuntimeExportService)
+        StaticRuntimeExportService staticRuntimeExportService,
+        BackendRouteConfigService backendRouteConfigService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -55,6 +57,7 @@ public class AppsControllerExecutionService
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.appDeployCapabilityService = appDeployCapabilityService;
         this.staticRuntimeExportService = staticRuntimeExportService;
+        this.backendRouteConfigService = backendRouteConfigService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -202,6 +205,8 @@ public class AppsControllerExecutionService
                     metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
                 }
             });
+
+            await backendRouteConfigService.RefreshAsync(cancellationToken);
         }
 
         return new DeployPackageResponse
@@ -259,6 +264,7 @@ public class AppsControllerExecutionService
         });
 
         var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
+        await backendRouteConfigService.RefreshAsync(cancellationToken);
 
         return new DeployAppResponse
         {
@@ -335,6 +341,7 @@ public class AppsControllerExecutionService
         });
 
         var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
+        await backendRouteConfigService.RefreshAsync(cancellationToken);
 
         return new DeployAppResponse
         {

@@ -32,10 +32,12 @@ x-api-common: &api-common
     ASPNETCORE_URLS: http://+:8080
     WebAppConfig__StaticRuntimeRoot: /app/AppData/static-runtime
     PublishedApps__RuntimeProxyAuthKey: ${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}
+    PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
     - prod-static-runtime:/app/AppData/static-runtime
+    - prod-traefik-dynamic:/app/AppData/traefik-dynamic
     - prod-api-logs:/app/logs
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
     - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
@@ -148,7 +150,7 @@ services:
     logging: *default-json-logging
     volumes:
       - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./.prod-runtime/traefik/dynamic:/etc/traefik/dynamic:ro
+      - prod-traefik-dynamic:/etc/traefik/dynamic
     networks:
       - automaton-runtime
     healthcheck:
@@ -241,6 +243,7 @@ volumes:
   prod-api-appdata:
   prod-published-apps:
   prod-static-runtime:
+  prod-traefik-dynamic:
   prod-api-logs:
   prod-worker-logs:
   prod-worker-dataprotection:

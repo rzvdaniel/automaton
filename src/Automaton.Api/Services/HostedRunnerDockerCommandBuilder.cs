@@ -34,7 +34,16 @@ public static class HostedRunnerDockerCommandBuilder
             ShellQuote(options.DockerImage)
         });
 
-        return string.Join("\n", new[]
+        var runtimeNetworkAttach = string.IsNullOrWhiteSpace(options.RuntimeDockerNetwork)
+            ? null
+            : $"docker network inspect {ShellQuote(options.RuntimeDockerNetwork)} >/dev/null 2>&1 || docker network create {ShellQuote(options.RuntimeDockerNetwork)} >/dev/null";
+
+        var runtimeNetworkConnect = string.IsNullOrWhiteSpace(options.RuntimeDockerNetwork) ||
+                                    string.Equals(options.RuntimeDockerNetwork, options.DockerNetwork, StringComparison.Ordinal)
+            ? null
+            : $"docker network connect {ShellQuote(options.RuntimeDockerNetwork)} {ShellQuote(runner.ContainerName)} >/dev/null 2>&1 || true";
+
+        var lines = new List<string>
         {
             "set -eu",
             $"mkdir -p {ShellQuote($"{runnerRoot}/config")} {ShellQuote($"{runnerRoot}/logs")}",
@@ -43,7 +52,19 @@ public static class HostedRunnerDockerCommandBuilder
             $"docker network inspect {ShellQuote(options.DockerNetwork)} >/dev/null 2>&1 || docker network create {ShellQuote(options.DockerNetwork)} >/dev/null",
             $"docker rm -f {ShellQuote(runner.ContainerName)} >/dev/null 2>&1 || true",
             dockerRun
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(runtimeNetworkAttach))
+        {
+            lines.Insert(4, runtimeNetworkAttach);
+        }
+
+        if (!string.IsNullOrWhiteSpace(runtimeNetworkConnect))
+        {
+            lines.Add(runtimeNetworkConnect);
+        }
+
+        return string.Join("\n", lines);
     }
 
     private static string BuildDataVolumeName(HostedRunner runner)

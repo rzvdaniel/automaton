@@ -138,7 +138,8 @@ public class UserAppsController : ControllerBase
                 app.Id,
                 app.OwnerId.Value,
                 path,
-                backendApiPath: $"/api/web-apps/app/{app.Id}");
+                backendApiPath: $"/a/{app.Id}/api",
+                useCurrentHostApiBase: true);
         }
         catch (Exception ex)
         {
@@ -322,7 +323,7 @@ public class UserAppsController : ControllerBase
         return StatusCode(statusCode);
     }
 
-    private async Task<IActionResult> ServeRuntimeFileAsync(Guid appId, Guid ownerId, string? path, string backendApiPath)
+    private async Task<IActionResult> ServeRuntimeFileAsync(Guid appId, Guid ownerId, string? path, string backendApiPath, bool useCurrentHostApiBase = false)
     {
         path = string.IsNullOrEmpty(path) ? "index.html" : path;
 
@@ -350,7 +351,7 @@ public class UserAppsController : ControllerBase
         if (contentType == "text/html")
         {
             var html = Encoding.UTF8.GetString(content);
-            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath);
+            var injectedHtml = InjectRuntimeScripts(html, appId, backendApiPath, useCurrentHostApiBase);
             return Content(injectedHtml, "text/html; charset=utf-8", Encoding.UTF8);
         }
 
@@ -387,7 +388,7 @@ public class UserAppsController : ControllerBase
         return File(content, contentType);
     }
 
-    private string InjectRuntimeScripts(string html, Guid appId, string backendApiPath)
+    private string InjectRuntimeScripts(string html, Guid appId, string backendApiPath, bool useCurrentHostApiBase = false)
     {
         if (html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase) ||
             html.Contains("automaton-api.js", StringComparison.OrdinalIgnoreCase))
@@ -395,9 +396,11 @@ public class UserAppsController : ControllerBase
             return html;
         }
 
-        var apiHost = Request.Host.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
-            ? $"api.{Request.Host.Host["apps.".Length..]}"
-            : Request.Host.Host;
+        var apiHost = useCurrentHostApiBase
+            ? Request.Host.Host
+            : Request.Host.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
+                ? $"api.{Request.Host.Host["apps.".Length..]}"
+                : Request.Host.Host;
         var apiBaseUrl = $"{Request.Scheme}://{apiHost}";
         if (Request.Host.Port.HasValue)
         {

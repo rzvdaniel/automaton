@@ -25,4 +25,10 @@ public class PublishedAppsConfig
     /// Shared secret that the runtime proxy must send to internal runtime auth endpoints.
     /// </summary>
     public string RuntimeProxyAuthKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Folder where the API writes Traefik dynamic route files for managed runtime backends.
+    /// Relative paths are resolved under the API content root.
+    /// </summary>
+    public string TraefikDynamicConfigRoot { get; set; } = "AppData/traefik-dynamic";
 }
