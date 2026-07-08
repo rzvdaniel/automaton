@@ -48,6 +48,7 @@ load_prod_env() {
     : "${WEBSITE_DOMAIN:?WEBSITE_DOMAIN is required in .env}"
     : "${APPS_DOMAIN:?APPS_DOMAIN is required in .env}"
     : "${ACME_EMAIL:?ACME_EMAIL is required in .env}"
+    : "${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}"
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
     RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-180}"
@@ -98,6 +99,7 @@ render_template() {
         -e "s|__WEBSITE_DOMAIN__|$WEBSITE_DOMAIN|g" \
         -e "s|__APPS_DOMAIN__|$APPS_DOMAIN|g" \
         -e "s|__CERT_NAME__|$CERT_NAME|g" \
+        -e "s|__RUNTIME_PROXY_AUTH_KEY__|$RUNTIME_PROXY_AUTH_KEY|g" \
         "$template_file" > "$destination_file"
 }
 

@@ -30,9 +30,12 @@ x-api-common: &api-common
   environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
+    WebAppConfig__StaticRuntimeRoot: /app/AppData/static-runtime
+    PublishedApps__RuntimeProxyAuthKey: ${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
+    - prod-static-runtime:/app/AppData/static-runtime
     - prod-api-logs:/app/logs
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
     - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
@@ -125,6 +128,7 @@ services:
       - ./.prod-runtime/nginx/upstreams:/etc/nginx/upstreams:ro
       - ./.prod-runtime/nginx/app-runtime:/var/www/automaton-app-runtime:ro
       - prod-published-apps:/var/www/automaton-apps:ro
+      - prod-static-runtime:/var/www/automaton-private-runtime:ro
       - ./.prod-runtime/certbot-www:/var/www/certbot:ro
       - ./.prod-runtime/letsencrypt:/etc/letsencrypt:ro
     networks:
@@ -218,6 +222,7 @@ volumes:
   prod-rabbitmq-data:
   prod-api-appdata:
   prod-published-apps:
+  prod-static-runtime:
   prod-api-logs:
   prod-worker-logs:
   prod-worker-dataprotection:
