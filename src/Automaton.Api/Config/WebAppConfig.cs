@@ -12,4 +12,10 @@ public class WebAppConfig
     /// Default: 86400 (24 hours)
     /// </summary>
     public int CacheMaxAgeSeconds { get; set; } = 86400;
+
+    /// <summary>
+    /// Root folder for the disposable static runtime cache served by nginx.
+    /// Relative paths are resolved under the API content root.
+    /// </summary>
+    public string StaticRuntimeRoot { get; set; } = "AppData/static-runtime";
 }
