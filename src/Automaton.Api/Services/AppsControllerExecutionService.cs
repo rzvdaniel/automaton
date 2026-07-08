@@ -24,6 +24,7 @@ public class AppsControllerExecutionService
     private const string BackendRuntimeLevelInfo = "info";
     private const string BackendRuntimeLevelWarn = "warn";
     private const string BackendRuntimeLevelError = "error";
+    private const string FlowArtifactsRelativeRoot = ".automaton/flows";
     private readonly ApplicationDbContext dataContext;
     private readonly AppFileStorageService fileStorageService;
     private readonly IHubContext<AutomatonHub> automatonHub;
@@ -33,6 +34,7 @@ public class AppsControllerExecutionService
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly StaticRuntimeExportService staticRuntimeExportService;
+    private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly Serilog.ILogger logger;
 
@@ -46,6 +48,7 @@ public class AppsControllerExecutionService
         ApiInstanceIdentityService apiInstanceIdentityService,
         IAppDeployCapabilityService appDeployCapabilityService,
         StaticRuntimeExportService staticRuntimeExportService,
+        UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         BackendRouteConfigService backendRouteConfigService)
     {
         this.dataContext = dataContext;
@@ -57,6 +60,7 @@ public class AppsControllerExecutionService
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.appDeployCapabilityService = appDeployCapabilityService;
         this.staticRuntimeExportService = staticRuntimeExportService;
+        this.flowsServiceFactory = flowsServiceFactory;
         this.backendRouteConfigService = backendRouteConfigService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
@@ -94,7 +98,16 @@ public class AppsControllerExecutionService
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
 
         if (scripts.Count == 0)
-            return new DeployBackendResponse { Success = true, DeployedCount = 0, Message = "No backend scripts found" };
+        {
+            var runnersWithoutScripts = (await ResolveRunnersByOwnerAsync(ownerId, runnerNames, appId)).ToList();
+            if (runnersWithoutScripts.Count == 0)
+            {
+                return new DeployBackendResponse { Success = true, DeployedCount = 0, Message = "No backend scripts found" };
+            }
+
+            await DeployManagedFlowArtifactsAsync(appId, ownerId, runnersWithoutScripts, cancellationToken);
+            return new DeployBackendResponse { Success = true, DeployedCount = 0, RunnerCount = runnersWithoutScripts.Count, Message = "No backend scripts found" };
+        }
 
         var runners = await ResolveRunnersByOwnerAsync(ownerId, runnerNames, appId);
 
@@ -137,6 +150,16 @@ public class AppsControllerExecutionService
                     errors.Add($"Runner '{runner.Name}', script '{script.ControllerName}': {ex.Message}");
                     logger.Warning(ex, "Failed to deploy {ControllerName} to runner {RunnerName}", script.ControllerName, runner.Name);
                 }
+            }
+
+            try
+            {
+                await DeployManagedFlowArtifactsAsync(appId, ownerId, [runner], cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Runner '{runner.Name}', flow artifacts: {ex.Message}");
+                logger.Warning(ex, "Failed to deploy flow artifacts for app {AppId} to runner {RunnerName}", appId, runner.Name);
             }
         }
 
@@ -206,6 +229,7 @@ public class AppsControllerExecutionService
                 }
             });
 
+            await DeployManagedFlowArtifactsAsync(appId, ownerId, [runner], cancellationToken);
             await backendRouteConfigService.RefreshAsync(cancellationToken);
         }
 
@@ -709,6 +733,77 @@ public class AppsControllerExecutionService
         }
 
         return await completionTask;
+    }
+
+    private async Task DeployManagedFlowArtifactsAsync(
+        Guid appId,
+        Guid ownerId,
+        IEnumerable<Runner> runners,
+        CancellationToken cancellationToken)
+    {
+        var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
+        var flowIds = metadata.ConnectedFlowIds?
+            .Select(value => Guid.TryParse(value, out var parsed) ? parsed : (Guid?)null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .Distinct()
+            .ToList() ?? [];
+
+        if (flowIds.Count == 0)
+        {
+            return;
+        }
+
+        var ownerFlowsService = flowsServiceFactory.CreateForUser(ownerId);
+        var indexEntries = new List<object>();
+        var artifacts = new List<(string RelativePath, byte[] Content)>();
+
+        foreach (var flowId in flowIds)
+        {
+            var flow = ownerFlowsService.Get(flowId);
+            if (flow == null)
+            {
+                logger.Warning("Connected flow {FlowId} for app {AppId} could not be loaded for deployment", flowId, appId);
+                continue;
+            }
+
+            indexEntries.Add(new
+            {
+                FlowId = flow.Id,
+                flow.Name
+            });
+
+            artifacts.Add((
+                $"{FlowArtifactsRelativeRoot}/{flow.Id:N}.json",
+                JsonSerializer.SerializeToUtf8Bytes(flow)));
+        }
+
+        artifacts.Add((
+            $"{FlowArtifactsRelativeRoot}/index.json",
+            JsonSerializer.SerializeToUtf8Bytes(indexEntries)));
+
+        foreach (var runner in runners)
+        {
+            foreach (var artifact in artifacts)
+            {
+                var payload = new
+                {
+                    AppId = appId,
+                    RelativePath = artifact.RelativePath,
+                    ControllerName = "managed-flow-artifact",
+                    Content = artifact.Content,
+                    Language = "Text"
+                };
+
+                var result = await automatonHub.Clients.Client(runner.ConnectionId!)
+                    .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
+
+                if (!result.Success)
+                {
+                    throw new InvalidOperationException($"Runner '{runner.Name}' rejected backend file '{artifact.RelativePath}'.");
+                }
+            }
+        }
     }
 
     private async Task<List<RunnerAppControllerResult>> ExecuteViaTunnelAsync(
