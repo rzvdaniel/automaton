@@ -91,6 +91,7 @@ __pycache__/
 *.egg-info/
 
 .tmp/
+.local-dev/
 .prod-runtime/
 
 .artifacts/

@@ -1,0 +1,91 @@
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${APPS_DOMAIN};
+
+    ssl_certificate /etc/nginx/certs/${APPS_TLS_CERT_FILE};
+    ssl_certificate_key /etc/nginx/certs/${APPS_TLS_KEY_FILE};
+
+    location = /healthz {
+        return 200;
+    }
+
+    location ~ /\.(?!well-known(?:/|$)) {
+        return 404;
+    }
+
+    location ^~ /runtime/ {
+        alias /var/www/automaton-app-runtime/;
+        add_header Cache-Control "public, max-age=300" always;
+    }
+
+    location = /internal/runtime/auth {
+        internal;
+        proxy_pass ${API_ORIGIN}/internal/runtime/auth;
+        proxy_http_version 1.1;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header X-App-Id $runtime_app_id;
+        proxy_set_header X-Automaton-Runtime-Auth ${RUNTIME_PROXY_AUTH_KEY};
+    }
+
+    location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})$ {
+        return 301 /a/$runtime_app_id/;
+    }
+
+    location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})/api(?:/|$) {
+        auth_request /internal/runtime/auth;
+        proxy_pass http://managed-runtime-traefik:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+
+    location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})/$ {
+        auth_request /internal/runtime/auth;
+        root /var/www/automaton-private-runtime;
+        add_header Cache-Control "no-cache" always;
+        try_files /apps/$runtime_app_id/index.html =404;
+    }
+
+    location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})/(?<runtime_asset_path>.+)$ {
+        auth_request /internal/runtime/auth;
+        root /var/www/automaton-private-runtime;
+        add_header Cache-Control "no-cache" always;
+
+        if ($runtime_asset_path ~ "(?:^|/)\.") {
+            return 404;
+        }
+
+        if ($runtime_asset_path ~ "(?:^|/)\.\.(?:/|$)") {
+            return 404;
+        }
+
+        if ($runtime_asset_path ~* "(?:^|/)(?:source|backend|data|logs|versions)(?:/|$)") {
+            return 404;
+        }
+
+        if ($runtime_asset_path ~* "\.(?:bak|sql|log|ya?ml|toml|ini|env|pem|key|crt|pfx|p12|ps1|sh|cmd|bat|config|lock)$") {
+            return 404;
+        }
+
+        try_files /apps/$runtime_app_id/$runtime_asset_path /apps/$runtime_app_id/index.html =404;
+    }
+
+    location /a/ {
+        return 404;
+    }
+
+    location / {
+        return 404;
+    }
+}

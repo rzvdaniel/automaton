@@ -52,6 +52,7 @@ WORKSPACE_ROOT = _effective_workspace_root()
 RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controller_runner.py")
 RUNNER_DLL = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "automaton-runner.dll"))
 DOTNET_HOST = shutil.which("dotnet") or "dotnet"
+FASTAPI_HOST = os.environ.get("RUNNER_FASTAPI_HOST", "127.0.0.1").strip() or "127.0.0.1"
 
 
 def _print_startup_diagnostics() -> None:
@@ -418,5 +419,5 @@ if __name__ == "__main__":
     _print_startup_diagnostics()
     workers = 1 if sys.platform == "win32" else 4
     uvicorn.run(
-        "main:app", host="127.0.0.1", port=8001, workers=workers, log_level="info"
+        "main:app", host=FASTAPI_HOST, port=8001, workers=workers, log_level="info"
     )

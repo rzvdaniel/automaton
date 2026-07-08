@@ -34,7 +34,9 @@ if [ -n "$(echo "$ALL_PKGS" | tr -d ' ')" ]; then
         echo "Warning: system package reinstall failed — apps using system-requirements.txt may not work correctly"
 fi
 
-# Start FastAPI backend on port 8001 (localhost-only)
+# Start FastAPI backend on port 8001.
+# In the container we bind to 0.0.0.0 so internal reverse proxies such as Traefik can reach it.
+export RUNNER_FASTAPI_HOST="${RUNNER_FASTAPI_HOST:-0.0.0.0}"
 cd /app/fastapi_server
 echo "Starting FastAPI backend..."
 python main.py &

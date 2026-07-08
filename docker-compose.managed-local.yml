@@ -1,0 +1,43 @@
+name: automaton-managed-local
+
+services:
+  managed-runtime-nginx:
+    image: nginx:1.27-alpine
+    container_name: automaton-local-managed-nginx
+    restart: unless-stopped
+    ports:
+      - "${MANAGED_APPS_HTTPS_PORT:-8443}:443"
+    environment:
+      APPS_DOMAIN: ${MANAGED_APPS_DOMAIN:-apps.automaton.test}
+      API_ORIGIN: ${MANAGED_API_ORIGIN:-https://host.docker.internal:7091}
+      APPS_TLS_CERT_FILE: ${MANAGED_APPS_TLS_CERT_FILE:-apps.automaton.test.pem}
+      APPS_TLS_KEY_FILE: ${MANAGED_APPS_TLS_KEY_FILE:-apps.automaton.test-key.pem}
+      RUNTIME_PROXY_AUTH_KEY: ${MANAGED_RUNTIME_PROXY_AUTH_KEY:?MANAGED_RUNTIME_PROXY_AUTH_KEY is required}
+    volumes:
+      - ./docker/nginx/local-managed/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./docker/nginx/app-runtime:/var/www/automaton-app-runtime:ro
+      - ${MANAGED_STATIC_RUNTIME_ROOT:-./.local-dev/managed-runtime/static-runtime}:/var/www/automaton-private-runtime:ro
+      - ${MANAGED_LOCAL_CERTS_DIR:-./.local-dev/managed-runtime/certs}:/etc/nginx/certs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - automaton-local
+    depends_on:
+      - managed-runtime-traefik
+
+  managed-runtime-traefik:
+    image: traefik:v3.1
+    container_name: automaton-local-managed-traefik
+    restart: unless-stopped
+    ports:
+      - "${MANAGED_TRAEFIK_PING_PORT:-8082}:8082"
+    volumes:
+      - ./docker/traefik/local-managed/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ${MANAGED_TRAEFIK_DYNAMIC_ROOT:-./.local-dev/managed-runtime/traefik-dynamic}:/etc/traefik/dynamic
+    networks:
+      - automaton-local
+
+networks:
+  automaton-local:
+    external: true
+    name: automaton-local
