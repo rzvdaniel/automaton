@@ -41,6 +41,7 @@ status_table
 
 check "Docker Compose service status" docker compose -f "$COMPOSE_FILE" ps
 check "nginx configuration" docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -t
+check "traefik ping" docker compose -f "$COMPOSE_FILE" exec -T traefik wget -q -O- http://127.0.0.1:8082/ping
 
 check_url "origin API health" "https://$API_DOMAIN/healthz" -k --resolve "$API_DOMAIN:443:127.0.0.1"
 check_head "origin Studio" "https://$STUDIO_DOMAIN/" -k --resolve "$STUDIO_DOMAIN:443:127.0.0.1"

@@ -1,0 +1,20 @@
+entryPoints:
+  web:
+    address: ":80"
+  ping:
+    address: ":8082"
+
+ping:
+  entryPoint: ping
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+api:
+  dashboard: false
+  insecure: false
+
+log:
+  level: INFO

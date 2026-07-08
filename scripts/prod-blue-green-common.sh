@@ -9,11 +9,14 @@ COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
 ENV_FILE="$REPO_ROOT/.env"
 NGINX_TEMPLATE_DIR="$REPO_ROOT/docker/nginx/prod"
 APP_RUNTIME_SOURCE_DIR="$REPO_ROOT/docker/nginx/app-runtime"
+TRAEFIK_TEMPLATE_DIR="$REPO_ROOT/docker/traefik/prod"
 RUNTIME_ROOT="$REPO_ROOT/.prod-runtime"
 NGINX_RUNTIME_DIR="$RUNTIME_ROOT/nginx"
 NGINX_CONF_DIR="$NGINX_RUNTIME_DIR/conf.d"
 NGINX_UPSTREAMS_DIR="$NGINX_RUNTIME_DIR/upstreams"
 NGINX_APP_RUNTIME_DIR="$NGINX_RUNTIME_DIR/app-runtime"
+TRAEFIK_RUNTIME_DIR="$RUNTIME_ROOT/traefik"
+TRAEFIK_DYNAMIC_DIR="$TRAEFIK_RUNTIME_DIR/dynamic"
 STATE_DIR="$NGINX_RUNTIME_DIR/state"
 STATE_FILE="$STATE_DIR/blue-green-state.env"
 CERTBOT_WWW_DIR="$RUNTIME_ROOT/certbot-www"
@@ -25,7 +28,7 @@ LIVE_WEBSITE_COLOR_DEFAULT="blue"
 BOOTSTRAP_UPSTREAM_HOST="127.0.0.1"
 
 ensure_runtime_dirs() {
-    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$NGINX_APP_RUNTIME_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR"
+    mkdir -p "$NGINX_CONF_DIR" "$NGINX_UPSTREAMS_DIR" "$NGINX_APP_RUNTIME_DIR" "$STATE_DIR" "$CERTBOT_WWW_DIR" "$LETSENCRYPT_DIR" "$TRAEFIK_DYNAMIC_DIR"
 }
 
 ensure_env_file() {
@@ -169,6 +172,11 @@ render_nginx_runtime() {
     else
         render_bootstrap_upstreams
     fi
+
+    cp "$TRAEFIK_TEMPLATE_DIR/traefik.yml" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
+    cat > "$TRAEFIK_DYNAMIC_DIR/00-placeholder.yml" <<EOF
+http: {}
+EOF
 }
 
 ensure_placeholder_certificate() {
@@ -501,12 +509,13 @@ switch_all_live_colors() {
 
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
-    echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and nginx are up"
-    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker nginx
+    echo "[INFO] Ensuring MySQL, RabbitMQ, worker, nginx, and traefik are up"
+    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker nginx traefik
     wait_for_service_healthy mysql 120
     wait_for_service_healthy rabbitmq 120
     wait_for_service_healthy worker 120
     wait_for_service_healthy nginx 120
+    wait_for_service_healthy traefik 120
 }
 
 reset_blue_green_to_blue() {

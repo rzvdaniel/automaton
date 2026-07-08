@@ -386,6 +386,13 @@ Cache expectations for Cloudflare/nginx:
 
 Private and unpublished apps are still not copied into `prod-published-apps`. Instead, the API exports managed runtime frontend files into the shared `prod-static-runtime` volume, and `apps.automaton.monster` serves `/a/{appId}/...` directly from that cache. Published slug apps remain static from `prod-published-apps`.
 
+Managed runtime backend traffic is separate from frontend static serving:
+
+- nginx continues serving `/a/{appId}/...` frontend files from `prod-static-runtime`
+- nginx forwards `/a/{appId}/api/...` to internal Traefik
+- Traefik owns managed backend routing behind nginx
+- Automaton.Api stays out of backend byte serving and remains only the `auth_request` authority
+
 Restricted runtime proxy contract:
 
 - `/a/{appId}/...` is the browser-visible runtime path, so the `automaton_runtime` cookie is scoped to `/a/{appId}`.
@@ -399,6 +406,11 @@ Restricted runtime proxy contract:
 Production nginx shape:
 
 ```nginx
+location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})/api(?:/|$) {
+    auth_request /internal/runtime/auth;
+    proxy_pass http://traefik:80;
+}
+
 location ~ ^/a/(?<runtime_app_id>[0-9a-fA-F-]{36})/$ {
     auth_request /internal/runtime/auth;
     root /var/www/automaton-private-runtime;
@@ -454,9 +466,9 @@ chmod +x ./scripts/prod-*.sh
 
 For API-only or Studio-only deploys, use `prod-redeploy-api.sh --keep-previous` or `prod-redeploy-studio.sh --keep-previous` with the same verify step.
 
-`prod-redeploy-all.sh` also refreshes the app-host nginx config and `/runtime/automaton-api.js`. Single-service deploys do not need to touch the app host unless that runtime SDK or app-host nginx config changed.
+`prod-redeploy-all.sh` also refreshes the app-host nginx config, the internal Traefik bootstrap config, and `/runtime/automaton-api.js`. Single-service deploys do not need to touch the app host unless that runtime SDK or runtime-edge config changed.
 
-If only the app-host runtime SDK or nginx app-host config changed, use the dedicated app-host infrastructure script:
+If only the app-host runtime SDK, nginx app-host config, or Traefik runtime-router bootstrap config changed, use the dedicated app-host infrastructure script:
 
 ```bash
 cd /opt/automaton

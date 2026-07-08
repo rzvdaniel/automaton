@@ -133,8 +133,26 @@ services:
       - ./.prod-runtime/letsencrypt:/etc/letsencrypt:ro
     networks:
       - automaton-prod
+      - automaton-runtime
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/.well-known/acme-challenge/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  traefik:
+    image: traefik:v3.1
+    container_name: automaton-traefik
+    restart: unless-stopped
+    logging: *default-json-logging
+    volumes:
+      - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./.prod-runtime/traefik/dynamic:/etc/traefik/dynamic:ro
+    networks:
+      - automaton-runtime
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8082/ping | grep -q OK || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -230,3 +248,6 @@ volumes:
 networks:
   automaton-prod:
     driver: bridge
+  automaton-runtime:
+    driver: bridge
+    internal: true
