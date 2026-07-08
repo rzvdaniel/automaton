@@ -1,4 +1,5 @@
 using Automaton.Runner.Console.Services;
+using Automaton.Core.Enums;
 using Automaton.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,11 @@ public static class VerboseOptions
 
 public class Program
 {
+    private static readonly System.Text.Json.JsonSerializerOptions jsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+    };
+
     private static readonly Option<bool> verboseOption = new Option<bool>(
         aliases: new[] { "--verbose", "-v" },
         description: "Enable verbose output (prints Python environment details)",
@@ -44,7 +50,8 @@ public class Program
                 CreateStatusCommand(),
                 CreateServerCommand(),
                 CreateServiceCommand(),
-                CreateCleanupCommand()
+                CreateCleanupCommand(),
+                CreateExecuteAppFlowCommand()
             };
 
             rootCommand.AddGlobalOption(verboseOption);
@@ -236,6 +243,72 @@ public class Program
         return command;
     }
 
+    private static Command CreateExecuteAppFlowCommand()
+    {
+        var appIdOption = new Option<Guid>(
+            name: "--app-id",
+            description: "App ID to execute flow for")
+        {
+            IsRequired = true
+        };
+
+        var flowIdentifierOption = new Option<string>(
+            name: "--flow-identifier",
+            description: "Flow ID or flow name")
+        {
+            IsRequired = true
+        };
+
+        var inputsJsonOption = new Option<string>(
+            name: "--inputs-json",
+            description: "JSON object of string inputs")
+        {
+            IsRequired = false
+        };
+
+        var command = new Command("execute-app-flow", "Execute a deployed app flow from local runner workspace")
+        {
+            appIdOption,
+            flowIdentifierOption,
+            inputsJsonOption
+        };
+
+        command.SetHandler(async (Guid appId, string flowIdentifier, string? inputsJson, bool verbose) =>
+        {
+            VerboseOptions.Verbose = verbose;
+            using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            using var scope = host.Services.CreateScope();
+            var appFlowExecutionService = scope.ServiceProvider.GetRequiredService<AppFlowExecutionService>();
+
+            try
+            {
+                var inputs = string.IsNullOrWhiteSpace(inputsJson)
+                    ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(inputsJson)
+                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                var result = await appFlowExecutionService.ExecuteAsync(appId, flowIdentifier, inputs);
+                WriteLine(System.Text.Json.JsonSerializer.Serialize(result, jsonSerializerOptions));
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                var error = new AppFlowExecutionResult
+                {
+                    Success = false,
+                    Status = WorkflowStatus.Error.ToString(),
+                    RunnerCount = 1,
+                    ExecutedAt = DateTime.UtcNow,
+                    Message = ex.Message
+                };
+                WriteLine(System.Text.Json.JsonSerializer.Serialize(error, jsonSerializerOptions));
+                Environment.ExitCode = 1;
+            }
+        }, appIdOption, flowIdentifierOption, inputsJsonOption, verboseOption);
+
+        return command;
+    }
+
     private static IConfiguration GetConfiguration(string[] args)
     {
         // Allow self-signed certificates in development
@@ -271,6 +344,7 @@ public class Program
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<HubService>();
                 services.AddSingleton<FlowExecutionService>();
+                services.AddSingleton<AppFlowExecutionService>();
                 services.AddSingleton<RunnerHostService>();
                 services.AddSingleton<RunnerWorkflowExecutionPersistenceService>();
                 services.AddSingleton<IWorkflowExecutionPersistenceService, RunnerWorkflowExecutionPersistenceService>();

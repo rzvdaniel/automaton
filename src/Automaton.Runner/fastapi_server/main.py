@@ -4,6 +4,7 @@ import mimetypes
 import os
 import subprocess
 import sys
+import shutil
 import tempfile
 import uuid
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -49,6 +50,8 @@ def _effective_workspace_root() -> str:
 SCRIPTS_DIR = os.environ.get("RUNNER_SCRIPTS_DIR") or _default_scripts_dir()
 WORKSPACE_ROOT = _effective_workspace_root()
 RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controller_runner.py")
+RUNNER_DLL = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "automaton-runner.dll"))
+DOTNET_HOST = shutil.which("dotnet") or "dotnet"
 
 
 def _print_startup_diagnostics() -> None:
@@ -289,16 +292,60 @@ async def execute_internal_controller(
 
 
 @app.post("/internal/apps/{app_id}/api/flows/{flow_identifier}/execute")
-async def execute_internal_flow(app_id: str, flow_identifier: str) -> JSONResponse:
+async def execute_internal_flow(app_id: str, flow_identifier: str, request: Request) -> JSONResponse:
     try:
         _resolve_app_paths(app_id)
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        inputs = body.get("inputs", {}) if isinstance(body, dict) else {}
+        inputs_json = json.dumps(inputs)
+
+        process = subprocess.run(
+            [
+                DOTNET_HOST,
+                RUNNER_DLL,
+                "execute-app-flow",
+                "--app-id",
+                app_id,
+                "--flow-identifier",
+                flow_identifier,
+                "--inputs-json",
+                inputs_json,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=os.path.dirname(RUNNER_DLL),
+        )
+
+        stdout = (process.stdout or "").strip()
+        if stdout:
+            try:
+                payload = json.loads(stdout)
+            except json.JSONDecodeError:
+                payload = {
+                    "success": False,
+                    "status": "Error",
+                    "runnerCount": 1,
+                    "executedAt": None,
+                    "message": stdout,
+                    "outputVariables": {},
+                    "logs": [],
+                }
+        else:
+            payload = {
+                "success": False,
+                "status": "Error",
+                "runnerCount": 1,
+                "executedAt": None,
+                "message": (process.stderr or "Flow execution returned no payload.").strip(),
+                "outputVariables": {},
+                "logs": [],
+            }
+
+        status_code = 200 if process.returncode == 0 else (404 if "not found" in str(payload.get("message", "")).lower() else 400)
+        return JSONResponse(status_code=status_code, content=payload)
     except HTTPException as ex:
         return JSONResponse(status_code=ex.status_code, content={"message": ex.detail})
-
-    return JSONResponse(
-        status_code=501,
-        content={"message": f"Managed runtime flow execution is not available for '{flow_identifier}' on this runner."},
-    )
 
 
 @app.post("/internal/apps/{app_id}/api/files/upload")
