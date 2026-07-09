@@ -159,6 +159,114 @@ public class DeployServiceTests
     }
 
     [Test]
+    public async Task DeployAsync_WhenManagedRuntimeIsPreparing_ReturnsManagedRuntimeNextSteps()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
+            Backend = new BackendConfig { DeployDir = "backend" }
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        WriteBackendController(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployBackendResult(
+                    false,
+                    0,
+                    "Managed runtime is being prepared.",
+                    "preparingManagedRuntime",
+                    true))));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.HasWarnings, Is.True);
+        Assert.That(result.NextSteps, Does.Contain("Managed runtime is being prepared. Rerun automaton deploy in a moment."));
+        Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed runtime is being prepared.");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenManagedRuntimeIsUnavailable_ReturnsEntitlementNextSteps()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
+            Backend = new BackendConfig { DeployDir = "backend" }
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        WriteBackendController(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployBackendResult(
+                    false,
+                    0,
+                    "Managed backend runtime is not included in the current plan.",
+                    "managedRuntimeUnavailable",
+                    false))));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.NextSteps, Does.Contain("This workspace plan does not include managed backend runtime."));
+        Assert.That(result.NextSteps, Does.Contain("Assign a self-hosted runner or change the workspace plan, then rerun automaton deploy."));
+        Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed backend runtime is not included in the current plan.");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenAssignedRunnerIsOffline_ReturnsAssignedRunnerNextSteps()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
+            Backend = new BackendConfig { DeployDir = "backend" }
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        WriteBackendController(projectRoot);
+
+        var service = new DeployService(
+            configService,
+            (_, _, _) => Task.FromResult(0),
+            (_, _, _, _, _, _) => Task.FromResult((
+                new DeployUploadResult(1, 0, 0.1),
+                new DeployBackendResult(
+                    false,
+                    0,
+                    "No connected runner is assigned to this app.",
+                    "managedRuntimeUnavailable",
+                    false))));
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.NextSteps, Does.Contain("This app is assigned to a runner, but that runner is not currently connected."));
+        Assert.That(result.NextSteps, Does.Contain("Bring the assigned runner online or reassign the app to a healthy runner in Automaton Studio, then rerun automaton deploy."));
+        Assert.That(result.NextSteps.Any(step => step.Contains("plan does not include", StringComparison.OrdinalIgnoreCase)), Is.False);
+        AssertCheck(result, DeployCheckNames.PackageDeploy, false, "No connected runner is assigned to this app.");
+    }
+
+    [Test]
     public async Task DeployAsync_WhenPackageUploadFails_ReturnsStructuredFailure()
     {
         var projectRoot = CreateProjectRoot();

@@ -5,6 +5,10 @@ namespace Automaton.Cli.Services;
 public sealed class DeployService
 {
     private const string AutomatonConfigFileName = "automaton.json";
+    private const string DeployStatePreparingManagedRuntime = "preparingManagedRuntime";
+    private const string DeployStateManagedRunnerProvisionFailed = "managedRunnerProvisionFailed";
+    private const string DeployStateManagedRunnerWaitingForConnection = "managedRunnerWaitingForConnection";
+    private const string DeployStateManagedRuntimeUnavailable = "managedRuntimeUnavailable";
 
     private readonly ConfigService config;
     private readonly Action<string>? progress;
@@ -172,8 +176,7 @@ public sealed class DeployService
 
         if (!backendResult.Success || backendResult.RunnerCount <= 0)
         {
-            nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
-            nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
+            AddManagedRuntimeNextSteps(nextSteps, backendResult);
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, backendResult.Message ?? "deploy package did not reach any runner", IsWarning: true));
             return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
         }
@@ -380,10 +383,46 @@ public sealed class DeployService
         var success = deployResult.TryGetProperty("success", out var successProperty) && successProperty.GetBoolean();
         var message = deployResult.TryGetProperty("message", out var messageProperty) ? messageProperty.GetString() : null;
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
+        var state = deployResult.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
+        var requiresRetry = deployResult.TryGetProperty("requiresRetry", out var requiresRetryProperty) && requiresRetryProperty.GetBoolean();
 
         return (
             new DeployUploadResult(sourceFiles + runtimeFiles, 0, sizeMb),
-            new DeployBackendResult(success, runnerCount, message));
+            new DeployBackendResult(success, runnerCount, message, state, requiresRetry));
+    }
+
+    private static void AddManagedRuntimeNextSteps(ISet<string> nextSteps, DeployBackendResult backendResult)
+    {
+        if (string.Equals(backendResult.Message, "No connected runner is assigned to this app.", StringComparison.Ordinal))
+        {
+            nextSteps.Add("This app is assigned to a runner, but that runner is not currently connected.");
+            nextSteps.Add("Bring the assigned runner online or reassign the app to a healthy runner in Automaton Studio, then rerun automaton deploy.");
+            return;
+        }
+
+        switch (backendResult.State)
+        {
+            case DeployStatePreparingManagedRuntime:
+                nextSteps.Add("Managed runtime is being prepared. Rerun automaton deploy in a moment.");
+                nextSteps.Add("Check Hosted Runners in Automaton Studio if provisioning takes longer than expected.");
+                return;
+            case DeployStateManagedRunnerWaitingForConnection:
+                nextSteps.Add("Managed runner was provisioned but has not connected yet. Rerun automaton deploy in a moment.");
+                nextSteps.Add("Check Hosted Runners in Automaton Studio for runner connection status.");
+                return;
+            case DeployStateManagedRunnerProvisionFailed:
+                nextSteps.Add("Managed runner could not be provisioned. Check Hosted Runners in Automaton Studio.");
+                nextSteps.Add("Inspect worker and hosted runner logs, then rerun automaton deploy.");
+                return;
+            case DeployStateManagedRuntimeUnavailable:
+                nextSteps.Add("This workspace plan does not include managed backend runtime.");
+                nextSteps.Add("Assign a self-hosted runner or change the workspace plan, then rerun automaton deploy.");
+                return;
+            default:
+                nextSteps.Add("Rerun automaton deploy with --runner <runner-id-or-name>");
+                nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
+                return;
+        }
     }
 
     private static string FormatUploadMessage(string verb, string subject, DeployUploadResult result)

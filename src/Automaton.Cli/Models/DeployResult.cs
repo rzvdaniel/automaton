@@ -24,7 +24,12 @@ public sealed record DeployUploadResult(
     double SizeMb,
     IReadOnlyList<DeploySkippedEntry>? SkippedEntries = null);
 
-public sealed record DeployBackendResult(bool Success, int RunnerCount, string? Message);
+public sealed record DeployBackendResult(
+    bool Success,
+    int RunnerCount,
+    string? Message,
+    string? State = null,
+    bool RequiresRetry = false);
 
 public sealed class DeployResult
 {
