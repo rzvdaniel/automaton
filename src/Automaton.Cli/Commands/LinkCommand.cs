@@ -14,17 +14,19 @@ public static class LinkCommand
             Arity = ArgumentArity.ZeroOrOne
         };
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = new Option<string?>("--env", "Environment name to link, for example local or live");
 
         var cmd = new Command("link", "Link this directory to an existing Automaton app")
         {
             appIdArgument,
-            jsonOption
+            jsonOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (string? appId, bool asJson) =>
+        cmd.SetHandler(async (string? appId, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+            var (server, apiKey) = config.ResolveCredentials(directory: cwd, environmentName: environmentName);
 
             var resolvedAppId = appId;
             if (!asJson && string.IsNullOrWhiteSpace(resolvedAppId))
@@ -34,7 +36,7 @@ public static class LinkCommand
             }
 
             var linkService = new LinkAppService(config);
-            var result = await linkService.LinkAsync(cwd, resolvedAppId, server, apiKey);
+            var result = await linkService.LinkAsync(cwd, resolvedAppId, server, apiKey, environmentName);
 
             if (asJson)
             {
@@ -69,7 +71,7 @@ public static class LinkCommand
             AnsiConsole.MarkupLine($"[green]✓[/] Linked to app [bold]{result.Name}[/] ({result.AppId})");
             AnsiConsole.MarkupLine("[grey]Run 'automaton pull' to download the app's current files.[/]");
             Environment.ExitCode = 0;
-        }, appIdArgument, jsonOption);
+        }, appIdArgument, jsonOption, environmentOption);
 
         return cmd;
     }

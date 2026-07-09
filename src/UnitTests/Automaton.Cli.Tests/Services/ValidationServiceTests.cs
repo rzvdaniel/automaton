@@ -66,7 +66,6 @@ public class ValidationServiceTests
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Unlinked App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
@@ -83,7 +82,7 @@ public class ValidationServiceTests
         var result = await service.ValidateAsync(projectRoot);
 
         Assert.That(result.Success, Is.False);
-        AssertCheck(result, ValidationCheckNames.AppLink, false, "not linked yet");
+        AssertCheck(result, ValidationCheckNames.AppLink, false, "not linked to an appId");
         Assert.That(result.NextSteps, Has.Some.Contains("automaton create"));
     }
 
@@ -95,15 +94,13 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Test App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist"));
 
         var service = new ValidationService(configService, (_, _, _, _) =>
@@ -123,9 +120,7 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Backend App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
@@ -135,7 +130,7 @@ public class ValidationServiceTests
                 DeployDir = "backend"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
         Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
         File.WriteAllText(Path.Combine(projectRoot, "backend", "todos.py"), "def handle(action_name, inputs):\n    return {'success': True, 'data': {}, 'error': ''}\n");
@@ -159,15 +154,13 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Remote App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
@@ -188,15 +181,13 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
         var service = new ValidationService(configService, (_, _, _, _) =>
@@ -217,15 +208,13 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));
         WriteFrontendIndexHtml(projectRoot);
 
@@ -248,15 +237,13 @@ public class ValidationServiceTests
 
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "Frontend App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         File.Delete(Path.Combine(projectRoot, ".automatonignore"));
         WriteFrontendIndexHtml(projectRoot);
 
@@ -291,5 +278,19 @@ public class ValidationServiceTests
         var frontendDist = Path.Combine(projectRoot, "frontend", "dist");
         Directory.CreateDirectory(frontendDist);
         File.WriteAllText(Path.Combine(frontendDist, "index.html"), "<html><body>ok</body></html>");
+    }
+
+    private static void SaveEnvironment(ConfigService configService, string projectRoot, string environmentName, string server, string apiKey, string appId)
+    {
+        configService.SaveNamedEnvironmentConfig(projectRoot, environmentName, new GlobalConfig
+        {
+            Server = server,
+            ApiKey = apiKey,
+            AppId = appId
+        });
+        configService.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection
+        {
+            Default = environmentName
+        });
     }
 }

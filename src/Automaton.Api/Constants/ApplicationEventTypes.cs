@@ -13,6 +13,9 @@ public static class ApplicationEventTypes
     public const string BackendDeployStarted = "BackendDeployStarted";
     public const string BackendDeployCompleted = "BackendDeployCompleted";
     public const string BackendDeployFailed = "BackendDeployFailed";
+    public const string ManagedRuntimePreparing = "ManagedRuntimePreparing";
+    public const string ManagedRuntimeProvisionFailed = "ManagedRuntimeProvisionFailed";
+    public const string ManagedRuntimeWaitingForConnection = "ManagedRuntimeWaitingForConnection";
 
     public const string AppPublished = "AppPublished";
     public const string AppUnpublished = "AppUnpublished";

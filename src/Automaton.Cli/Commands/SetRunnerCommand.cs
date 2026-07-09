@@ -51,8 +51,11 @@ public static class SetRunnerCommand
 
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
-                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var resolved = config.ResolveContext(appConfig, cwd);
+                var server = resolved.Server;
+                var apiKey = resolved.ApiKey;
+                var appId = resolved.AppId;
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, appId, nextSteps);
                 var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
                 checks.Add(appLinkCheck);
                 checks.Add(credentialsCheck);
@@ -76,12 +79,12 @@ public static class SetRunnerCommand
 
                 if (clear)
                 {
-                    await client.UpdateAppRunnerAsync(appConfig.AppId, null);
+                    await client.UpdateAppRunnerAsync(appId!, null);
                     checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, "runner assignment cleared"));
                     var clearResult = new CommandDiagnosticResult { Success = true, Summary = "Runner cleared", Checks = checks, NextSteps = [] };
                     if (asJson)
                     {
-                        CliJson.Write(new { success = true, summary = clearResult.Summary, checks = clearResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = clearResult.NextSteps, action = "clear", appId = appConfig.AppId, runnerId = (string?)null });
+                        CliJson.Write(new { success = true, summary = clearResult.Summary, checks = clearResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = clearResult.NextSteps, action = "clear", appId = appId, runnerId = (string?)null });
                         return;
                     }
                     AnsiConsole.MarkupLine($"[green]✓[/] Cleared runner assignment for [cyan]{appConfig.Name}[/].");
@@ -143,13 +146,13 @@ public static class SetRunnerCommand
                 var runnerId = selected.GetProperty("id").GetString();
                 var runnerName = selected.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString() ?? runnerId : runnerId;
 
-                await client.UpdateAppRunnerAsync(appConfig.AppId, runnerId);
+                await client.UpdateAppRunnerAsync(appId!, runnerId);
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerLookup, true, $"runner resolved: {runnerName}"));
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RunnerAssignment, true, $"runner assigned: {runnerId}"));
                 var assignResult = new CommandDiagnosticResult { Success = true, Summary = "Runner assigned", Checks = checks, NextSteps = [] };
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, summary = assignResult.Summary, checks = assignResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = assignResult.NextSteps, action = "assign", appId = appConfig.AppId, runnerId, runnerName });
+                    CliJson.Write(new { success = true, summary = assignResult.Summary, checks = assignResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = assignResult.NextSteps, action = "assign", appId = appId, runnerId, runnerName });
                     return;
                 }
                 AnsiConsole.MarkupLine($"[green]✓[/] Assigned runner [bold]{runnerName}[/] to [cyan]{appConfig.Name}[/].");

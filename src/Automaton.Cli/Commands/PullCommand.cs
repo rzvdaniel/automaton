@@ -74,13 +74,19 @@ public static class PullCommand
     private static async Task PullIntoLinkedProjectAsync(ConfigService config, string cwd, string? dir, bool force, bool nonInteractive)
     {
         var appConfig = config.LoadProjectConfig(cwd);
+        var resolved = config.ResolveContext(appConfig, cwd);
+        if (string.IsNullOrWhiteSpace(resolved.AppId))
+        {
+            throw new InvalidOperationException("No appId is configured for the selected environment.");
+        }
+
         var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
         var targetDir = dir ?? cwd;
 
         WriteStart(nonInteractive, appConfig.Name, targetDir);
 
         using var client = new AutomatonApiClient(server, apiKey);
-        var files = await ListSourceFilesAsync(client, appConfig.AppId);
+        var files = await ListSourceFilesAsync(client, resolved.AppId);
         var sourceFiles = files.Where(IsPortableSourceFile).ToList();
 
         if (sourceFiles.Count == 0)
@@ -92,7 +98,7 @@ public static class PullCommand
         var overwritePaths = GetOverwritePaths(sourceFiles, targetDir);
         EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
 
-        await DownloadFilesAsync(client, appConfig.AppId, sourceFiles, targetDir, nonInteractive);
+        await DownloadFilesAsync(client, resolved.AppId, sourceFiles, targetDir, nonInteractive);
     }
 
     private static async Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive)
@@ -130,10 +136,8 @@ public static class PullCommand
 
         config.SaveProjectConfig(targetDir, new AutomatonConfig
         {
-            AppId = appId,
             Name = appName,
             Slug = slug,
-            Server = server,
             Frontend = hasFrontend
                 ? new FrontendConfig
                 {

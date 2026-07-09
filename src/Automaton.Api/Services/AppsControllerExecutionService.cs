@@ -36,6 +36,7 @@ public class AppsControllerExecutionService
     private readonly StaticRuntimeExportService staticRuntimeExportService;
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly BackendRouteConfigService backendRouteConfigService;
+    private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -49,7 +50,8 @@ public class AppsControllerExecutionService
         IAppDeployCapabilityService appDeployCapabilityService,
         StaticRuntimeExportService staticRuntimeExportService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
-        BackendRouteConfigService backendRouteConfigService)
+        BackendRouteConfigService backendRouteConfigService,
+        ManagedRunnerBootstrapService managedRunnerBootstrapService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -62,6 +64,7 @@ public class AppsControllerExecutionService
         this.staticRuntimeExportService = staticRuntimeExportService;
         this.flowsServiceFactory = flowsServiceFactory;
         this.backendRouteConfigService = backendRouteConfigService;
+        this.managedRunnerBootstrapService = managedRunnerBootstrapService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -93,6 +96,21 @@ public class AppsControllerExecutionService
         List<string>? runnerNames,
         CancellationToken cancellationToken)
     {
+        if (runnerNames == null || runnerNames.Count == 0)
+        {
+            var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
+            if (!bootstrap.IsReady)
+            {
+                return new DeployBackendResponse
+                {
+                    Success = false,
+                    State = bootstrap.State,
+                    RequiresRetry = bootstrap.RequiresRetry,
+                    Message = bootstrap.Message
+                };
+            }
+        }
+
         _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
         var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
@@ -185,6 +203,18 @@ public class AppsControllerExecutionService
         if (file == null || file.Length <= 0)
         {
             throw new InvalidOperationException("A deployment package file is required.");
+        }
+
+        var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
+        if (!bootstrap.IsReady)
+        {
+            return new DeployPackageResponse
+            {
+                Success = false,
+                State = bootstrap.State,
+                RequiresRetry = bootstrap.RequiresRetry,
+                Message = bootstrap.Message
+            };
         }
 
         var runners = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).ToList();
@@ -292,7 +322,9 @@ public class AppsControllerExecutionService
 
         return new DeployAppResponse
         {
-            Success = true,
+            Success = backendDeploy.Success,
+            State = backendDeploy.State,
+            RequiresRetry = backendDeploy.RequiresRetry,
             FrontendFilesSynced = frontendSync.CopiedFiles,
             BackendFilesSynced = backendSync.CopiedFiles,
             FrontendAction = frontendSync.Updated ? "updated" : "preserved",
@@ -369,7 +401,9 @@ public class AppsControllerExecutionService
 
         return new DeployAppResponse
         {
-            Success = true,
+            Success = backendDeploy.Success,
+            State = backendDeploy.State,
+            RequiresRetry = backendDeploy.RequiresRetry,
             FrontendFilesSynced = 0,
             BackendFilesSynced = backendSync.CopiedFiles,
             FrontendAction = "preserved",

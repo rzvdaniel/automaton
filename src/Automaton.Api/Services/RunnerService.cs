@@ -23,6 +23,7 @@ public class RunnerService
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly IAuditEventService auditEventService;
     private readonly IApplicationEventService applicationEventService;
+    private readonly ManagedRunnerAppAssignmentService managedRunnerAppAssignmentService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -34,7 +35,8 @@ public class RunnerService
         ResourceAuthorizationService authorizationService,
         ApiInstanceIdentityService apiInstanceIdentityService,
         IAuditEventService auditEventService,
-        IApplicationEventService applicationEventService)
+        IApplicationEventService applicationEventService,
+        ManagedRunnerAppAssignmentService managedRunnerAppAssignmentService)
     {
         this.dbContext = dbContext;
         this.automatonHub = automatonHub;
@@ -43,6 +45,7 @@ public class RunnerService
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.auditEventService = auditEventService;
         this.applicationEventService = applicationEventService;
+        this.managedRunnerAppAssignmentService = managedRunnerAppAssignmentService;
         logger = Serilog.Log.ForContext<RunnerService>();
     }
 
@@ -288,6 +291,7 @@ public class RunnerService
 
         LinkHostedRunnerAfterReconnect(runner, userId);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
 
         await WriteRunnerApplicationEventsAsync(
             runner.Id,

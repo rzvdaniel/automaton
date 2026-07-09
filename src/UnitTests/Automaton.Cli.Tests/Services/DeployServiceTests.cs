@@ -41,12 +41,10 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = string.Empty });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", string.Empty, Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
         var buildInvoked = false;
@@ -72,16 +70,14 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 Build = "cd frontend && npm run build",
                 DeployDir = "frontend/dist"
             }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
         var service = new DeployService(
@@ -101,13 +97,11 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
             Backend = new BackendConfig { DeployDir = "backend" }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
         WriteBackendController(projectRoot);
 
@@ -142,13 +136,11 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
             Backend = new BackendConfig { DeployDir = "backend" }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
         WriteBackendController(projectRoot);
 
@@ -173,12 +165,10 @@ public class DeployServiceTests
         var configService = new ConfigService();
         configService.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
         });
-        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
 
         var service = new DeployService(
@@ -219,5 +209,19 @@ public class DeployServiceTests
         var backend = Path.Combine(projectRoot, "backend");
         Directory.CreateDirectory(backend);
         File.WriteAllText(Path.Combine(backend, "todos.py"), "def handle(action_name, inputs):\n    return {'success': True}\n");
+    }
+
+    private static void SaveEnvironment(ConfigService configService, string projectRoot, string server, string apiKey, string appId)
+    {
+        configService.SaveNamedEnvironmentConfig(projectRoot, "local", new GlobalConfig
+        {
+            Server = server,
+            ApiKey = apiKey,
+            AppId = appId
+        });
+        configService.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection
+        {
+            Default = "local"
+        });
     }
 }

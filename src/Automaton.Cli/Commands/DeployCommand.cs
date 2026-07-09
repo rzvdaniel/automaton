@@ -38,6 +38,7 @@ public static class DeployCommand
         var publishOption = new Option<bool>("--publish", "Publish the app after a successful deploy");
         var openOption = new Option<bool>("--open", "Open the deployed app in the browser after success");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable prompts and rich terminal rendering");
+        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
@@ -49,7 +50,8 @@ public static class DeployCommand
             verboseOption,
             publishOption,
             openOption,
-            nonInteractiveOption
+            nonInteractiveOption,
+            environmentOption
         };
 
         cmd.SetHandler(async (InvocationContext context) =>
@@ -63,6 +65,7 @@ public static class DeployCommand
             var publish = context.ParseResult.GetValueForOption(publishOption);
             var open = context.ParseResult.GetValueForOption(openOption);
             var nonInteractiveFlag = context.ParseResult.GetValueForOption(nonInteractiveOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
 
             var preparationService = new DeployPreparationService(config);
             var publishService = new PublishService(config);
@@ -76,9 +79,11 @@ public static class DeployCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var projectConfig = config.TryLoadProjectConfig(cwd);
+                var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
+                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
                 var preparation = skipBackend
                     ? new DeployPreparationResult { Success = true }
-                    : await preparationService.PrepareAsync(cwd, runner);
+                    : await preparationService.PrepareAsync(cwd, runner, environmentName);
 
                 if (preparation.RequiresRunnerSelection && !nonInteractive && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
                 {
@@ -88,7 +93,7 @@ public static class DeployCommand
 
                     prompt.AddChoices(preparation.AvailableRunners);
                     var selected = AnsiConsole.Prompt(prompt);
-                    preparation = await preparationService.PrepareAsync(cwd, selected.Id);
+                    preparation = await preparationService.PrepareAsync(cwd, selected.Id, environmentName);
                 }
 
                 if (!preparation.Success)
@@ -106,15 +111,14 @@ public static class DeployCommand
                     return;
                 }
 
-                WriteDeployHeading(projectConfig?.Name, projectConfig?.AppId, asJson, nonInteractive, ref headingWritten);
-                var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir);
+                var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir, environmentName);
                 result = MergePreparation(result, preparation);
 
                 if (result.Success)
                 {
                     if (publish)
                     {
-                        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true);
+                        var publishResult = await publishService.PublishAsync(cwd, slug: null, requiresAuthentication: null, isForkable: null, yes: true, environmentName: environmentName);
                         if (asJson)
                         {
                             WriteCombinedJson(result, publishResult);
@@ -142,7 +146,7 @@ public static class DeployCommand
 
                         if (open)
                         {
-                            var (client, server) = CreateApiClient(config, cwd);
+                            var (client, server) = CreateApiClient(config, cwd, environmentName);
                             using (client)
                             {
                             var launchCode = await client.CreateRuntimeLaunchAsync(result.AppId!);
@@ -345,7 +349,7 @@ public static class DeployCommand
         AnsiConsole.MarkupLine($"[bold]{Markup.Escape(check.Name)}[/] {markupStatus} {Markup.Escape(check.Message)}");
     }
 
-    private static void WriteDeployHeading(string? appName, string? appId, bool asJson, bool nonInteractive, ref bool headingWritten)
+    private static void WriteDeployHeading(string? appName, string? appId, string? environmentName, string? server, bool asJson, bool nonInteractive, ref bool headingWritten)
     {
         if (asJson || headingWritten || string.IsNullOrWhiteSpace(appName) || string.IsNullOrWhiteSpace(appId))
         {
@@ -355,10 +359,20 @@ public static class DeployCommand
         if (nonInteractive)
         {
             Console.WriteLine($"Deploying {appName} ({appId})");
+            Console.WriteLine($"Environment: {environmentName ?? "default"}");
+            if (!string.IsNullOrWhiteSpace(server))
+            {
+                Console.WriteLine($"Server: {server}");
+            }
         }
         else
         {
             AnsiConsole.MarkupLine($"[bold]Deploying[/] [cyan]{appName}[/] ({appId})");
+            AnsiConsole.MarkupLine($"[bold]Environment:[/] {Markup.Escape(environmentName ?? "default")}");
+            if (!string.IsNullOrWhiteSpace(server))
+            {
+                AnsiConsole.MarkupLine($"[bold]Server:[/] {Markup.Escape(server)}");
+            }
         }
 
         headingWritten = true;
@@ -470,10 +484,10 @@ public static class DeployCommand
         });
     }
 
-    private static (AutomatonApiClient Client, string Server) CreateApiClient(ConfigService config, string cwd)
+    private static (AutomatonApiClient Client, string Server) CreateApiClient(ConfigService config, string cwd, string? environmentName)
     {
         var appConfig = config.TryLoadProjectConfig(cwd);
-        var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+        var (server, apiKey) = config.ResolveCredentials(appConfig, cwd, environmentName);
         if (appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
         {
             throw new InvalidOperationException("Could not resolve app credentials for open.");

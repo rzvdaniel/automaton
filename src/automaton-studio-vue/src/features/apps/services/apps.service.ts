@@ -25,6 +25,30 @@ import type {
 } from '../types/apps.types'
 import { getFileIcon } from '../types/apps.types'
 
+export type DeployBackendResult = {
+  success: boolean
+  deployedCount: number
+  totalScripts: number
+  runnerCount: number
+  hasRequirements: boolean
+  message: string
+  installLogs?: string[]
+  state?: string
+  requiresRetry?: boolean
+}
+
+export type DeployAppResult = {
+  success: boolean
+  frontendFilesSynced: number
+  backendFilesSynced: number
+  frontendAction: string
+  backendAction: string
+  backendDeploy: DeployBackendResult
+  message?: string
+  state?: string
+  requiresRetry?: boolean
+}
+
 class AppsService {
   private readonly internalRootFilePaths = new Set([
     'live',
@@ -200,21 +224,13 @@ class AppsService {
    * Deploy backend scripts to the app's configured runner(s).
    * POST /api/apps/{id}/backend/deploy
    */
-  async deployBackend(id: string): Promise<{ success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }> {
-    const { data } = await apiClient.post(`/api/apps/${id}/backend/deploy`, {})
+  async deployBackend(id: string): Promise<DeployBackendResult> {
+    const { data } = await apiClient.post<DeployBackendResult>(`/api/apps/${id}/backend/deploy`, {})
     return data
   }
 
-  async deployApp(id: string): Promise<{
-    success: boolean
-    frontendFilesSynced: number
-    backendFilesSynced: number
-    frontendAction: string
-    backendAction: string
-    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
-    message?: string
-  }> {
-    const { data } = await apiClient.post(`/api/apps/${id}/deploy`, {})
+  async deployApp(id: string): Promise<DeployAppResult> {
+    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {})
     return data
   }
 
@@ -230,16 +246,8 @@ class AppsService {
     return data
   }
 
-  async redeployBackendComponent(id: string): Promise<{
-    success: boolean
-    frontendFilesSynced: number
-    backendFilesSynced: number
-    frontendAction: string
-    backendAction: string
-    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
-    message?: string
-  }> {
-    const { data } = await apiClient.post(`/api/apps/${id}/backend/redeploy`, {})
+  async redeployBackendComponent(id: string): Promise<DeployAppResult> {
+    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/backend/redeploy`, {})
     return data
   }
 

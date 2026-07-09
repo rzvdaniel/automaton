@@ -19,6 +19,7 @@ public sealed class PublishService
         bool? requiresAuthentication,
         bool? isForkable,
         bool yes,
+        string? environmentName = null,
         bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
@@ -28,8 +29,11 @@ public sealed class PublishService
         try
         {
             var appConfig = _config.TryLoadProjectConfig(directory);
-            var (server, apiKey) = _config.ResolveCredentials(appConfig, directory);
-            var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(directory, "automaton.json")), appConfig, nextSteps);
+            var resolved = _config.ResolveContext(appConfig, directory, environmentName);
+            var server = resolved.Server;
+            var apiKey = resolved.ApiKey;
+            var appId = resolved.AppId;
+            var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(directory, "automaton.json")), appConfig, appId, nextSteps);
             var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
             checks.Add(appLinkCheck);
             checks.Add(credentialsCheck);
@@ -42,15 +46,15 @@ public sealed class PublishService
                     Summary = "Publish failed",
                     Checks = checks,
                     NextSteps = nextSteps.ToList(),
-                        AppId = appConfig?.AppId,
-                    AppName = appConfig?.Name,
-                    StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server, appConfig?.AppId)
+                        AppId = appId,
+                        AppName = appConfig?.Name,
+                    StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server, appId)
                 };
             }
 
             using var client = new AutomatonApiClient(server!, apiKey!);
-            var app = await client.GetAppAsync(appConfig.AppId, cancellationToken);
-            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
+            var app = await client.GetAppAsync(appId!, cancellationToken);
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appId}"));
 
             var resolvedSlug = !string.IsNullOrWhiteSpace(slug)
                 ? slug.Trim()
@@ -70,9 +74,9 @@ public sealed class PublishService
                         Summary = "Publish failed",
                         Checks = checks,
                         NextSteps = nextSteps.ToList(),
-                        AppId = appConfig.AppId,
+                        AppId = appId,
                         AppName = appConfig.Name,
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -92,11 +96,11 @@ public sealed class PublishService
                         Summary = "Publish failed",
                         Checks = checks,
                         NextSteps = ["Rerun automaton publish --yes once you intend to make the app public"],
-                        AppId = appConfig.AppId,
+                        AppId = appId,
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
                         Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -115,11 +119,11 @@ public sealed class PublishService
                         Summary = "Publish cancelled",
                         Checks = checks,
                         NextSteps = ["Rerun automaton publish --yes when you are ready to make the app public"],
-                        AppId = appConfig.AppId,
+                        AppId = appId,
                         AppName = appConfig.Name,
                         Slug = resolvedSlug,
                         Url = CliAppUrlBuilder.BuildPublishedUrl(server!, resolvedSlug),
-                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
+                        StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
                         RequiresAuthentication = resolvedRequiresAuthentication,
                         IsForkable = resolvedIsForkable
                     };
@@ -127,7 +131,7 @@ public sealed class PublishService
             }
 
             await client.PublishAppAsync(
-                appConfig.AppId,
+                appId!,
                 resolvedSlug,
                 resolvedRequiresAuthentication,
                 executionRunnerId: null,
@@ -145,11 +149,11 @@ public sealed class PublishService
                 Summary = "Publish complete",
                 Checks = checks,
                 NextSteps = [],
-                AppId = appConfig.AppId,
+                AppId = appId,
                 AppName = appConfig.Name,
                 Slug = resolvedSlug,
                 Url = publishedUrl,
-                StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appConfig.AppId),
+                StudioAppUrl = CliAppUrlBuilder.BuildStudioAppUrl(server!, appId),
                 RequiresAuthentication = resolvedRequiresAuthentication,
                 IsForkable = resolvedIsForkable
             };

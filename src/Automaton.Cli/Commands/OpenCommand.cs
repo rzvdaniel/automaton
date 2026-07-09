@@ -10,14 +10,16 @@ public static class OpenCommand
     {
         var publicOption = new Option<bool>("--public", "Open the published public app URL");
         var privateOption = new Option<bool>("--private", "Open the app in Studio (legacy alias)");
+        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("open", "Open the current app in the browser")
         {
             publicOption,
-            privateOption
+            privateOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (bool openPublic, bool openPrivate) =>
+        cmd.SetHandler(async (bool openPublic, bool openPrivate, string? environmentName) =>
         {
             if (openPublic && openPrivate)
             {
@@ -30,9 +32,12 @@ public static class OpenCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
+                var resolved = config.ResolveContext(appConfig, cwd, environmentName);
+                var server = resolved.Server;
+                var apiKey = resolved.ApiKey;
+                var appId = resolved.AppId;
                 var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, appId, nextSteps);
                 var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
 
                 if (!appLinkCheck.Success || !credentialsCheck.Success || appConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
@@ -49,7 +54,7 @@ public static class OpenCommand
                 }
 
                 using var client = new AutomatonApiClient(server!, apiKey!);
-                var app = await client.GetAppAsync(appConfig.AppId);
+                var app = await client.GetAppAsync(appId!);
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var publicSlug = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
 
@@ -67,7 +72,7 @@ public static class OpenCommand
                 }
                 else
                 {
-                    url = CliAppUrlBuilder.BuildStudioApplicationUrl(server!, appConfig.AppId);
+                    url = CliAppUrlBuilder.BuildStudioApplicationUrl(server!, appId);
                 }
 
                 CliBrowserService.OpenUrl(url);
@@ -79,7 +84,7 @@ public static class OpenCommand
                 WriteFailure(ex.Message);
                 Environment.ExitCode = 1;
             }
-        }, publicOption, privateOption);
+        }, publicOption, privateOption, environmentOption);
 
         return cmd;
     }

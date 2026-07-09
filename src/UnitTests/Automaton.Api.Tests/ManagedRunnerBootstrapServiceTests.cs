@@ -1,0 +1,325 @@
+using Automaton.Api.Config;
+using Automaton.Api.Constants;
+using Automaton.Api.Data;
+using Automaton.Api.Entities;
+using Automaton.Api.Models;
+using Automaton.Api.Services;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+
+namespace Automaton.Api.Tests;
+
+[TestFixture]
+public class ManagedRunnerBootstrapServiceTests
+{
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_QueuesProvisioning_WhenManagedRunnerIsNeeded()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db);
+
+        var publisher = new RecordingEventPublisher();
+        var applicationEvents = new RecordingApplicationEventService();
+        var service = CreateService(db, publisher, applicationEvents);
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
+        Assert.That(result.RequiresRetry, Is.True);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+
+        var hostedRunner = await db.HostedRunners.SingleAsync();
+        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
+        Assert.That(hostedRunner.RunnerHostId, Is.Not.Null);
+        Assert.That(applicationEvents.Events.Select(x => x.EventType), Does.Contain(ApplicationEventTypes.ManagedRuntimePreparing));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_AssignsExistingConnectedManagedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        var runner = SeedConnectedRunner(db);
+        SeedRunningHostedRunner(db, ownerId, planId, runner);
+
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.True);
+        Assert.That(result.RunnerId, Is.EqualTo(runner.Id));
+
+        var refreshedApp = await db.WebApps.SingleAsync(x => x.Id == app.Id);
+        Assert.That(refreshedApp.ExecutionRunnerId, Is.EqualTo(runner.Id));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_WhenPlanHasNoManagedRuntime()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: false);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Is.EqualTo("User plan does not include managed backend runtime."));
+        Assert.That(publisher.Messages, Is.Empty);
+    }
+
+    private static ManagedRunnerBootstrapService CreateService(
+        ApplicationDbContext db,
+        RecordingEventPublisher publisher,
+        RecordingApplicationEventService applicationEvents)
+    {
+        var provisioningService = new HostedRunnerProvisioningService(
+            db,
+            new ApiKeyService(
+                db,
+                NullLogger<ApiKeyService>.Instance,
+                authorizationService: null!,
+                new NoOpAuditEventService()),
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
+            {
+                Enabled = true,
+                DeploymentMode = HostedRunnerDeploymentModes.SshDocker,
+                RuntimePort = 8001
+            }),
+            new NoOpAuditEventService(),
+            NullLogger<HostedRunnerProvisioningService>.Instance);
+
+        return new ManagedRunnerBootstrapService(
+            db,
+            provisioningService,
+            publisher,
+            applicationEvents);
+    }
+
+    private static ApplicationDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new ApplicationDbContext(options);
+    }
+
+    private static void SeedUser(ApplicationDbContext db, Guid userId, Guid? planId)
+    {
+        db.Users.Add(new ApplicationUser
+        {
+            Id = userId,
+            UserName = $"user-{userId:N}@automaton.test",
+            Email = $"user-{userId:N}@automaton.test",
+            PublicUsername = $"user-{userId:N}",
+            SubscriptionPlanId = planId
+        });
+        db.SaveChanges();
+    }
+
+    private static WebApp SeedBackendApp(ApplicationDbContext db, Guid ownerId)
+    {
+        var app = new WebApp
+        {
+            Id = Guid.NewGuid(),
+            Name = "Backend App",
+            Summary = "Summary",
+            Description = "Description",
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow
+        };
+
+        db.WebApps.Add(app);
+        db.WebAppUsers.Add(new WebAppUser
+        {
+            WebAppId = app.Id,
+            UserId = ownerId
+        });
+        db.SaveChanges();
+        return app;
+    }
+
+    private static Guid SeedHostedRunnerPlan(ApplicationDbContext db, bool enabled)
+    {
+        var plan = new SubscriptionPlan
+        {
+            Id = Guid.NewGuid(),
+            Name = enabled ? "Hosted" : "No Hosted",
+            IsActive = true,
+            CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
+            {
+                HostedRunner = new HostedRunnerCapability
+                {
+                    Enabled = enabled,
+                    CpuCores = enabled ? 1 : 0,
+                    MemoryMb = enabled ? 1024 : 0,
+                    DiskMb = enabled ? 4096 : 0,
+                    MaxApps = enabled ? 3 : 0,
+                    Visibility = HostedRunnerVisibility.Public
+                }
+            })
+        };
+
+        db.SubscriptionPlans.Add(plan);
+        db.SaveChanges();
+        return plan.Id;
+    }
+
+    private static RunnerHost SeedRunnerHost(ApplicationDbContext db)
+    {
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-a",
+            Provider = RunnerHostProviders.Local,
+            Status = RunnerHostStatuses.Active,
+            IsLocal = true,
+            TotalCpuCores = 8,
+            TotalMemoryMb = 16384,
+            TotalDiskMb = 65536,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.RunnerHosts.Add(host);
+        db.SaveChanges();
+        return host;
+    }
+
+    private static Runner SeedConnectedRunner(ApplicationDbContext db)
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "managed-runner",
+            ConnectionId = "conn-1",
+            LastHeartbeatAtUtc = DateTime.UtcNow,
+            LastConnectedAtUtc = DateTime.UtcNow,
+            Status = "online"
+        };
+
+        db.Runners.Add(runner);
+        db.SaveChanges();
+        return runner;
+    }
+
+    private static void SeedRunningHostedRunner(ApplicationDbContext db, Guid ownerId, Guid planId, Runner runner)
+    {
+        var host = SeedRunnerHost(db);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = ownerId,
+            SubscriptionPlanId = planId,
+            RunnerHostId = host.Id,
+            RunnerHost = host,
+            RunnerId = runner.Id,
+            Runner = runner,
+            Name = "Hosted Runner",
+            Status = HostedRunnerStatuses.Running,
+            CpuCores = 1,
+            MemoryMb = 1024,
+            DiskMb = 4096,
+            MaxApps = 3,
+            ContainerName = "automaton-hosted-runner-test",
+            RuntimeEndpoint = "http://automaton-hosted-runner-test:8001",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+    }
+
+    private sealed class RecordingEventPublisher : IEventPublisher
+    {
+        public List<object> Messages { get; } = [];
+
+        public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingApplicationEventService : IApplicationEventService
+    {
+        public List<ApplicationEventWriteRequest> Events { get; } = [];
+
+        public Task WriteAsync(ApplicationEventWriteRequest request, CancellationToken cancellationToken = default)
+        {
+            Events.Add(request);
+            return Task.CompletedTask;
+        }
+
+        public Task<PagedResult<ApplicationEventDto>> GetEventsAsync(
+            Guid appId,
+            ApplicationEventQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PagedResult<ApplicationEventDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                Page = query.Page,
+                PageSize = query.PageSize
+            });
+    }
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class FakeHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCommandExecutor
+    {
+        public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
+            RunnerHost host,
+            string script,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, "ok", string.Empty));
+
+        public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
+            RunnerHost host,
+            string script,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HostedRunnerRemoteExecutionResult(true, 0, "ok", string.Empty));
+    }
+
+    private sealed class TestOptionsSnapshot<T>(T value) : IOptionsSnapshot<T>
+        where T : class
+    {
+        public T Value { get; } = value;
+
+        public T Get(string? name) => Value;
+    }
+}

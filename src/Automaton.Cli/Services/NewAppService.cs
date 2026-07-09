@@ -31,10 +31,14 @@ public sealed class NewAppService
         string? name,
         string? server,
         string? apiKey,
+        string? environmentName = null,
         CancellationToken cancellationToken = default)
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolvedEnvironmentName = string.IsNullOrWhiteSpace(environmentName)
+            ? ConfigService.DefaultEnvironmentName
+            : environmentName.Trim();
 
         var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
         checks.Add(credentialsCheck);
@@ -67,7 +71,7 @@ public sealed class NewAppService
         try
         {
             var existingConfig = _config.TryLoadProjectConfig(directory);
-            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, name.Trim(), server, appId: null));
+            _config.SaveProjectConfig(directory, BuildProjectConfig(existingConfig, name.Trim()));
             checks.Add(new CommandDiagnosticCheck(
                 CommandDiagnosticCheckNames.LocalScaffold,
                 true,
@@ -92,7 +96,12 @@ public sealed class NewAppService
             var (appId, appName) = await _createAppAsync(server, apiKey, name.Trim(), cancellationToken);
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.CreateApp, true, $"created app {appId}"));
 
-            _config.SaveProjectConfig(directory, BuildProjectConfig(_config.TryLoadProjectConfig(directory), appName, server, appId));
+            var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, resolvedEnvironmentName) ?? new GlobalConfig();
+            namedEnvironment.Server = server;
+            namedEnvironment.ApiKey = apiKey;
+            namedEnvironment.AppId = appId;
+            _config.SaveNamedEnvironmentConfig(directory, resolvedEnvironmentName, namedEnvironment);
+            _config.SaveProjectEnvironmentSelection(directory, new ProjectEnvironmentSelection { Default = resolvedEnvironmentName });
 
             nextSteps.Add("Run automaton deploy");
 
@@ -142,13 +151,11 @@ public sealed class NewAppService
         }
     }
 
-    private static AutomatonConfig BuildProjectConfig(AutomatonConfig? existingConfig, string name, string server, string? appId)
+    private static AutomatonConfig BuildProjectConfig(AutomatonConfig? existingConfig, string name)
     {
         return new AutomatonConfig
         {
-            AppId = appId ?? string.Empty,
             Name = name,
-            Server = server,
             Frontend = existingConfig?.Frontend ?? new FrontendConfig
             {
                 Build = FrontendBuildCommand,

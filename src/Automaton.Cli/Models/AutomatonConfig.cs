@@ -5,13 +5,14 @@ namespace Automaton.Cli.Models;
 /// </summary>
 public class AutomatonConfig
 {
-    public string AppId { get; set; } = string.Empty;
+    // Legacy fields kept for compatibility with older local files and tests.
+    // The new environment-based implementation resolves server/appId from
+    // .automaton/environments/<name>.json instead of automaton.json.
+    public string? AppId { get; set; }
+
     public string Name  { get; set; } = string.Empty;
     public string? Slug { get; set; }
 
-    /// <summary>
-    /// Optional Automaton server URL for this project.
-    /// </summary>
     public string? Server { get; set; }
 
     public FrontendConfig? Frontend { get; set; }

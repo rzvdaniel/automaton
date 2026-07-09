@@ -25,6 +25,7 @@ public sealed class DeployPreparationService
     public async Task<DeployPreparationResult> PrepareAsync(
         string directory,
         string? runnerPreference,
+        string? environmentName = null,
         CancellationToken cancellationToken = default)
     {
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -33,9 +34,12 @@ public sealed class DeployPreparationService
         var configPath = Path.Combine(directory, "automaton.json");
         var configFileExists = File.Exists(configPath);
         var projectConfig = _config.TryLoadProjectConfig(directory);
-        var (server, apiKey) = _config.ResolveCredentials(projectConfig, directory);
+        var resolved = _config.ResolveContext(projectConfig, directory, environmentName);
+        var server = resolved.Server;
+        var apiKey = resolved.ApiKey;
+        var appId = resolved.AppId;
 
-        if (!configFileExists || projectConfig == null || string.IsNullOrWhiteSpace(projectConfig.AppId) || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+        if (!configFileExists || projectConfig == null || string.IsNullOrWhiteSpace(appId) || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
         {
             return new DeployPreparationResult { Success = true };
         }
@@ -48,8 +52,8 @@ public sealed class DeployPreparationService
         RemoteAppValidationInfo remoteApp;
         try
         {
-            remoteApp = await _loadRemoteAppAsync(server, apiKey, projectConfig.AppId, cancellationToken);
-            checks.Add(new DeployCheckResult(DeployCheckNames.RemoteAppAccess, true, $"remote app found: {projectConfig.AppId}"));
+            remoteApp = await _loadRemoteAppAsync(server, apiKey, appId, cancellationToken);
+            checks.Add(new DeployCheckResult(DeployCheckNames.RemoteAppAccess, true, $"remote app found: {appId}"));
         }
         catch (Exception ex)
         {
@@ -83,7 +87,7 @@ public sealed class DeployPreparationService
             return await AssignPreferredRunnerAsync(
                 server,
                 apiKey,
-                projectConfig.AppId,
+                appId,
                 runnerPreference,
                 checks,
                 nextSteps,
@@ -95,7 +99,7 @@ public sealed class DeployPreparationService
         {
             var selected = connectedRunners[0];
             checks.Add(new DeployCheckResult(DeployCheckNames.RunnerLookup, true, $"auto-selected connected runner: {selected.Name}"));
-            await _assignRunnerAsync(server, apiKey, projectConfig.AppId, selected.Id, cancellationToken);
+            await _assignRunnerAsync(server, apiKey, appId, selected.Id, cancellationToken);
             checks.Add(new DeployCheckResult(DeployCheckNames.RunnerAssignment, true, $"runner assigned: {selected.Id}"));
             return new DeployPreparationResult
             {

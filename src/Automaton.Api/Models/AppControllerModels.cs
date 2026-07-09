@@ -21,6 +21,15 @@ public static class AppFrontendDeployModes
     public const string BuildRequired = "build-required";
 }
 
+public static class AppDeployStates
+{
+    public const string Ready = "ready";
+    public const string PreparingManagedRuntime = "preparingManagedRuntime";
+    public const string ManagedRunnerProvisionFailed = "managedRunnerProvisionFailed";
+    public const string ManagedRunnerWaitingForConnection = "managedRunnerWaitingForConnection";
+    public const string ManagedRuntimeUnavailable = "managedRuntimeUnavailable";
+}
+
 public class AppDeployCapabilitiesResponse
 {
     public bool CanDeployAppFromStudio { get; set; }
@@ -33,6 +42,8 @@ public class AppDeployCapabilitiesResponse
 public class DeployBackendResponse
 {
     public bool Success { get; set; }
+    public string State { get; set; } = AppDeployStates.Ready;
+    public bool RequiresRetry { get; set; }
     public int DeployedCount { get; set; }
     public int TotalScripts { get; set; }
     public int RunnerCount { get; set; }
@@ -56,6 +67,8 @@ public class DeployBackendRequest
 public class DeployPackageResponse
 {
     public bool Success { get; set; }
+    public string State { get; set; } = AppDeployStates.Ready;
+    public bool RequiresRetry { get; set; }
     public int RunnerCount { get; set; }
     public int SourceFilesDeployed { get; set; }
     public int RuntimeFilesDeployed { get; set; }
@@ -67,6 +80,8 @@ public class DeployPackageResponse
 public class DeployAppResponse
 {
     public bool Success { get; set; }
+    public string State { get; set; } = AppDeployStates.Ready;
+    public bool RequiresRetry { get; set; }
     public int FrontendFilesSynced { get; set; }
     public int BackendFilesSynced { get; set; }
     public string FrontendAction { get; set; } = "preserved";

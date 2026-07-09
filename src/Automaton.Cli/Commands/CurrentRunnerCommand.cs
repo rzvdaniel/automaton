@@ -26,8 +26,11 @@ public static class CurrentRunnerCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
-                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var resolved = config.ResolveContext(appConfig, cwd);
+                var server = resolved.Server;
+                var apiKey = resolved.ApiKey;
+                var appId = resolved.AppId;
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, appId, nextSteps);
                 var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
                 checks.Add(appLinkCheck);
                 checks.Add(credentialsCheck);
@@ -49,11 +52,11 @@ public static class CurrentRunnerCommand
 
                 using var client = new AutomatonApiClient(server!, apiKey!);
 
-                var app = await client.GetAppAsync(appConfig.AppId);
+                var app = await client.GetAppAsync(appId!);
                 var runnerId = app.TryGetProperty("executionRunnerId", out var runnerProperty) && runnerProperty.ValueKind == JsonValueKind.String
                     ? runnerProperty.GetString()
                     : null;
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appId}"));
 
                 if (string.IsNullOrWhiteSpace(runnerId))
                 {
@@ -61,7 +64,7 @@ public static class CurrentRunnerCommand
                     var noAssignment = new CommandDiagnosticResult { Success = true, Summary = "No runner assigned", Checks = checks, NextSteps = ["Run automaton deploy and choose a connected runner when prompted", "If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy"] };
                     if (asJson)
                     {
-                        CliJson.Write(new { success = true, summary = noAssignment.Summary, checks = noAssignment.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = noAssignment.NextSteps, appId = appConfig.AppId, runnerAssigned = false });
+                        CliJson.Write(new { success = true, summary = noAssignment.Summary, checks = noAssignment.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = noAssignment.NextSteps, appId = appId, runnerAssigned = false });
                         return;
                     }
 
@@ -86,7 +89,7 @@ public static class CurrentRunnerCommand
 
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, summary = runnerResult.Summary, checks = runnerResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = runnerResult.NextSteps, appId = appConfig.AppId, runnerAssigned = true, runnerId, runnerName, status = connected ? "connected" : "offline" });
+                    CliJson.Write(new { success = true, summary = runnerResult.Summary, checks = runnerResult.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = runnerResult.NextSteps, appId = appId, runnerAssigned = true, runnerId, runnerName, status = connected ? "connected" : "offline" });
                     return;
                 }
 

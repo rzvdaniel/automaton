@@ -1,5 +1,6 @@
 param(
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [string[]]$Services = @("api", "worker", "studio")
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,14 +33,23 @@ if (-not (Test-Path $certFile) -or -not (Test-Path $certKeyFile)) {
 }
 
 $composeArgs = @("compose", "-f", $composeFile)
+$servicesToBuild = @($Services | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
+
+if ($servicesToBuild.Count -eq 0) {
+    throw "At least one service name must be provided when using -Services."
+}
 
 Write-Host "[INFO] Using LOCAL_RUNTIME_MYSQL_PORT=$($env:LOCAL_RUNTIME_MYSQL_PORT)" -ForegroundColor Cyan
+Write-Host "[INFO] Build services: $($servicesToBuild -join ', ')" -ForegroundColor Cyan
 
 if (-not $NoBuild) {
-    Write-Host "[INFO] Building runtime-local images" -ForegroundColor Cyan
-    docker @composeArgs build
-    if ($LASTEXITCODE -ne 0) {
-        throw "docker compose build failed with exit code $LASTEXITCODE"
+    Write-Host "[INFO] Building selected runtime-local images sequentially" -ForegroundColor Cyan
+    foreach ($service in $servicesToBuild) {
+        Write-Host "[INFO] Building service: $service" -ForegroundColor Cyan
+        docker @composeArgs build $service
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker compose build failed for service '$service' with exit code $LASTEXITCODE"
+        }
     }
 }
 

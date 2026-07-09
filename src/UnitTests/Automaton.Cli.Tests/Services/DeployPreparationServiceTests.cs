@@ -148,9 +148,7 @@ public class DeployPreparationServiceTests
         var config = new ConfigService();
         config.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"
@@ -160,7 +158,13 @@ public class DeployPreparationServiceTests
                 DeployDir = "backend"
             }
         });
-        config.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = "ak_test" });
+        config.SaveNamedEnvironmentConfig(projectRoot, "local", new GlobalConfig
+        {
+            Server = "https://api.example.com",
+            ApiKey = "ak_test",
+            AppId = Guid.NewGuid().ToString()
+        });
+        config.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection { Default = "local" });
         return config;
     }
 }

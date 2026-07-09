@@ -63,7 +63,7 @@ public static class PublishCommand
                     makePrivate ? true : makePublic ? false : null,
                     forkable ? true : null,
                     yes,
-                    nonInteractive);
+                    nonInteractive: nonInteractive);
                 WriteResult(result, asJson, nonInteractive);
                 if (result.Success && open && !string.IsNullOrWhiteSpace(result.Url))
                 {

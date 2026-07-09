@@ -7,6 +7,7 @@ public static class CliCommandChecks
     public static CommandDiagnosticCheck ValidateProjectLink(
         bool configFileExists,
         Models.AutomatonConfig? projectConfig,
+        string? resolvedAppId,
         ISet<string> nextSteps)
     {
         if (!configFileExists)
@@ -21,13 +22,13 @@ public static class CliCommandChecks
             return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "automaton.json is invalid or unreadable");
         }
 
-        if (string.IsNullOrWhiteSpace(projectConfig.AppId))
+        if (string.IsNullOrWhiteSpace(resolvedAppId))
         {
-            nextSteps.Add("Run automaton create to create and link a remote app, or automaton link <app-id> to link an existing app");
-            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "automaton.json is missing appId; local scaffold exists but is not linked yet");
+            nextSteps.Add("Run automaton create or automaton link <app-id> with --env <name> to link an environment-specific remote app");
+            return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, false, "no appId is configured for the selected environment");
         }
 
-        return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, true, $"linked app {projectConfig.AppId}");
+        return new CommandDiagnosticCheck(CommandDiagnosticCheckNames.AppLink, true, $"linked app {resolvedAppId}");
     }
 
     public static CommandDiagnosticCheck ValidateCredentials(string? server, string? apiKey, ISet<string> nextSteps)

@@ -647,7 +647,14 @@ function handleCloseTab(event: Event, path: string) {
 async function handleDeployBackend() {
   try {
     const result = await editorStore.deployBackendComponent()
-    if (result.backendDeploy.totalScripts === 0) {
+    if (!result.success) {
+      toast.add({
+        severity: result.requiresRetry ? 'info' : 'warn',
+        summary: result.requiresRetry ? 'Preparing Managed Runtime' : 'Deploy Failed',
+        detail: result.message ?? result.backendDeploy.message,
+        life: 5000,
+      })
+    } else if (result.backendDeploy.totalScripts === 0) {
       toast.add({ severity: 'info', summary: 'No Scripts', detail: 'No backend scripts found to deploy', life: 4000 })
     } else if (!result.backendDeploy.deployedCount) {
       toast.add({ severity: 'warn', summary: 'Deploy Failed', detail: result.backendDeploy.message, life: 5000 })
@@ -700,6 +707,15 @@ async function handleDeployFrontend() {
 async function handleDeployApp() {
   try {
     const result = await editorStore.deployApp()
+    if (!result.success) {
+      toast.add({
+        severity: result.requiresRetry ? 'info' : 'warn',
+        summary: result.requiresRetry ? 'Preparing Managed Runtime' : 'Deploy Failed',
+        detail: result.message ?? result.backendDeploy.message,
+        life: 5000,
+      })
+      return
+    }
     const openAppUrl = editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
     const backendMessage = result.backendDeploy.totalScripts > 0
       ? ` Backend: ${result.backendDeploy.deployedCount}/${result.backendDeploy.totalScripts} scripts to ${result.backendDeploy.runnerCount} runner(s).`

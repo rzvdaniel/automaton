@@ -11,13 +11,15 @@ public static class StatusCommand
     public static Command Build(ConfigService config)
     {
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("status", "Show the current linked app, deploy settings, and publish state")
         {
-            jsonOption
+            jsonOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (bool asJson) =>
+        cmd.SetHandler(async (bool asJson, string? environmentName) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -26,8 +28,11 @@ public static class StatusCommand
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var appConfig = config.TryLoadProjectConfig(cwd);
-                var (server, apiKey) = config.ResolveCredentials(appConfig, cwd);
-                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, nextSteps);
+                var resolved = config.ResolveContext(appConfig, cwd, environmentName);
+                var server = resolved.Server;
+                var apiKey = resolved.ApiKey;
+                var appId = resolved.AppId;
+                var appLinkCheck = CliCommandChecks.ValidateProjectLink(File.Exists(Path.Combine(cwd, "automaton.json")), appConfig, appId, nextSteps);
                 var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
                 checks.Add(appLinkCheck);
                 checks.Add(credentialsCheck);
@@ -48,7 +53,7 @@ public static class StatusCommand
                 }
 
                 using var client = new AutomatonApiClient(server!, apiKey!);
-                var app = await client.GetAppAsync(appConfig.AppId);
+                var app = await client.GetAppAsync(appId!);
 
                 var deployDirectory = !string.IsNullOrWhiteSpace(appConfig.Frontend?.DeployDir)
                     ? ZipService.ResolveDeployDirectory(cwd, appConfig.Frontend.DeployDir)
@@ -62,8 +67,8 @@ public static class StatusCommand
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? CliAppUrlBuilder.BuildPublishedUrl(server!, publicUrl) : null;
-                var openAppUrl = CliAppUrlBuilder.BuildRestrictedAppUrl(server!, appConfig.AppId);
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appConfig.AppId}"));
+                var openAppUrl = CliAppUrlBuilder.BuildRestrictedAppUrl(server!, appId);
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.RemoteAccess, true, $"remote app loaded: {appId}"));
                 var statusResult = new CommandDiagnosticResult { Success = true, Summary = "Status loaded", Checks = checks, NextSteps = [] };
 
                 if (asJson)
@@ -78,8 +83,9 @@ public static class StatusCommand
                         {
                             root = cwd,
                             configPath = Path.Combine(cwd, "automaton.json"),
-                            appId = appConfig.AppId,
+                            appId = appId,
                             name = appConfig.Name,
+                            environment = resolved.EnvironmentName,
                             server,
                             build = appConfig.Frontend?.Build,
                             deployDir = appConfig.Frontend?.DeployDir,
@@ -103,7 +109,8 @@ public static class StatusCommand
                 var table = new Table();
                 table.AddColumn("Field");
                 table.AddColumn("Value");
-                table.AddRow("app", $"{appConfig.Name} ({appConfig.AppId})");
+                table.AddRow("app", $"{appConfig.Name} ({appId})");
+                table.AddRow("environment", string.IsNullOrWhiteSpace(resolved.EnvironmentName) ? "-" : resolved.EnvironmentName);
                 table.AddRow("server", server);
                 table.AddRow("build", string.IsNullOrWhiteSpace(appConfig.Frontend?.Build) ? "-" : appConfig.Frontend.Build);
                 table.AddRow("frontend deploy dir", deployDirectory == null ? "-" : Path.GetRelativePath(cwd, deployDirectory));
@@ -130,7 +137,7 @@ public static class StatusCommand
                 }
                 Environment.ExitCode = 1;
             }
-        }, jsonOption);
+        }, jsonOption, environmentOption);
 
         return cmd;
     }

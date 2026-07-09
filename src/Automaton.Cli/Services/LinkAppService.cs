@@ -28,10 +28,14 @@ public sealed class LinkAppService
         string? appId,
         string? server,
         string? apiKey,
+        string? environmentName = null,
         CancellationToken cancellationToken = default)
     {
         var checks = new List<CommandDiagnosticCheck>();
         var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolvedEnvironmentName = string.IsNullOrWhiteSpace(environmentName)
+            ? ConfigService.DefaultEnvironmentName
+            : environmentName.Trim();
 
         var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
         checks.Add(credentialsCheck);
@@ -67,12 +71,16 @@ public sealed class LinkAppService
             var appName = app.TryGetProperty("name", out var nameProperty) ? nameProperty.GetString()! : appId.Trim();
             checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.LinkApp, true, $"linked to app {appId.Trim()}"));
 
-            _config.SaveProjectConfig(directory, new AutomatonConfig
-            {
-                AppId = appId.Trim(),
-                Name = appName,
-                Server = server
-            });
+            var projectConfig = _config.TryLoadProjectConfig(directory) ?? new AutomatonConfig();
+            projectConfig.Name = appName;
+            _config.SaveProjectConfig(directory, projectConfig);
+
+            var namedEnvironment = _config.LoadNamedEnvironmentConfig(directory, resolvedEnvironmentName) ?? new GlobalConfig();
+            namedEnvironment.Server = server;
+            namedEnvironment.ApiKey = apiKey;
+            namedEnvironment.AppId = appId.Trim();
+            _config.SaveNamedEnvironmentConfig(directory, resolvedEnvironmentName, namedEnvironment);
+            _config.SaveProjectEnvironmentSelection(directory, new ProjectEnvironmentSelection { Default = resolvedEnvironmentName });
 
             try
             {

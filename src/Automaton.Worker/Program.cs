@@ -1,6 +1,9 @@
 using Automaton.Worker.Consumers;
 using Automaton.Worker.Handlers;
+using Automaton.Worker.Messaging;
+using Automaton.Worker.Services;
 using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
 using Automaton.Identity;
 using Automaton.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
@@ -45,6 +48,7 @@ builder.Services.AddSerilog((services, config) =>
 
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
+builder.Services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -52,8 +56,12 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
         .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
         .SetApplicationName("Automaton.Worker");
 }
+builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
-builder.Services.AddTransient<IEventHandler<Automaton.Messaging.Events.UserRegisteredEvent>, UserRegisteredEventHandler>();
+builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
+builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
+builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
+builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")

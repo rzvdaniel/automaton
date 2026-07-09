@@ -42,27 +42,34 @@ public class HostedRunnerProvisioningService
         this.logger = logger;
     }
 
-    public async Task<HostedRunner?> EnsureHostedRunnerForUserPlanAsync(Guid userId, Guid planId, CancellationToken cancellationToken = default)
+    public async Task<HostedRunnerPreparationResult> PrepareProvisioningAsync(
+        Guid userId,
+        Guid planId,
+        CancellationToken cancellationToken = default,
+        bool forceProvision = false)
     {
         var plan = await db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == planId && p.IsActive, cancellationToken);
         if (plan == null)
         {
-            return null;
+            throw new InvalidOperationException("Subscription plan not found.");
         }
 
         var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
         if (!capabilities.Enabled)
         {
             await DisableHostedRunnersForUserAsync(userId, "Assigned plan does not include a hosted runner.", cancellationToken);
-            return null;
+            throw new InvalidOperationException("User plan does not include managed backend runtime.");
         }
 
         var hostedRunner = await db.HostedRunners
+            .Include(x => x.Runner)
             .FirstOrDefaultAsync(x => x.UserId == userId && x.DeletedAt == null && x.Status != HostedRunnerStatuses.Disabled, cancellationToken);
 
         var now = DateTime.UtcNow;
+        var createdHostedRunner = false;
         if (hostedRunner == null)
         {
+            createdHostedRunner = true;
             hostedRunner = new HostedRunner
             {
                 Id = Guid.NewGuid(),
@@ -89,21 +96,27 @@ public class HostedRunnerProvisioningService
             hostedRunner.LastError = "No active runner host has enough available capacity.";
             AddDeployment(hostedRunner, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
-            return hostedRunner;
+            return new HostedRunnerPreparationResult(hostedRunner, null, false);
         }
 
         hostedRunner.RunnerHostId = host.Id;
         hostedRunner.LastError = null;
 
-        if (hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
+        if (!forceProvision && hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
         {
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogDebug("Hosted runner {HostedRunnerId} is already registered; plan metadata was refreshed without redeploying.", hostedRunner.Id);
-            return hostedRunner;
+            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+        }
+
+        if (!forceProvision &&
+            !createdHostedRunner &&
+            (hostedRunner.Status == HostedRunnerStatuses.Provisioning || hostedRunner.Status == HostedRunnerStatuses.Pending))
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return new HostedRunnerPreparationResult(hostedRunner, null, false);
         }
 
         var rawApiKey = await EnsureProvisioningApiKeyAsync(hostedRunner, userId, cancellationToken);
-
         hostedRunner.Status = options.Enabled
             ? HostedRunnerStatuses.Provisioning
             : HostedRunnerStatuses.Pending;
@@ -134,16 +147,42 @@ public class HostedRunnerProvisioningService
             },
             cancellationToken);
 
-        var commandPreview = HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, options);
-        var deployment = AddDeployment(
+        AddDeployment(
             hostedRunner,
-            options.Enabled ? HostedRunnerDeploymentStatuses.Running : HostedRunnerDeploymentStatuses.Skipped,
-            commandPreview,
+            HostedRunnerDeploymentStatuses.Running,
+            HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, options),
             options.Enabled
-                ? $"Provisioning mode '{options.DeploymentMode}' selected."
+                ? "Managed runner provisioning queued."
                 : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.");
 
         await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
+        return new HostedRunnerPreparationResult(hostedRunner, rawApiKey, true);
+    }
+
+    public async Task<HostedRunner?> EnsureHostedRunnerForUserPlanAsync(Guid userId, Guid planId, CancellationToken cancellationToken = default)
+    {
+        var plan = await db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == planId && p.IsActive, cancellationToken);
+        if (plan == null)
+        {
+            throw new InvalidOperationException("Subscription plan not found.");
+        }
+
+        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
+        if (!capabilities.Enabled)
+        {
+            await DisableHostedRunnersForUserAsync(userId, "Assigned plan does not include a hosted runner.", cancellationToken);
+            return null;
+        }
+
+        var preparation = await PrepareProvisioningAsync(userId, planId, cancellationToken, forceProvision: true);
+        var hostedRunner = preparation.HostedRunner;
+        var host = hostedRunner.RunnerHostId.HasValue
+            ? await db.RunnerHosts.FirstOrDefaultAsync(x => x.Id == hostedRunner.RunnerHostId.Value, cancellationToken)
+            : null;
+        if (!preparation.ShouldPublishProvisionRequest)
+        {
+            return hostedRunner;
+        }
 
         if (!options.Enabled)
         {
@@ -155,11 +194,15 @@ public class HostedRunnerProvisioningService
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
             hostedRunner.LastError = $"Unsupported hosted runner deployment mode '{options.DeploymentMode}'.";
+            var deployment = await db.HostedRunnerDeployments
+                .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
+                .OrderByDescending(x => x.StartedAt)
+                .FirstAsync(cancellationToken);
             CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
             await WriteProvisioningCompletionAuditAsync(
                 hostedRunner,
-                host.Name,
+                host?.Name,
                 AuditEventTypes.HostedRunnerProvisioningFailed,
                 "Failed",
                 $"Hosted runner '{hostedRunner.Name}' provisioning failed",
@@ -168,13 +211,34 @@ public class HostedRunnerProvisioningService
             return hostedRunner;
         }
 
-        var provisionScript = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, options, rawApiKey);
+        var deploymentRecord = await db.HostedRunnerDeployments
+            .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
+            .OrderByDescending(x => x.StartedAt)
+            .FirstAsync(cancellationToken);
+        if (host == null)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.Failed;
+            hostedRunner.LastError = "No runner host is assigned for hosted runner provisioning.";
+            CompleteDeployment(deploymentRecord, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
+            await db.SaveChangesAsync(cancellationToken);
+            await WriteProvisioningCompletionAuditAsync(
+                hostedRunner,
+                null,
+                AuditEventTypes.HostedRunnerProvisioningFailed,
+                "Failed",
+                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
+                hostedRunner.LastError,
+                cancellationToken);
+            return hostedRunner;
+        }
+
+        var provisionScript = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, options, preparation.RawApiKey!);
         var executionResult = await remoteCommandExecutor.ExecuteProvisionScriptAsync(host, provisionScript, cancellationToken);
         if (!executionResult.Succeeded)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
             hostedRunner.LastError = BuildRemoteFailureMessage(executionResult);
-            CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, executionResult.StandardOutput, hostedRunner.LastError);
+            CompleteDeployment(deploymentRecord, HostedRunnerDeploymentStatuses.Failed, executionResult.StandardOutput, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
             await WriteProvisioningCompletionAuditAsync(
                 hostedRunner,
@@ -191,7 +255,7 @@ public class HostedRunnerProvisioningService
         hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         CompleteDeployment(
-            deployment,
+            deploymentRecord,
             HostedRunnerDeploymentStatuses.Succeeded,
             executionResult.StandardOutput,
             string.IsNullOrWhiteSpace(executionResult.StandardError) ? null : executionResult.StandardError);
@@ -388,3 +452,8 @@ public class HostedRunnerProvisioningService
             cancellationToken);
     }
 }
+
+public sealed record HostedRunnerPreparationResult(
+    HostedRunner HostedRunner,
+    string? RawApiKey,
+    bool ShouldPublishProvisionRequest);

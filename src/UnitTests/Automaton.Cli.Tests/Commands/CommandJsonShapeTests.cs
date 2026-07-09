@@ -68,10 +68,10 @@ public class CommandJsonShapeTests
         var config = new ConfigService();
         config.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
-            AppId = Guid.NewGuid().ToString(),
             Name = "App",
-            Server = "https://api.example.com"
         });
+        config.SaveNamedEnvironmentConfig(projectRoot, "local", new GlobalConfig { Server = "https://api.example.com", AppId = Guid.NewGuid().ToString() });
+        config.SaveProjectEnvironmentSelection(projectRoot, new ProjectEnvironmentSelection { Default = "local" });
         config.SaveProjectLocalConfig(projectRoot, new GlobalConfig { ApiKey = string.Empty });
 
         var command = StatusCommand.Build(new ConfigService());
@@ -79,6 +79,24 @@ public class CommandJsonShapeTests
         var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
 
         AssertDiagnosticFailure(output, "Status failed", CommandDiagnosticCheckNames.Credentials, "checks", "nextSteps");
+    }
+
+    [Test]
+    public async Task StatusCommand_WhenNamedEnvironmentIsMissing_ReturnsDiagnosticJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var config = new ConfigService();
+        config.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App"
+        });
+
+        var command = StatusCommand.Build(new ConfigService());
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json", "--env", "missing"]);
+
+        using var doc = JsonDocument.Parse(output);
+        Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.False);
+        Assert.That(doc.RootElement.GetProperty("summary").GetString(), Is.EqualTo("Status failed"));
     }
 
     [Test]
@@ -127,6 +145,19 @@ public class CommandJsonShapeTests
     }
 
     [Test]
+    public async Task WhoAmICommand_WhenNamedEnvironmentIsMissing_ReturnsDiagnosticJsonShape()
+    {
+        var projectRoot = CreateProjectRoot();
+        var command = WhoAmICommand.Build(new ConfigService());
+
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json", "--env", "missing"]);
+
+        using var doc = JsonDocument.Parse(output);
+        Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.False);
+        Assert.That(doc.RootElement.GetProperty("summary").GetString(), Is.EqualTo("Whoami failed"));
+    }
+
+    [Test]
     public async Task SetRunnerCommand_WhenRunnerArgumentMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();
@@ -162,7 +193,6 @@ public class CommandJsonShapeTests
         config.SaveProjectConfig(projectRoot, new AutomatonConfig
         {
             Name = "Recovered App",
-            Server = "https://automaton.monster",
             Frontend = new FrontendConfig
             {
                 DeployDir = "frontend/dist"

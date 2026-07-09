@@ -12,4 +12,7 @@ public class GlobalConfig
 
     /// <summary>Overridden by AUTOMATON_API_KEY when present.</summary>
     public string? ApiKey { get; set; }
+
+    /// <summary>Optional environment-specific linked app ID.</summary>
+    public string? AppId { get; set; }
 }

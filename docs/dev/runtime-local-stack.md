@@ -2,6 +2,8 @@
 
 This stack runs the local Automaton environment in containers behind a single nginx TLS edge, closer to the production runtime shape than the host-mixed local setup.
 
+Use this page as the local managed-runtime cheat sheet.
+
 ## What it runs
 
 - `nginx`
@@ -33,13 +35,19 @@ Use this stack when you want:
 
 ## Hosts file
 
-Add these entries:
+Add these entries to your Windows hosts file:
 
 ```txt
 127.0.0.1 api.automaton.test
 127.0.0.1 studio.automaton.test
 127.0.0.1 apps.automaton.test
 127.0.0.1 website.automaton.test
+```
+
+Typical file path:
+
+```txt
+C:\Windows\System32\drivers\etc\hosts
 ```
 
 ## Certificate
@@ -54,6 +62,38 @@ mkcert `
   -key-file ".local-runtime\certs\automaton.test-key.pem" `
   api.automaton.test studio.automaton.test apps.automaton.test website.automaton.test
 ```
+
+If `mkcert` is not installed yet:
+
+```powershell
+choco install mkcert
+mkcert -install
+```
+
+Expected output files:
+
+```txt
+.local-runtime/certs/automaton.test.pem
+.local-runtime/certs/automaton.test-key.pem
+```
+
+## From scratch
+
+If you want a clean restart of the runtime-local stack:
+
+1. Stop and remove the old runtime-local containers.
+2. Keep or recreate the local certs under `.local-runtime/certs/`.
+3. Restore the MySQL dump if you want your previous local data back.
+4. Start the stack with the bootstrap script.
+
+If you are intentionally wiping the runtime-local stack first:
+
+```powershell
+docker compose -f docker-compose.runtime-local.yml down -v
+```
+
+This removes the runtime-local containers and Docker volumes created by that compose file.
+It does not remove your SQL dump file.
 
 ## Runner note
 
@@ -80,6 +120,192 @@ Useful options:
 
 ```powershell
 .\scripts\local-runtime-redeploy.ps1 -NoBuild
+.\scripts\local-runtime-redeploy.ps1 -Services api,worker,studio
+.\scripts\local-runtime-redeploy.ps1 -Services api
+```
+
+What the script does:
+
+- ensures `.local-runtime/certs`, `.local-runtime/static-runtime`, and `.local-runtime/traefik-dynamic` exist
+- checks that the local TLS cert files exist
+- defaults `LOCAL_RUNTIME_MYSQL_PORT` to `3311` when it is not set
+- builds selected services sequentially unless `-NoBuild` is passed
+- starts the runtime-local compose stack
+
+Default build services:
+
+- `api`
+- `worker`
+- `studio`
+
+The `-Services` parameter only affects which services are built. The script still starts the full runtime-local stack with `docker compose up -d --remove-orphans`.
+
+The script now prints the effective MySQL port before startup, for example:
+
+```txt
+[INFO] Using LOCAL_RUNTIME_MYSQL_PORT=3311
+```
+
+That matters because a local Windows MySQL service can already be using `3307`.
+
+## Faster inner loop
+
+Use the full script when:
+
+- you changed compose wiring
+- you changed certs, volumes, networks, or local runtime bootstrap behavior
+- you want a full stack rebuild/reset
+
+For normal code-only changes in API, Worker, or Studio, use the narrower compose update instead:
+
+```powershell
+docker compose -f docker-compose.runtime-local.yml up -d --build api worker studio
+```
+
+Equivalent two-step form:
+
+```powershell
+docker compose -f docker-compose.runtime-local.yml build api worker studio
+docker compose -f docker-compose.runtime-local.yml up -d api worker studio
+```
+
+This is the recommended day-to-day development loop when you only changed:
+
+- `src/Automaton.Api`
+- `src/Automaton.Worker`
+- `src/automaton-studio-vue`
+
+It avoids unnecessary restarts of:
+
+- `mysql`
+- `rabbitmq`
+- `smtp4dev`
+- `nginx`
+- `traefik`
+- `website`
+
+## Local endpoints
+
+After a successful start:
+
+- Studio: [https://studio.automaton.test:8443](https://studio.automaton.test:8443)
+- API health: [https://api.automaton.test:8443/healthz](https://api.automaton.test:8443/healthz)
+- Apps health: [https://apps.automaton.test:8443/healthz](https://apps.automaton.test:8443/healthz)
+- Website: [https://website.automaton.test:8443](https://website.automaton.test:8443)
+- RabbitMQ management: [http://localhost:15673](http://localhost:15673)
+- smtp4dev: [http://localhost:3001](http://localhost:3001)
+- Traefik ping: [http://localhost:8082/ping](http://localhost:8082/ping)
+
+## Restore a MySQL dump
+
+If you already created a SQL dump with `mysqldump`, that dump contains both schema and data.
+
+Recommended clean restore flow:
+
+1. Start the runtime-local stack.
+2. Drop and recreate the `automaton` database in the runtime-local MySQL container.
+3. Import the dump.
+4. Restart API and worker.
+
+Drop and recreate the database:
+
+```powershell
+docker exec -i automaton-runtime-local-mysql mysql -u root -pAutomatonRoot123! -e "DROP DATABASE IF EXISTS automaton; CREATE DATABASE automaton;"
+```
+
+Import the dump:
+
+```powershell
+Get-Content ".artifacts\db-backups\automaton-before-runtime-local.sql" | docker exec -i automaton-runtime-local-mysql mysql -u root -pAutomatonRoot123! automaton
+```
+
+Restart API and worker after restore:
+
+```powershell
+docker restart automaton-runtime-local-api automaton-runtime-local-worker
+```
+
+Optional sanity check:
+
+```powershell
+docker exec -i automaton-runtime-local-mysql mysql -u root -pAutomatonRoot123! -D automaton -e "SHOW TABLES;"
+```
+
+If your dump file has a different name, substitute the actual path.
+
+## MySQL Workbench
+
+To connect MySQL Workbench to the runtime-local MySQL container, create a connection with:
+
+- Connection Name: `AutomatonRuntimeLocal`
+- Hostname: `127.0.0.1`
+- Port: `3311`
+- Username: `root`
+- Password: `AutomatonRoot123!`
+
+After saving the connection, open it and refresh the `Schemas` panel. You should see the `automaton` database after restore.
+
+Important:
+
+- the runtime-local MySQL container is exposed on `3311`
+- an older local or Docker MySQL connection on `3306` is not the same database
+
+### Import with Workbench
+
+If you prefer restoring the dump through MySQL Workbench instead of PowerShell:
+
+1. Open the `AutomatonRuntimeLocal` connection.
+2. Go to `Administration` -> `Data Import/Restore`.
+3. Choose `Import from Self-Contained File`.
+4. Select:
+
+   ```txt
+   C:\Work\automaton\.artifacts\db-backups\automaton-before-runtime-local.sql
+   ```
+
+5. Set the target schema to `automaton`.
+6. Start Import.
+
+## Typical bootstrap flow
+
+For a clean machine or a fully reset local runtime:
+
+1. Add the `automaton.test` host entries.
+2. Generate the local SAN certificate into `.local-runtime/certs/`.
+3. Run:
+
+   ```powershell
+   .\scripts\local-runtime-redeploy.ps1
+   ```
+
+4. Restore the MySQL dump if needed.
+5. Log into Studio at [https://studio.automaton.test:8443](https://studio.automaton.test:8443).
+6. Create or reconnect runners separately when you need backend deploy/runtime validation.
+
+## Script usage patterns
+
+Full local runtime start with the default development build set:
+
+```powershell
+.\scripts\local-runtime-redeploy.ps1
+```
+
+Restart the stack without rebuilding:
+
+```powershell
+.\scripts\local-runtime-redeploy.ps1 -NoBuild
+```
+
+Rebuild only API and Worker, then bring the full stack up:
+
+```powershell
+.\scripts\local-runtime-redeploy.ps1 -Services api,worker
+```
+
+Rebuild only Studio, then bring the full stack up:
+
+```powershell
+.\scripts\local-runtime-redeploy.ps1 -Services studio
 ```
 
 ## Compose file
@@ -100,9 +326,19 @@ Local runtime state lives under:
 
 and in Docker volumes named with the `runtime-local` prefix.
 
+Important local folders:
+
+```txt
+.local-runtime/certs
+.local-runtime/static-runtime
+.local-runtime/traefik-dynamic
+```
+
 ## Notes
 
 - This stack is intentionally closer to production networking than `docker-compose.local.yml`.
 - It does not attempt local blue/green rollout behavior.
 - It keeps a dedicated namespace instead of reusing the older local stack containers.
 - The compose file still contains a runner service profile for explicit local experiments, but the bootstrap script does not use it.
+- Frontend app traffic is expected to go through `https://apps.automaton.test:8443`, not through `localhost`.
+- API traffic for Studio is expected to go through `https://api.automaton.test:8443`, not through `https://localhost:7091`.

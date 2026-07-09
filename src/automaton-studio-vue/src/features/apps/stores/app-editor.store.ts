@@ -5,6 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
+import type { DeployAppResult, DeployBackendResult } from '../services/apps.service'
 import { runnersService } from '@/features/runners/services/runners.service'
 import { RunnerStatus } from '@/features/runners/types/runners.types'
 import type {
@@ -868,7 +869,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Checks for requirements.txt up-front and surfaces a status label beneath the button
    * for the duration of the operation — no blocking toast needed.
    */
-  async function deployBackend(): Promise<{ deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }> {
+  async function deployBackend(): Promise<DeployBackendResult> {
     if (!currentApp.value) throw new Error('No app loaded')
     isDeployingBackend.value = true
     deployStatusMessage.value = 'Deploying...'
@@ -878,7 +879,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         deployStatusMessage.value = 'Installing packages…'
       }
       const result = await appsService.deployBackend(currentApp.value.id)
-      lastDeployError.value = null
+      lastDeployError.value = result.success ? null : result.message
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -889,15 +890,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
-  async function deployApp(): Promise<{
-    success: boolean
-    frontendFilesSynced: number
-    backendFilesSynced: number
-    frontendAction: string
-    backendAction: string
-    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
-    message?: string
-  }> {
+  async function deployApp(): Promise<DeployAppResult> {
     if (!currentApp.value) throw new Error('No app loaded')
     if (!canDeployFromStudio.value) {
       throw new Error(deployBlockedReason.value || 'This app cannot be fully deployed from Studio.')
@@ -916,7 +909,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
-      await finalizeSuccessfulDeployment()
+      if (result.success) {
+        await finalizeSuccessfulDeployment()
+      } else {
+        lastDeployError.value = result.message ?? result.backendDeploy.message
+      }
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)
@@ -964,15 +961,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
-  async function deployBackendComponent(): Promise<{
-    success: boolean
-    frontendFilesSynced: number
-    backendFilesSynced: number
-    frontendAction: string
-    backendAction: string
-    backendDeploy: { success: boolean; deployedCount: number; totalScripts: number; runnerCount: number; hasRequirements: boolean; message: string; installLogs?: string[] }
-    message?: string
-  }> {
+  async function deployBackendComponent(): Promise<DeployAppResult> {
     if (!currentApp.value) throw new Error('No app loaded')
     if (!canDeployBackendFromStudio.value) {
       throw new Error('Backend cannot be deployed from Studio.')
@@ -991,7 +980,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
-      await finalizeSuccessfulDeployment()
+      if (result.success) {
+        await finalizeSuccessfulDeployment()
+      } else {
+        lastDeployError.value = result.message ?? result.backendDeploy.message
+      }
       return result
     } catch (err: unknown) {
       lastDeployError.value = getErrorMessage(err)

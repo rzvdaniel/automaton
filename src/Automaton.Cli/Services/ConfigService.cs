@@ -8,12 +8,14 @@ namespace Automaton.Cli.Services;
 /// <summary>
 /// Reads and writes automaton.json (project-level) and ~/.automaton/config.json (global).
 /// Project config and project-local credentials are discovered by walking up from the current directory.
-/// Resolution order for server: AUTOMATON_SERVER > project config > project-local config > global config file > prompt.
-/// Resolution order for api-key: AUTOMATON_API_KEY > project-local config > global config file > prompt.
+/// Resolution order for server: AUTOMATON_SERVER > named environment > project-local config > global config file > prompt.
+/// Resolution order for api-key: AUTOMATON_API_KEY > named environment > project-local config > global config file > prompt.
+/// Resolution order for app-id: named environment.
 /// </summary>
 public class ConfigService
 {
     public const string DefaultHostedServer = "https://api.automaton.monster";
+    public const string DefaultEnvironmentName = "live";
 
     private const string ResourcePrefix = "Automaton.Cli.AiGuidance.";
     private const string ProjectConfigFileName = "automaton.json";
@@ -21,6 +23,8 @@ public class ConfigService
     private const string ProjectGitIgnoreFileName = ".gitignore";
     private const string ProjectConfigDirName = ".automaton";
     private const string ProjectLocalConfigFileName = "config.json";
+    private const string ProjectEnvironmentDirName = "environments";
+    private const string ProjectEnvironmentSelectionFileName = "environment.json";
     private const string GitIgnoreTemplateResourceName = ResourcePrefix + "templates.gitignore";
     private static readonly string GlobalConfigDir  = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".automaton");
@@ -54,9 +58,9 @@ public class ConfigService
     public AutomatonConfig LoadProjectConfig(string directory)
     {
         var config = TryLoadProjectConfig(directory);
-        if (config == null || string.IsNullOrWhiteSpace(config.AppId))
+        if (config == null)
             throw new InvalidOperationException(
-                "automaton.json not found or missing appId. Run 'automaton new', 'automaton create', or 'automaton link <app-id>' first.");
+                "automaton.json not found. Run 'automaton new' first.");
         return config;
     }
 
@@ -93,6 +97,31 @@ public class ConfigService
         EnsureProjectIgnoreFile(directory);
     }
 
+    public void SaveNamedEnvironmentConfig(string directory, string environmentName, GlobalConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(environmentName))
+        {
+            throw new InvalidOperationException("Environment name is required.");
+        }
+
+        var projectRoot = FindNearestProjectRoot(directory) ?? directory;
+        var configPath = GetProjectEnvironmentConfigPath(projectRoot, environmentName.Trim());
+        Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+        File.WriteAllText(configPath, JsonSerializer.Serialize(config, SerializerOptions));
+
+        EnsureProjectIgnoreFile(projectRoot);
+    }
+
+    public void SaveProjectEnvironmentSelection(string directory, ProjectEnvironmentSelection selection)
+    {
+        var projectRoot = FindNearestProjectRoot(directory) ?? directory;
+        var path = GetProjectEnvironmentSelectionPath(projectRoot);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(selection, SerializerOptions));
+
+        EnsureProjectIgnoreFile(projectRoot);
+    }
+
     public bool ClearProjectLocalConfig(string directory)
     {
         var path = GetProjectLocalConfigPath(directory);
@@ -105,6 +134,16 @@ public class ConfigService
     public string GetProjectLocalConfigPath(string directory)
     {
         return Path.Combine(directory, ProjectConfigDirName, ProjectLocalConfigFileName);
+    }
+
+    public string GetProjectEnvironmentConfigPath(string directory, string environmentName)
+    {
+        return Path.Combine(directory, ProjectConfigDirName, ProjectEnvironmentDirName, $"{environmentName}.json");
+    }
+
+    public string GetProjectEnvironmentSelectionPath(string directory)
+    {
+        return Path.Combine(directory, ProjectConfigDirName, ProjectEnvironmentSelectionFileName);
     }
 
     public string? FindNearestProjectRoot(string directory)
@@ -125,6 +164,34 @@ public class ConfigService
         foreach (var current in EnumerateDirectoryAndParents(directory))
         {
             var candidate = GetProjectLocalConfigPath(current);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    public string? FindNearestProjectEnvironmentConfigPath(string directory, string environmentName)
+    {
+        foreach (var current in EnumerateDirectoryAndParents(directory))
+        {
+            var candidate = GetProjectEnvironmentConfigPath(current, environmentName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    public string? FindNearestProjectEnvironmentSelectionPath(string directory)
+    {
+        foreach (var current in EnumerateDirectoryAndParents(directory))
+        {
+            var candidate = GetProjectEnvironmentSelectionPath(current);
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -195,7 +262,8 @@ public class ConfigService
         return new GlobalConfig
         {
             Server = file.Server,
-            ApiKey = file.ApiKey
+            ApiKey = file.ApiKey,
+            AppId = file.AppId
         };
     }
 
@@ -220,38 +288,57 @@ public class ConfigService
             return LoadGlobalConfig();
         }
 
-        var (server, apiKey) = ResolveCredentials(directory: directory);
+        var resolved = ResolveContext(directory: directory);
         return new GlobalConfig
         {
-            Server = server,
-            ApiKey = apiKey
+            Server = resolved.Server,
+            ApiKey = resolved.ApiKey,
+            AppId = resolved.AppId
         };
     }
 
-    public (string? server, string? apiKey) ResolveCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
+    public ResolvedCliContext ResolveContext(AutomatonConfig? projectConfig = null, string? directory = null, string? environmentName = null)
     {
         var cwd = directory ?? Directory.GetCurrentDirectory();
         var local = LoadProjectLocalConfig(cwd);
         var global = LoadGlobalConfig();
+        var resolvedEnvironmentName = ResolveEnvironmentName(cwd, environmentName);
+        var namedEnvironment = resolvedEnvironmentName == null
+            ? new GlobalConfig()
+            : LoadNamedEnvironmentConfig(cwd, resolvedEnvironmentName)
+                ?? throw new InvalidOperationException(CreateMissingEnvironmentMessage(cwd, resolvedEnvironmentName));
         var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
 
         var server = envServer
-            ?? projectConfig?.Server
+            ?? namedEnvironment.Server
             ?? local.Server
             ?? global.Server;
         var apiKey = envApiKey
+            ?? namedEnvironment.ApiKey
             ?? local.ApiKey
             ?? global.ApiKey;
 
-        return (server?.TrimEnd('/'), apiKey);
+        return new ResolvedCliContext
+        {
+            EnvironmentName = resolvedEnvironmentName,
+            Server = server?.TrimEnd('/'),
+            ApiKey = apiKey,
+            AppId = namedEnvironment.AppId?.Trim()
+        };
     }
 
-    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null, string? directory = null)
+    public (string? server, string? apiKey) ResolveCredentials(AutomatonConfig? projectConfig = null, string? directory = null, string? environmentName = null)
     {
-        var (resolvedServer, resolvedApiKey) = ResolveCredentials(projectConfig, directory);
-        var server = resolvedServer;
-        var apiKey = resolvedApiKey;
+        var resolved = ResolveContext(projectConfig, directory, environmentName);
+        return (resolved.Server, resolved.ApiKey);
+    }
+
+    public (string server, string apiKey) RequireCredentials(AutomatonConfig? projectConfig = null, string? directory = null, string? environmentName = null)
+    {
+        var resolved = ResolveContext(projectConfig, directory, environmentName);
+        var server = resolved.Server;
+        var apiKey = resolved.ApiKey;
 
         if (string.IsNullOrWhiteSpace(server))
         {
@@ -270,6 +357,76 @@ public class ConfigService
         }
 
         return (server.TrimEnd('/'), apiKey);
+    }
+
+    public GlobalConfig? LoadNamedEnvironmentConfig(string directory, string environmentName)
+    {
+        if (string.IsNullOrWhiteSpace(environmentName))
+        {
+            return null;
+        }
+
+        var path = FindNearestProjectEnvironmentConfigPath(directory, environmentName.Trim())
+                   ?? GetProjectEnvironmentConfigPath(FindNearestProjectRoot(directory) ?? directory, environmentName.Trim());
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<GlobalConfig>(json, SerializerOptions) ?? new GlobalConfig();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public ProjectEnvironmentSelection LoadProjectEnvironmentSelection(string directory)
+    {
+        var path = FindNearestProjectEnvironmentSelectionPath(directory)
+                   ?? GetProjectEnvironmentSelectionPath(FindNearestProjectRoot(directory) ?? directory);
+        if (!File.Exists(path))
+        {
+            return new ProjectEnvironmentSelection();
+        }
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<ProjectEnvironmentSelection>(json, SerializerOptions) ?? new ProjectEnvironmentSelection();
+        }
+        catch
+        {
+            return new ProjectEnvironmentSelection();
+        }
+    }
+
+    private string? ResolveEnvironmentName(string directory, string? explicitEnvironmentName)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitEnvironmentName))
+        {
+            return explicitEnvironmentName.Trim();
+        }
+
+        var selection = LoadProjectEnvironmentSelection(directory);
+        if (!string.IsNullOrWhiteSpace(selection.Default))
+        {
+            return selection.Default.Trim();
+        }
+
+        return FindNearestProjectEnvironmentConfigPath(directory, DefaultEnvironmentName) != null
+            ? DefaultEnvironmentName
+            : null;
+    }
+
+    private string CreateMissingEnvironmentMessage(string directory, string environmentName)
+    {
+        var projectRoot = FindNearestProjectRoot(directory) ?? directory;
+        var environmentPath = GetProjectEnvironmentConfigPath(projectRoot, environmentName);
+        return $"Environment '{environmentName}' was not found. Create '{environmentPath}' or choose a different environment.";
     }
 
     private static IEnumerable<string> EnumerateDirectoryAndParents(string directory)

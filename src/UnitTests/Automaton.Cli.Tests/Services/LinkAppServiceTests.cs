@@ -34,7 +34,7 @@ public class LinkAppServiceTests
             (_, _, _, _) => Task.FromResult(ParseApp("app-456", "Linked App")),
             (_, _, _) => Task.FromResult(references));
 
-        var result = await service.LinkAsync(projectRoot, "app-456", "https://automaton.monster", "ak_test");
+        var result = await service.LinkAsync(projectRoot, "app-456", "https://automaton.monster", "ak_test", "local");
 
         Assert.That(result.Success, Is.True);
         Assert.That(result.AppId, Is.EqualTo("app-456"));
@@ -46,6 +46,8 @@ public class LinkAppServiceTests
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".github")), Is.False);
         Assert.That(File.Exists(Path.Combine(projectRoot, "CLAUDE.md")), Is.False);
         Assert.That(Directory.Exists(Path.Combine(projectRoot, ".automaton", "agents", "references", "llms")), Is.True);
+        var env = new ConfigService().LoadNamedEnvironmentConfig(projectRoot, "local");
+        Assert.That(env!.AppId, Is.EqualTo("app-456"));
     }
 
     [Test]
@@ -54,10 +56,32 @@ public class LinkAppServiceTests
         var projectRoot = CreateProjectRoot();
         var service = new LinkAppService(new ConfigService(), (_, _, _, _) => throw new InvalidOperationException("should not be called"));
 
-        var result = await service.LinkAsync(projectRoot, null, "https://automaton.monster", "ak_test");
+        var result = await service.LinkAsync(projectRoot, null, "https://automaton.monster", "ak_test", "local");
 
         Assert.That(result.Success, Is.False);
         Assert.That(result.Checks.Any(check => check.Name == "linkApp" && !check.Success && check.Message.Contains("app ID is required")), Is.True);
+    }
+
+    [Test]
+    public async Task LinkAsync_WhenEnvironmentIsOmitted_WritesLiveEnvironmentByDefault()
+    {
+        var projectRoot = CreateProjectRoot();
+        var service = new LinkAppService(
+            new ConfigService(),
+            (_, _, _, _) => Task.FromResult(ParseApp("app-live", "Linked App")),
+            (_, _, _) => Task.FromResult(GetReferenceSources()));
+
+        var result = await service.LinkAsync(projectRoot, "app-live", "https://api.automaton.monster", "ak_live");
+
+        Assert.That(result.Success, Is.True);
+
+        var configService = new ConfigService();
+        var live = configService.LoadNamedEnvironmentConfig(projectRoot, ConfigService.DefaultEnvironmentName);
+        var selection = configService.LoadProjectEnvironmentSelection(projectRoot);
+
+        Assert.That(live, Is.Not.Null);
+        Assert.That(live!.AppId, Is.EqualTo("app-live"));
+        Assert.That(selection.Default, Is.EqualTo(ConfigService.DefaultEnvironmentName));
     }
 
     [Test]
@@ -66,7 +90,7 @@ public class LinkAppServiceTests
         var projectRoot = CreateProjectRoot();
         var service = new LinkAppService(new ConfigService(), (_, _, _, _) => throw new InvalidOperationException("should not be called"));
 
-        var result = await service.LinkAsync(projectRoot, "app-456", null, null);
+        var result = await service.LinkAsync(projectRoot, "app-456", null, null, "local");
 
         Assert.That(result.Success, Is.False);
         Assert.That(result.Checks.Any(check => check.Name == "credentials" && !check.Success), Is.True);

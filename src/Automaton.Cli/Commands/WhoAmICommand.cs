@@ -11,13 +11,15 @@ public static class WhoAmICommand
     public static Command Build(ConfigService config)
     {
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("whoami", "Show the current authenticated Automaton user")
         {
-            jsonOption
+            jsonOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (bool asJson) =>
+        cmd.SetHandler(async (bool asJson, string? environmentName) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -25,7 +27,9 @@ public static class WhoAmICommand
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
-                var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+                var resolved = config.ResolveContext(directory: cwd, environmentName: environmentName);
+                var server = resolved.Server;
+                var apiKey = resolved.ApiKey;
                 var credentialsCheck = CliCommandChecks.ValidateCredentials(server, apiKey, nextSteps);
                 checks.Add(credentialsCheck);
 
@@ -59,13 +63,14 @@ public static class WhoAmICommand
 
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, summary = result.Summary, checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = result.NextSteps, authMode = "apiKey", server, user = new { id, name, email, publicUsername, roles } });
+                    CliJson.Write(new { success = true, summary = result.Summary, checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = result.NextSteps, environment = resolved.EnvironmentName, authMode = "apiKey", server, user = new { id, name, email, publicUsername, roles } });
                     return;
                 }
 
                 var table = new Table();
                 table.AddColumn("Field");
                 table.AddColumn("Value");
+                table.AddRow("environment", string.IsNullOrWhiteSpace(resolved.EnvironmentName) ? "-" : resolved.EnvironmentName);
                 table.AddRow("server", server);
                 table.AddRow("auth", "apiKey");
                 table.AddRow("id", id ?? "?");
@@ -90,7 +95,7 @@ public static class WhoAmICommand
                 }
                 Environment.ExitCode = 1;
             }
-        }, jsonOption);
+        }, jsonOption, environmentOption);
 
         return cmd;
     }

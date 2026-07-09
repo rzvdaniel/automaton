@@ -37,9 +37,12 @@ public sealed class ValidationService
         var configPath = Path.Combine(directory, AutomatonConfigFileName);
         var configFileExists = File.Exists(configPath);
         var projectConfig = _config.TryLoadProjectConfig(directory);
-        var (resolvedServer, resolvedApiKey) = _config.ResolveCredentials(projectConfig, directory);
+        var resolved = _config.ResolveContext(projectConfig, directory);
+        var resolvedServer = resolved.Server;
+        var resolvedApiKey = resolved.ApiKey;
+        var resolvedAppId = resolved.AppId;
 
-        var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, resolvedServer, nextSteps);
+        var appLinkCheck = ValidateAppLink(configFileExists, projectConfig, resolvedAppId, resolvedServer, nextSteps);
         checks.Add(appLinkCheck);
 
         var frontendCheck = ValidateFrontendDeployShape(directory, projectConfig);
@@ -53,6 +56,7 @@ public sealed class ValidationService
         var remoteAppCheck = await ValidateRemoteAppAccessAsync(
             appLinkCheck,
             projectConfig,
+            resolvedAppId,
             resolvedServer,
             resolvedApiKey,
             nextSteps,
@@ -107,6 +111,7 @@ public sealed class ValidationService
     private static ValidationCheckResult ValidateAppLink(
         bool configFileExists,
         Models.AutomatonConfig? projectConfig,
+        string? resolvedAppId,
         string? resolvedServer,
         ISet<string> nextSteps)
     {
@@ -123,11 +128,11 @@ public sealed class ValidationService
             return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json is invalid or unreadable");
         }
 
-        if (string.IsNullOrWhiteSpace(projectConfig.AppId))
+        if (string.IsNullOrWhiteSpace(resolvedAppId))
         {
-            nextSteps.Add("Run automaton create to create and link a remote app, or automaton link <app-id> to link an existing app");
+            nextSteps.Add("Run automaton create or automaton link <app-id> with --env <name> to link a remote app");
             nextSteps.Add($"Minimal automaton.json example:{Environment.NewLine}{MinimalConfigExample}");
-            return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "automaton.json is missing appId; local scaffold exists but is not linked yet");
+            return new ValidationCheckResult(ValidationCheckNames.AppLink, false, "the selected environment is not linked to an appId");
         }
 
         if (string.IsNullOrWhiteSpace(resolvedServer))
@@ -142,7 +147,7 @@ public sealed class ValidationService
         return new ValidationCheckResult(
             ValidationCheckNames.AppLink,
             true,
-            $"linked app {projectConfig.AppId} on {resolvedServer}");
+            $"linked app {resolvedAppId} on {resolvedServer}");
     }
 
     private static ValidationCheckResult ValidateFrontendDeployShape(string directory, Models.AutomatonConfig? projectConfig)
@@ -281,6 +286,7 @@ public sealed class ValidationService
     private async Task<RemoteAppCheckResult> ValidateRemoteAppAccessAsync(
         ValidationCheckResult appLinkCheck,
         Models.AutomatonConfig? projectConfig,
+        string? resolvedAppId,
         string? resolvedServer,
         string? resolvedApiKey,
         ISet<string> nextSteps,
@@ -313,9 +319,9 @@ public sealed class ValidationService
 
         try
         {
-            var remoteApp = await _loadRemoteAppAsync(resolvedServer!, resolvedApiKey, projectConfig.AppId, cancellationToken);
+            var remoteApp = await _loadRemoteAppAsync(resolvedServer!, resolvedApiKey, resolvedAppId!, cancellationToken);
             return new RemoteAppCheckResult(
-                new ValidationCheckResult(ValidationCheckNames.RemoteAppAccess, true, $"remote app found: {projectConfig.AppId}"),
+                new ValidationCheckResult(ValidationCheckNames.RemoteAppAccess, true, $"remote app found: {resolvedAppId}"),
                 remoteApp);
         }
         catch (Exception ex)

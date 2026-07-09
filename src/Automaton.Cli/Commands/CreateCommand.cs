@@ -11,17 +11,19 @@ public static class CreateCommand
     {
         var nameOption = new Option<string?>(["--name", "-n"], "App name");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = new Option<string?>("--env", "Environment name to create and link, for example local or live");
 
         var cmd = new Command("create", "Create a remote Automaton app for the current folder and write appId into automaton.json")
         {
             nameOption,
-            jsonOption
+            jsonOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (string? name, bool asJson) =>
+        cmd.SetHandler(async (string? name, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var (server, apiKey) = config.ResolveCredentials(directory: cwd);
+            var (server, apiKey) = config.ResolveCredentials(directory: cwd, environmentName: environmentName);
             var existingConfig = config.TryLoadProjectConfig(cwd);
 
             if (string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(existingConfig?.Name))
@@ -36,7 +38,7 @@ public static class CreateCommand
             }
 
             var service = new NewAppService(config);
-            var result = await service.CreateAsync(cwd, name, server, apiKey);
+            var result = await service.CreateAsync(cwd, name, server, apiKey, environmentName);
 
             if (asJson)
             {
@@ -72,7 +74,7 @@ public static class CreateCommand
             AnsiConsole.MarkupLine($"[grey]App ID:[/] {result.AppId}");
             AnsiConsole.MarkupLine("[grey]automaton.json written.[/]");
             Environment.ExitCode = 0;
-        }, nameOption, jsonOption);
+        }, nameOption, jsonOption, environmentOption);
 
         return cmd;
     }
