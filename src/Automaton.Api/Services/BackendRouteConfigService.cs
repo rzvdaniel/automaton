@@ -35,14 +35,22 @@ public class BackendRouteConfigService
             .AsNoTracking()
             .Where(app => app.ExecutionRunnerId != null)
             .Join(
-                dbContext.HostedRunners.AsNoTracking().Where(r => r.DeletedAt == null && r.RunnerId != null),
+                dbContext.HostedRunners.AsNoTracking().Where(r =>
+                    r.DeletedAt == null &&
+                    r.RunnerId != null &&
+                    r.RuntimeEndpoint != null &&
+                    r.RuntimeEndpoint != string.Empty),
                 app => app.ExecutionRunnerId,
                 runner => runner.RunnerId,
-                (app, runner) => new RouteTarget(
-                    app.Id,
-                    runner.RuntimeEndpoint!))
-            .Where(x => !string.IsNullOrWhiteSpace(x.RuntimeEndpoint))
+                (app, runner) => new
+                {
+                    AppId = app.Id,
+                    RuntimeEndpoint = runner.RuntimeEndpoint!
+                })
             .OrderBy(x => x.AppId)
+            .Select(x => new RouteTarget(
+                x.AppId,
+                x.RuntimeEndpoint.Trim()))
             .ToListAsync(cancellationToken);
 
         var rootPath = ResolveRootPath();

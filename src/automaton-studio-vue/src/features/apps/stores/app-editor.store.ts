@@ -25,10 +25,9 @@ import {
   PendingFileChangeType as PendingChangeType,
 } from '../types/apps.types'
 import type { BackendRuntimeLogEvent, ConsoleEntry } from '../types/console.types'
+import { getDeployedAppUrl } from '../utils/public-app-url'
 
 export const useAppEditorStore = defineStore('appEditor', () => {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
-
   // ============================================
   // State
   // ============================================
@@ -779,9 +778,9 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         return
       }
 
-      const { runtimeToken } = await appsService.createRuntimeLaunch(currentApp.value.id)
-      const runtimeUrl = new URL(`${apiBaseUrl}/a/${currentApp.value.id}/`, window.location.origin)
-      runtimeUrl.searchParams.set('token', runtimeToken)
+      const runtimeUrl = currentApp.value.requiresAuthentication
+        ? new URL(appsService.getRestrictedRuntimeLaunchUrl(currentApp.value.id), window.location.origin)
+        : new URL(getDeployedAppUrl(currentApp.value.id), window.location.origin)
       runtimeUrl.searchParams.set('v', Date.now().toString())
       applicationUrl.value = runtimeUrl.toString()
       applicationWarning.value = getApplicationWarningMessage()

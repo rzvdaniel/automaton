@@ -9,13 +9,21 @@
     console.warn('Automaton app backend API path is not configured.');
   }
 
-  function getAppApiRoot() {
-    if (!apiBaseUrl) {
-      throw new Error('Automaton API base URL is not configured.');
-    }
+  function isManagedRuntimeBackendPath(path) {
+    return /^\/a\/[0-9a-f-]+\/api(?:\/|$)/i.test(path);
+  }
 
+  function getAppApiRoot() {
     if (!backendApiPath) {
       throw new Error('Automaton app backend API path is not configured.');
+    }
+
+    if (isManagedRuntimeBackendPath(backendApiPath)) {
+      return backendApiPath.replace(/\/+$/, '');
+    }
+
+    if (!apiBaseUrl) {
+      throw new Error('Automaton API base URL is not configured.');
     }
 
     return `${apiBaseUrl}${backendApiPath}`;

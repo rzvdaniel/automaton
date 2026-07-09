@@ -248,6 +248,11 @@ class AppsService {
     return data
   }
 
+  getRestrictedRuntimeLaunchUrl(id: string): string {
+    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+    return `${apiBaseUrl}/api/apps/${encodeURIComponent(id)}/launch-runtime`
+  }
+
   async listRunnerBackendFiles(id: string, area: RunnerFileArea): Promise<RunnerBackendFilesResponse> {
     const { data } = await apiClient.get<RunnerBackendFilesResponse>(
       `/api/apps/${id}/runner-backend/files`,

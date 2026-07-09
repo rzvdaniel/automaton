@@ -19,6 +19,7 @@ COPY Automaton.Core/*.csproj ./Automaton.Core/
 COPY Automaton.Core.Scripting/*.csproj ./Automaton.Core.Scripting/
 COPY Automaton.Steps/*.csproj ./Automaton.Steps/
 COPY Automaton.Ai/*.csproj ./Automaton.Ai/
+COPY Automaton.AiGuidance/*.csproj ./Automaton.AiGuidance/
 COPY Automaton.Mcp/*.csproj ./Automaton.Mcp/
 COPY Automaton.Runner/*.csproj ./Automaton.Runner/
 COPY UnitTests/Automaton.Core.Tests/*.csproj ./UnitTests/Automaton.Core.Tests/
@@ -32,6 +33,7 @@ COPY Automaton.Core/ ./Automaton.Core/
 COPY Automaton.Core.Scripting/ ./Automaton.Core.Scripting/
 COPY Automaton.Steps/ ./Automaton.Steps/
 COPY Automaton.Ai/ ./Automaton.Ai/
+COPY Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY Automaton.Mcp/ ./Automaton.Mcp/
 COPY Automaton.Runner/ ./Automaton.Runner/
 
