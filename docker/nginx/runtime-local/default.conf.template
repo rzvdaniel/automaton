@@ -214,7 +214,7 @@ server {
         proxy_set_header Content-Length "";
         proxy_set_header X-Original-URI $request_uri;
         proxy_set_header X-App-Id $runtime_app_id;
-        proxy_set_header X-Runtime-Proxy-Key ${LOCAL_RUNTIME_PROXY_AUTH_KEY};
+        proxy_set_header X-Automaton-Runtime-Auth ${LOCAL_RUNTIME_PROXY_AUTH_KEY};
         proxy_set_header Cookie $http_cookie;
         proxy_set_header Host ${LOCAL_RUNTIME_API_DOMAIN};
         proxy_set_header X-Forwarded-Proto https;
