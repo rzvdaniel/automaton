@@ -342,6 +342,7 @@ public class Program
                 services.AddSingleton<RunnerWorkspaceService>();
                 services.AddSingleton<RunnerBackendEnvironmentService>();
                 services.AddSingleton<RunnerDeploymentService>();
+                services.AddSingleton<RunnerBackendRegistry>();
                 services.AddSingleton<RunnerRuntimeGatewayService>();
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();
