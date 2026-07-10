@@ -162,9 +162,12 @@ services:
     logging: *default-json-logging
     volumes:
       - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./.prod-runtime/traefik/api-edge.yml:/etc/traefik/dynamic/api-edge.yml:ro
+      - ./.prod-runtime/letsencrypt/live/${CERT_NAME:-${WEBSITE_DOMAIN:?WEBSITE_DOMAIN is required in .env}}:/etc/traefik/certs:ro
       - prod-traefik-dynamic:/etc/traefik/dynamic
     networks:
       - automaton-runtime
+      - automaton-prod
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8082/ping | grep -q OK || exit 1"]
       interval: 10s

@@ -1,0 +1,41 @@
+http:
+  routers:
+    api-http-redirect:
+      entryPoints:
+        - web
+      rule: "Host(`__API_DOMAIN__`)"
+      middlewares:
+        - api-redirect
+      service: api-blue-edge
+
+    api-edge:
+      entryPoints:
+        - websecure
+      rule: "Host(`__API_DOMAIN__`)"
+      service: api-blue-edge
+      middlewares:
+        - api-https-headers
+      tls: {}
+
+  middlewares:
+    api-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    api-https-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+  services:
+    api-blue-edge:
+      loadBalancer:
+        servers:
+          - url: "http://api-blue:8080"
+        passHostHeader: true
+
+tls:
+  certificates:
+    - certFile: "/etc/traefik/certs/fullchain.pem"
+      keyFile: "/etc/traefik/certs/privkey.pem"

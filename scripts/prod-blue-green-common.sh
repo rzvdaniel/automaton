@@ -165,6 +165,7 @@ render_nginx_runtime() {
     render_template "$NGINX_TEMPLATE_DIR/conf.d/website.conf.template" "$NGINX_CONF_DIR/website.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/apps.conf.template" "$NGINX_CONF_DIR/apps.conf"
     cp "$APP_RUNTIME_SOURCE_DIR/automaton-api.js" "$NGINX_APP_RUNTIME_DIR/automaton-api.js"
+    render_template "$TRAEFIK_TEMPLATE_DIR/api-edge.yml" "$TRAEFIK_RUNTIME_DIR/api-edge.yml"
 
     if [[ -f "$STATE_FILE" ]]; then
         render_all_upstreams
