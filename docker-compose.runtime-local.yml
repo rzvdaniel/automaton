@@ -65,7 +65,9 @@ services:
       - ./docker/traefik/prod/traefik.yml:/etc/traefik/traefik.yml:ro
       - runtime-local-traefik-dynamic:/etc/traefik/dynamic
     networks:
-      - automaton-runtime-local-runner
+      automaton-runtime-local-runner:
+        aliases:
+          - traefik
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8082/ping | grep -q OK || exit 1"]
       interval: 10s
@@ -84,7 +86,7 @@ services:
       MYSQL_USER: ${LOCAL_RUNTIME_MYSQL_USER:-automaton_user}
       MYSQL_PASSWORD: ${LOCAL_RUNTIME_MYSQL_PASSWORD:-AutomatonPass123!}
     ports:
-      - "${LOCAL_RUNTIME_MYSQL_PORT:-3307}:3306"
+      - "${LOCAL_RUNTIME_MYSQL_PORT:-3311}:3306"
     volumes:
       - runtime-local-mysql-data:/var/lib/mysql
       - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
