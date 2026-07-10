@@ -79,6 +79,9 @@ builder.Services.AddCap(options =>
     options.UseRabbitMQ(rabbitMq =>
     {
         rabbitMq.HostName = rabbitMqHost;
+        rabbitMq.Port = int.TryParse(builder.Configuration["RabbitMq:Port"], out var rabbitMqPort)
+            ? rabbitMqPort
+            : 5672;
         rabbitMq.UserName = rabbitMqUsername;
         rabbitMq.Password = rabbitMqPassword;
         rabbitMq.VirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";

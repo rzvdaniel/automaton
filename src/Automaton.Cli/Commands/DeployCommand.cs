@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
@@ -18,6 +19,9 @@ namespace Automaton.Cli.Commands;
 /// </summary>
 public static class DeployCommand
 {
+    private static readonly Stopwatch managedRunnerWaitTimer = new();
+    private static int managedRunnerSpinnerFrame;
+    private static DateTime managedRunnerLastNonInteractiveUpdateUtc;
     public static Command Build(ConfigService config)
     {
         var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before backend deploy when needed");
@@ -179,11 +183,19 @@ public static class DeployCommand
             return result;
         }
 
+        var automaticRunnerReady = result.Success && result.Backend?.Success == true && result.Backend.RunnerCount > 0;
+        var preparationChecks = automaticRunnerReady
+            ? preparation.Checks.Where(check => check.Name != DeployCheckNames.RunnerLookup || check.Success).ToList()
+            : preparation.Checks;
+        var preparationNextSteps = automaticRunnerReady
+            ? preparation.NextSteps.Where(step => !step.Contains("runner", StringComparison.OrdinalIgnoreCase)).ToList()
+            : preparation.NextSteps;
+
         return new DeployResult
         {
             Success = result.Success,
             Summary = result.Summary,
-            HasWarnings = result.HasWarnings || preparation.Checks.Any(check => !check.Success && check.IsWarning),
+            HasWarnings = result.HasWarnings || preparationChecks.Any(check => !check.Success && check.IsWarning),
             AppId = result.AppId,
             AppName = result.AppName,
             OpenAppUrl = result.OpenAppUrl,
@@ -191,8 +203,8 @@ public static class DeployCommand
             DeployDirectory = result.DeployDirectory,
             Clean = result.Clean,
             SkipBackend = result.SkipBackend,
-            Checks = preparation.Checks.Concat(result.Checks).ToList(),
-            NextSteps = preparation.NextSteps.Concat(result.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            Checks = preparationChecks.Concat(result.Checks).ToList(),
+            NextSteps = preparationNextSteps.Concat(result.NextSteps).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             SourceUploaded = result.SourceUploaded,
             Uploaded = result.Uploaded,
             BackendUploaded = result.BackendUploaded,
@@ -319,7 +331,59 @@ public static class DeployCommand
 
         if (nonInteractive)
         {
+            if (message.Contains("Managed runtime is being prepared", StringComparison.OrdinalIgnoreCase))
+            {
+                managedRunnerWaitTimer.Restart();
+                managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
+                Console.WriteLine(message);
+                return;
+            }
+
+            if (message.Contains("Waiting for managed runner", StringComparison.OrdinalIgnoreCase))
+            {
+                if (DateTime.UtcNow - managedRunnerLastNonInteractiveUpdateUtc >= TimeSpan.FromSeconds(15))
+                {
+                    managedRunnerLastNonInteractiveUpdateUtc = DateTime.UtcNow;
+                    Console.WriteLine($"Still waiting for managed runner... {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s");
+                }
+                return;
+            }
+
+            if (message.Contains("Managed runner connected", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"Managed runner connected after {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s.");
+                managedRunnerWaitTimer.Stop();
+                return;
+            }
+
             Console.WriteLine(message);
+            return;
+        }
+
+        if (message.Contains("Managed runtime is being prepared", StringComparison.OrdinalIgnoreCase))
+        {
+            managedRunnerWaitTimer.Restart();
+            managedRunnerSpinnerFrame = 0;
+            AnsiConsole.MarkupLine("[grey]Managed runtime is being prepared...[/]");
+            return;
+        }
+
+        if (message.Contains("Waiting for managed runner", StringComparison.OrdinalIgnoreCase))
+        {
+            var unicodeSupported = Console.OutputEncoding.CodePage == 65001;
+            var frames = unicodeSupported
+                ? new[] { '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏' }
+                : new[] { '|', '/', '-', '\\' };
+            var frame = frames[managedRunnerSpinnerFrame++ % frames.Length];
+            Console.Write($"\r{frame}");
+            return;
+        }
+
+        if (message.Contains("Managed runner connected", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Write("\r\u001b[2K");
+            AnsiConsole.MarkupLine($"[green]✓ Managed runner connected after {managedRunnerWaitTimer.Elapsed.TotalSeconds:F0}s.[/]");
+            managedRunnerWaitTimer.Stop();
             return;
         }
 

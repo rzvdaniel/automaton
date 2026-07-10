@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Checkbox from 'primevue/checkbox'
@@ -24,7 +23,6 @@ import type {
 } from '../types/admin.types'
 
 const toast = useToast()
-const confirm = useConfirm()
 
 const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
@@ -34,6 +32,8 @@ const loadingProvisioningOptions = ref(false)
 const provisioningUserId = ref<string | null>(null)
 const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
+const deletingRunnerId = ref<string | null>(null)
+const deleteConfirmationRunnerId = ref<string | null>(null)
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
 const hostDialogVisible = ref(false)
@@ -278,24 +278,22 @@ async function reprovisionHostedRunner(runner: HostedRunner) {
 }
 
 function deleteHostedRunner(runner: HostedRunner) {
-  confirm.require({
-    message: `Delete ${runner.name}? This removes the managed container, unassigns its apps, and permanently releases the hosted runner record.`,
-    header: 'Delete Hosted Runner',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Delete',
-    rejectLabel: 'Cancel',
-    acceptClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        await adminHostedRunnersService.deleteHostedRunner(runner.id)
-        selectedRunner.value = null
-        toast.add({ severity: 'success', summary: 'Deleted', detail: `${runner.name} was deleted.`, life: 3000 })
-        await refreshAll()
-      } catch {
-        toast.add({ severity: 'error', summary: 'Delete failed', detail: 'Failed to delete the hosted runner.', life: 4000 })
-      }
-    },
-  })
+  deleteConfirmationRunnerId.value = runner.id
+}
+
+async function confirmDeleteHostedRunner(runner: HostedRunner) {
+  deletingRunnerId.value = runner.id
+  try {
+    await adminHostedRunnersService.deleteHostedRunner(runner.id)
+    toast.add({ severity: 'success', summary: 'Deleted', detail: `${runner.name} was deleted.`, life: 3000 })
+    await refreshAll()
+    selectedRunner.value = hostedRunners.value.find((candidate) => candidate.id === runner.id) ?? null
+  } catch {
+    toast.add({ severity: 'error', summary: 'Delete failed', detail: 'Failed to delete the hosted runner.', life: 4000 })
+  } finally {
+    deletingRunnerId.value = null
+    deleteConfirmationRunnerId.value = null
+  }
 }
 
 async function openProvisionDialog() {
@@ -650,6 +648,22 @@ onMounted(refreshAll)
 
     <Dialog v-model:visible="runnerDetailsVisible" header="Hosted Runner Details" modal :style="{ width: '48rem' }">
       <div v-if="selectedRunner" class="flex flex-column gap-3">
+        <div v-if="deletingRunnerId === selectedRunner.id" class="flex align-items-center gap-2 border-bottom-1 surface-border pb-3 text-color-secondary">
+          <i class="pi pi-spin pi-spinner" />
+          <span>Deleting hosted runner. Removing managed container and clearing assignments...</span>
+        </div>
+        <div v-else-if="deleteConfirmationRunnerId === selectedRunner.id" class="border-bottom-1 surface-border pb-3">
+          <div class="flex align-items-center gap-2 text-color-danger font-semibold mb-2">
+            <i class="pi pi-exclamation-triangle" />
+            <span>Delete Hosted Runner</span>
+          </div>
+          <p class="mt-0 mb-3 text-color-secondary">This will remove the managed container, unassign all applications, release the hosted runner, and cannot be undone.</p>
+          <div class="flex justify-content-end gap-2">
+            <Button label="Cancel" text @click="deleteConfirmationRunnerId = null" />
+            <Button label="Delete hosted runner" icon="pi pi-trash" severity="danger" @click="confirmDeleteHostedRunner(selectedRunner)" />
+          </div>
+        </div>
+        <template v-else>
         <div class="grid">
           <div class="col-12 md:col-6">
             <div class="text-color-secondary text-sm">User</div>
@@ -700,13 +714,16 @@ onMounted(refreshAll)
         </div>
         <div v-if="!isDeletedRunner(selectedRunner)" class="flex justify-content-end border-top-1 surface-border pt-3">
           <Button
-            label="Delete hosted runner"
+            :label="deletingRunnerId === selectedRunner.id ? 'Deleting...' : 'Delete hosted runner'"
             icon="pi pi-trash"
             severity="danger"
             outlined
+            :loading="deletingRunnerId === selectedRunner.id"
+            :disabled="deletingRunnerId === selectedRunner.id"
             @click="deleteHostedRunner(selectedRunner)"
           />
         </div>
+        </template>
       </div>
     </Dialog>
   </div>
