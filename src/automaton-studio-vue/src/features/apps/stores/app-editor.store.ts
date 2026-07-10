@@ -779,9 +779,8 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         return
       }
 
-      const runtimeUrl = currentApp.value.requiresAuthentication
-        ? new URL(appsService.getRestrictedRuntimeLaunchUrl(currentApp.value.id), window.location.origin)
-        : new URL(getDeployedAppUrl(currentApp.value.id), window.location.origin)
+      await appsService.createRuntimeLaunch(currentApp.value.id)
+      const runtimeUrl = new URL(getDeployedAppUrl(currentApp.value.id), window.location.origin)
       runtimeUrl.searchParams.set('v', Date.now().toString())
       applicationUrl.value = runtimeUrl.toString()
       applicationWarning.value = getApplicationWarningMessage()

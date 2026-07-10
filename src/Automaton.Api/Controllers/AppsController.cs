@@ -382,8 +382,15 @@ public class AppsController : BaseController
             return NotFound(new { message = "App not found" });
         }
 
-        var runtimeToken = privateAppLaunchService.CreateRuntimeToken(id, userContextService.GetUserId());
-        return Ok(new { runtimeToken });
+        var userId = userContextService.GetUserId();
+        var expiresAtUtc = runtimeCookieService.GetDefaultExpiry();
+        var runtimeCookie = runtimeCookieService.CreateRuntimeCookie(id, userId, expiresAtUtc);
+        Response.Cookies.Append(
+            RuntimeCookieConstants.CookieName,
+            runtimeCookie,
+            runtimeCookieService.BuildRuntimeCookieOptions(id, Request, expiresAtUtc));
+
+        return Ok(new { runtimeToken = string.Empty });
     }
 
     [HttpGet("{id}/launch-runtime")]
@@ -393,11 +400,6 @@ public class AppsController : BaseController
         if (app == null)
         {
             return NotFound(new { message = "App not found" });
-        }
-
-        if (!app.RequiresAuthentication)
-        {
-            return BadRequest(new { message = "This app does not require restricted runtime launch." });
         }
 
         var userId = userContextService.GetUserId();
