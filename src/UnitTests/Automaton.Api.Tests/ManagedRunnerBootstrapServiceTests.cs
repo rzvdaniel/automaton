@@ -97,7 +97,7 @@ public class ManagedRunnerBootstrapServiceTests
                 NullLogger<ApiKeyService>.Instance,
                 authorizationService: null!,
                 new NoOpAuditEventService()),
-            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerRemoteCommandExecutorResolver([new FakeHostedRunnerRemoteCommandExecutor()]),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = true,
@@ -302,6 +302,8 @@ public class ManagedRunnerBootstrapServiceTests
 
     private sealed class FakeHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCommandExecutor
     {
+        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
+
         public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
             RunnerHost host,
             string script,

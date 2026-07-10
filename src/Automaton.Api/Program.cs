@@ -387,8 +387,11 @@ services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>(
 services.AddScoped<AdminAiGuidanceService>();
 services.AddScoped<AdminDocumentationService>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
+services.AddScoped<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
+services.AddScoped<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<HostedRunnerManagementService>();
+services.AddScoped<LocalRunnerHostBootstrapService>();
 
 // System Prompt Builders for AI Chat
 services.AddScoped<Automaton.Mcp.SystemPrompts.IStepSystemPromptBuilder, Automaton.Mcp.SystemPrompts.StepSystemPromptBuilder>();
@@ -496,6 +499,7 @@ var app = applicationBuilder.Build();
 var logSuccessfulRequests = configurationManager.GetValue<bool>("RequestLogging:LogSuccessfulRequests");
 
 await app.ApplyMigrationsAsync();
+await app.Services.SeedLocalRunnerHostAsync();
 
 app.UseForwardedHeaders();
 

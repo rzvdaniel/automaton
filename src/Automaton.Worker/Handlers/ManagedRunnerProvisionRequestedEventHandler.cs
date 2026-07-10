@@ -12,7 +12,7 @@ namespace Automaton.Worker.Handlers;
 
 public sealed class ManagedRunnerProvisionRequestedEventHandler(
     ApplicationDbContext dbContext,
-    IHostedRunnerRemoteCommandExecutor remoteCommandExecutor,
+    IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
     IEventPublisher eventPublisher,
     IOptionsSnapshot<HostedRunnerOptions> options,
     ILogger<ManagedRunnerProvisionRequestedEventHandler> logger) : IEventHandler<ManagedRunnerProvisionRequestedEvent>
@@ -53,10 +53,15 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
-        if (!string.Equals(options.Value.DeploymentMode, HostedRunnerDeploymentModes.SshDocker, StringComparison.Ordinal))
+        IHostedRunnerRemoteCommandExecutor executor;
+        try
+        {
+            executor = remoteCommandExecutorResolver.Resolve(runnerHost, options.Value);
+        }
+        catch (InvalidOperationException ex)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = $"Unsupported hosted runner deployment mode '{options.Value.DeploymentMode}'.";
+            hostedRunner.LastError = ex.Message;
             hostedRunner.UpdatedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
             await eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
@@ -68,14 +73,13 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             }, cancellationToken);
             return;
         }
-
         var deployment = hostedRunner.Deployments
             .Where(x => x.Action == HostedRunnerDeploymentActions.Provision)
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefault();
 
-        var script = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, options.Value, message.RunnerApiKey);
-        var executionResult = await remoteCommandExecutor.ExecuteProvisionScriptAsync(runnerHost, script, cancellationToken);
+        var script = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, runnerHost, options.Value, message.RunnerApiKey);
+        var executionResult = await executor.ExecuteProvisionScriptAsync(runnerHost, script, cancellationToken);
 
         if (!executionResult.Succeeded)
         {

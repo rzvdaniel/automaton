@@ -1,4 +1,5 @@
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Worker.Config;
 using Microsoft.Extensions.Options;
 using Renci.SshNet;
@@ -18,6 +19,10 @@ public sealed class SshHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCo
         this.options = options.Value;
         this.logger = logger;
     }
+
+    public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
+        => string.Equals(options.DeploymentMode, HostedRunnerDeploymentModes.SshDocker, StringComparison.Ordinal)
+           && !string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase);
 
     public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
         RunnerHost host,

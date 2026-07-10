@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [string[]]$Services = @("api", "worker", "studio")
+    [string[]]$Services = @("api", "worker", "studio", "runner")
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,5 +69,5 @@ Write-Host "RabbitMQ management: http://localhost:15673"
 Write-Host "smtp4dev:           http://localhost:3001"
 Write-Host "Traefik ping:       http://localhost:8082/ping"
 Write-Host ""
-Write-Host "[INFO] Runner is intentionally not started by this script." -ForegroundColor Yellow
-Write-Host "       Managed runtime backend routing also requires the corresponding Runner and HostedRunner database state."
+Write-Host "[INFO] Managed hosted runners are enabled for runtime-local." -ForegroundColor Yellow
+Write-Host "       Deploying a backend-capable app can provision a runner container automatically."

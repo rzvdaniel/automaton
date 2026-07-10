@@ -33,6 +33,12 @@ x-api-common: &api-common
     WebAppConfig__StaticRuntimeRoot: /app/AppData/static-runtime
     PublishedApps__RuntimeProxyAuthKey: ${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}
     PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
+    HostedRunners__Enabled: ${HOSTED_RUNNERS_ENABLED:-true}
+    HostedRunners__DeploymentMode: ${HOSTED_RUNNERS_DEPLOYMENT_MODE:-sshDocker}
+    HostedRunners__ServerUrl: https://${API_DOMAIN:?API_DOMAIN is required in .env}
+    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
+    HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
+    HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
@@ -62,9 +68,15 @@ x-worker-common: &worker-common
   image: automaton-prod-worker:latest
   restart: unless-stopped
   logging: *default-json-logging
-  environment:
+  environment: &worker-env
     DOTNET_ENVIRONMENT: Production
     Logging__File__Path: /app/logs
+    HostedRunners__Enabled: ${HOSTED_RUNNERS_ENABLED:-true}
+    HostedRunners__DeploymentMode: ${HOSTED_RUNNERS_DEPLOYMENT_MODE:-sshDocker}
+    HostedRunners__ServerUrl: https://${API_DOMAIN:?API_DOMAIN is required in .env}
+    HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
+    HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
+    HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
   volumes:
     - prod-worker-logs:/app/logs
     - prod-worker-dataprotection:/app/data-protection-keys

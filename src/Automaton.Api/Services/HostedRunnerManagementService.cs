@@ -13,7 +13,7 @@ public class HostedRunnerManagementService
 {
     private readonly ApplicationDbContext db;
     private readonly HostedRunnerProvisioningService provisioningService;
-    private readonly IHostedRunnerRemoteCommandExecutor remoteCommandExecutor;
+    private readonly IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver;
     private readonly HostedRunnerOptions options;
     private readonly IAuditEventService auditEventService;
     private readonly UserContextService userContextService;
@@ -24,7 +24,7 @@ public class HostedRunnerManagementService
     public HostedRunnerManagementService(
         ApplicationDbContext db,
         HostedRunnerProvisioningService provisioningService,
-        IHostedRunnerRemoteCommandExecutor remoteCommandExecutor,
+        IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
         IOptionsSnapshot<HostedRunnerOptions> options,
         IAuditEventService auditEventService,
         UserContextService userContextService,
@@ -32,7 +32,7 @@ public class HostedRunnerManagementService
     {
         this.db = db;
         this.provisioningService = provisioningService;
-        this.remoteCommandExecutor = remoteCommandExecutor;
+        this.remoteCommandExecutorResolver = remoteCommandExecutorResolver;
         this.options = options.Value;
         this.auditEventService = auditEventService;
         this.userContextService = userContextService;
@@ -108,13 +108,31 @@ public class HostedRunnerManagementService
 
         await db.SaveChangesAsync(cancellationToken);
 
+        IHostedRunnerRemoteCommandExecutor executor;
+        try
+        {
+            executor = remoteCommandExecutorResolver.Resolve(host, options);
+        }
+        catch (InvalidOperationException ex)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.Failed;
+            hostedRunner.LastError = ex.Message;
+            hostedRunner.UpdatedAt = DateTime.UtcNow;
+            CompleteDeployment(
+                deployment,
+                HostedRunnerDeploymentStatuses.Failed,
+                null,
+                hostedRunner.LastError);
+            await db.SaveChangesAsync(cancellationToken);
+            throw new InvalidOperationException(hostedRunner.LastError);
+        }
         var script = string.Join('\n', new[]
         {
             "set -eu",
             $"docker restart {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)}"
         });
 
-        var executionResult = await remoteCommandExecutor.ExecuteScriptAsync(host, script, cancellationToken);
+        var executionResult = await executor.ExecuteScriptAsync(host, script, cancellationToken);
         if (!executionResult.Succeeded)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;

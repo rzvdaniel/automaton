@@ -353,7 +353,7 @@ public class HostedRunnerAuditTests
         return new HostedRunnerProvisioningService(
             db,
             apiKeyService,
-            remoteExecutor,
+            new HostedRunnerRemoteCommandExecutorResolver([remoteExecutor]),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
@@ -380,7 +380,7 @@ public class HostedRunnerAuditTests
         return new HostedRunnerManagementService(
             db,
             provisioningService,
-            remoteExecutor,
+            new HostedRunnerRemoteCommandExecutorResolver([remoteExecutor]),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = true,
@@ -413,6 +413,8 @@ public class HostedRunnerAuditTests
 
         public HostedRunnerRemoteExecutionResult ProvisionResult { get; init; } =
             new(true, 0, "container-default", string.Empty);
+
+        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
 
         public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
             RunnerHost host,

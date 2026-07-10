@@ -21,7 +21,7 @@ public class HostedRunnerProvisioningService
 
     private readonly ApplicationDbContext db;
     private readonly ApiKeyService apiKeyService;
-    private readonly IHostedRunnerRemoteCommandExecutor remoteCommandExecutor;
+    private readonly IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver;
     private readonly HostedRunnerOptions options;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
@@ -29,14 +29,14 @@ public class HostedRunnerProvisioningService
     public HostedRunnerProvisioningService(
         ApplicationDbContext db,
         ApiKeyService apiKeyService,
-        IHostedRunnerRemoteCommandExecutor remoteCommandExecutor,
+        IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
         IOptionsSnapshot<HostedRunnerOptions> options,
         IAuditEventService auditEventService,
         ILogger<HostedRunnerProvisioningService> logger)
     {
         this.db = db;
         this.apiKeyService = apiKeyService;
-        this.remoteCommandExecutor = remoteCommandExecutor;
+        this.remoteCommandExecutorResolver = remoteCommandExecutorResolver;
         this.options = options.Value;
         this.auditEventService = auditEventService;
         this.logger = logger;
@@ -150,7 +150,7 @@ public class HostedRunnerProvisioningService
         AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentStatuses.Running,
-            HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, options),
+            HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, host, options),
             options.Enabled
                 ? "Managed runner provisioning queued."
                 : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.");
@@ -190,10 +190,10 @@ public class HostedRunnerProvisioningService
             return hostedRunner;
         }
 
-        if (options.DeploymentMode != HostedRunnerDeploymentModes.SshDocker)
+        if (host == null)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = $"Unsupported hosted runner deployment mode '{options.DeploymentMode}'.";
+            hostedRunner.LastError = "No runner host is assigned for hosted runner provisioning.";
             var deployment = await db.HostedRunnerDeployments
                 .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
                 .OrderByDescending(x => x.StartedAt)
@@ -206,7 +206,7 @@ public class HostedRunnerProvisioningService
                 AuditEventTypes.HostedRunnerProvisioningFailed,
                 "Failed",
                 $"Hosted runner '{hostedRunner.Name}' provisioning failed",
-                $"Unsupported hosted runner deployment mode '{options.DeploymentMode}'.",
+                hostedRunner.LastError,
                 cancellationToken);
             return hostedRunner;
         }
@@ -215,15 +215,21 @@ public class HostedRunnerProvisioningService
             .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
             .OrderByDescending(x => x.StartedAt)
             .FirstAsync(cancellationToken);
-        if (host == null)
+
+        IHostedRunnerRemoteCommandExecutor executor;
+        try
+        {
+            executor = remoteCommandExecutorResolver.Resolve(host, options);
+        }
+        catch (InvalidOperationException ex)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = "No runner host is assigned for hosted runner provisioning.";
+            hostedRunner.LastError = ex.Message;
             CompleteDeployment(deploymentRecord, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
             await db.SaveChangesAsync(cancellationToken);
             await WriteProvisioningCompletionAuditAsync(
                 hostedRunner,
-                null,
+                host.Name,
                 AuditEventTypes.HostedRunnerProvisioningFailed,
                 "Failed",
                 $"Hosted runner '{hostedRunner.Name}' provisioning failed",
@@ -231,9 +237,8 @@ public class HostedRunnerProvisioningService
                 cancellationToken);
             return hostedRunner;
         }
-
-        var provisionScript = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, options, preparation.RawApiKey!);
-        var executionResult = await remoteCommandExecutor.ExecuteProvisionScriptAsync(host, provisionScript, cancellationToken);
+        var provisionScript = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, host, options, preparation.RawApiKey!);
+        var executionResult = await executor.ExecuteProvisionScriptAsync(host, provisionScript, cancellationToken);
         if (!executionResult.Succeeded)
         {
             hostedRunner.Status = HostedRunnerStatuses.Failed;
@@ -310,7 +315,7 @@ public class HostedRunnerProvisioningService
 
     private async Task<string> EnsureProvisioningApiKeyAsync(HostedRunner hostedRunner, Guid userId, CancellationToken cancellationToken)
     {
-        var requiresFreshRawKey = options.Enabled && options.DeploymentMode == HostedRunnerDeploymentModes.SshDocker;
+        var requiresFreshRawKey = options.Enabled && options.DeploymentMode != HostedRunnerDeploymentModes.DryRun;
         if (!requiresFreshRawKey && hostedRunner.ApiKeyId != null)
         {
             return string.Empty;

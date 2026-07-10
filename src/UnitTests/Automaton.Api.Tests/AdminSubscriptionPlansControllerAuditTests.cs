@@ -135,7 +135,7 @@ public class AdminSubscriptionPlansControllerAuditTests
         var hostedRunnerProvisioningService = new HostedRunnerProvisioningService(
             dbContext,
             apiKeyService,
-            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerRemoteCommandExecutorResolver([new FakeHostedRunnerRemoteCommandExecutor()]),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = false
@@ -206,6 +206,8 @@ public class AdminSubscriptionPlansControllerAuditTests
 
     private sealed class FakeHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCommandExecutor
     {
+        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
+
         public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
             RunnerHost host,
             string script,

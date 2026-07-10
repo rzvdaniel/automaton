@@ -11,6 +11,7 @@ Use this page as the local managed-runtime cheat sheet.
 - `api`
 - `worker`
 - `studio`
+- `runner`
 - `website`
 - `mysql`
 - `rabbitmq`
@@ -95,18 +96,29 @@ docker compose -f docker-compose.runtime-local.yml down -v
 This removes the runtime-local containers and Docker volumes created by that compose file.
 It does not remove your SQL dump file.
 
-## Runner note
+## Managed runners
 
-This bootstrap script does not start the runner container.
+The runtime-local stack now enables managed hosted runner provisioning.
 
-That is intentional. Managed runtime backend routing requires more than a running container:
+That means a backend-capable app can follow the normal product path:
 
-- a `Runner` row
-- a `HostedRunner` row
-- a usable runtime endpoint
-- app assignment state such as `ExecutionRunnerId`
+- deploy from CLI or Studio
+- API requests managed runtime preparation
+- worker provisions a hosted runner container through the local Docker socket
+- runner connects back to API
+- app backend deploy proceeds on retry
 
-So the base stack brings up the platform services only. Runner setup should happen separately through the real product flow or an explicit local runner setup step.
+The stack still does not start a permanent shared runner container up front. Hosted runners are created on demand per user.
+
+The local hosted-runner settings in `docker-compose.runtime-local.yml`:
+
+- `HostedRunners__LocalRunnerHostCpuCores`
+- `HostedRunners__LocalRunnerHostMemoryMb`
+- `HostedRunners__LocalRunnerHostDiskMb`
+
+are scheduler capacity budgets for the auto-seeded local `RunnerHost`.
+
+They are not auto-detected machine specs. They simply define how much hosted-runner capacity the local scheduler should consider available on the synthetic `runtime-local-docker` host. Keep them high enough for normal local testing, or reduce them if you want to exercise capacity limits more aggressively.
 
 ## Start or redeploy
 
@@ -137,6 +149,7 @@ Default build services:
 - `api`
 - `worker`
 - `studio`
+- `runner`
 
 The `-Services` parameter only affects which services are built. The script still starts the full runtime-local stack with `docker compose up -d --remove-orphans`.
 
@@ -174,6 +187,19 @@ This is the recommended day-to-day development loop when you only changed:
 - `src/Automaton.Api`
 - `src/Automaton.Worker`
 - `src/automaton-studio-vue`
+
+If you changed managed runner container code under `src/Automaton.Runner`, include `runner` in the build set:
+
+```powershell
+docker compose -f docker-compose.runtime-local.yml build runner api worker
+docker compose -f docker-compose.runtime-local.yml up -d api worker
+```
+
+Important:
+
+- build the `runner` image when `src/Automaton.Runner` changes
+- do not start the shared `runner` service for the managed-runtime path
+- managed provisioning creates runner containers on demand from the prebuilt `automaton-runtime-local-runner:latest` image
 
 It avoids unnecessary restarts of:
 
@@ -280,7 +306,7 @@ For a clean machine or a fully reset local runtime:
 
 4. Restore the MySQL dump if needed.
 5. Log into Studio at [https://studio.automaton.test:8443](https://studio.automaton.test:8443).
-6. Create or reconnect runners separately when you need backend deploy/runtime validation.
+6. Deploy a backend-capable app. The first deploy may return a preparing/provisioning state while the hosted runner container is created.
 
 ## Script usage patterns
 
@@ -339,6 +365,6 @@ Important local folders:
 - This stack is intentionally closer to production networking than `docker-compose.local.yml`.
 - It does not attempt local blue/green rollout behavior.
 - It keeps a dedicated namespace instead of reusing the older local stack containers.
-- The compose file still contains a runner service profile for explicit local experiments, but the bootstrap script does not use it.
+- The compose file still contains a runner service profile for explicit local experiments, but managed runtime no longer depends on that profile.
 - Frontend app traffic is expected to go through `https://apps.automaton.test:8443`, not through `localhost`.
 - API traffic for Studio is expected to go through `https://api.automaton.test:8443`, not through `https://localhost:7091`.

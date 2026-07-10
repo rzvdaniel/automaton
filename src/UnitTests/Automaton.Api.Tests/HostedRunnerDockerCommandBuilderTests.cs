@@ -1,5 +1,6 @@
 using Automaton.Api.Config;
 using Automaton.Api.Entities;
+using Automaton.Api.Models;
 using Automaton.Api.Services;
 
 namespace Automaton.Api.Tests;
@@ -26,8 +27,12 @@ public class HostedRunnerDockerCommandBuilderTests
             RuntimeDockerNetwork = "automaton-runtime",
             DataRoot = "/opt/automaton/hosted-runners/"
         };
+        var host = new RunnerHost
+        {
+            Provider = RunnerHostProviders.Hetzner
+        };
 
-        var command = HostedRunnerDockerCommandBuilder.BuildPreview(runner, options);
+        var command = HostedRunnerDockerCommandBuilder.BuildPreview(runner, host, options);
 
         Assert.Multiple(() =>
         {
@@ -58,6 +63,7 @@ public class HostedRunnerDockerCommandBuilderTests
 
         var command = HostedRunnerDockerCommandBuilder.BuildProvisionScript(
             runner,
+            new RunnerHost { Provider = RunnerHostProviders.Hetzner },
             new HostedRunnerOptions(),
             "ak_runner_secret_for_remote_execution");
 
@@ -82,6 +88,7 @@ public class HostedRunnerDockerCommandBuilderTests
 
         var command = HostedRunnerDockerCommandBuilder.BuildProvisionScript(
             runner,
+            new RunnerHost { Provider = RunnerHostProviders.Hetzner },
             new HostedRunnerOptions(),
             "ak_runner_secret_for_remote_execution");
 

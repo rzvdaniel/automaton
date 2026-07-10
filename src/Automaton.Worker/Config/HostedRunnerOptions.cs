@@ -10,6 +10,11 @@ public class HostedRunnerOptions
     public string? RuntimeDockerNetwork { get; set; }
     public int RuntimePort { get; set; } = 8001;
     public string DataRoot { get; set; } = "/opt/automaton/hosted-runners";
+    public bool AutoCreateLocalRunnerHost { get; set; }
+    public string LocalRunnerHostName { get; set; } = "runtime-local";
+    public decimal LocalRunnerHostCpuCores { get; set; } = 8m;
+    public int LocalRunnerHostMemoryMb { get; set; } = 16384;
+    public int LocalRunnerHostDiskMb { get; set; } = 65536;
     public string SshUsername { get; set; } = "automaton-runner-provisioner";
     public int SshPort { get; set; } = 22;
     public string SshPrivateKeyPath { get; set; } = "/run/secrets/hosted_runner_ssh_key";
