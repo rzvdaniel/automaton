@@ -343,6 +343,9 @@ public class Program
                 services.AddSingleton<RunnerBackendEnvironmentService>();
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerBackendRegistry>();
+                services.AddSingleton<RunnerBackendProcessManager>();
+                services.AddSingleton<IAppBackendProcessManager>(sp => sp.GetRequiredService<RunnerBackendProcessManager>());
+                services.AddHostedService(sp => sp.GetRequiredService<RunnerBackendProcessManager>());
                 services.AddSingleton<RunnerRuntimeGatewayService>();
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();

@@ -384,9 +384,9 @@ public class HubService
                 return DeleteAppBackendFile(appId, path, area);
             });
 
-            connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, (request) =>
+            connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, async (request) =>
             {
-                return runnerDeploymentService.DeployPackage(request);
+                return await runnerDeploymentService.DeployPackage(request);
             });
 
             // Handle connection events

@@ -9,18 +9,21 @@ public class RunnerDeploymentService
 {
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly RunnerBackendEnvironmentService backendEnvironmentService;
+    private readonly IAppBackendProcessManager backendProcessManager;
     private readonly ILogger logger;
 
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
-        RunnerBackendEnvironmentService backendEnvironmentService)
+        RunnerBackendEnvironmentService backendEnvironmentService,
+        IAppBackendProcessManager backendProcessManager)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.backendEnvironmentService = backendEnvironmentService;
+        this.backendProcessManager = backendProcessManager;
         logger = Log.ForContext<RunnerDeploymentService>();
     }
 
-    public DeployAppPackageResult DeployPackage(DeployAppPackageRequest request)
+    public async Task<DeployAppPackageResult> DeployPackage(DeployAppPackageRequest request)
     {
         var logs = new List<string>();
         var appId = request.AppId;
@@ -73,6 +76,12 @@ public class RunnerDeploymentService
                 }
             }
 
+            await PersistDeploymentMetadataAsync(appId, manifest.HasBackend);
+            if (manifest.HasBackend)
+                await backendProcessManager.EnsureRunningAsync(appId);
+            else
+                await backendProcessManager.StopAsync(appId);
+
             return new DeployAppPackageResult
             {
                 Success = true,
@@ -107,6 +116,14 @@ public class RunnerDeploymentService
             {
             }
         }
+    }
+
+    private async Task PersistDeploymentMetadataAsync(Guid appId, bool hasBackend)
+    {
+        var metadataPath = Path.Combine(runnerWorkspaceService.GetAppRoot(appId), "deployment.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        var metadata = JsonSerializer.Serialize(new { appId = appId.ToString(), hasBackend, deployedAtUtc = DateTime.UtcNow });
+        await File.WriteAllTextAsync(metadataPath, metadata);
     }
 
     private AppDeploymentPackageManifest LoadManifest(string extractRoot)
