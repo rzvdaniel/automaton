@@ -24,6 +24,7 @@ public class AppsControllerExecutionController : ControllerBase
     private readonly PrivateAppLaunchService privateAppLaunchService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
     private readonly IApplicationEventService applicationEventService;
+    private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
 
     public AppsControllerExecutionController(
         AppsService appsService,
@@ -32,7 +33,8 @@ public class AppsControllerExecutionController : ControllerBase
         ConfirmedEmailGuardService confirmedEmailGuardService,
         PrivateAppLaunchService privateAppLaunchService,
         IAppDeployCapabilityService appDeployCapabilityService,
-        IApplicationEventService applicationEventService)
+        IApplicationEventService applicationEventService,
+        ManagedRunnerBootstrapService managedRunnerBootstrapService)
     {
         this.appsService = appsService;
         this.controllerExecutionService = controllerExecutionService;
@@ -41,7 +43,20 @@ public class AppsControllerExecutionController : ControllerBase
         this.privateAppLaunchService = privateAppLaunchService;
         this.appDeployCapabilityService = appDeployCapabilityService;
         this.applicationEventService = applicationEventService;
+        this.managedRunnerBootstrapService = managedRunnerBootstrapService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionController>();
+    }
+
+    [HttpPost("api/apps/{appId:guid}/managed-runtime/readiness")]
+    [Authorize(Policy = "AllowApiKey")]
+    public async Task<ActionResult<ManagedRunnerBootstrapResult>> GetManagedRuntimeReadiness(
+        Guid appId,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(
+            appId,
+            userContextService.GetUserId(),
+            cancellationToken));
     }
 
     /// <summary>

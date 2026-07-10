@@ -108,6 +108,13 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> GetManagedRuntimeReadinessAsync(string appId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/apps/{appId}/managed-runtime/readiness", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     // ── Publish app / versioning ──────────────────────────────────────────────
 
     public async Task PublishAppAsync(

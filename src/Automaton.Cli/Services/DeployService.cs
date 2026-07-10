@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Automaton.Cli.Models;
 
 namespace Automaton.Cli.Services;
@@ -9,6 +10,8 @@ public sealed class DeployService
     private const string DeployStateManagedRunnerProvisionFailed = "managedRunnerProvisionFailed";
     private const string DeployStateManagedRunnerWaitingForConnection = "managedRunnerWaitingForConnection";
     private const string DeployStateManagedRuntimeUnavailable = "managedRuntimeUnavailable";
+    private static readonly TimeSpan ManagedRuntimeTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ManagedRuntimePollInterval = TimeSpan.FromSeconds(3);
 
     private readonly ConfigService config;
     private readonly Action<string>? progress;
@@ -16,6 +19,7 @@ public sealed class DeployService
     private readonly Func<string, string, CancellationToken, Task<int>> runBuildAsync;
     private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync;
     private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> createSnapshotAsync;
+    private readonly Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync;
 
     public DeployService(
         ConfigService config,
@@ -43,6 +47,18 @@ public sealed class DeployService
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
+        : this(config, progress, null, runBuildAsync, deployPackageAsync, createSnapshotAsync, null)
+    {
+    }
+
+    private DeployService(
+        ConfigService config,
+        Action<string>? progress,
+        Action<DeployCheckResult>? checkReported,
+        Func<string, string, CancellationToken, Task<int>>? runBuildAsync,
+        Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync,
+        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync,
+        Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync)
     {
         this.config = config;
         this.progress = progress;
@@ -50,6 +66,8 @@ public sealed class DeployService
         this.runBuildAsync = runBuildAsync ?? RunBuildAsync;
         this.deployPackageAsync = deployPackageAsync ?? DeployPackageAsync;
         this.createSnapshotAsync = createSnapshotAsync ?? CreateSnapshotAsync;
+        this.ensureManagedRuntimeReadyAsync = ensureManagedRuntimeReadyAsync
+            ?? (deployPackageAsync == null ? EnsureManagedRuntimeReadyAsync : null);
     }
 
     public async Task<DeployResult> DeployAsync(
@@ -144,6 +162,17 @@ public sealed class DeployService
             backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
         }
 
+        if (backendControllers > 0 && ensureManagedRuntimeReadyAsync != null)
+        {
+            var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
+            if (!readiness.Ready)
+            {
+                nextSteps.Add(readiness.NextStep);
+                AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message, IsWarning: true));
+                return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            }
+        }
+
         try
         {
             ReportProgress("Creating deploy package...");
@@ -185,6 +214,44 @@ public sealed class DeployService
         ReportProgress(backendResult.Message ?? $"Deploy package applied to {backendResult.RunnerCount} runner(s).");
 
         return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+    }
+
+    private async Task<(bool Ready, string Message, string NextStep)> WaitForManagedRuntimeAsync(
+        string server,
+        string apiKey,
+        string appId,
+        CancellationToken cancellationToken)
+    {
+        ReportProgress("Managed runtime is being prepared...");
+        var deadline = DateTime.UtcNow + ManagedRuntimeTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var readiness = await ensureManagedRuntimeReadyAsync!(server, apiKey, appId, cancellationToken);
+            var ready = readiness.TryGetProperty("isReady", out var readyProperty) && readyProperty.GetBoolean();
+            if (ready)
+            {
+                ReportProgress("Managed runner connected.");
+                return (true, "Managed runner connected.", string.Empty);
+            }
+
+            var state = readiness.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
+            var message = readiness.TryGetProperty("message", out var messageProperty)
+                ? messageProperty.GetString() ?? "Managed runtime is being prepared."
+                : "Managed runtime is being prepared.";
+            if (string.Equals(state, DeployStateManagedRuntimeUnavailable, StringComparison.Ordinal)
+                || string.Equals(state, DeployStateManagedRunnerProvisionFailed, StringComparison.Ordinal))
+            {
+                return (false, message, message);
+            }
+
+            ReportProgress("Waiting for managed runner...");
+            await Task.Delay(ManagedRuntimePollInterval, cancellationToken);
+        }
+
+        return (false,
+            "Managed runner did not become ready before the timeout.",
+            "Managed runner did not connect within 5 minutes. Rerun automaton deploy to try again.");
     }
 
     private static DeployCheckResult ValidateAppLink(bool configFileExists, Models.AutomatonConfig? projectConfig, string? appId, ISet<string> nextSteps)
@@ -389,6 +456,16 @@ public sealed class DeployService
         return (
             new DeployUploadResult(sourceFiles + runtimeFiles, 0, sizeMb),
             new DeployBackendResult(success, runnerCount, message, state, requiresRetry));
+    }
+
+    private static async Task<JsonElement> EnsureManagedRuntimeReadyAsync(
+        string server,
+        string apiKey,
+        string appId,
+        CancellationToken cancellationToken)
+    {
+        using var client = new AutomatonApiClient(server, apiKey);
+        return await client.GetManagedRuntimeReadinessAsync(appId, cancellationToken);
     }
 
     private static void AddManagedRuntimeNextSteps(ISet<string> nextSteps, DeployBackendResult backendResult)
