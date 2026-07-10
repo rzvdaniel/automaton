@@ -240,7 +240,6 @@ public class AppsControllerExecutionService
         if (result.Success)
         {
             var deployedAtUtc = DateTime.UtcNow;
-            await staticRuntimeExportService.ExportFromDeployPackageAsync(appId, file, cancellationToken);
             await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
             {
@@ -295,11 +294,6 @@ public class AppsControllerExecutionService
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
         var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var deployedAtUtc = DateTime.UtcNow;
-        await staticRuntimeExportService.ExportFromDirectoryAsync(
-            appId,
-            fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, appId),
-            cancellationToken);
-
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Studio;
@@ -346,11 +340,6 @@ public class AppsControllerExecutionService
 
         var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
         var deployedAtUtc = DateTime.UtcNow;
-        await staticRuntimeExportService.ExportFromDirectoryAsync(
-            appId,
-            fileStorageService.GetAppRuntimeFrontendDirectoryPath(ownerId, appId),
-            CancellationToken.None);
-
         await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
         {
             metadata.DevelopmentMode = AppDevelopmentModes.Studio;

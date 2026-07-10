@@ -32,6 +32,4 @@ public class PublishedAppsConfig
     /// </summary>
     public string TraefikDynamicConfigRoot { get; set; } = "AppData/traefik-dynamic";
 
-    /// <summary>Temporarily enables runner-owned frontend routes in the generated Traefik config.</summary>
-    public bool RunnerFrontendRoutingEnabled { get; set; }
 }

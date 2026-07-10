@@ -111,20 +111,17 @@ public class BackendRouteConfigService
             builder.AppendLine($"        - \"{key}-rewrite\"");
         }
 
-        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        foreach (var route in routes)
         {
-            foreach (var route in routes)
-            {
-                var key = $"app-frontend-{route.AppId:N}";
-                builder.AppendLine($"    {key}:");
-                builder.AppendLine("      entryPoints:");
-                builder.AppendLine("        - web");
-                builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}`)\"");
-                builder.AppendLine("      priority: 1");
-                builder.AppendLine($"      service: \"{key}\"");
-                builder.AppendLine("      middlewares:");
-                builder.AppendLine($"        - \"{key}-rewrite\"");
-            }
+            var key = $"app-frontend-{route.AppId:N}";
+            builder.AppendLine($"    {key}:");
+            builder.AppendLine("      entryPoints:");
+            builder.AppendLine("        - web");
+            builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}`)\"");
+            builder.AppendLine("      priority: 1");
+            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine("      middlewares:");
+            builder.AppendLine($"        - \"{key}-rewrite\"");
         }
 
         builder.AppendLine("  middlewares:");
@@ -137,16 +134,13 @@ public class BackendRouteConfigService
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
         }
 
-        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        foreach (var route in routes)
         {
-            foreach (var route in routes)
-            {
-                var key = $"app-frontend-{route.AppId:N}";
-                builder.AppendLine($"    {key}-rewrite:");
-                builder.AppendLine("      replacePathRegex:");
-                builder.AppendLine($"        regex: \"^/a/{route.AppId}(?:/(.*))?$\"");
-                builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
-            }
+            var key = $"app-frontend-{route.AppId:N}";
+            builder.AppendLine($"    {key}-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine($"        regex: \"^/a/{route.AppId}(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
         }
 
         builder.AppendLine("  services:");
@@ -159,16 +153,13 @@ public class BackendRouteConfigService
             builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
         }
 
-        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        foreach (var route in routes)
         {
-            foreach (var route in routes)
-            {
-                var key = $"app-frontend-{route.AppId:N}";
-                builder.AppendLine($"    {key}:");
-                builder.AppendLine("      loadBalancer:");
-                builder.AppendLine("        servers:");
-                builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
-            }
+            var key = $"app-frontend-{route.AppId:N}";
+            builder.AppendLine($"    {key}:");
+            builder.AppendLine("      loadBalancer:");
+            builder.AppendLine("        servers:");
+            builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
         }
 
         return builder.ToString();
