@@ -94,6 +94,7 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runners = await db.HostedRunners
             .AsNoTracking()
+            .Where(x => x.DeletedAt == null)
             .Include(x => x.User)
             .Include(x => x.SubscriptionPlan)
             .Include(x => x.RunnerHost)
@@ -153,6 +154,13 @@ public class AdminHostedRunnersController : ControllerBase
     {
         await managementService.ReprovisionAsAdminAsync(id, cancellationToken);
         return Ok(await ReloadHostedRunnerResponseAsync(id, cancellationToken));
+    }
+
+    [HttpDelete("runners/{id:guid}")]
+    public async Task<IActionResult> DeleteHostedRunner(Guid id, CancellationToken cancellationToken)
+    {
+        await managementService.DeleteAsAdminAsync(id, cancellationToken);
+        return NoContent();
     }
 
     private async Task<HostedRunnerResponse> ReloadHostedRunnerResponseAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
@@ -232,6 +240,7 @@ public class AdminHostedRunnersController : ControllerBase
             CreatedAt = runner.CreatedAt,
             UpdatedAt = runner.UpdatedAt,
             ProvisionedAt = runner.ProvisionedAt,
+            DeletedAt = runner.DeletedAt,
             LatestDeployment = deployment == null ? null : new HostedRunnerDeploymentResponse
             {
                 Id = deployment.Id,
@@ -322,6 +331,7 @@ public record HostedRunnerResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
     public DateTime? ProvisionedAt { get; init; }
+    public DateTime? DeletedAt { get; init; }
     public HostedRunnerDeploymentResponse? LatestDeployment { get; init; }
 }
 

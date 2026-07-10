@@ -33,6 +33,8 @@ public static class AuditEventTypes
     public const string RunnerReprovisionRequested = "RunnerReprovisionRequested";
     public const string RunnerReprovisionSucceeded = "RunnerReprovisionSucceeded";
     public const string RunnerReprovisionFailed = "RunnerReprovisionFailed";
+    public const string HostedRunnerDeleted = "HostedRunnerDeleted";
+    public const string HostedRunnerDeleteFailed = "HostedRunnerDeleteFailed";
     public const string UserRegistered = "UserRegistered";
     public const string UserDisabled = "UserDisabled";
     public const string UserEnabled = "UserEnabled";

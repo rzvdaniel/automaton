@@ -42,6 +42,10 @@ class AdminHostedRunnersService {
     const response = await apiClient.post<HostedRunner>(`/api/admin/hosted-runners/runners/${id}/reprovision`)
     return response.data
   }
+
+  async deleteHostedRunner(id: string): Promise<void> {
+    await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`)
+  }
 }
 
 export const adminHostedRunnersService = new AdminHostedRunnersService()

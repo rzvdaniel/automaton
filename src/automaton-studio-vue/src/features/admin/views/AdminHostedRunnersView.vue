@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Checkbox from 'primevue/checkbox'
@@ -23,6 +24,7 @@ import type {
 } from '../types/admin.types'
 
 const toast = useToast()
+const confirm = useConfirm()
 
 const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
@@ -275,6 +277,27 @@ async function reprovisionHostedRunner(runner: HostedRunner) {
   }
 }
 
+function deleteHostedRunner(runner: HostedRunner) {
+  confirm.require({
+    message: `Delete ${runner.name}? This removes the managed container, unassigns its apps, and permanently releases the hosted runner record.`,
+    header: 'Delete Hosted Runner',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await adminHostedRunnersService.deleteHostedRunner(runner.id)
+        selectedRunner.value = null
+        toast.add({ severity: 'success', summary: 'Deleted', detail: `${runner.name} was deleted.`, life: 3000 })
+        await refreshAll()
+      } catch {
+        toast.add({ severity: 'error', summary: 'Delete failed', detail: 'Failed to delete the hosted runner.', life: 4000 })
+      }
+    },
+  })
+}
+
 async function openProvisionDialog() {
   selectedProvisionUserId.value = null
   selectedProvisionPlanId.value = null
@@ -307,9 +330,18 @@ async function provisionHostedRunner() {
 
 function statusSeverity(status: string) {
   if (status === 'active' || status === 'running' || status === 'succeeded') return 'success'
-  if (status === 'failed' || status === 'disabled') return 'danger'
+  if (status === 'failed' || status === 'disabled' || status === 'deleteFailed') return 'danger'
+  if (status === 'deleted') return 'secondary'
   if (status === 'draining' || status === 'provisioning' || status === 'pending') return 'warn'
   return 'info'
+}
+
+function isDeletedRunner(runner: HostedRunner) {
+  return runner.status === 'deleted' || !!runner.deletedAt
+}
+
+function displayRunnerStatus(runner: HostedRunner) {
+  return isDeletedRunner(runner) ? 'deleted' : runner.status
 }
 
 function formatMb(value: number) {
@@ -431,7 +463,7 @@ onMounted(refreshAll)
           <Column field="publicIp" header="IP" />
           <Column header="Status">
             <template #body="{ data }">
-              <Tag :value="data.status" :severity="statusSeverity(data.status)" />
+              <Tag :value="displayRunnerStatus(data)" :severity="statusSeverity(displayRunnerStatus(data))" />
             </template>
           </Column>
           <Column header="CPU">
@@ -461,14 +493,14 @@ onMounted(refreshAll)
         </div>
       </template>
       <template #content>
-        <DataTable :value="hostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll">
+        <DataTable :value="hostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
           <Column field="userEmail" header="User" />
           <Column field="subscriptionPlanName" header="Plan" />
           <Column field="name" header="Runner" />
           <Column field="runnerHostName" header="Host" />
           <Column header="Status">
             <template #body="{ data }">
-              <Tag :value="data.status" :severity="statusSeverity(data.status)" />
+              <Tag :value="displayRunnerStatus(data)" :severity="statusSeverity(displayRunnerStatus(data))" />
             </template>
           </Column>
           <Column header="Resources">
@@ -489,6 +521,7 @@ onMounted(refreshAll)
               <div class="flex gap-2">
                 <Button label="Details" text size="small" @click="selectedRunner = data" />
                 <Button
+                  v-if="!isDeletedRunner(data)"
                   label="Restart"
                   icon="pi pi-refresh"
                   size="small"
@@ -497,6 +530,7 @@ onMounted(refreshAll)
                   @click="restartHostedRunner(data)"
                 />
                 <Button
+                  v-if="!isDeletedRunner(data)"
                   label="Reprovision"
                   icon="pi pi-replay"
                   size="small"
@@ -506,7 +540,7 @@ onMounted(refreshAll)
                   @click="reprovisionHostedRunner(data)"
                 />
                 <Button
-                  v-if="data.status !== 'running'"
+                  v-if="!isDeletedRunner(data) && data.status !== 'running'"
                   label="Retry"
                   icon="pi pi-play"
                   size="small"
@@ -647,6 +681,10 @@ onMounted(refreshAll)
             <div class="text-color-secondary text-sm">Machine name</div>
             <div class="font-medium">{{ selectedRunner.runnerMachineName || 'Unknown' }}</div>
           </div>
+          <div v-if="selectedRunner.deletedAt" class="col-12 md:col-6">
+            <div class="text-color-secondary text-sm">Deleted</div>
+            <div class="font-medium">{{ formatDateTime(selectedRunner.deletedAt) }}</div>
+          </div>
         </div>
         <div v-if="selectedRunner.lastError">
           <div class="text-color-secondary text-sm mb-2">Last error</div>
@@ -659,6 +697,15 @@ onMounted(refreshAll)
         <div v-if="selectedRunner.latestDeployment?.commandPreview">
           <div class="text-color-secondary text-sm mb-2">Docker command preview</div>
           <pre class="command-preview">{{ selectedRunner.latestDeployment.commandPreview }}</pre>
+        </div>
+        <div v-if="!isDeletedRunner(selectedRunner)" class="flex justify-content-end border-top-1 surface-border pt-3">
+          <Button
+            label="Delete hosted runner"
+            icon="pi pi-trash"
+            severity="danger"
+            outlined
+            @click="deleteHostedRunner(selectedRunner)"
+          />
         </div>
       </div>
     </Dialog>

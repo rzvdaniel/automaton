@@ -481,7 +481,7 @@ export interface HostedRunner {
   runnerName?: string
   apiKeyId?: string
   name: string
-  status: 'pending' | 'provisioning' | 'running' | 'failed' | 'disabled' | 'deleting'
+  status: 'pending' | 'provisioning' | 'running' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
   cpuCores: number
   memoryMb: number
   diskMb: number
@@ -497,6 +497,7 @@ export interface HostedRunner {
   createdAt: string
   updatedAt?: string
   provisionedAt?: string
+  deletedAt?: string
   latestDeployment?: HostedRunnerDeployment
 }
 

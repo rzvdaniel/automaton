@@ -59,6 +59,21 @@ public class RunnerService
         // Use authorization service to get runners filtered by project context
         var runnerQuery = authorizationService.GetRunnersQueryByContext(projectId, UserId);
         var runnerEntities = await runnerQuery.ToListAsync(cancellationToken);
+        var deletedHostedRunners = await dbContext.HostedRunners
+            .AsNoTracking()
+            .Where(x => x.DeletedAt != null)
+            .Select(x => new { x.RunnerId, x.Name })
+            .ToListAsync(cancellationToken);
+        var deletedHostedRunnerIds = deletedHostedRunners
+            .Where(x => x.RunnerId.HasValue)
+            .Select(x => x.RunnerId!.Value)
+            .ToHashSet();
+        var deletedHostedRunnerNames = deletedHostedRunners
+            .Select(x => x.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        runnerEntities = runnerEntities
+            .Where(x => !deletedHostedRunnerIds.Contains(x.Id) && !deletedHostedRunnerNames.Contains(x.Name))
+            .ToList();
 
         var projectLookup = await BuildRunnerProjectLookup(
             runnerEntities.Select(r => r.Id),

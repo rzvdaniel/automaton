@@ -21,6 +21,8 @@ public static class HostedRunnerStatuses
     public const string Failed = "failed";
     public const string Disabled = "disabled";
     public const string Deleting = "deleting";
+    public const string DeleteFailed = "deleteFailed";
+    public const string Deleted = "deleted";
 }
 
 public static class HostedRunnerDeploymentActions

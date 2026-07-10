@@ -51,6 +51,99 @@ public class HostedRunnerManagementService
         return await ReprovisionCoreAsync(hostedRunner, cancellationToken);
     }
 
+    public async Task DeleteAsAdminAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
+    {
+        var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
+        var host = hostedRunner.RunnerHost;
+
+        hostedRunner.Status = HostedRunnerStatuses.Deleting;
+        hostedRunner.UpdatedAt = DateTime.UtcNow;
+        var appAssignments = await db.WebApps
+            .Where(x => x.ExecutionRunnerId == hostedRunner.RunnerId)
+            .ToListAsync(cancellationToken);
+        foreach (var app in appAssignments)
+        {
+            app.ExecutionRunnerId = null;
+        }
+
+        AddDeployment(
+            hostedRunner,
+            HostedRunnerDeploymentActions.Deprovision,
+            HostedRunnerDeploymentStatuses.Running,
+            $"docker rm -f {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)}",
+            "Hosted runner deletion requested.");
+        await db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            if (host != null && !string.IsNullOrWhiteSpace(hostedRunner.ContainerName))
+            {
+                var executor = remoteCommandExecutorResolver.Resolve(host, options);
+                var script = string.Join('\n', new[]
+                {
+                    "set -eu",
+                    $"docker rm -f {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)} >/dev/null 2>&1 || true"
+                });
+                var result = await executor.ExecuteScriptAsync(host, script, cancellationToken);
+                if (!result.Succeeded)
+                {
+                    throw new InvalidOperationException(BuildRemoteFailureMessage(result));
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.DeleteFailed;
+            hostedRunner.LastError = ex.Message;
+            hostedRunner.UpdatedAt = DateTime.UtcNow;
+            var deployment = hostedRunner.Deployments.OrderByDescending(x => x.StartedAt).First();
+            CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, null, ex.Message);
+            await db.SaveChangesAsync(cancellationToken);
+            await auditEventService.WriteAsync(new AuditEventWriteRequest
+            {
+                Action = AuditActions.Failed,
+                EntityType = AuditEntityTypes.HostedRunner,
+                EntityId = hostedRunner.Id,
+                EventType = AuditEventTypes.HostedRunnerDeleteFailed,
+                Outcome = AuditOutcomes.Failed,
+                Message = $"Hosted runner '{hostedRunner.Name}' deletion failed",
+                TargetUserId = hostedRunner.UserId,
+                Metadata = new { hostedRunner.Name, hostedRunner.ContainerName, Error = ex.Message }
+            }, cancellationToken);
+            throw;
+        }
+
+        var completedDeployment = hostedRunner.Deployments.OrderByDescending(x => x.StartedAt).First();
+        CompleteDeployment(completedDeployment, HostedRunnerDeploymentStatuses.Succeeded, null, null);
+        hostedRunner.ApiKeyId = null;
+        hostedRunner.RunnerId = null;
+        hostedRunner.ContainerId = null;
+        hostedRunner.RuntimeEndpoint = null;
+        hostedRunner.Status = HostedRunnerStatuses.Deleted;
+        hostedRunner.DeletedAt = DateTime.UtcNow;
+        hostedRunner.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Deleted,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = hostedRunner.Id,
+            EventType = AuditEventTypes.HostedRunnerDeleted,
+            Outcome = AuditOutcomes.Success,
+            Message = $"Hosted runner '{hostedRunner.Name}' was deleted",
+            TargetUserId = hostedRunner.UserId,
+            Metadata = new
+            {
+                hostedRunner.Name,
+                hostedRunner.RunnerId,
+                hostedRunner.RunnerHostId,
+                hostedRunner.ContainerName
+            }
+        }, cancellationToken);
+
+    }
+
     public async Task RestartOwnedHostedRunnerByRunnerIdAsync(Guid runnerId, CancellationToken cancellationToken)
     {
         var hostedRunner = await db.HostedRunners
