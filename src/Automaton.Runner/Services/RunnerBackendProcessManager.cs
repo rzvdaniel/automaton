@@ -40,7 +40,7 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
             {
                 var deployment = JsonSerializer.Deserialize<BackendDeploymentMetadata>(await File.ReadAllTextAsync(metadata, cancellationToken));
                 if (deployment is { HasBackend: true } && Guid.TryParse(deployment.AppId, out var appId))
-                    await EnsureRunningAsync(appId, cancellationToken);
+                    await EnsureRunningAsync(appId, deployment.BackendModule, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -49,7 +49,10 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
         }
     }
 
-    public async Task EnsureRunningAsync(Guid appId, CancellationToken cancellationToken = default)
+    public Task EnsureRunningAsync(Guid appId, CancellationToken cancellationToken = default)
+        => EnsureRunningAsync(appId, "main:app", cancellationToken);
+
+    private async Task EnsureRunningAsync(Guid appId, string? backendModule, CancellationToken cancellationToken)
     {
         Process? old;
         lock (gate) processes.TryGetValue(appId, out old);
@@ -68,7 +71,7 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
         var start = new ProcessStartInfo
         {
             FileName = Environment.GetEnvironmentVariable("AUTOMATON_BACKEND_PYTHON") ?? "python",
-            Arguments = $"-m uvicorn main:app --host 127.0.0.1 --port {port}",
+            Arguments = $"-m uvicorn {SanitizeModule(backendModule)} --host 127.0.0.1 --port {port}",
             WorkingDirectory = backendRoot,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -170,5 +173,13 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
 
     private static int ReadPort(string name, int fallback) => int.TryParse(Environment.GetEnvironmentVariable(name), out var port) && port is > 0 and <= 65535 ? port : fallback;
     public void Dispose() => StopAsync(CancellationToken.None).GetAwaiter().GetResult();
-    private sealed record BackendDeploymentMetadata(string AppId, bool HasBackend);
+    private sealed record BackendDeploymentMetadata(string AppId, bool HasBackend, string? BackendModule);
+
+    private static string SanitizeModule(string? module)
+    {
+        var value = string.IsNullOrWhiteSpace(module) ? "main:app" : module.Trim();
+        if (value.Any(character => !(char.IsLetterOrDigit(character) || character is '_' or '-' or '.' or ':')))
+            throw new InvalidOperationException("Backend module contains unsupported characters.");
+        return value;
+    }
 }

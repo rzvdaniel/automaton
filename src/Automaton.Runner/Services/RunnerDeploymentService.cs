@@ -76,7 +76,7 @@ public class RunnerDeploymentService
                 }
             }
 
-            await PersistDeploymentMetadataAsync(appId, manifest.HasBackend);
+            await PersistDeploymentMetadataAsync(appId, manifest);
             if (manifest.HasBackend)
                 await backendProcessManager.EnsureRunningAsync(appId);
             else
@@ -118,11 +118,17 @@ public class RunnerDeploymentService
         }
     }
 
-    private async Task PersistDeploymentMetadataAsync(Guid appId, bool hasBackend)
+    private async Task PersistDeploymentMetadataAsync(Guid appId, AppDeploymentPackageManifest manifest)
     {
         var metadataPath = Path.Combine(runnerWorkspaceService.GetAppRoot(appId), "deployment.json");
         Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
-        var metadata = JsonSerializer.Serialize(new { appId = appId.ToString(), hasBackend, deployedAtUtc = DateTime.UtcNow });
+        var metadata = JsonSerializer.Serialize(new
+        {
+            appId = appId.ToString(),
+            hasBackend = manifest.HasBackend,
+            backendModule = manifest.BackendModule,
+            deployedAtUtc = DateTime.UtcNow
+        });
         await File.WriteAllTextAsync(metadataPath, metadata);
     }
 

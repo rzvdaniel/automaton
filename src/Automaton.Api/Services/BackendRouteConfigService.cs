@@ -117,7 +117,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine($"        regex: \"^/a/{route.AppId}/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/internal/apps/{route.AppId}/api/$1\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
         }
 
         builder.AppendLine("  services:");

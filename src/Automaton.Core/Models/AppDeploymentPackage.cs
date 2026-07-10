@@ -9,6 +9,7 @@ public sealed class AppDeploymentPackageManifest
     public string BackendRuntimePath { get; set; } = "runtime/backend";
     public string FrontendSourcePath { get; set; } = "source/frontend";
     public string BackendSourcePath { get; set; } = "source/backend";
+    public string BackendModule { get; set; } = "main:app";
 }
 
 public sealed class DeployAppPackageRequest
