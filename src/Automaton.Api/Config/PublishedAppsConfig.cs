@@ -31,4 +31,7 @@ public class PublishedAppsConfig
     /// Relative paths are resolved under the API content root.
     /// </summary>
     public string TraefikDynamicConfigRoot { get; set; } = "AppData/traefik-dynamic";
+
+    /// <summary>Temporarily enables runner-owned frontend routes in the generated Traefik config.</summary>
+    public bool RunnerFrontendRoutingEnabled { get; set; }
 }

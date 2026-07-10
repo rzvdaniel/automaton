@@ -105,9 +105,26 @@ public class BackendRouteConfigService
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - web");
             builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}/api`)\"");
+            builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
             builder.AppendLine("      middlewares:");
             builder.AppendLine($"        - \"{key}-rewrite\"");
+        }
+
+        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        {
+            foreach (var route in routes)
+            {
+                var key = $"app-frontend-{route.AppId:N}";
+                builder.AppendLine($"    {key}:");
+                builder.AppendLine("      entryPoints:");
+                builder.AppendLine("        - web");
+                builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}`)\"");
+                builder.AppendLine("      priority: 1");
+                builder.AppendLine($"      service: \"{key}\"");
+                builder.AppendLine("      middlewares:");
+                builder.AppendLine($"        - \"{key}-rewrite\"");
+            }
         }
 
         builder.AppendLine("  middlewares:");
@@ -120,6 +137,18 @@ public class BackendRouteConfigService
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
         }
 
+        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        {
+            foreach (var route in routes)
+            {
+                var key = $"app-frontend-{route.AppId:N}";
+                builder.AppendLine($"    {key}-rewrite:");
+                builder.AppendLine("      replacePathRegex:");
+                builder.AppendLine($"        regex: \"^/a/{route.AppId}(?:/(.*))?$\"");
+                builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
+            }
+        }
+
         builder.AppendLine("  services:");
         foreach (var route in routes)
         {
@@ -128,6 +157,18 @@ public class BackendRouteConfigService
             builder.AppendLine("      loadBalancer:");
             builder.AppendLine("        servers:");
             builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
+        }
+
+        if (publishedAppsConfig.RunnerFrontendRoutingEnabled)
+        {
+            foreach (var route in routes)
+            {
+                var key = $"app-frontend-{route.AppId:N}";
+                builder.AppendLine($"    {key}:");
+                builder.AppendLine("      loadBalancer:");
+                builder.AppendLine("        servers:");
+                builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
+            }
         }
 
         return builder.ToString();
