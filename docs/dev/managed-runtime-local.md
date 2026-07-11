@@ -1,4 +1,4 @@
-# Managed Runtime Local Validation
+# Managed Runtime Local Edge Overlay
 
 This guide adds a production-shaped local edge for managed runtime validation:
 
@@ -6,12 +6,10 @@ This guide adds a production-shaped local edge for managed runtime validation:
 - Traefik -> managed runner frontend/backend gateway
 - API writes Traefik dynamic route files
 
-It is intentionally separate from `docker-compose.local.yml` so you can keep:
+It is infrastructure support for the host-development workflow. It is intentionally separate from `docker-compose.local.yml` so you can keep:
 
-- MySQL
-- RabbitMQ
-- runner container
 - API on `dotnet watch`
+- Studio on `npm run dev`
 
 and only add the missing runtime edge.
 
@@ -93,6 +91,8 @@ Start the local managed-runtime edge:
 $env:MANAGED_RUNTIME_PROXY_AUTH_KEY = "local-managed-runtime-secret"
 docker compose -f docker-compose.managed-local.yml up -d
 ```
+
+This overlay does not provide API, Studio, Website, MySQL, or RabbitMQ. Use `scripts/start-managed-runtime-host-dev.ps1` to prepare its network, certificate path, and dynamic-route directory consistently.
 
 This starts `automaton-local-managed-traefik`.
 
