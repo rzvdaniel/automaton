@@ -109,6 +109,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
@@ -122,6 +123,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
@@ -131,6 +133,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-frontend:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");
@@ -143,6 +146,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");

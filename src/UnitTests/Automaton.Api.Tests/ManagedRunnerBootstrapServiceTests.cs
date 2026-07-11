@@ -102,7 +102,7 @@ public class ManagedRunnerBootstrapServiceTests
             {
                 Enabled = true,
                 DeploymentMode = HostedRunnerDeploymentModes.SshDocker,
-                RuntimePort = 8001
+                RuntimePort = 8080
             }),
             new NoOpAuditEventService(),
             NullLogger<HostedRunnerProvisioningService>.Instance);

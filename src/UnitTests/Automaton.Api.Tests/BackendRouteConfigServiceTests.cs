@@ -31,7 +31,7 @@ public class BackendRouteConfigServiceTests
             Status = "Running",
             ContainerName = "runner-a",
             RunnerId = runnerId,
-            RuntimeEndpoint = "http://runner-a:8001"
+            RuntimeEndpoint = "http://runner-a:8080"
         });
 
         dbContext.WebApps.Add(new WebApp
@@ -57,8 +57,8 @@ public class BackendRouteConfigServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(content, Does.Contain($"PathPrefix(`/a/{appId}/api`)"));
-            Assert.That(content, Does.Contain($"/internal/apps/{appId}/api/$1"));
-            Assert.That(content, Does.Contain("http://runner-a:8001"));
+            Assert.That(content, Does.Contain($"/apps/{appId}/api/$1"));
+            Assert.That(content, Does.Contain("http://runner-a:8080"));
         });
     }
 
