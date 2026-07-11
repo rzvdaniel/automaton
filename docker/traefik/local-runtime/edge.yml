@@ -17,7 +17,7 @@ http:
       tls: {}
     local-website:
       entryPoints: [websecure]
-      rule: "HostRegexp(`^(?:www\\.)?automaton\\..+$`)"
+      rule: "HostRegexp(`^(?:www\\.)?(?:automaton|website)\\..+$`)"
       service: local-website
       tls: {}
   middlewares:
