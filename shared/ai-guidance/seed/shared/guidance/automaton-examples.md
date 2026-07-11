@@ -66,7 +66,7 @@ def list_todos():
 
 ```ts
 export async function listTodos() {
-  const response = await fetch('/api/todos')
+  const response = await fetch('api/todos')
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)
   return response.json()
 }

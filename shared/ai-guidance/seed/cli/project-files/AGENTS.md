@@ -58,7 +58,7 @@ automaton deploy
 
 - Default to frontend-only unless the requested feature truly needs backend execution.
 - If backend behavior is required, create an ordinary HTTP backend under `backend/`; the initial supported Python convention is FastAPI/ASGI with `main:app`.
-- Expose normal same-origin HTTP routes under `/api` and call them from the frontend with `fetch` or an equivalent HTTP client.
+- Expose normal HTTP routes under `/api` and call them from the frontend with app-relative URLs such as `fetch('api/todos')`; do not hardcode the app ID.
 - Add a small amount of useful backend logging around meaningful actions and error paths.
 - Keep frontend console logging minimal. Prefer `console.warn(...)` and `console.error(...)` for real issues, and never log secrets or sensitive user data.
 - Do not say the app is done until `automaton deploy` succeeds.
