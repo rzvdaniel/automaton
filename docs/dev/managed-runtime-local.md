@@ -2,10 +2,9 @@
 
 This guide adds a production-shaped local edge for managed runtime validation:
 
-- browser -> nginx
-- nginx -> `auth_request` -> `Automaton.Api`
-- nginx -> Traefik -> runner backend
-- API writes static runtime files and Traefik dynamic route files
+- browser -> Traefik
+- Traefik -> managed runner frontend/backend gateway
+- API writes Traefik dynamic route files
 
 It is intentionally separate from `docker-compose.local.yml` so you can keep:
 
@@ -24,7 +23,7 @@ Use this setup when you want to validate:
 - `/a/{appId}/api/controllers/...` runner backend execution
 - `/a/{appId}/api/flows/{flowIdentifier}/execute` runner flow execution
 - upload and download helpers
-- API participation only through `/internal/runtime/auth`
+- API participation through the normal API hostname
 - Traefik dynamic route generation
 
 ## Prerequisites
@@ -63,7 +62,6 @@ Place the generated files at:
 4. Writable local directories:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path .local-dev\managed-runtime\static-runtime | Out-Null
 New-Item -ItemType Directory -Force -Path .local-dev\managed-runtime\traefik-dynamic | Out-Null
 New-Item -ItemType Directory -Force -Path .local-dev\managed-runtime\certs | Out-Null
 ```
@@ -77,7 +75,6 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:PublishedApps__ApiBaseUrl = "https://api.automaton.test:7091"
 $env:PublishedApps__PublicBaseUrl = "https://apps.automaton.test:8443"
 $env:PublishedApps__RuntimeProxyAuthKey = "local-managed-runtime-secret"
-$env:WebAppConfig__StaticRuntimeRoot = (Resolve-Path ".local-dev\managed-runtime\static-runtime").Path
 $env:PublishedApps__TraefikDynamicConfigRoot = (Resolve-Path ".local-dev\managed-runtime\traefik-dynamic").Path
 
 dotnet watch --project src\Automaton.Api
@@ -85,7 +82,7 @@ dotnet watch --project src\Automaton.Api
 
 Notes:
 
-- `https://apps.automaton.test:8443` is intentional. The local nginx overlay binds TLS on `8443`.
+- `https://apps.automaton.test:8443` is the local Traefik TLS entrypoint.
 - The runtime cookie is always `Secure`, so browser validation must use HTTPS.
 
 ## Edge overlay
@@ -97,12 +94,9 @@ $env:MANAGED_RUNTIME_PROXY_AUTH_KEY = "local-managed-runtime-secret"
 docker compose -f docker-compose.managed-local.yml up -d
 ```
 
-This starts:
+This starts `automaton-local-managed-traefik`.
 
-- `automaton-local-managed-nginx`
-- `automaton-local-managed-traefik`
-
-Both join the existing `automaton-local` Docker network so Traefik can route to the runner container by container DNS name.
+It joins the existing `automaton-local` Docker network so Traefik can route to the runner container by container DNS name.
 
 ## Runner reachability
 
