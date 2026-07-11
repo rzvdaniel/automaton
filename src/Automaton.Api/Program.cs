@@ -349,7 +349,6 @@ services.AddScoped<AdminAuthorizationService>();
 services.AddScoped<AppFileStorageService>();
 services.AddScoped<AppMediaStorageService>();
 services.AddScoped<PublishedAppStorageService>();
-services.AddSingleton<StaticRuntimeExportService>();
 services.AddScoped<AppArchiveService>();
 services.AddScoped<AppVersionService>();
 services.AddSingleton<PrivateAppLaunchService>();

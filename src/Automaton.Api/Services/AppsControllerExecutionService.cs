@@ -33,7 +33,6 @@ public class AppsControllerExecutionService
     private readonly AppsTunnelConfig tunnelConfig;
     private readonly ApiInstanceIdentityService apiInstanceIdentityService;
     private readonly IAppDeployCapabilityService appDeployCapabilityService;
-    private readonly StaticRuntimeExportService staticRuntimeExportService;
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
@@ -48,7 +47,6 @@ public class AppsControllerExecutionService
         IOptions<AppsTunnelConfig> tunnelConfig,
         ApiInstanceIdentityService apiInstanceIdentityService,
         IAppDeployCapabilityService appDeployCapabilityService,
-        StaticRuntimeExportService staticRuntimeExportService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         BackendRouteConfigService backendRouteConfigService,
         ManagedRunnerBootstrapService managedRunnerBootstrapService)
@@ -61,7 +59,6 @@ public class AppsControllerExecutionService
         this.tunnelConfig = tunnelConfig.Value;
         this.apiInstanceIdentityService = apiInstanceIdentityService;
         this.appDeployCapabilityService = appDeployCapabilityService;
-        this.staticRuntimeExportService = staticRuntimeExportService;
         this.flowsServiceFactory = flowsServiceFactory;
         this.backendRouteConfigService = backendRouteConfigService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;

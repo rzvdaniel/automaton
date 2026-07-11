@@ -158,7 +158,6 @@ services:
       EmailConfig__SendEmailsInDevelopment: "true"
       GitHub__FrontendUrl: https://${LOCAL_RUNTIME_STUDIO_DOMAIN:-studio.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       CloudflareTurnstile__Enabled: "false"
-      WebAppConfig__StaticRuntimeRoot: /app/AppData/static-runtime
       PublishedApps__PublicBaseUrl: https://${LOCAL_RUNTIME_APPS_DOMAIN:-apps.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       PublishedApps__ApiBaseUrl: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       PublishedApps__RuntimeProxyAuthKey: ${LOCAL_RUNTIME_PROXY_AUTH_KEY:-local-runtime-secret}
@@ -179,7 +178,6 @@ services:
     volumes:
       - runtime-local-api-appdata:/app/AppData
       - runtime-local-published-apps:/app/AppData/published-apps
-      - runtime-local-static-runtime:/app/AppData/static-runtime
       - runtime-local-traefik-dynamic:/app/AppData/traefik-dynamic
       - runtime-local-api-logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock
@@ -318,7 +316,6 @@ volumes:
   runtime-local-rabbitmq-data:
   runtime-local-api-appdata:
   runtime-local-published-apps:
-  runtime-local-static-runtime:
   runtime-local-traefik-dynamic:
   runtime-local-api-logs:
   runtime-local-worker-logs:

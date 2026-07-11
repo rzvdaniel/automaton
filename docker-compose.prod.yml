@@ -30,7 +30,6 @@ x-api-common: &api-common
   environment: &api-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:8080
-    WebAppConfig__StaticRuntimeRoot: /app/AppData/static-runtime
     PublishedApps__RuntimeProxyAuthKey: ${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}
     PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
     HostedRunners__Enabled: ${HOSTED_RUNNERS_ENABLED:-true}
@@ -42,7 +41,6 @@ x-api-common: &api-common
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
-    - prod-static-runtime:/app/AppData/static-runtime
     - ./.prod-runtime/traefik/dynamic:/app/AppData/traefik-dynamic
     - prod-api-logs:/app/logs
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
@@ -226,7 +224,6 @@ volumes:
   prod-rabbitmq-data:
   prod-api-appdata:
   prod-published-apps:
-  prod-static-runtime:
   prod-traefik-acme:
   prod-api-logs:
   prod-worker-logs:
