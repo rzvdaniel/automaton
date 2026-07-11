@@ -9,6 +9,14 @@ entryPoints:
 ping:
   entryPoint: ping
 
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "__ACME_EMAIL__"
+      storage: "/etc/traefik/acme/acme.json"
+      httpChallenge:
+        entryPoint: web
+
 providers:
   file:
     directory: /etc/traefik/dynamic

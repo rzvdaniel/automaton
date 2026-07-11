@@ -3,7 +3,7 @@ http:
     api-http-redirect:
       entryPoints:
         - web
-      rule: "Host(`__API_DOMAIN__`)"
+      rule: "Host(`__API_DOMAIN__`) || Host(`__STUDIO_DOMAIN__`) || Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`) || Host(`__APPS_DOMAIN__`)"
       middlewares:
         - api-redirect
       service: api-blue-edge
@@ -15,24 +15,24 @@ http:
       service: api-blue-edge
       middlewares:
         - api-https-headers
-      tls: {}
+      tls:
+        certResolver: letsencrypt
 
-    legacy-http-redirect:
-      entryPoints:
-        - web
-      rule: "HostRegexp(`^.+$`)"
-      priority: 1
-      middlewares:
-        - api-redirect
-      service: legacy-nginx
-
-    legacy-https:
+    studio-edge:
       entryPoints:
         - websecure
-      rule: "HostRegexp(`^.+$`)"
-      priority: 1
-      service: legacy-nginx
-      tls: {}
+      rule: "Host(`__STUDIO_DOMAIN__`)"
+      service: studio-__STUDIO_COLOR__-edge
+      tls:
+        certResolver: letsencrypt
+
+    website-edge:
+      entryPoints:
+        - websecure
+      rule: "Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`)"
+      service: website-__WEBSITE_COLOR__-edge
+      tls:
+        certResolver: letsencrypt
 
   middlewares:
     api-redirect:
@@ -52,18 +52,15 @@ http:
           - url: "http://api-__API_COLOR__:8080"
         passHostHeader: true
 
-    legacy-nginx:
+    studio-__STUDIO_COLOR__-edge:
       loadBalancer:
         servers:
-          - url: "https://nginx:443"
-        passHostHeader: true
-        serversTransport: legacy-nginx-tls
+          - url: "http://studio-__STUDIO_COLOR__:80"
 
-  serversTransports:
-    legacy-nginx-tls:
-      insecureSkipVerify: true
+    website-__WEBSITE_COLOR__-edge:
+      loadBalancer:
+        servers:
+          - url: "http://website-__WEBSITE_COLOR__:80"
 
 tls:
-  certificates:
-    - certFile: "/etc/traefik/certs/fullchain.pem"
-      keyFile: "/etc/traefik/certs/privkey.pem"
+  options: {}

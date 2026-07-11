@@ -175,16 +175,21 @@ render_nginx_runtime() {
     fi
 
     cp "$TRAEFIK_TEMPLATE_DIR/traefik.yml" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
+    sed -i "s|__ACME_EMAIL__|$ACME_EMAIL|g" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
     render_traefik_api_edge "$(get_live_color api)"
 }
 
 render_traefik_api_edge() {
     local color="$1"
+    local studio_color="${2:-$(get_live_color studio)}"
+    local website_color="${3:-$(get_live_color website)}"
     local rendered_path="$TRAEFIK_RUNTIME_DIR/api-edge.yml"
     local temp_path="${rendered_path}.tmp"
 
     render_template "$TRAEFIK_TEMPLATE_DIR/api-edge.yml" "$temp_path"
     sed -i "s|__API_COLOR__|$color|g" "$temp_path"
+    sed -i "s|__STUDIO_COLOR__|$studio_color|g" "$temp_path"
+    sed -i "s|__WEBSITE_COLOR__|$website_color|g" "$temp_path"
     mv -f "$temp_path" "$rendered_path"
 }
 
@@ -465,16 +470,20 @@ switch_live_color() {
 
     render_service_upstream "$service" "$color"
 
-    if [[ "$service" == "api" ]]; then
-        render_traefik_api_edge "$color"
-    fi
+    case "$service" in
+        api) render_traefik_api_edge "$color" "$(get_live_color studio)" "$(get_live_color website)" ;;
+        studio) render_traefik_api_edge "$(get_live_color api)" "$color" "$(get_live_color website)" ;;
+        website) render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$color" ;;
+    esac
 
     if ! nginx_reload; then
         echo "[ERROR] nginx reload failed while switching $service to $color. Reverting selector." >&2
         render_service_upstream "$service" "$previous_color"
-        if [[ "$service" == "api" ]]; then
-            render_traefik_api_edge "$previous_color"
-        fi
+        case "$service" in
+            api) render_traefik_api_edge "$previous_color" "$(get_live_color studio)" "$(get_live_color website)" ;;
+            studio) render_traefik_api_edge "$(get_live_color api)" "$previous_color" "$(get_live_color website)" ;;
+            website) render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$previous_color" ;;
+        esac
         nginx_reload || true
         exit 1
     fi
@@ -499,14 +508,14 @@ switch_all_live_colors() {
     render_service_upstream api "$api_color"
     render_service_upstream studio "$studio_color"
     render_service_upstream website "$website_color"
-    render_traefik_api_edge "$api_color"
+    render_traefik_api_edge "$api_color" "$studio_color" "$website_color"
 
     if ! nginx_reload; then
         echo "[ERROR] nginx reload failed while switching all public services. Reverting selectors." >&2
         render_service_upstream api "$previous_api_color"
         render_service_upstream studio "$previous_studio_color"
         render_service_upstream website "$previous_website_color"
-        render_traefik_api_edge "$previous_api_color"
+        render_traefik_api_edge "$previous_api_color" "$previous_studio_color" "$previous_website_color"
         nginx_reload || true
         exit 1
     fi

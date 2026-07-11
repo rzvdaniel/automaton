@@ -128,33 +128,6 @@ x-website-common: &website-common
     start_period: 10s
 
 services:
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: automaton-nginx
-    restart: unless-stopped
-    logging: *default-json-logging
-    ports:
-      - "8088:80"
-      - "8448:443"
-    volumes:
-      - ./.prod-runtime/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./.prod-runtime/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./.prod-runtime/nginx/upstreams:/etc/nginx/upstreams:ro
-      - ./.prod-runtime/nginx/app-runtime:/var/www/automaton-app-runtime:ro
-      - prod-published-apps:/var/www/automaton-apps:ro
-      - prod-static-runtime:/var/www/automaton-private-runtime:ro
-      - ./.prod-runtime/certbot-www:/var/www/certbot:ro
-      - ./.prod-runtime/letsencrypt:/etc/letsencrypt:ro
-    networks:
-      - automaton-prod
-      - automaton-runtime
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/.well-known/acme-challenge/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
   traefik:
     image: traefik:v3.1
     container_name: automaton-traefik
@@ -163,8 +136,8 @@ services:
     volumes:
       - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./.prod-runtime/traefik/api-edge.yml:/etc/traefik/dynamic/api-edge.yml:ro
-      - ./.prod-runtime/letsencrypt/live/${CERT_NAME:-${WEBSITE_DOMAIN:?WEBSITE_DOMAIN is required in .env}}:/etc/traefik/certs:ro
       - ./.prod-runtime/traefik/dynamic:/etc/traefik/dynamic:ro
+      - prod-traefik-acme:/etc/traefik/acme
     ports:
       - "80:80"
       - "443:443"
@@ -177,13 +150,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
-
-  certbot:
-    image: certbot/certbot:latest
-    logging: *default-json-logging
-    volumes:
-      - ./.prod-runtime/certbot-www:/var/www/certbot
-      - ./.prod-runtime/letsencrypt:/etc/letsencrypt
 
   mysql:
     image: mysql:8.0
@@ -261,6 +227,7 @@ volumes:
   prod-api-appdata:
   prod-published-apps:
   prod-static-runtime:
+  prod-traefik-acme:
   prod-api-logs:
   prod-worker-logs:
   prod-worker-dataprotection:
