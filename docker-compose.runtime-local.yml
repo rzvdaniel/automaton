@@ -117,6 +117,7 @@ services:
       JwtOptions__Issuer: https://${LOCAL_RUNTIME_API_DOMAIN:-api.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       AppConfig__WebsiteUrl: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
       RabbitMq__Username: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
       RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
       EmailConfig__EmailHost: smtp4dev
@@ -177,6 +178,7 @@ services:
       AppConfig__WebsiteUrl: https://${LOCAL_RUNTIME_WEBSITE_DOMAIN:-website.automaton.test}:${LOCAL_RUNTIME_HTTPS_PORT:-8443}
       AppConfig__ApiUrl: http://api:8080
       RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
       RabbitMq__Username: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
       RabbitMq__Password: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
       EmailConfig__EmailHost: smtp4dev
