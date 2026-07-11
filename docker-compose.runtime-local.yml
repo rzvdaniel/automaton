@@ -17,54 +17,21 @@ x-runtime-local-env: &runtime-local-env
   LOCAL_RUNTIME_PROXY_AUTH_KEY: ${LOCAL_RUNTIME_PROXY_AUTH_KEY:-local-runtime-secret}
 
 services:
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: automaton-runtime-local-nginx
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - "${LOCAL_RUNTIME_HTTP_PORT:-8080}:80"
-      - "${LOCAL_RUNTIME_HTTPS_PORT:-8443}:443"
-    environment:
-      <<: *runtime-local-env
-      NGINX_ENVSUBST_FILTER: ^LOCAL_RUNTIME_
-    volumes:
-      - ./docker/nginx/prod/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/runtime-local/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./docker/nginx/app-runtime:/var/www/automaton-app-runtime:ro
-      - runtime-local-published-apps:/var/www/automaton-apps:ro
-      - runtime-local-static-runtime:/var/www/automaton-private-runtime:ro
-      - ${LOCAL_RUNTIME_CERTS_DIR:-./.local-runtime/certs}:/etc/nginx/certs:ro
-    networks:
-      - automaton-runtime-local
-      - automaton-runtime-local-runner
-    depends_on:
-      api:
-        condition: service_healthy
-      studio:
-        condition: service_healthy
-      website:
-        condition: service_healthy
-      traefik:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-
   traefik:
     image: traefik:v3.1
     container_name: automaton-runtime-local-traefik
     restart: unless-stopped
     logging: *default-logging
     ports:
+      - "${LOCAL_RUNTIME_HTTP_PORT:-8080}:80"
+      - "${LOCAL_RUNTIME_HTTPS_PORT:-8443}:443"
       - "${LOCAL_RUNTIME_TRAEFIK_PING_PORT:-8082}:8082"
     volumes:
-      - ./docker/traefik/prod/traefik.yml:/etc/traefik/traefik.yml:ro
-      - runtime-local-traefik-dynamic:/etc/traefik/dynamic
+      - ./docker/traefik/local-managed/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ${LOCAL_RUNTIME_CERTS_DIR:-./.local-runtime/certs}:/etc/traefik/certs:ro
+      - ${LOCAL_RUNTIME_TRAEFIK_DYNAMIC_ROOT:-./.local-runtime/traefik-dynamic}:/etc/traefik/dynamic:ro
     networks:
+      automaton-runtime-local:
       automaton-runtime-local-runner:
         aliases:
           - traefik
@@ -178,7 +145,7 @@ services:
     volumes:
       - runtime-local-api-appdata:/app/AppData
       - runtime-local-published-apps:/app/AppData/published-apps
-      - runtime-local-traefik-dynamic:/app/AppData/traefik-dynamic
+      - ${LOCAL_RUNTIME_TRAEFIK_DYNAMIC_ROOT:-./.local-runtime/traefik-dynamic}:/app/AppData/traefik-dynamic
       - runtime-local-api-logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -316,7 +283,6 @@ volumes:
   runtime-local-rabbitmq-data:
   runtime-local-api-appdata:
   runtime-local-published-apps:
-  runtime-local-traefik-dynamic:
   runtime-local-api-logs:
   runtime-local-worker-logs:
   runtime-local-worker-dataprotection:

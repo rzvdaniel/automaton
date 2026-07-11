@@ -1,0 +1,44 @@
+http:
+  routers:
+    local-http-redirect:
+      entryPoints: [web]
+      rule: "HostRegexp(`^.+$`)"
+      middlewares: [local-redirect]
+      service: local-api
+    local-api:
+      entryPoints: [websecure]
+      rule: "HostRegexp(`^api\\..+$`)"
+      service: local-api
+      tls: {}
+    local-studio:
+      entryPoints: [websecure]
+      rule: "HostRegexp(`^studio\\..+$`)"
+      service: local-studio
+      tls: {}
+    local-website:
+      entryPoints: [websecure]
+      rule: "HostRegexp(`^(?:www\\.)?automaton\\..+$`)"
+      service: local-website
+      tls: {}
+  middlewares:
+    local-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+  services:
+    local-api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8080"
+    local-studio:
+      loadBalancer:
+        servers:
+          - url: "http://studio:80"
+    local-website:
+      loadBalancer:
+        servers:
+          - url: "http://website:80"
+tls:
+  certificates:
+    - certFile: "/etc/traefik/certs/automaton.test.pem"
+      keyFile: "/etc/traefik/certs/automaton.test-key.pem"

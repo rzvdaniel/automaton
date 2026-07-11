@@ -9,8 +9,8 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot "docker-compose.runtime-local.yml"
 $runtimeRoot = Join-Path $repoRoot ".local-runtime"
 $certRoot = Join-Path $runtimeRoot "certs"
-$staticRuntimeRoot = Join-Path $runtimeRoot "static-runtime"
 $traefikDynamicRoot = Join-Path $runtimeRoot "traefik-dynamic"
+$localEdgeConfig = Join-Path $repoRoot "docker\traefik\local-runtime\edge.yml"
 $certFile = Join-Path $certRoot "automaton.test.pem"
 $certKeyFile = Join-Path $certRoot "automaton.test-key.pem"
 
@@ -19,8 +19,8 @@ if (-not $env:LOCAL_RUNTIME_MYSQL_PORT) {
 }
 
 New-Item -ItemType Directory -Force -Path $certRoot | Out-Null
-New-Item -ItemType Directory -Force -Path $staticRuntimeRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $traefikDynamicRoot | Out-Null
+Copy-Item -LiteralPath $localEdgeConfig -Destination (Join-Path $traefikDynamicRoot "local-edge.yml") -Force
 
 if (-not (Test-Path $certFile) -or -not (Test-Path $certKeyFile)) {
     Write-Host "[ERROR] Missing local TLS certificate files:" -ForegroundColor Red
