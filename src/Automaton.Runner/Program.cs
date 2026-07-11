@@ -60,6 +60,7 @@ public class Program
             rootCommand.SetHandler(async (bool verbose) =>
             {
                 using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+                await host.StartAsync();
                 using var scope = host.Services.CreateScope();
                 var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
                 await runnerService.StartInteractiveAsync();
@@ -216,6 +217,7 @@ public class Program
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
+            await host.StartAsync();
             using var scope = host.Services.CreateScope();
             var runnerService = scope.ServiceProvider.GetRequiredService<RunnerHostService>();
             await runnerService.StartServiceModeAsync();
