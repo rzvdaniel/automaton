@@ -289,7 +289,7 @@ with `main:app`, exposing normal resource routes under `/api`.
 
 ```javascript
 try {
-  const response = await fetch('api/todos?page=1')
+  const response = await fetch('/api/todos?page=1')
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)
   const data = await response.json()
   console.log(data.items)

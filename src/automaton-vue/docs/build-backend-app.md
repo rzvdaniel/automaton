@@ -59,11 +59,11 @@ def create_todo(todo: dict):
     return {"todo": todo}
 ```
 
-Your frontend should call app-relative HTTP endpoints under `api/`:
+Your frontend should call same-origin root-relative HTTP endpoints under `/api`:
 
 ```js
 try {
-  const response = await fetch('api/todos')
+  const response = await fetch('/api/todos')
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)
   const data = await response.json()
   console.log(data.items)

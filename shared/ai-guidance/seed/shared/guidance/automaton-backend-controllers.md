@@ -6,7 +6,7 @@ Rules:
 
 - The initial supported convention is FastAPI/ASGI with an entrypoint of `main:app`.
 - Expose normal resource endpoints under `/api`.
-- Frontends call app-relative URLs such as `fetch('api/todos')`; do not add a leading slash.
+- Frontends call same-origin root-relative URLs such as `fetch('/api/todos')`.
 - Keep secrets, persistence, and server-side logic in the backend.
 - Keep shared helpers in `backend/` and dependencies in `backend/requirements.txt`.
 - Use appropriate HTTP methods, status codes, and JSON responses.
@@ -31,5 +31,6 @@ def create_todo(todo: dict):
     return {"todo": todo}
 ```
 
-The runner owns the backend process and proxies the app's `/api` paths. The browser should not
-need to know whether the app is hosted locally, on a managed runner, or elsewhere.
+The runner owns the backend process and proxies the app's `/api` paths. Published apps use an
+app-specific origin derived from the slug, so the browser should not need an app ID or special
+deployment path.

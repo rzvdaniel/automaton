@@ -301,10 +301,10 @@ If `automaton.json` already exists, add missing `frontend.build` and `frontend.d
 
 ## Frontend to backend calls
 
-Frontend code must use app-relative HTTP under `api/` so it works when hosted under `/a/{appId}/`:
+Frontend code must use same-origin root-relative HTTP under `/api`:
 
 ```javascript
-await fetch('api/posts')
+await fetch('/api/posts')
 ```
 
 Important:
@@ -315,7 +315,7 @@ Example:
 
 ```javascript
 try {
-  const response = await fetch('api/posts?page=1')
+  const response = await fetch('/api/posts?page=1')
   if (!response.ok) throw new Error(`Request failed: ${response.status}`)
   const data = await response.json()
   console.log(data.items)

@@ -35,7 +35,8 @@ backend/
 ## Backend rules
 
 - Automaton backends are ordinary HTTP applications. The initial supported convention is FastAPI/ASGI with `main:app`.
-- Frontends call app-relative HTTP paths such as `api/posts`; do not add a leading slash or hardcode the app ID.
+- Frontends call same-origin root-relative HTTP paths such as `/api/posts`.
+- Published apps run on an app-specific origin derived from the slug; do not hardcode app IDs, hostnames, or ports.
 - Keep the backend server behind the runner gateway. The browser should not know that it is running on Automaton.
 - Use normal HTTP resources and methods, for example `GET /api/posts` and `POST /api/posts`.
 - Backend responses should use the application’s normal JSON shape.
