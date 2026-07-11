@@ -120,11 +120,12 @@ public class BackendRouteConfigService
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
         {
             var key = $"slug-{route.AppId:N}";
+            var host = BuildPublishedAppHost(route.Slug!);
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
             builder.AppendLine("      tls: {}");
-            builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}/api`)\"");
+            builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
             builder.AppendLine("      middlewares:");
@@ -134,7 +135,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
             builder.AppendLine("      tls: {}");
-            builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}`)\"");
+            builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");
             builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
@@ -159,11 +160,11 @@ public class BackendRouteConfigService
             var key = $"slug-{route.AppId:N}";
             builder.AppendLine($"    {key}-api-rewrite:");
             builder.AppendLine("      replacePathRegex:");
-            builder.AppendLine($"        regex: \"^/{route.Slug}/api(?:/(.*))?$\"");
+            builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
             builder.AppendLine($"    {key}-frontend-rewrite:");
             builder.AppendLine("      replacePathRegex:");
-            builder.AppendLine($"        regex: \"^/{route.Slug}(?:/(.*))?$\"");
+            builder.AppendLine("        regex: \"^/(.*)$\"");
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
         }
 
@@ -215,6 +216,19 @@ public class BackendRouteConfigService
         }
 
         return builder.ToString();
+    }
+
+    private string BuildPublishedAppHost(string slug)
+    {
+        var baseHost = publishedAppsConfig.PublicBaseUrlHost;
+        const string appsSuffix = ".apps.";
+        var appsMarker = baseHost.IndexOf(appsSuffix, StringComparison.OrdinalIgnoreCase);
+        if (appsMarker >= 0)
+        {
+            return $"{slug}{baseHost[appsMarker..]}";
+        }
+
+        return $"{slug}.{baseHost}";
     }
 
     private string ResolveRootPath()

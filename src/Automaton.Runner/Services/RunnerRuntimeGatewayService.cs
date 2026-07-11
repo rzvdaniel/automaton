@@ -58,7 +58,8 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
 
         var target = new UriBuilder("http", "127.0.0.1", backend.Port)
         {
-            Path = "/" + (path ?? string.Empty),
+            // The gateway route removes only /apps/{appId}; preserve /api for the app backend.
+            Path = "/api/" + (path ?? string.Empty),
             Query = context.Request.QueryString.Value?.TrimStart('?') ?? string.Empty
         }.Uri;
 
