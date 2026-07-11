@@ -74,6 +74,8 @@ $env:PublishedApps__ApiBaseUrl = "https://api.automaton.test:7091"
 $env:PublishedApps__PublicBaseUrl = "https://apps.automaton.test:8443"
 $env:PublishedApps__RuntimeProxyAuthKey = "local-managed-runtime-secret"
 $env:PublishedApps__TraefikDynamicConfigRoot = (Resolve-Path ".local-dev\managed-runtime\traefik-dynamic").Path
+$env:ASPNETCORE_URLS = "http://0.0.0.0:7091"
+$env:HostedRunners__ServerUrl = "http://host.docker.internal:7091"
 
 dotnet watch --project src\Automaton.Api
 ```
@@ -93,6 +95,8 @@ docker compose -f docker-compose.managed-local.yml up -d
 ```
 
 This overlay does not provide API, Studio, Website, MySQL, or RabbitMQ. Use `scripts/start-managed-runtime-host-dev.ps1` to prepare its network, certificate path, and dynamic-route directory consistently.
+
+The hosted-runner server URL must use `host.docker.internal`; a runner container cannot reach a host process through `localhost`.
 
 This starts `automaton-local-managed-traefik`.
 

@@ -27,6 +27,8 @@ Prepare infrastructure and the managed-runtime edge:
 Run the API and Studio from the host in separate terminals:
 
 ```powershell
+$env:ASPNETCORE_URLS = "http://0.0.0.0:7091"
+$env:HostedRunners__ServerUrl = "http://host.docker.internal:7091"
 dotnet watch --project src\Automaton.Api
 ```
 
@@ -36,6 +38,8 @@ npm run dev
 ```
 
 This mode is optimized for API, Studio, routing, orchestration, database, and CLI work. It is not a substitute for the full runtime-local validation path.
+
+The Docker-reachable `HostedRunners__ServerUrl` is required for dynamically provisioned runner containers. Do not use host-side `localhost` in that setting.
 
 ## Managed-runtime edge overlay
 
