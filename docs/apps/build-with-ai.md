@@ -119,8 +119,8 @@ If you already ran `automaton new` or `automaton link` in the project, prefer th
 https://automaton.monster/llms.txt
 ```
 
-The file links to detailed instructions covering frontend structure, backend controller pattern,
-`callController()` usage, mock responses, and ready-to-paste starter prompts.
+The file links to detailed instructions covering frontend structure, HTTP backend patterns,
+same-origin `/api` calls, and ready-to-paste starter prompts.
 
 Fallback prompt when the tool does not consume local guidance files:
 
@@ -254,11 +254,10 @@ my-app/
 │   ├── package.json
 │   └── vite.config.ts
 └── backend/
-    ├── *.py                ← Python controllers (filename = controller name)
+    ├── main.py             ← FastAPI entrypoint (`main:app`)
     ├── requirements.txt    ← pip dependencies (optional)
     ├── shared/             ← shared Python helpers
-    └── mocks/
-        └── {ctrl}.{action}.json   ← local dev mock responses
+    └── shared/             ← shared Python helpers
 ```
 
 Notes:
@@ -267,46 +266,40 @@ Notes:
 - Source files are local editable project files; public Automaton runtime is produced from `frontend.deployDir`, not from raw frontend source folders.
 - Durable runtime files such as uploads, SQLite databases, generated exports, and private app state belong under `AUTOMATON_APP_DATA_DIR`, not under `frontend/`, `backend/`, or deployed runtime folders.
 
-## Python Controller Pattern
+## FastAPI HTTP Backend Pattern
 
 ```python
-# backend/todos.py
-class TodosController:
-  def list(self, inputs: dict) -> dict:
-    return {"success": True, "data": {"items": []}, "error": ""}
+from fastapi import FastAPI
 
-  def create(self, inputs: dict) -> dict:
-    title = inputs.get("title", "").strip()
-    if not title:
-      return {"success": False, "data": None, "error": "title is required"}
-    return {"success": True, "data": {"title": title}, "error": ""}
+app = FastAPI()
 
-_controller = TodosController()
+@app.get("/api/todos")
+def list_todos():
+  return {"items": []}
 
-def handle(action_name: str, inputs: dict) -> dict:
-  method = getattr(_controller, action_name, None)
-  if method is None:
-    return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
-  return method(inputs)
+@app.post("/api/todos")
+def create_todo(todo: dict):
+  return {"todo": todo}
 ```
 
-Each backend controller file must export `handle(action_name, inputs)` and return the standard
-response envelope: `{ success, data, error }`.
+The backend should be a real HTTP application. The initial supported convention is FastAPI/ASGI
+with `main:app`, exposing normal resource routes under `/api`.
 
-## Calling a Backend Controller from the Frontend
+## Calling the Backend from the Frontend
 
 ```javascript
 try {
-  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
+  const response = await fetch('/api/todos?page=1')
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  const data = await response.json()
   console.log(data.items)
 } catch (err) {
   console.error(err.message)
 }
 ```
 
-`window.automatonApi` is provided by Automaton at runtime. `callController()` returns the backend
-`data` payload directly and throws on error, so always use `try/catch`. In local development, the
-dev polyfill in `index.html` reads from `backend/mocks/` automatically — no server needed.
+Use relative same-origin URLs so the same frontend works locally and when deployed behind the
+runner gateway. Do not depend on a runtime-injected Automaton browser global.
 
 ---
 
@@ -318,8 +311,8 @@ python -m http.server 8080
 # open http://localhost:8080
 ```
 
-The dev polyfill intercepts `callController` calls and reads from `backend/mocks/` instead.
-No API key, no runner, no Automaton server needed for frontend development.
+Run the backend locally when developing frontend/backend integration. The deployed runner proxies
+the app's `/api` paths to its local HTTP backend.
 
 ---
 

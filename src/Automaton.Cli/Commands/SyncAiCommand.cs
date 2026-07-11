@@ -14,17 +14,19 @@ public static class SyncAiCommand
             () => AiGuidanceAdapters.None,
             "Optional AI tool adapter to generate: none, claude, copilot, github-skills, or all");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("sync-ai", "Refresh the generated local AI guidance files in this folder")
         {
             adapterOption,
-            jsonOption
+            jsonOption,
+            environmentOption
         };
 
-        cmd.SetHandler((string adapter, bool asJson) =>
+        cmd.SetHandler((string adapter, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var result = Sync(config, cwd, adapter);
+            var result = Sync(config, cwd, adapter, environmentName);
 
             if (asJson)
             {
@@ -58,16 +60,16 @@ public static class SyncAiCommand
             }
 
             Environment.ExitCode = result.Success ? 0 : 1;
-        }, adapterOption, jsonOption);
+        }, adapterOption, jsonOption, environmentOption);
 
         return cmd;
     }
 
-    private static SyncAiResult Sync(ConfigService config, string directory, string adapter)
+    private static SyncAiResult Sync(ConfigService config, string directory, string adapter, string? environmentName)
     {
         try
         {
-            var (server, apiKey) = config.RequireCredentials(directory: directory);
+            var (server, apiKey) = config.RequireCredentials(directory: directory, environmentName: environmentName);
             using var client = new AutomatonApiClient(server, apiKey);
             var references = client.GetAiGuidanceExportAsync().GetAwaiter().GetResult();
             var syncResult = new AiGuidancePackService().Sync(directory, references, adapter);

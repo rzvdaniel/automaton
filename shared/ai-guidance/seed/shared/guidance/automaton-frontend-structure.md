@@ -261,7 +261,7 @@ Rules:
 - Keep framework source code in the repo.
 - For frontend-only apps, build to `frontend/dist/` or another static output folder under `frontend/`.
 - Do not move framework build output to root `dist/` unless the user explicitly requested a no-build static app or Automaton CLI output proves that the framework output under `frontend/` cannot work.
-- For apps with Python backend controllers, keep backend source in `backend/`; frontend runtime deploy still points to the frontend build output.
+- For apps with HTTP backends, keep backend source in `backend/`; frontend runtime deploy still points to the frontend build output.
 - Put `frontend.build` and `frontend.deployDir` in `automaton.json` when needed.
 - `automaton deploy` uploads frontend runtime and backend runtime separately.
 - Do not create empty `backend/` or `data/` folders for frontend-only apps.
@@ -301,22 +301,23 @@ If `automaton.json` already exists, add missing `frontend.build` and `frontend.d
 
 ## Frontend to backend calls
 
-Frontend code must call backend actions with:
+Frontend code must use same-origin HTTP under `/api`:
 
 ```javascript
-await window.automatonApi.callController(controller, action, inputs)
+await fetch('/api/posts')
 ```
 
 Important:
-- `callController()` returns the backend `data` payload directly.
-- It throws on error.
-- Always use `try/catch`.
+- Use relative paths so deployed apps work across environments.
+- Use normal HTTP methods, JSON bodies, and HTTP status codes.
 
 Example:
 
 ```javascript
 try {
-  const data = await window.automatonApi.callController('todos', 'list', { page: 1 })
+  const response = await fetch('/api/posts?page=1')
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  const data = await response.json()
   console.log(data.items)
 } catch (err) {
   console.error(err.message)

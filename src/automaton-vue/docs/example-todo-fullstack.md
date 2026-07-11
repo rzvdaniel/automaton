@@ -1,6 +1,6 @@
 ---
 title: Full-Stack Todo Example
-description: Canonical Automaton Monster example project with Vite frontend, Python backend controllers, persistence, deploy, and publish flow.
+description: Canonical Automaton Monster example project with Vite frontend, FastAPI backend, persistence, deploy, and publish flow.
 ---
 
 # Full-Stack Todo Example
@@ -10,9 +10,9 @@ This is the canonical checked-in example project for Automaton Monster.
 It shows:
 
 - `frontend/` Vite TypeScript UI
-- `backend/` Python controller runtime
+- `backend/` FastAPI HTTP runtime
 - persistent todo storage in a JSON file
-- `window.automatonApi.callController(...)` usage
+- same-origin `/api` usage
 - `automaton deploy`
 - `automaton publish`
 

@@ -14,7 +14,7 @@ todo-app/
       api.ts
       main.ts
   backend/
-    todos.py
+    main.py
 ```
 
 ## Minimal frontend `automaton.json`
@@ -50,28 +50,25 @@ todo-app/
 }
 ```
 
-`backend/todos.py`
+`backend/main.py`
 
 ```python
-class TodosController:
-    def list(self, inputs: dict) -> dict:
-        return {"success": True, "data": {"items": []}, "error": ""}
+from fastapi import FastAPI
 
-_controller = TodosController()
+app = FastAPI()
 
-def handle(action_name: str, inputs: dict) -> dict:
-    method = getattr(_controller, action_name, None)
-    if method is None:
-        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
-
-    return method(inputs)
+@app.get("/api/todos")
+def list_todos():
+    return {"items": []}
 ```
 
 `frontend/src/api.ts`
 
 ```ts
 export async function listTodos() {
-  return window.automatonApi.callController('todos', 'list', {})
+  const response = await fetch('/api/todos')
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  return response.json()
 }
 ```
 

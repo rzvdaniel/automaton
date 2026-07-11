@@ -1,6 +1,6 @@
 ---
 title: Build a Backend App
-description: Build a Python backend app with Automaton. Deploy controllers to a self-hosted Runner and call them from your frontend.
+description: Build a Python HTTP backend app with Automaton and call it from your frontend.
 ---
 
 # Build a Backend App
@@ -41,49 +41,31 @@ my-app/
 
 ## Backend contract
 
-Automaton backend apps use Python controllers in `backend/`.
-
-Do not create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners.
-
-Each controller file must export `handle(action_name, inputs)` and return the standard envelope `{ success, data, error }`.
+Automaton backend apps are ordinary HTTP applications. The initial supported Python convention is FastAPI/ASGI with `main:app`.
 
 Example:
 
 ```python
-class TodosController:
-    def list(self, inputs: dict) -> dict:
-        return {
-            "success": True,
-            "data": {"items": [{"id": 1, "title": "Ship app", "done": False}]},
-            "error": ""
-        }
+from fastapi import FastAPI
 
-    def create(self, inputs: dict) -> dict:
-        title = str(inputs.get("title", "")).strip()
-        if not title:
-            return {"success": False, "data": None, "error": "title is required"}
+app = FastAPI()
 
-        return {
-            "success": True,
-            "data": {"id": 2, "title": title, "done": False},
-            "error": ""
-        }
+@app.get("/api/todos")
+def list_todos():
+    return {"items": [{"id": 1, "title": "Ship app", "done": False}]}
 
-_controller = TodosController()
-
-def handle(action_name: str, inputs: dict) -> dict:
-    method = getattr(_controller, action_name, None)
-    if method is None:
-        return {"success": False, "data": None, "error": f"Unknown action: {action_name}"}
-
-    return method(inputs)
+@app.post("/api/todos")
+def create_todo(todo: dict):
+    return {"todo": todo}
 ```
 
-Your frontend should call backend actions with `window.automatonApi.callController(...)`:
+Your frontend should call normal same-origin HTTP endpoints under `/api`:
 
 ```js
 try {
-  const data = await window.automatonApi.callController('todos', 'list', {})
+  const response = await fetch('/api/todos')
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  const data = await response.json()
   console.log(data.items)
 } catch (err) {
   console.error(err.message)
@@ -126,7 +108,7 @@ If no Runner is connected yet, deploy can still upload the backend, but the back
 
 Install a Runner before publishing backend apps you want people to use.
 
-For a fuller controller contract and starter examples, see:
+For fuller backend guidance and starter examples, see:
 
-- [Automaton backend controllers](https://automaton.monster/llms/automaton-backend-controllers.md)
+- [Automaton HTTP backends](https://automaton.monster/llms/automaton-backend-controllers.md)
 - [Automaton examples](https://automaton.monster/llms/automaton-examples.md)

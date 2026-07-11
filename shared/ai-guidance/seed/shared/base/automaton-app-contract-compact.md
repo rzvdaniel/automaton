@@ -34,16 +34,17 @@ backend/
 
 ## Backend rules
 
-- Automaton backends are Python controller-based backends.
-- Do not introduce FastAPI, Flask, Express, ASP.NET, or custom long-running servers unless the user explicitly asks for a non-standard setup.
-- Preserve the controller response envelope expected by `window.automatonApi.callController(...)`.
-- Backend controller responses should use the standard shape:
+- Automaton backends are ordinary HTTP applications. The initial supported convention is FastAPI/ASGI with `main:app`.
+- Frontends call same-origin HTTP paths under `/api`; do not use runtime-injected browser globals.
+- Keep the backend server behind the runner gateway. The browser should not know that it is running on Automaton.
+- Use normal HTTP resources and methods, for example `GET /api/posts` and `POST /api/posts`.
+- Backend responses should use the application’s normal JSON shape.
 
 ```json
-{ "success": true, "data": null, "error": null }
+{ "posts": [] }
 ```
 
-- On errors, return the same envelope shape with `success: false` and a useful `error` message.
+- Return appropriate HTTP status codes and useful JSON error messages.
 - Keep backend files under `backend/`.
 
 ## Runtime data

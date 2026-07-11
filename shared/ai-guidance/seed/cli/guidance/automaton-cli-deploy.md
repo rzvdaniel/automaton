@@ -23,7 +23,7 @@ automaton deploy
 - runs `frontend.build` when configured
 - uploads `frontend.deployDir` to frontend runtime
 - uploads `backend.deployDir` to backend runtime when present
-- handles runner selection only when backend controllers exist
+- handles runner selection when an HTTP backend is present
 
 For backend apps, let deploy choose or prompt for a connected runner:
 
@@ -32,7 +32,7 @@ automaton deploy
 automaton deploy --runner <runner-id-or-name>
 ```
 
-If backend controllers exist and no connected runner is available, ask for confirmation and prefer:
+If an HTTP backend exists and no connected runner is available, ask for confirmation and prefer:
 
 ```bash
 automaton runner install
