@@ -63,11 +63,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pandoc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install .NET 9 runtime
+# Install the .NET 9 ASP.NET Core runtime. The runner hosts the HTTP runtime gateway.
 ENV DOTNET_ROOT=/usr/share/dotnet
 RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh \
     && chmod +x dotnet-install.sh \
-    && ./dotnet-install.sh --runtime dotnet --version 9.0.6 --install-dir $DOTNET_ROOT \
+    && ./dotnet-install.sh --runtime aspnetcore --version 9.0.6 --install-dir $DOTNET_ROOT \
     && rm dotnet-install.sh \
     && ln -s $DOTNET_ROOT/dotnet /usr/bin/dotnet
 
