@@ -195,7 +195,6 @@ public class PublishedAppStorageService
     {
         const string runtimeScripts = """
     <script src="./automaton-config.js"></script>
-    <script src="/runtime/automaton-api.js"></script>
 """;
 
         var headCloseIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
@@ -246,7 +245,7 @@ public class PublishedAppStorageService
         {
             throw new InvalidOperationException(
                 "Published app index.html must not include Automaton runtime scripts. " +
-                "Automaton injects automaton-config.js and /runtime/automaton-api.js at publish time.");
+                "Automaton injects automaton-config.js at publish time.");
         }
 
         var invalidReferences = EnumerateHtmlReferences(html)
@@ -268,7 +267,6 @@ public class PublishedAppStorageService
 
     private static bool ContainsAutomatonRuntimeReference(string html) =>
         html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase) ||
-        html.Contains("automaton-api.js", StringComparison.OrdinalIgnoreCase) ||
         html.Contains("__automaton_api__", StringComparison.OrdinalIgnoreCase) ||
         html.Contains("__AUTOMATON_APP__", StringComparison.OrdinalIgnoreCase);
 

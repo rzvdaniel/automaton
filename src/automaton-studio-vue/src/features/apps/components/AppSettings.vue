@@ -1118,7 +1118,7 @@ automaton deploy</pre>
                   <div class="pl-3"><span class="ct-dir">mocks/</span> <span class="ct-comment">← local mock responses</span></div>
                 </div>
                 <p class="text-color-secondary text-sm mt-2 mb-0">
-                  Frontend code should call backend actions with <code class="connect-code">window.automatonApi.callController(controller, action, inputs)</code>.
+                  Frontend code should call the app backend with same-origin HTTP requests under <code class="connect-code">/api</code>.
                   The call returns the backend data payload directly and throws on error, so use <code class="connect-code">try/catch</code>.
                 </p>
                 <p class="text-color-secondary text-sm mt-2 mb-0">

@@ -18,17 +18,17 @@ Common problems and how to fix them.
 
 ---
 
-## `callController` throws in the frontend
+## Backend requests fail in the frontend
 
-**Symptom:** The frontend throws an error when calling `window.automatonApi.callController(...)`.
+**Symptom:** A frontend request to a same-origin `/api/...` endpoint fails.
 
 **Causes and fixes:**
 
 - **Backend not deployed** — Changes to Python files need a Deploy Backend step before they take effect. Deploy, then reload the preview.
 - **Backend uploaded but not running** — For CLI deploys, frontend and backend runtime may already be synced even when no runner is available. In that case rerun `automaton deploy --runner <runner-id-or-name>` after a runner is online.
 - **Wrong controller or action name** — The controller name is the filename without `.py`. The action name is the method name on the controller class. Check spelling.
-- **Action returned an error** — `callController` throws when the backend returns `{ success: false, ... }`. Add `try/catch` around every call and log `err.message` to see the backend error.
-- **Local development without mocks** — When running locally (not in the Automaton preview), `callController` reads from `backend/mocks/{controller}.{action}.json`. If that file is missing, the call throws. Add a mock file.
+- **Backend returned an error** — Check the HTTP status and response body, then inspect the runner backend logs.
+- **Backend is not running** — Confirm the HTTP backend is listening and that the runner has restored the app process.
 
 ---
 

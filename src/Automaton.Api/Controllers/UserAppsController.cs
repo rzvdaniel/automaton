@@ -69,28 +69,6 @@ public class UserAppsController : ControllerBase
         this.privateAppLaunchService = privateAppLaunchService;
     }
 
-    [HttpGet("runtime/automaton-api.js")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ServeRuntimeBridgeScript(CancellationToken cancellationToken)
-    {
-        var scriptPath = Path.GetFullPath(Path.Combine(
-            environment.ContentRootPath,
-            "..",
-            "..",
-            "docker",
-            "nginx",
-            "app-runtime",
-            "automaton-api.js"));
-
-        if (!System.IO.File.Exists(scriptPath))
-        {
-            return NotFound();
-        }
-
-        var script = await System.IO.File.ReadAllTextAsync(scriptPath, cancellationToken);
-        return Content(script, "application/javascript; charset=utf-8", Encoding.UTF8);
-    }
-
     /// <summary>
     /// Serve a user app's index.html by its public URL slug.
     /// Example: https://apps.automaton.monster/my-cool-app
@@ -390,8 +368,7 @@ public class UserAppsController : ControllerBase
 
     private string InjectRuntimeScripts(string html, Guid appId, string backendApiPath, bool useCurrentHostApiBase = false)
     {
-        if (html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase) ||
-            html.Contains("automaton-api.js", StringComparison.OrdinalIgnoreCase))
+        if (html.Contains("automaton-config.js", StringComparison.OrdinalIgnoreCase))
         {
             return html;
         }
@@ -417,7 +394,6 @@ public class UserAppsController : ControllerBase
 
         var runtimeScripts = $"""
     <script>window.__AUTOMATON_APP__ = {payload};</script>
-    <script src="/runtime/automaton-api.js"></script>
 """;
 
         var headCloseIndex = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
