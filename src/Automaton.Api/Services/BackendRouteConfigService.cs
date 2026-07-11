@@ -1,6 +1,7 @@
 using System.Text;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
+using Automaton.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -15,7 +16,7 @@ public class BackendRouteConfigService
     private readonly IWebHostEnvironment environment;
     private readonly ILogger<BackendRouteConfigService> logger;
 
-    private sealed record RouteTarget(Guid AppId, string RuntimeEndpoint);
+    private sealed record RouteTarget(Guid AppId, string RuntimeEndpoint, string? Slug);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -45,12 +46,16 @@ public class BackendRouteConfigService
                 (app, runner) => new
                 {
                     AppId = app.Id,
-                    RuntimeEndpoint = runner.RuntimeEndpoint!
+                    RuntimeEndpoint = runner.RuntimeEndpoint!,
+                    Slug = app.IsPublished && app.AccessStatus == AppAccessStatuses.Active
+                        ? app.PublicUrl
+                        : null
                 })
             .OrderBy(x => x.AppId)
             .Select(x => new RouteTarget(
                 x.AppId,
-                x.RuntimeEndpoint.Trim()))
+                x.RuntimeEndpoint.Trim(),
+                x.Slug))
             .ToListAsync(cancellationToken);
 
         var rootPath = ResolveRootPath();
@@ -103,7 +108,7 @@ public class BackendRouteConfigService
             var key = $"app-{route.AppId:N}";
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      entryPoints:");
-            builder.AppendLine("        - web");
+            builder.AppendLine("        - websecure");
             builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
@@ -111,17 +116,51 @@ public class BackendRouteConfigService
             builder.AppendLine($"        - \"{key}-rewrite\"");
         }
 
+        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        {
+            var key = $"slug-{route.AppId:N}";
+            builder.AppendLine($"    {key}-api:");
+            builder.AppendLine("      entryPoints:");
+            builder.AppendLine("        - websecure");
+            builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}/api`)\"");
+            builder.AppendLine("      priority: 100");
+            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine("      middlewares:");
+            builder.AppendLine($"        - \"{key}-api-rewrite\"");
+
+            builder.AppendLine($"    {key}-frontend:");
+            builder.AppendLine("      entryPoints:");
+            builder.AppendLine("        - websecure");
+            builder.AppendLine($"      rule: \"Host(`{publishedAppsConfig.PublicBaseUrlHost}`) && PathPrefix(`/{route.Slug}`)\"");
+            builder.AppendLine("      priority: 1");
+            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
+        }
+
         foreach (var route in routes)
         {
             var key = $"app-frontend-{route.AppId:N}";
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      entryPoints:");
-            builder.AppendLine("        - web");
+            builder.AppendLine("        - websecure");
             builder.AppendLine($"      rule: \"PathPrefix(`/a/{route.AppId}`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");
             builder.AppendLine("      middlewares:");
             builder.AppendLine($"        - \"{key}-rewrite\"");
+        }
+
+        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        {
+            var key = $"slug-{route.AppId:N}";
+            builder.AppendLine($"    {key}-api-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine($"        regex: \"^/{route.Slug}/api(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
+            builder.AppendLine($"    {key}-frontend-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine($"        regex: \"^/{route.Slug}(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
         }
 
         builder.AppendLine("  middlewares:");
@@ -132,6 +171,15 @@ public class BackendRouteConfigService
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine($"        regex: \"^/a/{route.AppId}/api(?:/(.*))?$\"");
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
+        }
+
+        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        {
+            var key = $"slug-{route.AppId:N}";
+            builder.AppendLine($"    {key}:");
+            builder.AppendLine("      loadBalancer:");
+            builder.AppendLine("        servers:");
+            builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
         }
 
         foreach (var route in routes)

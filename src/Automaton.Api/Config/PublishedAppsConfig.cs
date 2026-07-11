@@ -16,6 +16,11 @@ public class PublishedAppsConfig
     /// </summary>
     public string PublicBaseUrl { get; set; } = "http://localhost:5173";
 
+    public string PublicBaseUrlHost =>
+        Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out var uri)
+            ? uri.Host
+            : "localhost";
+
     /// <summary>
     /// API base URL injected into published apps so they can call Automaton runtime APIs.
     /// </summary>
