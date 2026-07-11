@@ -17,6 +17,23 @@ http:
         - api-https-headers
       tls: {}
 
+    legacy-http-redirect:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`^.+$`)"
+      priority: 1
+      middlewares:
+        - api-redirect
+      service: legacy-nginx
+
+    legacy-https:
+      entryPoints:
+        - websecure
+      rule: "HostRegexp(`^.+$`)"
+      priority: 1
+      service: legacy-nginx
+      tls: {}
+
   middlewares:
     api-redirect:
       redirectScheme:
@@ -32,8 +49,19 @@ http:
     api-blue-edge:
       loadBalancer:
         servers:
-          - url: "http://api-blue:8080"
+          - url: "http://api-__API_COLOR__:8080"
         passHostHeader: true
+
+    legacy-nginx:
+      loadBalancer:
+        servers:
+          - url: "https://nginx:443"
+        passHostHeader: true
+        serversTransport: legacy-nginx-tls
+
+  serversTransports:
+    legacy-nginx-tls:
+      insecureSkipVerify: true
 
 tls:
   certificates:
