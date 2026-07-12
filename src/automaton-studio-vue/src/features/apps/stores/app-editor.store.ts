@@ -834,6 +834,11 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         tags: request.tags ?? currentApp.value.tags,
       }
 
+      // The API writes the Traefik route atomically, but the file provider
+      // reload is asynchronous. Give it a moment before switching the iframe
+      // from the private runtime route to the published host route.
+      await new Promise(resolve => window.setTimeout(resolve, 750))
+
       // Refresh running application with published API
       await refreshApplication()
     } catch (err: unknown) {
