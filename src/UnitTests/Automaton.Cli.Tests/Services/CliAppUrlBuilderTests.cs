@@ -47,7 +47,7 @@ public class CliAppUrlBuilderTests
     {
         var url = CliAppUrlBuilder.BuildRestrictedAppUrl("http://localhost:5091", "app-123");
 
-        Assert.That(url, Is.EqualTo("http://localhost:5091/a/app-123/"));
+        Assert.That(url, Is.EqualTo("http://app-app123.apps.localhost:5091/"));
     }
 
     [Test]

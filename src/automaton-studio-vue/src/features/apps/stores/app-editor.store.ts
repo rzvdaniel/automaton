@@ -26,7 +26,7 @@ import {
   PendingFileChangeType as PendingChangeType,
 } from '../types/apps.types'
 import type { BackendRuntimeLogEvent, ConsoleEntry } from '../types/console.types'
-import { getDeployedAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl } from '../utils/public-app-url'
 
 export const useAppEditorStore = defineStore('appEditor', () => {
   // ============================================
@@ -780,7 +780,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       }
 
       await appsService.createRuntimeLaunch(currentApp.value.id)
-      const runtimeUrl = new URL(getDeployedAppUrl(currentApp.value.id), window.location.origin)
+      const runtimeUrl = new URL(getOpenAppUrl(currentApp.value), window.location.origin)
       runtimeUrl.searchParams.set('v', Date.now().toString())
       applicationUrl.value = runtimeUrl.toString()
       applicationWarning.value = getApplicationWarningMessage()

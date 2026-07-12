@@ -2047,12 +2047,20 @@ public class AppsController : BaseController
     private string BuildRestrictedRuntimeUrl(Guid appId)
     {
         var configuredBaseUrl = publishedAppsConfig.PublicBaseUrl?.Trim().TrimEnd('/');
-        if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
+        var baseUri = Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var configuredUri)
+            ? configuredUri
+            : new Uri($"{Request.Scheme}://{Request.Host}");
+        var rootDomain = baseUri.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
+            ? baseUri.Host["apps.".Length..]
+            : baseUri.Host;
+        var builder = new UriBuilder(baseUri)
         {
-            return $"{configuredBaseUrl}/a/{appId}";
-        }
-
-        return $"{Request.Scheme}://{Request.Host.ToUriComponent()}/a/{appId}";
+            Host = $"app-{appId:N}.apps.{rootDomain}",
+            Path = "/",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri.ToString();
     }
 
 }

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ProgressSpinner from 'primevue/progressspinner'
 import { appsService } from '../services/apps.service'
 import type { App } from '../types/apps.types'
-import { getDeployedAppUrl } from '../utils/public-app-url'
+import { getOpenAppUrl } from '../utils/public-app-url'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +35,7 @@ async function loadRuntimeView() {
 
     const runtimeUrl = app.value.requiresAuthentication
       ? new URL(appsService.getRestrictedRuntimeLaunchUrl(appId.value), window.location.origin)
-      : new URL(getDeployedAppUrl(appId.value), window.location.origin)
+      : new URL(getOpenAppUrl(app.value), window.location.origin)
     runtimeUrl.searchParams.set('v', Date.now().toString())
     applicationUrl.value = runtimeUrl.toString()
   } catch (err) {

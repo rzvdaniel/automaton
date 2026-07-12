@@ -235,7 +235,6 @@ public class AppAuthorizationRegressionTests
             null!,
             authorizationService,
             fileStorageService,
-            null!,
             environment,
             new NoOpAuditEventService(),
             new NoOpApplicationEventService(),

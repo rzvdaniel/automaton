@@ -9,7 +9,18 @@ public static class CliAppUrlBuilder
             return string.Empty;
         }
 
-        return $"{ResolveAppsBaseUrl(server).TrimEnd('/')}/a/{Uri.EscapeDataString(appId.Trim())}/";
+        var appsBaseUrl = new Uri(ResolveAppsBaseUrl(server));
+        var host = appsBaseUrl.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
+            ? appsBaseUrl.Host["apps.".Length..]
+            : appsBaseUrl.Host;
+        var builder = new UriBuilder(appsBaseUrl)
+        {
+            Host = $"app-{appId.Trim().Replace("-", string.Empty, StringComparison.Ordinal)}.apps.{host}",
+            Path = "/",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri.ToString();
     }
 
     public static string BuildRuntimeLaunchUrl(string? server, string? appId, string? runtimeToken)
@@ -25,7 +36,18 @@ public static class CliAppUrlBuilder
 
     public static string BuildPublishedUrl(string server, string slug)
     {
-        return $"{ResolveAppsBaseUrl(server).TrimEnd('/')}/{Uri.EscapeDataString(slug.Trim())}/";
+        var appsBaseUrl = new Uri(ResolveAppsBaseUrl(server));
+        var host = appsBaseUrl.Host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
+            ? appsBaseUrl.Host["apps.".Length..]
+            : appsBaseUrl.Host;
+        var builder = new UriBuilder(appsBaseUrl)
+        {
+            Host = $"{slug.Trim()}.apps.{host}",
+            Path = "/",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri.ToString();
     }
 
     public static string BuildStudioAppUrl(string? server, string? appId)

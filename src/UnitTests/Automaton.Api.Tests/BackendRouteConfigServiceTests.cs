@@ -56,7 +56,7 @@ public class BackendRouteConfigServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(content, Does.Contain($"PathPrefix(`/a/{appId}/api`)"));
+            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/api`)"));
             Assert.That(content, Does.Contain($"/apps/{appId}/api/$1"));
             Assert.That(content, Does.Contain("http://runner-a:8080"));
         });

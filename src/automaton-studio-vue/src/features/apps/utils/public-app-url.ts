@@ -32,7 +32,15 @@ export function getPublishedAppsUrlPrefix(): string {
 
 export function getDeployedAppUrl(appId?: string | null): string {
   const normalizedAppId = appId?.trim()
-  return normalizedAppId ? `${getPublicAppsBaseUrl()}/a/${encodeURIComponent(normalizedAppId)}/` : ''
+  if (!normalizedAppId) return ''
+
+  const baseUrl = new URL(getPublicAppsBaseUrl(), window.location.origin)
+  const appsMarker = baseUrl.hostname.indexOf('.apps.')
+  baseUrl.hostname = appsMarker >= 0
+    ? `app-${normalizedAppId.replace(/-/g, '')}${baseUrl.hostname.slice(appsMarker)}`
+    : `app-${normalizedAppId.replaceAll('-', '')}.${baseUrl.hostname}`
+  baseUrl.pathname = '/'
+  return baseUrl.toString()
 }
 
 export function getStudioAppUrl(appId?: string | null): string {
@@ -73,11 +81,18 @@ export function getPublishedAppUrl(slug?: string | null): string {
   const normalizedSlug = slug?.trim()
   if (!normalizedSlug) return ''
 
-  const baseUrl = getPublicAppsBaseUrl()
-  const pathPrefix = shouldNamespacePublishedApps(baseUrl) ? '/apps' : ''
-  return `${baseUrl}${pathPrefix}/${encodeURIComponent(normalizedSlug)}/`
+  const baseUrl = new URL(getPublicAppsBaseUrl(), window.location.origin)
+  const appsMarker = baseUrl.hostname.indexOf('.apps.')
+  const rootDomain = appsMarker >= 0
+    ? baseUrl.hostname.slice(appsMarker + '.apps.'.length)
+    : baseUrl.hostname.replace(/^apps\./, '')
+  baseUrl.hostname = `${normalizedSlug}.apps.${rootDomain}`
+  baseUrl.pathname = '/'
+  return baseUrl.toString()
 }
 
 export function getOpenAppUrl(app: { id?: string | null; isPublished?: boolean; publicUrl?: string | null }): string {
-  return getStudioApplicationUrl(app.id)
+  return app.isPublished && app.publicUrl
+    ? getPublishedAppUrl(app.publicUrl)
+    : getDeployedAppUrl(app.id)
 }

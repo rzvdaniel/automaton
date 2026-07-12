@@ -138,7 +138,6 @@ public class UserAppsControllerTests
             null!,
             authorizationService,
             null!,
-            null!,
             new StubWebHostEnvironment(),
             new NoOpAuditEventService(),
             new NoOpApplicationEventService(),
