@@ -155,19 +155,6 @@ public class BackendRouteConfigService
             builder.AppendLine($"        - \"{key}-rewrite\"");
         }
 
-        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
-        {
-            var key = $"slug-{route.AppId:N}";
-            builder.AppendLine($"    {key}-api-rewrite:");
-            builder.AppendLine("      replacePathRegex:");
-            builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
-            builder.AppendLine($"    {key}-frontend-rewrite:");
-            builder.AppendLine("      replacePathRegex:");
-            builder.AppendLine("        regex: \"^/(.*)$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
-        }
-
         builder.AppendLine("  middlewares:");
         foreach (var route in routes)
         {
@@ -184,6 +171,19 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine($"        regex: \"^/a/{route.AppId}(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
+        }
+
+        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        {
+            var key = $"slug-{route.AppId:N}";
+            builder.AppendLine($"    {key}-api-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
+            builder.AppendLine($"    {key}-frontend-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine("        regex: \"^/(.*)$\"");
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
         }
 
