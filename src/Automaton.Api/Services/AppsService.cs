@@ -18,7 +18,6 @@ public class AppsService
     private readonly UserContextService userContextService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly AppFileStorageService fileStorageService;
-    private readonly PublishedAppStorageService publishedAppStorageService;
     private readonly IWebHostEnvironment webHostEnvironment;
     private readonly IAuditEventService auditEventService;
     private readonly IApplicationEventService applicationEventService;
@@ -34,7 +33,6 @@ public class AppsService
         RecentActivityService recentActivityService,
         ResourceAuthorizationService authorizationService,
         AppFileStorageService fileStorageService,
-        PublishedAppStorageService publishedAppStorageService,
         IWebHostEnvironment webHostEnvironment,
         IAuditEventService auditEventService,
         IApplicationEventService applicationEventService,
@@ -46,7 +44,6 @@ public class AppsService
         this.recentActivityService = recentActivityService;
         this.authorizationService = authorizationService;
         this.fileStorageService = fileStorageService;
-        this.publishedAppStorageService = publishedAppStorageService;
         this.webHostEnvironment = webHostEnvironment;
         this.auditEventService = auditEventService;
         this.applicationEventService = applicationEventService;
@@ -592,17 +589,6 @@ public class AppsService
         var ownerId = ResolveAppOwnerId(entity) ?? UserId;
         var nextVersion = entity.Version + 1;
 
-        await publishedAppStorageService.PublishAsync(
-            ownerId,
-            id,
-            new PublishedAppPackageMetadata(
-                id,
-                publicUrl,
-                entity.Name,
-                entity.Summary,
-                entity.Description,
-                nextVersion));
-
         entity.IsPublished = true;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
@@ -675,8 +661,6 @@ public class AppsService
         {
             throw new InvalidOperationException($"App {id} not found");
         }
-
-        await publishedAppStorageService.UnpublishAsync(entity.PublicUrl);
 
         entity.IsPublished = false;
         entity.PublishedAt = null;

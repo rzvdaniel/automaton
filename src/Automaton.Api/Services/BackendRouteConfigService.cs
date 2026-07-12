@@ -178,15 +178,6 @@ public class BackendRouteConfigService
             builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
         }
 
-        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
-        {
-            var key = $"slug-{route.AppId:N}";
-            builder.AppendLine($"    {key}:");
-            builder.AppendLine("      loadBalancer:");
-            builder.AppendLine("        servers:");
-            builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
-        }
-
         foreach (var route in routes)
         {
             var key = $"app-frontend-{route.AppId:N}";
@@ -197,6 +188,15 @@ public class BackendRouteConfigService
         }
 
         builder.AppendLine("  services:");
+        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        {
+            var key = $"slug-{route.AppId:N}";
+            builder.AppendLine($"    {key}:");
+            builder.AppendLine("      loadBalancer:");
+            builder.AppendLine("        servers:");
+            builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
+        }
+
         foreach (var route in routes)
         {
             var key = $"app-{route.AppId:N}";
