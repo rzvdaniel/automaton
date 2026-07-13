@@ -89,7 +89,7 @@ deploy_color website "$TARGET_WEBSITE_COLOR"
 
 switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSITE_COLOR"
 
-echo "[INFO] nginx is now routing api, studio, and website to the freshly deployed colors"
+echo "[INFO] Traefik is now routing api, studio, and website to the freshly deployed colors"
 
 if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
     signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"

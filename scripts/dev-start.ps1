@@ -5,25 +5,15 @@
 .DESCRIPTION
     1. Copies appsettings.Development.json from the main repo
     2. Starts Automaton.Api  (new terminal window)
-    3. Starts Automaton.Worker         (new terminal window)
-    4. Starts FastAPI backend          (new terminal window, port 8001)
-    5. Starts Automaton.Runner         (new terminal window)
-    6. Starts the Vue.js frontend      (new terminal window)
-    7. Starts the public website app   (new terminal window)
+    3. Starts the Studio Vue frontend (new terminal window)
+    4. Starts the public website app  (new terminal window)
 
     Documentation servers are not started by default.
     Start them manually only when working on docs:
       public docs:  cd src\automaton-vue && npm run docs:dev
 
-    Requires Python with fastapi and uvicorn installed:
-      pip install fastapi "uvicorn[standard]"
-
-        New: If you pass `-AutoInstall` the script will attempt to install missing
-        Python and frontend packages when possible:
-            - Uses `python -m pip install fastapi "uvicorn[standard]"` when Python
-                is present but FastAPI/uvicorn are missing.
-            - Runs `npm install` in the Vue project when Node/npm are present but
-                frontend dependencies (vite) are missing.
+    If you pass `-AutoInstall` the script will attempt to run `npm install` in
+    the Studio and Website projects when frontend dependencies are missing.
 
         Note: The script will NOT install Node.js itself; install Node from
         https://nodejs.org if not present.
@@ -36,9 +26,8 @@
     Auto-detected from git worktree list if not supplied.
 
 .PARAMETER AutoInstall
-    When supplied the script will attempt to auto-install missing Python
-    packages (FastAPI/uvicorn) and frontend dependencies (`npm install`) if
-    the corresponding package managers (`python` and `npm`) are available.
+    When supplied the script will attempt to auto-install missing frontend
+    dependencies (`npm install`) if npm is available.
     Use this for convenience on developer machines. Omit to require manual
     installation in controlled environments.
 
@@ -59,8 +48,6 @@ $ErrorActionPreference = "Stop"
 
 $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
 $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
-$WorkerProject = Join-Path $WorktreeRoot "src\Automaton.Worker"
-$RunnerProject = Join-Path $WorktreeRoot "src\Automaton.Runner"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
 
@@ -88,71 +75,6 @@ function Start-DevWindow([string]$title, [string]$workDir, [string]$cmd) {
 Write-Step "Starting Automaton.Api..."
 Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
 Write-Ok "Server window launched"
-
-# Give the server time to start before the runner connects
-Start-Sleep -Seconds 15
-
-# ---------- 3. Automaton.Worker ---------------------------------------------
-
-Write-Step "Starting Automaton.Worker..."
-Start-DevWindow "Automaton Worker" $WorkerProject "dotnet watch"
-Write-Ok "Worker window launched"
-
-# ---------- 4. FastAPI backend (required for tunnel execution) ---------------
-
-# Check Python and required packages are installed
-Write-Step "Checking FastAPI prerequisites..."
-$pythonOk  = $null -ne (Get-Command python -ErrorAction SilentlyContinue)
-$fastapiOk = $false
-$uvicornOk = $false
-if (-not $pythonOk) {
-    Write-Warn "Python not found. FastAPI backend will not start."
-    Write-Warn "Install Python from https://python.org, then run:"
-    Write-Warn "  pip install fastapi `"uvicorn[standard]`""
-} else {
-    $prev = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    python -c "import fastapi" 2>&1 | Out-String | Out-Null; $fastapiOk = ($LASTEXITCODE -eq 0)
-    python -c "import uvicorn" 2>&1 | Out-String | Out-Null; $uvicornOk = ($LASTEXITCODE -eq 0)
-    $ErrorActionPreference = $prev
-    if (-not $fastapiOk -or -not $uvicornOk) {
-        if ($AutoInstall) {
-            Write-Step "Attempting to install FastAPI and uvicorn via pip..."
-            try {
-                python -m pip install --upgrade pip
-                python -m pip install fastapi "uvicorn[standard]"
-                python -c "import fastapi" 2>&1 | Out-String | Out-Null; $fastapiOk = ($LASTEXITCODE -eq 0)
-                python -c "import uvicorn" 2>&1 | Out-String | Out-Null; $uvicornOk = ($LASTEXITCODE -eq 0)
-                if ($fastapiOk -and $uvicornOk) { Write-Ok "FastAPI prerequisites OK (installed)" } else { Write-Warn "FastAPI install attempted but imports still fail." }
-            } catch {
-                Write-Warn "Auto-install of FastAPI failed: $_"
-            }
-        } else {
-            Write-Warn "FastAPI or uvicorn not installed. App controller execution will not work."
-            Write-Warn "Run once to fix:  pip install fastapi \"uvicorn[standard]\" or re-run with -AutoInstall"
-        }
-    } else {
-        Write-Ok "FastAPI prerequisites OK"
-    }
-}
-
-Write-Step "Starting FastAPI backend..."
-$FastApiDir     = Join-Path $RunnerProject "fastapi_server"
-# Stable path at the worktree root - shared by FastAPI and the C# runner via RUNNER_SCRIPTS_DIR
-$RunnerDataDir  = Join-Path $WorktreeRoot "runner-data\apps"
-New-Item -ItemType Directory -Force -Path $RunnerDataDir | Out-Null
-# Set once here - all child windows inherit these automatically
-$env:RUNNER_SCRIPTS_DIR    = $RunnerDataDir
-# Allows the runner to connect to localhost using the ASP.NET self-signed dev certificate
-$env:DOTNET_ENVIRONMENT    = "Development"
-if ($pythonOk -and $fastapiOk -and $uvicornOk) {
-    Start-DevWindow "Automaton FastAPI" $FastApiDir "python main.py"
-    Write-Ok "FastAPI window launched (port 8001)"
-    # Give FastAPI a moment to start before the runner connects
-    Start-Sleep -Seconds 3
-} else {
-    Write-Warn "Skipping FastAPI window - prerequisites not met."
-}
 
 # ---------- Node / Vite checks for frontend --------------------------------
 $nodeOk = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
@@ -204,17 +126,11 @@ if (-not $nodeOk -or -not $npmOk) {
     }
 }
 
-# ---------- 5. Automaton.Runner ---------------------------------------------
+# ---------- 3. Studio frontend ----------------------------------------------
 
-Write-Step "Starting Automaton.Runner..."
-Start-DevWindow "Automaton Runner" $RunnerProject "dotnet watch"
-Write-Ok "Runner window launched"
-
-# ---------- 6. Vue.js frontend ----------------------------------------------
-
-Write-Step "Starting Vue.js frontend..."
-Start-DevWindow "Automaton Vue" $VueProject "npm run dev"
-Write-Ok "Vue window launched"
+Write-Step "Starting Automaton Studio frontend..."
+Start-DevWindow "Automaton Studio" $VueProject "npm run dev"
+Write-Ok "Studio window launched"
 
 Write-Step "Starting front-facing Automaton website..."
 Start-DevWindow "Automaton Website" $WebsiteProject "npm run dev"
@@ -228,7 +144,7 @@ Write-Host "  Automaton dev environment starting up    " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Server   : https://localhost:7091        " -ForegroundColor White
 Write-Host "  Swagger  : https://localhost:7091/swagger" -ForegroundColor White
-Write-Host "  Frontend : http://localhost:5173         " -ForegroundColor White
+Write-Host "  Studio   : http://localhost:5173         " -ForegroundColor White
 Write-Host "  Website  : http://localhost:5174         " -ForegroundColor White
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""

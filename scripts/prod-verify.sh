@@ -1,5 +1,5 @@
 #!/bin/bash
-# Verify the nginx production stack after bootstrap, deploy, rollback, or cert renewal.
+# Verify the Traefik production stack after bootstrap, deploy, rollback, or cert renewal.
 
 set -euo pipefail
 
@@ -40,7 +40,6 @@ echo "[INFO] Production blue/green state"
 status_table
 
 check "Docker Compose service status" docker compose -f "$COMPOSE_FILE" ps
-check "nginx configuration" docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -t
 check "traefik ping" docker compose -f "$COMPOSE_FILE" exec -T traefik wget -q -O- http://127.0.0.1:8082/ping
 
 check_url "origin API health" "https://$API_DOMAIN/healthz" -k --resolve "$API_DOMAIN:443:127.0.0.1"

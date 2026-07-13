@@ -237,10 +237,14 @@ ensure_acme_webroot() {
 ensure_blue_green_bootstrap() {
     load_prod_env
     ensure_runtime_dirs
-    ensure_acme_webroot
 
-    render_nginx_runtime
-    ensure_placeholder_certificate
+    if [[ ! -f "$STATE_FILE" ]]; then
+        write_default_state
+    fi
+
+    cp "$TRAEFIK_TEMPLATE_DIR/traefik.yml" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
+    sed -i "s|__ACME_EMAIL__|$ACME_EMAIL|g" "$TRAEFIK_RUNTIME_DIR/traefik.yml"
+    render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$(get_live_color website)"
 }
 
 other_color() {
@@ -369,13 +373,10 @@ wait_for_service_healthy() {
     done
 }
 
-nginx_test() {
-    docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -t
-}
-
-nginx_reload() {
-    nginx_test
-    docker compose -f "$COMPOSE_FILE" exec -T nginx nginx -s reload
+traefik_reload() {
+    # The file provider watches api-edge.yml and the managed-runtime directory.
+    # Rendering is atomic; a ping confirms the edge remains alive after reload.
+    docker compose -f "$COMPOSE_FILE" exec -T traefik wget -q -O- http://127.0.0.1:8082/ping > /dev/null
 }
 
 verify_live_origin() {
@@ -476,15 +477,15 @@ switch_live_color() {
         website) render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$color" ;;
     esac
 
-    if ! nginx_reload; then
-        echo "[ERROR] nginx reload failed while switching $service to $color. Reverting selector." >&2
+    if ! traefik_reload; then
+        echo "[ERROR] Traefik validation failed while switching $service to $color. Reverting selector." >&2
         render_service_upstream "$service" "$previous_color"
         case "$service" in
             api) render_traefik_api_edge "$previous_color" "$(get_live_color studio)" "$(get_live_color website)" ;;
             studio) render_traefik_api_edge "$(get_live_color api)" "$previous_color" "$(get_live_color website)" ;;
             website) render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$previous_color" ;;
         esac
-        nginx_reload || true
+        traefik_reload || true
         exit 1
     fi
 
@@ -510,13 +511,13 @@ switch_all_live_colors() {
     render_service_upstream website "$website_color"
     render_traefik_api_edge "$api_color" "$studio_color" "$website_color"
 
-    if ! nginx_reload; then
-        echo "[ERROR] nginx reload failed while switching all public services. Reverting selectors." >&2
+    if ! traefik_reload; then
+        echo "[ERROR] Traefik validation failed while switching all public services. Reverting selectors." >&2
         render_service_upstream api "$previous_api_color"
         render_service_upstream studio "$previous_studio_color"
         render_service_upstream website "$previous_website_color"
         render_traefik_api_edge "$previous_api_color" "$previous_studio_color" "$previous_website_color"
-        nginx_reload || true
+        traefik_reload || true
         exit 1
     fi
 
@@ -536,12 +537,11 @@ switch_all_live_colors() {
 
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
-    echo "[INFO] Ensuring MySQL, RabbitMQ, worker, nginx, and traefik are up"
-    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker nginx traefik
+    echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and traefik are up"
+    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker traefik
     wait_for_service_healthy mysql 120
     wait_for_service_healthy rabbitmq 120
     wait_for_service_healthy worker 120
-    wait_for_service_healthy nginx 120
     wait_for_service_healthy traefik 120
 }
 
@@ -553,24 +553,24 @@ reset_blue_green_to_blue() {
     render_all_upstreams
 }
 
-verify_target_from_nginx() {
+verify_target_from_traefik_network() {
     local service="$1"
     local color="$2"
     local timeout_seconds="${3:-60}"
     local started_at
     started_at="$(date +%s)"
 
-    echo "[INFO] Verifying nginx can reach $service-$color before cutover"
+    echo "[INFO] Verifying Traefik network can reach $service-$color before cutover"
 
     while true; do
-        if docker compose -f "$COMPOSE_FILE" exec -T nginx sh -lc "$(nginx_target_probe_command "$service" "$color")" > /dev/null 2>&1; then
-            echo "[INFO] nginx reachability check passed for $service-$color"
+        if docker compose -f "$COMPOSE_FILE" exec -T traefik sh -lc "$(traefik_target_probe_command "$service" "$color")" > /dev/null 2>&1; then
+            echo "[INFO] Traefik network reachability check passed for $service-$color"
             return 0
         fi
 
         if (( "$(date +%s)" - started_at >= timeout_seconds )); then
-            echo "[ERROR] Timed out waiting for nginx to reach $service-$color" >&2
-            docker compose -f "$COMPOSE_FILE" logs --tail 100 nginx >&2 || true
+            echo "[ERROR] Timed out waiting for Traefik network to reach $service-$color" >&2
+            docker compose -f "$COMPOSE_FILE" logs --tail 100 "$service-$color" >&2 || true
             exit 1
         fi
 
@@ -578,12 +578,12 @@ verify_target_from_nginx() {
     done
 }
 
-nginx_target_probe_command() {
+traefik_target_probe_command() {
     local service="$1"
     local color="$2"
 
     case "$service" in
-        api) echo "curl -fsS http://api-$color:8080/healthz > /dev/null" ;;
+        api) echo "wget -q -O- http://api-$color:8080/healthz > /dev/null" ;;
         studio) echo "wget -q --spider http://studio-$color/" ;;
         website) echo "wget -q --spider http://website-$color/" ;;
         *)
@@ -602,7 +602,7 @@ deploy_color() {
     echo "[INFO] Deploying $compose_service"
     docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans "$compose_service"
     wait_for_service_healthy "$compose_service"
-    verify_target_from_nginx "$service" "$color"
+    verify_target_from_traefik_network "$service" "$color"
 
     if (( CUTOVER_WARMUP_SECONDS > 0 )); then
         echo "[INFO] Warming up $compose_service for ${CUTOVER_WARMUP_SECONDS}s before cutover"

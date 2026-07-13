@@ -14,8 +14,8 @@ certificatesResolvers:
     acme:
       email: "__ACME_EMAIL__"
       storage: "/etc/traefik/acme/acme.json"
-      httpChallenge:
-        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
 
 providers:
   file:

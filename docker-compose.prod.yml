@@ -131,6 +131,8 @@ services:
     container_name: automaton-traefik
     restart: unless-stopped
     logging: *default-json-logging
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN is required in .env}
     volumes:
       - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./.prod-runtime/traefik/api-edge.yml:/etc/traefik/dynamic/api-edge.yml:ro
