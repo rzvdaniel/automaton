@@ -7,6 +7,7 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Automaton.Api.Services;
 
@@ -81,12 +82,12 @@ public class HostedRunnerProvisioningService
             db.HostedRunners.Add(hostedRunner);
         }
 
+        var previousHostId = hostedRunner.RunnerHostId;
         hostedRunner.SubscriptionPlanId = plan.Id;
         hostedRunner.CpuCores = capabilities.CpuCores;
         hostedRunner.MemoryMb = capabilities.MemoryMb;
         hostedRunner.DiskMb = capabilities.DiskMb;
         hostedRunner.MaxApps = capabilities.MaxApps;
-        hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner.ContainerName);
         hostedRunner.UpdatedAt = now;
 
         var host = await SelectHostAsync(capabilities, cancellationToken);
@@ -100,6 +101,12 @@ public class HostedRunnerProvisioningService
         }
 
         hostedRunner.RunnerHostId = host.Id;
+        hostedRunner.RuntimePort = await AllocateRuntimePortAsync(
+            host,
+            hostedRunner,
+            previousHostId == host.Id,
+            cancellationToken);
+        hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner, host);
         hostedRunner.LastError = null;
 
         if (!forceProvision && hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
@@ -308,6 +315,11 @@ public class HostedRunnerProvisioningService
 
         return hosts.FirstOrDefault(host =>
         {
+            if (!IsLocalHost(host) && string.IsNullOrWhiteSpace(host.PublicIp))
+            {
+                return false;
+            }
+
             var assigned = host.HostedRunners.Where(r => OccupyingStatuses.Contains(r.Status) && r.DeletedAt == null);
             return assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
                 && assigned.Sum(r => r.MemoryMb) + requested.MemoryMb <= host.TotalMemoryMb
@@ -394,8 +406,73 @@ public class HostedRunnerProvisioningService
 
     private static string BuildContainerName(Guid userId) => $"automaton-hosted-runner-{userId.ToString("N")[..12]}";
 
-    private string BuildRuntimeEndpoint(string containerName)
-        => $"http://{containerName}:{options.RuntimePort}";
+    private string? BuildRuntimeEndpoint(HostedRunner hostedRunner, RunnerHost host)
+    {
+        if (IsLocalHost(host))
+        {
+            return $"http://{hostedRunner.ContainerName}:{options.RuntimePort}";
+        }
+
+        if (string.IsNullOrWhiteSpace(host.PublicIp) || hostedRunner.RuntimePort is not > 0)
+        {
+            return null;
+        }
+
+        var endpointHost = host.PublicIp.Trim();
+        if (IPAddress.TryParse(endpointHost, out var address) &&
+            address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            endpointHost = $"[{endpointHost}]";
+        }
+
+        return $"http://{endpointHost}:{hostedRunner.RuntimePort}";
+    }
+
+    private async Task<int?> AllocateRuntimePortAsync(
+        RunnerHost host,
+        HostedRunner hostedRunner,
+        bool keepExistingPort,
+        CancellationToken cancellationToken)
+    {
+        if (IsLocalHost(host))
+        {
+            return null;
+        }
+
+        if (keepExistingPort && hostedRunner.RuntimePort is > 0)
+        {
+            return hostedRunner.RuntimePort;
+        }
+
+        var start = options.RemoteRuntimePortStart;
+        var end = options.RemoteRuntimePortEnd;
+        if (start <= 0 || end < start || end > 65535)
+        {
+            throw new InvalidOperationException("HostedRunners remote runtime port range is invalid.");
+        }
+
+        var usedPorts = await db.HostedRunners
+            .Where(x => x.RunnerHostId == host.Id &&
+                        x.Id != hostedRunner.Id &&
+                        x.DeletedAt == null &&
+                        x.RuntimePort != null)
+            .Select(x => x.RuntimePort!.Value)
+            .ToListAsync(cancellationToken);
+        var used = usedPorts.ToHashSet();
+
+        for (var port = start; port <= end; port++)
+        {
+            if (!used.Contains(port))
+            {
+                return port;
+            }
+        }
+
+        throw new InvalidOperationException($"Runner host '{host.Name}' has no available remote runtime ports.");
+    }
+
+    private static bool IsLocalHost(RunnerHost host)
+        => host.IsLocal || string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase);
 
     private async Task SaveProvisioningCheckpointAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
     {

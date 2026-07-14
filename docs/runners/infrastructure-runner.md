@@ -72,9 +72,13 @@ Infrastructure Runner, hosted-runner Docker provisioning, restart, and delete
 operations are sent over its authenticated Runner connection. SSH remains the
 bootstrap and emergency recovery path for hosts that are not yet linked.
 
-Remote app traffic still needs a routable runtime endpoint or per-host gateway;
-the infrastructure connection solves host management, not cross-server
-container-name resolution.
+For remote hosts, Automaton allocates a unique host port from
+`HostedRunners:RemoteRuntimePortStart` through
+`HostedRunners:RemoteRuntimePortEnd`, publishes it to the hosted Runner's
+gateway port, and stores a runtime endpoint such as
+`http://<runner-host-address>:20000`. The host firewall must allow that range
+from the API/reverse-proxy network. Same-host deployments continue using the
+Docker-network endpoint.
 
 ## Host commands
 

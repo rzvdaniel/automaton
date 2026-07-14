@@ -235,6 +235,7 @@ public class AdminHostedRunnersController : ControllerBase
             MaxApps = runner.MaxApps,
             ContainerName = runner.ContainerName,
             ContainerId = runner.ContainerId,
+            RuntimePort = runner.RuntimePort,
             RunnerConnectivityStatus = runnerConnectivityStatus,
             RunnerLastHeartbeatAtUtc = runner.Runner?.LastHeartbeatAtUtc,
             RunnerLastConnectedAtUtc = runner.Runner?.LastConnectedAtUtc,
@@ -329,6 +330,7 @@ public record HostedRunnerResponse
     public int MaxApps { get; init; }
     public string ContainerName { get; init; } = string.Empty;
     public string? ContainerId { get; init; }
+    public int? RuntimePort { get; init; }
     public string RunnerConnectivityStatus { get; init; } = RunnerStatus.None.ToString();
     public DateTime? RunnerLastHeartbeatAtUtc { get; init; }
     public DateTime? RunnerLastConnectedAtUtc { get; init; }

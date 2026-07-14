@@ -491,6 +491,7 @@ export interface HostedRunner {
   maxApps: number
   containerName: string
   containerId?: string
+  runtimePort?: number
   runnerConnectivityStatus: string
   runnerLastHeartbeatAtUtc?: string
   runnerLastConnectedAtUtc?: string

@@ -511,6 +511,12 @@ onMounted(refreshAll)
             <template #body="{ data }">{{ data.cpuCores }} CPU, {{ formatMb(data.memoryMb) }}, {{ formatMb(data.diskMb) }}</template>
           </Column>
           <Column field="containerName" header="Container" />
+          <Column header="Runtime port">
+            <template #body="{ data }">
+              <span v-if="data.runtimePort">{{ data.runtimePort }}</span>
+              <span v-else class="text-color-secondary">Internal</span>
+            </template>
+          </Column>
           <Column header="Deployment">
             <template #body="{ data }">
               <Tag

@@ -42,11 +42,12 @@ public static class HostedRunnerDockerCommandBuilder
             $"-e AUTOMATON_API_KEY={ShellQuote(apiKey)}",
             $"-e AUTOMATON_RUNNER_NAME={ShellQuote(runner.Name)}",
             $"-e AUTOMATON_HOSTED_RUNNER_ID={ShellQuote(runner.Id.ToString())}",
+            BuildRuntimePortPublishArgument(runner, options),
             $"-v {ShellQuote($"{runnerRoot}/config:/home/automaton/.config/AutomatonRunner")}",
             $"-v {ShellQuote($"{dataVolumeName}:/automaton/workspace")}",
             $"-v {ShellQuote($"{runnerRoot}/logs:/app/logs")}",
             ShellQuote(options.DockerImage)
-        });
+        }.Where(argument => !string.IsNullOrWhiteSpace(argument)));
 
         var runtimeNetworkAttach = string.IsNullOrWhiteSpace(options.RuntimeDockerNetwork)
             ? null
@@ -100,11 +101,12 @@ public static class HostedRunnerDockerCommandBuilder
             $"-e AUTOMATON_API_KEY={ShellQuote(apiKey)}",
             $"-e AUTOMATON_RUNNER_NAME={ShellQuote(runner.Name)}",
             $"-e AUTOMATON_HOSTED_RUNNER_ID={ShellQuote(runner.Id.ToString())}",
+            BuildRuntimePortPublishArgument(runner, options),
             $"-v {ShellQuote($"{configVolumeName}:/home/automaton/.config/AutomatonRunner")}",
             $"-v {ShellQuote($"{workspaceVolumeName}:/automaton/workspace")}",
             $"-v {ShellQuote($"{logsVolumeName}:/app/logs")}",
             ShellQuote(options.DockerImage)
-        });
+        }.Where(argument => !string.IsNullOrWhiteSpace(argument)));
 
         var runtimeNetworkAttach = string.IsNullOrWhiteSpace(options.RuntimeDockerNetwork)
             ? null
@@ -144,6 +146,11 @@ public static class HostedRunnerDockerCommandBuilder
     internal static string BuildWorkspaceVolumeName(HostedRunner runner) => $"automaton-runner-{runner.Id:N}-data";
 
     internal static string BuildLogsVolumeName(HostedRunner runner) => $"automaton-runner-{runner.Id:N}-logs";
+
+    private static string BuildRuntimePortPublishArgument(HostedRunner runner, HostedRunnerOptions options)
+        => runner.RuntimePort is > 0
+            ? $"-p {ShellQuote($"{runner.RuntimePort}:{options.RuntimePort}")}"
+            : string.Empty;
 
     private static string TrimTrailingSlash(string value) => value.TrimEnd('/', '\\');
 

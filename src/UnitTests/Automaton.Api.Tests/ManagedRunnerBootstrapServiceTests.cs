@@ -44,6 +44,25 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
+    public async Task EnsureRunnerAssignmentAsync_AssignsRemoteRuntimePortAndEndpoint()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db, remote: true);
+
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
+
+        await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        var hostedRunner = await db.HostedRunners.SingleAsync();
+        Assert.That(hostedRunner.RuntimePort, Is.EqualTo(20000));
+        Assert.That(hostedRunner.RuntimeEndpoint, Is.EqualTo("http://203.0.113.10:20000"));
+    }
+
+    [Test]
     public async Task EnsureRunnerAssignmentAsync_AssignsExistingConnectedManagedRunner()
     {
         using var db = CreateDbContext();
@@ -185,15 +204,16 @@ public class ManagedRunnerBootstrapServiceTests
         return plan.Id;
     }
 
-    private static RunnerHost SeedRunnerHost(ApplicationDbContext db)
+    private static RunnerHost SeedRunnerHost(ApplicationDbContext db, bool remote = false)
     {
         var host = new RunnerHost
         {
             Id = Guid.NewGuid(),
             Name = "host-a",
-            Provider = RunnerHostProviders.Local,
+            Provider = remote ? RunnerHostProviders.Hetzner : RunnerHostProviders.Local,
             Status = RunnerHostStatuses.Active,
-            IsLocal = true,
+            IsLocal = !remote,
+            PublicIp = remote ? "203.0.113.10" : null,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,

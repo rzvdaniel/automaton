@@ -49,6 +49,12 @@ public class HostedRunner
     [MaxLength(2000)]
     public string? RuntimeEndpoint { get; set; }
 
+    /// <summary>
+    /// Host port published for the Runner gateway when this Runner is remote.
+    /// Same-host Docker deployments use the container network and leave this null.
+    /// </summary>
+    public int? RuntimePort { get; set; }
+
     [MaxLength(2000)]
     public string? LastError { get; set; }
 

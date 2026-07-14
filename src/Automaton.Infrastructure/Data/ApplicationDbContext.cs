@@ -262,6 +262,7 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.RunnerHostId);
+                entity.HasIndex(e => new { e.RunnerHostId, e.RuntimePort }).IsUnique();
                 entity.HasIndex(e => e.RunnerId);
                 entity.HasIndex(e => e.ApiKeyId);
 

@@ -192,7 +192,14 @@ Managed runtime volumes:
   - API writes Traefik dynamic backend route files
   - Traefik reads `/a/{appId}/api/...` backend routing config directly
 
-Hosted managed runners should expose a stable internal runtime endpoint. For same-host Docker this can be the runner container DNS name on the shared runtime network, for example `http://runner-name:8001`.
+Hosted managed runners should expose a stable runtime endpoint. For same-host Docker this can be the runner container DNS name on the shared runtime network, for example `http://runner-name:8080`.
+
+For a hosted runner on a separate server, the API allocates a port from
+`HostedRunners:RemoteRuntimePortStart` through
+`HostedRunners:RemoteRuntimePortEnd`, publishes that port to the runner's
+runtime port, and stores an endpoint such as `http://<runner-host-address>:20000`.
+Open the configured range on each remote runner host, restricted to the API or
+proxy network that needs to reach the runner runtime.
 
 ### 7. Add hosted-runner SSH key if needed
 

@@ -100,4 +100,24 @@ public class HostedRunnerDockerCommandBuilderTests
             Assert.That(command, Does.Not.Contain("docker rm -v"));
         });
     }
+
+    [Test]
+    public void BuildProvisionScript_PublishesRemoteRuntimePort_WhenAssigned()
+    {
+        var runner = new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hosted Runner remote",
+            ContainerName = "automaton-hosted-runner-remote",
+            RuntimePort = 20000
+        };
+
+        var command = HostedRunnerDockerCommandBuilder.BuildProvisionScript(
+            runner,
+            new RunnerHost { Provider = RunnerHostProviders.Hetzner },
+            new HostedRunnerOptions { RuntimePort = 8080 },
+            "ak_runner_secret_for_remote_execution");
+
+        Assert.That(command, Does.Contain("-p '20000:8080'"));
+    }
 }

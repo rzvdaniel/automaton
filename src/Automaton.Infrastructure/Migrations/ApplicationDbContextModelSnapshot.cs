@@ -1190,6 +1190,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
 
+                    b.Property<int?>("RuntimePort")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1217,6 +1220,9 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("SubscriptionPlanId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("RunnerHostId", "RuntimePort")
+                        .IsUnique();
 
                     b.ToTable("HostedRunners");
                 });
