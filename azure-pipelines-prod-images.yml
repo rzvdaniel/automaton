@@ -63,5 +63,7 @@ jobs:
         env:
           API_DOMAIN: example.com
           APPS_DOMAIN: apps.example.com
+          RUNTIME_PROXY_AUTH_KEY: ci-placeholder-runtime-proxy-auth-key
+          CF_DNS_API_TOKEN: ci-placeholder-cloudflare-dns-token
           MYSQL_ROOT_PASSWORD: placeholder-root-password
           MYSQL_PASSWORD: placeholder-user-password
