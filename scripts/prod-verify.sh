@@ -46,12 +46,12 @@ check_url "origin API health" "https://$API_DOMAIN/healthz" -k --resolve "$API_D
 check_head "origin Studio" "https://$STUDIO_DOMAIN/" -k --resolve "$STUDIO_DOMAIN:443:127.0.0.1"
 check_head "origin Website apex" "https://$WEBSITE_DOMAIN/" -k --resolve "$WEBSITE_DOMAIN:443:127.0.0.1"
 check_head "origin Website www" "https://www.$WEBSITE_DOMAIN/" -k --resolve "www.$WEBSITE_DOMAIN:443:127.0.0.1"
-check_head "origin Apps runtime" "https://$APPS_DOMAIN/runtime/automaton-api.js" -k --resolve "$APPS_DOMAIN:443:127.0.0.1"
+check_url "origin Apps host" "https://$APPS_DOMAIN/healthz" -k --resolve "$APPS_DOMAIN:443:127.0.0.1"
 
 check_url "public API health" "https://$API_DOMAIN/healthz"
 check_head "public Studio" "https://$STUDIO_DOMAIN/"
 check_head "public Website apex" "https://$WEBSITE_DOMAIN/"
 check_head "public Website www" "https://www.$WEBSITE_DOMAIN/"
-check_head "public Apps runtime" "https://$APPS_DOMAIN/runtime/automaton-api.js"
+check_url "public Apps host" "https://$APPS_DOMAIN/healthz"
 
 echo "[INFO] Production verification completed successfully"

@@ -34,6 +34,16 @@ http:
       tls:
         certResolver: letsencrypt
 
+    apps-edge:
+      entryPoints:
+        - websecure
+      rule: "Host(`__APPS_DOMAIN__`)"
+      service: api-blue-edge
+      middlewares:
+        - api-https-headers
+      tls:
+        certResolver: letsencrypt
+
   middlewares:
     api-redirect:
       redirectScheme:
@@ -61,6 +71,3 @@ http:
       loadBalancer:
         servers:
           - url: "http://website-__WEBSITE_COLOR__:80"
-
-tls:
-  options: {}

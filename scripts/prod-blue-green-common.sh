@@ -165,8 +165,7 @@ render_nginx_runtime() {
     render_template "$NGINX_TEMPLATE_DIR/conf.d/studio.conf.template" "$NGINX_CONF_DIR/studio.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/website.conf.template" "$NGINX_CONF_DIR/website.conf"
     render_template "$NGINX_TEMPLATE_DIR/conf.d/apps.conf.template" "$NGINX_CONF_DIR/apps.conf"
-    cp "$APP_RUNTIME_SOURCE_DIR/automaton-api.js" "$NGINX_APP_RUNTIME_DIR/automaton-api.js"
-    render_template "$TRAEFIK_TEMPLATE_DIR/api-edge.yml" "$TRAEFIK_RUNTIME_DIR/api-edge.yml"
+    render_template "$TRAEFIK_TEMPLATE_DIR/api-edge.yml" "$TRAEFIK_DYNAMIC_DIR/api-edge.yml"
 
     if [[ -f "$STATE_FILE" ]]; then
         render_all_upstreams
@@ -183,7 +182,7 @@ render_traefik_api_edge() {
     local color="$1"
     local studio_color="${2:-$(get_live_color studio)}"
     local website_color="${3:-$(get_live_color website)}"
-    local rendered_path="$TRAEFIK_RUNTIME_DIR/api-edge.yml"
+    local rendered_path="$TRAEFIK_DYNAMIC_DIR/api-edge.yml"
     local temp_path="${rendered_path}.tmp"
 
     render_template "$TRAEFIK_TEMPLATE_DIR/api-edge.yml" "$temp_path"
@@ -435,7 +434,7 @@ soft_wait_for_public_origin() {
 }
 
 verify_app_host_origin() {
-    curl -kIfsS --resolve "$APPS_DOMAIN:443:127.0.0.1" "https://$APPS_DOMAIN/runtime/automaton-api.js" > /dev/null
+    curl -kfsS --resolve "$APPS_DOMAIN:443:127.0.0.1" "https://$APPS_DOMAIN/healthz" > /dev/null
 }
 
 wait_for_public_origin() {
@@ -538,7 +537,7 @@ switch_all_live_colors() {
 ensure_infrastructure() {
     ensure_blue_green_bootstrap
     echo "[INFO] Ensuring MySQL, RabbitMQ, worker, and traefik are up"
-    docker compose -f "$COMPOSE_FILE" up -d --remove-orphans mysql rabbitmq worker traefik
+    docker compose -f "$COMPOSE_FILE" up -d mysql rabbitmq worker traefik
     wait_for_service_healthy mysql 120
     wait_for_service_healthy rabbitmq 120
     wait_for_service_healthy worker 120
@@ -600,7 +599,7 @@ deploy_color() {
     compose_service="$(compose_service_name "$service" "$color")"
 
     echo "[INFO] Deploying $compose_service"
-    docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans "$compose_service"
+    docker compose -f "$COMPOSE_FILE" up -d --build "$compose_service"
     wait_for_service_healthy "$compose_service"
     verify_target_from_traefik_network "$service" "$color"
 

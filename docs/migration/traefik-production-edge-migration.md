@@ -86,7 +86,7 @@ The compose file supplies the new runtime settings: `PublishedApps__RuntimeProxy
 
 ## Traefik persistence
 
-Verify `.prod-runtime/traefik/traefik.yml`, `.prod-runtime/traefik/api-edge.yml`, and `.prod-runtime/traefik/dynamic/` exist.
+Verify `.prod-runtime/traefik/traefik.yml`, `.prod-runtime/traefik/dynamic/api-edge.yml`, and `.prod-runtime/traefik/dynamic/` exist.
 
 The API writes managed runner routes to `.prod-runtime/traefik/dynamic/managed-runtime-routes.yml`.
 

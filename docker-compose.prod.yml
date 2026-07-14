@@ -135,7 +135,6 @@ services:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN is required in .env}
     volumes:
       - ./.prod-runtime/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./.prod-runtime/traefik/api-edge.yml:/etc/traefik/dynamic/api-edge.yml:ro
       - ./.prod-runtime/traefik/dynamic:/etc/traefik/dynamic:ro
       - prod-traefik-acme:/etc/traefik/acme
     ports:
