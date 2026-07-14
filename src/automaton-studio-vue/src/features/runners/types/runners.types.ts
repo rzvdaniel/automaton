@@ -45,6 +45,8 @@ export interface Runner {
   ipAddress?: string | null
   apiInstanceId?: string | null
   apiColor?: string | null
+  purpose?: string
+  runnerHostId?: string | null
   scope: AccessScope
   projectId?: string | null
   projectName?: string | null

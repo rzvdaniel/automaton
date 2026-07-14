@@ -1,6 +1,7 @@
 ﻿using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Models;
+using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
@@ -15,6 +16,8 @@ public class AutomatonHub : Hub
     private const string RunnerNameHeader = "RunnerName";
     private const string RunnerVersionHeader = "RunnerVersion";
     private const string RunnerMachineNameHeader = "RunnerMachineName";
+    private const string RunnerPurposeHeader = "RunnerPurpose";
+    private const string RunnerHostIdHeader = "RunnerHostId";
 
     private readonly RunnerService runnerService;
     private readonly AppsService appsService;
@@ -226,6 +229,8 @@ public class AutomatonHub : Hub
             ConnectionId = connectionId,
             Version = httpContext.Request.Headers[RunnerVersionHeader].ToString(),
             MachineName = httpContext.Request.Headers[RunnerMachineNameHeader].ToString(),
+            Purpose = RunnerPurposes.Normalize(httpContext.Request.Headers[RunnerPurposeHeader].ToString()),
+            RunnerHostId = Guid.TryParse(httpContext.Request.Headers[RunnerHostIdHeader].ToString(), out var hostId) ? hostId : null,
             IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
             ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
             ApiColor = apiInstanceIdentityService.ApiColor,

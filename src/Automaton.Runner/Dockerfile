@@ -55,6 +55,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
     curl \
+    docker.io \
+    util-linux \
     sudo \
     ffmpeg \
     ghostscript \
@@ -121,6 +123,8 @@ COPY --from=build /app/publish .
 
 # Copy FastAPI server
 COPY Automaton.Runner/fastapi_server /app/fastapi_server
+COPY Automaton.Runner/automaton-host-exec /usr/local/bin/automaton-host-exec
+RUN chmod +x /usr/local/bin/automaton-host-exec
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 
 # Pre-create writable directories so named volumes inherit correct ownership

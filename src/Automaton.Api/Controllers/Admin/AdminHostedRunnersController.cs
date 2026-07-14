@@ -34,6 +34,7 @@ public class AdminHostedRunnersController : ControllerBase
         var hosts = await db.RunnerHosts
             .AsNoTracking()
             .Include(x => x.HostedRunners)
+            .Include(x => x.InfrastructureRunner)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
@@ -200,7 +201,10 @@ public class AdminHostedRunnersController : ControllerBase
             UsedDiskMb = assigned.Sum(x => x.DiskMb),
             HostedRunnerCount = assigned.Count,
             CreatedAt = host.CreatedAt,
-            UpdatedAt = host.UpdatedAt
+            UpdatedAt = host.UpdatedAt,
+            InfrastructureRunnerId = host.InfrastructureRunnerId,
+            InfrastructureRunnerName = host.InfrastructureRunner?.Name,
+            InfrastructureRunnerPurpose = host.InfrastructureRunner?.Purpose
         };
     }
 
@@ -274,6 +278,9 @@ public record RunnerHostResponse
     public int HostedRunnerCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
+    public Guid? InfrastructureRunnerId { get; init; }
+    public string? InfrastructureRunnerName { get; init; }
+    public string? InfrastructureRunnerPurpose { get; init; }
 }
 
 public record CreateRunnerHostRequest

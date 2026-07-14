@@ -35,6 +35,12 @@ public class RunnerHost
     public int TotalMemoryMb { get; set; } = 4096;
     public int TotalDiskMb { get; set; } = 40960;
 
+    /// <summary>
+    /// Shared Runner installed with infrastructure privileges on this host.
+    /// </summary>
+    public Guid? InfrastructureRunnerId { get; set; }
+    public virtual Runner? InfrastructureRunner { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

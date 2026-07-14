@@ -1874,6 +1874,13 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("Managed");
+
                     b.Property<string>("ScriptEngineSettings")
                         .HasColumnType("longtext");
 
@@ -1944,6 +1951,9 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<Guid?>("InfrastructureRunnerId")
+                        .HasColumnType("char(36)");
+
                     b.Property<bool>("IsLocal")
                         .HasColumnType("tinyint(1)");
 
@@ -1983,6 +1993,8 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("InfrastructureRunnerId");
 
                     b.HasIndex("Provider");
 
@@ -3151,6 +3163,16 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Runner");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.Runner", "InfrastructureRunner")
+                        .WithMany()
+                        .HasForeignKey("InfrastructureRunnerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("InfrastructureRunner");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerUser", b =>

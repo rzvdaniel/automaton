@@ -91,6 +91,9 @@ export interface AiModelAdmin {
   sortOrder: number
   createdAt: string
   updatedAt?: string
+  infrastructureRunnerId?: string
+  infrastructureRunnerName?: string
+  infrastructureRunnerPurpose?: string
 }
 /**
  * Matches AdminCreateAiModelRequest from backend

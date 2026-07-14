@@ -1,6 +1,7 @@
 ﻿#nullable disable
 
 using Automaton;
+using Automaton.Core.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automaton.Api.Entities;
@@ -21,6 +22,13 @@ public class Runner
     public string? IpAddress { get; set; }
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
+
+    /// <summary>
+    /// Installation purpose. This does not grant privileges; the installation
+    /// profile does that. Infrastructure runners are administrator-owned.
+    /// </summary>
+    [Required, MaxLength(40)]
+    public string Purpose { get; set; } = RunnerPurposes.Managed;
 
     /// <summary>
     /// JSON-serialized script engine configuration settings

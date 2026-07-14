@@ -191,6 +191,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.IpAddress).HasMaxLength(64);
                 entity.Property(e => e.ApiInstanceId).HasMaxLength(80);
                 entity.Property(e => e.ApiColor).HasMaxLength(32);
+                entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
             });
 
             modelBuilder.Entity<RunnerConnectionSession>(entity =>
@@ -236,6 +237,12 @@ namespace Automaton.Api.Data
 
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.Provider);
+                entity.HasIndex(e => e.InfrastructureRunnerId);
+
+                entity.HasOne(e => e.InfrastructureRunner)
+                    .WithMany()
+                    .HasForeignKey(e => e.InfrastructureRunnerId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<HostedRunner>(entity =>

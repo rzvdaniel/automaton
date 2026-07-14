@@ -177,7 +177,9 @@ public class HostedRunnerProvisioningService
         var preparation = await PrepareProvisioningAsync(userId, planId, cancellationToken, forceProvision: true);
         var hostedRunner = preparation.HostedRunner;
         var host = hostedRunner.RunnerHostId.HasValue
-            ? await db.RunnerHosts.FirstOrDefaultAsync(x => x.Id == hostedRunner.RunnerHostId.Value, cancellationToken)
+            ? await db.RunnerHosts
+                .Include(x => x.InfrastructureRunner)
+                .FirstOrDefaultAsync(x => x.Id == hostedRunner.RunnerHostId.Value, cancellationToken)
             : null;
         if (!preparation.ShouldPublishProvisionRequest)
         {

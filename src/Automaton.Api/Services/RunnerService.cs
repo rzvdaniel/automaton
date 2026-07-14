@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Automaton.Api.Models;
+using Automaton.Api.Enums;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Entities;
 using Automaton.Api.Constants;
@@ -122,6 +123,12 @@ public class RunnerService
             throw new InvalidOperationException("User context not available. Authentication may not have been properly processed. UserId is empty.");
         }
 
+        var purpose = RunnerPurposes.Normalize(runnerModel.Purpose);
+        if (purpose == RunnerPurposes.Infrastructure && !await IsAdministratorAsync(UserId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("Only an administrator may register an infrastructure runner.");
+        }
+
         var runner = new Runner()
         {
             Id = runnerModel.Id,
@@ -130,6 +137,7 @@ public class RunnerService
             Version = runnerModel.Version,
             MachineName = runnerModel.MachineName,
             IpAddress = runnerModel.IpAddress,
+            Purpose = purpose,
         };
 
         dbContext.Runners.Add(runner);
@@ -141,6 +149,24 @@ public class RunnerService
         };
 
         dbContext.RunnerUsers.Add(runnerUser);
+
+        if (purpose == RunnerPurposes.Infrastructure && runnerModel.RunnerHostId.HasValue)
+        {
+            var host = await dbContext.RunnerHosts
+                .FirstOrDefaultAsync(x => x.Id == runnerModel.RunnerHostId.Value, cancellationToken);
+            if (host == null)
+            {
+                throw new InvalidOperationException("The infrastructure runner host was not found.");
+            }
+
+            if (host.InfrastructureRunnerId.HasValue && host.InfrastructureRunnerId != runner.Id)
+            {
+                throw new InvalidOperationException("The runner host is already linked to another infrastructure runner.");
+            }
+
+            host.InfrastructureRunnerId = runner.Id;
+            host.UpdatedAt = DateTime.UtcNow;
+        }
 
         var result = await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -162,6 +188,8 @@ public class RunnerService
                 runner.Version,
                 runner.MachineName,
                 runner.IpAddress,
+                runner.Purpose,
+                runnerModel.RunnerHostId,
                 Changes = result
             }
         }, cancellationToken);
@@ -169,6 +197,16 @@ public class RunnerService
         logger.Debug("Runner created successfully: ID={RunnerId}", runner.Id);
 
         return result;
+    }
+
+    private async Task<bool> IsAdministratorAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await (
+            from userRole in dbContext.UserRoles
+            join role in dbContext.Roles on userRole.RoleId equals role.Id
+            where userRole.UserId == userId
+                && (role.Name == UserRole.Administrator || role.Name == UserRole.SystemAdministrator)
+            select userRole).AnyAsync(cancellationToken);
     }
 
     private void LinkHostedRunnerAfterRegistration(Runner runner)

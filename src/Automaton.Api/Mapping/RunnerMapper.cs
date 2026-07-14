@@ -37,6 +37,7 @@ public static class RunnerMapper
 		 IpAddress = runner.IpAddress,
          ApiInstanceId = runner.ApiInstanceId,
          ApiColor = runner.ApiColor,
+         Purpose = RunnerPurposes.Normalize(runner.Purpose),
 		 Scope = scope,
 		 ProjectId = projectId,
 		 ProjectName = projectName,
@@ -86,7 +87,8 @@ public static class RunnerMapper
  MachineName = details.MachineName,
  IpAddress = details.IpAddress,
  ApiInstanceId = details.ApiInstanceId,
- ApiColor = details.ApiColor
+ ApiColor = details.ApiColor,
+ Purpose = RunnerPurposes.Normalize(details.Purpose)
  // ScriptEngineSettings and RunnerUsers are not present in RunnerDetails
  };
  }

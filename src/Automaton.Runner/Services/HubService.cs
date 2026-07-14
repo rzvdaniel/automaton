@@ -20,8 +20,11 @@ public class HubService
     private const string RunnerNameHeader = "RunnerName";
     private const string RunnerVersionHeader = "RunnerVersion";
     private const string RunnerMachineNameHeader = "RunnerMachineName";
+    private const string RunnerPurposeHeader = "RunnerPurpose";
+    private const string RunnerHostIdHeader = "RunnerHostId";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
+    private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
     private const string UploadControllerScriptMethod = "UploadControllerScript";
     private const string TunnelRequestMethod = "TunnelRequest";
     private const string TunnelResponseMethod = "TunnelResponse";
@@ -52,6 +55,7 @@ public class HubService
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly RunnerBackendEnvironmentService backendEnvironmentService;
     private readonly RunnerDeploymentService runnerDeploymentService;
+    private readonly InfrastructureCommandService infrastructureCommandService;
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
@@ -69,7 +73,8 @@ public class HubService
         IServiceProvider serviceProvider,
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerBackendEnvironmentService backendEnvironmentService,
-        RunnerDeploymentService runnerDeploymentService)
+        RunnerDeploymentService runnerDeploymentService,
+        InfrastructureCommandService infrastructureCommandService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -79,6 +84,7 @@ public class HubService
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.backendEnvironmentService = backendEnvironmentService;
         this.runnerDeploymentService = runnerDeploymentService;
+        this.infrastructureCommandService = infrastructureCommandService;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -245,6 +251,12 @@ public class HubService
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
                     options.Headers.Add(RunnerVersionHeader, Environment.Version.ToString());
                     options.Headers.Add(RunnerMachineNameHeader, Environment.MachineName);
+                    options.Headers.Add(RunnerPurposeHeader, RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")));
+                    var runnerHostId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID");
+                    if (!string.IsNullOrWhiteSpace(runnerHostId))
+                    {
+                        options.Headers.Add(RunnerHostIdHeader, runnerHostId);
+                    }
                     
                     // Bypass SSL validation in development mode (for self-signed certificates)
                     var isDevelopment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development" ||
@@ -289,6 +301,10 @@ public class HubService
             {
                 return ExecuteCustomStepHandler(customStep);
             });
+
+            connection.On<InfrastructureCommandRequest, InfrastructureCommandResponse>(
+                RunInfrastructureCommandMethod,
+                request => infrastructureCommandService.ExecuteAsync(request, CancellationToken.None));
 
             // Register script upload handler — runner saves scripts to local disk for FastAPI to read
             connection.On<AppControllerUploadPayload, AppControllerUploadResult>(UploadControllerScriptMethod, (payload) =>

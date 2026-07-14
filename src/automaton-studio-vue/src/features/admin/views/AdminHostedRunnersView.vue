@@ -459,6 +459,12 @@ onMounted(refreshAll)
           <Column field="name" header="Host" />
           <Column field="provider" header="Provider" />
           <Column field="publicIp" header="IP" />
+          <Column header="Infrastructure Runner">
+            <template #body="{ data }">
+              <span v-if="data.infrastructureRunnerName">{{ data.infrastructureRunnerName }}</span>
+              <span v-else class="text-color-secondary">Not linked</span>
+            </template>
+          </Column>
           <Column header="Status">
             <template #body="{ data }">
               <Tag :value="displayRunnerStatus(data)" :severity="statusSeverity(displayRunnerStatus(data))" />

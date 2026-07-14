@@ -390,6 +390,7 @@ services.AddScoped<AdminAiGuidanceService>();
 services.AddScoped<AdminDocumentationService>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
+services.AddScoped<IHostedRunnerRemoteCommandExecutor, InfrastructureRunnerRemoteCommandExecutor>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<HostedRunnerManagementService>();

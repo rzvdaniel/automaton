@@ -3,6 +3,7 @@ using Automaton.Runner.Console.Models;
 using Automaton.Runner.Console.Services;
 using Serilog;
 using System.Text;
+using Automaton.Core.Enums;
 using System.Text.Json;
 using static System.Console;
 
@@ -827,6 +828,10 @@ public class RunnerHostService
                 Name = runnerName,
                 Version = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
+                Purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")),
+                RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
+                    ? (Guid?)runnerHostId
+                    : null,
             };
 
             var json = JsonSerializer.Serialize(runnerData);

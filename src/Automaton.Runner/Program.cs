@@ -365,6 +365,7 @@ public class Program
 
                 // Register custom step handler as transient (uses scoped ScriptEngineHost)
                 services.AddTransient<CustomStepExecuteService>();
+                services.AddSingleton<InfrastructureCommandService>();
                 services.AddSingleton<TunnelForwarderService>();
 
                 // Configure HTTP client factory with SSL bypass for development

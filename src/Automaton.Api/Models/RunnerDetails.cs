@@ -22,6 +22,9 @@ public class RunnerDetails
     public string? IpAddress { get; set; }
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
+    public string Purpose { get; set; } = RunnerPurposes.Managed;
+    public Guid? RunnerHostId { get; set; }
+    public bool IsInfrastructureRunner => string.Equals(Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase);
 
     // Project context
     public AccessScope Scope { get; set; }

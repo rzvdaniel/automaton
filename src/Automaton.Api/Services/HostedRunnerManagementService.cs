@@ -148,6 +148,7 @@ public class HostedRunnerManagementService
     {
         var hostedRunner = await db.HostedRunners
             .Include(x => x.RunnerHost)
+                .ThenInclude(x => x!.InfrastructureRunner)
             .Include(x => x.Deployments)
             .FirstOrDefaultAsync(x =>
                 x.RunnerId == runnerId &&
@@ -399,6 +400,7 @@ public class HostedRunnerManagementService
     {
         var hostedRunner = await db.HostedRunners
             .Include(x => x.RunnerHost)
+                .ThenInclude(x => x!.InfrastructureRunner)
             .Include(x => x.Runner)
             .Include(x => x.Deployments)
             .FirstOrDefaultAsync(x => x.Id == hostedRunnerId && x.DeletedAt == null, cancellationToken);
