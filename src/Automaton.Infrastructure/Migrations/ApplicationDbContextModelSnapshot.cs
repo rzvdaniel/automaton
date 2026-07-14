@@ -1864,6 +1864,10 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("ConnectionId")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("InstallationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<string>("IpAddress")
                         .HasMaxLength(64)
                         .HasColumnType("varchar(64)");
@@ -1904,6 +1908,9 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("varchar(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique();
 
                     b.ToTable("Runners");
                 });
@@ -1951,6 +1958,71 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RunnerId", "DisconnectedAtUtc");
 
                     b.ToTable("RunnerConnectionSessions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerEnrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EnrollmentTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("ExpectedCapabilitiesJson")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("ExpectedPurpose")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentTokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("RunnerHostId");
+
+                    b.HasIndex("RunnerHostId", "Status");
+
+                    b.ToTable("RunnerEnrollments");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
@@ -3174,6 +3246,17 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Runner");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerEnrollment", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
+                        .WithMany()
+                        .HasForeignKey("RunnerHostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RunnerHost");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>

@@ -13,6 +13,16 @@ public static class RunnerHostStatuses
     public const string Disabled = "disabled";
 }
 
+public static class RunnerEnrollmentStatuses
+{
+    public const string Pending = "pending";
+    public const string Claimed = "claimed";
+    public const string Completed = "completed";
+    public const string Expired = "expired";
+    public const string Revoked = "revoked";
+    public const string Failed = "failed";
+}
+
 public static class HostedRunnerStatuses
 {
     public const string Pending = "pending";

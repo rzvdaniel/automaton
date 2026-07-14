@@ -4,6 +4,7 @@ import type {
   HostedRunner,
   ProvisionHostedRunnerRequest,
   RunnerHost,
+  RunnerEnrollment,
   UpdateRunnerHostRequest,
 } from '../types/admin.types'
 
@@ -21,6 +22,17 @@ class AdminHostedRunnersService {
   async updateHost(id: string, request: UpdateRunnerHostRequest): Promise<RunnerHost> {
     const response = await apiClient.put<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}`, request)
     return response.data
+  }
+
+  async createInfrastructureRunnerEnrollment(hostId: string): Promise<RunnerEnrollment> {
+    const response = await apiClient.post<RunnerEnrollment>(
+      `/api/admin/hosted-runners/hosts/${hostId}/infrastructure-runner/enrollments`,
+    )
+    return response.data
+  }
+
+  async revokeInfrastructureRunnerEnrollment(hostId: string, enrollmentId: string): Promise<void> {
+    await apiClient.delete(`/api/admin/hosted-runners/hosts/${hostId}/infrastructure-runner/enrollments/${enrollmentId}`)
   }
 
   async getHostedRunners(): Promise<HostedRunner[]> {

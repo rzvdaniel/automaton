@@ -10,25 +10,24 @@ its workflows.
 
 ## Installation profile
 
-Create the `RunnerHost` record in Admin -> Hosted Runners first. Create an
-administrator-owned API key with Runner scope and keep it for the one-time
-installation, then run
+Create the `RunnerHost` record in Admin -> Hosted Runners first. In the host
+row, choose **Install Runner**. Studio creates a short-lived, one-time
+enrollment token bound to that host and the administrator-approved
+Infrastructure capability profile. Copy the generated command and run
 [`scripts/install-infrastructure-runner.sh`](../../scripts/install-infrastructure-runner.sh)
 over SSH as root:
 
 ```bash
-export AUTOMATON_SERVER_URL='https://your-configured-api-url'
-export AUTOMATON_API_KEY='protected-admin-runner-key'
-export AUTOMATON_RUNNER_IMAGE='your-registry/automaton-runner:tag'
-export AUTOMATON_RUNNER_NAME='infrastructure-<host-name>'
-export AUTOMATON_RUNNER_HOST_ID='<runner-host-id>'
-export AUTOMATON_RUNNER_CAPABILITIES='ApplicationHosting,WorkflowExecution,DockerManagement,HostExecution,HostedRunnerProvisioning,RouteManagement,CertificateManagement'
-bash scripts/install-infrastructure-runner.sh
+sudo bash scripts/install-infrastructure-runner.sh \
+  --server-url 'https://your-configured-api-url' \
+  --enrollment-token 're_one-time-token' \
+  --runner-image 'your-registry/automaton-runner:tag'
 ```
 
-The script installs Docker on a Debian-style host when needed, starts Docker,
-pulls the image, and starts the same image with the infrastructure profile. The
-equivalent container command is:
+The installer installs Docker on a Debian-style host when needed, starts
+Docker, pulls the image, and starts the same image with privileged host access.
+The equivalent container command contains only the server URL and one-time
+enrollment token:
 
 ```bash
 docker run -d \
@@ -40,23 +39,27 @@ docker run -d \
   --network host \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /:/host \
-  -v automaton-infrastructure-runner-data:/automaton/workspace \
+  -v /var/lib/automaton/infrastructure-runner/config:/app/config \
+  -v /var/lib/automaton/infrastructure-runner/workspace:/automaton/workspace \
+  -v /var/lib/automaton/infrastructure-runner/logs:/app/logs \
   -e AUTOMATON_SERVER_URL='https://your-configured-api-url' \
-  -e AUTOMATON_API_KEY='protected-admin-runner-key' \
-  -e AUTOMATON_RUNNER_NAME='infrastructure-<host-name>' \
-  -e AUTOMATON_RUNNER_PURPOSE=Infrastructure \
-  -e AUTOMATON_RUNNER_CAPABILITIES='ApplicationHosting,WorkflowExecution,DockerManagement,HostExecution,HostedRunnerProvisioning,RouteManagement,CertificateManagement' \
-  -e AUTOMATON_RUNNER_HOST_ID='<runner-host-id>' \
+  -e AUTOMATON_ENROLLMENT_TOKEN='re_one-time-token' \
   <runner-image>
 ```
 
-The API accepts `Infrastructure` purpose only when the API key belongs to an
-administrator. Capabilities are reported by the same Runner registration and
-persisted with the Runner. Purpose remains as a compatibility and ownership
-boundary; operation routing should use the capability required by that
-operation. On registration, the Runner is linked to the supplied `RunnerHost`
-record. The Runner generates and persists its own identity on the first
-registration. The API does not store the raw API key.
+The Runner exchanges the token at `POST /api/runner-enrollments/exchange`. The
+API determines the purpose and capabilities from the enrollment record; the
+Runner cannot request a broader profile. The API creates the Runner, links it
+to the `RunnerHost`, and issues a new Runner-scoped credential. The Runner
+persists that credential and its installation profile in the mounted config
+volume, so recreating the container with the same volume reconnects as the
+same Runner. The raw enrollment token is hashed by the API and the raw Runner
+credential is never logged or returned by later API calls.
+
+If the enrollment command is run again after successful use, the token is
+rejected. Use a new enrollment from Studio for a deliberate replacement; the
+current slice does not yet implement automatic replacement or credential
+rotation.
 
 ## Workflows and hosted-runner provisioning
 

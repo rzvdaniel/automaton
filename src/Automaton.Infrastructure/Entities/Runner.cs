@@ -36,6 +36,12 @@ public class Runner
     public string CapabilitiesJson { get; set; } = "[]";
 
     /// <summary>
+    /// Stable identity for one installed Runner volume.
+    /// </summary>
+    [MaxLength(128)]
+    public string? InstallationId { get; set; }
+
+    /// <summary>
     /// JSON-serialized script engine configuration settings
     /// Stores RunnerScriptEngineSettings as JSON string
     /// </summary>

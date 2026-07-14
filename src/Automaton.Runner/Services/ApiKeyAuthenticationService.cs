@@ -59,6 +59,7 @@ public class ApiKeyAuthenticationService
                 
                 // API key validated successfully - cache it in memory FIRST
                 _cachedApiKey = apiKey;
+                await storageService.SaveApiKeyAsync(apiKey);
                 logger.Debug("API key cached in memory for current session");
                 
                 WriteLine();
@@ -162,7 +163,7 @@ public class ApiKeyAuthenticationService
         }
     }
 
-    public Task<string?> GetValidApiKeyAsync()
+    public async Task<string?> GetValidApiKeyAsync()
     {
         // PRIORITY 1: Check in-memory cache (for current session after SetApiKeyAsync)
         if (!string.IsNullOrEmpty(_cachedApiKey))
@@ -170,30 +171,36 @@ public class ApiKeyAuthenticationService
             if (IsValidApiKeyFormat(_cachedApiKey))
             {
                 logger.Debug("Using cached API key from memory");
-                return Task.FromResult<string?>(_cachedApiKey);
+                return _cachedApiKey;
             }
         }
         
         // PRIORITY 2: Try to read from environment variable (persisted key or externally set)
-        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+        var apiKey = await storageService.LoadApiKeyAsync();
         
         if (!string.IsNullOrEmpty(apiKey))
         {
             if (IsValidApiKeyFormat(apiKey))
             {
-                logger.Debug("Using API key from environment variable");
+                logger.Debug("Using API key from configured Runner credential");
                 // Cache it for future requests in this session
                 _cachedApiKey = apiKey;
-                return Task.FromResult<string?>(apiKey);
+                return apiKey;
             }
             else
             {
-                WriteLine("🔧 API key from environment variable has invalid format. Expected format: ak_xxxxxxxxxxxx");
-                logger.Warning("API key from environment variable has invalid format");
+                WriteLine("🔧 Configured API key has invalid format. Expected format: ak_xxxxxxxxxxxx");
+                logger.Warning("Configured API key has invalid format");
             }
         }
 
-        return Task.FromResult<string?>(null);
+        return null;
+    }
+
+    public Task SetEnrolledApiKeyAsync(string apiKey)
+    {
+        _cachedApiKey = apiKey;
+        return storageService.SaveApiKeyAsync(apiKey);
     }
 
     public async Task<bool> IsAuthenticatedAsync()

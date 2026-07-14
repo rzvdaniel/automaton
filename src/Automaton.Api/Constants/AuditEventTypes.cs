@@ -21,6 +21,9 @@ public static class AuditEventTypes
     public const string RunnerAssignedToApp = "RunnerAssignedToApp";
     public const string RunnerUnassignedFromApp = "RunnerUnassignedFromApp";
     public const string RunnerCreated = "RunnerCreated";
+    public const string RunnerEnrollmentCreated = "RunnerEnrollmentCreated";
+    public const string RunnerEnrollmentCompleted = "RunnerEnrollmentCompleted";
+    public const string RunnerEnrollmentRevoked = "RunnerEnrollmentRevoked";
     public const string RunnerDeleted = "RunnerDeleted";
     public const string RunnerAssignedToProject = "RunnerAssignedToProject";
     public const string RunnerUnassignedFromProject = "RunnerUnassignedFromProject";

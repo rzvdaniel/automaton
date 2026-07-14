@@ -466,6 +466,15 @@ export interface UpdateRunnerHostRequest {
   totalDiskMb?: number
 }
 
+export interface RunnerEnrollment {
+  id: string
+  runnerHostId: string
+  enrollmentToken: string
+  expiresAtUtc: string
+  expectedPurpose: string
+  expectedCapabilities: string[]
+}
+
 export interface HostedRunnerDeployment {
   id: string
   action: string

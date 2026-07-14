@@ -27,6 +27,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<RunnerConnectionSession> RunnerConnectionSessions { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
+        public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
         public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
@@ -193,6 +194,8 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ApiColor).HasMaxLength(32);
                 entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
                 entity.Property(e => e.CapabilitiesJson).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.InstallationId).HasMaxLength(128);
+                entity.HasIndex(e => e.InstallationId).IsUnique();
             });
 
             modelBuilder.Entity<RunnerConnectionSession>(entity =>
@@ -244,6 +247,25 @@ namespace Automaton.Api.Data
                     .WithMany()
                     .HasForeignKey(e => e.InfrastructureRunnerId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<RunnerEnrollment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ExpectedPurpose).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.ExpectedCapabilitiesJson).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.EnrollmentTokenHash).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.InstallationId).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.FailureReason).HasMaxLength(1000);
+
+                entity.HasIndex(e => e.RunnerHostId);
+                entity.HasIndex(e => e.EnrollmentTokenHash).IsUnique();
+                entity.HasIndex(e => new { e.RunnerHostId, e.Status });
+                entity.HasOne(e => e.RunnerHost)
+                    .WithMany()
+                    .HasForeignKey(e => e.RunnerHostId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<HostedRunner>(entity =>

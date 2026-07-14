@@ -17,15 +17,21 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly ApplicationDbContext db;
     private readonly HostedRunnerProvisioningService provisioningService;
     private readonly HostedRunnerManagementService managementService;
+    private readonly RunnerEnrollmentService runnerEnrollmentService;
+    private readonly UserContextService userContextService;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
         HostedRunnerProvisioningService provisioningService,
-        HostedRunnerManagementService managementService)
+        HostedRunnerManagementService managementService,
+        RunnerEnrollmentService runnerEnrollmentService,
+        UserContextService userContextService)
     {
         this.db = db;
         this.provisioningService = provisioningService;
         this.managementService = managementService;
+        this.runnerEnrollmentService = runnerEnrollmentService;
+        this.userContextService = userContextService;
     }
 
     [HttpGet("hosts")]
@@ -62,6 +68,34 @@ public class AdminHostedRunnersController : ControllerBase
         db.RunnerHosts.Add(host);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"/api/admin/hosted-runners/hosts/{host.Id}", ToResponse(host));
+    }
+
+    [HttpPost("hosts/{id:guid}/infrastructure-runner/enrollments")]
+    public async Task<ActionResult<RunnerEnrollmentCreatedResponse>> CreateInfrastructureRunnerEnrollment(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var enrollment = await runnerEnrollmentService.CreateAsync(
+            id,
+            userContextService.GetUserId(),
+            cancellationToken);
+
+        return Ok(enrollment);
+    }
+
+    [HttpDelete("hosts/{id:guid}/infrastructure-runner/enrollments/{enrollmentId:guid}")]
+    public async Task<IActionResult> RevokeInfrastructureRunnerEnrollment(
+        Guid id,
+        Guid enrollmentId,
+        CancellationToken cancellationToken)
+    {
+        var revoked = await runnerEnrollmentService.RevokeAsync(
+            id,
+            enrollmentId,
+            userContextService.GetUserId(),
+            cancellationToken);
+
+        return revoked ? NoContent() : NotFound();
     }
 
     [HttpPut("hosts/{id:guid}")]

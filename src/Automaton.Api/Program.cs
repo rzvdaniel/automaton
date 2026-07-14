@@ -65,6 +65,7 @@ services.Configure<MediaStorageOptions>(applicationBuilder.Configuration.GetSect
 services.Configure<GitHubOAuthOptions>(applicationBuilder.Configuration.GetSection("GitHub"));
 services.Configure<AppsTunnelConfig>(applicationBuilder.Configuration.GetSection("AppsTunnel"));
 services.Configure<HostedRunnerOptions>(applicationBuilder.Configuration.GetSection("HostedRunners"));
+services.Configure<RunnerEnrollmentOptions>(applicationBuilder.Configuration.GetSection(RunnerEnrollmentOptions.SectionName));
 services.Configure<RabbitMqOptions>(applicationBuilder.Configuration.GetSection("RabbitMq"));
 services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
 services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
@@ -339,6 +340,7 @@ services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
+services.AddScoped<RunnerEnrollmentService>();
 services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();

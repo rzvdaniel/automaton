@@ -12,6 +12,7 @@ public class RunnerSettingsService
 {
     private readonly HttpClient _httpClient;
     private readonly ConfigurationService _configService;
+    private readonly ApiKeyAuthenticationService _apiKeyAuthenticationService;
     private readonly ILogger _logger;
     private RunnerScriptEngineSettings? _cachedSettings;
     private DateTime _lastLoadTime = DateTime.MinValue;
@@ -19,10 +20,12 @@ public class RunnerSettingsService
 
     public RunnerSettingsService(
         HttpClient httpClient,
-        ConfigurationService configService)
+        ConfigurationService configService,
+        ApiKeyAuthenticationService apiKeyAuthenticationService)
     {
         _httpClient = httpClient;
         _configService = configService;
+        _apiKeyAuthenticationService = apiKeyAuthenticationService;
         _logger = Log.ForContext<RunnerSettingsService>();
     }
 
@@ -54,7 +57,14 @@ public class RunnerSettingsService
             var url = $"{_configService.BaseUrl}{_configService.RunnersUrl}/{runnerId}/script-settings";
             _logger.Debug("Loading script engine settings from {Url}", url);
 
-            var response = await _httpClient.GetAsync(url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var apiKey = await _apiKeyAuthenticationService.GetValidApiKeyAsync();
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                request.Headers.Add("X-API-Key", apiKey);
+            }
+
+            var response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {

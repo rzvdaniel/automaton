@@ -9,6 +9,7 @@ import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
@@ -17,6 +18,7 @@ import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlan
 import type {
   CreateRunnerHostRequest,
   HostedRunner,
+  RunnerEnrollment,
   RunnerHost,
   SubscriptionPlan,
   UserPlan,
@@ -40,6 +42,10 @@ const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
 const selectedRunner = ref<HostedRunner | null>(null)
+const enrollmentDialogVisible = ref(false)
+const enrollmentHost = ref<RunnerHost | null>(null)
+const enrollment = ref<RunnerEnrollment | null>(null)
+const enrollingHostId = ref<string | null>(null)
 const provisionDialogVisible = ref(false)
 const provisioningNewRunner = ref(false)
 const users = ref<UserPlan[]>([])
@@ -208,6 +214,26 @@ async function saveHost() {
   } finally {
     savingHost.value = false
   }
+}
+
+async function createInfrastructureRunnerEnrollment(host: RunnerHost) {
+  enrollingHostId.value = host.id
+  try {
+    enrollment.value = await adminHostedRunnersService.createInfrastructureRunnerEnrollment(host.id)
+    enrollmentHost.value = host
+    enrollmentDialogVisible.value = true
+    await loadHosts()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Enrollment failed', detail: 'Failed to create the Infrastructure Runner enrollment.', life: 3500 })
+  } finally {
+    enrollingHostId.value = null
+  }
+}
+
+function enrollmentCommand(): string {
+  if (!enrollment.value) return ''
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+  return `sudo bash install-infrastructure-runner.sh --server-url '${apiBaseUrl}' --enrollment-token '${enrollment.value.enrollmentToken}'`
 }
 
 async function retryProvisioning(runner: HostedRunner) {
@@ -488,7 +514,18 @@ onMounted(refreshAll)
           <Column field="hostedRunnerCount" header="Runners" />
           <Column header="Actions">
             <template #body="{ data }">
-              <Button icon="pi pi-pencil" text rounded @click="openEditHost(data)" />
+              <div class="flex gap-2">
+                <Button
+                  v-if="!data.infrastructureRunnerId"
+                  label="Install Runner"
+                  icon="pi pi-key"
+                  size="small"
+                  outlined
+                  :loading="enrollingHostId === data.id"
+                  @click="createInfrastructureRunnerEnrollment(data)"
+                />
+                <Button icon="pi pi-pencil" text rounded @click="openEditHost(data)" />
+              </div>
             </template>
           </Column>
         </DataTable>
@@ -610,6 +647,34 @@ onMounted(refreshAll)
           :loading="provisioningNewRunner"
           @click="provisionHostedRunner"
         />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="enrollmentDialogVisible" header="Install Infrastructure Runner" modal :style="{ width: '48rem' }">
+      <div v-if="enrollment" class="flex flex-column gap-3">
+        <Message severity="warn" :closable="false">
+          This token is shown once. It expires {{ formatDateTime(enrollment.expiresAtUtc) }} and cannot be reused after enrollment.
+        </Message>
+        <div>
+          <div class="text-color-secondary text-sm mb-2">Runner Host</div>
+          <div class="font-medium">{{ enrollmentHost?.name || enrollment.runnerHostId }}</div>
+        </div>
+        <div>
+          <div class="text-color-secondary text-sm mb-2">Installer command</div>
+          <Textarea :model-value="enrollmentCommand()" readonly auto-resize class="w-full" />
+        </div>
+        <div>
+          <div class="text-color-secondary text-sm mb-2">Authorized capabilities</div>
+          <div class="flex flex-wrap gap-2">
+            <Tag v-for="capability in enrollment.expectedCapabilities" :key="capability" :value="capability" />
+          </div>
+        </div>
+        <div class="text-color-secondary text-sm">
+          Copy the command to the new Hetzner server and run it as root. The Runner will persist its durable credential in its mounted config volume.
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Close" text @click="enrollmentDialogVisible = false" />
       </template>
     </Dialog>
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Automaton.Runner.Console.Models;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -7,6 +8,8 @@ public class FileStorageService
     private readonly string configDirectory;
     private readonly string runnerConfigFile;
     private readonly string serverConfigFile;
+    private readonly string apiKeyFile;
+    private readonly string installationProfileFile;
 
     public FileStorageService()
     {
@@ -27,22 +30,47 @@ public class FileStorageService
         
         runnerConfigFile = Path.Combine(configDirectory, "runner.json");
         serverConfigFile = Path.Combine(configDirectory, "server.json");
+        apiKeyFile = Path.Combine(configDirectory, "api-key");
+        installationProfileFile = Path.Combine(configDirectory, "installation-profile.json");
 
         EnsureConfigDirectoryExists();
     }
 
-    // API Key methods - Environment variable only (no file storage)
-    public Task<string?> LoadApiKeyAsync()
+    // Environment variables remain supported for existing deployments. Enrolled
+    // Runners persist their issued credential in the mounted config volume.
+    public async Task<string?> LoadApiKeyAsync()
     {
-        // API keys are now stored in environment variables only for better security
         var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-        return Task.FromResult(apiKey);
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            return apiKey;
+        }
+
+        if (!File.Exists(apiKeyFile))
+        {
+            return null;
+        }
+
+        try
+        {
+            var storedKey = await File.ReadAllTextAsync(apiKeyFile);
+            return string.IsNullOrWhiteSpace(storedKey) ? null : storedKey.Trim();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
-    public Task<bool> HasApiKeyAsync()
+    public async Task SaveApiKeyAsync(string apiKey)
     {
-        var apiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-        return Task.FromResult(!string.IsNullOrEmpty(apiKey));
+        await File.WriteAllTextAsync(apiKeyFile, apiKey.Trim());
+        TryRestrictFile(apiKeyFile);
+    }
+
+    public async Task<bool> HasApiKeyAsync()
+    {
+        return !string.IsNullOrEmpty(await LoadApiKeyAsync());
     }
 
     // Runner configuration methods
@@ -57,6 +85,31 @@ public class FileStorageService
 
         var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(runnerConfigFile, json);
+    }
+
+    public async Task SaveInstallationProfileAsync(RunnerInstallationProfile profile)
+    {
+        var json = JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(installationProfileFile, json);
+        TryRestrictFile(installationProfileFile);
+    }
+
+    public async Task<RunnerInstallationProfile?> LoadInstallationProfileAsync()
+    {
+        if (!File.Exists(installationProfileFile))
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(installationProfileFile);
+            return await JsonSerializer.DeserializeAsync<RunnerInstallationProfile>(stream);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public string? GetRunnerId()
@@ -177,6 +230,23 @@ public class FileStorageService
         if (!Directory.Exists(configDirectory))
         {
             Directory.CreateDirectory(configDirectory);
+        }
+    }
+
+    private static void TryRestrictFile(string path)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch
+        {
+            // Best effort only; the container/user filesystem may not support chmod.
         }
     }
 }

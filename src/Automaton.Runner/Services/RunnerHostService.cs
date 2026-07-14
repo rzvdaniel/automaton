@@ -3,6 +3,8 @@ using Automaton.Runner.Console.Models;
 using Automaton.Runner.Console.Services;
 using Serilog;
 using System.Text;
+using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using Automaton.Core.Enums;
 using System.Text.Json;
 using static System.Console;
@@ -49,6 +51,7 @@ public class RunnerHostService
         try
         {
             logger.Information("Starting runner in service mode (non-interactive)");
+            await ApplyInstallationProfileAsync();
 
             // Validate configuration from environment variables only
             if (!configService.IsServerConfigured())
@@ -60,8 +63,14 @@ public class RunnerHostService
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
-                logger.Error("Service mode requires AUTOMATON_API_KEY environment variable");
-                throw new InvalidOperationException("API key not configured. Set AUTOMATON_API_KEY environment variable.");
+                var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
+                if (string.IsNullOrWhiteSpace(enrollmentToken) || !await EnrollAsync())
+                {
+                    logger.Error("Service mode requires a Runner credential or an enrollment token");
+                    throw new InvalidOperationException("Runner authentication is not configured. Set AUTOMATON_ENROLLMENT_TOKEN for first installation or provide a Runner API key.");
+                }
+
+                apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             }
 
             logger.Debug("Service configuration valid - Server: {Server}", configService.BaseUrl);
@@ -165,6 +174,7 @@ public class RunnerHostService
             logger.Debug("DOTNET_VERSION: {EnvVar}", Environment.Version);
             logger.Debug("Current Directory: {Dir}", Environment.CurrentDirectory);
             logger.Debug("=== END ENVIRONMENT VARIABLES ===");
+            await ApplyInstallationProfileAsync();
 
             WriteLine("=== ENVIRONMENT VARIABLES DEBUG ===");
             WriteLine("AUTOMATON_SERVER_URL: {0}", Environment.GetEnvironmentVariable("AUTOMATON_SERVER_URL"));
@@ -191,6 +201,21 @@ public class RunnerHostService
 
             // Check Authentication
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN")))
+                {
+                    WriteLine("🔐 Enrolling this Runner using the one-time enrollment token...");
+                    if (!await EnrollAsync())
+                    {
+                        WriteLine("❌ Runner enrollment failed. Check the server URL and enrollment token.");
+                        return;
+                    }
+
+                    apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
+                }
+            }
+
             if (string.IsNullOrEmpty(apiKey))
             {
                 // Check if the API key might be set in registry but not visible to current process
@@ -920,6 +945,100 @@ public class RunnerHostService
             WriteLine("Check the log files for detailed technical information.");
             return false;
         }
+    }
+
+    private async Task<bool> EnrollAsync()
+    {
+        var enrollmentToken = Environment.GetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN");
+        if (string.IsNullOrWhiteSpace(enrollmentToken))
+        {
+            return false;
+        }
+
+        var runnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
+        if (string.IsNullOrWhiteSpace(runnerName))
+        {
+            runnerName = $"infrastructure-{Environment.MachineName}";
+        }
+
+        var request = new RunnerEnrollmentExchangeRequest
+        {
+            EnrollmentToken = enrollmentToken,
+            RunnerName = runnerName,
+            RunnerVersion = Environment.Version.ToString(),
+            MachineName = Environment.MachineName,
+            OperatingSystem = RuntimeInformation.OSDescription,
+            Architecture = RuntimeInformation.OSArchitecture.ToString(),
+            ImageVersion = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE")
+        };
+
+        try
+        {
+            using var response = await httpClient.PostAsJsonAsync(
+                $"{configService.BaseUrl}/api/runner-enrollments/exchange",
+                request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.Warning("Runner enrollment failed with status {StatusCode}", response.StatusCode);
+                return false;
+            }
+
+            var enrollment = await response.Content.ReadFromJsonAsync<RunnerEnrollmentExchangeResponse>();
+            if (enrollment == null || string.IsNullOrWhiteSpace(enrollment.ApiKey))
+            {
+                logger.Warning("Runner enrollment response did not include a durable credential");
+                return false;
+            }
+
+            await apiKeyAuthService.SetEnrolledApiKeyAsync(enrollment.ApiKey);
+            await storageService.SaveRunnerConfigAsync(enrollment.RunnerId.ToString(), enrollment.RunnerName);
+            await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
+            {
+                Purpose = enrollment.Purpose,
+                Capabilities = enrollment.Capabilities,
+                RunnerHostId = enrollment.RunnerHostId,
+                InstallationId = enrollment.InstallationId
+            });
+
+            ApplyInstallationProfile(enrollment.Purpose, enrollment.Capabilities, enrollment.RunnerHostId);
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", enrollment.RunnerId.ToString());
+            Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", enrollment.RunnerName);
+            Environment.SetEnvironmentVariable("AUTOMATON_ENROLLMENT_TOKEN", null);
+
+            logger.Information(
+                "Runner enrollment completed for host {RunnerHostId} as runner {RunnerId}",
+                enrollment.RunnerHostId,
+                enrollment.RunnerId);
+            WriteLine($"✅ Runner enrolled successfully: {enrollment.RunnerName}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Runner enrollment request failed");
+            return false;
+        }
+    }
+
+    private async Task ApplyInstallationProfileAsync()
+    {
+        var profile = await storageService.LoadInstallationProfileAsync();
+        if (profile == null || string.IsNullOrWhiteSpace(profile.Purpose))
+        {
+            return;
+        }
+
+        ApplyInstallationProfile(profile.Purpose, profile.Capabilities, profile.RunnerHostId);
+    }
+
+    private static void ApplyInstallationProfile(
+        string purpose,
+        IReadOnlyList<string> capabilities,
+        Guid? runnerHostId)
+    {
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE", purpose);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES", string.Join(',', capabilities));
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID", runnerHostId?.ToString());
     }
 
     public async Task ShowStatusAsync()

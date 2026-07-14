@@ -11,7 +11,7 @@ namespace Automaton.Runner.Console.Services;
 /// </summary>
 public sealed class InfrastructureCommandService
 {
-    private readonly bool enabled = RunnerCapabilities.Normalize(
+    private bool IsEnabled() => RunnerCapabilities.Normalize(
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
@@ -21,7 +21,7 @@ public sealed class InfrastructureCommandService
         InfrastructureCommandRequest request,
         CancellationToken cancellationToken)
     {
-        if (!enabled)
+        if (!IsEnabled())
         {
             return Failure("Infrastructure commands are disabled for this Runner installation.");
         }
