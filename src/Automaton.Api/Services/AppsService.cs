@@ -724,6 +724,13 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
+        if (executionRunnerId.HasValue && dataContext.Runners.Any(r =>
+                r.Id == executionRunnerId.Value &&
+                r.Purpose == RunnerPurposes.Infrastructure))
+        {
+            throw new InvalidOperationException("Infrastructure runners cannot be assigned to app execution.");
+        }
+
         var previousRunnerId = entity.ExecutionRunnerId;
         entity.ExecutionRunnerId = executionRunnerId;
         entity.Updated = DateTime.UtcNow;

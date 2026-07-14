@@ -207,6 +207,14 @@ public class CustomStepsService
     public async Task<IEnumerable<RunnerCustomStepResult>> Execute(Guid customStepId, IEnumerable<Guid> runnerIds, CancellationToken cancellationToken)
     {
         var results = new List<RunnerCustomStepResult>();
+        var selectedRunnerIds = runnerIds.Distinct().ToList();
+
+        var infrastructureRunnerSelected = await dataContext.Runners
+            .AnyAsync(r => selectedRunnerIds.Contains(r.Id) && r.Purpose == RunnerPurposes.Infrastructure, cancellationToken);
+        if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
+        {
+            throw new UnauthorizedAccessException("Only administrators may execute custom steps on Infrastructure Runners.");
+        }
         
         // Get the custom step with decrypted values
         var customStep = await GetForExecutionAsync(customStepId);
@@ -216,7 +224,7 @@ public class CustomStepsService
             throw new InvalidOperationException($"Custom step {customStepId} not found");
         }
 
-        foreach (var runnerId in runnerIds)
+        foreach (var runnerId in selectedRunnerIds)
         {
             RunnerCustomStepResult result;
             
@@ -322,6 +330,12 @@ public class CustomStepsService
 
         return results;
     }
+
+    private Task<bool> IsAdministratorAsync(CancellationToken cancellationToken)
+        => dataContext.UserRoles
+            .Join(dataContext.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { userRole.UserId, role.Name })
+            .AnyAsync(x => x.UserId == userId &&
+                           (x.Name == UserRole.Administrator || x.Name == UserRole.SystemAdministrator), cancellationToken);
 
     /// <summary>
     /// Get custom step with decrypted sensitive variables for UI editing

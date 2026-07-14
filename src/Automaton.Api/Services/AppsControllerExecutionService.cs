@@ -4,6 +4,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -635,6 +636,7 @@ public class AppsControllerExecutionService
         var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
+            .Where(r => r.Purpose != RunnerPurposes.Infrastructure)
             .Where(r => r.ConnectionId != null
                 && r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
@@ -652,6 +654,7 @@ public class AppsControllerExecutionService
         var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
+            .Where(r => r.Purpose != RunnerPurposes.Infrastructure)
             .Where(r => r.ConnectionId != null
                 && r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc);

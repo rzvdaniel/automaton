@@ -107,6 +107,9 @@ docker network create <network>
 
 - Keep SSH available as an emergency recovery channel.
 - Audit and review every workflow that targets an Infrastructure Runner.
+- Infrastructure Runners cannot be added to projects or assigned to app
+  execution. Public and private app execution paths exclude them; use an
+  administrator's direct Studio/API workflow or custom-step execution instead.
 - Persist state before restarting Docker, replacing the Runner, changing
   firewall/networking, or rebooting the host.
 - Wait for the Runner heartbeat after disruptive operations and report a

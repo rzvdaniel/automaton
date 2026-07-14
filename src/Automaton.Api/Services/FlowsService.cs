@@ -219,16 +219,30 @@ public class FlowsService
         {
             throw new InvalidOperationException($"Flow {flowId} not found");
         }
+
+        var selectedRunnerIds = runnerIds.Distinct().ToList();
+        var infrastructureRunnerSelected = await dbContext.Runners
+            .AnyAsync(r => selectedRunnerIds.Contains(r.Id) && r.Purpose == RunnerPurposes.Infrastructure, cancellationToken);
+        if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
+        {
+            throw new UnauthorizedAccessException("Only administrators may execute flows on Infrastructure Runners.");
+        }
         
         // Note: Flow decryption happens when Runner loads flow via API
         // The Get(Guid id) method returns flow with decrypted values
-        var result = await runnerService.ExecuteFlow(flowId, runnerIds, cancellationToken);
+        var result = await runnerService.ExecuteFlow(flowId, selectedRunnerIds, cancellationToken);
 
         // Log activity
         await recentActivityService.LogFlowActivityAsync(ActivityType.FlowExecuted, flow.Name, flowId, cancellationToken);
 
         return result;
     }
+
+    private Task<bool> IsAdministratorAsync(CancellationToken cancellationToken)
+        => dbContext.UserRoles
+            .Join(dbContext.Roles, userRole => userRole.RoleId, role => role.Id, (userRole, role) => new { userRole.UserId, role.Name })
+            .AnyAsync(x => x.UserId == userId &&
+                           (x.Name == UserRole.Administrator || x.Name == UserRole.SystemAdministrator), cancellationToken);
 
     public FlowSettings GetSettings(Guid id)
     {

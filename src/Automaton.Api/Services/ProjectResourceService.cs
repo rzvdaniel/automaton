@@ -4,6 +4,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
@@ -331,6 +332,11 @@ public class ProjectResourceService
         if (runner == null)
         {
             throw new InvalidOperationException("Runner not found or access denied");
+        }
+
+        if (runner.Purpose == RunnerPurposes.Infrastructure)
+        {
+            throw new InvalidOperationException("Infrastructure runners cannot be added to projects.");
         }
 
         var existingLink = await dbContext.ProjectRunners
