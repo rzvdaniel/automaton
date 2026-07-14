@@ -822,13 +822,18 @@ public class RunnerHostService
                 }
             }
 
+            var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
             var runnerData = new
             {
                 Id = runnerId,
                 Name = runnerName,
                 Version = Environment.Version.ToString(),
                 MachineName = Environment.MachineName,
-                Purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")),
+                Purpose = purpose,
+                Capabilities = RunnerCapabilities.Normalize(
+                    Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                    purpose),
                 RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
                     ? (Guid?)runnerHostId
                     : null,

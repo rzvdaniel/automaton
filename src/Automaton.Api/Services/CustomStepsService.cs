@@ -209,8 +209,12 @@ public class CustomStepsService
         var results = new List<RunnerCustomStepResult>();
         var selectedRunnerIds = runnerIds.Distinct().ToList();
 
-        var infrastructureRunnerSelected = await dataContext.Runners
-            .AnyAsync(r => selectedRunnerIds.Contains(r.Id) && r.Purpose == RunnerPurposes.Infrastructure, cancellationToken);
+        var selectedRunners = await dataContext.Runners
+            .Where(r => selectedRunnerIds.Contains(r.Id))
+            .Select(r => new { r.CapabilitiesJson, r.Purpose })
+            .ToListAsync(cancellationToken);
+        var infrastructureRunnerSelected = selectedRunners.Any(r =>
+            RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
         if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
         {
             throw new UnauthorizedAccessException("Only administrators may execute custom steps on Infrastructure Runners.");

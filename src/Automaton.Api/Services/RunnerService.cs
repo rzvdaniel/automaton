@@ -124,9 +124,10 @@ public class RunnerService
         }
 
         var purpose = RunnerPurposes.Normalize(runnerModel.Purpose);
-        if (purpose == RunnerPurposes.Infrastructure && !await IsAdministratorAsync(UserId, cancellationToken))
+        var capabilities = RunnerCapabilities.Normalize(runnerModel.Capabilities, purpose);
+        if (RunnerCapabilities.RequiresAdministrator(capabilities) && !await IsAdministratorAsync(UserId, cancellationToken))
         {
-            throw new UnauthorizedAccessException("Only an administrator may register an infrastructure runner.");
+            throw new UnauthorizedAccessException("Only an administrator may register a Runner with privileged capabilities.");
         }
 
         var runner = new Runner()
@@ -138,6 +139,7 @@ public class RunnerService
             MachineName = runnerModel.MachineName,
             IpAddress = runnerModel.IpAddress,
             Purpose = purpose,
+            CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, purpose),
         };
 
         dbContext.Runners.Add(runner);
@@ -150,7 +152,8 @@ public class RunnerService
 
         dbContext.RunnerUsers.Add(runnerUser);
 
-        if (purpose == RunnerPurposes.Infrastructure && runnerModel.RunnerHostId.HasValue)
+        if (capabilities.Contains(RunnerCapabilities.HostedRunnerProvisioning, StringComparer.OrdinalIgnoreCase) &&
+            runnerModel.RunnerHostId.HasValue)
         {
             var host = await dbContext.RunnerHosts
                 .FirstOrDefaultAsync(x => x.Id == runnerModel.RunnerHostId.Value, cancellationToken);
@@ -558,10 +561,17 @@ public class RunnerService
             throw new InvalidOperationException($"Runner {id} not found");
         }
 
+        var capabilities = RunnerCapabilities.Normalize(runner.Capabilities, entity.Purpose);
+        if (RunnerCapabilities.RequiresAdministrator(capabilities) && !await IsAdministratorAsync(UserId, cancellationToken))
+        {
+            throw new UnauthorizedAccessException("Only an administrator may register a Runner with privileged capabilities.");
+        }
+
         entity.Name = runner.Name;
         entity.Version = runner.Version;
         entity.MachineName = runner.MachineName;
         entity.IpAddress = runner.IpAddress;
+        entity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, entity.Purpose);
 
         // Mark entity as modified
         dbContext.Entry(entity).State = EntityState.Modified;

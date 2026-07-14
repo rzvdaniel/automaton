@@ -23,6 +23,7 @@ public class RunnerDetails
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
     public string Purpose { get; set; } = RunnerPurposes.Managed;
+    public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
     public Guid? RunnerHostId { get; set; }
     public bool IsInfrastructureRunner => string.Equals(Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase);
 

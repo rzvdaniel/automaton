@@ -334,7 +334,7 @@ public class ProjectResourceService
             throw new InvalidOperationException("Runner not found or access denied");
         }
 
-        if (runner.Purpose == RunnerPurposes.Infrastructure)
+        if (RunnerCapabilities.RequiresAdministrator(runner.CapabilitiesJson, runner.Purpose))
         {
             throw new InvalidOperationException("Infrastructure runners cannot be added to projects.");
         }

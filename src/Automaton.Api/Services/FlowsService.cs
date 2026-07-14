@@ -221,8 +221,12 @@ public class FlowsService
         }
 
         var selectedRunnerIds = runnerIds.Distinct().ToList();
-        var infrastructureRunnerSelected = await dbContext.Runners
-            .AnyAsync(r => selectedRunnerIds.Contains(r.Id) && r.Purpose == RunnerPurposes.Infrastructure, cancellationToken);
+        var selectedRunners = await dbContext.Runners
+            .Where(r => selectedRunnerIds.Contains(r.Id))
+            .Select(r => new { r.CapabilitiesJson, r.Purpose })
+            .ToListAsync(cancellationToken);
+        var infrastructureRunnerSelected = selectedRunners.Any(r =>
+            RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
         if (infrastructureRunnerSelected && !await IsAdministratorAsync(cancellationToken))
         {
             throw new UnauthorizedAccessException("Only administrators may execute flows on Infrastructure Runners.");

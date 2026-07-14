@@ -636,7 +636,6 @@ public class AppsControllerExecutionService
         var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
-            .Where(r => r.Purpose != RunnerPurposes.Infrastructure)
             .Where(r => r.ConnectionId != null
                 && r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
@@ -646,7 +645,8 @@ public class AppsControllerExecutionService
         else if (app.ExecutionRunnerId.HasValue)
             query = query.Where(r => r.Id == app.ExecutionRunnerId.Value);
 
-        return await query.ToListAsync();
+        var runners = await query.ToListAsync();
+        return runners.Where(r => !RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
     }
 
     private async Task<IEnumerable<Runner>> ResolveRunnersByOwnerAsync(Guid ownerId, List<string>? runnerNames, Guid appId)
@@ -654,7 +654,6 @@ public class AppsControllerExecutionService
         var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
         var query = dataContext.Runners
             .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.Purpose != RunnerPurposes.Infrastructure)
             .Where(r => r.ConnectionId != null
                 && r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
@@ -667,7 +666,8 @@ public class AppsControllerExecutionService
                 .Select(a => a.ExecutionRunnerId)
                 .FirstOrDefault());
 
-        return await query.ToListAsync();
+        var runners = await query.ToListAsync();
+        return runners.Where(r => !RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
     }
 
     private static string GetActionLabel(bool updated, int fileCount) =>

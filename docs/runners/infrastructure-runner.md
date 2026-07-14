@@ -22,6 +22,7 @@ export AUTOMATON_API_KEY='protected-admin-runner-key'
 export AUTOMATON_RUNNER_IMAGE='your-registry/automaton-runner:tag'
 export AUTOMATON_RUNNER_NAME='infrastructure-<host-name>'
 export AUTOMATON_RUNNER_HOST_ID='<runner-host-id>'
+export AUTOMATON_RUNNER_CAPABILITIES='ApplicationHosting,WorkflowExecution,DockerManagement,HostExecution,HostedRunnerProvisioning,RouteManagement,CertificateManagement'
 bash scripts/install-infrastructure-runner.sh
 ```
 
@@ -44,14 +45,18 @@ docker run -d \
   -e AUTOMATON_API_KEY='protected-admin-runner-key' \
   -e AUTOMATON_RUNNER_NAME='infrastructure-<host-name>' \
   -e AUTOMATON_RUNNER_PURPOSE=Infrastructure \
+  -e AUTOMATON_RUNNER_CAPABILITIES='ApplicationHosting,WorkflowExecution,DockerManagement,HostExecution,HostedRunnerProvisioning,RouteManagement,CertificateManagement' \
   -e AUTOMATON_RUNNER_HOST_ID='<runner-host-id>' \
   <runner-image>
 ```
 
 The API accepts `Infrastructure` purpose only when the API key belongs to an
-administrator. On registration, the Runner is linked to the supplied
-`RunnerHost` record. The Runner generates and persists its own identity on the
-first registration. The API does not store the raw API key.
+administrator. Capabilities are reported by the same Runner registration and
+persisted with the Runner. Purpose remains as a compatibility and ownership
+boundary; operation routing should use the capability required by that
+operation. On registration, the Runner is linked to the supplied `RunnerHost`
+record. The Runner generates and persists its own identity on the first
+registration. The API does not store the raw API key.
 
 ## Workflows and hosted-runner provisioning
 

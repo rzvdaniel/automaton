@@ -42,13 +42,20 @@ public sealed class InfrastructureRunnerRemoteCommandExecutor(
         }
 
         var runner = await db.Runners.FirstOrDefaultAsync(
-            x => x.Id == host.InfrastructureRunnerId.Value &&
-                 x.Purpose == RunnerPurposes.Infrastructure,
+            x => x.Id == host.InfrastructureRunnerId.Value,
             cancellationToken);
 
         if (runner == null)
         {
             return Failure("The linked infrastructure Runner was not found.");
+        }
+
+        if (!RunnerCapabilities.Includes(
+                runner.CapabilitiesJson,
+                RunnerCapabilities.HostedRunnerProvisioning,
+                runner.Purpose))
+        {
+            return Failure("The linked Runner does not advertise HostedRunnerProvisioning capability.");
         }
 
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))

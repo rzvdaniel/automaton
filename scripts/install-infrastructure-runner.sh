@@ -19,6 +19,7 @@ fi
 
 AUTOMATON_CONTAINER_NAME="${AUTOMATON_CONTAINER_NAME:-automaton-infrastructure-runner}"
 AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-/var/lib/automaton/infrastructure-runner}"
+AUTOMATON_RUNNER_CAPABILITIES="${AUTOMATON_RUNNER_CAPABILITIES:-ApplicationHosting,WorkflowExecution,DockerManagement,HostExecution,HostedRunnerProvisioning,RouteManagement,CertificateManagement}"
 
 if ! command -v docker >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
@@ -48,6 +49,7 @@ docker run -d \
   -e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY" \
   -e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME" \
   -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure" \
+  -e "AUTOMATON_RUNNER_CAPABILITIES=$AUTOMATON_RUNNER_CAPABILITIES" \
   -e "AUTOMATON_RUNNER_HOST_ID=$AUTOMATON_RUNNER_HOST_ID" \
   "$AUTOMATON_RUNNER_IMAGE"
 

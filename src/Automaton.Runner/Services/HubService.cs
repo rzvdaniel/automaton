@@ -21,6 +21,7 @@ public class HubService
     private const string RunnerVersionHeader = "RunnerVersion";
     private const string RunnerMachineNameHeader = "RunnerMachineName";
     private const string RunnerPurposeHeader = "RunnerPurpose";
+    private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
@@ -251,7 +252,14 @@ public class HubService
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
                     options.Headers.Add(RunnerVersionHeader, Environment.Version.ToString());
                     options.Headers.Add(RunnerMachineNameHeader, Environment.MachineName);
-                    options.Headers.Add(RunnerPurposeHeader, RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")));
+                    var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+                    options.Headers.Add(RunnerPurposeHeader, purpose);
+                    options.Headers.Add(
+                        RunnerCapabilitiesHeader,
+                        string.Join(',', RunnerCapabilities.Normalize(
+                            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
+                                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                            purpose)));
                     var runnerHostId = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID");
                     if (!string.IsNullOrWhiteSpace(runnerHostId))
                     {

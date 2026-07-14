@@ -475,6 +475,9 @@ onUnmounted(() => {
                   :severity="getStatusSeverity(runner.status)"
                   class="mt-1"
                 />
+                <div v-if="runner.capabilities?.length" class="text-color-secondary text-sm mt-2">
+                  {{ runner.capabilities.join(' · ') }}
+                </div>
               </div>
             </div>
 
@@ -596,6 +599,14 @@ onUnmounted(() => {
                 :value="getStatusDisplayName(data.status)"
                 :severity="getStatusSeverity(data.status)"
               />
+            </template>
+          </Column>
+
+          <Column header="Capabilities" style="min-width: 280px">
+            <template #body="{ data }">
+              <span class="text-color-secondary text-sm">
+                {{ data.capabilities?.join(' · ') || 'Default capabilities' }}
+              </span>
             </template>
           </Column>
 

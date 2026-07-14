@@ -137,7 +137,8 @@ public class AppsFlowExecutionController : ControllerBase
         // 5. Get owner's runners (impersonation already set) and select
         var allRunners = await runnerService.List(cancellationToken);
         var onlineRunners = allRunners
-            .Where(r => r.Status == RunnerStatus.Online && !r.IsInfrastructureRunner)
+            .Where(r => r.Status == RunnerStatus.Online &&
+                        !RunnerCapabilities.RequiresAdministrator(r.Capabilities))
             .ToList();
 
         // If there are no online runners at all then we cannot proceed
@@ -249,7 +250,8 @@ public class AppsFlowExecutionController : ControllerBase
 
         var allRunners = await runnerService.List(cancellationToken);
         var onlineRunners = allRunners
-            .Where(r => r.Status == RunnerStatus.Online && !r.IsInfrastructureRunner)
+            .Where(r => r.Status == RunnerStatus.Online &&
+                        !RunnerCapabilities.RequiresAdministrator(r.Capabilities))
             .ToList();
         if (!onlineRunners.Any())
             return BadRequest(new { success = false, message = "No online runners available to execute the flow" });

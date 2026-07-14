@@ -17,6 +17,7 @@ public class AutomatonHub : Hub
     private const string RunnerVersionHeader = "RunnerVersion";
     private const string RunnerMachineNameHeader = "RunnerMachineName";
     private const string RunnerPurposeHeader = "RunnerPurpose";
+    private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
 
     private readonly RunnerService runnerService;
@@ -230,6 +231,11 @@ public class AutomatonHub : Hub
             Version = httpContext.Request.Headers[RunnerVersionHeader].ToString(),
             MachineName = httpContext.Request.Headers[RunnerMachineNameHeader].ToString(),
             Purpose = RunnerPurposes.Normalize(httpContext.Request.Headers[RunnerPurposeHeader].ToString()),
+            Capabilities = RunnerCapabilities.Normalize(
+                httpContext.Request.Headers[RunnerCapabilitiesHeader]
+                    .ToString()
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                httpContext.Request.Headers[RunnerPurposeHeader].ToString()),
             RunnerHostId = Guid.TryParse(httpContext.Request.Headers[RunnerHostIdHeader].ToString(), out var hostId) ? hostId : null,
             IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
             ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,

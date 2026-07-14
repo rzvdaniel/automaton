@@ -11,10 +11,11 @@ namespace Automaton.Runner.Console.Services;
 /// </summary>
 public sealed class InfrastructureCommandService
 {
-    private readonly bool enabled = string.Equals(
-        RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")),
-        RunnerPurposes.Infrastructure,
-        StringComparison.Ordinal);
+    private readonly bool enabled = RunnerCapabilities.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
+        .Contains(RunnerCapabilities.HostExecution, StringComparer.OrdinalIgnoreCase);
 
     public async Task<InfrastructureCommandResponse> ExecuteAsync(
         InfrastructureCommandRequest request,

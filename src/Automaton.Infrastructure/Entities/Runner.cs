@@ -31,6 +31,11 @@ public class Runner
     public string Purpose { get; set; } = RunnerPurposes.Managed;
 
     /// <summary>
+    /// JSON-serialized Runner capabilities reported by the installation.
+    /// </summary>
+    public string CapabilitiesJson { get; set; } = "[]";
+
+    /// <summary>
     /// JSON-serialized script engine configuration settings
     /// Stores RunnerScriptEngineSettings as JSON string
     /// </summary>

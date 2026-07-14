@@ -192,6 +192,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ApiInstanceId).HasMaxLength(80);
                 entity.Property(e => e.ApiColor).HasMaxLength(32);
                 entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
+                entity.Property(e => e.CapabilitiesJson).IsRequired().HasMaxLength(2000);
             });
 
             modelBuilder.Entity<RunnerConnectionSession>(entity =>

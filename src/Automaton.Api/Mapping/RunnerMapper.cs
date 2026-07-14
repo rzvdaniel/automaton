@@ -38,6 +38,7 @@ public static class RunnerMapper
          ApiInstanceId = runner.ApiInstanceId,
          ApiColor = runner.ApiColor,
          Purpose = RunnerPurposes.Normalize(runner.Purpose),
+         Capabilities = RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
 		 Scope = scope,
 		 ProjectId = projectId,
 		 ProjectName = projectName,
@@ -88,7 +89,8 @@ public static class RunnerMapper
  IpAddress = details.IpAddress,
  ApiInstanceId = details.ApiInstanceId,
  ApiColor = details.ApiColor,
- Purpose = RunnerPurposes.Normalize(details.Purpose)
+ Purpose = RunnerPurposes.Normalize(details.Purpose),
+ CapabilitiesJson = RunnerCapabilities.Serialize(details.Capabilities, details.Purpose)
  // ScriptEngineSettings and RunnerUsers are not present in RunnerDetails
  };
  }

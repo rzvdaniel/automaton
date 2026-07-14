@@ -724,9 +724,11 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
-        if (executionRunnerId.HasValue && dataContext.Runners.Any(r =>
-                r.Id == executionRunnerId.Value &&
-                r.Purpose == RunnerPurposes.Infrastructure))
+        if (executionRunnerId.HasValue && dataContext.Runners
+            .Where(r => r.Id == executionRunnerId.Value)
+            .Select(r => new { r.CapabilitiesJson, r.Purpose })
+            .AsEnumerable()
+            .Any(r => RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose)))
         {
             throw new InvalidOperationException("Infrastructure runners cannot be assigned to app execution.");
         }
