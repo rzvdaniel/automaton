@@ -20,7 +20,7 @@ namespace Automaton.Api.Services;
 public sealed class InfrastructureRunnerRemoteCommandExecutor(
     ApplicationDbContext db,
     IHubContext<AutomatonHub> automatonHub,
-    ILogger<InfrastructureRunnerRemoteCommandExecutor> logger) : IHostedRunnerRemoteCommandExecutor
+    ILogger<InfrastructureRunnerRemoteCommandExecutor> logger) : IHostedRunnerRemoteCommandExecutor, IInfrastructureRunnerCommandExecutor
 {
     public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
         => host.InfrastructureRunnerId.HasValue;

@@ -5,6 +5,8 @@ import type {
   ProvisionHostedRunnerRequest,
   RunnerHost,
   RunnerEnrollment,
+  InfrastructureWorkflowExecution,
+  InfrastructureWorkflowExecutionLog,
   UpdateRunnerHostRequest,
 } from '../types/admin.types'
 
@@ -33,6 +35,22 @@ class AdminHostedRunnersService {
 
   async revokeInfrastructureRunnerEnrollment(hostId: string, enrollmentId: string): Promise<void> {
     await apiClient.delete(`/api/admin/hosted-runners/hosts/${hostId}/infrastructure-runner/enrollments/${enrollmentId}`)
+  }
+
+  async startHostValidation(hostId: string, runnerId?: string): Promise<InfrastructureWorkflowExecution> {
+    const response = await apiClient.post<InfrastructureWorkflowExecution>('/api/admin/infrastructure-workflows/host-validation', {
+      runnerHostId: hostId,
+      runnerId,
+      idempotencyKey: `studio-host-validation-${hostId}-${crypto.randomUUID()}`,
+    })
+    return response.data
+  }
+
+  async getInfrastructureWorkflowLogs(executionId: string): Promise<InfrastructureWorkflowExecutionLog[]> {
+    const response = await apiClient.get<InfrastructureWorkflowExecutionLog[]>(
+      `/api/admin/infrastructure-workflows/executions/${executionId}/logs`,
+    )
+    return response.data
   }
 
   async getHostedRunners(): Promise<HostedRunner[]> {

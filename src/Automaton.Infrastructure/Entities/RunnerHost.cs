@@ -45,4 +45,5 @@ public class RunnerHost
     public DateTime? UpdatedAt { get; set; }
 
     public virtual ICollection<HostedRunner> HostedRunners { get; set; } = new List<HostedRunner>();
+    public virtual ICollection<RunnerEnrollment> RunnerEnrollments { get; set; } = new List<RunnerEnrollment>();
 }

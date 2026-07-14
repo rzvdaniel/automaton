@@ -124,3 +124,37 @@ docker network create <network>
   visible timeout if it does not return.
 - Hosted-runner provisioning uses the linked Infrastructure Runner when it is
   online; SSH remains available for bootstrap and recovery.
+
+## Host validation workflow
+
+Administrators can select a Runner Host in Studio and run **Validate** once its
+Infrastructure Runner is online. The API resolves the host's active Runner,
+invokes the existing privileged Runner command channel, and stores a durable
+execution record.
+
+The first system workflow is versioned as `host-validation.v1`. Each execution
+records a stable execution ID and idempotency key, target Runner and host IDs,
+queued/running/succeeded/failed/cancelled status, timestamps, exit code,
+structured JSON, and append-only stdout/stderr log entries. The structured
+result includes operating system, kernel, CPU/memory/disk, Docker status and
+version, the configured Automaton network, infrastructure Runner container
+status, available listening ports, and Runner-to-API connectivity.
+
+The API endpoints are:
+
+- `POST /api/admin/infrastructure-workflows/host-validation`
+- `GET /api/admin/infrastructure-workflows/executions/{id}`
+- `GET /api/admin/infrastructure-workflows/executions/{id}/logs`
+
+This validation workflow is intentionally read-only. Hosted-runner
+provisioning remains on the existing direct capability-based path until the
+workflow system has broader asynchronous reconciliation, cancellation, and
+replacement support.
+
+## Stable installer URL
+
+Studio generates a command that downloads the current installer from
+`/api/infrastructure-runner/installer/latest.sh` and verifies it using
+`/api/infrastructure-runner/installer/latest.sha256` before execution. The
+endpoint currently serves the `latest` image/bootstrap contract; version
+pinning can be added when release artifacts are formalized.

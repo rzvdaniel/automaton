@@ -22,6 +22,8 @@ import type {
   RunnerHost,
   SubscriptionPlan,
   UserPlan,
+  InfrastructureWorkflowExecution,
+  InfrastructureWorkflowExecutionLog,
 } from '../types/admin.types'
 
 const toast = useToast()
@@ -46,6 +48,10 @@ const enrollmentDialogVisible = ref(false)
 const enrollmentHost = ref<RunnerHost | null>(null)
 const enrollment = ref<RunnerEnrollment | null>(null)
 const enrollingHostId = ref<string | null>(null)
+const validatingHostId = ref<string | null>(null)
+const validationDialogVisible = ref(false)
+const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
+const validationLogs = ref<InfrastructureWorkflowExecutionLog[]>([])
 const provisionDialogVisible = ref(false)
 const provisioningNewRunner = ref(false)
 const users = ref<UserPlan[]>([])
@@ -233,7 +239,23 @@ async function createInfrastructureRunnerEnrollment(host: RunnerHost) {
 function enrollmentCommand(): string {
   if (!enrollment.value) return ''
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
-  return `sudo bash install-infrastructure-runner.sh --server-url '${apiBaseUrl}' --enrollment-token '${enrollment.value.enrollmentToken}'`
+  const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
+  const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
+  const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --enrollment-token ${quote(enrollment.value.enrollmentToken)}; status=$?; rm -f "$tmp"; exit $status`
+}
+
+async function validateHost(host: RunnerHost) {
+  validatingHostId.value = host.id
+  try {
+    validationExecution.value = await adminHostedRunnersService.startHostValidation(host.id, host.infrastructureRunnerId)
+    validationLogs.value = await adminHostedRunnersService.getInfrastructureWorkflowLogs(validationExecution.value.id)
+    validationDialogVisible.value = true
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Validation failed', detail: error instanceof Error ? error.message : 'Host validation could not be started.', life: 4000 })
+  } finally {
+    validatingHostId.value = null
+  }
 }
 
 async function retryProvisioning(runner: HostedRunner) {
@@ -490,11 +512,15 @@ onMounted(refreshAll)
               <div v-if="data.infrastructureRunnerName" class="flex align-items-center gap-2">
                 <span>{{ data.infrastructureRunnerName }}</span>
                 <Tag
-                  :value="data.infrastructureRunnerStatus?.toLowerCase() || 'none'"
-                  :severity="statusSeverity(data.infrastructureRunnerStatus?.toLowerCase() || 'none')"
+                  :value="data.infrastructureRunnerOnboardingStatus || 'NotInstalled'"
+                  :severity="statusSeverity(data.infrastructureRunnerOnboardingStatus?.toLowerCase() || 'none')"
                 />
               </div>
-              <span v-else class="text-color-secondary">Not linked</span>
+              <Tag
+                v-else
+                :value="data.infrastructureRunnerOnboardingStatus || 'NotInstalled'"
+                :severity="statusSeverity(data.infrastructureRunnerOnboardingStatus?.toLowerCase() || 'none')"
+              />
             </template>
           </Column>
           <Column header="Status">
@@ -523,6 +549,15 @@ onMounted(refreshAll)
                   outlined
                   :loading="enrollingHostId === data.id"
                   @click="createInfrastructureRunnerEnrollment(data)"
+                />
+                <Button
+                  v-else
+                  label="Validate"
+                  icon="pi pi-check-circle"
+                  size="small"
+                  outlined
+                  :loading="validatingHostId === data.id"
+                  @click="validateHost(data)"
                 />
                 <Button icon="pi pi-pencil" text rounded @click="openEditHost(data)" />
               </div>
@@ -675,6 +710,28 @@ onMounted(refreshAll)
       </div>
       <template #footer>
         <Button label="Close" text @click="enrollmentDialogVisible = false" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="validationDialogVisible" header="Infrastructure Host Validation" modal :style="{ width: '56rem' }">
+      <div v-if="validationExecution" class="flex flex-column gap-3">
+        <div class="flex align-items-center gap-2">
+          <span class="text-color-secondary">Execution</span>
+          <code>{{ validationExecution.id }}</code>
+          <Tag :value="validationExecution.status" :severity="statusSeverity(validationExecution.status)" />
+        </div>
+        <Message v-if="validationExecution.error" severity="error" :closable="false">{{ validationExecution.error }}</Message>
+        <div v-if="validationExecution.resultJson">
+          <div class="text-color-secondary text-sm mb-2">Structured result</div>
+          <pre class="command-preview">{{ validationExecution.resultJson }}</pre>
+        </div>
+        <div>
+          <div class="text-color-secondary text-sm mb-2">Durable logs</div>
+          <Textarea :model-value="validationLogs.map((log) => `[${log.stream}] ${log.message}`).join('\n')" readonly auto-resize class="w-full" />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Close" text @click="validationDialogVisible = false" />
       </template>
     </Dialog>
 

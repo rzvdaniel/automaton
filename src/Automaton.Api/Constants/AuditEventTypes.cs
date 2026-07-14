@@ -24,6 +24,7 @@ public static class AuditEventTypes
     public const string RunnerEnrollmentCreated = "RunnerEnrollmentCreated";
     public const string RunnerEnrollmentCompleted = "RunnerEnrollmentCompleted";
     public const string RunnerEnrollmentRevoked = "RunnerEnrollmentRevoked";
+    public const string InfrastructureWorkflowExecuted = "InfrastructureWorkflowExecuted";
     public const string RunnerDeleted = "RunnerDeleted";
     public const string RunnerAssignedToProject = "RunnerAssignedToProject";
     public const string RunnerUnassignedFromProject = "RunnerUnassignedFromProject";

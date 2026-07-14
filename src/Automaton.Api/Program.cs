@@ -393,9 +393,12 @@ services.AddScoped<AdminDocumentationService>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
 services.AddScoped<IHostedRunnerRemoteCommandExecutor, InfrastructureRunnerRemoteCommandExecutor>();
+services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
+services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
 services.AddScoped<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<HostedRunnerManagementService>();
+services.AddScoped<InfrastructureWorkflowExecutionService>();
 services.AddScoped<LocalRunnerHostBootstrapService>();
 
 // System Prompt Builders for AI Chat

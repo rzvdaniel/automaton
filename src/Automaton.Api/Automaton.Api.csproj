@@ -61,6 +61,7 @@
     <ProjectReference Include="..\Automaton.Identity\Automaton.Identity.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\..\scripts\install-infrastructure-runner.sh" Link="Resources\install-infrastructure-runner.sh" />
     <Compile Update="Resources\Errors.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>

@@ -41,6 +41,7 @@ public class AdminHostedRunnersController : ControllerBase
             .AsNoTracking()
             .Include(x => x.HostedRunners)
             .Include(x => x.InfrastructureRunner)
+            .Include(x => x.RunnerEnrollments)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
@@ -246,6 +247,40 @@ public class AdminHostedRunnersController : ControllerBase
                     host.InfrastructureRunner.LastHeartbeatAtUtc,
                     DateTime.UtcNow).ToString(),
             InfrastructureRunnerLastHeartbeatAtUtc = host.InfrastructureRunner?.LastHeartbeatAtUtc
+            ,InfrastructureRunnerOnboardingStatus = GetInfrastructureRunnerOnboardingStatus(host)
+            ,InfrastructureRunnerVersion = host.InfrastructureRunner?.Version
+            ,InfrastructureRunnerInstallationId = host.InfrastructureRunner?.InstallationId
+            ,InfrastructureRunnerCapabilities = host.InfrastructureRunner == null
+                ? Array.Empty<string>()
+                : RunnerCapabilities.Deserialize(host.InfrastructureRunner.CapabilitiesJson, host.InfrastructureRunner.Purpose)
+            ,InfrastructureEnrollmentExpiresAtUtc = host.RunnerEnrollments
+                .Where(x => x.Status == RunnerEnrollmentStatuses.Pending)
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Select(x => (DateTime?)x.ExpiresAtUtc)
+                .FirstOrDefault()
+        };
+    }
+
+    private static string GetInfrastructureRunnerOnboardingStatus(RunnerHost host)
+    {
+        if (host.InfrastructureRunner != null)
+        {
+            return RunnerPresenceEvaluator.IsOnline(
+                host.InfrastructureRunner.ConnectionId,
+                host.InfrastructureRunner.LastHeartbeatAtUtc,
+                DateTime.UtcNow)
+                ? "Online"
+                : "Offline";
+        }
+
+        var latestEnrollment = host.RunnerEnrollments
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .FirstOrDefault();
+        return latestEnrollment?.Status switch
+        {
+            RunnerEnrollmentStatuses.Pending => "EnrollmentPending",
+            RunnerEnrollmentStatuses.Revoked => "Revoked",
+            _ => "NotInstalled"
         };
     }
 
@@ -325,6 +360,11 @@ public record RunnerHostResponse
     public string? InfrastructureRunnerPurpose { get; init; }
     public string InfrastructureRunnerStatus { get; init; } = RunnerStatus.None.ToString();
     public DateTime? InfrastructureRunnerLastHeartbeatAtUtc { get; init; }
+    public string InfrastructureRunnerOnboardingStatus { get; init; } = "NotInstalled";
+    public string? InfrastructureRunnerVersion { get; init; }
+    public string? InfrastructureRunnerInstallationId { get; init; }
+    public IReadOnlyList<string> InfrastructureRunnerCapabilities { get; init; } = Array.Empty<string>();
+    public DateTime? InfrastructureEnrollmentExpiresAtUtc { get; init; }
 }
 
 public record CreateRunnerHostRequest

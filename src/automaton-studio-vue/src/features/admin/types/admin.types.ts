@@ -438,6 +438,11 @@ export interface RunnerHost {
   infrastructureRunnerPurpose?: string
   infrastructureRunnerStatus?: string
   infrastructureRunnerLastHeartbeatAtUtc?: string
+  infrastructureRunnerOnboardingStatus: 'NotInstalled' | 'EnrollmentPending' | 'Online' | 'Offline' | 'Replacing' | 'Revoked' | string
+  infrastructureRunnerVersion?: string
+  infrastructureRunnerInstallationId?: string
+  infrastructureRunnerCapabilities: string[]
+  infrastructureEnrollmentExpiresAtUtc?: string
   createdAt: string
   updatedAt?: string
 }
@@ -473,6 +478,29 @@ export interface RunnerEnrollment {
   expiresAtUtc: string
   expectedPurpose: string
   expectedCapabilities: string[]
+}
+
+export interface InfrastructureWorkflowExecution {
+  id: string
+  workflowVersionId: string
+  requestedByUserId: string
+  targetRunnerId: string
+  targetRunnerHostId: string
+  status: string
+  createdAtUtc: string
+  startedAtUtc?: string
+  completedAtUtc?: string
+  exitCode?: number
+  error?: string
+  idempotencyKey: string
+  resultJson?: string
+}
+
+export interface InfrastructureWorkflowExecutionLog {
+  sequence: number
+  timestampUtc: string
+  stream: string
+  message: string
 }
 
 export interface HostedRunnerDeployment {

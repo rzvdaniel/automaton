@@ -28,6 +28,8 @@ namespace Automaton.Api.Data
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
         public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
+        public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
+        public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
         public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
@@ -263,8 +265,33 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => e.EnrollmentTokenHash).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
                 entity.HasOne(e => e.RunnerHost)
-                    .WithMany()
+                    .WithMany(e => e.RunnerEnrollments)
                     .HasForeignKey(e => e.RunnerHostId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<InfrastructureWorkflowExecution>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.WorkflowVersionId).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.ResultJson).HasColumnType("longtext");
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => new { e.TargetRunnerHostId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.TargetRunnerId, e.CreatedAtUtc });
+            });
+
+            modelBuilder.Entity<InfrastructureWorkflowExecutionLog>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Stream).IsRequired().HasMaxLength(16);
+                entity.Property(e => e.Message).IsRequired().HasColumnType("longtext");
+                entity.HasIndex(e => new { e.ExecutionId, e.Sequence }).IsUnique();
+                entity.HasOne(e => e.Execution)
+                    .WithMany(e => e.Logs)
+                    .HasForeignKey(e => e.ExecutionId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
