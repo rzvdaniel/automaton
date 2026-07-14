@@ -1,4 +1,4 @@
-# Automaton HTTP Backends
+# Automaton Backend Controllers
 
 Automaton backends are ordinary HTTP applications stored in `backend/`.
 
