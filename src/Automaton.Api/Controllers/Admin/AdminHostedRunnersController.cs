@@ -204,7 +204,14 @@ public class AdminHostedRunnersController : ControllerBase
             UpdatedAt = host.UpdatedAt,
             InfrastructureRunnerId = host.InfrastructureRunnerId,
             InfrastructureRunnerName = host.InfrastructureRunner?.Name,
-            InfrastructureRunnerPurpose = host.InfrastructureRunner?.Purpose
+            InfrastructureRunnerPurpose = host.InfrastructureRunner?.Purpose,
+            InfrastructureRunnerStatus = host.InfrastructureRunner == null
+                ? RunnerStatus.None.ToString()
+                : RunnerPresenceEvaluator.DeriveStatus(
+                    host.InfrastructureRunner.ConnectionId,
+                    host.InfrastructureRunner.LastHeartbeatAtUtc,
+                    DateTime.UtcNow).ToString(),
+            InfrastructureRunnerLastHeartbeatAtUtc = host.InfrastructureRunner?.LastHeartbeatAtUtc
         };
     }
 
@@ -282,6 +289,8 @@ public record RunnerHostResponse
     public Guid? InfrastructureRunnerId { get; init; }
     public string? InfrastructureRunnerName { get; init; }
     public string? InfrastructureRunnerPurpose { get; init; }
+    public string InfrastructureRunnerStatus { get; init; } = RunnerStatus.None.ToString();
+    public DateTime? InfrastructureRunnerLastHeartbeatAtUtc { get; init; }
 }
 
 public record CreateRunnerHostRequest

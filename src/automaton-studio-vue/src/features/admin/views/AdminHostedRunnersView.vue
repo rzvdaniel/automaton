@@ -461,7 +461,13 @@ onMounted(refreshAll)
           <Column field="publicIp" header="IP" />
           <Column header="Infrastructure Runner">
             <template #body="{ data }">
-              <span v-if="data.infrastructureRunnerName">{{ data.infrastructureRunnerName }}</span>
+              <div v-if="data.infrastructureRunnerName" class="flex align-items-center gap-2">
+                <span>{{ data.infrastructureRunnerName }}</span>
+                <Tag
+                  :value="data.infrastructureRunnerStatus?.toLowerCase() || 'none'"
+                  :severity="statusSeverity(data.infrastructureRunnerStatus?.toLowerCase() || 'none')"
+                />
+              </div>
               <span v-else class="text-color-secondary">Not linked</span>
             </template>
           </Column>

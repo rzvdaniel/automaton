@@ -433,6 +433,11 @@ export interface RunnerHost {
   totalDiskMb: number
   usedDiskMb: number
   hostedRunnerCount: number
+  infrastructureRunnerId?: string
+  infrastructureRunnerName?: string
+  infrastructureRunnerPurpose?: string
+  infrastructureRunnerStatus?: string
+  infrastructureRunnerLastHeartbeatAtUtc?: string
   createdAt: string
   updatedAt?: string
 }
