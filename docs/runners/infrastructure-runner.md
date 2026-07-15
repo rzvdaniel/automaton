@@ -26,6 +26,24 @@ sudo bash scripts/install-infrastructure-runner.sh \
 
 The installer installs Docker on a Debian-style host when needed, starts
 Docker, pulls the image, and starts the same image with privileged host access.
+The durable host layout is rooted at `/var/lib/automaton`:
+
+```text
+/var/lib/automaton/
+├── infrastructure-runner/
+│   ├── config/
+│   ├── logs/
+│   ├── workflows/
+│   └── artifacts/
+├── hosted-runners/
+├── gateway/
+└── certificates/
+```
+
+The `workflows` directory is mounted as the Runner's existing workspace path;
+this keeps the same Runner project and runtime behavior while giving the host
+the clearer infrastructure-oriented layout.
+
 The equivalent container command contains only the server URL and one-time
 enrollment token:
 
@@ -40,7 +58,8 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /:/host \
   -v /var/lib/automaton/infrastructure-runner/config:/app/config \
-  -v /var/lib/automaton/infrastructure-runner/workspace:/automaton/workspace \
+  -v /var/lib/automaton/infrastructure-runner/workflows:/automaton/workspace \
+  -v /var/lib/automaton/infrastructure-runner/artifacts:/automaton/artifacts \
   -v /var/lib/automaton/infrastructure-runner/logs:/app/logs \
   -e AUTOMATON_SERVER_URL='https://your-configured-api-url' \
   -e AUTOMATON_ENROLLMENT_TOKEN='re_one-time-token' \

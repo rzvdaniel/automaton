@@ -16,7 +16,8 @@ AUTOMATON_ENROLLMENT_TOKEN="${AUTOMATON_ENROLLMENT_TOKEN:-}"
 AUTOMATON_RUNNER_IMAGE="${AUTOMATON_RUNNER_IMAGE:-automaton-runner:latest}"
 AUTOMATON_RUNNER_NAME="${AUTOMATON_RUNNER_NAME:-}"
 AUTOMATON_CONTAINER_NAME="${AUTOMATON_CONTAINER_NAME:-automaton-infrastructure-runner}"
-AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-/var/lib/automaton/infrastructure-runner}"
+AUTOMATON_ROOT="${AUTOMATON_ROOT:-/var/lib/automaton}"
+AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-$AUTOMATON_ROOT/infrastructure-runner}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -62,7 +63,14 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 systemctl enable --now docker
-mkdir -p "$AUTOMATON_DATA_ROOT/config" "$AUTOMATON_DATA_ROOT/workspace" "$AUTOMATON_DATA_ROOT/logs"
+mkdir -p \
+  "$AUTOMATON_DATA_ROOT/config" \
+  "$AUTOMATON_DATA_ROOT/logs" \
+  "$AUTOMATON_DATA_ROOT/workflows" \
+  "$AUTOMATON_DATA_ROOT/artifacts" \
+  "$AUTOMATON_ROOT/hosted-runners" \
+  "$AUTOMATON_ROOT/gateway" \
+  "$AUTOMATON_ROOT/certificates"
 
 docker pull "$AUTOMATON_RUNNER_IMAGE"
 docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
@@ -78,7 +86,8 @@ docker_args=(
   -v /var/run/docker.sock:/var/run/docker.sock
   -v /:/host
   -v "$AUTOMATON_DATA_ROOT/config:/app/config"
-  -v "$AUTOMATON_DATA_ROOT/workspace:/automaton/workspace"
+  -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace"
+  -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts"
   -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
   -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL"
   -e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN"
