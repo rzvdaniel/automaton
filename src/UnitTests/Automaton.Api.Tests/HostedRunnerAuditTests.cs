@@ -118,6 +118,33 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task PrepareProvisioningAsync_DoesNotOverallocateHostCapacity()
+    {
+        using var db = CreateDbContext();
+        var planId = SeedHostedRunnerPlan(db);
+        var host = SeedRunnerHost(db);
+        host.TotalCpuCores = 1;
+        host.TotalMemoryMb = 1024;
+        host.TotalDiskMb = 4096;
+        db.SaveChanges();
+
+        var service = CreateProvisioningService(
+            db,
+            Guid.NewGuid(),
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerOptions { Enabled = false });
+
+        var first = await service.PrepareProvisioningAsync(Guid.NewGuid(), planId);
+        var second = await service.PrepareProvisioningAsync(Guid.NewGuid(), planId);
+
+        Assert.That(first.HostedRunner.RunnerHostId, Is.EqualTo(host.Id));
+        Assert.That(first.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Pending));
+        Assert.That(second.HostedRunner.RunnerHostId, Is.Null);
+        Assert.That(second.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+        Assert.That(await db.HostedRunners.CountAsync(x => x.RunnerHostId == host.Id), Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task RestartAsAdminAsync_WritesRequestedAndSucceededAuditEvents()
     {
         using var db = CreateDbContext();

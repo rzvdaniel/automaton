@@ -158,6 +158,9 @@ docker network create <network>
   visible timeout if it does not return.
 - Hosted-runner provisioning uses the linked Infrastructure Runner when it is
   online; SSH remains available for bootstrap and recovery.
+- Hosted-runner placement rechecks capacity inside a database transaction while
+  locking the candidate host row, so simultaneous provisioning requests cannot
+  reserve the same remaining CPU, memory, or disk.
 
 ## Host validation workflow
 

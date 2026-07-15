@@ -5,8 +5,10 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore.Storage;
 using System.Net;
 
 namespace Automaton.Api.Services;
@@ -90,43 +92,68 @@ public class HostedRunnerProvisioningService
         hostedRunner.MaxApps = capabilities.MaxApps;
         hostedRunner.UpdatedAt = now;
 
-        var host = await SelectHostAsync(capabilities, cancellationToken);
-        if (host == null)
+        IDbContextTransaction? capacityTransaction = null;
+        if (db.Database.IsRelational())
         {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = "No active runner host has enough available capacity.";
-            AddDeployment(hostedRunner, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            capacityTransaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
         }
 
-        hostedRunner.RunnerHostId = host.Id;
-        hostedRunner.RuntimePort = await AllocateRuntimePortAsync(
-            host,
-            hostedRunner,
-            previousHostId == host.Id,
-            cancellationToken);
-        hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner, host);
-        hostedRunner.LastError = null;
-
-        if (!forceProvision && hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
+        try
         {
-            await db.SaveChangesAsync(cancellationToken);
-            return new HostedRunnerPreparationResult(hostedRunner, null, false);
-        }
+            var host = await SelectHostAsync(capabilities, cancellationToken);
+            if (host == null)
+            {
+                hostedRunner.Status = HostedRunnerStatuses.Failed;
+                hostedRunner.LastError = "No active runner host has enough available capacity.";
+                AddDeployment(hostedRunner, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
+                await db.SaveChangesAsync(cancellationToken);
+                if (capacityTransaction != null)
+                {
+                    await capacityTransaction.CommitAsync(cancellationToken);
+                }
 
-        if (!forceProvision &&
-            !createdHostedRunner &&
-            (hostedRunner.Status == HostedRunnerStatuses.Provisioning || hostedRunner.Status == HostedRunnerStatuses.Pending))
-        {
-            await db.SaveChangesAsync(cancellationToken);
-            return new HostedRunnerPreparationResult(hostedRunner, null, false);
-        }
+                return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            }
 
-        var rawApiKey = await EnsureProvisioningApiKeyAsync(hostedRunner, userId, cancellationToken);
-        hostedRunner.Status = options.Enabled
-            ? HostedRunnerStatuses.Provisioning
-            : HostedRunnerStatuses.Pending;
+            hostedRunner.RunnerHostId = host.Id;
+            hostedRunner.RuntimePort = await AllocateRuntimePortAsync(
+                host,
+                hostedRunner,
+                previousHostId == host.Id,
+                cancellationToken);
+            hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner, host);
+            hostedRunner.LastError = null;
+
+            if (!forceProvision && hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                if (capacityTransaction != null)
+                {
+                    await capacityTransaction.CommitAsync(cancellationToken);
+                }
+
+                return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            }
+
+            if (!forceProvision &&
+                !createdHostedRunner &&
+                (hostedRunner.Status == HostedRunnerStatuses.Provisioning || hostedRunner.Status == HostedRunnerStatuses.Pending))
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                if (capacityTransaction != null)
+                {
+                    await capacityTransaction.CommitAsync(cancellationToken);
+                }
+
+                return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            }
+
+            var rawApiKey = await EnsureProvisioningApiKeyAsync(hostedRunner, userId, cancellationToken);
+            hostedRunner.Status = options.Enabled
+                ? HostedRunnerStatuses.Provisioning
+                : HostedRunnerStatuses.Pending;
 
         await auditEventService.WriteAsync(
             new AuditEventWriteRequest
@@ -162,8 +189,21 @@ public class HostedRunnerProvisioningService
                 ? "Managed runner provisioning queued."
                 : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.");
 
-        await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
-        return new HostedRunnerPreparationResult(hostedRunner, rawApiKey, true);
+            await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
+            if (capacityTransaction != null)
+            {
+                await capacityTransaction.CommitAsync(cancellationToken);
+            }
+
+            return new HostedRunnerPreparationResult(hostedRunner, rawApiKey, true);
+        }
+        finally
+        {
+            if (capacityTransaction != null)
+            {
+                await capacityTransaction.DisposeAsync();
+            }
+        }
     }
 
     public async Task<HostedRunner?> EnsureHostedRunnerForUserPlanAsync(Guid userId, Guid planId, CancellationToken cancellationToken = default)
@@ -307,25 +347,48 @@ public class HostedRunnerProvisioningService
     private async Task<RunnerHost?> SelectHostAsync(HostedRunnerCapability requested, CancellationToken cancellationToken)
     {
         var hosts = await db.RunnerHosts
-            .Include(x => x.HostedRunners)
+            .AsNoTracking()
             .Where(x => x.Status == RunnerHostStatuses.Active)
             .OrderByDescending(x => x.IsLocal)
             .ThenBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return hosts.FirstOrDefault(host =>
+        foreach (var candidate in hosts)
         {
-            if (!IsLocalHost(host) && string.IsNullOrWhiteSpace(host.PublicIp))
+            if (!IsLocalHost(candidate) && string.IsNullOrWhiteSpace(candidate.PublicIp))
             {
-                return false;
+                continue;
+            }
+
+            if (IsMySqlProvider())
+            {
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT Id FROM RunnerHosts WHERE Id = {candidate.Id} FOR UPDATE",
+                    cancellationToken);
+            }
+
+            var host = await db.RunnerHosts
+                .Include(x => x.HostedRunners)
+                .FirstOrDefaultAsync(x => x.Id == candidate.Id && x.Status == RunnerHostStatuses.Active, cancellationToken);
+            if (host == null)
+            {
+                continue;
             }
 
             var assigned = host.HostedRunners.Where(r => OccupyingStatuses.Contains(r.Status) && r.DeletedAt == null);
-            return host.ReservedCpuCores + assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
+            if (host.ReservedCpuCores + assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
                 && host.ReservedMemoryMb + assigned.Sum(r => r.MemoryMb) + requested.MemoryMb <= host.TotalMemoryMb
-                && host.ReservedDiskMb + assigned.Sum(r => r.DiskMb) + requested.DiskMb <= host.TotalDiskMb;
-        });
+                && host.ReservedDiskMb + assigned.Sum(r => r.DiskMb) + requested.DiskMb <= host.TotalDiskMb)
+            {
+                return host;
+            }
+        }
+
+        return null;
     }
+
+    private bool IsMySqlProvider()
+        => db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true;
 
     private async Task<string> EnsureProvisioningApiKeyAsync(HostedRunner hostedRunner, Guid userId, CancellationToken cancellationToken)
     {
