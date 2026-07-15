@@ -5,7 +5,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Automaton.Api.Entities;
 
 /// <summary>
-/// A physical or virtual machine that can host paid user runner containers.
+/// A physical or virtual machine registered for infrastructure management and,
+/// when enabled, managed user Runner containers.
 /// </summary>
 public class RunnerHost
 {
@@ -27,7 +28,17 @@ public class RunnerHost
     [MaxLength(120)]
     public string? PrivateIp { get; set; }
 
-    public bool IsLocal { get; set; }
+    [Required, MaxLength(40)]
+    public string ProvisioningTransport { get; set; } = RunnerHostProvisioningTransports.InfrastructureRunner;
+
+    [Required, MaxLength(40)]
+    public string RuntimeConnectivityMode { get; set; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
+
+    /// <summary>
+    /// Whether managed user Runner containers may be placed on this host.
+    /// This is independent from the local-vs-remote provisioning mechanism.
+    /// </summary>
+    public bool HostedRunnerSchedulingEnabled { get; set; } = true;
 
     [Required, MaxLength(40)]
     public string Status { get; set; } = RunnerHostStatuses.Active;

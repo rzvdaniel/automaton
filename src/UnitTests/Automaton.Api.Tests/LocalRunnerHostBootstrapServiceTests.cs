@@ -33,7 +33,9 @@ public class LocalRunnerHostBootstrapServiceTests
 
         var host = await dbContext.RunnerHosts.SingleAsync();
         Assert.That(host.Provider, Is.EqualTo(RunnerHostProviders.Local));
-        Assert.That(host.IsLocal, Is.True);
+        Assert.That(host.ProvisioningTransport, Is.EqualTo(RunnerHostProvisioningTransports.LocalDocker));
+        Assert.That(host.RuntimeConnectivityMode, Is.EqualTo(RunnerHostRuntimeConnectivityModes.LocalDockerNetwork));
+        Assert.That(host.HostedRunnerSchedulingEnabled, Is.True);
         Assert.That(host.Status, Is.EqualTo(RunnerHostStatuses.Active));
         Assert.That(host.Name, Is.EqualTo("runtime-local-docker"));
         Assert.That(host.TotalCpuCores, Is.EqualTo(12m));

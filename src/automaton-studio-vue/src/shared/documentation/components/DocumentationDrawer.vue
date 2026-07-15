@@ -62,12 +62,9 @@ async function loadTopics() {
   try {
     topics.value = await documentationService.listAdminTopics()
 
-    if (!state.topicKey && topics.value.length > 0) {
-      setDocumentationTopic(topics.value[0].key)
-    }
-
-    if (state.topicKey && !topics.value.some(item => item.key === state.topicKey) && topics.value.length > 0) {
-      setDocumentationTopic(topics.value[0].key)
+    const firstTopic = topics.value[0]
+    if (firstTopic && (!state.topicKey || !topics.value.some(item => item.key === state.topicKey))) {
+      setDocumentationTopic(firstTopic.key)
     }
   } catch {
     topics.value = []

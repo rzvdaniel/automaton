@@ -38,7 +38,7 @@ export function getDeployedAppUrl(appId?: string | null): string {
   const appsMarker = baseUrl.hostname.indexOf('.apps.')
   baseUrl.hostname = appsMarker >= 0
     ? `app-${normalizedAppId.replace(/-/g, '')}${baseUrl.hostname.slice(appsMarker)}`
-    : `app-${normalizedAppId.replaceAll('-', '')}.${baseUrl.hostname}`
+    : `app-${normalizedAppId.replace(/-/g, '')}.${baseUrl.hostname}`
   baseUrl.pathname = '/'
   return baseUrl.toString()
 }

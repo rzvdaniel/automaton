@@ -9,16 +9,14 @@ public static class HostedRunnerDockerCommandBuilder
 {
     public static string BuildPreview(HostedRunner runner, RunnerHost host, HostedRunnerOptions options)
     {
-        return string.Equals(options.DeploymentMode, HostedRunnerDeploymentModes.LocalDocker, StringComparison.Ordinal)
-               || string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase)
+        return string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.LocalDocker, StringComparison.Ordinal)
             ? BuildLocalDockerPreview(runner, options)
             : BuildSshDockerPreview(runner, options);
     }
 
     public static string BuildProvisionScript(HostedRunner runner, RunnerHost host, HostedRunnerOptions options, string apiKey)
     {
-        return string.Equals(options.DeploymentMode, HostedRunnerDeploymentModes.LocalDocker, StringComparison.Ordinal)
-               || string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase)
+        return string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.LocalDocker, StringComparison.Ordinal)
             ? BuildLocalDockerProvisionScript(runner, options, apiKey)
             : BuildSshDockerProvisionScript(runner, options, apiKey);
     }

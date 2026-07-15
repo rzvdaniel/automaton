@@ -157,7 +157,16 @@ docker network create <network>
 - Wait for the Runner heartbeat after disruptive operations and report a
   visible timeout if it does not return.
 - Hosted-runner provisioning uses the linked Infrastructure Runner when it is
-  online; SSH remains available for bootstrap and recovery.
+  online; SSH remains an explicit transport for older remote hosts and
+  bootstrap or recovery.
+- `ProvisioningTransport` describes how host commands execute (`localDocker`,
+  `infrastructureRunner`, or explicitly configured `ssh`).
+- `RuntimeConnectivityMode` describes how the published hosted Runner is
+  reached (`localDockerNetwork` or `publicHostPort`). These are independent
+  from placement policy.
+- `HostedRunnerSchedulingEnabled` is the independent placement policy. The
+  control-plane host keeps this disabled while remaining eligible for
+  Infrastructure Runner workflows; dedicated Runner Hosts enable it.
 - Hosted-runner placement rechecks capacity inside a database transaction while
   locking the candidate host row, so simultaneous provisioning requests cannot
   reserve the same remaining CPU, memory, or disk.

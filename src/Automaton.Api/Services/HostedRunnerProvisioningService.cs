@@ -348,14 +348,13 @@ public class HostedRunnerProvisioningService
     {
         var hosts = await db.RunnerHosts
             .AsNoTracking()
-            .Where(x => x.Status == RunnerHostStatuses.Active)
-            .OrderByDescending(x => x.IsLocal)
-            .ThenBy(x => x.CreatedAt)
+            .Where(x => x.Status == RunnerHostStatuses.Active && x.HostedRunnerSchedulingEnabled)
+            .OrderBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
         foreach (var candidate in hosts)
         {
-            if (!IsLocalHost(candidate) && string.IsNullOrWhiteSpace(candidate.PublicIp))
+            if (!UsesLocalDockerNetwork(candidate) && string.IsNullOrWhiteSpace(candidate.PublicIp))
             {
                 continue;
             }
@@ -369,7 +368,11 @@ public class HostedRunnerProvisioningService
 
             var host = await db.RunnerHosts
                 .Include(x => x.HostedRunners)
-                .FirstOrDefaultAsync(x => x.Id == candidate.Id && x.Status == RunnerHostStatuses.Active, cancellationToken);
+                .FirstOrDefaultAsync(
+                    x => x.Id == candidate.Id
+                         && x.Status == RunnerHostStatuses.Active
+                         && x.HostedRunnerSchedulingEnabled,
+                    cancellationToken);
             if (host == null)
             {
                 continue;
@@ -471,7 +474,7 @@ public class HostedRunnerProvisioningService
 
     private string? BuildRuntimeEndpoint(HostedRunner hostedRunner, RunnerHost host)
     {
-        if (IsLocalHost(host))
+        if (UsesLocalDockerNetwork(host))
         {
             return $"http://{hostedRunner.ContainerName}:{options.RuntimePort}";
         }
@@ -497,7 +500,7 @@ public class HostedRunnerProvisioningService
         bool keepExistingPort,
         CancellationToken cancellationToken)
     {
-        if (IsLocalHost(host))
+        if (UsesLocalDockerNetwork(host))
         {
             return null;
         }
@@ -534,8 +537,11 @@ public class HostedRunnerProvisioningService
         throw new InvalidOperationException($"Runner host '{host.Name}' has no available remote runtime ports.");
     }
 
-    private static bool IsLocalHost(RunnerHost host)
-        => host.IsLocal || string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase);
+    private static bool UsesLocalDockerNetwork(RunnerHost host)
+        => string.Equals(
+            host.RuntimeConnectivityMode,
+            RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
+            StringComparison.Ordinal);
 
     private async Task SaveProvisioningCheckpointAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
     {

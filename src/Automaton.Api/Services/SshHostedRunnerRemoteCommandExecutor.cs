@@ -23,7 +23,7 @@ public sealed class SshHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCo
     public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
         => string.Equals(options.DeploymentMode, HostedRunnerDeploymentModes.SshDocker, StringComparison.Ordinal)
            && !host.InfrastructureRunnerId.HasValue
-           && !string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase);
+           && string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.Ssh, StringComparison.Ordinal);
 
     public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
         RunnerHost host,

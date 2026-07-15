@@ -23,7 +23,8 @@ public sealed class InfrastructureRunnerRemoteCommandExecutor(
     ILogger<InfrastructureRunnerRemoteCommandExecutor> logger) : IHostedRunnerRemoteCommandExecutor, IInfrastructureRunnerCommandExecutor
 {
     public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
-        => host.InfrastructureRunnerId.HasValue;
+        => host.InfrastructureRunnerId.HasValue
+           && string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.InfrastructureRunner, StringComparison.Ordinal);
 
     public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
         RunnerHost host,

@@ -59,7 +59,9 @@ public class AdminHostedRunnersController : ControllerBase
             Region = request.Region,
             PublicIp = request.PublicIp,
             PrivateIp = request.PrivateIp,
-            IsLocal = request.IsLocal,
+            ProvisioningTransport = request.ProvisioningTransport,
+            RuntimeConnectivityMode = request.RuntimeConnectivityMode,
+            HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled,
             Status = request.Status,
             TotalCpuCores = request.TotalCpuCores,
             ReservedCpuCores = request.ReservedCpuCores,
@@ -119,7 +121,12 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.Region != null) host.Region = request.Region == string.Empty ? null : request.Region;
         if (request.PublicIp != null) host.PublicIp = request.PublicIp == string.Empty ? null : request.PublicIp;
         if (request.PrivateIp != null) host.PrivateIp = request.PrivateIp == string.Empty ? null : request.PrivateIp;
-        if (request.IsLocal.HasValue) host.IsLocal = request.IsLocal.Value;
+        if (request.ProvisioningTransport != null) host.ProvisioningTransport = request.ProvisioningTransport;
+        if (request.RuntimeConnectivityMode != null) host.RuntimeConnectivityMode = request.RuntimeConnectivityMode;
+        if (request.HostedRunnerSchedulingEnabled.HasValue)
+        {
+            host.HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled.Value;
+        }
         if (request.Status != null) host.Status = request.Status;
         if (request.TotalCpuCores.HasValue) host.TotalCpuCores = request.TotalCpuCores.Value;
         if (request.ReservedCpuCores.HasValue) host.ReservedCpuCores = request.ReservedCpuCores.Value;
@@ -235,7 +242,9 @@ public class AdminHostedRunnersController : ControllerBase
             Region = host.Region,
             PublicIp = host.PublicIp,
             PrivateIp = host.PrivateIp,
-            IsLocal = host.IsLocal,
+            ProvisioningTransport = host.ProvisioningTransport,
+            RuntimeConnectivityMode = host.RuntimeConnectivityMode,
+            HostedRunnerSchedulingEnabled = host.HostedRunnerSchedulingEnabled,
             Status = host.Status,
             TotalCpuCores = host.TotalCpuCores,
             ReservedCpuCores = host.ReservedCpuCores,
@@ -360,7 +369,9 @@ public record RunnerHostResponse
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
     public string? PrivateIp { get; init; }
-    public bool IsLocal { get; init; }
+    public string ProvisioningTransport { get; init; } = RunnerHostProvisioningTransports.InfrastructureRunner;
+    public string RuntimeConnectivityMode { get; init; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
+    public bool HostedRunnerSchedulingEnabled { get; init; } = true;
     public string Status { get; init; } = RunnerHostStatuses.Active;
     public decimal TotalCpuCores { get; init; }
     public decimal ReservedCpuCores { get; init; }
@@ -396,7 +407,9 @@ public record CreateRunnerHostRequest
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
     public string? PrivateIp { get; init; }
-    public bool IsLocal { get; init; }
+    public string ProvisioningTransport { get; init; } = RunnerHostProvisioningTransports.InfrastructureRunner;
+    public string RuntimeConnectivityMode { get; init; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
+    public bool HostedRunnerSchedulingEnabled { get; init; } = true;
     public string Status { get; init; } = RunnerHostStatuses.Active;
     public decimal TotalCpuCores { get; init; } = 2m;
     public decimal ReservedCpuCores { get; init; }
@@ -413,7 +426,9 @@ public record UpdateRunnerHostRequest
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
     public string? PrivateIp { get; init; }
-    public bool? IsLocal { get; init; }
+    public string? ProvisioningTransport { get; init; }
+    public string? RuntimeConnectivityMode { get; init; }
+    public bool? HostedRunnerSchedulingEnabled { get; init; }
     public string? Status { get; init; }
     public decimal? TotalCpuCores { get; init; }
     public decimal? ReservedCpuCores { get; init; }

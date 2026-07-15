@@ -425,7 +425,9 @@ export interface RunnerHost {
   region?: string
   publicIp?: string
   privateIp?: string
-  isLocal: boolean
+  provisioningTransport: string
+  runtimeConnectivityMode: string
+  hostedRunnerSchedulingEnabled: boolean
   status: 'active' | 'draining' | 'disabled'
   totalCpuCores: number
   reservedCpuCores: number
@@ -460,7 +462,9 @@ export interface CreateRunnerHostRequest {
   region?: string
   publicIp?: string
   privateIp?: string
-  isLocal: boolean
+  provisioningTransport: string
+  runtimeConnectivityMode: string
+  hostedRunnerSchedulingEnabled: boolean
   status: 'active' | 'draining' | 'disabled'
   totalCpuCores: number
   reservedCpuCores: number
@@ -476,7 +480,9 @@ export interface UpdateRunnerHostRequest {
   region?: string
   publicIp?: string
   privateIp?: string
-  isLocal?: boolean
+  provisioningTransport?: string
+  runtimeConnectivityMode?: string
+  hostedRunnerSchedulingEnabled?: boolean
   status?: 'active' | 'draining' | 'disabled'
   totalCpuCores?: number
   reservedCpuCores?: number

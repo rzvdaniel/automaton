@@ -236,6 +236,9 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.Region).HasMaxLength(80);
                 entity.Property(e => e.PublicIp).HasMaxLength(120);
                 entity.Property(e => e.PrivateIp).HasMaxLength(120);
+                entity.Property(e => e.ProvisioningTransport).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.RuntimeConnectivityMode).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.HostedRunnerSchedulingEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.TotalCpuCores).IsRequired().HasColumnType("decimal(5,2)");
                 entity.Property(e => e.ReservedCpuCores).IsRequired().HasColumnType("decimal(5,2)");
@@ -248,6 +251,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.CreatedAt).IsRequired();
 
                 entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => new { e.Status, e.HostedRunnerSchedulingEnabled });
                 entity.HasIndex(e => e.Provider);
                 entity.HasIndex(e => e.Region);
                 entity.HasIndex(e => e.InfrastructureRunnerId);

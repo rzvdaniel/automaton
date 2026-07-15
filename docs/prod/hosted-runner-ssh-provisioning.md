@@ -304,19 +304,20 @@ Use `green-1` instead of `blue-1` when green is live.
 
 ### 5. Add the runner host in Automaton Studio
 
-**In plain words:** now we introduce that Hetzner machine to Automaton. This creates a schedulable host record, so the system knows where it is allowed to place paid users' runner containers and how much capacity that machine has.
+**In plain words:** now we introduce that Hetzner machine to Automaton. This creates a Runner Host record and, for a dedicated host, enables managed user Runner placement. The control-plane host may also have an Infrastructure Runner, but its managed Runner placement policy remains disabled.
 
 In Studio:
 
 1. Open `Admin -> Hosted Runners`.
 2. Click `Add Host`.
-3. Enter:
-   - a readable name, for example `Hetzner CX23 - Nuremberg`
-   - provider `hetzner`
-   - public IP of the server
-   - total CPU, memory, and disk capacity
-   - status `active`
+3. Enter a readable name, for example `Hetzner CX23 - Nuremberg`.
 4. Save the host.
+
+The dedicated remote host is eligible for managed Runner placement by default.
+Provider, network addresses, capacity, metadata, and health are confirmed by
+the Infrastructure Runner validation workflow. The control-plane host is
+identified by bootstrap and is never made eligible for managed user Runner
+placement by default.
 
 ### 6. Create or update a hosted-runner subscription plan
 

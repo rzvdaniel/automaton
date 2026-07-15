@@ -71,6 +71,17 @@ const statusOptions = [
   { label: 'Disabled', value: 'disabled' },
 ] as const
 
+const provisioningTransportOptions = [
+  { label: 'Infrastructure Runner', value: 'infrastructureRunner' },
+  { label: 'Local Docker', value: 'localDocker' },
+  { label: 'SSH', value: 'ssh' },
+] as const
+
+const runtimeConnectivityOptions = [
+  { label: 'Public host port', value: 'publicHostPort' },
+  { label: 'Local Docker network', value: 'localDockerNetwork' },
+] as const
+
 const provisionablePlans = computed(() =>
   plans.value.filter((plan) => plan.isActive && plan.capabilities.hostedRunner.enabled),
 )
@@ -95,7 +106,9 @@ function defaultHostForm(): CreateRunnerHostRequest {
     provider: 'hetzner',
     region: '',
     publicIp: '',
-    isLocal: false,
+    provisioningTransport: 'infrastructureRunner',
+    runtimeConnectivityMode: 'publicHostPort',
+    hostedRunnerSchedulingEnabled: true,
     status: 'active',
     totalCpuCores: 2,
     reservedCpuCores: 0,
@@ -236,7 +249,9 @@ function openEditHost(host: RunnerHost) {
     region: host.region ?? '',
     publicIp: host.publicIp ?? '',
     privateIp: host.privateIp ?? '',
-    isLocal: host.isLocal,
+    provisioningTransport: host.provisioningTransport,
+    runtimeConnectivityMode: host.runtimeConnectivityMode,
+    hostedRunnerSchedulingEnabled: host.hostedRunnerSchedulingEnabled,
     status: host.status,
     totalCpuCores: host.totalCpuCores,
     reservedCpuCores: host.reservedCpuCores,
@@ -787,56 +802,131 @@ onMounted(refreshAll)
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="hostDialogVisible" :header="editingHost ? 'Edit Runner Host' : 'Add Runner Host'" modal :style="{ width: '36rem' }">
-      <div class="flex flex-column gap-3">
+    <Dialog v-model:visible="hostDialogVisible" :header="editingHost ? 'Edit Runner Host' : 'Add Runner Host'" modal :style="{ width: 'min(42rem, calc(100vw - 2rem))' }">
+      <div class="runner-host-form flex flex-column gap-3">
         <div>
           <label class="block text-sm font-medium mb-2">Name</label>
           <InputText v-model="hostForm.name" class="w-full" placeholder="Hetzner CX23 - Nuremberg" />
         </div>
         <div v-if="!editingHost" class="text-color-secondary text-sm">
-          Provider, network addresses, and capacity are discovered by the Infrastructure Runner during host validation. You only need to name the host now.
+          The Infrastructure Runner will report the provider details, network addresses, capacity, metadata, and health after enrollment. You only need to name the host now.
         </div>
-        <div v-if="editingHost" class="grid">
-          <div class="col-12 md:col-6">
+        <Message v-if="editingHost" severity="info" :closable="false">
+          Capacity, metadata, health, and heartbeat values reported by the Infrastructure Runner are authoritative. Use these fields only for administrative corrections or initial scheduling values.
+        </Message>
+        <div v-if="editingHost" class="runner-host-form__reported">
+          <div class="text-sm font-semibold mb-2">Reported by Infrastructure Runner</div>
+          <div class="runner-host-form__reported-grid text-sm">
+            <div>
+              <div class="text-color-secondary">Host metadata</div>
+              <div>{{ hostMetadataSummary(editingHost) }}</div>
+            </div>
+            <div>
+              <div class="text-color-secondary">Health</div>
+              <div>{{ hostHealthSummary(editingHost) }}</div>
+            </div>
+            <div>
+              <div class="text-color-secondary">Runner version</div>
+              <div>{{ editingHost.infrastructureRunnerVersion || 'Unknown' }}</div>
+            </div>
+            <div>
+              <div class="text-color-secondary">Last heartbeat</div>
+              <div>{{ formatDateTime(editingHost.lastHeartbeatAtUtc) }}</div>
+            </div>
+            <div class="runner-host-form__reported-capabilities">
+              <div class="text-color-secondary mb-1">Capabilities</div>
+              <div v-if="editingHost.infrastructureRunnerCapabilities.length" class="flex flex-wrap gap-1">
+                <Tag v-for="capability in editingHost.infrastructureRunnerCapabilities" :key="capability" :value="capability" />
+              </div>
+              <div v-else>None reported</div>
+            </div>
+          </div>
+        </div>
+        <div v-if="editingHost" class="runner-host-form__two-column">
+          <div>
             <label class="block text-sm font-medium mb-2">Provider</label>
             <InputText v-model="hostForm.provider" class="w-full" />
           </div>
-          <div class="col-12 md:col-6">
+          <div>
             <label class="block text-sm font-medium mb-2">Status</label>
             <Select v-model="hostForm.status" :options="[...statusOptions]" option-label="label" option-value="value" class="w-full" />
           </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">Provisioning transport</label>
+            <Select
+              v-model="hostForm.provisioningTransport"
+              :options="[...provisioningTransportOptions]"
+              option-label="label"
+              option-value="value"
+              class="w-full"
+              :disabled="editingHost?.provisioningTransport === 'localDocker'"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">Runtime connectivity</label>
+            <Select
+              v-model="hostForm.runtimeConnectivityMode"
+              :options="[...runtimeConnectivityOptions]"
+              option-label="label"
+              option-value="value"
+              class="w-full"
+              :disabled="editingHost?.provisioningTransport === 'localDocker'"
+            />
+          </div>
         </div>
-        <div v-if="editingHost" class="grid">
-          <div class="col-12 md:col-6">
+        <div v-if="editingHost" class="runner-host-form__three-column">
+          <div>
             <label class="block text-sm font-medium mb-2">Region</label>
             <InputText v-model="hostForm.region" class="w-full" placeholder="nbg1" />
           </div>
-          <div class="col-12 md:col-6">
+          <div>
             <label class="block text-sm font-medium mb-2">Public IP</label>
             <InputText v-model="hostForm.publicIp" class="w-full" />
           </div>
-          <div class="col-12 md:col-6">
+          <div>
             <label class="block text-sm font-medium mb-2">Private IP</label>
             <InputText v-model="hostForm.privateIp" class="w-full" />
           </div>
         </div>
-        <div v-if="editingHost" class="grid">
-          <div class="col-12 md:col-4">
+        <div v-if="editingHost" class="runner-host-form__three-column">
+          <div>
             <label class="block text-sm font-medium mb-2">CPU cores</label>
             <InputNumber v-model="hostForm.totalCpuCores" class="w-full" :min="0.25" :step="0.25" :min-fraction-digits="0" :max-fraction-digits="2" />
           </div>
-          <div class="col-12 md:col-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">Reserved CPU cores</label>
+            <InputNumber v-model="hostForm.reservedCpuCores" class="w-full" :min="0" :step="0.25" :min-fraction-digits="0" :max-fraction-digits="2" />
+          </div>
+          <div>
             <label class="block text-sm font-medium mb-2">Memory MB</label>
             <InputNumber v-model="hostForm.totalMemoryMb" class="w-full" :min="128" />
           </div>
-          <div class="col-12 md:col-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">Reserved memory MB</label>
+            <InputNumber v-model="hostForm.reservedMemoryMb" class="w-full" :min="0" />
+          </div>
+          <div>
             <label class="block text-sm font-medium mb-2">Disk MB</label>
             <InputNumber v-model="hostForm.totalDiskMb" class="w-full" :min="512" />
           </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">Reserved disk MB</label>
+            <InputNumber v-model="hostForm.reservedDiskMb" class="w-full" :min="0" />
+          </div>
         </div>
-        <div class="flex align-items-center gap-2">
-          <Checkbox v-model="hostForm.isLocal" binary input-id="isLocalHost" />
-          <label for="isLocalHost">This is the current Automaton server</label>
+        <div class="flex align-items-start gap-2">
+          <Checkbox
+            v-model="hostForm.hostedRunnerSchedulingEnabled"
+            binary
+            input-id="hostedRunnerSchedulingEnabled"
+            :disabled="editingHost?.provisioningTransport === 'localDocker'"
+          />
+          <div>
+            <label for="hostedRunnerSchedulingEnabled">Allow managed Runner placement on this host</label>
+            <div v-if="editingHost?.provisioningTransport === 'localDocker'" class="text-color-secondary text-sm mt-1">
+              The control-plane host is reserved for platform services and Infrastructure Runner workflows.
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -974,5 +1064,70 @@ onMounted(refreshAll)
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.875rem;
+}
+
+.runner-host-form {
+  min-width: 0;
+}
+
+.runner-host-form__two-column,
+.runner-host-form__three-column {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.runner-host-form__two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.runner-host-form__three-column {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.runner-host-form__two-column > *,
+.runner-host-form__three-column > * {
+  min-width: 0;
+}
+
+.runner-host-form__reported {
+  padding: 0.875rem;
+  border: 1px solid var(--p-surface-200);
+  border-radius: 0.75rem;
+  background: var(--p-surface-50);
+}
+
+.runner-host-form__reported-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.runner-host-form__reported-capabilities {
+  grid-column: 1 / -1;
+}
+
+.runner-host-form :deep(.p-inputtext),
+.runner-host-form :deep(.p-inputnumber),
+.runner-host-form :deep(.p-select) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.runner-host-form :deep(.p-inputnumber-input) {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .runner-host-form__two-column,
+  .runner-host-form__three-column,
+  .runner-host-form__reported-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runner-host-form__reported-capabilities {
+    grid-column: auto;
+  }
 }
 </style>

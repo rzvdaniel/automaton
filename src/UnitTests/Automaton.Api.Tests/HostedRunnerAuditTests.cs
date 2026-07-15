@@ -145,6 +145,42 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task PrepareProvisioningAsync_DoesNotSelectLocalHostWhenSchedulingIsDisabled()
+    {
+        using var db = CreateDbContext();
+        var planId = SeedHostedRunnerPlan(db);
+        var localHost = SeedRunnerHost(db);
+        localHost.HostedRunnerSchedulingEnabled = false;
+
+        var remoteHost = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-remote",
+            Provider = RunnerHostProviders.Hetzner,
+            PublicIp = "203.0.113.10",
+            Status = RunnerHostStatuses.Active,
+            HostedRunnerSchedulingEnabled = true,
+            TotalCpuCores = 8,
+            TotalMemoryMb = 16384,
+            TotalDiskMb = 65536,
+            CreatedAt = DateTime.UtcNow.AddMinutes(1)
+        };
+        db.RunnerHosts.Add(remoteHost);
+        db.SaveChanges();
+
+        var service = CreateProvisioningService(
+            db,
+            Guid.NewGuid(),
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerOptions { Enabled = false });
+
+        var prepared = await service.PrepareProvisioningAsync(Guid.NewGuid(), planId);
+
+        Assert.That(prepared.HostedRunner.RunnerHostId, Is.EqualTo(remoteHost.Id));
+        Assert.That(prepared.HostedRunner.RunnerHostId, Is.Not.EqualTo(localHost.Id));
+    }
+
+    [Test]
     public async Task RestartAsAdminAsync_WritesRequestedAndSucceededAuditEvents()
     {
         using var db = CreateDbContext();
@@ -314,7 +350,8 @@ public class HostedRunnerAuditTests
             Name = "host-a",
             Provider = RunnerHostProviders.Local,
             Status = RunnerHostStatuses.Active,
-            IsLocal = true,
+            ProvisioningTransport = RunnerHostProvisioningTransports.LocalDocker,
+            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,

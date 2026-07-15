@@ -16,9 +16,9 @@ public sealed class HostedRunnerRemoteCommandExecutorResolver(
         {
             1 => matches[0],
             0 => throw new InvalidOperationException(
-                $"No hosted runner provisioner can handle provider '{host.Provider}' with deployment mode '{options.DeploymentMode}'."),
+                $"No hosted runner provisioner can handle transport '{host.ProvisioningTransport}' with deployment mode '{options.DeploymentMode}'."),
             _ => throw new InvalidOperationException(
-                $"Multiple hosted runner provisioners matched provider '{host.Provider}' with deployment mode '{options.DeploymentMode}'.")
+                $"Multiple hosted runner provisioners matched transport '{host.ProvisioningTransport}' with deployment mode '{options.DeploymentMode}'.")
         };
     }
 }

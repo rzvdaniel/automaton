@@ -22,7 +22,7 @@ public sealed class LocalDockerHostedRunnerRemoteCommandExecutor : IHostedRunner
     public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
         => string.Equals(options.DeploymentMode, HostedRunnerDeploymentModes.LocalDocker, StringComparison.Ordinal)
            && !host.InfrastructureRunnerId.HasValue
-           && string.Equals(host.Provider, RunnerHostProviders.Local, StringComparison.OrdinalIgnoreCase);
+           && string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.LocalDocker, StringComparison.Ordinal);
 
     public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
         RunnerHost host,

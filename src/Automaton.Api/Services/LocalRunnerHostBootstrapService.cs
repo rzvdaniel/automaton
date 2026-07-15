@@ -24,8 +24,8 @@ public sealed class LocalRunnerHostBootstrapService(
 
         var existingHost = await dbContext.RunnerHosts
             .FirstOrDefaultAsync(
-                host => host.IsLocal
-                        && host.Provider == RunnerHostProviders.Local
+                host => host.Provider == RunnerHostProviders.Local
+                        && host.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
                         && host.Name == config.LocalRunnerHostName,
                 cancellationToken);
 
@@ -36,6 +36,12 @@ public sealed class LocalRunnerHostBootstrapService(
             if (existingHost.Status != RunnerHostStatuses.Active)
             {
                 existingHost.Status = RunnerHostStatuses.Active;
+                changed = true;
+            }
+
+            if (!existingHost.HostedRunnerSchedulingEnabled)
+            {
+                existingHost.HostedRunnerSchedulingEnabled = true;
                 changed = true;
             }
 
@@ -72,7 +78,9 @@ public sealed class LocalRunnerHostBootstrapService(
             Id = Guid.NewGuid(),
             Name = config.LocalRunnerHostName,
             Provider = RunnerHostProviders.Local,
-            IsLocal = true,
+            ProvisioningTransport = RunnerHostProvisioningTransports.LocalDocker,
+            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
+            HostedRunnerSchedulingEnabled = true,
             Status = RunnerHostStatuses.Active,
             TotalCpuCores = config.LocalRunnerHostCpuCores,
             TotalMemoryMb = config.LocalRunnerHostMemoryMb,

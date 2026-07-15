@@ -6,6 +6,19 @@ public static class RunnerHostProviders
     public const string Local = "local";
 }
 
+public static class RunnerHostProvisioningTransports
+{
+    public const string LocalDocker = "localDocker";
+    public const string InfrastructureRunner = "infrastructureRunner";
+    public const string Ssh = "ssh";
+}
+
+public static class RunnerHostRuntimeConnectivityModes
+{
+    public const string LocalDockerNetwork = "localDockerNetwork";
+    public const string PublicHostPort = "publicHostPort";
+}
+
 public static class RunnerHostStatuses
 {
     public const string Active = "active";

@@ -2130,11 +2130,13 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("HealthJson")
                         .HasColumnType("json");
 
+                    b.Property<bool>("HostedRunnerSchedulingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
                     b.Property<Guid?>("InfrastructureRunnerId")
                         .HasColumnType("char(36)");
-
-                    b.Property<bool>("IsLocal")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastHeartbeatAtUtc")
                         .HasColumnType("datetime(6)");
@@ -2156,6 +2158,11 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
 
+                    b.Property<string>("ProvisioningTransport")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
                     b.Property<string>("PublicIp")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
@@ -2172,6 +2179,11 @@ namespace Automaton.Api.Migrations
 
                     b.Property<int>("ReservedMemoryMb")
                         .HasColumnType("int");
+
+                    b.Property<string>("RuntimeConnectivityMode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2199,6 +2211,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("Region");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("Status", "HostedRunnerSchedulingEnabled");
 
                     b.ToTable("RunnerHosts");
                 });
