@@ -424,13 +424,17 @@ export interface RunnerHost {
   provider: string
   region?: string
   publicIp?: string
+  privateIp?: string
   isLocal: boolean
   status: 'active' | 'draining' | 'disabled'
   totalCpuCores: number
+  reservedCpuCores: number
   usedCpuCores: number
   totalMemoryMb: number
+  reservedMemoryMb: number
   usedMemoryMb: number
   totalDiskMb: number
+  reservedDiskMb: number
   usedDiskMb: number
   hostedRunnerCount: number
   infrastructureRunnerId?: string
@@ -443,6 +447,9 @@ export interface RunnerHost {
   infrastructureRunnerInstallationId?: string
   infrastructureRunnerCapabilities: string[]
   infrastructureEnrollmentExpiresAtUtc?: string
+  lastHeartbeatAtUtc?: string
+  metadataJson?: string
+  healthJson?: string
   createdAt: string
   updatedAt?: string
 }
@@ -452,11 +459,15 @@ export interface CreateRunnerHostRequest {
   provider: string
   region?: string
   publicIp?: string
+  privateIp?: string
   isLocal: boolean
   status: 'active' | 'draining' | 'disabled'
   totalCpuCores: number
+  reservedCpuCores: number
   totalMemoryMb: number
+  reservedMemoryMb: number
   totalDiskMb: number
+  reservedDiskMb: number
 }
 
 export interface UpdateRunnerHostRequest {
@@ -464,11 +475,15 @@ export interface UpdateRunnerHostRequest {
   provider?: string
   region?: string
   publicIp?: string
+  privateIp?: string
   isLocal?: boolean
   status?: 'active' | 'draining' | 'disabled'
   totalCpuCores?: number
+  reservedCpuCores?: number
   totalMemoryMb?: number
+  reservedMemoryMb?: number
   totalDiskMb?: number
+  reservedDiskMb?: number
 }
 
 export interface RunnerEnrollment {
@@ -478,6 +493,7 @@ export interface RunnerEnrollment {
   expiresAtUtc: string
   expectedPurpose: string
   expectedCapabilities: string[]
+  dockerImage: string
 }
 
 export interface InfrastructureWorkflowExecution {

@@ -24,6 +24,9 @@ sudo bash scripts/install-infrastructure-runner.sh \
   --runner-image 'your-registry/automaton-runner:tag'
 ```
 
+The generated Studio command supplies the configured hosted-runner image, so
+the new host does not need any API `.env` or `appsettings` files.
+
 The installer installs Docker on a Debian-style host when needed, starts
 Docker, pulls the image, and starts the same image with privileged host access.
 The durable host layout is rooted at `/var/lib/automaton`:
@@ -39,6 +42,12 @@ The durable host layout is rooted at `/var/lib/automaton`:
 ├── gateway/
 └── certificates/
 ```
+
+The host record keeps scheduling data in columns: provider/region and network
+addresses, total and reserved CPU/memory/disk, status, and the latest heartbeat.
+The linked Runner remains the source of truth for execution capabilities. The
+host also stores separate JSON snapshots for reported metadata and validation
+health.
 
 The `workflows` directory is mounted as the Runner's existing workspace path;
 this keeps the same Runner project and runtime behavior while giving the host
@@ -133,6 +142,12 @@ docker network create <network>
 ## Operational rules
 
 - Keep SSH available as an emergency recovery channel.
+- Use SSH keys only; disable password authentication after enrollment and limit
+  access to the recovery account, for example `AllowUsers automaton-admin`.
+- Initially allow the host only outbound HTTPS to the Automaton API and the
+  configured container registry. Do not expose inbound HTTP/HTTPS for the
+  Infrastructure Runner itself; private networking or a host gateway can be
+  added later for published runtime traffic.
 - Audit and review every workflow that targets an Infrastructure Runner.
 - Infrastructure Runners cannot be added to projects or assigned to app
   execution. Public and private app execution paths exclude them; use an
@@ -155,9 +170,13 @@ The first system workflow is versioned as `host-validation.v1`. Each execution
 records a stable execution ID and idempotency key, target Runner and host IDs,
 queued/running/succeeded/failed/cancelled status, timestamps, exit code,
 structured JSON, and append-only stdout/stderr log entries. The structured
-result includes operating system, kernel, CPU/memory/disk, Docker status and
-version, the configured Automaton network, infrastructure Runner container
-status, available listening ports, and Runner-to-API connectivity.
+result includes nested `metadata` and `health` objects. Metadata contains
+operating system, kernel, architecture, CPU/memory/disk, Docker status/version,
+private network information, the configured Automaton network, infrastructure
+Runner container status, and available listening ports. Health contains
+independent Docker, network, disk, and API connectivity statuses plus warnings
+and errors. Successful validation also refreshes the host's scheduling totals
+and reported private IP.
 
 The API endpoints are:
 

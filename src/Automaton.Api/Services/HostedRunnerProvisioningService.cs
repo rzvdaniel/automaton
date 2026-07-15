@@ -321,9 +321,9 @@ public class HostedRunnerProvisioningService
             }
 
             var assigned = host.HostedRunners.Where(r => OccupyingStatuses.Contains(r.Status) && r.DeletedAt == null);
-            return assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
-                && assigned.Sum(r => r.MemoryMb) + requested.MemoryMb <= host.TotalMemoryMb
-                && assigned.Sum(r => r.DiskMb) + requested.DiskMb <= host.TotalDiskMb;
+            return host.ReservedCpuCores + assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
+                && host.ReservedMemoryMb + assigned.Sum(r => r.MemoryMb) + requested.MemoryMb <= host.TotalMemoryMb
+                && host.ReservedDiskMb + assigned.Sum(r => r.DiskMb) + requested.DiskMb <= host.TotalDiskMb;
         });
     }
 

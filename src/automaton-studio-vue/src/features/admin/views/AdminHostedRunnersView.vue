@@ -98,22 +98,63 @@ function defaultHostForm(): CreateRunnerHostRequest {
     isLocal: false,
     status: 'active',
     totalCpuCores: 2,
+    reservedCpuCores: 0,
     totalMemoryMb: 4096,
+    reservedMemoryMb: 0,
     totalDiskMb: 40960,
+    reservedDiskMb: 0,
   }
 }
 
 const hostForm = ref<CreateRunnerHostRequest>(defaultHostForm())
 
+interface HostMetadataSummary {
+  hostname?: string
+  architecture?: string
+  os?: { distribution?: string; version?: string }
+  docker?: { version?: string; status?: string }
+}
+
+interface HostHealthSummary {
+  docker?: string
+  network?: string
+  disk?: string
+  apiConnectivity?: string
+}
+
+function parseHostJson<T>(value?: string): T | undefined {
+  if (!value) return undefined
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return undefined
+  }
+}
+
+function hostMetadataSummary(host: RunnerHost): string {
+  const metadata = parseHostJson<HostMetadataSummary>(host.metadataJson)
+  if (!metadata) return 'Not validated'
+  const os = metadata.os?.distribution
+    ? `${metadata.os.distribution} ${metadata.os.version || ''}`.trim()
+    : 'Unknown OS'
+  return [metadata.hostname || 'Unknown host', os, metadata.docker?.version ? `Docker ${metadata.docker.version}` : ''].filter(Boolean).join(' · ')
+}
+
+function hostHealthSummary(host: RunnerHost): string {
+  const health = parseHostJson<HostHealthSummary>(host.healthJson)
+  if (!health) return 'Not validated'
+  return [health.docker, health.network, health.disk, health.apiConnectivity].filter(Boolean).join(' · ')
+}
+
 const totals = computed(() => {
   return hosts.value.reduce(
     (acc, host) => {
       acc.cpu += host.totalCpuCores
-      acc.usedCpu += host.usedCpuCores
+      acc.usedCpu += host.usedCpuCores + host.reservedCpuCores
       acc.memory += host.totalMemoryMb
-      acc.usedMemory += host.usedMemoryMb
+      acc.usedMemory += host.usedMemoryMb + host.reservedMemoryMb
       acc.disk += host.totalDiskMb
-      acc.usedDisk += host.usedDiskMb
+      acc.usedDisk += host.usedDiskMb + host.reservedDiskMb
       return acc
     },
     { cpu: 0, usedCpu: 0, memory: 0, usedMemory: 0, disk: 0, usedDisk: 0 },
@@ -194,11 +235,15 @@ function openEditHost(host: RunnerHost) {
     provider: host.provider,
     region: host.region ?? '',
     publicIp: host.publicIp ?? '',
+    privateIp: host.privateIp ?? '',
     isLocal: host.isLocal,
     status: host.status,
     totalCpuCores: host.totalCpuCores,
+    reservedCpuCores: host.reservedCpuCores,
     totalMemoryMb: host.totalMemoryMb,
+    reservedMemoryMb: host.reservedMemoryMb,
     totalDiskMb: host.totalDiskMb,
+    reservedDiskMb: host.reservedDiskMb,
   }
   hostDialogVisible.value = true
 }
@@ -242,7 +287,7 @@ function enrollmentCommand(): string {
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
   const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
   const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --enrollment-token ${quote(enrollment.value.enrollmentToken)}; status=$?; rm -f "$tmp"; exit $status`
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --enrollment-token ${quote(enrollment.value.enrollmentToken)} --runner-image ${quote(enrollment.value.dockerImage)}; status=$?; rm -f "$tmp"; exit $status`
 }
 
 async function validateHost(host: RunnerHost) {
@@ -250,6 +295,7 @@ async function validateHost(host: RunnerHost) {
   try {
     validationExecution.value = await adminHostedRunnersService.startHostValidation(host.id, host.infrastructureRunnerId)
     validationLogs.value = await adminHostedRunnersService.getInfrastructureWorkflowLogs(validationExecution.value.id)
+    await loadHosts()
     validationDialogVisible.value = true
   } catch (error) {
     toast.add({ severity: 'error', summary: 'Validation failed', detail: error instanceof Error ? error.message : 'Host validation could not be started.', life: 4000 })
@@ -507,6 +553,12 @@ onMounted(refreshAll)
           <Column field="name" header="Host" />
           <Column field="provider" header="Provider" />
           <Column field="publicIp" header="IP" />
+          <Column header="Reported host">
+            <template #body="{ data }">
+              <div class="text-sm">{{ hostMetadataSummary(data) }}</div>
+              <div class="text-color-secondary text-xs">{{ hostHealthSummary(data) }}</div>
+            </template>
+          </Column>
           <Column header="Infrastructure Runner">
             <template #body="{ data }">
               <div v-if="data.infrastructureRunnerName" class="flex align-items-center gap-2">
@@ -529,13 +581,13 @@ onMounted(refreshAll)
             </template>
           </Column>
           <Column header="CPU">
-            <template #body="{ data }">{{ data.usedCpuCores }} / {{ data.totalCpuCores }}</template>
+            <template #body="{ data }">{{ data.usedCpuCores + data.reservedCpuCores }} / {{ data.totalCpuCores }}</template>
           </Column>
           <Column header="Memory">
-            <template #body="{ data }">{{ formatMb(data.usedMemoryMb) }} / {{ formatMb(data.totalMemoryMb) }}</template>
+            <template #body="{ data }">{{ formatMb(data.usedMemoryMb + data.reservedMemoryMb) }} / {{ formatMb(data.totalMemoryMb) }}</template>
           </Column>
           <Column header="Disk">
-            <template #body="{ data }">{{ formatMb(data.usedDiskMb) }} / {{ formatMb(data.totalDiskMb) }}</template>
+            <template #body="{ data }">{{ formatMb(data.usedDiskMb + data.reservedDiskMb) }} / {{ formatMb(data.totalDiskMb) }}</template>
           </Column>
           <Column field="hostedRunnerCount" header="Runners" />
           <Column header="Actions">
@@ -741,7 +793,10 @@ onMounted(refreshAll)
           <label class="block text-sm font-medium mb-2">Name</label>
           <InputText v-model="hostForm.name" class="w-full" placeholder="Hetzner CX23 - Nuremberg" />
         </div>
-        <div class="grid">
+        <div v-if="!editingHost" class="text-color-secondary text-sm">
+          Provider, network addresses, and capacity are discovered by the Infrastructure Runner during host validation. You only need to name the host now.
+        </div>
+        <div v-if="editingHost" class="grid">
           <div class="col-12 md:col-6">
             <label class="block text-sm font-medium mb-2">Provider</label>
             <InputText v-model="hostForm.provider" class="w-full" />
@@ -751,7 +806,7 @@ onMounted(refreshAll)
             <Select v-model="hostForm.status" :options="[...statusOptions]" option-label="label" option-value="value" class="w-full" />
           </div>
         </div>
-        <div class="grid">
+        <div v-if="editingHost" class="grid">
           <div class="col-12 md:col-6">
             <label class="block text-sm font-medium mb-2">Region</label>
             <InputText v-model="hostForm.region" class="w-full" placeholder="nbg1" />
@@ -760,8 +815,12 @@ onMounted(refreshAll)
             <label class="block text-sm font-medium mb-2">Public IP</label>
             <InputText v-model="hostForm.publicIp" class="w-full" />
           </div>
+          <div class="col-12 md:col-6">
+            <label class="block text-sm font-medium mb-2">Private IP</label>
+            <InputText v-model="hostForm.privateIp" class="w-full" />
+          </div>
         </div>
-        <div class="grid">
+        <div v-if="editingHost" class="grid">
           <div class="col-12 md:col-4">
             <label class="block text-sm font-medium mb-2">CPU cores</label>
             <InputNumber v-model="hostForm.totalCpuCores" class="w-full" :min="0.25" :step="0.25" :min-fraction-digits="0" :max-fraction-digits="2" />

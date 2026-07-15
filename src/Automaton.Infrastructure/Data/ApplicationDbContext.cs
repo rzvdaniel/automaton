@@ -235,14 +235,21 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.Provider).IsRequired().HasMaxLength(80);
                 entity.Property(e => e.Region).HasMaxLength(80);
                 entity.Property(e => e.PublicIp).HasMaxLength(120);
+                entity.Property(e => e.PrivateIp).HasMaxLength(120);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.TotalCpuCores).IsRequired().HasColumnType("decimal(5,2)");
+                entity.Property(e => e.ReservedCpuCores).IsRequired().HasColumnType("decimal(5,2)");
                 entity.Property(e => e.TotalMemoryMb).IsRequired();
+                entity.Property(e => e.ReservedMemoryMb).IsRequired();
                 entity.Property(e => e.TotalDiskMb).IsRequired();
+                entity.Property(e => e.ReservedDiskMb).IsRequired();
+                entity.Property(e => e.MetadataJson).HasColumnType("json");
+                entity.Property(e => e.HealthJson).HasColumnType("json");
                 entity.Property(e => e.CreatedAt).IsRequired();
 
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.Provider);
+                entity.HasIndex(e => e.Region);
                 entity.HasIndex(e => e.InfrastructureRunnerId);
 
                 entity.HasOne(e => e.InfrastructureRunner)

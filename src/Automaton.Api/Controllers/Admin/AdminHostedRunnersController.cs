@@ -58,11 +58,15 @@ public class AdminHostedRunnersController : ControllerBase
             Provider = request.Provider,
             Region = request.Region,
             PublicIp = request.PublicIp,
+            PrivateIp = request.PrivateIp,
             IsLocal = request.IsLocal,
             Status = request.Status,
             TotalCpuCores = request.TotalCpuCores,
+            ReservedCpuCores = request.ReservedCpuCores,
             TotalMemoryMb = request.TotalMemoryMb,
+            ReservedMemoryMb = request.ReservedMemoryMb,
             TotalDiskMb = request.TotalDiskMb,
+            ReservedDiskMb = request.ReservedDiskMb,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -114,11 +118,15 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.Provider != null) host.Provider = request.Provider;
         if (request.Region != null) host.Region = request.Region == string.Empty ? null : request.Region;
         if (request.PublicIp != null) host.PublicIp = request.PublicIp == string.Empty ? null : request.PublicIp;
+        if (request.PrivateIp != null) host.PrivateIp = request.PrivateIp == string.Empty ? null : request.PrivateIp;
         if (request.IsLocal.HasValue) host.IsLocal = request.IsLocal.Value;
         if (request.Status != null) host.Status = request.Status;
         if (request.TotalCpuCores.HasValue) host.TotalCpuCores = request.TotalCpuCores.Value;
+        if (request.ReservedCpuCores.HasValue) host.ReservedCpuCores = request.ReservedCpuCores.Value;
         if (request.TotalMemoryMb.HasValue) host.TotalMemoryMb = request.TotalMemoryMb.Value;
+        if (request.ReservedMemoryMb.HasValue) host.ReservedMemoryMb = request.ReservedMemoryMb.Value;
         if (request.TotalDiskMb.HasValue) host.TotalDiskMb = request.TotalDiskMb.Value;
+        if (request.ReservedDiskMb.HasValue) host.ReservedDiskMb = request.ReservedDiskMb.Value;
         host.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -226,13 +234,17 @@ public class AdminHostedRunnersController : ControllerBase
             Provider = host.Provider,
             Region = host.Region,
             PublicIp = host.PublicIp,
+            PrivateIp = host.PrivateIp,
             IsLocal = host.IsLocal,
             Status = host.Status,
             TotalCpuCores = host.TotalCpuCores,
+            ReservedCpuCores = host.ReservedCpuCores,
             UsedCpuCores = assigned.Sum(x => x.CpuCores),
             TotalMemoryMb = host.TotalMemoryMb,
+            ReservedMemoryMb = host.ReservedMemoryMb,
             UsedMemoryMb = assigned.Sum(x => x.MemoryMb),
             TotalDiskMb = host.TotalDiskMb,
+            ReservedDiskMb = host.ReservedDiskMb,
             UsedDiskMb = assigned.Sum(x => x.DiskMb),
             HostedRunnerCount = assigned.Count,
             CreatedAt = host.CreatedAt,
@@ -253,6 +265,9 @@ public class AdminHostedRunnersController : ControllerBase
             ,InfrastructureRunnerCapabilities = host.InfrastructureRunner == null
                 ? Array.Empty<string>()
                 : RunnerCapabilities.Deserialize(host.InfrastructureRunner.CapabilitiesJson, host.InfrastructureRunner.Purpose)
+            ,LastHeartbeatAtUtc = host.LastHeartbeatAtUtc
+            ,MetadataJson = host.MetadataJson
+            ,HealthJson = host.HealthJson
             ,InfrastructureEnrollmentExpiresAtUtc = host.RunnerEnrollments
                 .Where(x => x.Status == RunnerEnrollmentStatuses.Pending)
                 .OrderByDescending(x => x.CreatedAtUtc)
@@ -344,13 +359,17 @@ public record RunnerHostResponse
     public string Provider { get; init; } = string.Empty;
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
+    public string? PrivateIp { get; init; }
     public bool IsLocal { get; init; }
     public string Status { get; init; } = RunnerHostStatuses.Active;
     public decimal TotalCpuCores { get; init; }
+    public decimal ReservedCpuCores { get; init; }
     public decimal UsedCpuCores { get; init; }
     public int TotalMemoryMb { get; init; }
+    public int ReservedMemoryMb { get; init; }
     public int UsedMemoryMb { get; init; }
     public int TotalDiskMb { get; init; }
+    public int ReservedDiskMb { get; init; }
     public int UsedDiskMb { get; init; }
     public int HostedRunnerCount { get; init; }
     public DateTime CreatedAt { get; init; }
@@ -365,6 +384,9 @@ public record RunnerHostResponse
     public string? InfrastructureRunnerInstallationId { get; init; }
     public IReadOnlyList<string> InfrastructureRunnerCapabilities { get; init; } = Array.Empty<string>();
     public DateTime? InfrastructureEnrollmentExpiresAtUtc { get; init; }
+    public DateTime? LastHeartbeatAtUtc { get; init; }
+    public string? MetadataJson { get; init; }
+    public string? HealthJson { get; init; }
 }
 
 public record CreateRunnerHostRequest
@@ -373,11 +395,15 @@ public record CreateRunnerHostRequest
     public string Provider { get; init; } = RunnerHostProviders.Hetzner;
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
+    public string? PrivateIp { get; init; }
     public bool IsLocal { get; init; }
     public string Status { get; init; } = RunnerHostStatuses.Active;
     public decimal TotalCpuCores { get; init; } = 2m;
+    public decimal ReservedCpuCores { get; init; }
     public int TotalMemoryMb { get; init; } = 4096;
+    public int ReservedMemoryMb { get; init; }
     public int TotalDiskMb { get; init; } = 40960;
+    public int ReservedDiskMb { get; init; }
 }
 
 public record UpdateRunnerHostRequest
@@ -386,11 +412,15 @@ public record UpdateRunnerHostRequest
     public string? Provider { get; init; }
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
+    public string? PrivateIp { get; init; }
     public bool? IsLocal { get; init; }
     public string? Status { get; init; }
     public decimal? TotalCpuCores { get; init; }
+    public decimal? ReservedCpuCores { get; init; }
     public int? TotalMemoryMb { get; init; }
+    public int? ReservedMemoryMb { get; init; }
     public int? TotalDiskMb { get; init; }
+    public int? ReservedDiskMb { get; init; }
 }
 
 public record HostedRunnerResponse

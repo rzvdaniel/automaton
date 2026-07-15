@@ -24,6 +24,9 @@ public class RunnerHost
     [MaxLength(120)]
     public string? PublicIp { get; set; }
 
+    [MaxLength(120)]
+    public string? PrivateIp { get; set; }
+
     public bool IsLocal { get; set; }
 
     [Required, MaxLength(40)]
@@ -32,8 +35,25 @@ public class RunnerHost
     [Column(TypeName = "decimal(5,2)")]
     public decimal TotalCpuCores { get; set; } = 2m;
 
+    [Column(TypeName = "decimal(5,2)")]
+    public decimal ReservedCpuCores { get; set; }
+
     public int TotalMemoryMb { get; set; } = 4096;
+    public int ReservedMemoryMb { get; set; }
     public int TotalDiskMb { get; set; } = 40960;
+    public int ReservedDiskMb { get; set; }
+
+    public DateTime? LastHeartbeatAtUtc { get; set; }
+
+    /// <summary>
+    /// Runner-reported facts that are useful to display but not to schedule on.
+    /// </summary>
+    public string? MetadataJson { get; set; }
+
+    /// <summary>
+    /// Latest host-validation snapshot, kept separate from relatively stable metadata.
+    /// </summary>
+    public string? HealthJson { get; set; }
 
     /// <summary>
     /// Shared Runner installed with infrastructure privileges on this host.

@@ -1270,6 +1270,99 @@ namespace Automaton.Api.Migrations
                     b.ToTable("HostedRunnerDeployments");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<int?>("ExitCode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<Guid>("TargetRunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("TargetRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("WorkflowVersionId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("TargetRunnerHostId", "CreatedAtUtc");
+
+                    b.HasIndex("TargetRunnerId", "CreatedAtUtc");
+
+                    b.ToTable("InfrastructureWorkflowExecutions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecutionLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Stream")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutionId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("InfrastructureWorkflowExecutionLogs");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.InvitationToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2034,14 +2127,27 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("HealthJson")
+                        .HasColumnType("json");
+
                     b.Property<Guid?>("InfrastructureRunnerId")
                         .HasColumnType("char(36)");
 
                     b.Property<bool>("IsLocal")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<DateTime?>("LastHeartbeatAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("json");
+
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("PrivateIp")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
@@ -2057,6 +2163,15 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("Region")
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
+
+                    b.Property<decimal>("ReservedCpuCores")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("ReservedDiskMb")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReservedMemoryMb")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2080,6 +2195,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("InfrastructureRunnerId");
 
                     b.HasIndex("Provider");
+
+                    b.HasIndex("Region");
 
                     b.HasIndex("Status");
 
@@ -2936,6 +3053,17 @@ namespace Automaton.Api.Migrations
                     b.Navigation("HostedRunner");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecutionLog", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.InfrastructureWorkflowExecution", "Execution")
+                        .WithMany("Logs")
+                        .HasForeignKey("ExecutionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Execution");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", "Owner")
@@ -3251,7 +3379,7 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.RunnerEnrollment", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
-                        .WithMany()
+                        .WithMany("RunnerEnrollments")
                         .HasForeignKey("RunnerHostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -3445,6 +3573,11 @@ namespace Automaton.Api.Migrations
                     b.Navigation("Deployments");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecution", b =>
+                {
+                    b.Navigation("Logs");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Organization", b =>
                 {
                     b.Navigation("AppAssignments");
@@ -3483,6 +3616,8 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.RunnerHost", b =>
                 {
                     b.Navigation("HostedRunners");
+
+                    b.Navigation("RunnerEnrollments");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>

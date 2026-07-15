@@ -99,6 +99,7 @@ public class RunnerEnrollmentServiceTests
             apiKeyService,
             auditService,
             Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+            Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
     }
 

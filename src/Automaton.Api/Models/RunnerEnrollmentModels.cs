@@ -10,6 +10,7 @@ public sealed record RunnerEnrollmentCreatedResponse
     public DateTime ExpiresAtUtc { get; init; }
     public string ExpectedPurpose { get; init; } = RunnerPurposes.Infrastructure;
     public IReadOnlyList<string> ExpectedCapabilities { get; init; } = Array.Empty<string>();
+    public string DockerImage { get; init; } = "automaton-runner:latest";
 }
 
 public sealed record RunnerEnrollmentExchangeRequest

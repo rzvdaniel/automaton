@@ -18,6 +18,7 @@ public sealed class RunnerEnrollmentService(
     ApiKeyService apiKeyService,
     IAuditEventService auditEventService,
     IOptions<RunnerEnrollmentOptions> options,
+    IOptions<HostedRunnerOptions> hostedRunnerOptions,
     ILogger<RunnerEnrollmentService> logger)
 {
     public async Task<RunnerEnrollmentCreatedResponse> CreateAsync(
@@ -94,7 +95,8 @@ public sealed class RunnerEnrollmentService(
             EnrollmentToken = enrollmentToken,
             ExpiresAtUtc = enrollment.ExpiresAtUtc,
             ExpectedPurpose = enrollment.ExpectedPurpose,
-            ExpectedCapabilities = expectedCapabilities
+            ExpectedCapabilities = expectedCapabilities,
+            DockerImage = hostedRunnerOptions.Value.DockerImage
         };
     }
 

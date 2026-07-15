@@ -98,6 +98,11 @@ public sealed class InfrastructureWorkflowExecutionService(
                 ? InfrastructureWorkflowExecutionStatuses.Succeeded
                 : InfrastructureWorkflowExecutionStatuses.Failed;
 
+            if (result.Succeeded && execution.ResultJson != null)
+            {
+                ApplyHostValidationSnapshot(host, execution.ResultJson);
+            }
+
             AppendLogs(execution, result.StandardOutput, "stdout");
             AppendLogs(execution, result.StandardError, "stderr");
         }
@@ -179,19 +184,88 @@ public sealed class InfrastructureWorkflowExecutionService(
         json_escape() {
           printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
         }
-        os_name=$(uname -srm 2>/dev/null || printf 'unknown')
+        hostname_value=$(hostname 2>/dev/null || printf 'unknown')
+        distribution=$(awk -F= '$1=="ID"{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null || printf 'unknown')
+        os_version=$(awk -F= '$1=="VERSION_ID"{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null || printf 'unknown')
         kernel=$(uname -r 2>/dev/null || printf 'unknown')
-        cpu_count=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf 'unknown')
-        memory=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || printf 'unknown')
-        disk=$(df -Pm / 2>/dev/null | awk 'NR==2{print $2}' || printf 'unknown')
-        docker_version=$(docker --version 2>/dev/null || printf 'unavailable')
+        architecture=$(uname -m 2>/dev/null || printf 'unknown')
+        cpu_count=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf '0')
+        cpu_model=$(awk -F: '/model name|Hardware/{gsub(/^ +/,"",$2); print $2; exit}' /proc/cpuinfo 2>/dev/null || printf 'unknown')
+        memory=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || printf '0')
+        disk=$(df -Pm / 2>/dev/null | awk 'NR==2{print $2}' || printf '0')
+        docker_version=$(docker version --format '{{.Server.Version}}' 2>/dev/null || printf 'unavailable')
         docker_status=$(docker info >/dev/null 2>&1 && printf 'running' || printf 'unavailable')
+        docker_storage_driver=$(docker info --format '{{.Driver}}' 2>/dev/null || printf 'unknown')
+        docker_cgroup_version=$(docker info --format '{{.CgroupVersion}}' 2>/dev/null || printf 'unknown')
         network_status=$(docker network inspect '__DOCKER_NETWORK__' >/dev/null 2>&1 && printf 'present' || printf 'missing')
         runner_container=$(docker ps --filter 'name=automaton-infrastructure-runner' --format '{{.Status}}' 2>/dev/null || printf 'unknown')
         ports=$(ss -lnt 2>/dev/null | awk 'NR>1{print $4}' | head -50 | paste -sd ',' - || printf 'unknown')
-        printf '{"operatingSystem":"%s","kernel":"%s","cpuCount":"%s","memoryMb":"%s","rootDiskMb":"%s","dockerVersion":"%s","dockerStatus":"%s","automatonNetwork":"%s","infrastructureRunnerContainer":"%s","availableRuntimePorts":"%s","hostToApiConnectivity":"verified_by_runner_connection"}\n' \
-          "$(json_escape "$os_name")" "$(json_escape "$kernel")" "$(json_escape "$cpu_count")" "$(json_escape "$memory")" "$(json_escape "$disk")" "$(json_escape "$docker_version")" "$(json_escape "$docker_status")" "$(json_escape "$network_status")" "$(json_escape "$runner_container")" "$(json_escape "$ports")"
+        interfaces=$(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | paste -sd ',' - || printf 'unknown')
+        private_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}' || printf 'unknown')
+        timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        docker_health=$(test "$docker_status" = running && printf 'Healthy' || printf 'Unhealthy')
+        network_health=$(test "$network_status" = present && printf 'Healthy' || printf 'Unhealthy')
+        printf '{"totalCpuCores":%s,"totalMemoryMb":%s,"totalDiskMb":%s,"metadata":{"hostname":"%s","os":{"distribution":"%s","version":"%s","kernel":"%s"},"architecture":"%s","docker":{"version":"%s","status":"%s","storageDriver":"%s","cgroupVersion":"%s"},"cpu":{"model":"%s","cores":%s},"memoryMb":%s,"diskMb":%s,"network":{"privateIp":"%s","interfaces":"%s","automatonNetwork":"%s","availableRuntimePorts":"%s"},"runtime":{"infrastructureRunnerContainer":"%s"}},"health":{"validationVersion":"host-validation.v1","timestampUtc":"%s","docker":"%s","network":"%s","disk":"%s","apiConnectivity":"Healthy","warnings":[],"errors":[]}}\n' \
+          "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$hostname_value")" "$(json_escape "$distribution")" "$(json_escape "$os_version")" "$(json_escape "$kernel")" "$(json_escape "$architecture")" "$(json_escape "$docker_version")" "$(json_escape "$docker_status")" "$(json_escape "$docker_storage_driver")" "$(json_escape "$docker_cgroup_version")" "$(json_escape "$cpu_model")" "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$private_ip")" "$(json_escape "$interfaces")" "$(json_escape "$network_status")" "$(json_escape "$ports")" "$(json_escape "$runner_container")" "$(json_escape "$timestamp_utc")" "$(json_escape "$docker_health")" "$(json_escape "$network_health")" "$(test "${disk:-0}" -gt 0 2>/dev/null && printf 'Healthy' || printf 'Unhealthy')"
         """.Replace("__DOCKER_NETWORK__", safeNetwork, StringComparison.Ordinal);
+    }
+
+    private static void ApplyHostValidationSnapshot(RunnerHost host, string resultJson)
+    {
+        using var document = JsonDocument.Parse(resultJson);
+        var root = document.RootElement;
+        if (root.TryGetProperty("metadata", out var metadata)
+            && metadata.ValueKind == JsonValueKind.Object)
+        {
+            host.MetadataJson = metadata.GetRawText();
+        }
+
+        if (root.TryGetProperty("health", out var health)
+            && health.ValueKind == JsonValueKind.Object)
+        {
+            host.HealthJson = health.GetRawText();
+        }
+
+        if (root.TryGetProperty("metadata", out var metadataRoot)
+            && metadataRoot.TryGetProperty("network", out var network)
+            && network.TryGetProperty("privateIp", out var privateIp)
+            && privateIp.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(privateIp.GetString())
+            && !string.Equals(privateIp.GetString(), "unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            host.PrivateIp = privateIp.GetString();
+        }
+
+        if (TryGetDecimal(root, "totalCpuCores", out var totalCpuCores) && totalCpuCores > 0)
+        {
+            host.TotalCpuCores = totalCpuCores;
+        }
+
+        if (TryGetInt32(root, "totalMemoryMb", out var totalMemoryMb) && totalMemoryMb > 0)
+        {
+            host.TotalMemoryMb = totalMemoryMb;
+        }
+
+        if (TryGetInt32(root, "totalDiskMb", out var totalDiskMb) && totalDiskMb > 0)
+        {
+            host.TotalDiskMb = totalDiskMb;
+        }
+
+        host.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static bool TryGetDecimal(JsonElement root, string propertyName, out decimal value)
+    {
+        value = default;
+        return root.TryGetProperty(propertyName, out var property)
+            && property.TryGetDecimal(out value);
+    }
+
+    private static bool TryGetInt32(JsonElement root, string propertyName, out int value)
+    {
+        value = default;
+        return root.TryGetProperty(propertyName, out var property)
+            && property.TryGetInt32(out value);
     }
 
     private static void AppendLogs(InfrastructureWorkflowExecution execution, string text, string stream)

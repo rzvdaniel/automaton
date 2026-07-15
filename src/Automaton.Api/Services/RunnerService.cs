@@ -390,6 +390,20 @@ public class RunnerService
         runner.ApiInstanceId = runnerHeartbeat.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
         runner.ApiColor = runnerHeartbeat.ApiColor ?? apiInstanceIdentityService.ApiColor;
 
+        if (string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
+        {
+            var host = await dbContext.RunnerHosts
+                .SingleOrDefaultAsync(x => x.InfrastructureRunnerId == runner.Id, cancellationToken);
+            if (host != null)
+            {
+                host.LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc;
+                if (string.IsNullOrWhiteSpace(host.PublicIp) && !string.IsNullOrWhiteSpace(runner.IpAddress))
+                {
+                    host.PublicIp = runner.IpAddress;
+                }
+            }
+        }
+
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
