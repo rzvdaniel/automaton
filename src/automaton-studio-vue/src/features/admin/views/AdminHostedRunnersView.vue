@@ -48,6 +48,7 @@ const enrollmentDialogVisible = ref(false)
 const enrollmentHost = ref<RunnerHost | null>(null)
 const enrollment = ref<RunnerEnrollment | null>(null)
 const enrollingHostId = ref<string | null>(null)
+const provisioningHostId = ref<string | null>(null)
 const validatingHostId = ref<string | null>(null)
 const validationDialogVisible = ref(false)
 const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
@@ -296,6 +297,19 @@ async function createInfrastructureRunnerEnrollment(host: RunnerHost) {
   }
 }
 
+async function provisionRunnerHost(host: RunnerHost) {
+  provisioningHostId.value = host.id
+  try {
+    await adminHostedRunnersService.provisionHost(host.id)
+    toast.add({ severity: 'success', summary: 'Provisioning requested', detail: 'The Worker is creating the Runner Host.', life: 3000 })
+    await loadHosts()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Provisioning failed', detail: error instanceof Error ? error.message : 'Failed to provision Runner Host.', life: 4000 })
+  } finally {
+    provisioningHostId.value = null
+  }
+}
+
 function enrollmentCommand(): string {
   if (!enrollment.value) return ''
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
@@ -441,6 +455,10 @@ function statusSeverity(status: string) {
   if (status === 'deleted') return 'secondary'
   if (status === 'draining' || status === 'provisioning' || status === 'pending') return 'warn'
   return 'info'
+}
+
+function displayProvisioningStatus(host: RunnerHost) {
+  return host.provisioningStatus || host.provisioningOperationStatus || 'manual'
 }
 
 function isDeletedRunner(runner: HostedRunner) {
@@ -592,7 +610,23 @@ onMounted(refreshAll)
           </Column>
           <Column header="Status">
             <template #body="{ data }">
-              <Tag :value="displayRunnerStatus(data)" :severity="statusSeverity(displayRunnerStatus(data))" />
+              <div class="flex flex-column gap-1">
+                <Tag :value="displayProvisioningStatus(data)" :severity="statusSeverity(displayProvisioningStatus(data))" />
+                <span v-if="data.providerResourceId" class="text-color-secondary text-xs">ID: {{ data.providerResourceId }}</span>
+                <span v-if="data.provisioningOperationNextTimeoutAtUtc" class="text-color-secondary text-xs">
+                  Deadline: {{ formatDateTime(data.provisioningOperationNextTimeoutAtUtc) }}
+                </span>
+                <span v-if="data.provisioningFailureCode" class="text-red-500 text-xs">{{ data.provisioningFailureCode }}</span>
+              </div>
+            </template>
+          </Column>
+          <Column header="Operation">
+            <template #body="{ data }">
+              <div v-if="data.provisioningOperationStatus" class="text-sm">
+                <div>{{ data.provisioningOperationAction || 'provision' }} · {{ data.provisioningOperationStatus }}</div>
+                <div class="text-color-secondary text-xs">Attempt {{ data.provisioningOperationAttempt || 0 }}</div>
+              </div>
+              <span v-else class="text-color-secondary text-sm">No operation</span>
             </template>
           </Column>
           <Column header="CPU">
@@ -608,6 +642,15 @@ onMounted(refreshAll)
           <Column header="Actions">
             <template #body="{ data }">
               <div class="flex gap-2">
+                <Button
+                  v-if="data.provider === 'hetzner' && data.provisioningTransport === 'infrastructureRunner' && !data.providerResourceId && (!data.provisioningOperationStatus || data.provisioningOperationStatus === 'failed')"
+                  label="Provision Server"
+                  icon="pi pi-cloud-upload"
+                  size="small"
+                  outlined
+                  :loading="provisioningHostId === data.id"
+                  @click="provisionRunnerHost(data)"
+                />
                 <Button
                   v-if="!data.infrastructureRunnerId"
                   label="Install Runner"

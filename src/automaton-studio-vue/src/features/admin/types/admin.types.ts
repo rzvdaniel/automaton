@@ -459,6 +459,12 @@ export interface RunnerHost {
   infrastructureRunnerInstallationId?: string
   infrastructureRunnerCapabilities: string[]
   infrastructureEnrollmentExpiresAtUtc?: string
+  provisioningOperationId?: string
+  provisioningOperationAction?: string
+  provisioningOperationStatus?: string
+  provisioningOperationRequestedAtUtc?: string
+  provisioningOperationAttempt?: number
+  provisioningOperationNextTimeoutAtUtc?: string
   lastHeartbeatAtUtc?: string
   metadataJson?: string
   healthJson?: string

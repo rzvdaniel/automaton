@@ -26,6 +26,11 @@ class AdminHostedRunnersService {
     return response.data
   }
 
+  async provisionHost(id: string): Promise<{ id: string; status: string }> {
+    const response = await apiClient.post<{ id: string; status: string }>(`/api/admin/hosted-runners/hosts/${id}/provision`)
+    return response.data
+  }
+
   async createInfrastructureRunnerEnrollment(hostId: string): Promise<RunnerEnrollment> {
     const response = await apiClient.post<RunnerEnrollment>(
       `/api/admin/hosted-runners/hosts/${hostId}/infrastructure-runner/enrollments`,

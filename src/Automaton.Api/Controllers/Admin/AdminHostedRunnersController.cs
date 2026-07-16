@@ -91,7 +91,19 @@ public class AdminHostedRunnersController : ControllerBase
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
-        return Ok(hosts.Select(ToResponse));
+        var hostIds = hosts.Select(x => x.Id).ToArray();
+        var operations = await db.RunnerHostProvisioningOperations
+            .AsNoTracking()
+            .Where(x => hostIds.Contains(x.RunnerHostId))
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .ToListAsync(cancellationToken);
+        var latestOperations = operations
+            .GroupBy(x => x.RunnerHostId)
+            .ToDictionary(x => x.Key, x => x.First());
+
+        return Ok(hosts.Select(host => latestOperations.TryGetValue(host.Id, out var operation)
+            ? ToResponse(host, operation)
+            : ToResponse(host)));
     }
 
     [HttpPost("hosts")]
@@ -274,7 +286,7 @@ public class AdminHostedRunnersController : ControllerBase
         return ToResponse(runner);
     }
 
-    private static RunnerHostResponse ToResponse(RunnerHost host)
+    private static RunnerHostResponse ToResponse(RunnerHost host, RunnerHostProvisioningOperation? operation = null)
     {
         var assigned = host.HostedRunners
             .Where(x => x.DeletedAt == null && x.Status is HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Running)
@@ -338,6 +350,12 @@ public class AdminHostedRunnersController : ControllerBase
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => (DateTime?)x.ExpiresAtUtc)
                 .FirstOrDefault()
+            ,ProvisioningOperationId = operation?.Id
+            ,ProvisioningOperationAction = operation?.Action
+            ,ProvisioningOperationStatus = operation?.Status
+            ,ProvisioningOperationRequestedAtUtc = operation?.RequestedAtUtc
+            ,ProvisioningOperationAttempt = operation?.Attempt
+            ,ProvisioningOperationNextTimeoutAtUtc = operation?.NextTimeoutAtUtc
         };
     }
 
@@ -461,6 +479,12 @@ public record RunnerHostResponse
     public string? InfrastructureRunnerInstallationId { get; init; }
     public IReadOnlyList<string> InfrastructureRunnerCapabilities { get; init; } = Array.Empty<string>();
     public DateTime? InfrastructureEnrollmentExpiresAtUtc { get; init; }
+    public Guid? ProvisioningOperationId { get; init; }
+    public string? ProvisioningOperationAction { get; init; }
+    public string? ProvisioningOperationStatus { get; init; }
+    public DateTime? ProvisioningOperationRequestedAtUtc { get; init; }
+    public int? ProvisioningOperationAttempt { get; init; }
+    public DateTime? ProvisioningOperationNextTimeoutAtUtc { get; init; }
     public DateTime? LastHeartbeatAtUtc { get; init; }
     public string? MetadataJson { get; init; }
     public string? HealthJson { get; init; }
