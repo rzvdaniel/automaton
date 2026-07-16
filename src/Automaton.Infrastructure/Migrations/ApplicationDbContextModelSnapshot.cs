@@ -2135,6 +2135,9 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(true);
 
+                    b.Property<DateTime?>("InfrastructureRunnerEnrolledAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<Guid?>("InfrastructureRunnerId")
                         .HasColumnType("char(36)");
 
@@ -2157,6 +2160,36 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
+
+                    b.Property<string>("ProviderImageId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("ProviderResourceId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("ProviderServerType")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("ProvisioningFailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("ProvisioningFailureMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("ProvisioningStartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ProvisioningStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("manual");
 
                     b.Property<string>("ProvisioningTransport")
                         .IsRequired()
@@ -2202,11 +2235,16 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<DateTime?>("ValidatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("InfrastructureRunnerId");
 
                     b.HasIndex("Provider");
+
+                    b.HasIndex("ProvisioningStatus");
 
                     b.HasIndex("Region");
 

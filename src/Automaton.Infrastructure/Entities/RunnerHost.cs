@@ -19,6 +19,18 @@ public class RunnerHost
     [Required, MaxLength(80)]
     public string Provider { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Provider-owned resource identifier, such as a Hetzner server ID.
+    /// </summary>
+    [MaxLength(120)]
+    public string? ProviderResourceId { get; set; }
+
+    [MaxLength(80)]
+    public string? ProviderServerType { get; set; }
+
+    [MaxLength(120)]
+    public string? ProviderImageId { get; set; }
+
     [MaxLength(80)]
     public string? Region { get; set; }
 
@@ -42,6 +54,19 @@ public class RunnerHost
 
     [Required, MaxLength(40)]
     public string Status { get; set; } = RunnerHostStatuses.Active;
+
+    [Required, MaxLength(40)]
+    public string ProvisioningStatus { get; set; } = RunnerHostProvisioningStatuses.Manual;
+
+    public DateTime? ProvisioningStartedAtUtc { get; set; }
+    public DateTime? InfrastructureRunnerEnrolledAtUtc { get; set; }
+    public DateTime? ValidatedAtUtc { get; set; }
+
+    [MaxLength(80)]
+    public string? ProvisioningFailureCode { get; set; }
+
+    [MaxLength(2000)]
+    public string? ProvisioningFailureMessage { get; set; }
 
     [Column(TypeName = "decimal(5,2)")]
     public decimal TotalCpuCores { get; set; } = 2m;
@@ -77,4 +102,13 @@ public class RunnerHost
 
     public virtual ICollection<HostedRunner> HostedRunners { get; set; } = new List<HostedRunner>();
     public virtual ICollection<RunnerEnrollment> RunnerEnrollments { get; set; } = new List<RunnerEnrollment>();
+
+    [NotMapped]
+    public bool IsSchedulingEligible =>
+        ProvisioningStatus == RunnerHostProvisioningStatuses.Ready &&
+        Status == RunnerHostStatuses.Active &&
+        HostedRunnerSchedulingEnabled &&
+        ValidatedAtUtc.HasValue &&
+        (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
+            || InfrastructureRunnerId.HasValue);
 }

@@ -171,6 +171,32 @@ docker network create <network>
   locking the candidate host row, so simultaneous provisioning requests cannot
   reserve the same remaining CPU, memory, or disk.
 
+## Provisioned Runner Hosts
+
+Runner Hosts now keep provider provisioning state separately from operational
+health/status. `ProvisioningStatus` progresses independently through values
+such as `pending`, `creatingServer`, `awaitingInfrastructureRunner`,
+`validating`, `ready`, or `failed`. Provider-owned identifiers and image/server
+choices are stored on the host so a future provider adapter can inspect,
+reboot, or delete the correct server without exposing provider credentials to a
+Runner.
+
+Scheduling requires a ready and validated host. Local Docker development hosts
+remain eligible after local bootstrap; remote hosts also require a linked
+Infrastructure Runner. A failed host validation records a durable failure and
+disables scheduling.
+
+The shared `IRunnerHostInfrastructureProvider` contract is intentionally small:
+create, inspect, reboot, and delete. The initial Hetzner adapter will use the
+Docker CE image and inject cloud-init. Cloud-init only creates the four Runner
+data directories and starts the existing privileged Runner image; Docker
+network setup, host validation, hosted-runner provisioning, repairs, and
+upgrades remain Infrastructure Runner responsibilities.
+
+Cloud-init contains only a short-lived, host-bound enrollment token. Hetzner
+provider API credentials remain in API/Worker configuration and are never
+passed to the provisioned host or Infrastructure Runner.
+
 ## Host validation workflow
 
 Administrators can select a Runner Host in Studio and run **Validate** once its

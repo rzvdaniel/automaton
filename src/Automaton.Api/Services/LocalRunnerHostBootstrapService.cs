@@ -39,6 +39,13 @@ public sealed class LocalRunnerHostBootstrapService(
                 changed = true;
             }
 
+            if (existingHost.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready)
+            {
+                existingHost.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
+                existingHost.ValidatedAtUtc ??= DateTime.UtcNow;
+                changed = true;
+            }
+
             if (!existingHost.HostedRunnerSchedulingEnabled)
             {
                 existingHost.HostedRunnerSchedulingEnabled = true;
@@ -82,6 +89,8 @@ public sealed class LocalRunnerHostBootstrapService(
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
             HostedRunnerSchedulingEnabled = true,
             Status = RunnerHostStatuses.Active,
+            ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
+            ValidatedAtUtc = DateTime.UtcNow,
             TotalCpuCores = config.LocalRunnerHostCpuCores,
             TotalMemoryMb = config.LocalRunnerHostMemoryMb,
             TotalDiskMb = config.LocalRunnerHostDiskMb,

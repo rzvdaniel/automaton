@@ -241,6 +241,11 @@ public sealed class RunnerEnrollmentService(
         });
 
         host.InfrastructureRunnerId = runner.Id;
+        host.InfrastructureRunnerEnrolledAtUtc = now;
+        if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Manual)
+        {
+            host.ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingInfrastructureRunner;
+        }
         host.UpdatedAt = now;
         enrollment.Status = RunnerEnrollmentStatuses.Completed;
         enrollment.UsedAtUtc = now;

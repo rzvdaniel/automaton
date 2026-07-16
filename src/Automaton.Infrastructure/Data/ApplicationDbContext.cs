@@ -1,6 +1,7 @@
 using Automaton.Api.Authentication;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
+using Automaton.Api.Models;
 using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -233,6 +234,9 @@ namespace Automaton.Api.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
                 entity.Property(e => e.Provider).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.ProviderResourceId).HasMaxLength(120);
+                entity.Property(e => e.ProviderServerType).HasMaxLength(80);
+                entity.Property(e => e.ProviderImageId).HasMaxLength(120);
                 entity.Property(e => e.Region).HasMaxLength(80);
                 entity.Property(e => e.PublicIp).HasMaxLength(120);
                 entity.Property(e => e.PrivateIp).HasMaxLength(120);
@@ -240,6 +244,9 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.RuntimeConnectivityMode).IsRequired().HasMaxLength(40);
                 entity.Property(e => e.HostedRunnerSchedulingEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.ProvisioningStatus).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerHostProvisioningStatuses.Manual);
+                entity.Property(e => e.ProvisioningFailureCode).HasMaxLength(80);
+                entity.Property(e => e.ProvisioningFailureMessage).HasMaxLength(2000);
                 entity.Property(e => e.TotalCpuCores).IsRequired().HasColumnType("decimal(5,2)");
                 entity.Property(e => e.ReservedCpuCores).IsRequired().HasColumnType("decimal(5,2)");
                 entity.Property(e => e.TotalMemoryMb).IsRequired();
@@ -251,6 +258,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.CreatedAt).IsRequired();
 
                 entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.ProvisioningStatus);
                 entity.HasIndex(e => new { e.Status, e.HostedRunnerSchedulingEnabled });
                 entity.HasIndex(e => e.Provider);
                 entity.HasIndex(e => e.Region);

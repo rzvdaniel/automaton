@@ -242,10 +242,20 @@ public class AdminHostedRunnersController : ControllerBase
             Region = host.Region,
             PublicIp = host.PublicIp,
             PrivateIp = host.PrivateIp,
+            ProviderResourceId = host.ProviderResourceId,
+            ProviderServerType = host.ProviderServerType,
+            ProviderImageId = host.ProviderImageId,
             ProvisioningTransport = host.ProvisioningTransport,
             RuntimeConnectivityMode = host.RuntimeConnectivityMode,
             HostedRunnerSchedulingEnabled = host.HostedRunnerSchedulingEnabled,
             Status = host.Status,
+            ProvisioningStatus = host.ProvisioningStatus,
+            ProvisioningStartedAtUtc = host.ProvisioningStartedAtUtc,
+            InfrastructureRunnerEnrolledAtUtc = host.InfrastructureRunnerEnrolledAtUtc,
+            ValidatedAtUtc = host.ValidatedAtUtc,
+            ProvisioningFailureCode = host.ProvisioningFailureCode,
+            ProvisioningFailureMessage = host.ProvisioningFailureMessage,
+            IsSchedulingEligible = host.IsSchedulingEligible,
             TotalCpuCores = host.TotalCpuCores,
             ReservedCpuCores = host.ReservedCpuCores,
             UsedCpuCores = assigned.Sum(x => x.CpuCores),
@@ -369,10 +379,20 @@ public record RunnerHostResponse
     public string? Region { get; init; }
     public string? PublicIp { get; init; }
     public string? PrivateIp { get; init; }
+    public string? ProviderResourceId { get; init; }
+    public string? ProviderServerType { get; init; }
+    public string? ProviderImageId { get; init; }
     public string ProvisioningTransport { get; init; } = RunnerHostProvisioningTransports.InfrastructureRunner;
     public string RuntimeConnectivityMode { get; init; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
     public bool HostedRunnerSchedulingEnabled { get; init; } = true;
     public string Status { get; init; } = RunnerHostStatuses.Active;
+    public string ProvisioningStatus { get; init; } = RunnerHostProvisioningStatuses.Manual;
+    public DateTime? ProvisioningStartedAtUtc { get; init; }
+    public DateTime? InfrastructureRunnerEnrolledAtUtc { get; init; }
+    public DateTime? ValidatedAtUtc { get; init; }
+    public string? ProvisioningFailureCode { get; init; }
+    public string? ProvisioningFailureMessage { get; init; }
+    public bool IsSchedulingEligible { get; init; }
     public decimal TotalCpuCores { get; init; }
     public decimal ReservedCpuCores { get; init; }
     public decimal UsedCpuCores { get; init; }

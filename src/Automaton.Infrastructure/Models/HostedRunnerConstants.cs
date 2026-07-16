@@ -26,6 +26,19 @@ public static class RunnerHostStatuses
     public const string Disabled = "disabled";
 }
 
+public static class RunnerHostProvisioningStatuses
+{
+    public const string Manual = "manual";
+    public const string Pending = "pending";
+    public const string CreatingServer = "creatingServer";
+    public const string AwaitingInfrastructureRunner = "awaitingInfrastructureRunner";
+    public const string Validating = "validating";
+    public const string Ready = "ready";
+    public const string Failed = "failed";
+    public const string Deleting = "deleting";
+    public const string Deleted = "deleted";
+}
+
 public static class RunnerEnrollmentStatuses
 {
     public const string Pending = "pending";

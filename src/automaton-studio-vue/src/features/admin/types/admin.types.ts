@@ -425,10 +425,20 @@ export interface RunnerHost {
   region?: string
   publicIp?: string
   privateIp?: string
+  providerResourceId?: string
+  providerServerType?: string
+  providerImageId?: string
   provisioningTransport: string
   runtimeConnectivityMode: string
   hostedRunnerSchedulingEnabled: boolean
   status: 'active' | 'draining' | 'disabled'
+  provisioningStatus: string
+  provisioningStartedAtUtc?: string
+  infrastructureRunnerEnrolledAtUtc?: string
+  validatedAtUtc?: string
+  provisioningFailureCode?: string
+  provisioningFailureMessage?: string
+  isSchedulingEligible: boolean
   totalCpuCores: number
   reservedCpuCores: number
   usedCpuCores: number

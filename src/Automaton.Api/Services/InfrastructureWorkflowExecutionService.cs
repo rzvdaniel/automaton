@@ -98,6 +98,14 @@ public sealed class InfrastructureWorkflowExecutionService(
                 ? InfrastructureWorkflowExecutionStatuses.Succeeded
                 : InfrastructureWorkflowExecutionStatuses.Failed;
 
+            if (!result.Succeeded)
+            {
+                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+                host.ProvisioningFailureCode = "HostValidationExecutionFailed";
+                host.ProvisioningFailureMessage = Limit(result.StandardError, 2000);
+                host.HostedRunnerSchedulingEnabled = false;
+            }
+
             if (result.Succeeded && execution.ResultJson != null)
             {
                 ApplyHostValidationSnapshot(host, execution.ResultJson);
@@ -116,6 +124,10 @@ public sealed class InfrastructureWorkflowExecutionService(
         {
             execution.Status = InfrastructureWorkflowExecutionStatuses.Failed;
             execution.Error = Limit(ex.Message);
+            host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+            host.ProvisioningFailureCode = "HostValidationExecutionFailed";
+            host.ProvisioningFailureMessage = Limit(ex.Message, 2000);
+            host.HostedRunnerSchedulingEnabled = false;
             AppendLog(execution, "stderr", ex.Message);
             logger.LogError(ex, "Infrastructure workflow execution {ExecutionId} failed", execution.Id);
         }
@@ -224,6 +236,27 @@ public sealed class InfrastructureWorkflowExecutionService(
             && health.ValueKind == JsonValueKind.Object)
         {
             host.HealthJson = health.GetRawText();
+
+            var dockerHealthy = health.TryGetProperty("docker", out var docker)
+                && string.Equals(docker.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
+            var networkHealthy = health.TryGetProperty("network", out var networkHealth)
+                && string.Equals(networkHealth.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
+            var diskHealthy = health.TryGetProperty("disk", out var diskHealth)
+                && string.Equals(diskHealth.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
+            if (dockerHealthy && networkHealthy && diskHealthy)
+            {
+                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
+                host.ValidatedAtUtc = DateTime.UtcNow;
+                host.ProvisioningFailureCode = null;
+                host.ProvisioningFailureMessage = null;
+            }
+            else
+            {
+                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+                host.ProvisioningFailureCode = "HostValidationFailed";
+                host.ProvisioningFailureMessage = "One or more host validation checks failed.";
+                host.HostedRunnerSchedulingEnabled = false;
+            }
         }
 
         if (root.TryGetProperty("metadata", out var metadataRoot)
