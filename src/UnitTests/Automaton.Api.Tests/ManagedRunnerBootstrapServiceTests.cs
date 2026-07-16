@@ -218,7 +218,10 @@ public class ManagedRunnerBootstrapServiceTests
             RuntimeConnectivityMode = remote
                 ? RunnerHostRuntimeConnectivityModes.PublicHostPort
                 : RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
+            ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
+            ValidatedAtUtc = DateTime.UtcNow,
             PublicIp = remote ? "203.0.113.10" : null,
+            InfrastructureRunnerId = remote ? Guid.NewGuid() : null,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,
