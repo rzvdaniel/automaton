@@ -22,9 +22,9 @@ public sealed class HetznerInfrastructureProvider(
         var payload = new
         {
             name = request.Name,
-            server_type = new { name = request.ServerType },
-            image = new { name = request.Image },
-            location = new { name = request.Region },
+            server_type = request.ServerType,
+            image = request.Image,
+            location = request.Region,
             ssh_keys = request.SshKeyIds.Select(long.Parse).ToArray(),
             user_data = request.CloudInit,
             networks = string.IsNullOrWhiteSpace(request.PrivateNetworkId) ? null : new[] { long.Parse(request.PrivateNetworkId) },

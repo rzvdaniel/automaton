@@ -173,6 +173,27 @@ docker network create <network>
 
 ## Provisioned Runner Hosts
 
+### Production Worker provider settings
+
+Hetzner credentials belong only to the Worker. Configure these values in the
+production server's `.env`; do not add the API token to API or Studio settings:
+
+```dotenv
+HETZNER_PROVIDER_ENABLED=true
+HETZNER_API_TOKEN=your-hetzner-api-token
+HETZNER_API_BASE_URL=https://api.hetzner.cloud/v1
+HETZNER_DEFAULT_LOCATION=nbg1
+HETZNER_DEFAULT_SERVER_TYPE=cx23
+HETZNER_DOCKER_IMAGE=docker-ce
+HETZNER_SSH_KEY_ID_0=123456
+HETZNER_PRIVATE_NETWORK_ID=123456
+```
+
+`HETZNER_DOCKER_IMAGE` defaults to Hetzner's `docker-ce` Cloud App identifier.
+`HETZNER_PRIVATE_NETWORK_ID` is optional. The Worker
+receives these values through the `InfrastructureProviders__Hetzner__*`
+Compose environment mappings.
+
 Provisioning operations use a provider-neutral contract (`IRunnerHostInfrastructureProvider`).
 The Worker currently registers the Hetzner implementation, while provider selection is resolved
 by provider name. Provider API tokens remain Worker configuration and are never sent to an

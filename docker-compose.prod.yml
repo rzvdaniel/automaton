@@ -38,6 +38,15 @@ x-api-common: &api-common
     HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
+    InfrastructureProviders__Hetzner__Enabled: ${HETZNER_PROVIDER_ENABLED:-false}
+    InfrastructureProviders__Hetzner__ApiToken: ${HETZNER_API_TOKEN:-}
+    InfrastructureProviders__Hetzner__ApiBaseUrl: ${HETZNER_API_BASE_URL:-https://api.hetzner.cloud/v1}
+    InfrastructureProviders__Hetzner__DefaultLocation: ${HETZNER_DEFAULT_LOCATION:-}
+    InfrastructureProviders__Hetzner__DefaultServerType: ${HETZNER_DEFAULT_SERVER_TYPE:-}
+    InfrastructureProviders__Hetzner__DockerImage: ${HETZNER_DOCKER_IMAGE:-docker-ce}
+    InfrastructureProviders__Hetzner__InfrastructureRunnerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
+    InfrastructureProviders__Hetzner__PrivateNetworkId: ${HETZNER_PRIVATE_NETWORK_ID:-}
+    InfrastructureProviders__Hetzner__SshKeyIds__0: ${HETZNER_SSH_KEY_ID_0:-}
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
