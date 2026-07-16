@@ -173,26 +173,17 @@ docker network create <network>
 
 ## Provisioned Runner Hosts
 
-### Production Worker provider settings
+### Server provisioning boundary
 
-Hetzner credentials belong only to the Worker. Configure these values in the
-production server's `.env`; do not add the API token to API or Studio settings:
+Automaton does not create cloud servers. Create a Docker-capable server with
+your provider of choice, then install the Infrastructure Runner from Studio.
+Provider credentials and provider-specific server creation settings are not
+required by the Automaton Worker.
 
-```dotenv
-HETZNER_PROVIDER_ENABLED=true
-HETZNER_API_TOKEN=your-hetzner-api-token
-HETZNER_API_BASE_URL=https://api.hetzner.cloud/v1
-HETZNER_DEFAULT_LOCATION=nbg1
-HETZNER_DEFAULT_SERVER_TYPE=cx23
-HETZNER_DOCKER_IMAGE=docker-ce
-HETZNER_SSH_KEY_ID_0=123456
-HETZNER_PRIVATE_NETWORK_ID=123456
-```
-
-`HETZNER_DOCKER_IMAGE` defaults to Hetzner's `docker-ce` Cloud App identifier.
-`HETZNER_PRIVATE_NETWORK_ID` is optional. The Worker
-receives these values through the `InfrastructureProviders__Hetzner__*`
-Compose environment mappings.
+The Infrastructure Runner enrollment flow is the generic onboarding path for
+Hetzner, AWS, DigitalOcean, Azure, bare metal, and local servers. The host is
+created or reconnected when the Runner registers, then validated before it can
+receive managed Runner workloads.
 
 Provisioning operations use a provider-neutral contract (`IRunnerHostInfrastructureProvider`).
 The Worker currently registers the Hetzner implementation, while provider selection is resolved

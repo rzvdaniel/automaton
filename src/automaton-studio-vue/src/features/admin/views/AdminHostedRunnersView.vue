@@ -48,7 +48,6 @@ const enrollmentDialogVisible = ref(false)
 const enrollmentHost = ref<RunnerHost | null>(null)
 const enrollment = ref<RunnerEnrollment | null>(null)
 const enrollingHostId = ref<string | null>(null)
-const provisioningHostId = ref<string | null>(null)
 const validatingHostId = ref<string | null>(null)
 const validationDialogVisible = ref(false)
 const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
@@ -297,19 +296,6 @@ async function createInfrastructureRunnerEnrollment(host: RunnerHost) {
   }
 }
 
-async function provisionRunnerHost(host: RunnerHost) {
-  provisioningHostId.value = host.id
-  try {
-    await adminHostedRunnersService.provisionHost(host.id)
-    toast.add({ severity: 'success', summary: 'Provisioning requested', detail: 'The Worker is creating the Runner Host.', life: 3000 })
-    await loadHosts()
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Provisioning failed', detail: error instanceof Error ? error.message : 'Failed to provision Runner Host.', life: 4000 })
-  } finally {
-    provisioningHostId.value = null
-  }
-}
-
 function enrollmentCommand(): string {
   if (!enrollment.value) return ''
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
@@ -531,7 +517,7 @@ onMounted(refreshAll)
       <div>
         <h1 class="m-0">Hosted Runners</h1>
         <p class="text-color-secondary mt-2 mb-0">
-          Manage Hetzner capacity and paid-user runner containers from the same subscription flow used by Stripe.
+          Manage discovered infrastructure hosts and paid-user runner containers from the same subscription flow used by Stripe.
         </p>
       </div>
       <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
@@ -620,15 +606,6 @@ onMounted(refreshAll)
               </div>
             </template>
           </Column>
-          <Column header="Operation">
-            <template #body="{ data }">
-              <div v-if="data.provisioningOperationStatus" class="text-sm">
-                <div>{{ data.provisioningOperationAction || 'provision' }} · {{ data.provisioningOperationStatus }}</div>
-                <div class="text-color-secondary text-xs">Attempt {{ data.provisioningOperationAttempt || 0 }}</div>
-              </div>
-              <span v-else class="text-color-secondary text-sm">No operation</span>
-            </template>
-          </Column>
           <Column header="CPU">
             <template #body="{ data }">{{ data.usedCpuCores + data.reservedCpuCores }} / {{ data.totalCpuCores }}</template>
           </Column>
@@ -642,15 +619,6 @@ onMounted(refreshAll)
           <Column header="Actions">
             <template #body="{ data }">
               <div class="flex gap-2">
-                <Button
-                  v-if="data.provider === 'hetzner' && data.provisioningTransport === 'infrastructureRunner' && !data.providerResourceId && (!data.provisioningOperationStatus || data.provisioningOperationStatus === 'failed')"
-                  label="Provision Server"
-                  icon="pi pi-cloud-upload"
-                  size="small"
-                  outlined
-                  :loading="provisioningHostId === data.id"
-                  @click="provisionRunnerHost(data)"
-                />
                 <Button
                   v-if="!data.infrastructureRunnerId"
                   label="Install Runner"
