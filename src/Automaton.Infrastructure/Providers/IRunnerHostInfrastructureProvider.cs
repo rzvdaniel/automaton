@@ -12,6 +12,11 @@ public interface IRunnerHostInfrastructureProvider
         string providerResourceId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<RunnerHostServerInfo>> FindServersByLabelAsync(
+        string labelKey,
+        string labelValue,
+        CancellationToken cancellationToken);
+
     Task RebootServerAsync(
         string providerResourceId,
         CancellationToken cancellationToken);

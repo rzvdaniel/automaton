@@ -44,6 +44,15 @@ public sealed class HetznerInfrastructureProvider(
         return ReadServerInfo(document.RootElement.GetProperty("server"));
     }
 
+    public async Task<IReadOnlyList<RunnerHostServerInfo>> FindServersByLabelAsync(string labelKey, string labelValue, CancellationToken cancellationToken)
+    {
+        EnsureConfigured();
+        var selector = Uri.EscapeDataString($"{labelKey}={labelValue}");
+        using var response = await SendAsync(HttpMethod.Get, $"/servers?label_selector={selector}", null, cancellationToken);
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        return document.RootElement.GetProperty("servers").EnumerateArray().Select(ReadServerInfo).ToArray();
+    }
+
     public async Task RebootServerAsync(string providerResourceId, CancellationToken cancellationToken)
     {
         EnsureConfigured();

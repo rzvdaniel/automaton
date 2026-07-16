@@ -280,6 +280,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ProviderResourceId).HasMaxLength(120);
                 entity.Property(e => e.FailureCode).HasMaxLength(80);
                 entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.Property(e => e.CloudInitTemplateVersion).HasMaxLength(40);
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
                 entity.HasOne(e => e.RunnerHost).WithMany().HasForeignKey(e => e.RunnerHostId).OnDelete(DeleteBehavior.Cascade);

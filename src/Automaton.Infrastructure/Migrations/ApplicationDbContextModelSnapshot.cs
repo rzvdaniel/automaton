@@ -2269,6 +2269,19 @@ namespace Automaton.Api.Migrations
                     b.Property<int>("Attempt")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ClaimedUntilUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("CloudInitGeneratedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CloudInitTemplateVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<Guid?>("EnrollmentId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("Error")
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
@@ -2285,12 +2298,18 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
+                    b.Property<DateTime?>("NextTimeoutAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("ProviderResourceId")
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
 
                     b.Property<DateTime>("RequestedAtUtc")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("char(36)");
 
                     b.Property<Guid>("RunnerHostId")
                         .HasColumnType("char(36)");

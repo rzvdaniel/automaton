@@ -6,6 +6,8 @@ using Automaton.Api.Models;
 using Automaton.Api.Entities;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
 
 namespace Automaton.Api.Controllers.Admin;
 
@@ -19,19 +21,63 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly HostedRunnerManagementService managementService;
     private readonly RunnerEnrollmentService runnerEnrollmentService;
     private readonly UserContextService userContextService;
+    private readonly IEventPublisher eventPublisher;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
         HostedRunnerProvisioningService provisioningService,
         HostedRunnerManagementService managementService,
         RunnerEnrollmentService runnerEnrollmentService,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        IEventPublisher eventPublisher)
     {
         this.db = db;
         this.provisioningService = provisioningService;
         this.managementService = managementService;
         this.runnerEnrollmentService = runnerEnrollmentService;
         this.userContextService = userContextService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    [HttpPost("hosts/{id:guid}/provision")]
+    public async Task<ActionResult<RunnerHostProvisioningOperationResponse>> ProvisionHost(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var host = await db.RunnerHosts.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (host == null) return NotFound();
+        if (host.Status == RunnerHostStatuses.Disabled || host.Status == RunnerHostStatuses.Draining)
+            return Conflict("The Runner Host is not active.");
+
+        var existing = await db.RunnerHostProvisioningOperations
+            .Where(x => x.RunnerHostId == id
+                && (x.Status == RunnerHostProvisioningOperationStatuses.Pending
+                    || x.Status == RunnerHostProvisioningOperationStatuses.Running
+                    || x.Status == RunnerHostProvisioningOperationStatuses.AwaitingInfrastructureRunner))
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existing != null) return Ok(new RunnerHostProvisioningOperationResponse(existing.Id, existing.Status));
+
+        var operation = new RunnerHostProvisioningOperation
+        {
+            Id = Guid.NewGuid(),
+            RunnerHostId = id,
+            RequestedByUserId = userContextService.GetUserId(),
+            Action = RunnerHostProvisioningActions.Create,
+            Status = RunnerHostProvisioningOperationStatuses.Pending,
+            IdempotencyKey = $"runner-host:{id:N}:create:{Guid.NewGuid():N}",
+            RequestedAtUtc = DateTime.UtcNow
+        };
+        host.ProvisioningStatus = RunnerHostProvisioningStatuses.Pending;
+        host.HostedRunnerSchedulingEnabled = false;
+        db.RunnerHostProvisioningOperations.Add(operation);
+        await db.SaveChangesAsync(cancellationToken);
+        await eventPublisher.PublishAsync(new RunnerHostProvisionRequestedEvent
+        {
+            RunnerHostId = id,
+            ProvisioningOperationId = operation.Id
+        }, cancellationToken);
+        return Accepted(new RunnerHostProvisioningOperationResponse(operation.Id, operation.Status));
     }
 
     [HttpGet("hosts")]
@@ -419,6 +465,8 @@ public record RunnerHostResponse
     public string? MetadataJson { get; init; }
     public string? HealthJson { get; init; }
 }
+
+public sealed record RunnerHostProvisioningOperationResponse(Guid Id, string Status);
 
 public record CreateRunnerHostRequest
 {

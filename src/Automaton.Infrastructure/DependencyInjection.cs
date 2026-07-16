@@ -3,6 +3,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Infrastructure.Email;
+using Automaton.Infrastructure.RunnerHosts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ public static class DependencyInjection
 
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<EmailConfirmationLinkBuilder>();
+        services.AddScoped<RunnerEnrollmentMaterialService>();
 
         return services;
     }

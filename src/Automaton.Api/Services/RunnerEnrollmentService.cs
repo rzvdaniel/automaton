@@ -244,7 +244,16 @@ public sealed class RunnerEnrollmentService(
         host.InfrastructureRunnerEnrolledAtUtc = now;
         if (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Manual)
         {
-            host.ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingInfrastructureRunner;
+            host.ProvisioningStatus = RunnerHostProvisioningStatuses.Validating;
+            var operation = await db.RunnerHostProvisioningOperations
+                .Where(x => x.RunnerHostId == host.Id
+                    && x.Status == RunnerHostProvisioningOperationStatuses.AwaitingInfrastructureRunner)
+                .OrderByDescending(x => x.RequestedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (operation != null)
+            {
+                operation.Status = RunnerHostProvisioningOperationStatuses.Running;
+            }
         }
         host.UpdatedAt = now;
         enrollment.Status = RunnerEnrollmentStatuses.Completed;

@@ -104,11 +104,13 @@ public sealed class InfrastructureWorkflowExecutionService(
                 host.ProvisioningFailureCode = "HostValidationExecutionFailed";
                 host.ProvisioningFailureMessage = Limit(result.StandardError, 2000);
                 host.HostedRunnerSchedulingEnabled = false;
+                await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
             }
 
             if (result.Succeeded && execution.ResultJson != null)
             {
                 ApplyHostValidationSnapshot(host, execution.ResultJson);
+                await UpdateProvisioningOperationFromValidationAsync(host, cancellationToken);
             }
 
             AppendLogs(execution, result.StandardOutput, "stdout");
@@ -128,6 +130,7 @@ public sealed class InfrastructureWorkflowExecutionService(
             host.ProvisioningFailureCode = "HostValidationExecutionFailed";
             host.ProvisioningFailureMessage = Limit(ex.Message, 2000);
             host.HostedRunnerSchedulingEnabled = false;
+            await MarkProvisioningOperationFailedAsync(host, "HostValidationExecutionFailed", cancellationToken);
             AppendLog(execution, "stderr", ex.Message);
             logger.LogError(ex, "Infrastructure workflow execution {ExecutionId} failed", execution.Id);
         }
@@ -220,6 +223,38 @@ public sealed class InfrastructureWorkflowExecutionService(
         printf '{"totalCpuCores":%s,"totalMemoryMb":%s,"totalDiskMb":%s,"metadata":{"hostname":"%s","os":{"distribution":"%s","version":"%s","kernel":"%s"},"architecture":"%s","docker":{"version":"%s","status":"%s","storageDriver":"%s","cgroupVersion":"%s"},"cpu":{"model":"%s","cores":%s},"memoryMb":%s,"diskMb":%s,"network":{"privateIp":"%s","interfaces":"%s","automatonNetwork":"%s","availableRuntimePorts":"%s"},"runtime":{"infrastructureRunnerContainer":"%s"}},"health":{"validationVersion":"host-validation.v1","timestampUtc":"%s","docker":"%s","network":"%s","disk":"%s","apiConnectivity":"Healthy","warnings":[],"errors":[]}}\n' \
           "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$hostname_value")" "$(json_escape "$distribution")" "$(json_escape "$os_version")" "$(json_escape "$kernel")" "$(json_escape "$architecture")" "$(json_escape "$docker_version")" "$(json_escape "$docker_status")" "$(json_escape "$docker_storage_driver")" "$(json_escape "$docker_cgroup_version")" "$(json_escape "$cpu_model")" "${cpu_count:-0}" "${memory:-0}" "${disk:-0}" "$(json_escape "$private_ip")" "$(json_escape "$interfaces")" "$(json_escape "$network_status")" "$(json_escape "$ports")" "$(json_escape "$runner_container")" "$(json_escape "$timestamp_utc")" "$(json_escape "$docker_health")" "$(json_escape "$network_health")" "$(test "${disk:-0}" -gt 0 2>/dev/null && printf 'Healthy' || printf 'Unhealthy')"
         """.Replace("__DOCKER_NETWORK__", safeNetwork, StringComparison.Ordinal);
+    }
+
+    private async Task UpdateProvisioningOperationFromValidationAsync(RunnerHost host, CancellationToken cancellationToken)
+    {
+        var operation = await db.RunnerHostProvisioningOperations
+            .Where(x => x.RunnerHostId == host.Id
+                && (x.Status == RunnerHostProvisioningOperationStatuses.Running
+                    || x.Status == RunnerHostProvisioningOperationStatuses.AwaitingInfrastructureRunner))
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (operation == null) return;
+
+        operation.Status = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
+            ? RunnerHostProvisioningOperationStatuses.Succeeded
+            : RunnerHostProvisioningOperationStatuses.Failed;
+        operation.FailureCode = host.ProvisioningFailureCode;
+        operation.Error = host.ProvisioningFailureMessage;
+        operation.FinishedAtUtc = DateTime.UtcNow;
+    }
+
+    private async Task MarkProvisioningOperationFailedAsync(RunnerHost host, string code, CancellationToken cancellationToken)
+    {
+        var operation = await db.RunnerHostProvisioningOperations
+            .Where(x => x.RunnerHostId == host.Id
+                && x.Status != RunnerHostProvisioningOperationStatuses.Succeeded)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (operation == null) return;
+        operation.Status = RunnerHostProvisioningOperationStatuses.Failed;
+        operation.FailureCode = code;
+        operation.Error = host.ProvisioningFailureMessage;
+        operation.FinishedAtUtc = DateTime.UtcNow;
     }
 
     private static void ApplyHostValidationSnapshot(RunnerHost host, string resultJson)

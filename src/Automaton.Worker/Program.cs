@@ -62,12 +62,15 @@ builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
+builder.Services.AddTransient<RunnerHostProvisionRequestedCapSubscriber>();
+builder.Services.AddTransient<RunnerHostProvisionRequestedEventHandler>();
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 builder.Services.AddHttpClient<HetznerInfrastructureProvider>();
 builder.Services.AddTransient<Automaton.Infrastructure.Providers.IRunnerHostInfrastructureProvider>(sp => sp.GetRequiredService<HetznerInfrastructureProvider>());
 builder.Services.AddSingleton<IInfrastructureProviderResolver, InfrastructureProviderResolver>();
+builder.Services.AddHostedService<RunnerHostProvisioningReconciliationService>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
