@@ -173,6 +173,11 @@ docker network create <network>
 
 ## Provisioned Runner Hosts
 
+Provisioning operations use a provider-neutral contract (`IRunnerHostInfrastructureProvider`).
+The Worker currently registers the Hetzner implementation, while provider selection is resolved
+by provider name. Provider API tokens remain Worker configuration and are never sent to an
+Infrastructure Runner or included in provisioning events.
+
 Runner Hosts now keep provider provisioning state separately from operational
 health/status. `ProvisioningStatus` progresses independently through values
 such as `pending`, `creatingServer`, `awaitingInfrastructureRunner`,

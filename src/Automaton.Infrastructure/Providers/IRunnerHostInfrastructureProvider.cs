@@ -28,7 +28,8 @@ public sealed record CreateRunnerHostServerRequest(
     string Image,
     IReadOnlyCollection<string> SshKeyIds,
     string CloudInit,
-    string? PrivateNetworkId);
+    string? PrivateNetworkId,
+    IReadOnlyDictionary<string, string>? Labels = null);
 
 public sealed record CreateRunnerHostServerResult(
     string ProviderResourceId,

@@ -28,6 +28,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<RunnerConnectionSession> RunnerConnectionSessions { get; set; }
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
+        public virtual DbSet<RunnerHostProvisioningOperation> RunnerHostProvisioningOperations { get; set; }
         public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
@@ -268,6 +269,20 @@ namespace Automaton.Api.Data
                     .WithMany()
                     .HasForeignKey(e => e.InfrastructureRunnerId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<RunnerHostProvisioningOperation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Action).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.ProviderResourceId).HasMaxLength(120);
+                entity.Property(e => e.FailureCode).HasMaxLength(80);
+                entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => new { e.RunnerHostId, e.Status });
+                entity.HasOne(e => e.RunnerHost).WithMany().HasForeignKey(e => e.RunnerHostId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<RunnerEnrollment>(entity =>

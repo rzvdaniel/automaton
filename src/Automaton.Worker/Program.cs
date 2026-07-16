@@ -49,6 +49,7 @@ builder.Services.AddSerilog((services, config) =>
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
 builder.Services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));
+builder.Services.Configure<Automaton.Worker.Config.HetznerInfrastructureProviderOptions>(builder.Configuration.GetSection(Automaton.Worker.Config.HetznerInfrastructureProviderOptions.SectionName));
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -64,6 +65,9 @@ builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
 builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
+builder.Services.AddHttpClient<HetznerInfrastructureProvider>();
+builder.Services.AddTransient<Automaton.Infrastructure.Providers.IRunnerHostInfrastructureProvider>(sp => sp.GetRequiredService<HetznerInfrastructureProvider>());
+builder.Services.AddSingleton<IInfrastructureProviderResolver, InfrastructureProviderResolver>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")

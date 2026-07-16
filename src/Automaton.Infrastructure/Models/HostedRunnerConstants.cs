@@ -39,6 +39,25 @@ public static class RunnerHostProvisioningStatuses
     public const string Deleted = "deleted";
 }
 
+public static class RunnerHostProvisioningActions
+{
+    public const string Create = "create";
+    public const string Reconcile = "reconcile";
+    public const string RetryEnrollment = "retryEnrollment";
+    public const string Validate = "validate";
+    public const string Delete = "delete";
+}
+
+public static class RunnerHostProvisioningOperationStatuses
+{
+    public const string Pending = "pending";
+    public const string Running = "running";
+    public const string AwaitingInfrastructureRunner = "awaitingInfrastructureRunner";
+    public const string Succeeded = "succeeded";
+    public const string Failed = "failed";
+    public const string Cancelled = "cancelled";
+}
+
 public static class RunnerEnrollmentStatuses
 {
     public const string Pending = "pending";

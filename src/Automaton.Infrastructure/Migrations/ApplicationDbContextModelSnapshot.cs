@@ -2255,6 +2255,64 @@ namespace Automaton.Api.Migrations
                     b.ToTable("RunnerHosts");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerHostProvisioningOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("ProviderResourceId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("RunnerHostId", "Status");
+
+                    b.ToTable("RunnerHostProvisioningOperations");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.RunnerUser", b =>
                 {
                     b.Property<Guid>("RunnerId")
@@ -3447,6 +3505,17 @@ namespace Automaton.Api.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("InfrastructureRunner");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.RunnerHostProvisioningOperation", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
+                        .WithMany()
+                        .HasForeignKey("RunnerHostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RunnerHost");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerUser", b =>
