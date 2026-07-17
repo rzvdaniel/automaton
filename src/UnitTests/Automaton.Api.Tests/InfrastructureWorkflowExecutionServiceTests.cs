@@ -62,6 +62,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         Assert.That(validatedHost.IsSchedulingEligible, Is.False);
         Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(2));
         Assert.That(executor.LastScript, Does.Contain("test-network"));
+        Assert.That(executor.LastScript, Does.Contain("automaton-host-exec"));
     }
 
     [Test]
