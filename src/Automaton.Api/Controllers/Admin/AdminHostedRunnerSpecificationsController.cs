@@ -94,10 +94,11 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         var source = await db.HostedRunnerSpecifications.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (source == null) return NotFound();
+        var code = await BuildDuplicateCodeAsync(source.Code, cancellationToken);
         var copy = new HostedRunnerSpecification
         {
             Id = Guid.NewGuid(),
-            Code = $"{source.Code}-copy",
+            Code = code,
             Name = $"{source.Name} Copy",
             Description = source.Description,
             Resources = HostedRunnerSpecificationSnapshotFactory.CloneResources(source.Resources),
@@ -106,8 +107,36 @@ public sealed class AdminHostedRunnerSpecificationsController(
         };
         db.HostedRunnerSpecifications.Add(copy);
         db.HostedRunnerSpecificationRevisions.Add(CreateRevision(copy, userContextService.GetUserId()));
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { message = "A specification with the generated duplicate code already exists. Please try again." });
+        }
         return Ok(await ToDtoAsync(copy, false, cancellationToken));
+    }
+
+    private async Task<string> BuildDuplicateCodeAsync(string sourceCode, CancellationToken cancellationToken)
+    {
+        const string firstSuffix = "-copy";
+        var root = sourceCode.Trim();
+        var candidate = $"{root[..Math.Min(root.Length, 80 - firstSuffix.Length)]}{firstSuffix}";
+        if (!await db.HostedRunnerSpecifications.AnyAsync(x => x.Code == candidate, cancellationToken))
+        {
+            return candidate;
+        }
+
+        for (var suffixNumber = 2; ; suffixNumber++)
+        {
+            var suffix = $"-copy-{suffixNumber}";
+            candidate = $"{root[..Math.Min(root.Length, 80 - suffix.Length)]}{suffix}";
+            if (!await db.HostedRunnerSpecifications.AnyAsync(x => x.Code == candidate, cancellationToken))
+            {
+                return candidate;
+            }
+        }
     }
 
     [HttpDelete("{id:guid}")]
