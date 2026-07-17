@@ -33,7 +33,9 @@ public static class RunnerHostProvisioningStatuses
     public const string CreatingServer = "creatingServer";
     public const string AwaitingInfrastructureRunner = "awaitingInfrastructureRunner";
     public const string Validating = "validating";
+    public const string AwaitingApproval = "awaitingApproval";
     public const string Ready = "ready";
+    public const string ValidationFailed = "validationFailed";
     public const string Failed = "failed";
     public const string Deleting = "deleting";
     public const string Deleted = "deleted";

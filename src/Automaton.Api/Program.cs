@@ -360,6 +360,7 @@ services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
 services.AddScoped<RunnerEnrollmentService>();
 services.AddScoped<InfrastructureRunnerRegistrationService>();
+services.AddScoped<InfrastructureRunnerHostApprovalService>();
 services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();

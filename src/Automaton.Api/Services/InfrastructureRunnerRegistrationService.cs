@@ -147,8 +147,9 @@ public sealed class InfrastructureRunnerRegistrationService(
         host.TotalDiskMb = request.DiskMb.GetValueOrDefault(host.TotalDiskMb);
         host.LastHeartbeatAtUtc = now;
         host.MetadataJson = BuildMetadataJson(request, now);
-        host.ProvisioningStatus = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
-            ? RunnerHostProvisioningStatuses.Ready
+        host.ProvisioningStatus = host.ProvisioningStatus is RunnerHostProvisioningStatuses.Ready
+            or RunnerHostProvisioningStatuses.AwaitingApproval
+            ? host.ProvisioningStatus
             : RunnerHostProvisioningStatuses.Validating;
         host.UpdatedAt = now;
 

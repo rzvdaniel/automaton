@@ -28,6 +28,21 @@ class AdminHostedRunnersService {
     return response.data
   }
 
+  async approveHost(id: string): Promise<RunnerHost> {
+    const response = await apiClient.post<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}/approve`)
+    return response.data
+  }
+
+  async disableHostScheduling(id: string): Promise<RunnerHost> {
+    const response = await apiClient.post<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}/disable-scheduling`)
+    return response.data
+  }
+
+  async revokeInfrastructureRunner(id: string): Promise<RunnerHost> {
+    const response = await apiClient.post<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}/revoke-infrastructure-runner`)
+    return response.data
+  }
+
   async createInfrastructureRunnerEnrollment(hostId: string): Promise<RunnerEnrollment> {
     const response = await apiClient.post<RunnerEnrollment>(
       `/api/admin/hosted-runners/hosts/${hostId}/infrastructure-runner/enrollments`,

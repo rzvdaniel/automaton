@@ -100,7 +100,7 @@ public sealed class InfrastructureWorkflowExecutionService(
 
             if (!result.Succeeded)
             {
-                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+                host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
                 host.ProvisioningFailureCode = "HostValidationExecutionFailed";
                 host.ProvisioningFailureMessage = Limit(result.StandardError, 2000);
                 host.HostedRunnerSchedulingEnabled = false;
@@ -126,7 +126,7 @@ public sealed class InfrastructureWorkflowExecutionService(
         {
             execution.Status = InfrastructureWorkflowExecutionStatuses.Failed;
             execution.Error = Limit(ex.Message);
-            host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+            host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
             host.ProvisioningFailureCode = "HostValidationExecutionFailed";
             host.ProvisioningFailureMessage = Limit(ex.Message, 2000);
             host.HostedRunnerSchedulingEnabled = false;
@@ -235,7 +235,8 @@ public sealed class InfrastructureWorkflowExecutionService(
             .FirstOrDefaultAsync(cancellationToken);
         if (operation == null) return;
 
-        operation.Status = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
+        operation.Status = host.ProvisioningStatus is RunnerHostProvisioningStatuses.Ready
+            or RunnerHostProvisioningStatuses.AwaitingApproval
             ? RunnerHostProvisioningOperationStatuses.Succeeded
             : RunnerHostProvisioningOperationStatuses.Failed;
         operation.FailureCode = host.ProvisioningFailureCode;
@@ -280,14 +281,24 @@ public sealed class InfrastructureWorkflowExecutionService(
                 && string.Equals(diskHealth.GetString(), "Healthy", StringComparison.OrdinalIgnoreCase);
             if (dockerHealthy && networkHealthy && diskHealthy)
             {
-                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Ready;
+                var isLocalDevelopmentHost = host.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker;
+                var wasApproved = host.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
+                    && host.ApprovedAtUtc.HasValue;
+                host.ProvisioningStatus = isLocalDevelopmentHost || wasApproved
+                    ? RunnerHostProvisioningStatuses.Ready
+                    : RunnerHostProvisioningStatuses.AwaitingApproval;
                 host.ValidatedAtUtc = DateTime.UtcNow;
                 host.ProvisioningFailureCode = null;
                 host.ProvisioningFailureMessage = null;
+                if (!isLocalDevelopmentHost && !wasApproved)
+                {
+                    host.HostedRunnerSchedulingEnabled = false;
+                }
             }
             else
             {
-                host.ProvisioningStatus = RunnerHostProvisioningStatuses.Failed;
+                host.ProvisioningStatus = RunnerHostProvisioningStatuses.ValidationFailed;
+                host.ValidatedAtUtc = null;
                 host.ProvisioningFailureCode = "HostValidationFailed";
                 host.ProvisioningFailureMessage = "One or more host validation checks failed.";
                 host.HostedRunnerSchedulingEnabled = false;

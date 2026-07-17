@@ -436,6 +436,8 @@ export interface RunnerHost {
   provisioningStartedAtUtc?: string
   infrastructureRunnerEnrolledAtUtc?: string
   validatedAtUtc?: string
+  approvedAtUtc?: string
+  approvedByUserId?: string
   provisioningFailureCode?: string
   provisioningFailureMessage?: string
   isSchedulingEligible: boolean

@@ -1,6 +1,7 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
@@ -8,6 +9,7 @@ using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Automaton.Api.Tests;
 
@@ -53,9 +55,59 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
 
         Assert.That(response.Status, Is.EqualTo(InfrastructureWorkflowExecutionStatuses.Succeeded));
         Assert.That(response.TargetRunnerId, Is.EqualTo(runner.Id));
-        Assert.That(response.ResultJson, Does.Contain("dockerStatus"));
+        Assert.That(response.ResultJson, Does.Contain("\"health\""));
+        var validatedHost = await db.RunnerHosts.FindAsync(host.Id);
+        Assert.That(validatedHost!.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.AwaitingApproval));
+        Assert.That(validatedHost.ValidatedAtUtc, Is.Not.Null);
+        Assert.That(validatedHost.IsSchedulingEligible, Is.False);
         Assert.That(await db.InfrastructureWorkflowExecutionLogs.CountAsync(), Is.EqualTo(2));
         Assert.That(executor.LastScript, Does.Contain("test-network"));
+    }
+
+    [Test]
+    public async Task HostApproval_EnablesSchedulingOnlyAfterValidationAndOnlineRunner()
+    {
+        await using var db = CreateDbContext();
+        var apiKey = new ApiKey { Id = Guid.NewGuid(), Name = "infra", HashedKey = "hash", KeyPrefix = "ak_runner_test", CreatedAt = DateTime.UtcNow };
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infra-test",
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiKey = apiKey,
+            ApiKeyId = apiKey.Id,
+            ConnectionId = "connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-test",
+            Provider = RunnerHostProviders.Hetzner,
+            ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
+            ValidatedAtUtc = DateTime.UtcNow,
+            HostedRunnerSchedulingEnabled = false,
+            InfrastructureRunner = runner,
+            InfrastructureRunnerId = runner.Id
+        };
+        db.ApiKeys.Add(apiKey);
+        db.Runners.Add(runner);
+        db.RunnerHosts.Add(host);
+        await db.SaveChangesAsync();
+
+        var service = new InfrastructureRunnerHostApprovalService(
+            db,
+            new RecordingAuditEventService(),
+            NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
+            new NullHubContext<AutomatonHub>());
+
+        var approved = await service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.That(approved.ProvisioningStatus, Is.EqualTo(RunnerHostProvisioningStatuses.Ready));
+        Assert.That(approved.HostedRunnerSchedulingEnabled, Is.True);
+        Assert.That(approved.ApprovedAtUtc, Is.Not.Null);
+        Assert.That(approved.ApprovedByUserId, Is.Not.Null);
+        Assert.That(approved.IsSchedulingEligible, Is.True);
     }
 
     [Test]
@@ -120,7 +172,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             return Task.FromResult(new HostedRunnerRemoteExecutionResult(
                 true,
                 0,
-                "{\"operatingSystem\":\"Linux\",\"dockerStatus\":\"running\"}\n",
+                "{\"totalCpuCores\":2,\"totalMemoryMb\":4096,\"totalDiskMb\":40960,\"metadata\":{\"hostname\":\"host-test\"},\"health\":{\"docker\":\"Healthy\",\"network\":\"Healthy\",\"disk\":\"Healthy\",\"apiConnectivity\":\"Healthy\"}}\n",
                 "validation started\n"));
         }
     }
@@ -132,5 +184,35 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
 
         public Task WriteAsync(string action, string entityType, Guid? entityId, string message, object? metadata = null, string outcome = "Success", bool failOnError = false, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+    }
+
+    private sealed class NullHubContext<THub> : IHubContext<THub> where THub : Hub
+    {
+        public IHubClients Clients { get; } = new NullHubClients();
+        public IGroupManager Groups { get; } = new NullGroupManager();
+    }
+
+    private sealed class NullHubClients : IHubClients
+    {
+        public IClientProxy All => new NullClientProxy();
+        public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
+        public IClientProxy Client(string connectionId) => new NullClientProxy();
+        public IClientProxy Clients(IReadOnlyList<string> connectionIds) => new NullClientProxy();
+        public IClientProxy Group(string groupName) => new NullClientProxy();
+        public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => new NullClientProxy();
+        public IClientProxy Groups(IReadOnlyList<string> groupNames) => new NullClientProxy();
+        public IClientProxy User(string userId) => new NullClientProxy();
+        public IClientProxy Users(IReadOnlyList<string> userIds) => new NullClientProxy();
+    }
+
+    private sealed class NullClientProxy : IClientProxy
+    {
+        public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NullGroupManager : IGroupManager
+    {
+        public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

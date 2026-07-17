@@ -53,6 +53,9 @@ const installationDialogVisible = ref(false)
 const installationKey = ref<InfrastructureRunnerEnrollmentKey | null>(null)
 const generatingInstallationKey = ref(false)
 const validatingHostId = ref<string | null>(null)
+const approvingHostId = ref<string | null>(null)
+const disablingSchedulingHostId = ref<string | null>(null)
+const revokingInfrastructureRunnerHostId = ref<string | null>(null)
 const validationDialogVisible = ref(false)
 const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
 const validationLogs = ref<InfrastructureWorkflowExecutionLog[]>([])
@@ -316,6 +319,46 @@ async function validateHost(host: RunnerHost) {
   }
 }
 
+async function approveHost(host: RunnerHost) {
+  approvingHostId.value = host.id
+  try {
+    await adminHostedRunnersService.approveHost(host.id)
+    toast.add({ severity: 'success', summary: 'Host approved', detail: 'Managed Runner scheduling is now enabled.', life: 3000 })
+    await loadHosts()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Approval failed', detail: error instanceof Error ? error.message : 'Host approval failed.', life: 4000 })
+  } finally {
+    approvingHostId.value = null
+  }
+}
+
+async function disableHostScheduling(host: RunnerHost) {
+  disablingSchedulingHostId.value = host.id
+  try {
+    await adminHostedRunnersService.disableHostScheduling(host.id)
+    toast.add({ severity: 'success', summary: 'Scheduling disabled', detail: 'Existing Hosted Runners were preserved.', life: 3000 })
+    await loadHosts()
+  } catch {
+    toast.add({ severity: 'error', summary: 'Action failed', detail: 'Could not disable host scheduling.', life: 3500 })
+  } finally {
+    disablingSchedulingHostId.value = null
+  }
+}
+
+async function revokeInfrastructureRunner(host: RunnerHost) {
+  if (!window.confirm(`Revoke the Infrastructure Runner for ${host.name}? Scheduling will be disabled.`)) return
+  revokingInfrastructureRunnerHostId.value = host.id
+  try {
+    await adminHostedRunnersService.revokeInfrastructureRunner(host.id)
+    toast.add({ severity: 'success', summary: 'Runner revoked', detail: 'The host was disabled and its permanent credential revoked.', life: 3500 })
+    await loadHosts()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Revocation failed', detail: error instanceof Error ? error.message : 'Could not revoke the Infrastructure Runner.', life: 4000 })
+  } finally {
+    revokingInfrastructureRunnerHostId.value = null
+  }
+}
+
 async function retryProvisioning(runner: HostedRunner) {
   provisioningUserId.value = runner.userId
   try {
@@ -434,9 +477,9 @@ async function provisionHostedRunner() {
 
 function statusSeverity(status: string) {
   if (status === 'active' || status === 'running' || status === 'succeeded') return 'success'
-  if (status === 'failed' || status === 'disabled' || status === 'deleteFailed') return 'danger'
+  if (status === 'failed' || status === 'validationFailed' || status === 'disabled' || status === 'deleteFailed') return 'danger'
   if (status === 'deleted') return 'secondary'
-  if (status === 'draining' || status === 'provisioning' || status === 'pending') return 'warn'
+  if (status === 'draining' || status === 'provisioning' || status === 'pending' || status === 'awaitingApproval' || status === 'validating') return 'warn'
   return 'info'
 }
 
@@ -608,6 +651,10 @@ onMounted(refreshAll)
                   Deadline: {{ formatDateTime(data.provisioningOperationNextTimeoutAtUtc) }}
                 </span>
                 <span v-if="data.provisioningFailureCode" class="text-red-500 text-xs">{{ data.provisioningFailureCode }}</span>
+                <span v-if="data.approvedAtUtc" class="text-color-secondary text-xs">Approved: {{ formatDateTime(data.approvedAtUtc) }}</span>
+                <span v-if="data.provisioningStatus === 'ready'" class="text-color-secondary text-xs">
+                  Scheduling: {{ data.hostedRunnerSchedulingEnabled ? 'Enabled' : 'Disabled' }}
+                </span>
               </div>
             </template>
           </Column>
@@ -641,6 +688,35 @@ onMounted(refreshAll)
                   outlined
                   :loading="validatingHostId === data.id"
                   @click="validateHost(data)"
+                />
+                <Button
+                  v-if="data.provisioningStatus === 'awaitingApproval'"
+                  label="Approve"
+                  icon="pi pi-check"
+                  size="small"
+                  severity="success"
+                  :loading="approvingHostId === data.id"
+                  @click="approveHost(data)"
+                />
+                <Button
+                  v-if="data.provisioningStatus === 'ready' && data.hostedRunnerSchedulingEnabled"
+                  label="Disable scheduling"
+                  icon="pi pi-pause"
+                  size="small"
+                  severity="warning"
+                  outlined
+                  :loading="disablingSchedulingHostId === data.id"
+                  @click="disableHostScheduling(data)"
+                />
+                <Button
+                  v-if="data.infrastructureRunnerId"
+                  label="Revoke"
+                  icon="pi pi-ban"
+                  size="small"
+                  severity="danger"
+                  outlined
+                  :loading="revokingInfrastructureRunnerHostId === data.id"
+                  @click="revokeInfrastructureRunner(data)"
                 />
                 <Button icon="pi pi-pencil" text rounded @click="openEditHost(data)" />
               </div>

@@ -61,6 +61,8 @@ public class RunnerHost
     public DateTime? ProvisioningStartedAtUtc { get; set; }
     public DateTime? InfrastructureRunnerEnrolledAtUtc { get; set; }
     public DateTime? ValidatedAtUtc { get; set; }
+    public DateTime? ApprovedAtUtc { get; set; }
+    public Guid? ApprovedByUserId { get; set; }
 
     [MaxLength(80)]
     public string? ProvisioningFailureCode { get; set; }
@@ -110,5 +112,6 @@ public class RunnerHost
         HostedRunnerSchedulingEnabled &&
         ValidatedAtUtc.HasValue &&
         (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
-            || InfrastructureRunnerId.HasValue);
+            ? true
+            : InfrastructureRunnerId.HasValue);
 }

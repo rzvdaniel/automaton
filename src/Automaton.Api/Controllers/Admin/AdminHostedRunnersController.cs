@@ -20,6 +20,7 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly RunnerEnrollmentService runnerEnrollmentService;
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
+    private readonly InfrastructureRunnerHostApprovalService hostApprovalService;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
@@ -27,7 +28,8 @@ public class AdminHostedRunnersController : ControllerBase
         HostedRunnerManagementService managementService,
         RunnerEnrollmentService runnerEnrollmentService,
         ApiKeyService apiKeyService,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        InfrastructureRunnerHostApprovalService hostApprovalService)
     {
         this.db = db;
         this.provisioningService = provisioningService;
@@ -35,6 +37,7 @@ public class AdminHostedRunnersController : ControllerBase
         this.runnerEnrollmentService = runnerEnrollmentService;
         this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
+        this.hostApprovalService = hostApprovalService;
     }
 
     [HttpPost("infrastructure-runner/enrollment-keys")]
@@ -102,6 +105,45 @@ public class AdminHostedRunnersController : ControllerBase
         return revoked ? NoContent() : NotFound();
     }
 
+    [HttpPost("hosts/{id:guid}/approve")]
+    public async Task<ActionResult<RunnerHostResponse>> ApproveHost(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var host = await hostApprovalService.ApproveAsync(id, userContextService.GetUserId(), cancellationToken);
+            return Ok(ToResponse(host));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("hosts/{id:guid}/disable-scheduling")]
+    public async Task<ActionResult<RunnerHostResponse>> DisableHostScheduling(Guid id, CancellationToken cancellationToken)
+    {
+        var host = await hostApprovalService.DisableSchedulingAsync(id, userContextService.GetUserId(), cancellationToken);
+        return host == null ? NotFound() : Ok(ToResponse(host));
+    }
+
+    [HttpPost("hosts/{id:guid}/revoke-infrastructure-runner")]
+    public async Task<ActionResult<RunnerHostResponse>> RevokeInfrastructureRunner(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var host = await hostApprovalService.RevokeAsync(id, userContextService.GetUserId(), cancellationToken);
+            return host == null ? NotFound() : Ok(ToResponse(host));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpPut("hosts/{id:guid}")]
     public async Task<ActionResult<RunnerHostResponse>> UpdateHost(Guid id, UpdateRunnerHostRequest request, CancellationToken cancellationToken)
     {
@@ -122,6 +164,15 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.RuntimeConnectivityMode != null) host.RuntimeConnectivityMode = request.RuntimeConnectivityMode;
         if (request.HostedRunnerSchedulingEnabled.HasValue)
         {
+            if (request.HostedRunnerSchedulingEnabled.Value
+                && (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
+                    || !host.ValidatedAtUtc.HasValue
+                    || host.Status != RunnerHostStatuses.Active
+                    || (host.ProvisioningTransport != RunnerHostProvisioningTransports.LocalDocker
+                        && !host.InfrastructureRunnerId.HasValue)))
+            {
+                return Conflict(new { message = "A host must be Ready, validated, active, and correctly bound before scheduling can be enabled." });
+            }
             host.HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled.Value;
         }
         if (request.Status != null) host.Status = request.Status;
@@ -250,6 +301,8 @@ public class AdminHostedRunnersController : ControllerBase
             ProvisioningStartedAtUtc = host.ProvisioningStartedAtUtc,
             InfrastructureRunnerEnrolledAtUtc = host.InfrastructureRunnerEnrolledAtUtc,
             ValidatedAtUtc = host.ValidatedAtUtc,
+            ApprovedAtUtc = host.ApprovedAtUtc,
+            ApprovedByUserId = host.ApprovedByUserId,
             ProvisioningFailureCode = host.ProvisioningFailureCode,
             ProvisioningFailureMessage = host.ProvisioningFailureMessage,
             IsSchedulingEligible = host.IsSchedulingEligible,
@@ -387,6 +440,8 @@ public record RunnerHostResponse
     public DateTime? ProvisioningStartedAtUtc { get; init; }
     public DateTime? InfrastructureRunnerEnrolledAtUtc { get; init; }
     public DateTime? ValidatedAtUtc { get; init; }
+    public DateTime? ApprovedAtUtc { get; init; }
+    public Guid? ApprovedByUserId { get; init; }
     public string? ProvisioningFailureCode { get; init; }
     public string? ProvisioningFailureMessage { get; init; }
     public bool IsSchedulingEligible { get; init; }
