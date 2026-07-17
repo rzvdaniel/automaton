@@ -18,6 +18,7 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly HostedRunnerProvisioningService provisioningService;
     private readonly HostedRunnerManagementService managementService;
     private readonly RunnerEnrollmentService runnerEnrollmentService;
+    private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
 
     public AdminHostedRunnersController(
@@ -25,13 +26,38 @@ public class AdminHostedRunnersController : ControllerBase
         HostedRunnerProvisioningService provisioningService,
         HostedRunnerManagementService managementService,
         RunnerEnrollmentService runnerEnrollmentService,
+        ApiKeyService apiKeyService,
         UserContextService userContextService)
     {
         this.db = db;
         this.provisioningService = provisioningService;
         this.managementService = managementService;
         this.runnerEnrollmentService = runnerEnrollmentService;
+        this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
+    }
+
+    [HttpPost("infrastructure-runner/enrollment-keys")]
+    public async Task<ActionResult<InfrastructureRunnerEnrollmentKeyResponse>> CreateInfrastructureRunnerEnrollmentKey(
+        CancellationToken cancellationToken)
+    {
+        var expiresAt = DateTime.UtcNow.AddMinutes(30);
+        var (rawKey, entity) = await apiKeyService.CreateApiKeyAsync(
+            userContextService.GetUserId(),
+            "Infrastructure Runner enrollment",
+            "Single-use credential for Infrastructure Runner host self-registration.",
+            expiresAt,
+            ApiKeyScope.InfrastructureRunnerEnroll,
+            saveChanges: true,
+            maximumUses: 1);
+
+        return Ok(new InfrastructureRunnerEnrollmentKeyResponse
+        {
+            Id = entity.Id,
+            ApiKey = rawKey,
+            KeyPrefix = entity.KeyPrefix,
+            ExpiresAtUtc = expiresAt
+        });
     }
 
     [HttpGet("hosts")]
@@ -46,35 +72,6 @@ public class AdminHostedRunnersController : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(hosts.Select(ToResponse));
-    }
-
-    [HttpPost("hosts")]
-    public async Task<ActionResult<RunnerHostResponse>> CreateHost(CreateRunnerHostRequest request, CancellationToken cancellationToken)
-    {
-        var host = new RunnerHost
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name,
-            Provider = request.Provider,
-            Region = request.Region,
-            PublicIp = request.PublicIp,
-            PrivateIp = request.PrivateIp,
-            ProvisioningTransport = request.ProvisioningTransport,
-            RuntimeConnectivityMode = request.RuntimeConnectivityMode,
-            HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled,
-            Status = request.Status,
-            TotalCpuCores = request.TotalCpuCores,
-            ReservedCpuCores = request.ReservedCpuCores,
-            TotalMemoryMb = request.TotalMemoryMb,
-            ReservedMemoryMb = request.ReservedMemoryMb,
-            TotalDiskMb = request.TotalDiskMb,
-            ReservedDiskMb = request.ReservedDiskMb,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        db.RunnerHosts.Add(host);
-        await db.SaveChangesAsync(cancellationToken);
-        return Created($"/api/admin/hosted-runners/hosts/{host.Id}", ToResponse(host));
     }
 
     [HttpPost("hosts/{id:guid}/infrastructure-runner/enrollments")]
@@ -418,25 +415,6 @@ public record RunnerHostResponse
     public DateTime? LastHeartbeatAtUtc { get; init; }
     public string? MetadataJson { get; init; }
     public string? HealthJson { get; init; }
-}
-
-public record CreateRunnerHostRequest
-{
-    public string Name { get; init; } = string.Empty;
-    public string Provider { get; init; } = RunnerHostProviders.Hetzner;
-    public string? Region { get; init; }
-    public string? PublicIp { get; init; }
-    public string? PrivateIp { get; init; }
-    public string ProvisioningTransport { get; init; } = RunnerHostProvisioningTransports.InfrastructureRunner;
-    public string RuntimeConnectivityMode { get; init; } = RunnerHostRuntimeConnectivityModes.PublicHostPort;
-    public bool HostedRunnerSchedulingEnabled { get; init; } = true;
-    public string Status { get; init; } = RunnerHostStatuses.Active;
-    public decimal TotalCpuCores { get; init; } = 2m;
-    public decimal ReservedCpuCores { get; init; }
-    public int TotalMemoryMb { get; init; } = 4096;
-    public int ReservedMemoryMb { get; init; }
-    public int TotalDiskMb { get; init; } = 40960;
-    public int ReservedDiskMb { get; init; }
 }
 
 public record UpdateRunnerHostRequest

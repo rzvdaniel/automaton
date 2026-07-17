@@ -534,6 +534,9 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int?>("MaximumUses")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -544,12 +547,20 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(3);
 
+                    b.Property<int>("UseCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HashedKey")
                         .IsUnique();
 
                     b.HasIndex("LastUsedAt");
+
+                    b.HasIndex("UsedAt");
 
                     b.ToTable("ApiKeys");
                 });
@@ -1949,6 +1960,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
 
+                    b.Property<Guid?>("ApiKeyId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("CapabilitiesJson")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -2001,6 +2015,8 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("varchar(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApiKeyId");
 
                     b.HasIndex("InstallationId")
                         .IsUnique();
@@ -3492,6 +3508,16 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.Runner", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApiKey", "ApiKey")
+                        .WithMany()
+                        .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApiKey");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerConnectionSession", b =>

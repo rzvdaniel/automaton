@@ -131,6 +131,13 @@ services.AddAuthentication()
             options.HeaderName = "X-API-Key";
             options.QueryParameterName = "api_key";
         })
+    .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationSchemeOptions.InfrastructureRunnerEnrollmentScheme,
+        options =>
+        {
+            options.HeaderName = "X-API-Key";
+            options.QueryParameterName = string.Empty;
+        })
     .AddGitHubOAuth(applicationBuilder.Configuration);
 
 // Define specific authorization policies for different access levels
@@ -146,11 +153,22 @@ services.AddAuthorization(options =>
     // This policy accepts EITHER API Key OR JWT/Identity authentication
     options.AddPolicy("AllowApiKey", policy =>
         policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
-    .RequireAuthenticatedUser());
+      .RequireAuthenticatedUser()
+      .RequireAssertion(context =>
+      {
+          var scopeClaim = context.User.FindFirst("api_key_scope")?.Value;
+          return !Enum.TryParse<Automaton.Core.Enums.ApiKeyScope>(scopeClaim, out var scope)
+              || scope != Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll;
+      }));
 
     // Policy for anonymous endpoints (validation, etc.)
     options.AddPolicy("AllowAnonymous", policy =>
         policy.RequireAssertion(_ => true));
+
+    options.AddPolicy("InfrastructureRunnerEnrollment", policy =>
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.InfrastructureRunnerEnrollmentScheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim("api_key_scope", Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll.ToString()));
 
     // Admin policy for users with Admin or SysAdmin roles
     options.AddPolicy("Administrators", policy =>
@@ -341,6 +359,7 @@ services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
 services.AddScoped<RunnerService>();
 services.AddScoped<RunnerEnrollmentService>();
+services.AddScoped<InfrastructureRunnerRegistrationService>();
 services.AddScoped<AdminRunnersService>();
 services.AddScoped<FlowExecutionHistoryService>();
 services.AddScoped<FlowExecutionLogService>();

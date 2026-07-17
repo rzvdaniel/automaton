@@ -41,6 +41,9 @@ public class Runner
     [MaxLength(128)]
     public string? InstallationId { get; set; }
 
+    public Guid? ApiKeyId { get; set; }
+    public virtual ApiKey? ApiKey { get; set; }
+
     /// <summary>
     /// JSON-serialized script engine configuration settings
     /// Stores RunnerScriptEngineSettings as JSON string

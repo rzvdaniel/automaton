@@ -38,7 +38,8 @@ public class ApiKeyService
         DateTime? expiresAt = null,
         ApiKeyScope scope = ApiKeyScope.Runner,
         Guid? projectId = null,
-        bool saveChanges = true)
+        bool saveChanges = true,
+        int? maximumUses = null)
     {
         // Generate a cryptographically secure API key
         var rawKey = GenerateRawKey();
@@ -48,6 +49,7 @@ public class ApiKeyService
             ApiKeyScope.Execute => "ak_execute_",
             ApiKeyScope.Runner => "ak_runner_",
             ApiKeyScope.WebApp => "ak_webapp_",
+            ApiKeyScope.InfrastructureRunnerEnroll => "ak_infra_enroll_",
             ApiKeyScope.FullAccess => "ak_fullaccess_",
             _ => "ak_"
         };
@@ -63,6 +65,7 @@ public class ApiKeyService
             KeyPrefix = $"{prefix}{rawKey[..8]}...",
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = expiresAt,
+            MaximumUses = maximumUses,
             Description = description,
             Scope = scope,
             IsActive = true
@@ -142,6 +145,9 @@ public class ApiKeyService
         if (entity == null)
             return null;
 
+        if (entity.MaximumUses.HasValue && entity.UseCount >= entity.MaximumUses.Value)
+            return null;
+
         // Check expiration
         if (entity.ExpiresAt.HasValue && entity.ExpiresAt.Value < DateTime.UtcNow)
         {
@@ -154,6 +160,60 @@ public class ApiKeyService
         await dbContext.SaveChangesAsync();
 
         return entity;
+    }
+
+    public async Task<(ApiKey Key, Guid UserId)?> ConsumeApiKeyAsync(
+        string apiKey,
+        ApiKeyScope requiredScope,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return null;
+
+        if (dbContext.Database.IsRelational() && dbContext.Database.CurrentTransaction == null)
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable,
+                cancellationToken);
+            var result = await ConsumeApiKeyCoreAsync(apiKey, requiredScope, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+
+        return await ConsumeApiKeyCoreAsync(apiKey, requiredScope, cancellationToken);
+    }
+
+    private async Task<(ApiKey Key, Guid UserId)?> ConsumeApiKeyCoreAsync(
+        string apiKey,
+        ApiKeyScope requiredScope,
+        CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.ApiKeys
+            .FirstOrDefaultAsync(x => x.HashedKey == HashApiKey(apiKey) && x.IsActive, cancellationToken);
+        if (entity == null
+            || entity.Scope != requiredScope
+            || (entity.ExpiresAt.HasValue && entity.ExpiresAt.Value <= DateTime.UtcNow)
+            || entity.UsedAt.HasValue
+            || (entity.MaximumUses.HasValue && entity.UseCount >= entity.MaximumUses.Value))
+        {
+            return null;
+        }
+
+        var userId = await dbContext.ApiKeyUsers
+            .Where(x => x.ApiKeyId == entity.Id)
+            .Select(x => x.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (userId == Guid.Empty)
+            return null;
+
+        entity.UseCount++;
+        entity.UsedAt = DateTime.UtcNow;
+        entity.LastUsedAt = entity.UsedAt;
+        if (entity.MaximumUses.HasValue && entity.UseCount >= entity.MaximumUses.Value)
+            entity.IsActive = false;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return (entity, userId);
     }
 
     public async Task<IEnumerable<ApiKey>> GetUserApiKeysAsync(Guid userId, Guid? projectId = null)

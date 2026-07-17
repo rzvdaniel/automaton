@@ -29,5 +29,10 @@ public enum ApiKeyScope
     /// Can execute flows on behalf of published web apps (web app execution only)
     /// ?? Always add new values at the end to preserve serialized data compatibility
     /// </summary>
-    WebApp = 5
+    WebApp = 5,
+
+    /// <summary>
+    /// Single-use, short-lived credential for Infrastructure Runner host registration.
+    /// </summary>
+    InfrastructureRunnerEnroll = 6
 }

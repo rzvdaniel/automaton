@@ -27,6 +27,12 @@ public class ApiKey
 
     public DateTime? ExpiresAt { get; set; }
 
+    public DateTime? UsedAt { get; set; }
+
+    public int UseCount { get; set; }
+
+    public int? MaximumUses { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     // Set default to Runner to match database configuration

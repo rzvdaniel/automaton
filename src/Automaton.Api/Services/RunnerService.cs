@@ -140,6 +140,7 @@ public class RunnerService
             IpAddress = runnerModel.IpAddress,
             Purpose = purpose,
             CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, purpose),
+            InstallationId = runnerModel.InstallationId,
         };
 
         dbContext.Runners.Add(runner);
@@ -586,6 +587,7 @@ public class RunnerService
         entity.MachineName = runner.MachineName;
         entity.IpAddress = runner.IpAddress;
         entity.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, entity.Purpose);
+        entity.InstallationId = runner.InstallationId ?? entity.InstallationId;
 
         // Mark entity as modified
         dbContext.Entry(entity).State = EntityState.Modified;

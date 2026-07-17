@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bootstrap a Hetzner/Debian-style server over SSH. This uses the normal
-# Automaton Runner image; the server-side enrollment profile grants host
-# administration capability. The enrollment token is short-lived and one-time;
-# no permanent API key is passed through this installer.
+# Bootstrap a Docker-capable server. This uses the normal Automaton Runner
+# image with Infrastructure capabilities. New installations use a short-lived,
+# single-use Infrastructure Runner enrollment API key; the Runner exchanges it
+# for its permanent credential and stores that credential in the config volume.
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run this script as root (for example: sudo -E bash install-infrastructure-runner.sh)." >&2
@@ -12,6 +12,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 AUTOMATON_SERVER_URL="${AUTOMATON_SERVER_URL:-}"
+AUTOMATON_API_KEY="${AUTOMATON_API_KEY:-}"
 AUTOMATON_ENROLLMENT_TOKEN="${AUTOMATON_ENROLLMENT_TOKEN:-}"
 AUTOMATON_RUNNER_IMAGE="${AUTOMATON_RUNNER_IMAGE:-automaton-runner:latest}"
 AUTOMATON_RUNNER_NAME="${AUTOMATON_RUNNER_NAME:-}"
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --enrollment-token)
       AUTOMATON_ENROLLMENT_TOKEN="${2:-}"
+      shift 2
+      ;;
+    --api-key)
+      AUTOMATON_API_KEY="${2:-}"
       shift 2
       ;;
     --runner-image)
@@ -53,8 +58,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 : "${AUTOMATON_SERVER_URL:?Set --server-url or AUTOMATON_SERVER_URL to the Automaton API URL}"
-: "${AUTOMATON_ENROLLMENT_TOKEN:?Set --enrollment-token or AUTOMATON_ENROLLMENT_TOKEN to a one-time enrollment token}"
 : "${AUTOMATON_RUNNER_IMAGE:?Set --runner-image or AUTOMATON_RUNNER_IMAGE to the published Runner image}"
+
+if [[ -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROLLMENT_TOKEN" ]]; then
+  echo "Set --api-key to a one-time Infrastructure Runner enrollment key." >&2
+  exit 1
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
@@ -90,8 +99,16 @@ docker_args=(
   -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts"
   -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
   -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL"
-  -e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN"
 )
+
+if [[ -n "$AUTOMATON_API_KEY" ]]; then
+  docker_args+=(
+    -e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY"
+    -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure"
+  )
+else
+  docker_args+=( -e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN" )
+fi
 
 if [[ -n "$AUTOMATON_RUNNER_NAME" ]]; then
   docker_args+=( -e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME" )
@@ -100,8 +117,8 @@ fi
 docker_args+=( "$AUTOMATON_RUNNER_IMAGE" )
 docker "${docker_args[@]}"
 
-echo "Infrastructure Runner enrollment started: $AUTOMATON_CONTAINER_NAME"
-echo "The Runner will exchange the one-time token and persist its durable credential in: $AUTOMATON_DATA_ROOT/config"
+echo "Infrastructure Runner registration started: $AUTOMATON_CONTAINER_NAME"
+echo "The Runner will exchange the one-time credential and persist its durable credential in: $AUTOMATON_DATA_ROOT/config"
 
 for attempt in $(seq 1 30); do
   if [[ "$(docker inspect --format '{{.State.Running}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null || true)" != "true" ]]; then
@@ -110,8 +127,8 @@ for attempt in $(seq 1 30); do
     exit 1
   fi
 
-  if docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -q "Runner enrolled successfully"; then
-    echo "Infrastructure Runner enrolled successfully and is starting its Runner connection."
+  if docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -Eq "self-registration completed|Runner enrolled successfully|self-registered"; then
+    echo "Infrastructure Runner registered successfully and is starting its Runner connection."
     exit 0
   fi
 

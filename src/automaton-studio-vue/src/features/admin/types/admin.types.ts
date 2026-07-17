@@ -472,24 +472,6 @@ export interface RunnerHost {
   updatedAt?: string
 }
 
-export interface CreateRunnerHostRequest {
-  name: string
-  provider: string
-  region?: string
-  publicIp?: string
-  privateIp?: string
-  provisioningTransport: string
-  runtimeConnectivityMode: string
-  hostedRunnerSchedulingEnabled: boolean
-  status: 'active' | 'draining' | 'disabled'
-  totalCpuCores: number
-  reservedCpuCores: number
-  totalMemoryMb: number
-  reservedMemoryMb: number
-  totalDiskMb: number
-  reservedDiskMb: number
-}
-
 export interface UpdateRunnerHostRequest {
   name?: string
   provider?: string
@@ -516,6 +498,14 @@ export interface RunnerEnrollment {
   expectedPurpose: string
   expectedCapabilities: string[]
   dockerImage: string
+}
+
+export interface InfrastructureRunnerEnrollmentKey {
+  id: string
+  apiKey: string
+  keyPrefix: string
+  expiresAtUtc: string
+  maximumUses: number
 }
 
 export interface InfrastructureWorkflowExecution {

@@ -1,10 +1,10 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
-  CreateRunnerHostRequest,
   HostedRunner,
   ProvisionHostedRunnerRequest,
   RunnerHost,
   RunnerEnrollment,
+  InfrastructureRunnerEnrollmentKey,
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
   UpdateRunnerHostRequest,
@@ -16,8 +16,10 @@ class AdminHostedRunnersService {
     return response.data
   }
 
-  async createHost(request: CreateRunnerHostRequest): Promise<RunnerHost> {
-    const response = await apiClient.post<RunnerHost>('/api/admin/hosted-runners/hosts', request)
+  async createInfrastructureRunnerEnrollmentKey(): Promise<InfrastructureRunnerEnrollmentKey> {
+    const response = await apiClient.post<InfrastructureRunnerEnrollmentKey>(
+      '/api/admin/hosted-runners/infrastructure-runner/enrollment-keys',
+    )
     return response.data
   }
 

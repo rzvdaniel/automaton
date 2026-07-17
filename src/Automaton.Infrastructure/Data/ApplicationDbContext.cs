@@ -199,6 +199,11 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
                 entity.Property(e => e.CapabilitiesJson).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.InstallationId).HasMaxLength(128);
+                entity.HasIndex(e => e.ApiKeyId);
+                entity.HasOne(e => e.ApiKey)
+                    .WithMany()
+                    .HasForeignKey(e => e.ApiKeyId)
+                    .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(e => e.InstallationId).IsUnique();
             });
 
@@ -644,6 +649,7 @@ namespace Automaton.Api.Data
 
                 entity.HasIndex(e => e.HashedKey).IsUnique();
                 entity.HasIndex(e => e.LastUsedAt);
+                entity.HasIndex(e => e.UsedAt);
             });
             
             modelBuilder.Entity<ApiKeyUser>(entity =>

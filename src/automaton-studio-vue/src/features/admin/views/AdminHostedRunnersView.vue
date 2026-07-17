@@ -16,14 +16,15 @@ import Textarea from 'primevue/textarea'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
 import type {
-  CreateRunnerHostRequest,
   HostedRunner,
   RunnerEnrollment,
+  InfrastructureRunnerEnrollmentKey,
   RunnerHost,
   SubscriptionPlan,
   UserPlan,
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
+  UpdateRunnerHostRequest,
 } from '../types/admin.types'
 
 const toast = useToast()
@@ -48,6 +49,9 @@ const enrollmentDialogVisible = ref(false)
 const enrollmentHost = ref<RunnerHost | null>(null)
 const enrollment = ref<RunnerEnrollment | null>(null)
 const enrollingHostId = ref<string | null>(null)
+const installationDialogVisible = ref(false)
+const installationKey = ref<InfrastructureRunnerEnrollmentKey | null>(null)
+const generatingInstallationKey = ref(false)
 const validatingHostId = ref<string | null>(null)
 const validationDialogVisible = ref(false)
 const validationExecution = ref<InfrastructureWorkflowExecution | null>(null)
@@ -100,26 +104,7 @@ const planOptions = computed(() =>
   })),
 )
 
-function defaultHostForm(): CreateRunnerHostRequest {
-  return {
-    name: '',
-    provider: 'hetzner',
-    region: '',
-    publicIp: '',
-    provisioningTransport: 'infrastructureRunner',
-    runtimeConnectivityMode: 'publicHostPort',
-    hostedRunnerSchedulingEnabled: true,
-    status: 'active',
-    totalCpuCores: 2,
-    reservedCpuCores: 0,
-    totalMemoryMb: 4096,
-    reservedMemoryMb: 0,
-    totalDiskMb: 40960,
-    reservedDiskMb: 0,
-  }
-}
-
-const hostForm = ref<CreateRunnerHostRequest>(defaultHostForm())
+const hostForm = ref<UpdateRunnerHostRequest>({})
 
 interface HostMetadataSummary {
   hostname?: string
@@ -235,10 +220,25 @@ async function refreshAll() {
   await Promise.all([loadHosts(), loadHostedRunners()])
 }
 
-function openCreateHost() {
-  editingHost.value = null
-  hostForm.value = defaultHostForm()
-  hostDialogVisible.value = true
+async function generateInfrastructureRunnerInstallationKey() {
+  generatingInstallationKey.value = true
+  try {
+    installationKey.value = await adminHostedRunnersService.createInfrastructureRunnerEnrollmentKey()
+    installationDialogVisible.value = true
+  } catch {
+    toast.add({ severity: 'error', summary: 'Installation key failed', detail: 'Failed to generate an Infrastructure Runner enrollment key.', life: 4000 })
+  } finally {
+    generatingInstallationKey.value = false
+  }
+}
+
+function infrastructureRunnerInstallCommand(): string {
+  if (!installationKey.value) return ''
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+  const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
+  const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
+  const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey)} --runner-image 'rzvdaniel/automaton-runner:latest'; status=$?; rm -f "$tmp"; exit $status`
 }
 
 function openEditHost(host: RunnerHost) {
@@ -269,9 +269,6 @@ async function saveHost() {
     if (editingHost.value) {
       await adminHostedRunnersService.updateHost(editingHost.value.id, hostForm.value)
       toast.add({ severity: 'success', summary: 'Host updated', life: 2500 })
-    } else {
-      await adminHostedRunnersService.createHost(hostForm.value)
-      toast.add({ severity: 'success', summary: 'Host added', life: 2500 })
     }
     hostDialogVisible.value = false
     await loadHosts()
@@ -520,7 +517,16 @@ onMounted(refreshAll)
           Manage discovered infrastructure hosts and paid-user runner containers from the same subscription flow used by Stripe.
         </p>
       </div>
-      <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
+      <div class="flex gap-2">
+        <Button
+          label="Install Infrastructure Runner"
+          icon="pi pi-download"
+          outlined
+          :loading="generatingInstallationKey"
+          @click="generateInfrastructureRunnerInstallationKey"
+        />
+        <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
+      </div>
     </div>
 
     <Card class="mb-4 infrastructure-note">
@@ -564,7 +570,6 @@ onMounted(refreshAll)
       <template #title>
         <div class="flex justify-content-between align-items-center gap-3">
           <span>Runner Hosts</span>
-          <Button label="Add Host" icon="pi pi-plus" size="small" @click="openCreateHost" />
         </div>
       </template>
       <template #content>
@@ -788,6 +793,24 @@ onMounted(refreshAll)
       </div>
       <template #footer>
         <Button label="Close" text @click="enrollmentDialogVisible = false" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="installationDialogVisible" header="Install Infrastructure Runner" modal :style="{ width: '52rem' }">
+      <div v-if="installationKey" class="flex flex-column gap-3">
+        <Message severity="warn" :closable="false">
+          This enrollment key is shown once, expires {{ formatDateTime(installationKey.expiresAtUtc) }}, and can register exactly one Infrastructure Runner host.
+        </Message>
+        <div>
+          <div class="text-color-secondary text-sm mb-2">Installation command</div>
+          <Textarea :model-value="infrastructureRunnerInstallCommand()" readonly auto-resize class="w-full" />
+        </div>
+        <div class="text-color-secondary text-sm">
+          Create the server separately, install Docker if needed, then run this command as root. The Runner will create the host record automatically and persist its permanent credential in /app/config.
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Close" text @click="installationDialogVisible = false" />
       </template>
     </Dialog>
 

@@ -60,6 +60,19 @@ public class RunnerHostService
                 throw new InvalidOperationException("Server URL not configured. Set AUTOMATON_SERVER_URL environment variable.");
             }
 
+            var enrollmentApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+            var runnerPurpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+            if (string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase)
+                && !configService.IsRunnerRegistered()
+                && !string.IsNullOrWhiteSpace(enrollmentApiKey))
+            {
+                if (!await RegisterInfrastructureRunnerAsync(enrollmentApiKey))
+                {
+                    logger.Error("Infrastructure Runner self-registration failed");
+                    throw new InvalidOperationException("Infrastructure Runner self-registration failed.");
+                }
+            }
+
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
             if (string.IsNullOrEmpty(apiKey))
             {
@@ -848,6 +861,7 @@ public class RunnerHostService
             }
 
             var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
+            var installationId = await storageService.GetOrCreateInstallationIdAsync();
             var runnerData = new
             {
                 Id = runnerId,
@@ -862,6 +876,7 @@ public class RunnerHostService
                 RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
                     ? (Guid?)runnerHostId
                     : null,
+                InstallationId = installationId,
             };
 
             var json = JsonSerializer.Serialize(runnerData);
@@ -1017,6 +1032,105 @@ public class RunnerHostService
         {
             logger.Warning(ex, "Runner enrollment request failed");
             return false;
+        }
+    }
+
+    private async Task<bool> RegisterInfrastructureRunnerAsync(string enrollmentApiKey)
+    {
+        var installationId = await storageService.GetOrCreateInstallationIdAsync();
+        var purpose = RunnerPurposes.Infrastructure;
+        var capabilities = RunnerCapabilities.Normalize(
+            Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            purpose);
+        var request = new InfrastructureRunnerRegistrationRequest
+        {
+            InstallationId = installationId,
+            RunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME")
+                ?? $"infrastructure-{Environment.MachineName}",
+            RunnerVersion = Environment.Version.ToString(),
+            MachineName = Environment.MachineName,
+            OperatingSystem = RuntimeInformation.OSDescription,
+            Architecture = RuntimeInformation.OSArchitecture.ToString(),
+            DockerVersion = Environment.GetEnvironmentVariable("AUTOMATON_DOCKER_VERSION"),
+            PublicIp = Environment.GetEnvironmentVariable("AUTOMATON_PUBLIC_IP"),
+            PrivateIp = Environment.GetEnvironmentVariable("AUTOMATON_PRIVATE_IP"),
+            Provider = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PROVIDER"),
+            Region = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_REGION"),
+            CpuCores = Environment.ProcessorCount,
+            MemoryMb = GetHostMemoryMb(),
+            DiskMb = GetHostDiskMb(),
+            Capabilities = capabilities
+        };
+
+        using var httpRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{configService.BaseUrl}/api/infrastructure-runners/register")
+        {
+            Content = JsonContent.Create(request)
+        };
+        httpRequest.Headers.Add("X-API-Key", enrollmentApiKey);
+
+        using var response = await httpClient.SendAsync(httpRequest);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.Warning("Infrastructure Runner self-registration failed with status {StatusCode}", response.StatusCode);
+            return false;
+        }
+
+        var registration = await response.Content.ReadFromJsonAsync<InfrastructureRunnerRegistrationResponse>();
+        if (registration == null || string.IsNullOrWhiteSpace(registration.ApiKey))
+        {
+            logger.Warning("Infrastructure Runner self-registration response did not include a permanent credential");
+            return false;
+        }
+
+        await apiKeyAuthService.SetEnrolledApiKeyAsync(registration.ApiKey);
+        await storageService.SaveRunnerConfigAsync(registration.RunnerId.ToString(), registration.RunnerName);
+        await storageService.SaveInstallationProfileAsync(new RunnerInstallationProfile
+        {
+            Purpose = registration.Purpose,
+            Capabilities = registration.Capabilities,
+            RunnerHostId = registration.RunnerHostId,
+            InstallationId = registration.InstallationId
+        });
+
+        ApplyInstallationProfile(registration.Purpose, registration.Capabilities, registration.RunnerHostId);
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_ID", registration.RunnerId.ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_RUNNER_NAME", registration.RunnerName);
+        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", null);
+        WriteLine($"✅ Infrastructure Runner self-registration completed: {registration.RunnerName}");
+        return true;
+    }
+
+    private static int? GetHostMemoryMb()
+    {
+        var memInfoPath = File.Exists("/host/proc/meminfo") ? "/host/proc/meminfo" : "/proc/meminfo";
+        if (!File.Exists(memInfoPath))
+            return null;
+
+        var line = File.ReadLines(memInfoPath)
+            .FirstOrDefault(value => value.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase));
+        if (line == null)
+            return null;
+
+        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 && long.TryParse(parts[1], out var memoryKb)
+            ? (int)Math.Clamp(memoryKb / 1024, 1, int.MaxValue)
+            : null;
+    }
+
+    private static int? GetHostDiskMb()
+    {
+        try
+        {
+            var root = Directory.Exists("/host") ? "/host" : "/";
+            var drive = new DriveInfo(root);
+            return (int)Math.Clamp(drive.TotalSize / (1024L * 1024L), 1, int.MaxValue);
+        }
+        catch
+        {
+            return null;
         }
     }
 

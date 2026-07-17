@@ -10,6 +10,7 @@ public class FileStorageService
     private readonly string serverConfigFile;
     private readonly string apiKeyFile;
     private readonly string installationProfileFile;
+    private readonly string installationIdFile;
 
     public FileStorageService()
     {
@@ -32,6 +33,7 @@ public class FileStorageService
         serverConfigFile = Path.Combine(configDirectory, "server.json");
         apiKeyFile = Path.Combine(configDirectory, "api-key");
         installationProfileFile = Path.Combine(configDirectory, "installation-profile.json");
+        installationIdFile = Path.Combine(configDirectory, "installation-id");
 
         EnsureConfigDirectoryExists();
     }
@@ -92,6 +94,21 @@ public class FileStorageService
         var json = JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(installationProfileFile, json);
         TryRestrictFile(installationProfileFile);
+    }
+
+    public async Task<string> GetOrCreateInstallationIdAsync()
+    {
+        if (File.Exists(installationIdFile))
+        {
+            var existing = (await File.ReadAllTextAsync(installationIdFile)).Trim();
+            if (!string.IsNullOrWhiteSpace(existing))
+                return existing;
+        }
+
+        var installationId = $"ri_{Guid.NewGuid():N}";
+        await File.WriteAllTextAsync(installationIdFile, installationId);
+        TryRestrictFile(installationIdFile);
+        return installationId;
     }
 
     public async Task<RunnerInstallationProfile?> LoadInstallationProfileAsync()
