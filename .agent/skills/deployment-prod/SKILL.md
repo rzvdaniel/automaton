@@ -84,3 +84,62 @@ Read:
 ```txt
 .agent/harness/verification.md
 ```
+
+## Production connection and redeploy workflow
+
+When the user asks to update the live Automaton deployment, connect through the configured SSH alias:
+
+    ssh automaton
+    cd /opt/automaton
+
+The automaton account has passwordless sudo. Use sudo -n so an unattended agent never hangs waiting for a password. Production runtime directories and parts of the checkout may be root-owned.
+
+Start with read-only diagnostics:
+
+    ssh automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && sudo -n bash scripts/prod-switch-blue-green.sh status && docker compose -f docker-compose.prod.yml ps"
+
+Before pulling:
+
+- inspect tracked modifications with git diff --stat
+- preserve unrelated production changes
+- compare modified files with origin/main before deciding whether they are already upstream
+- never reset or discard a tracked production change silently
+- never stage production secrets, private keys, .env, secrets/, virtual environments, backups, or runtime state
+
+Pull only with a fast-forward:
+
+    ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+
+Selectively rebuild services based on the merged diff:
+
+    # API/backend, Infrastructure, migration, or messaging changes
+    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-api.sh"
+
+    # Studio frontend changes
+    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-studio.sh"
+
+    # Worker or messaging changes
+    ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh"
+
+    # Public website changes
+    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
+
+The API, Studio, and Website scripts use the inactive blue/green color, wait for health, verify network reachability and public warmup, switch nginx/Traefik routing, and remove the previous color after the overlap/reconnect period. The Worker script rebuilds and health-checks the single Worker container. Do not use the full-stack script when only a subset changed.
+
+For migrations, inspect affected production rows before deployment. If a migration is explicitly disposable and the user authorizes deletion of test data, delete only identified test rows before the API starts. Do not present a destructive development migration as production-safe.
+
+Finish with:
+
+    ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-verify.sh"
+
+The handoff should state the pulled commit, any local production change that was preserved or reverted, each redeployed service, successful health/cutover checks, services skipped, migration/data-safety status, and the final live colors:
+
+    Pulled main to commit <sha>
+    API redeployed to <color> and passed health/warmup checks
+    Studio redeployed to <color> and passed health/warmup checks
+    Worker rebuilt and restarted successfully
+    Website was unchanged and not redeployed
+    Live colors:
+    API: <color>
+    Studio: <color>
+    Website: <color>

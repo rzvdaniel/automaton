@@ -532,6 +532,65 @@ Rules:
 - Consider Cloudflare proxied mode when debugging.
 - Prefer read-only diagnostics before changing production scripts.
 
+### Production operations workflow
+
+The configured production server is reachable through the SSH alias "automaton" and uses:
+
+    Host: automaton
+    Checkout: /opt/automaton
+    Privilege: passwordless sudo
+
+When the user explicitly asks to update production:
+
+1. Run read-only preflight diagnostics over SSH:
+
+       ssh automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && sudo -n bash scripts/prod-switch-blue-green.sh status && docker compose -f docker-compose.prod.yml ps"
+
+2. Inspect tracked production changes before pulling. Production may contain local infrastructure changes, generated files, secrets, or test data. Never reset or discard tracked changes silently.
+
+   - If a tracked local change is already identical to origin/main, it may be reverted after confirming the upstream version.
+   - If it is not in origin/main, stop and report it before overwriting, committing, or pushing it.
+   - Never stage or commit privatekey.xml, publickey.xml, .env, secrets/, venv/, backups, database files, or other production state.
+
+3. Pull the requested revision without creating a merge commit:
+
+       ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+
+   Use sudo -n for Git/deployment operations when the production checkout or runtime directories are root-owned. Do not prompt interactively for a sudo password.
+
+4. Determine affected containers from the merged diff:
+
+   - API/backend, Infrastructure, migrations, or messaging changes: redeploy API.
+   - src/automaton-studio-vue/** changes: redeploy Studio.
+   - Worker or messaging changes: redeploy Worker.
+   - src/automaton-vue/** changes: redeploy Website.
+   - Do not rebuild unchanged services merely because a full-stack script exists.
+
+5. Run the specific production scripts from /opt/automaton/scripts:
+
+       ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-api.sh"
+       ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-studio.sh"
+       ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh"
+       ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
+
+   The scripts deploy to the inactive color, health-check and warm it, perform the cutover, and then stop the previous color after the configured overlap/reconnect period. The Worker helper may not have its executable bit on an older checkout; invoke it with bash in that case. Do not use prod-redeploy-all.sh unless API, Studio, and Website all need rebuilding.
+
+6. Run the production verification script and report the live colors:
+
+       ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-verify.sh"
+
+   Report at minimum:
+
+   - pulled commit
+   - tracked production changes preserved or reverted, with reason
+   - redeployed services and successful health/warmup/cutover checks
+   - services intentionally not redeployed
+   - live colors for API, Studio, and Website
+   - migration status and any data-safety precondition
+   - final verification result
+
+For development-stage destructive migrations, inspect affected rows before application. Delete only explicitly disposable test rows; never generalize that into production data deletion or claim production-safe conversion where none exists.
+
 ---
 
 ## 13. Planning rules
