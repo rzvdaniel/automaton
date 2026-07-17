@@ -15,9 +15,6 @@ public class HostedRunner
     public Guid UserId { get; set; }
     public virtual ApplicationUser User { get; set; } = null!;
 
-    public Guid SubscriptionPlanId { get; set; }
-    public virtual SubscriptionPlan SubscriptionPlan { get; set; } = null!;
-
     public Guid? RunnerHostId { get; set; }
     public virtual RunnerHost? RunnerHost { get; set; }
 
@@ -33,12 +30,11 @@ public class HostedRunner
     [Required, MaxLength(40)]
     public string Status { get; set; } = HostedRunnerStatuses.Pending;
 
-    [Column(TypeName = "decimal(5,2)")]
-    public decimal CpuCores { get; set; }
-
-    public int MemoryMb { get; set; }
-    public int DiskMb { get; set; }
-    public int MaxApps { get; set; }
+    public Guid HostedRunnerSpecificationId { get; set; }
+    public virtual HostedRunnerSpecification HostedRunnerSpecification { get; set; } = null!;
+    public int SpecificationRevision { get; set; }
+    public HostedRunnerSpecificationSnapshot SpecificationSnapshot { get; set; } = new();
+    public HostedRunnerSpecificationSnapshot? PendingSpecificationSnapshot { get; set; }
 
     [Required, MaxLength(160)]
     public string ContainerName { get; set; } = string.Empty;

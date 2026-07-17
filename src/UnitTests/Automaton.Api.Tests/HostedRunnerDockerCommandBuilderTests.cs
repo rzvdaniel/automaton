@@ -15,8 +15,10 @@ public class HostedRunnerDockerCommandBuilderTests
             Id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             Name = "Hosted Runner abc123",
             ContainerName = "automaton-hosted-runner-abc123",
-            CpuCores = 0.5m,
-            MemoryMb = 768
+            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                Resources = new HostedRunnerResources { CpuLimit = 0.5m, MemoryLimitMb = 768 }
+            }
         };
 
         var options = new HostedRunnerOptions
@@ -57,8 +59,10 @@ public class HostedRunnerDockerCommandBuilderTests
             Id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             Name = "Hosted Runner abc123",
             ContainerName = "automaton-hosted-runner-abc123",
-            CpuCores = 1m,
-            MemoryMb = 1024
+            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                Resources = new HostedRunnerResources { CpuLimit = 1m, MemoryLimitMb = 1024 }
+            }
         };
 
         var command = HostedRunnerDockerCommandBuilder.BuildProvisionScript(

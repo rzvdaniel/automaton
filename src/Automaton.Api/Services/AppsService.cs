@@ -22,6 +22,7 @@ public class AppsService
     private readonly IAuditEventService auditEventService;
     private readonly IApplicationEventService applicationEventService;
     private readonly BackendRouteConfigService backendRouteConfigService;
+    private readonly HostedRunnerAppCapacityService hostedRunnerAppCapacityService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -36,7 +37,8 @@ public class AppsService
         IWebHostEnvironment webHostEnvironment,
         IAuditEventService auditEventService,
         IApplicationEventService applicationEventService,
-        BackendRouteConfigService backendRouteConfigService
+        BackendRouteConfigService backendRouteConfigService,
+        HostedRunnerAppCapacityService hostedRunnerAppCapacityService
     )
     {
         this.dataContext = dataContext;
@@ -48,6 +50,7 @@ public class AppsService
         this.auditEventService = auditEventService;
         this.applicationEventService = applicationEventService;
         this.backendRouteConfigService = backendRouteConfigService;
+        this.hostedRunnerAppCapacityService = hostedRunnerAppCapacityService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -734,6 +737,12 @@ public class AppsService
         }
 
         var previousRunnerId = entity.ExecutionRunnerId;
+
+        if (executionRunnerId.HasValue)
+        {
+            await hostedRunnerAppCapacityService.AssignAsync(entity, executionRunnerId.Value);
+        }
+
         entity.ExecutionRunnerId = executionRunnerId;
         entity.Updated = DateTime.UtcNow;
 

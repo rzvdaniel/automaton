@@ -8,6 +8,9 @@ import type {
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
   UpdateRunnerHostRequest,
+  HostedRunnerSpecification,
+  HostedRunnerSpecificationRequest,
+  HostedRunnerPlatformSettings,
 } from '../types/admin.types'
 
 class AdminHostedRunnersService {
@@ -103,6 +106,46 @@ class AdminHostedRunnersService {
 
   async deleteHostedRunner(id: string): Promise<void> {
     await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`)
+  }
+
+  async getSpecifications(): Promise<HostedRunnerSpecification[]> {
+    const response = await apiClient.get<HostedRunnerSpecification[]>('/api/admin/hosted-runner-specifications')
+    return response.data
+  }
+
+  async getSpecification(id: string): Promise<HostedRunnerSpecification> {
+    const response = await apiClient.get<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}`)
+    return response.data
+  }
+
+  async createSpecification(request: HostedRunnerSpecificationRequest): Promise<HostedRunnerSpecification> {
+    const response = await apiClient.post<HostedRunnerSpecification>('/api/admin/hosted-runner-specifications', request)
+    return response.data
+  }
+
+  async updateSpecification(id: string, request: HostedRunnerSpecificationRequest): Promise<HostedRunnerSpecification> {
+    const response = await apiClient.put<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}`, request)
+    return response.data
+  }
+
+  async duplicateSpecification(id: string): Promise<HostedRunnerSpecification> {
+    const response = await apiClient.post<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}/duplicate`)
+    return response.data
+  }
+
+  async setSpecificationActive(id: string, active: boolean): Promise<HostedRunnerSpecification> {
+    const response = await apiClient.post<HostedRunnerSpecification>(`/api/admin/hosted-runner-specifications/${id}/${active ? 'activate' : 'deactivate'}`)
+    return response.data
+  }
+
+  async getSpecificationSettings(): Promise<HostedRunnerPlatformSettings> {
+    const response = await apiClient.get<HostedRunnerPlatformSettings>('/api/admin/hosted-runner-settings')
+    return response.data
+  }
+
+  async updateSpecificationSettings(request: Pick<HostedRunnerPlatformSettings, 'defaultSpecificationId' | 'provisioningEnabled'>): Promise<HostedRunnerPlatformSettings> {
+    const response = await apiClient.put<HostedRunnerPlatformSettings>('/api/admin/hosted-runner-settings', request)
+    return response.data
   }
 }
 

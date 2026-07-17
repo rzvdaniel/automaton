@@ -74,6 +74,7 @@ public static class HostedRunnerStatuses
 {
     public const string Pending = "pending";
     public const string Provisioning = "provisioning";
+    public const string Reprovisioning = "reprovisioning";
     public const string Running = "running";
     public const string Failed = "failed";
     public const string Disabled = "disabled";

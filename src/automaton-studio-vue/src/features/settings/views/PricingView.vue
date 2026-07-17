@@ -53,10 +53,8 @@ function planFeatures(plan: SubscriptionPlan): string[] {
 
   return [
     'Hosted runner included',
-    `${runner.cpuCores} vCPU`,
-    `${runner.memoryMb} MB memory`,
-    `${runner.diskMb} MB persistent disk`,
-    `Up to ${runner.maxApps} apps`,
+    'Managed resource specification',
+    'Persistent backend execution',
   ]
 }
 

@@ -57,28 +57,6 @@ public sealed class ManagedRunnerBootstrapService
             .FirstOrDefaultAsync(x => x.Id == ownerId, cancellationToken)
             ?? throw new InvalidOperationException("App owner not found.");
 
-        if (!user.SubscriptionPlanId.HasValue)
-        {
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "User plan does not include managed backend runtime.");
-        }
-
-        var plan = await dbContext.SubscriptionPlans
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == user.SubscriptionPlanId.Value && x.IsActive, cancellationToken);
-        if (plan == null)
-        {
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "User plan does not include managed backend runtime.");
-        }
-
-        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
-        if (!capabilities.Enabled)
-        {
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "User plan does not include managed backend runtime.");
-        }
-
         var hostedRunner = await dbContext.HostedRunners
             .Include(x => x.Runner)
             .FirstOrDefaultAsync(x =>
@@ -111,7 +89,7 @@ public sealed class ManagedRunnerBootstrapService
             return await GetInProgressResultAsync(appId, hostedRunner, cancellationToken);
         }
 
-        var preparation = await hostedRunnerProvisioningService.PrepareProvisioningAsync(ownerId, plan.Id, cancellationToken);
+        var preparation = await hostedRunnerProvisioningService.PrepareProvisioningAsync(ownerId, Guid.Empty, cancellationToken);
         if (!preparation.ShouldPublishProvisionRequest)
         {
             if (preparation.HostedRunner.Status == HostedRunnerStatuses.Failed)
@@ -132,7 +110,6 @@ public sealed class ManagedRunnerBootstrapService
             {
                 HostedRunnerId = preparation.HostedRunner.Id,
                 UserId = ownerId,
-                SubscriptionPlanId = plan.Id,
                 RunnerHostId = preparation.HostedRunner.RunnerHostId ?? Guid.Empty,
                 RunnerApiKey = preparation.RawApiKey ?? string.Empty
             },

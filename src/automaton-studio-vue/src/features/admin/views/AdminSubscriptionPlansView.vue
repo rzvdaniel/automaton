@@ -15,7 +15,6 @@ import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlan
 import type {
   SubscriptionPlan,
   CreateSubscriptionPlanRequest,
-  HostedRunnerCapability,
   UserPlan,
 } from '../types/admin.types'
 
@@ -42,14 +41,10 @@ const visibilityOptions = [
   { label: 'Public', value: 'public' },
 ]
 
-function defaultHostedRunner(): HostedRunnerCapability {
+function defaultHostedRunner() {
   return {
     enabled: false,
-    cpuCores: 0.5,
-    memoryMb: 768,
-    diskMb: 2048,
-    maxApps: 10,
-    visibility: 'disabled',
+    visibility: 'disabled' as const,
   }
 }
 
@@ -216,7 +211,7 @@ async function toggleHostedRunnerTestAccess(user: UserPlan) {
 function runnerSummary(plan: SubscriptionPlan) {
   const runner = plan.capabilities.hostedRunner
   if (!runner.enabled) return 'No hosted runner'
-  return `${runner.cpuCores} CPU, ${runner.memoryMb} MB, ${runner.diskMb} MB disk, ${runner.maxApps} apps`
+  return 'Hosted runtime enabled; resource limits come from the platform specification.'
 }
 </script>
 
@@ -340,24 +335,6 @@ function runnerSummary(plan: SubscriptionPlan) {
       <div class="flex align-items-center gap-2">
         <Checkbox v-model="planForm.capabilities.hostedRunner.enabled" :binary="true" input-id="runnerEnabled" />
         <label for="runnerEnabled" class="text-sm">Includes hosted runner</label>
-      </div>
-      <div class="grid">
-        <div class="col-6 flex flex-column gap-1">
-          <label class="font-medium text-sm">CPU Cores</label>
-          <InputNumber v-model="planForm.capabilities.hostedRunner.cpuCores" :min="0.1" :max="16" :min-fraction-digits="1" :max-fraction-digits="2" class="w-full" />
-        </div>
-        <div class="col-6 flex flex-column gap-1">
-          <label class="font-medium text-sm">Memory MB</label>
-          <InputNumber v-model="planForm.capabilities.hostedRunner.memoryMb" :min="128" :max="65536" class="w-full" />
-        </div>
-        <div class="col-6 flex flex-column gap-1">
-          <label class="font-medium text-sm">Disk MB</label>
-          <InputNumber v-model="planForm.capabilities.hostedRunner.diskMb" :min="256" :max="1048576" class="w-full" />
-        </div>
-        <div class="col-6 flex flex-column gap-1">
-          <label class="font-medium text-sm">Max Apps</label>
-          <InputNumber v-model="planForm.capabilities.hostedRunner.maxApps" :min="1" :max="1000" class="w-full" />
-        </div>
       </div>
       <div class="flex flex-column gap-1">
         <label class="font-medium text-sm">Visibility</label>

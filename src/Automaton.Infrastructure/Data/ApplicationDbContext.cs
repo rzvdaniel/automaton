@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using System.Text.Json;
 
 namespace Automaton.Api.Data
 {
@@ -33,6 +36,9 @@ namespace Automaton.Api.Data
         public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
+        public virtual DbSet<HostedRunnerSpecification> HostedRunnerSpecifications { get; set; }
+        public virtual DbSet<HostedRunnerSpecificationRevision> HostedRunnerSpecificationRevisions { get; set; }
+        public virtual DbSet<HostedRunnerPlatformSettings> HostedRunnerPlatformSettings { get; set; }
         public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
         public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
@@ -340,14 +346,12 @@ namespace Automaton.Api.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
-                entity.Property(e => e.CpuCores).IsRequired().HasColumnType("decimal(5,2)");
-                entity.Property(e => e.MemoryMb).IsRequired();
-                entity.Property(e => e.DiskMb).IsRequired();
-                entity.Property(e => e.MaxApps).IsRequired();
                 entity.Property(e => e.ContainerName).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.ContainerId).HasMaxLength(160);
                 entity.Property(e => e.LastError).HasMaxLength(2000);
                 entity.Property(e => e.CreatedAt).IsRequired();
+                ConfigureJson(entity.Property(e => e.SpecificationSnapshot));
+                ConfigureJson(entity.Property(e => e.PendingSpecificationSnapshot));
 
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.Status);
@@ -361,9 +365,9 @@ namespace Automaton.Api.Data
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.HasOne(e => e.SubscriptionPlan)
+                entity.HasOne(e => e.HostedRunnerSpecification)
                     .WithMany()
-                    .HasForeignKey(e => e.SubscriptionPlanId)
+                    .HasForeignKey(e => e.HostedRunnerSpecificationId)
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne(e => e.RunnerHost)
@@ -380,6 +384,38 @@ namespace Automaton.Api.Data
                     .WithMany()
                     .HasForeignKey(e => e.ApiKeyId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<HostedRunnerSpecification>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Code).IsRequired().HasMaxLength(80);
+                entity.HasIndex(e => e.Code).IsUnique();
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Description).HasMaxLength(2000);
+                ConfigureJson(entity.Property(e => e.Resources));
+            });
+
+            modelBuilder.Entity<HostedRunnerSpecificationRevision>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Description).HasMaxLength(2000);
+                ConfigureJson(entity.Property(e => e.Resources));
+                entity.HasIndex(e => new { e.SpecificationId, e.Revision }).IsUnique();
+                entity.HasOne(e => e.Specification)
+                    .WithMany(e => e.Revisions)
+                    .HasForeignKey(e => e.SpecificationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<HostedRunnerPlatformSettings>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.DefaultSpecification)
+                    .WithMany()
+                    .HasForeignKey(e => e.DefaultSpecificationId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<HostedRunnerDeployment>(entity =>
@@ -1264,6 +1300,18 @@ namespace Automaton.Api.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+        }
+
+        private static void ConfigureJson<T>(PropertyBuilder<T> property)
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            property.HasColumnType("json").HasConversion(
+                value => JsonSerializer.Serialize(value, options),
+                json => JsonSerializer.Deserialize<T>(json, options)!);
+            property.Metadata.SetValueComparer(new ValueComparer<T>(
+                (left, right) => JsonSerializer.Serialize(left, options) == JsonSerializer.Serialize(right, options),
+                value => JsonSerializer.Serialize(value, options).GetHashCode(),
+                value => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, options), options)!));
         }
 
         public void BeginTransaction()

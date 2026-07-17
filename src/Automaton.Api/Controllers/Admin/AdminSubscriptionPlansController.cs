@@ -193,7 +193,7 @@ public class AdminSubscriptionPlansController : ControllerBase
 
         if (req.PlanId.HasValue)
         {
-            await _hostedRunnerProvisioningService.EnsureHostedRunnerForUserPlanAsync(userId, req.PlanId.Value);
+            await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId);
         }
         else
         {

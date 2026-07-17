@@ -63,7 +63,7 @@ public class HostedRunnerAuditTests
                 DeploymentMode = HostedRunnerDeploymentModes.SshDocker
             });
 
-        var runner = await service.EnsureHostedRunnerForUserPlanAsync(userId, planId);
+        var runner = await service.EnsureHostedRunnerAsync(userId);
 
         Assert.That(runner, Is.Not.Null);
 
@@ -104,7 +104,7 @@ public class HostedRunnerAuditTests
                 DeploymentMode = HostedRunnerDeploymentModes.SshDocker
             });
 
-        var runner = await service.EnsureHostedRunnerForUserPlanAsync(userId, planId);
+        var runner = await service.EnsureHostedRunnerAsync(userId);
 
         Assert.That(runner, Is.Not.Null);
 
@@ -268,7 +268,7 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
-    public async Task ReprovisionAsAdminAsync_WritesFailedAuditEventWhenProvisioningCannotStart()
+    public async Task ReprovisionAsAdminAsync_IgnoresLegacyPlanHostedRunnerValues()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -280,13 +280,12 @@ public class HostedRunnerAuditTests
             userId,
             new FakeHostedRunnerRemoteCommandExecutor());
 
-        Assert.ThrowsAsync<InvalidOperationException>(() =>
-            managementService.ReprovisionAsAdminAsync(hostedRunner.Id, CancellationToken.None));
+        await managementService.ReprovisionAsAdminAsync(hostedRunner.Id, CancellationToken.None);
 
-        var failedEvent = await db.AuditEvents
-            .SingleAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionFailed);
+        var succeededEvent = await db.AuditEvents
+            .SingleAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionSucceeded);
 
-        Assert.That(failedEvent.Outcome, Is.EqualTo(AuditOutcomes.Failed));
+        Assert.That(succeededEvent.Outcome, Is.EqualTo(AuditOutcomes.Success));
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -310,10 +309,6 @@ public class HostedRunnerAuditTests
                 HostedRunner = new HostedRunnerCapability
                 {
                     Enabled = true,
-                    CpuCores = 1,
-                    MemoryMb = 1024,
-                    DiskMb = 4096,
-                    MaxApps = 3,
                     Visibility = HostedRunnerVisibility.Public
                 }
             })
@@ -383,17 +378,12 @@ public class HostedRunnerAuditTests
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            SubscriptionPlanId = effectivePlanId,
             RunnerHostId = host.Id,
             RunnerHost = host,
             RunnerId = runner.Id,
             Runner = runner,
             Name = "Hosted Runner",
             Status = HostedRunnerStatuses.Running,
-            CpuCores = 1,
-            MemoryMb = 1024,
-            DiskMb = 4096,
-            MaxApps = 3,
             ContainerName = "automaton-hosted-runner-test",
             CreatedAt = DateTime.UtcNow
         };
@@ -424,6 +414,7 @@ public class HostedRunnerAuditTests
             apiKeyService,
             new HostedRunnerRemoteCommandExecutorResolver([remoteExecutor]),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
+            new HostedRunnerSpecificationResolver(db),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
     }

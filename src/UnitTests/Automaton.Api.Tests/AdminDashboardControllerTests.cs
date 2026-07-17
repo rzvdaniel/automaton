@@ -76,39 +76,24 @@ public class AdminDashboardControllerTests
             {
                 Id = Guid.NewGuid(),
                 UserId = Guid.NewGuid(),
-                SubscriptionPlanId = Guid.NewGuid(),
                 Name = "Runner 1",
                 Status = HostedRunnerStatuses.Running,
-                CpuCores = 2,
-                MemoryMb = 2048,
-                DiskMb = 20480,
-                MaxApps = 2,
                 ContainerName = "runner-1"
             },
             new HostedRunner
             {
                 Id = Guid.NewGuid(),
                 UserId = Guid.NewGuid(),
-                SubscriptionPlanId = Guid.NewGuid(),
                 Name = "Runner 2",
                 Status = HostedRunnerStatuses.Failed,
-                CpuCores = 2,
-                MemoryMb = 2048,
-                DiskMb = 20480,
-                MaxApps = 2,
                 ContainerName = "runner-2"
             },
             new HostedRunner
             {
                 Id = Guid.NewGuid(),
                 UserId = Guid.NewGuid(),
-                SubscriptionPlanId = Guid.NewGuid(),
                 Name = "Runner 3",
                 Status = HostedRunnerStatuses.Running,
-                CpuCores = 2,
-                MemoryMb = 2048,
-                DiskMb = 20480,
-                MaxApps = 2,
                 ContainerName = "runner-3",
                 DeletedAt = now
             });

@@ -372,10 +372,6 @@ export interface PlanCapabilities {
 
 export interface HostedRunnerCapability {
   enabled: boolean
-  cpuCores: number
-  memoryMb: number
-  diskMb: number
-  maxApps: number
   visibility: 'disabled' | 'testUsersOnly' | 'public'
 }
 
@@ -553,19 +549,17 @@ export interface HostedRunner {
   id: string
   userId: string
   userEmail: string
-  subscriptionPlanId: string
-  subscriptionPlanName: string
+  hostedRunnerSpecificationId: string
+  specificationRevision: number
+  specificationSnapshot: HostedRunnerSpecificationSnapshot
+  pendingSpecificationSnapshot?: HostedRunnerSpecificationSnapshot
   runnerHostId?: string
   runnerHostName?: string
   runnerId?: string
   runnerName?: string
   apiKeyId?: string
   name: string
-  status: 'pending' | 'provisioning' | 'running' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
-  cpuCores: number
-  memoryMb: number
-  diskMb: number
-  maxApps: number
+  status: 'pending' | 'provisioning' | 'reprovisioning' | 'running' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
   containerName: string
   containerId?: string
   runtimePort?: number
@@ -582,8 +576,58 @@ export interface HostedRunner {
   latestDeployment?: HostedRunnerDeployment
 }
 
+export interface HostedRunnerResources {
+  cpuLimit: number
+  memoryLimitMb: number
+  memoryReservationMb: number
+  diskLimitMb: number
+  pidsLimit: number
+  maximumApps: number
+}
+
+export interface HostedRunnerSpecificationSnapshot {
+  schemaVersion: number
+  sourceSpecificationId: string
+  sourceSpecificationCode: string
+  sourceSpecificationName: string
+  sourceSpecificationDescription?: string
+  sourceSpecificationRevision: number
+  resources: HostedRunnerResources
+  capturedAtUtc: string
+}
+
+export interface HostedRunnerSpecification {
+  id: string
+  code: string
+  name: string
+  description?: string
+  revision: number
+  schemaVersion: number
+  isActive: boolean
+  isDefault: boolean
+  resources: HostedRunnerResources
+  runnerCount: number
+  outdatedRunnerCount: number
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface HostedRunnerSpecificationRequest {
+  name: string
+  code?: string
+  description?: string
+  isActive?: boolean
+  resources: HostedRunnerResources
+}
+
+export interface HostedRunnerPlatformSettings {
+  defaultSpecificationId: string
+  defaultSpecificationCode: string
+  provisioningEnabled: boolean
+  updatedAtUtc: string
+}
+
 export interface ProvisionHostedRunnerRequest {
-  planId?: string
 }
 
 export interface AdminAppDetails {

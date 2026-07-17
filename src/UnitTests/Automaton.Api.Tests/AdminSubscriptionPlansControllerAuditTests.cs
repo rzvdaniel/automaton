@@ -140,6 +140,7 @@ public class AdminSubscriptionPlansControllerAuditTests
             {
                 Enabled = false
             }),
+            new HostedRunnerSpecificationResolver(dbContext),
             auditEventService,
             NullLogger<HostedRunnerProvisioningService>.Instance);
 

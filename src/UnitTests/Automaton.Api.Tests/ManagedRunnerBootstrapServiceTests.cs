@@ -99,8 +99,8 @@ public class ManagedRunnerBootstrapServiceTests
         var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
         Assert.That(result.IsReady, Is.False);
-        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
-        Assert.That(result.Message, Is.EqualTo("User plan does not include managed backend runtime."));
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRunnerProvisionFailed));
+        Assert.That(result.Message, Does.Contain("could not be provisioned"));
         Assert.That(publisher.Messages, Is.Empty);
     }
 
@@ -123,6 +123,7 @@ public class ManagedRunnerBootstrapServiceTests
                 DeploymentMode = HostedRunnerDeploymentModes.SshDocker,
                 RuntimePort = 8080
             }),
+            new HostedRunnerSpecificationResolver(db),
             new NoOpAuditEventService(),
             NullLogger<HostedRunnerProvisioningService>.Instance);
 
@@ -150,7 +151,6 @@ public class ManagedRunnerBootstrapServiceTests
             UserName = $"user-{userId:N}@automaton.test",
             Email = $"user-{userId:N}@automaton.test",
             PublicUsername = $"user-{userId:N}",
-            SubscriptionPlanId = planId
         });
         db.SaveChanges();
     }
@@ -190,10 +190,6 @@ public class ManagedRunnerBootstrapServiceTests
                 HostedRunner = new HostedRunnerCapability
                 {
                     Enabled = enabled,
-                    CpuCores = enabled ? 1 : 0,
-                    MemoryMb = enabled ? 1024 : 0,
-                    DiskMb = enabled ? 4096 : 0,
-                    MaxApps = enabled ? 3 : 0,
                     Visibility = HostedRunnerVisibility.Public
                 }
             })
@@ -257,17 +253,12 @@ public class ManagedRunnerBootstrapServiceTests
         {
             Id = Guid.NewGuid(),
             UserId = ownerId,
-            SubscriptionPlanId = planId,
             RunnerHostId = host.Id,
             RunnerHost = host,
             RunnerId = runner.Id,
             Runner = runner,
             Name = "Hosted Runner",
             Status = HostedRunnerStatuses.Running,
-            CpuCores = 1,
-            MemoryMb = 1024,
-            DiskMb = 4096,
-            MaxApps = 3,
             ContainerName = "automaton-hosted-runner-test",
             RuntimeEndpoint = "http://automaton-hosted-runner-test:8001",
             CreatedAt = DateTime.UtcNow,

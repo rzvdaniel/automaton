@@ -334,7 +334,7 @@ public class StripeService
 
         try
         {
-            await _hostedRunnerProvisioningService.EnsureHostedRunnerForUserPlanAsync(userId, plan.Id);
+            await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId);
         }
         catch (Exception ex)
         {

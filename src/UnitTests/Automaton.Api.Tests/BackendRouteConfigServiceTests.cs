@@ -26,7 +26,6 @@ public class BackendRouteConfigServiceTests
         {
             Id = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
-            SubscriptionPlanId = Guid.NewGuid(),
             Name = "Hosted Runner",
             Status = "Running",
             ContainerName = "runner-a",

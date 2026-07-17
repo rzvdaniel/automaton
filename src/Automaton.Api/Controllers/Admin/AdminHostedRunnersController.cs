@@ -228,7 +228,6 @@ public class AdminHostedRunnersController : ControllerBase
             .AsNoTracking()
             .Where(x => x.DeletedAt == null)
             .Include(x => x.User)
-            .Include(x => x.SubscriptionPlan)
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
@@ -241,30 +240,11 @@ public class AdminHostedRunnersController : ControllerBase
     [HttpPost("users/{userId:guid}/provision")]
     public async Task<ActionResult<HostedRunnerResponse>> ProvisionForUser(Guid userId, ProvisionHostedRunnerRequest request, CancellationToken cancellationToken)
     {
-        var planId = request.PlanId;
-        if (planId == null)
-        {
-            planId = await db.Users
-                .Where(x => x.Id == userId)
-                .Select(x => x.SubscriptionPlanId)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
-        if (planId == null)
-        {
-            return BadRequest("User has no subscription plan.");
-        }
-
-        var hostedRunner = await provisioningService.EnsureHostedRunnerForUserPlanAsync(userId, planId.Value, cancellationToken);
-        if (hostedRunner == null)
-        {
-            return BadRequest("The selected plan does not include hosted runners.");
-        }
+        var hostedRunner = await provisioningService.EnsureHostedRunnerAsync(userId, cancellationToken);
 
         var responseRunner = await db.HostedRunners
             .AsNoTracking()
             .Include(x => x.User)
-            .Include(x => x.SubscriptionPlan)
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
@@ -300,7 +280,6 @@ public class AdminHostedRunnersController : ControllerBase
         var runner = await db.HostedRunners
             .AsNoTracking()
             .Include(x => x.User)
-            .Include(x => x.SubscriptionPlan)
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
@@ -341,13 +320,13 @@ public class AdminHostedRunnersController : ControllerBase
             IsSchedulingEligible = host.IsSchedulingEligible,
             TotalCpuCores = host.TotalCpuCores,
             ReservedCpuCores = host.ReservedCpuCores,
-            UsedCpuCores = assigned.Sum(x => x.CpuCores),
+            UsedCpuCores = assigned.Sum(x => x.SpecificationSnapshot.Resources.CpuLimit),
             TotalMemoryMb = host.TotalMemoryMb,
             ReservedMemoryMb = host.ReservedMemoryMb,
-            UsedMemoryMb = assigned.Sum(x => x.MemoryMb),
+            UsedMemoryMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.MemoryLimitMb),
             TotalDiskMb = host.TotalDiskMb,
             ReservedDiskMb = host.ReservedDiskMb,
-            UsedDiskMb = assigned.Sum(x => x.DiskMb),
+            UsedDiskMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.DiskLimitMb),
             HostedRunnerCount = assigned.Count,
             CreatedAt = host.CreatedAt,
             UpdatedAt = host.UpdatedAt,
@@ -424,8 +403,10 @@ public class AdminHostedRunnersController : ControllerBase
             Id = runner.Id,
             UserId = runner.UserId,
             UserEmail = runner.User.Email ?? string.Empty,
-            SubscriptionPlanId = runner.SubscriptionPlanId,
-            SubscriptionPlanName = runner.SubscriptionPlan.Name,
+            HostedRunnerSpecificationId = runner.HostedRunnerSpecificationId,
+            SpecificationRevision = runner.SpecificationRevision,
+            SpecificationSnapshot = runner.SpecificationSnapshot,
+            PendingSpecificationSnapshot = runner.PendingSpecificationSnapshot,
             RunnerHostId = runner.RunnerHostId,
             RunnerHostName = runner.RunnerHost?.Name,
             RunnerId = runner.RunnerId,
@@ -433,10 +414,6 @@ public class AdminHostedRunnersController : ControllerBase
             ApiKeyId = runner.ApiKeyId,
             Name = runner.Name,
             Status = runner.Status,
-            CpuCores = runner.CpuCores,
-            MemoryMb = runner.MemoryMb,
-            DiskMb = runner.DiskMb,
-            MaxApps = runner.MaxApps,
             ContainerName = runner.ContainerName,
             ContainerId = runner.ContainerId,
             RuntimePort = runner.RuntimePort,
@@ -540,8 +517,10 @@ public record HostedRunnerResponse
     public Guid Id { get; init; }
     public Guid UserId { get; init; }
     public string UserEmail { get; init; } = string.Empty;
-    public Guid SubscriptionPlanId { get; init; }
-    public string SubscriptionPlanName { get; init; } = string.Empty;
+    public Guid HostedRunnerSpecificationId { get; init; }
+    public int SpecificationRevision { get; init; }
+    public HostedRunnerSpecificationSnapshot SpecificationSnapshot { get; init; } = new();
+    public HostedRunnerSpecificationSnapshot? PendingSpecificationSnapshot { get; init; }
     public Guid? RunnerHostId { get; init; }
     public string? RunnerHostName { get; init; }
     public Guid? RunnerId { get; init; }
@@ -549,10 +528,6 @@ public record HostedRunnerResponse
     public Guid? ApiKeyId { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
-    public decimal CpuCores { get; init; }
-    public int MemoryMb { get; init; }
-    public int DiskMb { get; init; }
-    public int MaxApps { get; init; }
     public string ContainerName { get; init; } = string.Empty;
     public string? ContainerId { get; init; }
     public int? RuntimePort { get; init; }
@@ -583,5 +558,4 @@ public record HostedRunnerDeploymentResponse
 
 public record ProvisionHostedRunnerRequest
 {
-    public Guid? PlanId { get; init; }
 }

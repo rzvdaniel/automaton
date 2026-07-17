@@ -23,7 +23,8 @@ public static class HostedRunnerDockerCommandBuilder
 
     private static string BuildSshDockerProvisionScript(HostedRunner runner, HostedRunnerOptions options, string apiKey)
     {
-        var cpu = runner.CpuCores.ToString("0.##", CultureInfo.InvariantCulture);
+        var resources = runner.PendingSpecificationSnapshot?.Resources ?? runner.SpecificationSnapshot.Resources;
+        var cpu = resources.CpuLimit.ToString("0.##", CultureInfo.InvariantCulture);
         var dataRoot = TrimTrailingSlash(options.DataRoot);
         var runnerRoot = $"{dataRoot}/{runner.Id}";
         var dataVolumeName = BuildWorkspaceVolumeName(runner);
@@ -34,7 +35,9 @@ public static class HostedRunnerDockerCommandBuilder
             $"--name {ShellQuote(runner.ContainerName)}",
             "--restart unless-stopped",
             $"--cpus {ShellQuote(cpu)}",
-            $"--memory {ShellQuote($"{runner.MemoryMb}m")}",
+            $"--memory {ShellQuote($"{resources.MemoryLimitMb}m")}",
+            $"--memory-reservation {ShellQuote($"{resources.MemoryReservationMb}m")}",
+            $"--pids-limit {ShellQuote(resources.PidsLimit.ToString(CultureInfo.InvariantCulture))}",
             $"--network {ShellQuote(options.DockerNetwork)}",
             $"-e AUTOMATON_SERVER_URL={ShellQuote(options.ServerUrl)}",
             $"-e AUTOMATON_API_KEY={ShellQuote(apiKey)}",
@@ -82,7 +85,8 @@ public static class HostedRunnerDockerCommandBuilder
 
     private static string BuildLocalDockerProvisionScript(HostedRunner runner, HostedRunnerOptions options, string apiKey)
     {
-        var cpu = runner.CpuCores.ToString("0.##", CultureInfo.InvariantCulture);
+        var resources = runner.PendingSpecificationSnapshot?.Resources ?? runner.SpecificationSnapshot.Resources;
+        var cpu = resources.CpuLimit.ToString("0.##", CultureInfo.InvariantCulture);
         var configVolumeName = BuildConfigVolumeName(runner);
         var workspaceVolumeName = BuildWorkspaceVolumeName(runner);
         var logsVolumeName = BuildLogsVolumeName(runner);
@@ -93,7 +97,9 @@ public static class HostedRunnerDockerCommandBuilder
             $"--name {ShellQuote(runner.ContainerName)}",
             "--restart unless-stopped",
             $"--cpus {ShellQuote(cpu)}",
-            $"--memory {ShellQuote($"{runner.MemoryMb}m")}",
+            $"--memory {ShellQuote($"{resources.MemoryLimitMb}m")}",
+            $"--memory-reservation {ShellQuote($"{resources.MemoryReservationMb}m")}",
+            $"--pids-limit {ShellQuote(resources.PidsLimit.ToString(CultureInfo.InvariantCulture))}",
             $"--network {ShellQuote(options.DockerNetwork)}",
             $"-e AUTOMATON_SERVER_URL={ShellQuote(options.ServerUrl)}",
             $"-e AUTOMATON_API_KEY={ShellQuote(apiKey)}",

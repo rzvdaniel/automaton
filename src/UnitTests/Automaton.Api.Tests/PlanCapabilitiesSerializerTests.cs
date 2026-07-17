@@ -13,10 +13,6 @@ public class PlanCapabilitiesSerializerTests
         {
             Assert.That(capabilities.Version, Is.EqualTo(1));
             Assert.That(capabilities.HostedRunner.Enabled, Is.False);
-            Assert.That(capabilities.HostedRunner.CpuCores, Is.EqualTo(0.5m));
-            Assert.That(capabilities.HostedRunner.MemoryMb, Is.EqualTo(768));
-            Assert.That(capabilities.HostedRunner.DiskMb, Is.EqualTo(2048));
-            Assert.That(capabilities.HostedRunner.MaxApps, Is.EqualTo(10));
             Assert.That(capabilities.HostedRunner.Visibility, Is.EqualTo(HostedRunnerVisibility.Disabled));
         });
     }
@@ -29,10 +25,6 @@ public class PlanCapabilitiesSerializerTests
             HostedRunner = new HostedRunnerCapability
             {
                 Enabled = true,
-                CpuCores = 1.5m,
-                MemoryMb = 2048,
-                DiskMb = 8192,
-                MaxApps = 25,
                 Visibility = HostedRunnerVisibility.TestUsersOnly
             }
         };
@@ -43,10 +35,6 @@ public class PlanCapabilitiesSerializerTests
         Assert.Multiple(() =>
         {
             Assert.That(capabilities.HostedRunner.Enabled, Is.True);
-            Assert.That(capabilities.HostedRunner.CpuCores, Is.EqualTo(1.5m));
-            Assert.That(capabilities.HostedRunner.MemoryMb, Is.EqualTo(2048));
-            Assert.That(capabilities.HostedRunner.DiskMb, Is.EqualTo(8192));
-            Assert.That(capabilities.HostedRunner.MaxApps, Is.EqualTo(25));
             Assert.That(capabilities.HostedRunner.Visibility, Is.EqualTo(HostedRunnerVisibility.TestUsersOnly));
         });
     }

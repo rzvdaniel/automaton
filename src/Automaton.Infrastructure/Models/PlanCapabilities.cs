@@ -14,10 +14,6 @@ public sealed class PlanCapabilities
 public sealed class HostedRunnerCapability
 {
     public bool Enabled { get; set; }
-    public decimal CpuCores { get; set; } = 0.5m;
-    public int MemoryMb { get; set; } = 768;
-    public int DiskMb { get; set; } = 2048;
-    public int MaxApps { get; set; } = 10;
     public string Visibility { get; set; } = HostedRunnerVisibility.Disabled;
 }
 
@@ -78,10 +74,6 @@ public static class PlanCapabilitiesSerializer
         capabilities.HostedRunner ??= new HostedRunnerCapability();
 
         var runner = capabilities.HostedRunner;
-        runner.CpuCores = runner.CpuCores <= 0 ? 0.5m : runner.CpuCores;
-        runner.MemoryMb = runner.MemoryMb <= 0 ? 768 : runner.MemoryMb;
-        runner.DiskMb = runner.DiskMb <= 0 ? 2048 : runner.DiskMb;
-        runner.MaxApps = runner.MaxApps <= 0 ? 10 : runner.MaxApps;
         runner.Visibility = HostedRunnerVisibility.IsValid(runner.Visibility)
             ? runner.Visibility
             : HostedRunnerVisibility.Disabled;

@@ -381,6 +381,7 @@ services.AddSingleton<RuntimeCookieService>();
 services.AddScoped<BackendRouteConfigService>();
 services.AddScoped<ManagedRunnerBootstrapService>();
 services.AddScoped<ManagedRunnerAppAssignmentService>();
+services.AddScoped<HostedRunnerAppCapacityService>();
 
 // Register email service implementation based on environment and configuration.
 var useNoOpEmail = applicationBuilder.Environment.IsDevelopment() && !configurationService.EmailConfig.SendEmailsInDevelopment;
@@ -417,6 +418,7 @@ services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
 services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
 services.AddScoped<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 services.AddScoped<HostedRunnerProvisioningService>();
+services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
 services.AddScoped<HostedRunnerManagementService>();
 services.AddScoped<InfrastructureWorkflowExecutionService>();
 services.AddScoped<LocalRunnerHostBootstrapService>();

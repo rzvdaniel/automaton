@@ -20,7 +20,6 @@ import type {
   RunnerEnrollment,
   InfrastructureRunnerEnrollmentKey,
   RunnerHost,
-  SubscriptionPlan,
   UserPlan,
   InfrastructureWorkflowExecution,
   InfrastructureWorkflowExecutionLog,
@@ -64,9 +63,7 @@ const validationLogs = ref<InfrastructureWorkflowExecutionLog[]>([])
 const provisionDialogVisible = ref(false)
 const provisioningNewRunner = ref(false)
 const users = ref<UserPlan[]>([])
-const plans = ref<SubscriptionPlan[]>([])
 const selectedProvisionUserId = ref<string | null>(null)
-const selectedProvisionPlanId = ref<string | null>(null)
 const runnerDetailsVisible = computed({
   get: () => selectedRunner.value !== null,
   set: (visible: boolean) => {
@@ -91,21 +88,10 @@ const runtimeConnectivityOptions = [
   { label: 'Local Docker network', value: 'localDockerNetwork' },
 ] as const
 
-const provisionablePlans = computed(() =>
-  plans.value.filter((plan) => plan.isActive && plan.capabilities.hostedRunner.enabled),
-)
-
 const userOptions = computed(() =>
   users.value.map((user) => ({
     label: user.name ? `${user.name} (${user.email})` : user.email,
     value: user.userId,
-  })),
-)
-
-const planOptions = computed(() =>
-  provisionablePlans.value.map((plan) => ({
-    label: `${plan.name} - ${plan.capabilities.hostedRunner.cpuCores} CPU, ${formatMb(plan.capabilities.hostedRunner.memoryMb)}`,
-    value: plan.id,
   })),
 )
 
@@ -208,12 +194,8 @@ async function pollHostedRunnerUntilRunning(hostedRunnerId: string) {
 async function loadProvisioningOptions() {
   loadingProvisioningOptions.value = true
   try {
-    const [loadedUsers, loadedPlans] = await Promise.all([
-      adminSubscriptionPlansService.getUsers(),
-      adminSubscriptionPlansService.getPlans(),
-    ])
+    const loadedUsers = await adminSubscriptionPlansService.getUsers()
     users.value = loadedUsers
-    plans.value = loadedPlans
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load users or plans', life: 3000 })
   } finally {
@@ -388,7 +370,7 @@ async function revokeInfrastructureRunner(host: RunnerHost) {
 async function retryProvisioning(runner: HostedRunner) {
   provisioningUserId.value = runner.userId
   try {
-    await adminHostedRunnersService.provisionForUser(runner.userId, { planId: runner.subscriptionPlanId })
+    await adminHostedRunnersService.provisionForUser(runner.userId)
     toast.add({ severity: 'success', summary: 'Provisioning requested', detail: 'Hosted runner deployment was queued again.', life: 3000 })
     await refreshAll()
   } catch {
@@ -473,19 +455,16 @@ async function confirmDeleteHostedRunner(runner: HostedRunner) {
 
 async function openProvisionDialog() {
   selectedProvisionUserId.value = null
-  selectedProvisionPlanId.value = null
   provisionDialogVisible.value = true
   await loadProvisioningOptions()
 }
 
 async function provisionHostedRunner() {
-  if (!selectedProvisionUserId.value || !selectedProvisionPlanId.value) return
+  if (!selectedProvisionUserId.value) return
 
   provisioningNewRunner.value = true
   try {
-    await adminHostedRunnersService.provisionForUser(selectedProvisionUserId.value, {
-      planId: selectedProvisionPlanId.value,
-    })
+    await adminHostedRunnersService.provisionForUser(selectedProvisionUserId.value)
     toast.add({
       severity: 'success',
       summary: 'Provisioning requested',
@@ -771,7 +750,6 @@ onMounted(refreshAll)
       <template #content>
         <DataTable :value="hostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
           <Column field="userEmail" header="User" />
-          <Column field="subscriptionPlanName" header="Plan" />
           <Column field="name" header="Runner" />
           <Column field="runnerHostName" header="Host" />
           <Column header="Status">
@@ -780,7 +758,7 @@ onMounted(refreshAll)
             </template>
           </Column>
           <Column header="Resources">
-            <template #body="{ data }">{{ data.cpuCores }} CPU, {{ formatMb(data.memoryMb) }}, {{ formatMb(data.diskMb) }}</template>
+            <template #body="{ data }">{{ data.specificationSnapshot.resources.cpuLimit }} CPU, {{ formatMb(data.specificationSnapshot.resources.memoryLimitMb) }}, {{ formatMb(data.specificationSnapshot.resources.diskLimitMb) }}</template>
           </Column>
           <Column field="containerName" header="Container" />
           <Column header="Runtime port">
@@ -851,18 +829,6 @@ onMounted(refreshAll)
             :loading="loadingProvisioningOptions"
           />
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-2">Hosted runner plan</label>
-          <Select
-            v-model="selectedProvisionPlanId"
-            :options="planOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-            placeholder="Select a plan"
-            :loading="loadingProvisioningOptions"
-          />
-        </div>
         <div class="text-color-secondary text-sm">
           This uses the same provisioning endpoint as plan assignment and Stripe-driven subscriptions, but lets admins run the first smoke test directly.
         </div>
@@ -872,7 +838,7 @@ onMounted(refreshAll)
         <Button
           label="Provision"
           icon="pi pi-play"
-          :disabled="!selectedProvisionUserId || !selectedProvisionPlanId"
+          :disabled="!selectedProvisionUserId"
           :loading="provisioningNewRunner"
           @click="provisionHostedRunner"
         />

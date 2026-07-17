@@ -19,6 +19,7 @@ public class HostedRunnerProvisioningService
     [
         HostedRunnerStatuses.Pending,
         HostedRunnerStatuses.Provisioning,
+        HostedRunnerStatuses.Reprovisioning,
         HostedRunnerStatuses.Running
     ];
 
@@ -26,6 +27,7 @@ public class HostedRunnerProvisioningService
     private readonly ApiKeyService apiKeyService;
     private readonly IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver;
     private readonly HostedRunnerOptions options;
+    private readonly IHostedRunnerSpecificationResolver specificationResolver;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
 
@@ -34,6 +36,7 @@ public class HostedRunnerProvisioningService
         ApiKeyService apiKeyService,
         IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
         IOptionsSnapshot<HostedRunnerOptions> options,
+        IHostedRunnerSpecificationResolver specificationResolver,
         IAuditEventService auditEventService,
         ILogger<HostedRunnerProvisioningService> logger)
     {
@@ -41,6 +44,7 @@ public class HostedRunnerProvisioningService
         this.apiKeyService = apiKeyService;
         this.remoteCommandExecutorResolver = remoteCommandExecutorResolver;
         this.options = options.Value;
+        this.specificationResolver = specificationResolver;
         this.auditEventService = auditEventService;
         this.logger = logger;
     }
@@ -51,18 +55,13 @@ public class HostedRunnerProvisioningService
         CancellationToken cancellationToken = default,
         bool forceProvision = false)
     {
-        var plan = await db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == planId && p.IsActive, cancellationToken);
-        if (plan == null)
+        var platformSettings = await db.HostedRunnerPlatformSettings.AsNoTracking().SingleOrDefaultAsync(cancellationToken)
+            ?? new HostedRunnerPlatformSettings { ProvisioningEnabled = true };
+        if (!platformSettings.ProvisioningEnabled)
         {
-            throw new InvalidOperationException("Subscription plan not found.");
+            throw new InvalidOperationException("Hosted runner provisioning is paused by platform settings.");
         }
-
-        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
-        if (!capabilities.Enabled)
-        {
-            await DisableHostedRunnersForUserAsync(userId, "Assigned plan does not include a hosted runner.", cancellationToken);
-            throw new InvalidOperationException("User plan does not include managed backend runtime.");
-        }
+        var specification = await specificationResolver.ResolveAsync(userId, cancellationToken);
 
         var hostedRunner = await db.HostedRunners
             .Include(x => x.Runner)
@@ -85,11 +84,13 @@ public class HostedRunnerProvisioningService
         }
 
         var previousHostId = hostedRunner.RunnerHostId;
-        hostedRunner.SubscriptionPlanId = plan.Id;
-        hostedRunner.CpuCores = capabilities.CpuCores;
-        hostedRunner.MemoryMb = capabilities.MemoryMb;
-        hostedRunner.DiskMb = capabilities.DiskMb;
-        hostedRunner.MaxApps = capabilities.MaxApps;
+        var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
+        if (createdHostedRunner)
+        {
+            hostedRunner.HostedRunnerSpecificationId = specification.Id;
+            hostedRunner.SpecificationRevision = specification.Revision;
+            hostedRunner.SpecificationSnapshot = requestedSnapshot;
+        }
         hostedRunner.UpdatedAt = now;
 
         IDbContextTransaction? capacityTransaction = null;
@@ -102,7 +103,10 @@ public class HostedRunnerProvisioningService
 
         try
         {
-            var host = await SelectHostAsync(capabilities, cancellationToken);
+            var host = await SelectHostAsync(
+                requestedSnapshot.Resources,
+                createdHostedRunner ? null : hostedRunner.Id,
+                cancellationToken);
             if (host == null)
             {
                 hostedRunner.Status = HostedRunnerStatuses.Failed;
@@ -150,6 +154,12 @@ public class HostedRunnerProvisioningService
                 return new HostedRunnerPreparationResult(hostedRunner, null, false);
             }
 
+            if (!createdHostedRunner)
+            {
+                hostedRunner.PendingSpecificationSnapshot = requestedSnapshot;
+                hostedRunner.Status = HostedRunnerStatuses.Reprovisioning;
+            }
+
             var rawApiKey = await EnsureProvisioningApiKeyAsync(hostedRunner, userId, cancellationToken);
             hostedRunner.Status = options.Enabled
                 ? HostedRunnerStatuses.Provisioning
@@ -170,11 +180,9 @@ public class HostedRunnerProvisioningService
                     hostedRunner.Status,
                     hostedRunner.RunnerHostId,
                     RunnerHostName = host.Name,
-                    hostedRunner.SubscriptionPlanId,
-                    hostedRunner.CpuCores,
-                    hostedRunner.MemoryMb,
-                    hostedRunner.DiskMb,
-                    hostedRunner.MaxApps,
+                    hostedRunner.HostedRunnerSpecificationId,
+                    hostedRunner.SpecificationRevision,
+                    Resources = requestedSnapshot.Resources,
                     DeploymentMode = options.DeploymentMode,
                     IsProvisioningEnabled = options.Enabled
                 }
@@ -206,22 +214,9 @@ public class HostedRunnerProvisioningService
         }
     }
 
-    public async Task<HostedRunner?> EnsureHostedRunnerForUserPlanAsync(Guid userId, Guid planId, CancellationToken cancellationToken = default)
+    public async Task<HostedRunner?> EnsureHostedRunnerAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var plan = await db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == planId && p.IsActive, cancellationToken);
-        if (plan == null)
-        {
-            throw new InvalidOperationException("Subscription plan not found.");
-        }
-
-        var capabilities = PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
-        if (!capabilities.Enabled)
-        {
-            await DisableHostedRunnersForUserAsync(userId, "Assigned plan does not include a hosted runner.", cancellationToken);
-            return null;
-        }
-
-        var preparation = await PrepareProvisioningAsync(userId, planId, cancellationToken, forceProvision: true);
+        var preparation = await PrepareProvisioningAsync(userId, Guid.Empty, cancellationToken, forceProvision: true);
         var hostedRunner = preparation.HostedRunner;
         var host = hostedRunner.RunnerHostId.HasValue
             ? await db.RunnerHosts
@@ -230,7 +225,7 @@ public class HostedRunnerProvisioningService
             : null;
         if (!preparation.ShouldPublishProvisionRequest)
         {
-            return hostedRunner;
+            return hostedRunner.Status == HostedRunnerStatuses.Failed ? null : hostedRunner;
         }
 
         if (!options.Enabled)
@@ -306,6 +301,13 @@ public class HostedRunnerProvisioningService
         }
 
         hostedRunner.ContainerId = executionResult.ContainerId;
+        if (hostedRunner.PendingSpecificationSnapshot != null)
+        {
+            hostedRunner.SpecificationSnapshot = hostedRunner.PendingSpecificationSnapshot;
+            hostedRunner.HostedRunnerSpecificationId = hostedRunner.SpecificationSnapshot.SourceSpecificationId;
+            hostedRunner.SpecificationRevision = hostedRunner.SpecificationSnapshot.SourceSpecificationRevision;
+            hostedRunner.PendingSpecificationSnapshot = null;
+        }
         hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         CompleteDeployment(
@@ -344,7 +346,10 @@ public class HostedRunnerProvisioningService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<RunnerHost?> SelectHostAsync(HostedRunnerCapability requested, CancellationToken cancellationToken)
+    private async Task<RunnerHost?> SelectHostAsync(
+        HostedRunnerResources requested,
+        Guid? excludedHostedRunnerId,
+        CancellationToken cancellationToken)
     {
         var hosts = await db.RunnerHosts
             .AsNoTracking()
@@ -387,10 +392,13 @@ public class HostedRunnerProvisioningService
                 continue;
             }
 
-            var assigned = host.HostedRunners.Where(r => OccupyingStatuses.Contains(r.Status) && r.DeletedAt == null);
-            if (host.ReservedCpuCores + assigned.Sum(r => r.CpuCores) + requested.CpuCores <= host.TotalCpuCores
-                && host.ReservedMemoryMb + assigned.Sum(r => r.MemoryMb) + requested.MemoryMb <= host.TotalMemoryMb
-                && host.ReservedDiskMb + assigned.Sum(r => r.DiskMb) + requested.DiskMb <= host.TotalDiskMb)
+            var assigned = host.HostedRunners.Where(r =>
+                r.Id != excludedHostedRunnerId &&
+                OccupyingStatuses.Contains(r.Status) &&
+                r.DeletedAt == null);
+            if (host.ReservedCpuCores + assigned.Sum(r => r.SpecificationSnapshot.Resources.CpuLimit) + requested.CpuLimit <= host.TotalCpuCores
+                && host.ReservedMemoryMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb
+                && host.ReservedDiskMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.DiskLimitMb) + requested.DiskLimitMb <= host.TotalDiskMb)
             {
                 return host;
             }
@@ -605,7 +613,7 @@ public class HostedRunnerProvisioningService
                     hostedRunner.RunnerId,
                     hostedRunner.RunnerHostId,
                     RunnerHostName = runnerHostName,
-                    hostedRunner.SubscriptionPlanId,
+                    hostedRunner.HostedRunnerSpecificationId,
                     hostedRunner.ContainerName,
                     hostedRunner.ContainerId,
                     FailureSummary = failureSummary

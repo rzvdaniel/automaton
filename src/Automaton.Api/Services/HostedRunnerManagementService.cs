@@ -298,11 +298,6 @@ public class HostedRunnerManagementService
 
     private async Task<HostedRunner> ReprovisionCoreAsync(HostedRunner hostedRunner, CancellationToken cancellationToken)
     {
-        if (hostedRunner.SubscriptionPlanId == Guid.Empty)
-        {
-            throw new InvalidOperationException("Hosted runner has no subscription plan.");
-        }
-
         await auditEventService.WriteAsync(
             new AuditEventWriteRequest
             {
@@ -318,7 +313,7 @@ public class HostedRunnerManagementService
                     hostedRunner.Status,
                     hostedRunner.RunnerId,
                     hostedRunner.RunnerHostId,
-                    hostedRunner.SubscriptionPlanId,
+                    hostedRunner.HostedRunnerSpecificationId,
                     hostedRunner.ContainerName
                 }
             },
@@ -343,9 +338,8 @@ public class HostedRunnerManagementService
 
         await db.SaveChangesAsync(cancellationToken);
 
-        var reprovisioned = await provisioningService.EnsureHostedRunnerForUserPlanAsync(
+        var reprovisioned = await provisioningService.EnsureHostedRunnerAsync(
             hostedRunner.UserId,
-            hostedRunner.SubscriptionPlanId,
             cancellationToken);
 
         if (reprovisioned == null)
@@ -365,7 +359,7 @@ public class HostedRunnerManagementService
                         hostedRunner.Name,
                         hostedRunner.RunnerId,
                         hostedRunner.RunnerHostId,
-                        hostedRunner.SubscriptionPlanId
+                        hostedRunner.HostedRunnerSpecificationId
                     }
                 },
                 cancellationToken);
@@ -387,7 +381,7 @@ public class HostedRunnerManagementService
                     reprovisioned.Name,
                     reprovisioned.RunnerId,
                     reprovisioned.RunnerHostId,
-                    reprovisioned.SubscriptionPlanId,
+                    reprovisioned.HostedRunnerSpecificationId,
                     reprovisioned.Status
                 }
             },
