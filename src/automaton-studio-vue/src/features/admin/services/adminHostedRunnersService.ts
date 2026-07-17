@@ -23,6 +23,17 @@ class AdminHostedRunnersService {
     return response.data
   }
 
+  async getInfrastructureRunnerEnrollmentKeys(): Promise<InfrastructureRunnerEnrollmentKey[]> {
+    const response = await apiClient.get<InfrastructureRunnerEnrollmentKey[]>(
+      '/api/admin/hosted-runners/infrastructure-runner/enrollment-keys',
+    )
+    return response.data
+  }
+
+  async revokeInfrastructureRunnerEnrollmentKey(id: string): Promise<void> {
+    await apiClient.delete(`/api/admin/hosted-runners/infrastructure-runner/enrollment-keys/${id}`)
+  }
+
   async updateHost(id: string, request: UpdateRunnerHostRequest): Promise<RunnerHost> {
     const response = await apiClient.put<RunnerHost>(`/api/admin/hosted-runners/hosts/${id}`, request)
     return response.data

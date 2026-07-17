@@ -268,6 +268,45 @@ public class ApiKeyService
         return true;
     }
 
+    public Task<List<ApiKey>> GetInfrastructureRunnerEnrollmentKeysAsync(CancellationToken cancellationToken = default)
+        => dbContext.ApiKeys
+            .Where(x => x.Scope == ApiKeyScope.InfrastructureRunnerEnroll)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+    public async Task<bool> RevokeInfrastructureRunnerEnrollmentKeyAsync(
+        Guid apiKeyId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var key = await dbContext.ApiKeys
+            .FirstOrDefaultAsync(x => x.Id == apiKeyId
+                && x.Scope == ApiKeyScope.InfrastructureRunnerEnroll,
+                cancellationToken);
+        if (key == null)
+            return false;
+
+        if (key.IsActive)
+        {
+            key.IsActive = false;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await auditEventService.WriteAsync(new AuditEventWriteRequest
+            {
+                Action = AuditActions.Disabled,
+                EntityType = AuditEntityTypes.ApiKey,
+                EntityId = key.Id,
+                EventType = AuditEventTypes.ApiKeyDeleted,
+                Message = $"Infrastructure Runner enrollment key '{key.Name}' was revoked.",
+                Outcome = AuditOutcomes.Success,
+                ActorUserId = userId,
+                Metadata = new { key.KeyPrefix, key.Scope, key.ExpiresAt }
+            }, cancellationToken);
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Get the user's active WebApp-scoped API key for flow execution from web apps
     /// </summary>

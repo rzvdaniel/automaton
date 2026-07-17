@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Core.Enums;
 
 namespace Automaton.Api.Tests;
 
@@ -117,6 +118,34 @@ public class ApiKeyServiceTests
         Assert.That(auditEvent.MetadataJson, Does.Not.Contain(apiKey));
         Assert.That(auditEvent.MetadataJson, Does.Not.Contain(entity.HashedKey));
         Assert.That(auditEvent.MetadataJson, Does.Contain("[REDACTED]"));
+    }
+
+    [Test]
+    public async Task RevokeInfrastructureRunnerEnrollmentKey_DeactivatesKeyWithoutDeletingHistory()
+    {
+        using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var httpContextAccessor = CreateHttpContextAccessor(userId, "admin@automaton.test");
+        var userContextService = new UserContextService(httpContextAccessor);
+        IAuditEventService auditEventService = new AuditEventService(dbContext, userContextService, httpContextAccessor);
+        var service = new ApiKeyService(
+            dbContext,
+            NullLogger<ApiKeyService>.Instance,
+            authorizationService: null!,
+            auditEventService);
+
+        var (_, entity) = await service.CreateApiKeyAsync(
+            userId,
+            "Infrastructure enrollment",
+            scope: ApiKeyScope.InfrastructureRunnerEnroll,
+            maximumUses: 1);
+
+        Assert.That(await service.RevokeInfrastructureRunnerEnrollmentKeyAsync(entity.Id, userId), Is.True);
+
+        var stored = await dbContext.ApiKeys.SingleAsync(x => x.Id == entity.Id);
+        Assert.That(stored.IsActive, Is.False);
+        Assert.That(await dbContext.ApiKeys.CountAsync(), Is.EqualTo(1));
+        Assert.That(await dbContext.AuditEvents.AnyAsync(x => x.EntityId == entity.Id && x.Action == "Disabled"), Is.True);
     }
 
     private static ApplicationDbContext CreateDbContext()

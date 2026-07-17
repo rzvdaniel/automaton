@@ -38,5 +38,10 @@ public sealed class InfrastructureRunnerEnrollmentKeyResponse
     public string ApiKey { get; init; } = string.Empty;
     public string KeyPrefix { get; init; } = string.Empty;
     public DateTime ExpiresAtUtc { get; init; }
+    public DateTime CreatedAtUtc { get; init; }
+    public DateTime? UsedAtUtc { get; init; }
+    public int UseCount { get; init; }
     public int MaximumUses { get; init; } = 1;
+    public bool IsActive { get; init; }
+    public string Status { get; init; } = "Pending";
 }

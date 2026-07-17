@@ -504,10 +504,15 @@ export interface RunnerEnrollment {
 
 export interface InfrastructureRunnerEnrollmentKey {
   id: string
-  apiKey: string
+  apiKey?: string
   keyPrefix: string
   expiresAtUtc: string
+  createdAtUtc: string
+  usedAtUtc?: string | null
+  useCount: number
   maximumUses: number
+  isActive: boolean
+  status: 'Pending' | 'Consumed' | 'Expired' | 'Revoked' | string
 }
 
 export interface InfrastructureWorkflowExecution {

@@ -59,8 +59,41 @@ public class AdminHostedRunnersController : ControllerBase
             Id = entity.Id,
             ApiKey = rawKey,
             KeyPrefix = entity.KeyPrefix,
-            ExpiresAtUtc = expiresAt
+            ExpiresAtUtc = expiresAt,
+            CreatedAtUtc = entity.CreatedAt,
+            Status = "Pending",
+            IsActive = entity.IsActive,
+            MaximumUses = entity.MaximumUses ?? 1
         });
+    }
+
+    [HttpGet("infrastructure-runner/enrollment-keys")]
+    public async Task<ActionResult<IEnumerable<InfrastructureRunnerEnrollmentKeyResponse>>> GetInfrastructureRunnerEnrollmentKeys(
+        CancellationToken cancellationToken)
+    {
+        var keys = await apiKeyService.GetInfrastructureRunnerEnrollmentKeysAsync(cancellationToken);
+        return Ok(keys.Select(key => new InfrastructureRunnerEnrollmentKeyResponse
+        {
+            Id = key.Id,
+            KeyPrefix = key.KeyPrefix,
+            CreatedAtUtc = key.CreatedAt,
+            ExpiresAtUtc = key.ExpiresAt ?? key.CreatedAt,
+            UsedAtUtc = key.UsedAt,
+            UseCount = key.UseCount,
+            MaximumUses = key.MaximumUses ?? 1,
+            IsActive = key.IsActive,
+            Status = GetEnrollmentKeyStatus(key)
+        }));
+    }
+
+    [HttpDelete("infrastructure-runner/enrollment-keys/{id:guid}")]
+    public async Task<IActionResult> RevokeInfrastructureRunnerEnrollmentKey(Guid id, CancellationToken cancellationToken)
+    {
+        var revoked = await apiKeyService.RevokeInfrastructureRunnerEnrollmentKeyAsync(
+            id,
+            userContextService.GetUserId(),
+            cancellationToken);
+        return revoked ? NoContent() : NotFound();
     }
 
     [HttpGet("hosts")]
@@ -343,6 +376,17 @@ public class AdminHostedRunnersController : ControllerBase
                 .Select(x => (DateTime?)x.ExpiresAtUtc)
                 .FirstOrDefault()
         };
+    }
+
+    private static string GetEnrollmentKeyStatus(ApiKey key)
+    {
+        if (!key.IsActive && key.UsedAt.HasValue)
+            return "Consumed";
+        if (!key.IsActive)
+            return "Revoked";
+        if (key.ExpiresAt.HasValue && key.ExpiresAt.Value <= DateTime.UtcNow)
+            return "Expired";
+        return "Pending";
     }
 
     private static string GetInfrastructureRunnerOnboardingStatus(RunnerHost host)

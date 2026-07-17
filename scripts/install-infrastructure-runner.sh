@@ -19,6 +19,7 @@ AUTOMATON_RUNNER_NAME="${AUTOMATON_RUNNER_NAME:-}"
 AUTOMATON_CONTAINER_NAME="${AUTOMATON_CONTAINER_NAME:-automaton-infrastructure-runner}"
 AUTOMATON_ROOT="${AUTOMATON_ROOT:-/var/lib/automaton}"
 AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-$AUTOMATON_ROOT/infrastructure-runner}"
+AUTOMATON_REPLACE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       AUTOMATON_DATA_ROOT="${2:-}"
       shift 2
       ;;
+    --replace)
+      AUTOMATON_REPLACE=true
+      shift
+      ;;
     *)
       echo "Unknown installer argument: $1" >&2
       exit 1
@@ -62,6 +67,11 @@ done
 
 if [[ -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROLLMENT_TOKEN" ]]; then
   echo "Set --api-key to a one-time Infrastructure Runner enrollment key." >&2
+  exit 1
+fi
+
+if [[ "$AUTOMATON_REPLACE" == true && -z "$AUTOMATON_API_KEY" ]]; then
+  echo "--replace requires a fresh one-time Infrastructure Runner enrollment key via --api-key." >&2
   exit 1
 fi
 
@@ -83,6 +93,16 @@ mkdir -p \
 
 docker pull "$AUTOMATON_RUNNER_IMAGE"
 docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
+
+if [[ "$AUTOMATON_REPLACE" == true ]]; then
+  # Keep installation-id so the API reconnects the replacement to the same
+  # Runner/RunnerHost, while forcing a fresh permanent credential exchange.
+  rm -f \
+    "$AUTOMATON_DATA_ROOT/config/api-key" \
+    "$AUTOMATON_DATA_ROOT/config/runner.json" \
+    "$AUTOMATON_DATA_ROOT/config/installation-profile.json"
+  echo "Replacing the existing Infrastructure Runner while preserving its installation identity."
+fi
 
 docker_args=(
   run -d

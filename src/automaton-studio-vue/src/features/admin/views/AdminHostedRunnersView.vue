@@ -51,6 +51,8 @@ const enrollment = ref<RunnerEnrollment | null>(null)
 const enrollingHostId = ref<string | null>(null)
 const installationDialogVisible = ref(false)
 const installationKey = ref<InfrastructureRunnerEnrollmentKey | null>(null)
+const recentInstallationKeys = ref<InfrastructureRunnerEnrollmentKey[]>([])
+const installationReplaceHost = ref<RunnerHost | null>(null)
 const generatingInstallationKey = ref(false)
 const validatingHostId = ref<string | null>(null)
 const approvingHostId = ref<string | null>(null)
@@ -223,10 +225,20 @@ async function refreshAll() {
   await Promise.all([loadHosts(), loadHostedRunners()])
 }
 
-async function generateInfrastructureRunnerInstallationKey() {
+async function loadInfrastructureRunnerEnrollmentKeys() {
+  try {
+    recentInstallationKeys.value = await adminHostedRunnersService.getInfrastructureRunnerEnrollmentKeys()
+  } catch {
+    recentInstallationKeys.value = []
+  }
+}
+
+async function generateInfrastructureRunnerInstallationKey(host?: RunnerHost) {
   generatingInstallationKey.value = true
+  installationReplaceHost.value = host ?? null
   try {
     installationKey.value = await adminHostedRunnersService.createInfrastructureRunnerEnrollmentKey()
+    await loadInfrastructureRunnerEnrollmentKeys()
     installationDialogVisible.value = true
   } catch {
     toast.add({ severity: 'error', summary: 'Installation key failed', detail: 'Failed to generate an Infrastructure Runner enrollment key.', life: 4000 })
@@ -241,7 +253,21 @@ function infrastructureRunnerInstallCommand(): string {
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
   const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
   const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey)} --runner-image 'rzvdaniel/automaton-runner:latest'; status=$?; rm -f "$tmp"; exit $status`
+  const replaceArgument = installationReplaceHost.value ? ' --replace' : ''
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
+}
+
+async function revokeInstallationKey(key: InfrastructureRunnerEnrollmentKey) {
+  if (!key.isActive || !window.confirm(`Revoke enrollment key ${key.keyPrefix}?`)) return
+  try {
+    await adminHostedRunnersService.revokeInfrastructureRunnerEnrollmentKey(key.id)
+    key.isActive = false
+    key.status = 'Revoked'
+    if (installationKey.value?.id === key.id) installationKey.value = { ...installationKey.value, isActive: false, status: 'Revoked' }
+    toast.add({ severity: 'success', summary: 'Enrollment key revoked', life: 2500 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Revocation failed', detail: 'The enrollment key could not be revoked.', life: 3500 })
+  }
 }
 
 function openEditHost(host: RunnerHost) {
@@ -566,7 +592,7 @@ onMounted(refreshAll)
           icon="pi pi-download"
           outlined
           :loading="generatingInstallationKey"
-          @click="generateInfrastructureRunnerInstallationKey"
+          @click="generateInfrastructureRunnerInstallationKey()"
         />
         <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
       </div>
@@ -688,6 +714,15 @@ onMounted(refreshAll)
                   outlined
                   :loading="validatingHostId === data.id"
                   @click="validateHost(data)"
+                />
+                <Button
+                  v-if="data.infrastructureRunnerId"
+                  label="Replace"
+                  icon="pi pi-refresh"
+                  size="small"
+                  outlined
+                  :loading="generatingInstallationKey && installationReplaceHost?.id === data.id"
+                  @click="generateInfrastructureRunnerInstallationKey(data)"
                 />
                 <Button
                   v-if="data.provisioningStatus === 'awaitingApproval'"
@@ -875,14 +910,44 @@ onMounted(refreshAll)
     <Dialog v-model:visible="installationDialogVisible" header="Install Infrastructure Runner" modal :style="{ width: '52rem' }">
       <div v-if="installationKey" class="flex flex-column gap-3">
         <Message severity="warn" :closable="false">
-          This enrollment key is shown once, expires {{ formatDateTime(installationKey.expiresAtUtc) }}, and can register exactly one Infrastructure Runner host.
+          <span v-if="installationReplaceHost">
+            This replacement key expires {{ formatDateTime(installationKey.expiresAtUtc) }}. It stops the old Runner and preserves the existing installation identity.
+          </span>
+          <span v-else>
+            This enrollment key is shown once, expires {{ formatDateTime(installationKey.expiresAtUtc) }}, and can register exactly one Infrastructure Runner host.
+          </span>
         </Message>
+        <div class="flex align-items-center gap-2">
+          <span class="text-color-secondary">Key status</span>
+          <Tag :value="installationKey.status" :severity="statusSeverity(installationKey.status.toLowerCase())" />
+          <span class="text-color-secondary text-sm">{{ installationKey.keyPrefix }}</span>
+          <Button
+            v-if="installationKey.isActive"
+            label="Revoke"
+            icon="pi pi-ban"
+            severity="danger"
+            text
+            size="small"
+            @click="revokeInstallationKey(installationKey)"
+          />
+        </div>
         <div>
           <div class="text-color-secondary text-sm mb-2">Installation command</div>
           <Textarea :model-value="infrastructureRunnerInstallCommand()" readonly auto-resize class="w-full" />
         </div>
         <div class="text-color-secondary text-sm">
-          Create the server separately, install Docker if needed, then run this command as root. The Runner will create the host record automatically and persist its permanent credential in /app/config.
+          Create the server separately, install Docker if needed, then run this command as root. The Runner will create or reconnect the host record automatically and persist its permanent credential in /app/config.
+        </div>
+        <div v-if="recentInstallationKeys.length" class="flex flex-column gap-2">
+          <div class="text-color-secondary text-sm">Recent enrollment keys</div>
+          <div v-for="key in recentInstallationKeys" :key="key.id" class="flex justify-content-between align-items-center border-1 surface-border border-round p-2">
+            <div class="flex align-items-center gap-2">
+              <code>{{ key.keyPrefix }}</code>
+              <Tag :value="key.status" :severity="statusSeverity(key.status.toLowerCase())" />
+              <span class="text-color-secondary text-xs">Expires {{ formatDateTime(key.expiresAtUtc) }}</span>
+            </div>
+            <Button v-if="key.isActive" label="Revoke" icon="pi pi-ban" severity="danger" text size="small" @click="revokeInstallationKey(key)" />
+          </div>
         </div>
       </div>
       <template #footer>
