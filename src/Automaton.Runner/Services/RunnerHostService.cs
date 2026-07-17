@@ -1043,11 +1043,13 @@ public class RunnerHostService
             Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_CAPABILITIES")?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             purpose);
+        var configuredRunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME");
         var request = new InfrastructureRunnerRegistrationRequest
         {
             InstallationId = installationId,
-            RunnerName = Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_NAME")
-                ?? $"infrastructure-{Environment.MachineName}",
+            RunnerName = string.IsNullOrWhiteSpace(configuredRunnerName)
+                ? $"infrastructure-{Environment.MachineName}"
+                : configuredRunnerName,
             RunnerVersion = Environment.Version.ToString(),
             MachineName = Environment.MachineName,
             OperatingSystem = RuntimeInformation.OSDescription,
