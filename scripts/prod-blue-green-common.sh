@@ -54,7 +54,9 @@ load_prod_env() {
     : "${RUNTIME_PROXY_AUTH_KEY:?RUNTIME_PROXY_AUTH_KEY is required in .env}"
 
     CERT_NAME="${CERT_NAME:-$WEBSITE_DOMAIN}"
-    RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-180}"
+    # Maximum time to drain runners attached to the previous API color. The
+    # normal path exits earlier when all old-color connections are gone.
+    RUNNER_RECONNECT_GRACE_SECONDS="${RUNNER_RECONNECT_GRACE_SECONDS:-60}"
     CUTOVER_WARMUP_SECONDS="${CUTOVER_WARMUP_SECONDS:-10}"
     PREVIOUS_COLOR_OVERLAP_SECONDS="${PREVIOUS_COLOR_OVERLAP_SECONDS:-20}"
 }
@@ -488,7 +490,18 @@ switch_live_color() {
         exit 1
     fi
 
-    verify_live_origin "$service"
+    if ! verify_live_origin "$service"; then
+        echo "[ERROR] New $service color failed after cutover; rolling back" >&2
+        render_service_upstream "$service" "$previous_color"
+        case "$service" in
+            api) render_traefik_api_edge "$previous_color" "$(get_live_color studio)" "$(get_live_color website)" ;;
+            studio) render_traefik_api_edge "$(get_live_color api)" "$previous_color" "$(get_live_color website)" ;;
+            website) render_traefik_api_edge "$(get_live_color api)" "$(get_live_color studio)" "$previous_color" ;;
+        esac
+        traefik_reload || true
+        verify_live_origin "$service" || true
+        exit 1
+    fi
     soft_wait_for_public_origin "$service" || true
     set_live_color_record "$service" "$color"
 }
@@ -520,9 +533,15 @@ switch_all_live_colors() {
         exit 1
     fi
 
-    verify_live_origin api
-    verify_live_origin studio
-    verify_live_origin website
+    if ! verify_live_origin api || ! verify_live_origin studio || ! verify_live_origin website; then
+        echo "[ERROR] One or more services failed after cutover; rolling back all colors" >&2
+        render_service_upstream api "$previous_api_color"
+        render_service_upstream studio "$previous_studio_color"
+        render_service_upstream website "$previous_website_color"
+        render_traefik_api_edge "$previous_api_color" "$previous_studio_color" "$previous_website_color"
+        traefik_reload || true
+        exit 1
+    fi
 
     LIVE_API_COLOR="$api_color"
     LIVE_STUDIO_COLOR="$studio_color"
@@ -656,6 +675,68 @@ signal_api_color_runners_reconnect_when_idle() {
             echo "[WARN] Reconnect-when-idle signal was not accepted by API container $container_id. This is expected when the previous color is still on an older API version." >&2
         fi
     done
+}
+
+wait_for_api_color_runner_drain() {
+    local color="$1"
+    local timeout_seconds="${2:-60}"
+    local compose_service
+    compose_service="$(compose_service_name api "$color")"
+    local started_at
+    started_at="$(date +%s)"
+
+    mapfile -t container_ids < <(service_container_ids "$compose_service")
+    if [[ ${#container_ids[@]} -eq 0 ]]; then
+        echo "[INFO] No previous API containers remain to drain"
+        return 0
+    fi
+
+    while true; do
+        local all_drained=true
+        for container_id in "${container_ids[@]}"; do
+            local response
+            response="$(docker exec "$container_id" sh -lc \
+                "curl -fsS http://127.0.0.1:8080/internal/runners/drain-status" \
+                2>/dev/null || true)"
+
+            if [[ -z "$response" ]]; then
+                echo "[WARN] Previous API color does not expose runner drain status"
+                return 2
+            fi
+
+            if [[ "$response" != *'"drained":true'* ]]; then
+                all_drained=false
+                echo "[INFO] Previous API color still has connected runners: $response"
+            fi
+        done
+
+        if [[ "$all_drained" == "true" ]]; then
+            echo "[INFO] Previous API color runner drain completed"
+            return 0
+        fi
+
+        if (( $(date +%s) - started_at >= timeout_seconds )); then
+            echo "[WARN] Runner drain timed out after ${timeout_seconds}s; stopping previous API color" >&2
+            return 1
+        fi
+
+        sleep 2
+    done
+}
+
+drain_api_color_runners() {
+    local color="$1"
+    local timeout_seconds="${2:-60}"
+
+    if wait_for_api_color_runner_drain "$color" "$timeout_seconds"; then
+        return 0
+    fi
+
+    local drain_status=$?
+    if (( drain_status == 2 )); then
+        echo "[INFO] Falling back to the maximum ${timeout_seconds}s reconnect grace period"
+        sleep "$timeout_seconds"
+    fi
 }
 
 assert_service_exists() {

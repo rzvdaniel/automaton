@@ -282,13 +282,7 @@ public class HubService
                         };
                     }
                 })
-                .WithAutomaticReconnect(new[] 
-                { 
-                    TimeSpan.FromSeconds(2), 
-                    TimeSpan.FromSeconds(5), 
-                    TimeSpan.FromSeconds(10), 
-                    TimeSpan.FromSeconds(30) 
-                })
+                .WithAutomaticReconnect(new JitteredReconnectPolicy())
                 .Build();
 
             // Increase server timeout for long-running script execution

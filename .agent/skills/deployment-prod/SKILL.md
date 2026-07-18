@@ -47,6 +47,9 @@ Upstream selectors live under:
 - Do not make rollback harder.
 - Prefer read-only diagnostics before production changes.
 - Consider Cloudflare proxied mode when debugging external access.
+- Managed app traffic is served directly by the runtime edge from runner endpoints; API SignalR draining protects control-plane operations, not app request availability.
+- After API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it. Treat the configured grace period as a maximum timeout, not an unconditional sleep.
+- Preserve rollback when post-cutover local origin verification fails.
 
 ## Before changing deployment logic
 

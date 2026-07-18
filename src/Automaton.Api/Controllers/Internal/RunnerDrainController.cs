@@ -39,6 +39,17 @@ public class RunnerDrainController : ControllerBase
         });
     }
 
+    [HttpGet("drain-status")]
+    public async Task<ActionResult<RunnerDrainStatus>> GetDrainStatus(CancellationToken cancellationToken)
+    {
+        if (!IsPrivateOrLoopback(HttpContext.Connection.RemoteIpAddress))
+        {
+            return NotFound();
+        }
+
+        return Ok(await runnerService.GetReconnectDrainStatusAsync(cancellationToken));
+    }
+
     private static bool IsPrivateOrLoopback(IPAddress? address)
     {
         if (address == null)

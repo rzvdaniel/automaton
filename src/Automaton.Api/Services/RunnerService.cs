@@ -382,6 +382,19 @@ public class RunnerService
             throw new InvalidOperationException($"Runner {runnerId} not found");
         }
 
+        // A runner can still deliver a heartbeat while its old blue SignalR
+        // connection is closing after a green connection has registered. Do
+        // not let that stale session overwrite the current connection state.
+        if (!string.Equals(runner.ConnectionId, runnerHeartbeat.ConnectionId, StringComparison.Ordinal))
+        {
+            logger.Debug(
+                "Ignoring heartbeat from stale runner connection {ConnectionId} for runner {RunnerId}; current connection is {CurrentConnectionId}",
+                runnerHeartbeat.ConnectionId,
+                runner.Id,
+                runner.ConnectionId);
+            return;
+        }
+
         runner.ConnectionId = runnerHeartbeat.ConnectionId;
         runner.LastHeartbeatAtUtc = DateTime.UtcNow;
         runner.Status = RunnerConnectivityStatuses.Online;
@@ -557,6 +570,22 @@ public class RunnerService
             apiInstanceIdentityService.ApiInstanceId,
             apiInstanceIdentityService.ApiColor ?? "(unset)");
         return signaled;
+    }
+
+    public async Task<RunnerDrainStatus> GetReconnectDrainStatusAsync(CancellationToken cancellationToken)
+    {
+        var connectedRunnerCount = await dbContext.Runners
+            .AsNoTracking()
+            .CountAsync(x =>
+                x.ConnectionId != null &&
+                x.ApiInstanceId == apiInstanceIdentityService.ApiInstanceId,
+                cancellationToken);
+
+        return new RunnerDrainStatus
+        {
+            ConnectedRunnerCount = connectedRunnerCount,
+            Drained = connectedRunnerCount == 0
+        };
     }
 
     public async Task Update(Guid id, RunnerDetails runner, CancellationToken cancellationToken)
@@ -1119,4 +1148,10 @@ public class RunnerService
             }, cancellationToken);
         }
     }
+}
+
+public record RunnerDrainStatus
+{
+    public int ConnectedRunnerCount { get; init; }
+    public bool Drained { get; init; }
 }

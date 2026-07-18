@@ -63,8 +63,7 @@ if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
 fi
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
-    echo "[INFO] Waiting ${DRAIN_WAIT_SECONDS}s for runners on api-$CURRENT_COLOR to reconnect"
-    sleep "$DRAIN_WAIT_SECONDS"
+    drain_api_color_runners "$CURRENT_COLOR" "$DRAIN_WAIT_SECONDS"
     stop_color api "$CURRENT_COLOR"
 fi
 

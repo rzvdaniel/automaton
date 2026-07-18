@@ -531,6 +531,10 @@ Rules:
 - Do not hide failed warmups.
 - Consider Cloudflare proxied mode when debugging.
 - Prefer read-only diagnostics before changing production scripts.
+- Hosted app frontend and backend requests are routed directly from the runtime edge to runner endpoints; the API-runner SignalR connection is control-plane traffic.
+- API blue/green draining protects in-flight control-plane work and runner state. It is not required for hosted app availability.
+- After API cutover, signal old-color runners to reconnect when idle and poll the old color's drain status before stopping it. Use the configured maximum timeout only as a fallback.
+- Runner reconnects must be jittered, and stale heartbeats/disconnects must not overwrite a newer connection session.
 
 ### Production operations workflow
 
