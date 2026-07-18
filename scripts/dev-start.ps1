@@ -15,6 +15,11 @@
     If you pass `-AutoInstall` the script will attempt to run `npm install` in
     the Studio and Website projects when frontend dependencies are missing.
 
+    By default the API, Studio, and Website are started. If you pass one or
+    more selective switches, only the selected services are started. The
+    switches can be combined, for example:
+      .\scripts\dev-start.ps1 -ApiOnly -StudioOnly
+
         Note: The script will NOT install Node.js itself; install Node from
         https://nodejs.org if not present.
 
@@ -31,6 +36,15 @@
     Use this for convenience on developer machines. Omit to require manual
     installation in controlled environments.
 
+.PARAMETER ApiOnly
+    Include only Automaton.Api in a selective startup.
+
+.PARAMETER StudioOnly
+    Include only the Studio frontend in a selective startup.
+
+.PARAMETER WebsiteOnly
+    Include only the public Website frontend in a selective startup.
+
 .EXAMPLE
     .\scripts\dev-start.ps1
     .\scripts\dev-start.ps1 -MainRepo "C:\Work\automaton"
@@ -38,7 +52,10 @@
 
 param(
     [string]$MainRepo = "",
-    [switch]$AutoInstall
+    [switch]$AutoInstall,
+    [switch]$ApiOnly,
+    [switch]$StudioOnly,
+    [switch]$WebsiteOnly
 )
 
 Set-StrictMode -Version Latest
@@ -50,6 +67,12 @@ $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
 $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
+
+$selectiveStartup = $ApiOnly -or $StudioOnly -or $WebsiteOnly
+$startApi = -not $selectiveStartup -or $ApiOnly
+$startStudio = -not $selectiveStartup -or $StudioOnly
+$startWebsite = -not $selectiveStartup -or $WebsiteOnly
+$startedServices = [System.Collections.Generic.List[string]]::new()
 
 # Auto-detect main repo from git worktree list if not supplied
 if (-not $MainRepo) {
@@ -72,20 +95,25 @@ function Start-DevWindow([string]$title, [string]$workDir, [string]$cmd) {
 
 # ---------- 2. Automaton.Api --------------------------------------
 
-Write-Step "Starting Automaton.Api..."
-Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
-Write-Ok "Server window launched"
+if ($startApi) {
+    Write-Step "Starting Automaton.Api..."
+    Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
+    $startedServices.Add("API")
+    Write-Ok "Server window launched"
+}
 
 # ---------- Node / Vite checks for frontend --------------------------------
-$nodeOk = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-$npmOk  = $null -ne (Get-Command npm -ErrorAction SilentlyContinue)
-$studioViteBin = Join-Path $VueProject "node_modules\.bin\vite"
-$websiteViteBin = Join-Path $WebsiteProject "node_modules\.bin\vite"
-if (-not $nodeOk -or -not $npmOk) {
+$startFrontend = $startStudio -or $startWebsite
+if ($startFrontend) {
+    $nodeOk = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+    $npmOk  = $null -ne (Get-Command npm -ErrorAction SilentlyContinue)
+    $studioViteBin = Join-Path $VueProject "node_modules\.bin\vite"
+    $websiteViteBin = Join-Path $WebsiteProject "node_modules\.bin\vite"
+    if (-not $nodeOk -or -not $npmOk) {
     Write-Warn "Node.js and/or npm not found. Vue frontends will not start."
     Write-Warn "Install Node.js (includes npm) from https://nodejs.org/"
-} else {
-    if (-not (Test-Path $studioViteBin)) {
+    } else {
+    if ($startStudio -and -not (Test-Path $studioViteBin)) {
         if ($AutoInstall) {
             Write-Step "Installing studio frontend dependencies (npm install)..."
             $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -101,11 +129,11 @@ if (-not $nodeOk -or -not $npmOk) {
         } else {
             Write-Warn "Frontend dependencies missing. Run 'npm install' in $VueProject or re-run with -AutoInstall"
         }
-    } else {
+    } elseif ($startStudio) {
         Write-Ok "Studio frontend dependencies appear installed"
     }
 
-    if (-not (Test-Path $websiteViteBin)) {
+    if ($startWebsite -and -not (Test-Path $websiteViteBin)) {
         if ($AutoInstall) {
             Write-Step "Installing website frontend dependencies (npm install)..."
             $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -121,20 +149,27 @@ if (-not $nodeOk -or -not $npmOk) {
         } else {
             Write-Warn "Website frontend dependencies missing. Run 'npm install' in $WebsiteProject or re-run with -AutoInstall"
         }
-    } else {
+    } elseif ($startWebsite) {
         Write-Ok "Website frontend dependencies appear installed"
+    }
     }
 }
 
 # ---------- 3. Studio frontend ----------------------------------------------
 
-Write-Step "Starting Automaton Studio frontend..."
-Start-DevWindow "Automaton Studio" $VueProject "npm run dev"
-Write-Ok "Studio window launched"
+if ($startStudio) {
+    Write-Step "Starting Automaton Studio frontend..."
+    Start-DevWindow "Automaton Studio" $VueProject "npm run dev"
+    $startedServices.Add("Studio")
+    Write-Ok "Studio window launched"
+}
 
-Write-Step "Starting front-facing Automaton website..."
-Start-DevWindow "Automaton Website" $WebsiteProject "npm run dev"
-Write-Ok "Website window launched"
+if ($startWebsite) {
+    Write-Step "Starting front-facing Automaton website..."
+    Start-DevWindow "Automaton Website" $WebsiteProject "npm run dev"
+    $startedServices.Add("Website")
+    Write-Ok "Website window launched"
+}
 
 # ---------- Summary ---------------------------------------------------------
 
@@ -142,9 +177,16 @@ Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Automaton dev environment starting up    " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Server   : https://localhost:7091        " -ForegroundColor White
-Write-Host "  Swagger  : https://localhost:7091/swagger" -ForegroundColor White
-Write-Host "  Studio   : http://localhost:5173         " -ForegroundColor White
-Write-Host "  Website  : http://localhost:5174         " -ForegroundColor White
+Write-Host "  Started  : $($startedServices -join ', ')" -ForegroundColor White
+if ($startApi) {
+    Write-Host "  Server   : https://localhost:7091        " -ForegroundColor White
+    Write-Host "  Swagger  : https://localhost:7091/swagger" -ForegroundColor White
+}
+if ($startStudio) {
+    Write-Host "  Studio   : http://localhost:5173         " -ForegroundColor White
+}
+if ($startWebsite) {
+    Write-Host "  Website  : http://localhost:5174         " -ForegroundColor White
+}
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
