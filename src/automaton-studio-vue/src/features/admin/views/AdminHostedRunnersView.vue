@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -13,7 +13,7 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
@@ -29,7 +29,7 @@ import type {
 } from '../types/admin.types'
 
 const toast = useToast()
-const router = useRouter()
+const route = useRoute()
 
 const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
@@ -67,6 +67,10 @@ const provisionDialogVisible = ref(false)
 const provisioningNewRunner = ref(false)
 const users = ref<UserPlan[]>([])
 const selectedProvisionUserId = ref<string | null>(null)
+const statusFilter = ref<string | null>(null)
+const hostFilter = ref<string | null>(null)
+const specificationFilter = ref<string | null>(null)
+const userFilter = ref('')
 const runnerDetailsVisible = computed({
   get: () => selectedRunner.value !== null,
   set: (visible: boolean) => {
@@ -97,6 +101,22 @@ const userOptions = computed(() =>
     value: user.userId,
   })),
 )
+
+const isContainersView = computed(() => route.path.endsWith('/containers'))
+
+const containerStatusOptions = computed(() => Array.from(new Set(hostedRunners.value.map((runner) => runner.status))).sort())
+const containerHostOptions = computed(() => Array.from(new Set(hostedRunners.value.map((runner) => runner.runnerHostName).filter(Boolean))).sort())
+const containerSpecificationOptions = computed(() => Array.from(new Set(hostedRunners.value.map((runner) => runner.specificationSnapshot.sourceSpecificationName))).sort())
+const filteredHostedRunners = computed(() => {
+  const normalizedUserFilter = userFilter.value.trim().toLowerCase()
+  return hostedRunners.value.filter((runner) => {
+    if (statusFilter.value && runner.status !== statusFilter.value) return false
+    if (hostFilter.value && runner.runnerHostName !== hostFilter.value) return false
+    if (specificationFilter.value && runner.specificationSnapshot.sourceSpecificationName !== specificationFilter.value) return false
+    if (normalizedUserFilter && !runner.userEmail.toLowerCase().includes(normalizedUserFilter)) return false
+    return true
+  })
+})
 
 const hostForm = ref<UpdateRunnerHostRequest>({})
 
@@ -207,7 +227,11 @@ async function loadProvisioningOptions() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadHosts(), loadHostedRunners()])
+  if (isContainersView.value) {
+    await Promise.all([loadHosts(), loadHostedRunners()])
+  } else {
+    await loadHosts()
+  }
 }
 
 async function loadInfrastructureRunnerEnrollmentKeys() {
@@ -557,6 +581,7 @@ function formatRelativeTime(value?: string) {
 }
 
 onMounted(refreshAll)
+watch(() => route.path, refreshAll)
 </script>
 
 <template>
@@ -565,7 +590,9 @@ onMounted(refreshAll)
       <div>
         <h1 class="m-0">Hosted Runners</h1>
         <p class="text-color-secondary mt-2 mb-0">
-          Manage discovered infrastructure hosts and paid-user runner containers from the same subscription flow used by Stripe.
+          {{ isContainersView
+            ? 'Manage tenant runner containers, their specifications, lifecycle, and runtime state.'
+            : 'Manage infrastructure capacity, Infrastructure Runner connectivity, validation, and scheduling.' }}
         </p>
       </div>
       <div class="flex gap-2">
@@ -574,6 +601,7 @@ onMounted(refreshAll)
           icon="pi pi-download"
           outlined
           :loading="generatingInstallationKey"
+          v-if="!isContainersView"
           @click="generateInfrastructureRunnerInstallationKey()"
         />
         <Button label="Refresh" icon="pi pi-refresh" outlined @click="refreshAll" />
@@ -582,7 +610,7 @@ onMounted(refreshAll)
 
     <HostedRunnersTabs />
 
-    <Card class="mb-4 infrastructure-note">
+    <Card v-if="!isContainersView" class="mb-4 infrastructure-note">
       <template #content>
         <div class="infrastructure-note__eyebrow">Experimental Infrastructure</div>
         <div class="infrastructure-note__copy">
@@ -592,7 +620,34 @@ onMounted(refreshAll)
       </template>
     </Card>
 
-    <div class="grid mb-4">
+    <div v-if="!isContainersView" class="grid mb-4">
+      <div class="col-12 md:col-4">
+        <Card>
+          <template #content>
+            <div class="text-color-secondary text-sm mb-2">Host CPU capacity</div>
+            <div class="text-2xl font-semibold">{{ totals.usedCpu }} allocated / {{ totals.cpu }} available cores</div>
+          </template>
+        </Card>
+      </div>
+      <div class="col-12 md:col-4">
+        <Card>
+          <template #content>
+            <div class="text-color-secondary text-sm mb-2">Host memory capacity</div>
+            <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} allocated / {{ formatMb(totals.memory) }} available</div>
+          </template>
+        </Card>
+      </div>
+      <div class="col-12 md:col-4">
+        <Card>
+          <template #content>
+            <div class="text-color-secondary text-sm mb-2">Host disk capacity</div>
+            <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} allocated / {{ formatMb(totals.disk) }} available</div>
+          </template>
+        </Card>
+      </div>
+    </div>
+
+    <div v-else class="grid mb-4">
       <div class="col-12 md:col-4">
         <Card>
           <template #content>
@@ -619,7 +674,7 @@ onMounted(refreshAll)
       </div>
     </div>
 
-    <Card class="mb-4">
+    <Card v-if="!isContainersView" class="mb-4">
       <template #title>
         <div class="flex justify-content-between align-items-center gap-3">
           <span>Runner Hosts</span>
@@ -745,18 +800,23 @@ onMounted(refreshAll)
       </template>
     </Card>
 
-    <Card>
+    <Card v-if="isContainersView">
       <template #title>
         <div class="flex justify-content-between align-items-center gap-3">
           <span>Hosted Runner Containers</span>
           <div class="flex gap-2">
-            <Button label="Manage specifications" icon="pi pi-sliders-h" size="small" outlined @click="router.push('/admin/hosted-runners/specifications')" />
             <Button label="Provision Runner" icon="pi pi-play" size="small" @click="openProvisionDialog" />
           </div>
         </div>
       </template>
       <template #content>
-        <DataTable :value="hostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
+        <div class="flex flex-wrap gap-2 mb-3">
+          <InputText v-model="userFilter" placeholder="Filter by user" class="w-full md:w-15rem" />
+          <Select v-model="statusFilter" :options="containerStatusOptions" placeholder="Status" show-clear class="w-full md:w-12rem" />
+          <Select v-model="hostFilter" :options="containerHostOptions" placeholder="Host" show-clear class="w-full md:w-15rem" />
+          <Select v-model="specificationFilter" :options="containerSpecificationOptions" placeholder="Specification" show-clear class="w-full md:w-15rem" />
+        </div>
+        <DataTable :value="filteredHostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
           <Column field="userEmail" header="User" />
           <Column field="name" header="Runner" />
           <Column field="runnerHostName" header="Host" />

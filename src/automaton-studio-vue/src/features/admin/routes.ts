@@ -159,6 +159,12 @@ export const adminRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'hosted-runners/containers',
+        name: 'admin-hosted-runner-containers',
+        component: AdminHostedRunnersView,
+        meta: { title: 'Runner Containers' },
+      },
+      {
         path: 'hosted-runners/specifications',
         name: 'admin-hosted-runner-specifications',
         component: AdminHostedRunnerSpecificationsView,

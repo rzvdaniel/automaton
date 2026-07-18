@@ -7,11 +7,16 @@ const route = useRoute()
 const router = useRouter()
 
 const tabs = [
-  { label: 'Overview', icon: 'pi pi-server', to: '/admin/hosted-runners' },
+  { label: 'Runner Hosts', icon: 'pi pi-server', to: '/admin/hosted-runners' },
+  { label: 'Runner Containers', icon: 'pi pi-box', to: '/admin/hosted-runners/containers' },
   { label: 'Specifications', icon: 'pi pi-sliders-h', to: '/admin/hosted-runners/specifications' },
 ]
 
-const activeIndex = computed(() => route.path.endsWith('/specifications') ? 1 : 0)
+const activeIndex = computed(() => {
+  if (route.path.endsWith('/specifications')) return 2
+  if (route.path.endsWith('/containers')) return 1
+  return 0
+})
 
 function navigate(index: number) {
   const tab = tabs[index]
