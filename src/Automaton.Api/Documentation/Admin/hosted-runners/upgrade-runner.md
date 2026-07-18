@@ -26,4 +26,4 @@ Pro plan  → Pro Hosted Runner
 
 Changing a plan does not silently resize or move an existing running container. The existing container keeps its active snapshot, placement, port, and endpoint until explicit reprovisioning.
 
-If no host can fit the new specification, reprovisioning fails. The existing runtime remains authoritative until replacement succeeds; do not treat a failed reprovision as a completed upgrade.
+The active specification snapshot is promoted only after provisioning succeeds. However, a failed reprovision currently leaves the runner in a failed state and may leave the newly selected placement fields recorded in the database. The existing container is not automatically restored by this workflow. Treat the upgrade as incomplete, review the failure, and use administrative recovery or another explicit reprovision attempt as appropriate.
