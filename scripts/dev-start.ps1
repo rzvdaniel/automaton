@@ -18,7 +18,7 @@
     By default the API, Studio, and Website are started. If you pass one or
     more selective switches, only the selected services are started. The
     switches can be combined, for example:
-      .\scripts\dev-start.ps1 -ApiOnly -StudioOnly
+      .\scripts\dev-start.ps1 -Api -Studio
 
         Note: The script will NOT install Node.js itself; install Node from
         https://nodejs.org if not present.
@@ -36,13 +36,13 @@
     Use this for convenience on developer machines. Omit to require manual
     installation in controlled environments.
 
-.PARAMETER ApiOnly
+.PARAMETER Api
     Include only Automaton.Api in a selective startup.
 
-.PARAMETER StudioOnly
+.PARAMETER Studio
     Include only the Studio frontend in a selective startup.
 
-.PARAMETER WebsiteOnly
+.PARAMETER Website
     Include only the public Website frontend in a selective startup.
 
 .EXAMPLE
@@ -53,9 +53,9 @@
 param(
     [string]$MainRepo = "",
     [switch]$AutoInstall,
-    [switch]$ApiOnly,
-    [switch]$StudioOnly,
-    [switch]$WebsiteOnly
+    [switch]$Api,
+    [switch]$Studio,
+    [switch]$Website
 )
 
 Set-StrictMode -Version Latest
@@ -68,10 +68,10 @@ $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
 
-$selectiveStartup = $ApiOnly -or $StudioOnly -or $WebsiteOnly
-$startApi = -not $selectiveStartup -or $ApiOnly
-$startStudio = -not $selectiveStartup -or $StudioOnly
-$startWebsite = -not $selectiveStartup -or $WebsiteOnly
+$selectiveStartup = $Api -or $Studio -or $Website
+$startApi = -not $selectiveStartup -or $Api
+$startStudio = -not $selectiveStartup -or $Studio
+$startWebsite = -not $selectiveStartup -or $Website
 $startedServices = [System.Collections.Generic.List[string]]::new()
 
 # Auto-detect main repo from git worktree list if not supplied
