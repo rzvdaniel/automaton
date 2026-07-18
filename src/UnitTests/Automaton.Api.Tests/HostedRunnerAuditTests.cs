@@ -48,6 +48,7 @@ public class HostedRunnerAuditTests
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
         var planId = SeedHostedRunnerPlan(db);
+        SeedUser(db, userId, planId);
         SeedRunnerHost(db);
 
         var service = CreateProvisioningService(
@@ -89,6 +90,7 @@ public class HostedRunnerAuditTests
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
         var planId = SeedHostedRunnerPlan(db);
+        SeedUser(db, userId, planId);
         SeedRunnerHost(db);
 
         var service = CreateProvisioningService(
@@ -268,7 +270,7 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
-    public async Task ReprovisionAsAdminAsync_IgnoresLegacyPlanHostedRunnerValues()
+    public async Task ReprovisionAsAdminAsync_RejectsDisabledPlan()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -280,12 +282,10 @@ public class HostedRunnerAuditTests
             userId,
             new FakeHostedRunnerRemoteCommandExecutor());
 
-        await managementService.ReprovisionAsAdminAsync(hostedRunner.Id, CancellationToken.None);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(() =>
+            managementService.ReprovisionAsAdminAsync(hostedRunner.Id, CancellationToken.None));
 
-        var succeededEvent = await db.AuditEvents
-            .SingleAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionSucceeded);
-
-        Assert.That(succeededEvent.Outcome, Is.EqualTo(AuditOutcomes.Success));
+        Assert.That(exception!.Message, Does.Contain("does not include a hosted runner"));
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -297,8 +297,29 @@ public class HostedRunnerAuditTests
         return new ApplicationDbContext(options);
     }
 
+    private static void SeedUser(ApplicationDbContext db, Guid userId, Guid planId)
+    {
+        db.Users.Add(new ApplicationUser
+        {
+            Id = userId,
+            Email = $"user-{userId:N}@automaton.test",
+            UserName = $"user-{userId:N}@automaton.test",
+            PublicUsername = $"user-{userId:N}"[..32],
+            SubscriptionPlanId = planId,
+            SecurityStamp = Guid.NewGuid().ToString("N")
+        });
+        db.SaveChanges();
+    }
+
     private static Guid SeedHostedRunnerPlan(ApplicationDbContext db)
     {
+        var specification = new HostedRunnerSpecification
+        {
+            Id = Guid.NewGuid(),
+            Code = "test-hosted",
+            Name = "Test Hosted Runner",
+            IsActive = true
+        };
         var plan = new SubscriptionPlan
         {
             Id = Guid.NewGuid(),
@@ -309,11 +330,13 @@ public class HostedRunnerAuditTests
                 HostedRunner = new HostedRunnerCapability
                 {
                     Enabled = true,
-                    Visibility = HostedRunnerVisibility.Public
+                    Visibility = HostedRunnerVisibility.Public,
+                    SpecificationId = specification.Id
                 }
             })
         };
 
+        db.HostedRunnerSpecifications.Add(specification);
         db.SubscriptionPlans.Add(plan);
         db.SaveChanges();
         return plan.Id;
@@ -321,6 +344,13 @@ public class HostedRunnerAuditTests
 
     private static Guid SeedDisabledHostedRunnerPlan(ApplicationDbContext db)
     {
+        var specification = new HostedRunnerSpecification
+        {
+            Id = Guid.NewGuid(),
+            Code = "test-disabled",
+            Name = "Test Disabled Runner",
+            IsActive = true
+        };
         var plan = new SubscriptionPlan
         {
             Id = Guid.NewGuid(),
@@ -330,11 +360,13 @@ public class HostedRunnerAuditTests
             {
                 HostedRunner = new HostedRunnerCapability
                 {
-                    Enabled = false
+                    Enabled = false,
+                    SpecificationId = specification.Id
                 }
             })
         };
 
+        db.HostedRunnerSpecifications.Add(specification);
         db.SubscriptionPlans.Add(plan);
         db.SaveChanges();
         return plan.Id;
@@ -367,6 +399,20 @@ public class HostedRunnerAuditTests
     {
         var host = db.RunnerHosts.FirstOrDefault() ?? SeedRunnerHost(db);
         var effectivePlanId = planId ?? SeedHostedRunnerPlan(db);
+        var specificationId = PlanCapabilitiesSerializer.Deserialize(
+            db.SubscriptionPlans.Single(x => x.Id == effectivePlanId).CapabilitiesJson).HostedRunner.SpecificationId!.Value;
+        if (!db.Users.Any(x => x.Id == userId))
+        {
+            db.Users.Add(new ApplicationUser
+            {
+                Id = userId,
+                Email = $"user-{userId:N}@automaton.test",
+                UserName = $"user-{userId:N}@automaton.test",
+                PublicUsername = $"user-{userId:N}"[..32],
+                SubscriptionPlanId = effectivePlanId,
+                SecurityStamp = Guid.NewGuid().ToString("N")
+            });
+        }
         var runner = new Runner
         {
             Id = Guid.NewGuid(),
@@ -385,6 +431,8 @@ public class HostedRunnerAuditTests
             Name = "Hosted Runner",
             Status = HostedRunnerStatuses.Running,
             ContainerName = "automaton-hosted-runner-test",
+            HostedRunnerSpecificationId = specificationId,
+            SpecificationRevision = 1,
             CreatedAt = DateTime.UtcNow
         };
 

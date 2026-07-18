@@ -61,7 +61,34 @@ public class HostedRunnerProvisioningService
         {
             throw new InvalidOperationException("Hosted runner provisioning is paused by platform settings.");
         }
-        var specification = await specificationResolver.ResolveAsync(userId, cancellationToken);
+        var specificationResolution = await specificationResolver.ResolveAsync(
+            userId,
+            planId == Guid.Empty ? null : planId,
+            cancellationToken);
+        if (!specificationResolution.Succeeded)
+        {
+            var failure = specificationResolution.Failure ?? HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured;
+            var message = failure switch
+            {
+                HostedRunnerSpecificationResolutionFailure.NoEffectivePlan => "Your subscription plan does not include a hosted runner.",
+                HostedRunnerSpecificationResolutionFailure.CapabilityDisabled => "Your subscription plan does not include a hosted runner.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured => "The hosted runner configuration for your subscription plan is incomplete.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationNotFound => "The hosted runner specification configured for your subscription plan no longer exists.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationInactive => "The hosted runner specification configured for your subscription plan is inactive.",
+                _ => "The hosted runner configuration for your subscription plan is invalid."
+            };
+
+            if (failure is HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured
+                or HostedRunnerSpecificationResolutionFailure.SpecificationNotFound
+                or HostedRunnerSpecificationResolutionFailure.SpecificationInactive)
+            {
+                logger.LogError("Hosted runner specification resolution failed for user {UserId}: {Failure}", userId, failure);
+            }
+
+            throw new InvalidOperationException(message);
+        }
+
+        var specification = specificationResolution.Specification!;
 
         var hostedRunner = await db.HostedRunners
             .Include(x => x.Runner)

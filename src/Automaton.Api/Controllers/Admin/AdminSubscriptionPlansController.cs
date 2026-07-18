@@ -22,17 +22,20 @@ public class AdminSubscriptionPlansController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly HostedRunnerProvisioningService _hostedRunnerProvisioningService;
+    private readonly IHostedRunnerSpecificationResolver _hostedRunnerSpecificationResolver;
     private readonly IAuditEventService _auditEventService;
 
     public AdminSubscriptionPlansController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         HostedRunnerProvisioningService hostedRunnerProvisioningService,
+        IHostedRunnerSpecificationResolver hostedRunnerSpecificationResolver,
         IAuditEventService auditEventService)
     {
         _db = db;
         _userManager = userManager;
         _hostedRunnerProvisioningService = hostedRunnerProvisioningService;
+        _hostedRunnerSpecificationResolver = hostedRunnerSpecificationResolver;
         _auditEventService = auditEventService;
     }
 
@@ -60,8 +63,11 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<SubscriptionPlanResponse>> CreatePlan([FromBody] CreateSubscriptionPlanRequest req)
+    public async Task<ActionResult<SubscriptionPlanResponse>> CreatePlan([FromBody] CreateSubscriptionPlanRequest req, CancellationToken cancellationToken = default)
     {
+        var capabilityError = await ValidateHostedRunnerCapabilityAsync(req.Capabilities, cancellationToken);
+        if (capabilityError != null) return BadRequest(new { message = capabilityError });
+
         var isActive = req.IsActive;
         var isDefault = isActive && req.IsDefault;
 
@@ -112,10 +118,16 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<SubscriptionPlanResponse>> UpdatePlan(Guid id, [FromBody] UpdateSubscriptionPlanRequest req)
+    public async Task<ActionResult<SubscriptionPlanResponse>> UpdatePlan(Guid id, [FromBody] UpdateSubscriptionPlanRequest req, CancellationToken cancellationToken = default)
     {
         var plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == id);
         if (plan == null) return NotFound();
+
+        if (req.Capabilities != null)
+        {
+            var capabilityError = await ValidateHostedRunnerCapabilityAsync(req.Capabilities, cancellationToken);
+            if (capabilityError != null) return BadRequest(new { message = capabilityError });
+        }
 
         var newIsActive = req.IsActive ?? plan.IsActive;
         var newIsDefault = (req.IsDefault ?? plan.IsDefault) && newIsActive;
@@ -141,6 +153,21 @@ public class AdminSubscriptionPlansController : ControllerBase
     }
 
     #endregion
+
+    private async Task<string?> ValidateHostedRunnerCapabilityAsync(PlanCapabilities capabilities, CancellationToken cancellationToken)
+    {
+        var capability = capabilities.HostedRunner;
+        if (!capability.Enabled) return null;
+
+        var resolution = await _hostedRunnerSpecificationResolver.ValidateAsync(capability, cancellationToken);
+        return resolution.Failure switch
+        {
+            HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured => "A hosted runner specification is required when hosted runners are enabled.",
+            HostedRunnerSpecificationResolutionFailure.SpecificationNotFound => "The selected hosted runner specification does not exist.",
+            HostedRunnerSpecificationResolutionFailure.SpecificationInactive => "The selected hosted runner specification is inactive.",
+            _ => null
+        };
+    }
 
     #region User Plan Assignments
 
@@ -176,7 +203,7 @@ public class AdminSubscriptionPlansController : ControllerBase
     /// Assign a subscription plan to a user. Pass planId = null to remove the plan.
     /// </summary>
     [HttpPost("users/{userId:guid}/assign")]
-    public async Task<IActionResult> AssignPlan(Guid userId, [FromBody] AssignPlanRequest req)
+    public async Task<IActionResult> AssignPlan(Guid userId, [FromBody] AssignPlanRequest req, CancellationToken cancellationToken = default)
     {
         var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
         if (user == null) return NotFound("User not found.");
@@ -186,12 +213,20 @@ public class AdminSubscriptionPlansController : ControllerBase
         {
             plan = await _db.SubscriptionPlans.FirstOrDefaultAsync(p => p.Id == req.PlanId.Value);
             if (plan == null) return NotFound("Subscription plan not found.");
+
+            var capabilityError = await ValidateHostedRunnerCapabilityAsync(
+                PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson),
+                cancellationToken);
+            if (capabilityError != null) return BadRequest(new { message = capabilityError });
         }
 
         user.SubscriptionPlanId = req.PlanId;
         await _db.SaveChangesAsync();
 
-        if (req.PlanId.HasValue)
+        var hostedRunnerCapability = plan == null
+            ? null
+            : PlanCapabilitiesSerializer.Deserialize(plan.CapabilitiesJson).HostedRunner;
+        if (hostedRunnerCapability?.Enabled == true)
         {
             await _hostedRunnerProvisioningService.EnsureHostedRunnerAsync(userId);
         }

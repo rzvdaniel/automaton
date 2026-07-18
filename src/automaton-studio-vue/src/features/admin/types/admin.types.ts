@@ -373,6 +373,7 @@ export interface PlanCapabilities {
 export interface HostedRunnerCapability {
   enabled: boolean
   visibility: 'disabled' | 'testUsersOnly' | 'public'
+  specificationId?: string | null
 }
 
 export interface CreateSubscriptionPlanRequest {
@@ -604,7 +605,6 @@ export interface HostedRunnerSpecification {
   revision: number
   schemaVersion: number
   isActive: boolean
-  isDefault: boolean
   resources: HostedRunnerResources
   runnerCount: number
   outdatedRunnerCount: number
@@ -621,8 +621,6 @@ export interface HostedRunnerSpecificationRequest {
 }
 
 export interface HostedRunnerPlatformSettings {
-  defaultSpecificationId: string
-  defaultSpecificationCode: string
   provisioningEnabled: boolean
   updatedAtUtc: string
 }

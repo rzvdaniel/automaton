@@ -51,6 +51,40 @@ namespace Automaton.Api.Extensions
                 });
             }
 
+            var freePlan = await dbContext.SubscriptionPlans
+                .SingleOrDefaultAsync(x => x.Id == SubscriptionPlanIds.Free, cancellationToken);
+            if (freePlan == null)
+            {
+                freePlan = new SubscriptionPlan
+                {
+                    Id = SubscriptionPlanIds.Free,
+                    Name = "Free",
+                    Description = "Free Automaton plan.",
+                    IsDefault = true,
+                    IsActive = true,
+                    SortOrder = 0,
+                    CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(new PlanCapabilities
+                    {
+                        HostedRunner = new HostedRunnerCapability
+                        {
+                            Enabled = true,
+                            Visibility = HostedRunnerVisibility.Public,
+                            SpecificationId = specification.Id
+                        }
+                    })
+                };
+                dbContext.SubscriptionPlans.Add(freePlan);
+            }
+            else
+            {
+                var capabilities = PlanCapabilitiesSerializer.Deserialize(freePlan.CapabilitiesJson);
+                if (capabilities.HostedRunner.Enabled && !capabilities.HostedRunner.SpecificationId.HasValue)
+                {
+                    capabilities.HostedRunner.SpecificationId = specification.Id;
+                    freePlan.CapabilitiesJson = PlanCapabilitiesSerializer.Serialize(capabilities);
+                }
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
 
             var guidanceService = scope.ServiceProvider.GetRequiredService<IAiGuidanceRuntimeService>();

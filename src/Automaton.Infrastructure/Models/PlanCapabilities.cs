@@ -15,6 +15,12 @@ public sealed class HostedRunnerCapability
 {
     public bool Enabled { get; set; }
     public string Visibility { get; set; } = HostedRunnerVisibility.Disabled;
+    public Guid? SpecificationId { get; set; }
+}
+
+public static class SubscriptionPlanIds
+{
+    public static readonly Guid Free = new("6f03b7e0-3d96-4e51-8c49-1a4c03d7f4f7");
 }
 
 public static class HostedRunnerVisibility

@@ -240,7 +240,17 @@ public class AdminHostedRunnersController : ControllerBase
     [HttpPost("users/{userId:guid}/provision")]
     public async Task<ActionResult<HostedRunnerResponse>> ProvisionForUser(Guid userId, ProvisionHostedRunnerRequest request, CancellationToken cancellationToken)
     {
-        var hostedRunner = await provisioningService.EnsureHostedRunnerAsync(userId, cancellationToken);
+        HostedRunner? hostedRunner;
+        try
+        {
+            hostedRunner = await provisioningService.EnsureHostedRunnerAsync(userId, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+
+        if (hostedRunner == null) return BadRequest(new { message = "Hosted runner provisioning could not be prepared." });
 
         var responseRunner = await db.HostedRunners
             .AsNoTracking()

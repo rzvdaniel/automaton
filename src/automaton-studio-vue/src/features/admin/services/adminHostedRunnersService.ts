@@ -143,7 +143,7 @@ class AdminHostedRunnersService {
     return response.data
   }
 
-  async updateSpecificationSettings(request: Pick<HostedRunnerPlatformSettings, 'defaultSpecificationId' | 'provisioningEnabled'>): Promise<HostedRunnerPlatformSettings> {
+  async updateSpecificationSettings(request: Pick<HostedRunnerPlatformSettings, 'provisioningEnabled'>): Promise<HostedRunnerPlatformSettings> {
     const response = await apiClient.put<HostedRunnerPlatformSettings>('/api/admin/hosted-runner-settings', request)
     return response.data
   }
