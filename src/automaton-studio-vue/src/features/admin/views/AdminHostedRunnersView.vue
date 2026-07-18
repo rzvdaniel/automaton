@@ -625,7 +625,8 @@ watch(() => route.path, refreshAll)
         <Card>
           <template #content>
             <div class="text-color-secondary text-sm mb-2">Host CPU capacity</div>
-            <div class="text-2xl font-semibold">{{ totals.usedCpu }} allocated / {{ totals.cpu }} available cores</div>
+            <div class="text-2xl font-semibold">{{ totals.usedCpu }} / {{ totals.cpu }} cores</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -633,7 +634,8 @@ watch(() => route.path, refreshAll)
         <Card>
           <template #content>
             <div class="text-color-secondary text-sm mb-2">Host memory capacity</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} allocated / {{ formatMb(totals.memory) }} available</div>
+            <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} / {{ formatMb(totals.memory) }}</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -641,7 +643,8 @@ watch(() => route.path, refreshAll)
         <Card>
           <template #content>
             <div class="text-color-secondary text-sm mb-2">Host disk capacity</div>
-            <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} allocated / {{ formatMb(totals.disk) }} available</div>
+            <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} / {{ formatMb(totals.disk) }}</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -653,6 +656,7 @@ watch(() => route.path, refreshAll)
           <template #content>
             <div class="text-color-secondary text-sm mb-2">CPU allocated</div>
             <div class="text-2xl font-semibold">{{ totals.usedCpu }} / {{ totals.cpu }} cores</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -661,6 +665,7 @@ watch(() => route.path, refreshAll)
           <template #content>
             <div class="text-color-secondary text-sm mb-2">Memory allocated</div>
             <div class="text-2xl font-semibold">{{ formatMb(totals.usedMemory) }} / {{ formatMb(totals.memory) }}</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -669,6 +674,7 @@ watch(() => route.path, refreshAll)
           <template #content>
             <div class="text-color-secondary text-sm mb-2">Disk allocated</div>
             <div class="text-2xl font-semibold">{{ formatMb(totals.usedDisk) }} / {{ formatMb(totals.disk) }}</div>
+            <div class="text-color-secondary text-xs mt-1">Allocated / total capacity</div>
           </template>
         </Card>
       </div>
@@ -681,8 +687,8 @@ watch(() => route.path, refreshAll)
         </div>
       </template>
       <template #content>
-        <DataTable :value="hosts" :loading="loadingHosts" data-key="id" responsive-layout="scroll">
-          <Column field="name" header="Host" />
+        <DataTable :value="hosts" :loading="loadingHosts" data-key="id" responsive-layout="scroll" scrollable>
+          <Column field="name" header="Host" :frozen="true" />
           <Column field="provider" header="Provider" />
           <Column field="publicIp" header="IP" />
           <Column header="Reported host">
@@ -733,7 +739,7 @@ watch(() => route.path, refreshAll)
             <template #body="{ data }">{{ formatMb(data.usedDiskMb + data.reservedDiskMb) }} / {{ formatMb(data.totalDiskMb) }}</template>
           </Column>
           <Column field="hostedRunnerCount" header="Runners" />
-          <Column header="Actions">
+          <Column header="Actions" :frozen="true" align-frozen="right">
             <template #body="{ data }">
               <div class="flex gap-2">
                 <Button
@@ -803,23 +809,21 @@ watch(() => route.path, refreshAll)
     <Card v-if="isContainersView">
       <template #title>
         <div class="flex justify-content-between align-items-center gap-3">
-          <span>Hosted Runner Containers</span>
-          <div class="flex gap-2">
-            <Button label="Provision Runner" icon="pi pi-play" size="small" @click="openProvisionDialog" />
-          </div>
+          <span>Runner Containers</span>
         </div>
       </template>
       <template #content>
-        <div class="flex flex-wrap gap-2 mb-3">
-          <InputText v-model="userFilter" placeholder="Filter by user" class="w-full md:w-15rem" />
-          <Select v-model="statusFilter" :options="containerStatusOptions" placeholder="Status" show-clear class="w-full md:w-12rem" />
-          <Select v-model="hostFilter" :options="containerHostOptions" placeholder="Host" show-clear class="w-full md:w-15rem" />
-          <Select v-model="specificationFilter" :options="containerSpecificationOptions" placeholder="Specification" show-clear class="w-full md:w-15rem" />
+        <div class="container-filters mb-3">
+          <InputText v-model="userFilter" placeholder="Filter by user" aria-label="Filter by user" />
+          <Select v-model="statusFilter" :options="containerStatusOptions" placeholder="Status" show-clear aria-label="Filter by status" />
+          <Select v-model="hostFilter" :options="containerHostOptions" placeholder="Host" show-clear aria-label="Filter by host" />
+          <Select v-model="specificationFilter" :options="containerSpecificationOptions" placeholder="Specification" show-clear aria-label="Filter by specification" />
+          <Button label="Provision Runner" icon="pi pi-play" size="small" class="container-filters__action" @click="openProvisionDialog" />
         </div>
-        <DataTable :value="filteredHostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
+        <DataTable :value="filteredHostedRunners" :loading="loadingRunners" data-key="id" responsive-layout="scroll" scrollable :row-class="(data: HostedRunner) => isDeletedRunner(data) ? 'opacity-60' : undefined">
           <Column field="userEmail" header="User" />
           <Column field="name" header="Runner" />
-          <Column field="runnerHostName" header="Host" />
+          <Column field="runnerHostName" header="Host" :frozen="true" />
           <Column header="Status">
             <template #body="{ data }">
               <Tag :value="displayRunnerStatus(data)" :severity="statusSeverity(displayRunnerStatus(data))" />
@@ -844,7 +848,7 @@ watch(() => route.path, refreshAll)
               />
             </template>
           </Column>
-          <Column header="Actions">
+          <Column header="Actions" :frozen="true" align-frozen="right">
             <template #body="{ data }">
               <div class="flex gap-2">
                 <Button label="Details" text size="small" @click="selectedRunner = data" />
@@ -1251,6 +1255,33 @@ watch(() => route.path, refreshAll)
 .infrastructure-note__copy {
   color: var(--p-text-muted-color);
   line-height: 1.6;
+}
+
+.container-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.container-filters > :deep(.p-inputtext),
+.container-filters > :deep(.p-select) {
+  flex: 1 1 12rem;
+  min-width: 12rem;
+}
+
+.container-filters__action {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 992px) {
+  .container-filters {
+    flex-wrap: nowrap;
+  }
+
+  .container-filters > :deep(.p-inputtext),
+  .container-filters > :deep(.p-select) {
+    min-width: 0;
+  }
 }
 
 :global(.app-dark) .infrastructure-note {
