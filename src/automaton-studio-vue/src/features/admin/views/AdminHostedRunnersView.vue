@@ -17,6 +17,7 @@ import { useRoute } from 'vue-router'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
+import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
 import type {
   HostedRunner,
   RunnerEnrollment,
@@ -30,6 +31,7 @@ import type {
 
 const toast = useToast()
 const route = useRoute()
+const { openDocumentation } = useDocumentationDrawer()
 
 const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
@@ -103,6 +105,13 @@ const userOptions = computed(() =>
 )
 
 const isContainersView = computed(() => route.path.endsWith('/containers'))
+
+function openHostedRunnersHandbook() {
+  openDocumentation(
+    isContainersView.value ? 'admin.hosted-runners.runner-containers' : 'admin.hosted-runners.runner-hosts',
+    'Hosted Runners Handbook',
+  )
+}
 
 const containerStatusOptions = computed(() => Array.from(new Set(hostedRunners.value.map((runner) => runner.status))).sort())
 const containerHostOptions = computed(() => Array.from(new Set(hostedRunners.value.map((runner) => runner.runnerHostName).filter(Boolean))).sort())
@@ -596,6 +605,7 @@ watch(() => route.path, refreshAll)
         </p>
       </div>
       <div class="flex gap-2">
+        <Button label="Help" icon="pi pi-book" severity="secondary" outlined @click="openHostedRunnersHandbook" />
         <Button
           label="Install Infrastructure Runner"
           icon="pi pi-download"

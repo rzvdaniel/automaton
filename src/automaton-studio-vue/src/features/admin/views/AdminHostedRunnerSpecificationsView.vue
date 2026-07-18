@@ -12,9 +12,11 @@ import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
+import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
 import type { HostedRunnerPlatformSettings, HostedRunnerResources, HostedRunnerSpecification, HostedRunnerSpecificationRequest } from '../types/admin.types'
 
 const toast = useToast()
+const { openDocumentation } = useDocumentationDrawer()
 const specifications = ref<HostedRunnerSpecification[]>([])
 const settings = ref<HostedRunnerPlatformSettings | null>(null)
 const loading = ref(false)
@@ -24,6 +26,10 @@ const editing = ref<HostedRunnerSpecification | null>(null)
 
 const defaultResources = (): HostedRunnerResources => ({ cpuLimit: 0.25, memoryLimitMb: 768, memoryReservationMb: 256, diskLimitMb: 2048, pidsLimit: 128, maximumApps: 3 })
 const form = ref<HostedRunnerSpecificationRequest>({ name: '', code: '', description: '', isActive: true, resources: defaultResources() })
+
+function openHostedRunnersHandbook() {
+  openDocumentation('admin.hosted-runners.specifications', 'Hosted Runners Handbook')
+}
 
 async function load() {
   loading.value = true
@@ -83,7 +89,10 @@ onMounted(load)
   <div class="flex flex-column gap-4">
     <div class="flex align-items-center justify-content-between">
       <div><h1 class="m-0">Hosted Runners</h1><div class="text-color-secondary text-sm mt-2">Manage the runtime contract used by each hosted runner.</div></div>
-      <Button label="New specification" icon="pi pi-plus" size="small" @click="openCreate" />
+      <div class="flex gap-2">
+        <Button label="Help" icon="pi pi-book" severity="secondary" outlined @click="openHostedRunnersHandbook" />
+        <Button label="New specification" icon="pi pi-plus" size="small" @click="openCreate" />
+      </div>
     </div>
     <HostedRunnersTabs />
     <div class="text-xl font-semibold">Specifications</div>
