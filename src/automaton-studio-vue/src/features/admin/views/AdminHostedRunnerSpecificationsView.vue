@@ -9,7 +9,6 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
-import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
@@ -29,10 +28,8 @@ const form = ref<HostedRunnerSpecificationRequest>({ name: '', code: '', descrip
 async function load() {
   loading.value = true
   try {
-    ;[specifications.value, settings.value] = await Promise.all([
-      adminHostedRunnersService.getSpecifications(),
-      adminHostedRunnersService.getSpecificationSettings(),
-    ])
+    specifications.value = await adminHostedRunnersService.getSpecifications()
+    settings.value = await adminHostedRunnersService.getSpecificationSettings()
   } catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load hosted runner specifications', life: 3000 })
   } finally { loading.value = false }
@@ -96,13 +93,13 @@ onMounted(load)
       <Column field="revision" header="Revision" />
       <Column header="Resources" style="min-width: 14rem"><template #body="{ data }"><div class="flex flex-wrap gap-1"><Tag :value="`${data.resources.cpuLimit} CPU`" severity="secondary" /><Tag :value="`${data.resources.memoryLimitMb} MB`" severity="secondary" /><Tag :value="`${data.resources.maximumApps} apps`" severity="secondary" /></div></template></Column>
       <Column header="Usage"><template #body="{ data }">{{ data.runnerCount }} runners<span v-if="data.outdatedRunnerCount"> · {{ data.outdatedRunnerCount }} outdated</span></template></Column>
-      <Column header="Status"><template #body="{ data }"><Tag v-if="data.isDefault" value="Default" severity="info" /><Tag v-else :value="data.isActive ? 'Active' : 'Inactive'" :severity="data.isActive ? 'success' : 'secondary'" /></template></Column>
-      <Column header="" :frozen="true" align-frozen="right" style="min-width: 8rem"><template #body="{ data }"><div class="flex gap-1"><Button icon="pi pi-pencil" text size="small" @click="openEdit(data)" /><Button icon="pi pi-copy" text size="small" @click="duplicate(data)" /><Button v-if="!data.isDefault" :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" @click="toggle(data)" /></div></template></Column>
+      <Column header="Status"><template #body="{ data }"><Tag :value="data.isActive ? 'Active' : 'Inactive'" :severity="data.isActive ? 'success' : 'secondary'" /></template></Column>
+      <Column header="" :frozen="true" align-frozen="right" style="min-width: 8rem"><template #body="{ data }"><div class="flex gap-1"><Button icon="pi pi-pencil" text size="small" @click="openEdit(data)" /><Button icon="pi pi-copy" text size="small" @click="duplicate(data)" /><Button :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" @click="toggle(data)" /></div></template></Column>
     </DataTable>
     <div v-if="settings" class="surface-card border-round p-3 flex flex-column gap-3">
       <div class="text-lg font-semibold">Platform settings</div>
       <div class="flex align-items-center gap-2"><Checkbox v-model="settings.provisioningEnabled" :binary="true" input-id="provisioningEnabled" /><label for="provisioningEnabled">Allow hosted runner provisioning</label></div>
-      <div class="flex align-items-center gap-2"><Select v-model="settings.defaultSpecificationId" :options="specifications.filter(s => s.isActive)" option-label="name" option-value="id" class="w-20rem" /><Button label="Save settings" size="small" @click="saveSettings" /></div>
+      <div><Button label="Save settings" size="small" @click="saveSettings" /></div>
     </div>
   </div>
   <Dialog v-model:visible="visible" :header="editing ? 'Edit specification' : 'New specification'" modal style="width: 34rem">

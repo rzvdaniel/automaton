@@ -148,6 +148,7 @@ public class AdminSubscriptionPlansControllerAuditTests
             dbContext,
             new TestUserManager(),
             hostedRunnerProvisioningService,
+            new HostedRunnerSpecificationResolver(dbContext),
             auditEventService);
     }
 

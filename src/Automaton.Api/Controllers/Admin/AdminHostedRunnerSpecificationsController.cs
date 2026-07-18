@@ -18,15 +18,11 @@ public sealed class AdminHostedRunnerSpecificationsController(
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<HostedRunnerSpecificationDto>>> List(CancellationToken cancellationToken)
     {
-        var defaultId = await db.HostedRunnerPlatformSettings
-            .AsNoTracking()
-            .Select(x => (Guid?)x.DefaultSpecificationId)
-            .SingleOrDefaultAsync(cancellationToken);
         var specifications = await db.HostedRunnerSpecifications
             .AsNoTracking()
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
-        return Ok(await Task.WhenAll(specifications.Select(x => ToDtoAsync(x, x.Id == defaultId, cancellationToken))));
+        return Ok(await Task.WhenAll(specifications.Select(x => ToDtoAsync(x, cancellationToken))));
     }
 
     [HttpGet("{id:guid}")]
@@ -34,8 +30,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         var specification = await db.HostedRunnerSpecifications.FindAsync([id], cancellationToken);
         if (specification == null) return NotFound();
-        var defaultId = await db.HostedRunnerPlatformSettings.AsNoTracking().Select(x => (Guid?)x.DefaultSpecificationId).SingleOrDefaultAsync(cancellationToken);
-        return Ok(await ToDtoAsync(specification, specification.Id == defaultId, cancellationToken));
+        return Ok(await ToDtoAsync(specification, cancellationToken));
     }
 
     [HttpPost]
@@ -60,7 +55,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
         db.HostedRunnerSpecifications.Add(specification);
         db.HostedRunnerSpecificationRevisions.Add(CreateRevision(specification, userContextService.GetUserId()));
         await db.SaveChangesAsync(cancellationToken);
-        return CreatedAtAction(nameof(Get), new { id = specification.Id }, await ToDtoAsync(specification, false, cancellationToken));
+        return CreatedAtAction(nameof(Get), new { id = specification.Id }, await ToDtoAsync(specification, cancellationToken));
     }
 
     [HttpPut("{id:guid}")]
@@ -85,8 +80,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
             db.HostedRunnerSpecificationRevisions.Add(CreateRevision(specification, userContextService.GetUserId()));
         }
         await db.SaveChangesAsync(cancellationToken);
-        var defaultId = await db.HostedRunnerPlatformSettings.AsNoTracking().Select(x => (Guid?)x.DefaultSpecificationId).SingleOrDefaultAsync(cancellationToken);
-        return Ok(await ToDtoAsync(specification, specification.Id == defaultId, cancellationToken));
+        return Ok(await ToDtoAsync(specification, cancellationToken));
     }
 
     [HttpPost("{id:guid}/duplicate")]
@@ -115,7 +109,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
         {
             return Conflict(new { message = "A specification with the generated duplicate code already exists. Please try again." });
         }
-        return Ok(await ToDtoAsync(copy, false, cancellationToken));
+        return Ok(await ToDtoAsync(copy, cancellationToken));
     }
 
     private async Task<string> BuildDuplicateCodeAsync(string sourceCode, CancellationToken cancellationToken)
@@ -144,8 +138,6 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         var specification = await db.HostedRunnerSpecifications.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (specification == null) return NotFound();
-        if (await db.HostedRunnerPlatformSettings.AnyAsync(x => x.DefaultSpecificationId == id, cancellationToken))
-            return Conflict(new { message = "The platform default specification cannot be deleted." });
         if (await db.HostedRunners.AnyAsync(x => x.HostedRunnerSpecificationId == id && x.DeletedAt == null, cancellationToken))
             return Conflict(new { message = "A specification used by hosted runners cannot be deleted." });
 
@@ -164,7 +156,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
     [HttpGet("~/api/admin/hosted-runner-settings")]
     public async Task<ActionResult<HostedRunnerPlatformSettingsDto>> GetSettings(CancellationToken cancellationToken)
     {
-        var settings = await db.HostedRunnerPlatformSettings.AsNoTracking().Include(x => x.DefaultSpecification).SingleAsync(cancellationToken);
+        var settings = await db.HostedRunnerPlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
         return Ok(ToSettingsDto(settings));
     }
 
@@ -173,14 +165,10 @@ public sealed class AdminHostedRunnerSpecificationsController(
     public async Task<ActionResult<HostedRunnerPlatformSettingsDto>> UpdateSettings(UpdateHostedRunnerPlatformSettingsRequest request, CancellationToken cancellationToken)
     {
         var settings = await db.HostedRunnerPlatformSettings.SingleAsync(cancellationToken);
-        var specification = await db.HostedRunnerSpecifications.FindAsync([request.DefaultSpecificationId], cancellationToken);
-        if (specification == null || !specification.IsActive) return BadRequest(new { message = "Default specification must be active and exist." });
-        settings.DefaultSpecificationId = specification.Id;
         settings.ProvisioningEnabled = request.ProvisioningEnabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
         settings.UpdatedByUserId = userContextService.GetUserId();
         await db.SaveChangesAsync(cancellationToken);
-        settings.DefaultSpecification = specification;
         return Ok(ToSettingsDto(settings));
     }
 
@@ -188,20 +176,18 @@ public sealed class AdminHostedRunnerSpecificationsController(
     {
         var specification = await db.HostedRunnerSpecifications.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (specification == null) return NotFound();
-        var isDefault = await db.HostedRunnerPlatformSettings.AnyAsync(x => x.DefaultSpecificationId == id, cancellationToken);
-        if (!active && isDefault) return Conflict(new { message = "The platform default specification cannot be deactivated." });
         specification.IsActive = active;
         specification.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        return Ok(await ToDtoAsync(specification, isDefault, cancellationToken));
+        return Ok(await ToDtoAsync(specification, cancellationToken));
     }
 
-    private async Task<HostedRunnerSpecificationDto> ToDtoAsync(HostedRunnerSpecification specification, bool isDefault, CancellationToken cancellationToken)
+    private async Task<HostedRunnerSpecificationDto> ToDtoAsync(HostedRunnerSpecification specification, CancellationToken cancellationToken)
     {
         var runners = db.HostedRunners.Where(x => x.HostedRunnerSpecificationId == specification.Id && x.DeletedAt == null);
         return new HostedRunnerSpecificationDto(
             specification.Id, specification.Code, specification.Name, specification.Description,
-            specification.Revision, specification.SchemaVersion, specification.IsActive, isDefault,
+            specification.Revision, specification.SchemaVersion, specification.IsActive,
             specification.Resources,
             await runners.CountAsync(cancellationToken),
             await runners.CountAsync(x => x.SpecificationRevision < specification.Revision, cancellationToken),
@@ -233,12 +219,12 @@ public sealed class AdminHostedRunnerSpecificationsController(
     }
 
     private static HostedRunnerPlatformSettingsDto ToSettingsDto(HostedRunnerPlatformSettings settings)
-        => new(settings.DefaultSpecificationId, settings.DefaultSpecification.Code, settings.ProvisioningEnabled, settings.UpdatedAtUtc);
+        => new(settings.ProvisioningEnabled, settings.UpdatedAtUtc);
 }
 
 public sealed record HostedRunnerResourcesDto(decimal CpuLimit, int MemoryLimitMb, int MemoryReservationMb, int DiskLimitMb, int PidsLimit, int MaximumApps);
 public sealed record CreateHostedRunnerSpecificationRequest(string Name, string Code, string? Description, HostedRunnerResources Resources);
 public sealed record UpdateHostedRunnerSpecificationRequest(string Name, string? Description, bool IsActive, HostedRunnerResources Resources);
-public sealed record UpdateHostedRunnerPlatformSettingsRequest(Guid DefaultSpecificationId, bool ProvisioningEnabled);
-public sealed record HostedRunnerSpecificationDto(Guid Id, string Code, string Name, string? Description, int Revision, int SchemaVersion, bool IsActive, bool IsDefault, HostedRunnerResources Resources, int RunnerCount, int OutdatedRunnerCount, DateTime CreatedAtUtc, DateTime UpdatedAtUtc);
-public sealed record HostedRunnerPlatformSettingsDto(Guid DefaultSpecificationId, string DefaultSpecificationCode, bool ProvisioningEnabled, DateTime UpdatedAtUtc);
+public sealed record UpdateHostedRunnerPlatformSettingsRequest(bool ProvisioningEnabled);
+public sealed record HostedRunnerSpecificationDto(Guid Id, string Code, string Name, string? Description, int Revision, int SchemaVersion, bool IsActive, HostedRunnerResources Resources, int RunnerCount, int OutdatedRunnerCount, DateTime CreatedAtUtc, DateTime UpdatedAtUtc);
+public sealed record HostedRunnerPlatformSettingsDto(bool ProvisioningEnabled, DateTime UpdatedAtUtc);

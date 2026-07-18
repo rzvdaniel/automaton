@@ -12,9 +12,11 @@ import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
+import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import type {
   SubscriptionPlan,
   CreateSubscriptionPlanRequest,
+  HostedRunnerSpecification,
   UserPlan,
 } from '../types/admin.types'
 
@@ -22,6 +24,7 @@ const toast = useToast()
 
 const plans = ref<SubscriptionPlan[]>([])
 const users = ref<UserPlan[]>([])
+const specifications = ref<HostedRunnerSpecification[]>([])
 const loadingPlans = ref(false)
 const loadingUsers = ref(false)
 
@@ -45,6 +48,7 @@ function defaultHostedRunner() {
   return {
     enabled: false,
     visibility: 'disabled' as const,
+    specificationId: null,
   }
 }
 
@@ -74,6 +78,13 @@ const planOptions = computed(() => [
     .map((plan) => ({ label: plan.priceUsd > 0 ? `${plan.name} ($${plan.priceUsd}/mo)` : `${plan.name} (Free)`, value: plan.id })),
 ])
 
+const specificationOptions = computed(() => specifications.value
+  .filter((specification) => specification.isActive)
+  .map((specification) => ({
+    label: `${specification.name} (${specification.resources.cpuLimit} CPU · ${specification.resources.memoryLimitMb} MB · ${specification.resources.maximumApps} apps)`,
+    value: specification.id,
+  })))
+
 async function loadPlans() {
   loadingPlans.value = true
   try {
@@ -99,6 +110,9 @@ async function loadUsers() {
 onMounted(() => {
   loadPlans()
   loadUsers()
+  adminHostedRunnersService.getSpecifications().then((value) => { specifications.value = value }).catch(() => {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load hosted runner specifications', life: 3000 })
+  })
 })
 
 function openCreatePlan() {
@@ -211,7 +225,16 @@ async function toggleHostedRunnerTestAccess(user: UserPlan) {
 function runnerSummary(plan: SubscriptionPlan) {
   const runner = plan.capabilities.hostedRunner
   if (!runner.enabled) return 'No hosted runner'
-  return 'Hosted runtime enabled; resource limits come from the platform specification.'
+  const specification = specifications.value.find((item) => item.id === runner.specificationId)
+  return specification
+    ? `${specification.name} · ${specification.resources.cpuLimit} CPU · ${specification.resources.memoryLimitMb} MB · ${specification.resources.maximumApps} apps`
+    : 'Hosted runner specification not configured'
+}
+
+function onHostedRunnerEnabledChanged() {
+  if (!planForm.value.capabilities.hostedRunner.enabled) {
+    planForm.value.capabilities.hostedRunner.specificationId = null
+  }
 }
 </script>
 
@@ -333,12 +356,24 @@ function runnerSummary(plan: SubscriptionPlan) {
 
       <div class="font-medium text-sm mt-1">Hosted Runner</div>
       <div class="flex align-items-center gap-2">
-        <Checkbox v-model="planForm.capabilities.hostedRunner.enabled" :binary="true" input-id="runnerEnabled" />
+        <Checkbox v-model="planForm.capabilities.hostedRunner.enabled" :binary="true" input-id="runnerEnabled" @change="onHostedRunnerEnabledChanged" />
         <label for="runnerEnabled" class="text-sm">Includes hosted runner</label>
       </div>
       <div class="flex flex-column gap-1">
         <label class="font-medium text-sm">Visibility</label>
         <Select v-model="planForm.capabilities.hostedRunner.visibility" :options="visibilityOptions" option-label="label" option-value="value" class="w-full" />
+      </div>
+      <div v-if="planForm.capabilities.hostedRunner.enabled" class="flex flex-column gap-1">
+        <label class="font-medium text-sm">Specification</label>
+        <Select
+          v-model="planForm.capabilities.hostedRunner.specificationId"
+          :options="specificationOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Select a specification"
+          class="w-full"
+        />
+        <small v-if="!planForm.capabilities.hostedRunner.specificationId" class="text-red-500">A specification is required for hosted runner plans.</small>
       </div>
 
       <div class="flex align-items-center gap-2">
@@ -356,7 +391,7 @@ function runnerSummary(plan: SubscriptionPlan) {
     </div>
     <template #footer>
       <Button label="Cancel" text @click="planDialogVisible = false" />
-      <Button :label="editingPlan ? 'Save' : 'Create'" icon="pi pi-check" :loading="savingPlan" :disabled="!planForm.name.trim()" @click="savePlan" />
+      <Button :label="editingPlan ? 'Save' : 'Create'" icon="pi pi-check" :loading="savingPlan" :disabled="!planForm.name.trim() || (planForm.capabilities.hostedRunner.enabled && !planForm.capabilities.hostedRunner.specificationId)" @click="savePlan" />
     </template>
   </Dialog>
 

@@ -61,7 +61,34 @@ public class HostedRunnerProvisioningService
         {
             throw new InvalidOperationException("Hosted runner provisioning is paused by platform settings.");
         }
-        var specification = await specificationResolver.ResolveAsync(userId, cancellationToken);
+        var specificationResolution = await specificationResolver.ResolveAsync(
+            userId,
+            planId == Guid.Empty ? null : planId,
+            cancellationToken);
+        if (!specificationResolution.Succeeded)
+        {
+            var failure = specificationResolution.Failure ?? HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured;
+            var message = failure switch
+            {
+                HostedRunnerSpecificationResolutionFailure.NoEffectivePlan => "Your subscription plan does not include a hosted runner.",
+                HostedRunnerSpecificationResolutionFailure.CapabilityDisabled => "Your subscription plan does not include a hosted runner.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured => "The hosted runner configuration for your subscription plan is incomplete.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationNotFound => "The hosted runner specification configured for your subscription plan no longer exists.",
+                HostedRunnerSpecificationResolutionFailure.SpecificationInactive => "The hosted runner specification configured for your subscription plan is inactive.",
+                _ => "The hosted runner configuration for your subscription plan is invalid."
+            };
+
+            if (failure is HostedRunnerSpecificationResolutionFailure.SpecificationNotConfigured
+                or HostedRunnerSpecificationResolutionFailure.SpecificationNotFound
+                or HostedRunnerSpecificationResolutionFailure.SpecificationInactive)
+            {
+                logger.LogError("Hosted runner specification resolution failed for user {UserId}: {Failure}", userId, failure);
+            }
+
+            throw new InvalidOperationException(message);
+        }
+
+        var specification = specificationResolution.Specification!;
 
         var hostedRunner = await db.HostedRunners
             .Include(x => x.Runner)
@@ -83,8 +110,19 @@ public class HostedRunnerProvisioningService
             db.HostedRunners.Add(hostedRunner);
         }
 
-        var previousHostId = hostedRunner.RunnerHostId;
         var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
+        if (!forceProvision && hostedRunner is { RunnerId: not null, Status: HostedRunnerStatuses.Running })
+        {
+            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+        }
+
+        if (!forceProvision && !createdHostedRunner && hostedRunner.Status is
+            HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning)
+        {
+            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+        }
+
+        var previousHostId = hostedRunner.RunnerHostId;
         if (createdHostedRunner)
         {
             hostedRunner.HostedRunnerSpecificationId = specification.Id;
@@ -129,30 +167,6 @@ public class HostedRunnerProvisioningService
                 cancellationToken);
             hostedRunner.RuntimeEndpoint = BuildRuntimeEndpoint(hostedRunner, host);
             hostedRunner.LastError = null;
-
-            if (!forceProvision && hostedRunner.RunnerId != null && hostedRunner.Status == HostedRunnerStatuses.Running)
-            {
-                await db.SaveChangesAsync(cancellationToken);
-                if (capacityTransaction != null)
-                {
-                    await capacityTransaction.CommitAsync(cancellationToken);
-                }
-
-                return new HostedRunnerPreparationResult(hostedRunner, null, false);
-            }
-
-            if (!forceProvision &&
-                !createdHostedRunner &&
-                (hostedRunner.Status == HostedRunnerStatuses.Provisioning || hostedRunner.Status == HostedRunnerStatuses.Pending))
-            {
-                await db.SaveChangesAsync(cancellationToken);
-                if (capacityTransaction != null)
-                {
-                    await capacityTransaction.CommitAsync(cancellationToken);
-                }
-
-                return new HostedRunnerPreparationResult(hostedRunner, null, false);
-            }
 
             if (!createdHostedRunner)
             {

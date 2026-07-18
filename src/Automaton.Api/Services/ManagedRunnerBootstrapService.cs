@@ -89,7 +89,17 @@ public sealed class ManagedRunnerBootstrapService
             return await GetInProgressResultAsync(appId, hostedRunner, cancellationToken);
         }
 
-        var preparation = await hostedRunnerProvisioningService.PrepareProvisioningAsync(ownerId, Guid.Empty, cancellationToken);
+        HostedRunnerPreparationResult preparation;
+        try
+        {
+            preparation = await hostedRunnerProvisioningService.PrepareProvisioningAsync(ownerId, Guid.Empty, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            var result = ManagedRunnerBootstrapResult.ProvisionFailed(ex.Message);
+            await WriteManagedRuntimeEventAsync(appId, ApplicationEventTypes.ManagedRuntimeProvisionFailed, result.Message, cancellationToken);
+            return result;
+        }
         if (!preparation.ShouldPublishProvisionRequest)
         {
             if (preparation.HostedRunner.Status == HostedRunnerStatuses.Failed)

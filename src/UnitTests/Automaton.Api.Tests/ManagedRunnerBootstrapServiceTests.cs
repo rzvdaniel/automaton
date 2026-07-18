@@ -100,7 +100,7 @@ public class ManagedRunnerBootstrapServiceTests
 
         Assert.That(result.IsReady, Is.False);
         Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRunnerProvisionFailed));
-        Assert.That(result.Message, Does.Contain("could not be provisioned"));
+        Assert.That(result.Message, Does.Contain("does not include a hosted runner"));
         Assert.That(publisher.Messages, Is.Empty);
     }
 
@@ -151,6 +151,7 @@ public class ManagedRunnerBootstrapServiceTests
             UserName = $"user-{userId:N}@automaton.test",
             Email = $"user-{userId:N}@automaton.test",
             PublicUsername = $"user-{userId:N}",
+            SubscriptionPlanId = planId,
         });
         db.SaveChanges();
     }
@@ -180,6 +181,13 @@ public class ManagedRunnerBootstrapServiceTests
 
     private static Guid SeedHostedRunnerPlan(ApplicationDbContext db, bool enabled)
     {
+        var specification = new HostedRunnerSpecification
+        {
+            Id = Guid.NewGuid(),
+            Code = "test-hosted",
+            Name = "Test Hosted Runner",
+            IsActive = true
+        };
         var plan = new SubscriptionPlan
         {
             Id = Guid.NewGuid(),
@@ -190,11 +198,13 @@ public class ManagedRunnerBootstrapServiceTests
                 HostedRunner = new HostedRunnerCapability
                 {
                     Enabled = enabled,
-                    Visibility = HostedRunnerVisibility.Public
+                    Visibility = HostedRunnerVisibility.Public,
+                    SpecificationId = specification.Id
                 }
             })
         };
 
+        db.HostedRunnerSpecifications.Add(specification);
         db.SubscriptionPlans.Add(plan);
         db.SaveChanges();
         return plan.Id;
