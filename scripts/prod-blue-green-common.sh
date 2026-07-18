@@ -727,16 +727,29 @@ wait_for_api_color_runner_drain() {
 drain_api_color_runners() {
     local color="$1"
     local timeout_seconds="${2:-60}"
+    local drain_status
 
     if wait_for_api_color_runner_drain "$color" "$timeout_seconds"; then
         return 0
+    else
+        drain_status=$?
     fi
 
-    local drain_status=$?
-    if (( drain_status == 2 )); then
-        echo "[INFO] Falling back to the maximum ${timeout_seconds}s reconnect grace period"
-        sleep "$timeout_seconds"
-    fi
+    case "$drain_status" in
+        1)
+            # The drain function already waited for the maximum timeout.
+            return 0
+            ;;
+        2)
+            echo "[INFO] Falling back to the maximum ${timeout_seconds}s reconnect grace period"
+            sleep "$timeout_seconds"
+            return 0
+            ;;
+        *)
+            echo "[WARN] Unexpected runner drain status: $drain_status" >&2
+            return 0
+            ;;
+    esac
 }
 
 assert_service_exists() {

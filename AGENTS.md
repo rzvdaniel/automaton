@@ -535,6 +535,7 @@ Rules:
 - API blue/green draining protects in-flight control-plane work and runner state. It is not required for hosted app availability.
 - After API cutover, signal old-color runners to reconnect when idle and poll the old color's drain status before stopping it. Use the configured maximum timeout only as a fallback.
 - Runner reconnects must be jittered, and stale heartbeats/disconnects must not overwrite a newer connection session.
+- Internal deployment/drain endpoints must accept loopback requests only unless they also require a dedicated internal authentication mechanism. Do not trust RFC1918 source addresses behind a reverse proxy.
 
 ### Production operations workflow
 

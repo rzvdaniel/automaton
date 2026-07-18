@@ -50,6 +50,7 @@ Upstream selectors live under:
 - Managed app traffic is served directly by the runtime edge from runner endpoints; API SignalR draining protects control-plane operations, not app request availability.
 - After API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it. Treat the configured grace period as a maximum timeout, not an unconditional sleep.
 - Preserve rollback when post-cutover local origin verification fails.
+- Internal deployment endpoints must require loopback source addresses or dedicated internal authentication. Never treat all RFC1918 addresses as trusted behind a reverse proxy.
 
 ## Before changing deployment logic
 

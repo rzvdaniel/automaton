@@ -22,7 +22,7 @@ public class RunnerDrainController : ControllerBase
         [FromBody] ReconnectWhenIdleRequest? request,
         CancellationToken cancellationToken)
     {
-        if (!IsPrivateOrLoopback(HttpContext.Connection.RemoteIpAddress))
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
         {
             return NotFound();
         }
@@ -42,7 +42,7 @@ public class RunnerDrainController : ControllerBase
     [HttpGet("drain-status")]
     public async Task<ActionResult<RunnerDrainStatus>> GetDrainStatus(CancellationToken cancellationToken)
     {
-        if (!IsPrivateOrLoopback(HttpContext.Connection.RemoteIpAddress))
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
         {
             return NotFound();
         }
@@ -50,27 +50,9 @@ public class RunnerDrainController : ControllerBase
         return Ok(await runnerService.GetReconnectDrainStatusAsync(cancellationToken));
     }
 
-    private static bool IsPrivateOrLoopback(IPAddress? address)
+    private static bool IsLoopback(IPAddress? address)
     {
-        if (address == null)
-        {
-            return false;
-        }
-
-        if (IPAddress.IsLoopback(address))
-        {
-            return true;
-        }
-
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            var bytes = address.GetAddressBytes();
-            return bytes[0] == 10
-                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-                || (bytes[0] == 192 && bytes[1] == 168);
-        }
-
-        return false;
+        return address != null && IPAddress.IsLoopback(address);
     }
 }
 
