@@ -90,14 +90,14 @@ onMounted(load)
     </div>
     <HostedRunnersTabs />
     <div class="text-xl font-semibold">Specifications</div>
-    <DataTable :value="specifications" :loading="loading" data-key="id" responsive-layout="scroll">
+    <DataTable :value="specifications" :loading="loading" data-key="id" responsive-layout="scroll" scrollable>
       <Column field="name" header="Name" style="min-width: 15rem" />
       <Column field="code" header="Code" />
       <Column field="revision" header="Revision" />
       <Column header="Resources" style="min-width: 14rem"><template #body="{ data }"><div class="flex flex-wrap gap-1"><Tag :value="`${data.resources.cpuLimit} CPU`" severity="secondary" /><Tag :value="`${data.resources.memoryLimitMb} MB`" severity="secondary" /><Tag :value="`${data.resources.maximumApps} apps`" severity="secondary" /></div></template></Column>
       <Column header="Usage"><template #body="{ data }">{{ data.runnerCount }} runners<span v-if="data.outdatedRunnerCount"> · {{ data.outdatedRunnerCount }} outdated</span></template></Column>
       <Column header="Status"><template #body="{ data }"><Tag v-if="data.isDefault" value="Default" severity="info" /><Tag v-else :value="data.isActive ? 'Active' : 'Inactive'" :severity="data.isActive ? 'success' : 'secondary'" /></template></Column>
-      <Column header=""><template #body="{ data }"><div class="flex gap-1"><Button icon="pi pi-pencil" text size="small" @click="openEdit(data)" /><Button icon="pi pi-copy" text size="small" @click="duplicate(data)" /><Button v-if="!data.isDefault" :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" @click="toggle(data)" /></div></template></Column>
+      <Column header="" :frozen="true" align-frozen="right" style="min-width: 8rem"><template #body="{ data }"><div class="flex gap-1"><Button icon="pi pi-pencil" text size="small" @click="openEdit(data)" /><Button icon="pi pi-copy" text size="small" @click="duplicate(data)" /><Button v-if="!data.isDefault" :icon="data.isActive ? 'pi pi-eye-slash' : 'pi pi-eye'" text size="small" @click="toggle(data)" /></div></template></Column>
     </DataTable>
     <div v-if="settings" class="surface-card border-round p-3 flex flex-column gap-3">
       <div class="text-lg font-semibold">Platform settings</div>
