@@ -13,8 +13,10 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
+import { useRouter } from 'vue-router'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import { adminSubscriptionPlansService } from '../services/adminSubscriptionPlansService'
+import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import type {
   HostedRunner,
   RunnerEnrollment,
@@ -27,6 +29,7 @@ import type {
 } from '../types/admin.types'
 
 const toast = useToast()
+const router = useRouter()
 
 const hosts = ref<RunnerHost[]>([])
 const hostedRunners = ref<HostedRunner[]>([])
@@ -577,6 +580,8 @@ onMounted(refreshAll)
       </div>
     </div>
 
+    <HostedRunnersTabs />
+
     <Card class="mb-4 infrastructure-note">
       <template #content>
         <div class="infrastructure-note__eyebrow">Experimental Infrastructure</div>
@@ -744,7 +749,10 @@ onMounted(refreshAll)
       <template #title>
         <div class="flex justify-content-between align-items-center gap-3">
           <span>Hosted Runner Containers</span>
-          <Button label="Provision Runner" icon="pi pi-play" size="small" @click="openProvisionDialog" />
+          <div class="flex gap-2">
+            <Button label="Manage specifications" icon="pi pi-sliders-h" size="small" outlined @click="router.push('/admin/hosted-runners/specifications')" />
+            <Button label="Provision Runner" icon="pi pi-play" size="small" @click="openProvisionDialog" />
+          </div>
         </div>
       </template>
       <template #content>

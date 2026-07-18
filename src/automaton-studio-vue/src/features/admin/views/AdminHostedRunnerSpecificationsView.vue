@@ -11,6 +11,7 @@ import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import type { HostedRunnerPlatformSettings, HostedRunnerResources, HostedRunnerSpecification, HostedRunnerSpecificationRequest } from '../types/admin.types'
 
@@ -84,9 +85,11 @@ onMounted(load)
 <template>
   <div class="flex flex-column gap-4">
     <div class="flex align-items-center justify-content-between">
-      <div><div class="text-xl font-semibold">Hosted Runner Specifications</div><div class="text-color-secondary text-sm">The specification snapshot is the complete runtime contract for each runner.</div></div>
+      <div><h1 class="m-0">Hosted Runners</h1><div class="text-color-secondary text-sm mt-2">Manage the runtime contract used by each hosted runner.</div></div>
       <Button label="New specification" icon="pi pi-plus" size="small" @click="openCreate" />
     </div>
+    <HostedRunnersTabs />
+    <div class="text-xl font-semibold">Specifications</div>
     <DataTable :value="specifications" :loading="loading" data-key="id" responsive-layout="scroll">
       <Column field="name" header="Name" />
       <Column field="code" header="Code" />
