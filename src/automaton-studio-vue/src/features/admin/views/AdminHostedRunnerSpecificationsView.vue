@@ -28,7 +28,7 @@ const defaultResources = (): HostedRunnerResources => ({ cpuLimit: 0.25, memoryL
 const form = ref<HostedRunnerSpecificationRequest>({ name: '', code: '', description: '', isActive: true, resources: defaultResources() })
 
 function openHostedRunnersHandbook() {
-  openDocumentation('admin.hosted-runners.specifications', 'Hosted Runners Handbook')
+  openDocumentation('admin.hosted-runners.create-specification', 'Hosted Runners Administration Guide')
 }
 
 async function load() {

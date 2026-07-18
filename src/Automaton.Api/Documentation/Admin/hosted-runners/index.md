@@ -1,8 +1,8 @@
 ---
-title: Hosted Runners Handbook
+title: Hosted Runners Administration Guide
 order: 20
 ---
 
-# Hosted Runners Handbook
+# Hosted Runners Administration Guide
 
-Operational documentation for runner hosts, runner containers, hosted runner specifications, and subscription-plan entitlements.
+End-to-end onboarding and operational procedures for runner hosts, runner containers, hosted runner specifications, and subscription-plan entitlements.

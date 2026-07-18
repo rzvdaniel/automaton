@@ -108,8 +108,8 @@ const isContainersView = computed(() => route.path.endsWith('/containers'))
 
 function openHostedRunnersHandbook() {
   openDocumentation(
-    isContainersView.value ? 'admin.hosted-runners.runner-containers' : 'admin.hosted-runners.runner-hosts',
-    'Hosted Runners Handbook',
+    isContainersView.value ? 'admin.hosted-runners.provision-runner-container' : 'admin.hosted-runners.add-runner-host',
+    'Hosted Runners Administration Guide',
   )
 }
 
