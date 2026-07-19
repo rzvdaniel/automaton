@@ -259,11 +259,11 @@ public class RunnerHostService
 
                 WriteLine("🔧 Authentication required...");
                 WriteLine();
-                WriteLine("You need an API key to authenticate with the Automaton server.");
-                WriteLine("Get your API key from: Automaton Studio → API Keys");
+                WriteLine("This Runner requires a system-issued Runner credential.");
+                WriteLine("Re-enroll or reprovision the Runner from Automaton Studio.");
                 WriteLine();
 
-                Write("Enter your API key (starts with 'ak_'): ");
+                Write("Enter the system-issued Runner credential (starts with 'ak_runner_'): ");
                 var inputApiKey = ReadLine();
 
                 if (string.IsNullOrWhiteSpace(inputApiKey))
@@ -939,13 +939,13 @@ public class RunnerHostService
                 WriteLine("?? Authentication troubleshooting:");
                 WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
                 WriteLine("2. Check if the API key has expired in Automaton Studio");
-                WriteLine("3. Ensure the API key has the Runner scope (or a legacy FullAccess scope)");
+                WriteLine("3. Ensure the credential was issued by the Runner enrollment or provisioning workflow");
                 WriteLine("4. Verify the Automaton Studio server is running and accessible");
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission for runner registration.");
-                WriteLine("?? Ensure the API key has the 'Runner' scope (legacy 'FullAccess' is also accepted; 'ReadOnly' is not).");
+                WriteLine("?? Re-enroll or reprovision the Runner from Automaton Studio to obtain a valid system credential.");
             }
 
             return false;
@@ -1378,7 +1378,7 @@ public class RunnerHostService
     /// </summary>
     private async Task<string?> PromptForNewApiKeyAsync()
     {
-        WriteLine("Get your API key from: Automaton Studio → API Keys");
+        WriteLine("Obtain a system-issued Runner credential by enrolling or reprovisioning this Runner from Automaton Studio.");
         WriteLine();
         Write("Enter your API key (starts with 'ak_'): ");
         var newApiKey = ReadLine();

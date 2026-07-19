@@ -135,7 +135,7 @@ public class ApiKeyAuthenticationService
                 WriteLine("🔧 Troubleshooting suggestions:");
                 WriteLine("1. Verify the API key is correct and hasn't been modified");
                 WriteLine("2. Check if the API key has expired in Automaton Studio");
-                WriteLine("3. Ensure the API key has appropriate scope/permissions (not ReadOnly)");
+                WriteLine("3. Ensure the credential is a system-issued Runner credential");
                 WriteLine("4. Verify the server URL is correct");
                 WriteLine("5. Check if the Automaton Studio server is running and accessible");
                 WriteLine("6. Verify the API key was created for the correct server/environment");
@@ -143,7 +143,7 @@ public class ApiKeyAuthenticationService
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission to access runner operations.");
-                WriteLine("🔧 Make sure the API key has the 'Runner' scope (legacy 'FullAccess' is also accepted; 'ReadOnly' is not) in Automaton Studio.");
+                WriteLine("🔧 Re-enroll or reprovision the Runner from Automaton Studio to obtain a system-issued Runner credential.");
             }
 
             return false;

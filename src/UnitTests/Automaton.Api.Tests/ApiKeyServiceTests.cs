@@ -64,6 +64,23 @@ public class ApiKeyServiceTests
         Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
     }
 
+    [TestCase(ApiKeyScope.Runner)]
+    [TestCase(ApiKeyScope.FullAccess)]
+    public void RunnerValidationScopes_AllowOnlyRunnerCredentials(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeysController.RunnerUsableScopes, Does.Contain(scope));
+    }
+
+    [TestCase(ApiKeyScope.Developer)]
+    [TestCase(ApiKeyScope.ReadOnly)]
+    [TestCase(ApiKeyScope.WorkflowExecution)]
+    [TestCase(ApiKeyScope.WebApp)]
+    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    public void RunnerValidationScopes_RejectNonRunnerCredentials(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeysController.RunnerUsableScopes, Does.Not.Contain(scope));
+    }
+
     [Test]
     public void SanitizeMetadataJson_RedactsSensitiveKeys()
     {

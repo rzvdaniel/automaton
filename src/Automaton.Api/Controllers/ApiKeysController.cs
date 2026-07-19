@@ -22,6 +22,12 @@ public class ApiKeysController : BaseController
         ApiKeyScope.WebApp
     };
 
+    internal static readonly IReadOnlySet<ApiKeyScope> RunnerUsableScopes = new HashSet<ApiKeyScope>
+    {
+        ApiKeyScope.Runner,
+        ApiKeyScope.FullAccess
+    };
+
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
     private readonly ApplicationDbContext dbContext;
@@ -125,9 +131,9 @@ public class ApiKeysController : BaseController
             return Unauthorized(new { message = "Invalid or expired API key" });
         }
 
-        if (apiKeyEntity.Scope == ApiKeyScope.ReadOnly)
+        if (!RunnerUsableScopes.Contains(apiKeyEntity.Scope))
         {
-            return Forbid("This API key cannot be used for CLI or runner operations.");
+            return Forbid("This credential is not valid for Runner authentication.");
         }
 
         var userId = await dbContext.ApiKeyUsers
