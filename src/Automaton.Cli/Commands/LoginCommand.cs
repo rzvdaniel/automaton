@@ -12,7 +12,7 @@ public static class LoginCommand
         var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {ConfigService.DefaultHostedServer})");
         var keyOption = new Option<string?>(["--key", "-k"], "Use an existing API key (prefer --key-from-env for automation)");
         keyOption.Arity = ArgumentArity.ZeroOrOne;
-        var deviceOption = new Option<bool>("--device", "Force browser/device authorization flow");
+        var deviceOption = new Option<bool>("--device", "Do not open a browser; display the authorization URL and code");
         var keyFromEnvOption = new Option<bool>("--key-from-env", "Read the existing API key from AUTOMATON_API_KEY");
         var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
@@ -138,6 +138,7 @@ public static class LoginCommand
         using var authenticatedClient = new AutomatonApiClient(server, apiKey);
         var user = await authenticatedClient.GetUserProfileAsync();
         await SaveCredentialsAsync(config, cwd, server, apiKey, global);
+        await client.CompleteCliAuthorizationAsync(authorization.RequestId, authorization.Verifier);
 
         var displayName = GetUserDisplayName(user);
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));

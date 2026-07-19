@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -20,17 +21,20 @@ public sealed class CliAuthorizationService
     private readonly ApiKeyService apiKeyService;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<CliAuthorizationService> logger;
+    private readonly IDataProtector credentialProtector;
 
     public CliAuthorizationService(
         ApplicationDbContext dbContext,
         ApiKeyService apiKeyService,
         IAuditEventService auditEventService,
-        ILogger<CliAuthorizationService> logger)
+        ILogger<CliAuthorizationService> logger,
+        IDataProtectionProvider dataProtectionProvider)
     {
         this.dbContext = dbContext;
         this.apiKeyService = apiKeyService;
         this.auditEventService = auditEventService;
         this.logger = logger;
+        credentialProtector = dataProtectionProvider.CreateProtector("Automaton.CliAuthorizationCredential.v1");
     }
 
     public async Task<CliAuthorizationCreated> CreateAsync(
@@ -94,10 +98,6 @@ public sealed class CliAuthorizationService
         string verifier,
         CancellationToken cancellationToken)
     {
-        await dbContext.CliAuthorizationRequests
-            .Where(x => x.ExpiresAt < DateTime.UtcNow.AddHours(-1))
-            .ExecuteDeleteAsync(cancellationToken);
-
         await using var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
             : null;
@@ -120,13 +120,20 @@ public sealed class CliAuthorizationService
             return CliAuthorizationPollResult.Pending;
         }
 
+        if (!string.IsNullOrWhiteSpace(request.EncryptedApiKey))
+        {
+            var existingKey = credentialProtector.Unprotect(request.EncryptedApiKey);
+            return new CliAuthorizationPollResult(existingKey, request.UserId.Value);
+        }
+
         if (request.CompletedAt.HasValue)
         {
             return CliAuthorizationPollResult.Completed;
         }
 
         // The key is created only when the CLI polls after explicit browser approval.
-        // It is returned once and is never persisted in the authorization request.
+        // It remains encrypted until the CLI acknowledges that it saved the credential,
+        // allowing safe retries if the first response is interrupted.
         var keyName = $"CLI - {request.DeviceName}";
         var (rawKey, entity) = await apiKeyService.CreateApiKeyAsync(
             request.UserId.Value,
@@ -135,11 +142,9 @@ public sealed class CliAuthorizationService
             "Developer credential created by Automaton CLI authorization.",
             saveChanges: false);
 
-        request.CompletedAt = DateTime.UtcNow;
+        request.EncryptedApiKey = credentialProtector.Protect(rawKey);
+        request.CredentialIssuedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        if (transaction is not null)
-            await transaction.CommitAsync(cancellationToken);
 
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -149,6 +154,7 @@ public sealed class CliAuthorizationService
             EventType = AuditEventTypes.ApiKeyCreated,
             Message = $"API key '{entity.Name}' was created",
             Outcome = AuditOutcomes.Success,
+            FailOnError = true,
             ActorUserId = request.UserId,
             Metadata = new
             {
@@ -160,8 +166,69 @@ public sealed class CliAuthorizationService
             }
         }, cancellationToken);
 
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+
         logger.LogInformation("CLI authorization completed for user {UserId} on device {DeviceName}", request.UserId, request.DeviceName);
         return new CliAuthorizationPollResult(rawKey, request.UserId.Value);
+    }
+
+    public async Task<bool> CompleteAsync(
+        Guid requestId,
+        string verifier,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        var request = await dbContext.CliAuthorizationRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+
+        if (request is null || !CryptographicEquals(request.HashedVerifier, Hash(verifier)))
+            return false;
+
+        if (request.CompletedAt.HasValue && string.IsNullOrWhiteSpace(request.EncryptedApiKey))
+            return true;
+
+        if (string.IsNullOrWhiteSpace(request.EncryptedApiKey) || !request.ApprovedAt.HasValue)
+            return false;
+
+        request.EncryptedApiKey = null;
+        request.CompletedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<CliAuthorizationDetails?> GetDetailsAsync(
+        Guid requestId,
+        string userCode,
+        CancellationToken cancellationToken)
+    {
+        var request = await dbContext.CliAuthorizationRequests
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+
+        if (request is null || !string.Equals(request.UserCode, userCode.Trim(), StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var now = DateTime.UtcNow;
+        var status = request.ExpiresAt <= now && !request.CompletedAt.HasValue
+            ? "expired"
+            : request.CompletedAt.HasValue
+                ? "completed"
+                : request.ApprovedAt.HasValue
+                    ? "approved"
+                    : "pending";
+
+        return new CliAuthorizationDetails(
+            request.DeviceName,
+            request.RemoteIp,
+            request.CreatedAt,
+            request.ExpiresAt,
+            status);
     }
 
     private async Task<string> CreateUniqueUserCodeAsync(CancellationToken cancellationToken)
@@ -215,6 +282,13 @@ public sealed record CliAuthorizationCreated(
     string Verifier,
     DateTime ExpiresAt,
     int PollInterval);
+
+public sealed record CliAuthorizationDetails(
+    string DeviceName,
+    string? RemoteIp,
+    DateTime CreatedAt,
+    DateTime ExpiresAt,
+    string Status);
 
 public sealed class CliAuthorizationPollResult
 {

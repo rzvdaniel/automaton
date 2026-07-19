@@ -13,7 +13,7 @@ public class ConfirmedEmailGuardService
         this.usersService = usersService;
     }
 
-    public async Task<bool> IsConfirmedAsync(Guid userId)
+    public virtual async Task<bool> IsConfirmedAsync(Guid userId)
     {
         var user = await usersService.GetUserById(userId);
         return user.EmailConfirmed;

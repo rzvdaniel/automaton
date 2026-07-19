@@ -13,15 +13,18 @@ public sealed class CliAuthorizationController : BaseController
     private readonly CliAuthorizationService authorizationService;
     private readonly ConfigurationService configurationService;
     private readonly UserContextService userContextService;
+    private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
 
     public CliAuthorizationController(
         CliAuthorizationService authorizationService,
         ConfigurationService configurationService,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        ConfirmedEmailGuardService confirmedEmailGuardService)
     {
         this.authorizationService = authorizationService;
         this.configurationService = configurationService;
         this.userContextService = userContextService;
+        this.confirmedEmailGuardService = confirmedEmailGuardService;
     }
 
     [HttpPost("requests")]
@@ -58,6 +61,12 @@ public sealed class CliAuthorizationController : BaseController
         [FromBody] ApproveCliAuthorizationRequest request,
         CancellationToken cancellationToken)
     {
+        if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
+        }
+
         var approved = await authorizationService.ApproveAsync(
             requestId,
             request.UserCode,
@@ -67,6 +76,17 @@ public sealed class CliAuthorizationController : BaseController
         return approved
             ? Ok(new { approved = true })
             : BadRequest(new { message = "This CLI authorization request is invalid, expired, or already completed." });
+    }
+
+    [HttpGet("requests/{requestId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> GetDetails(
+        Guid requestId,
+        [FromQuery] string code,
+        CancellationToken cancellationToken)
+    {
+        var details = await authorizationService.GetDetailsAsync(requestId, code, cancellationToken);
+        return details is null ? NotFound(new { message = "This CLI authorization request is unavailable." }) : Ok(details);
     }
 
     [HttpPost("requests/{requestId:guid}/poll")]
@@ -90,6 +110,20 @@ public sealed class CliAuthorizationController : BaseController
             userId = result.UserId
         });
     }
+
+    [HttpPost("requests/{requestId:guid}/complete")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicyNames.ApiKeyValidation)]
+    public async Task<IActionResult> Complete(
+        Guid requestId,
+        [FromBody] CompleteCliAuthorizationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var completed = await authorizationService.CompleteAsync(requestId, request.Verifier, cancellationToken);
+        return completed
+            ? Ok(new { completed = true })
+            : Unauthorized(new { message = "Invalid CLI authorization request." });
+    }
 }
 
 public sealed class CreateCliAuthorizationRequest
@@ -103,6 +137,11 @@ public sealed class ApproveCliAuthorizationRequest
 }
 
 public sealed class PollCliAuthorizationRequest
+{
+    public required string Verifier { get; set; }
+}
+
+public sealed class CompleteCliAuthorizationRequest
 {
     public required string Verifier { get; set; }
 }

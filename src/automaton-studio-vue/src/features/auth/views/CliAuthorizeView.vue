@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import { approveCliAuthorization } from '../services/cli-authorization.service'
+import { approveCliAuthorization, getCliAuthorizationDetails, type CliAuthorizationDetails } from '../services/cli-authorization.service'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +13,24 @@ const userCode = computed(() => typeof route.query.code === 'string' ? route.que
 const approving = ref(false)
 const approved = ref(false)
 const error = ref('')
+const loadingDetails = ref(true)
+const details = ref<CliAuthorizationDetails | null>(null)
+
+onMounted(async () => {
+  if (!requestId.value || !userCode.value) {
+    error.value = 'This authorization link is incomplete. Restart automaton login.'
+    loadingDetails.value = false
+    return
+  }
+
+  try {
+    details.value = await getCliAuthorizationDetails(requestId.value, userCode.value)
+  } catch {
+    error.value = 'This authorization request is invalid or expired.'
+  } finally {
+    loadingDetails.value = false
+  }
+})
 
 async function approve() {
   if (!requestId.value || !userCode.value) {
@@ -36,6 +54,14 @@ async function approve() {
 function returnToDashboard() {
   void router.push('/')
 }
+
+function cancel() {
+  void router.push('/')
+}
+
+function formatDate(value?: string) {
+  return value ? new Date(value).toLocaleString() : 'Unavailable'
+}
 </script>
 
 <template>
@@ -57,7 +83,16 @@ function returnToDashboard() {
             <div class="text-color-secondary text-sm mb-1">Authorization code</div>
             <div class="text-2xl font-bold letter-spacing-2">{{ userCode || 'Unavailable' }}</div>
           </div>
-          <Button label="Authorize Automaton CLI" icon="pi pi-check" :loading="approving" class="w-full" @click="approve" />
+          <div v-if="details" class="border-1 surface-border border-round p-3 mb-4">
+            <div class="flex justify-content-between mb-2"><span class="text-color-secondary">Device</span><span>{{ details.deviceName }}</span></div>
+            <div class="flex justify-content-between mb-2"><span class="text-color-secondary">Requested from</span><span>{{ details.remoteIp || 'Not available' }}</span></div>
+            <div class="flex justify-content-between mb-2"><span class="text-color-secondary">Requested time</span><span>{{ formatDate(details.createdAt) }}</span></div>
+            <div class="flex justify-content-between"><span class="text-color-secondary">Credential</span><span>Developer / CLI</span></div>
+          </div>
+          <div class="flex gap-2">
+            <Button label="Cancel" severity="secondary" outlined class="flex-1" @click="cancel" />
+            <Button label="Authorize Automaton CLI" icon="pi pi-check" :loading="approving || loadingDetails" :disabled="loadingDetails || !details" class="flex-1" @click="approve" />
+          </div>
         </template>
         <Button v-else label="Return to Studio" severity="secondary" class="w-full" @click="returnToDashboard" />
       </template>

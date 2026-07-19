@@ -116,6 +116,13 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task CompleteCliAuthorizationAsync(Guid requestId, string verifier, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { verifier }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/cli-auth/requests/{requestId}/complete", payload, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
     // ── File upload ───────────────────────────────────────────────────────────
 
     /// <summary>
