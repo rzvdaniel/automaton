@@ -38,6 +38,8 @@ public class ApiKey
     // Set default to Runner to match database configuration
     public ApiKeyScope Scope { get; set; } = ApiKeyScope.Runner;
 
+    public ApiKeySource Source { get; set; } = ApiKeySource.Manual;
+
     [MaxLength(500)]
     public string? Description { get; set; }
 

@@ -219,7 +219,8 @@ public sealed class RunnerEnrollmentService(
             $"Infrastructure Runner - {runnerName}"[..Math.Min(100, $"Infrastructure Runner - {runnerName}".Length)],
             ApiKeyScope.Runner,
             "Issued by one-time Infrastructure Runner enrollment.",
-            saveChanges: false);
+            saveChanges: false,
+            source: ApiKeySource.RunnerProvisioning);
 
         var runner = new Runner
         {

@@ -52,7 +52,8 @@ public class AdminHostedRunnersController : ControllerBase
             "Single-use credential for Infrastructure Runner host self-registration.",
             expiresAt,
             saveChanges: true,
-            maximumUses: 1);
+            maximumUses: 1,
+            source: ApiKeySource.InfrastructureRunnerEnrollment);
 
         return Ok(new InfrastructureRunnerEnrollmentKeyResponse
         {

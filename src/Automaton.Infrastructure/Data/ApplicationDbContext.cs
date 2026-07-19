@@ -681,6 +681,10 @@ namespace Automaton.Api.Data
                     .IsRequired()
                     .HasDefaultValue(ApiKeyScope.Runner)
                     .HasSentinel((ApiKeyScope)0); // Use 0 as sentinel - if value is 0, use database default
+
+                entity.Property(e => e.Source)
+                    .IsRequired()
+                    .HasDefaultValue(ApiKeySource.Manual);
                 
                 entity.Property(e => e.Description).HasMaxLength(500);
 

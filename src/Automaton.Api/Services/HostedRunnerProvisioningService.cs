@@ -447,7 +447,8 @@ public class HostedRunnerProvisioningService
             $"{hostedRunner.Name} key",
             ApiKeyScope.Runner,
             "Generated for hosted runner container provisioning.",
-            saveChanges: false);
+            saveChanges: false,
+            source: ApiKeySource.RunnerProvisioning);
 
         hostedRunner.ApiKeyId = apiKey.Id;
         return rawApiKey;

@@ -547,6 +547,11 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(3);
 
+                    b.Property<int>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("UseCount")
                         .HasColumnType("int");
 

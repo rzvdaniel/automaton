@@ -73,6 +73,7 @@ public class ApiKeysController : BaseController
             ApiKey = apiKey,
             KeyPrefix = entity.KeyPrefix,
             Scope = entity.Scope,
+            Source = entity.Source,
             CreatedAt = entity.CreatedAt,
             ExpiresAt = entity.ExpiresAt
         });
@@ -94,7 +95,8 @@ public class ApiKeysController : BaseController
             LastUsedAt = ak.LastUsedAt,
             ExpiresAt = ak.ExpiresAt,
             IsActive = ak.IsActive,
-            Description = ak.Description
+            Description = ak.Description,
+            Source = ak.Source
         });
 
         return Ok(response);
@@ -173,6 +175,7 @@ public class CreateApiKeyResponse
     public required string ApiKey { get; set; }
     public required string KeyPrefix { get; set; }
     public ApiKeyScope Scope { get; set; }
+    public ApiKeySource Source { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
 }
@@ -188,6 +191,7 @@ public class ApiKeyResponse
     public DateTime? ExpiresAt { get; set; }
     public bool IsActive { get; set; }
     public string? Description { get; set; }
+    public ApiKeySource Source { get; set; }
 }
 
 public class ValidateApiKeyRequest

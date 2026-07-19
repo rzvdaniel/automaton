@@ -145,7 +145,8 @@ public sealed class CliAuthorizationService
             keyName,
             ApiKeyScope.Developer,
             "Developer credential created by Automaton CLI authorization.",
-            saveChanges: false);
+            saveChanges: false,
+            source: ApiKeySource.CliAuthorization);
 
         request.EncryptedApiKey = credentialProtector.Protect(rawKey);
         request.CredentialIssuedAt = DateTime.UtcNow;

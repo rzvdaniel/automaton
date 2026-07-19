@@ -18,6 +18,7 @@ import {
   ApiKeyScope,
   getScopeDisplayName,
   getScopeSeverity,
+  getSourceDisplayName,
   getUsageInstructions,
   type ApiKey,
   type CreateApiKeyRequest,
@@ -285,6 +286,12 @@ onMounted(() => {
     <Column field="scope" header="Key type" :sortable="true">
       <template #body="{ data }">
         <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
+      </template>
+    </Column>
+
+    <Column field="source" header="Created by" :sortable="true">
+      <template #body="{ data }">
+        <span class="text-sm text-color-secondary">{{ getSourceDisplayName(data.source) }}</span>
       </template>
     </Column>
 

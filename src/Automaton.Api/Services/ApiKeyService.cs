@@ -47,7 +47,8 @@ public class ApiKeyService
         DateTime? expiresAt = null,
         Guid? projectId = null,
         bool saveChanges = true,
-        int? maximumUses = null)
+        int? maximumUses = null,
+        ApiKeySource source = ApiKeySource.Manual)
     {
         // Generate a cryptographically secure API key
         var rawKey = GenerateRawKey();
@@ -77,6 +78,7 @@ public class ApiKeyService
             MaximumUses = maximumUses,
             Description = description,
             Scope = scope,
+            Source = source,
             IsActive = true
         };
 

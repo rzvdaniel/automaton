@@ -74,7 +74,8 @@ public sealed class InfrastructureRunnerRegistrationService(
                 $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
                 ApiKeyScope.Runner,
                 "Issued by Infrastructure Runner self-registration.",
-                saveChanges: false);
+                saveChanges: false,
+                source: ApiKeySource.InfrastructureRunnerRegistration);
 
             if (existingRunner.ApiKeyId.HasValue)
             {
@@ -93,7 +94,8 @@ public sealed class InfrastructureRunnerRegistrationService(
                 $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
                 ApiKeyScope.Runner,
                 "Issued by Infrastructure Runner self-registration.",
-                saveChanges: false);
+                saveChanges: false,
+                source: ApiKeySource.InfrastructureRunnerRegistration);
 
             runner = new Runner
             {

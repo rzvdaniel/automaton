@@ -17,6 +17,16 @@ export const ApiKeyScope = {
 
 export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
 
+export const ApiKeySource = {
+  Manual: 1,
+  CliAuthorization: 2,
+  RunnerProvisioning: 3,
+  InfrastructureRunnerEnrollment: 4,
+  InfrastructureRunnerRegistration: 5,
+} as const
+
+export type ApiKeySource = (typeof ApiKeySource)[keyof typeof ApiKeySource]
+
 /**
  * API Key response from server
  * Matches ApiKeyResponse from ApiKeysController.cs
@@ -26,6 +36,7 @@ export interface ApiKey {
   name: string
   keyPrefix: string
   scope: ApiKeyScope
+  source: ApiKeySource
   createdAt: string // ISO date string
   lastUsedAt?: string // ISO date string
   expiresAt?: string // ISO date string
@@ -54,6 +65,7 @@ export interface CreateApiKeyResponse {
   apiKey: string // Full key - only shown during creation
   keyPrefix: string
   scope: ApiKeyScope
+  source: ApiKeySource
   createdAt: string
   expiresAt?: string
 }
@@ -75,6 +87,23 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
       return 'Web App'
     case ApiKeyScope.Developer:
       return 'Developer / CLI'
+    default:
+      return 'Unknown'
+  }
+}
+
+export function getSourceDisplayName(source: ApiKeySource): string {
+  switch (source) {
+    case ApiKeySource.Manual:
+      return 'Manual'
+    case ApiKeySource.CliAuthorization:
+      return 'Automaton CLI authorization'
+    case ApiKeySource.RunnerProvisioning:
+      return 'Runner provisioning'
+    case ApiKeySource.InfrastructureRunnerEnrollment:
+      return 'Infrastructure Runner enrollment'
+    case ApiKeySource.InfrastructureRunnerRegistration:
+      return 'Infrastructure Runner registration'
     default:
       return 'Unknown'
   }

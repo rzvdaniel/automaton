@@ -198,6 +198,7 @@ public class ApiKeyServiceTests
             ApiKeyScope.Developer);
 
         Assert.That(entity.Scope, Is.EqualTo(ApiKeyScope.Developer));
+        Assert.That(entity.Source, Is.EqualTo(ApiKeySource.Manual));
         Assert.That(apiKey, Does.StartWith("ak_developer_"));
 
         var auditEvent = await dbContext.AuditEvents.SingleAsync();
