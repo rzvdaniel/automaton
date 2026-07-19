@@ -2,6 +2,11 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const authRoutes: RouteRecordRaw[] = [
   {
+    path: '/cli/authorize',
+    name: 'cli-authorize',
+    component: () => import('./views/CliAuthorizeView.vue'),
+  },
+  {
     path: '/auth/github/callback',
     name: 'github-callback',
     component: () => import('./views/GitHubCallbackView.vue'),

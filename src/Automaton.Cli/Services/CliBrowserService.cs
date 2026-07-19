@@ -2,6 +2,19 @@ namespace Automaton.Cli.Services;
 
 public static class CliBrowserService
 {
+    public static bool TryOpenUrl(string url)
+    {
+        try
+        {
+            OpenUrl(url);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static void OpenUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))

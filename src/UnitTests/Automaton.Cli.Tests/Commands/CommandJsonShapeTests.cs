@@ -116,7 +116,7 @@ public class CommandJsonShapeTests
     }
 
     [Test]
-    public async Task LoginCommand_WhenApiKeyIsMissing_UsesDefaultServerAndReturnsJsonFailure()
+    public async Task LoginCommand_WhenEnvironmentKeyIsMissing_ReturnsDiagnosticJsonFailure()
     {
         var projectRoot = CreateProjectRoot();
         new ConfigService().SaveProjectLocalConfig(projectRoot, new GlobalConfig
@@ -126,7 +126,7 @@ public class CommandJsonShapeTests
         });
         var command = LoginCommand.Build(new ConfigService());
 
-        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json", "--key-from-env"]);
 
         using var doc = JsonDocument.Parse(output);
         var root = doc.RootElement;
@@ -138,10 +138,10 @@ public class CommandJsonShapeTests
         var authenticationCheck = checks.Single(check =>
             string.Equals(check.GetProperty("name").GetString(), CommandDiagnosticCheckNames.Authentication, StringComparison.Ordinal));
 
-        Assert.That(authenticationCheck.GetProperty("error").GetString(), Is.EqualTo("API key is required"));
+        Assert.That(authenticationCheck.GetProperty("error").GetString(), Is.EqualTo("AUTOMATON_API_KEY is not set."));
 
         var nextSteps = root.GetProperty("nextSteps").EnumerateArray().Select(step => step.GetString()).ToList();
-        Assert.That(nextSteps, Has.Some.Contains("--key"));
+        Assert.That(nextSteps, Has.Some.Contains("browser/device authorization"));
     }
 
     [Test]

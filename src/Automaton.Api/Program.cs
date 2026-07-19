@@ -71,6 +71,7 @@ services.Configure<CloudflareTurnstileOptions>(applicationBuilder.Configuration.
 services.Configure<AppFileRuleBaselineOptions>(applicationBuilder.Configuration.GetSection("AppFileRules:Baseline"));
 services.AddSingleton<ISystemAiRateLimitService, SystemAiRateLimitService>();
 services.AddScoped<ISystemAiService, SystemAiService>();
+services.AddScoped<CliAuthorizationService>();
 services.AddScoped<IPromptClassifierService, PromptClassifierService>();
 services.AddScoped<IApplicationEventService, ApplicationEventService>();
 services.AddSingleton<ApiInstanceIdentityService>();

@@ -12,6 +12,8 @@ dotnet tool install --global Automaton.Cli
 
 ```bash
 automaton login
+automaton login --device
+automaton login --key-from-env
 automaton new "My App"
 automaton pull
 automaton pull my-remixed-app
@@ -20,6 +22,10 @@ automaton deploy --publish --yes --non-interactive
 automaton publish --yes --non-interactive
 automaton --version
 ```
+
+`automaton login` opens Automaton Studio and waits for you to approve a short-lived
+device authorization request. If a browser cannot be opened, copy the displayed URL
+and code to another device. Use `--key-from-env` for CI/CD and other unattended flows.
 
 ## Pull modes
 

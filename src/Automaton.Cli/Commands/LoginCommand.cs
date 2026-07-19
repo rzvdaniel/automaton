@@ -10,109 +10,64 @@ public static class LoginCommand
     public static Command Build(ConfigService config)
     {
         var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {ConfigService.DefaultHostedServer})");
-        var keyOption = new Option<string?>(["--key", "-k"], "API key for authentication");
+        var keyOption = new Option<string?>(["--key", "-k"], "Use an existing API key (prefer --key-from-env for automation)");
+        keyOption.Arity = ArgumentArity.ZeroOrOne;
+        var deviceOption = new Option<bool>("--device", "Force browser/device authorization flow");
+        var keyFromEnvOption = new Option<bool>("--key-from-env", "Read the existing API key from AUTOMATON_API_KEY");
         var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
-        var cmd = new Command("login", "Store CLI credentials and validate them against the server")
+        var cmd = new Command("login", "Authorize the Automaton CLI or validate an existing API key")
         {
             serverOption,
             keyOption,
+            deviceOption,
+            keyFromEnvOption,
             globalOption,
             jsonOption
         };
 
-        cmd.SetHandler(async (string? server, string? key, bool global, bool asJson) =>
+        cmd.SetHandler(async (string? server, string? key, bool device, bool keyFromEnv, bool global, bool asJson) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var nonInteractive = CliInteraction.IsNonInteractive(explicitNonInteractive: false, asJson);
 
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
                 var existing = config.ResolveExistingConfig(global, cwd);
-
                 server = string.IsNullOrWhiteSpace(server)
                     ? existing.Server ?? ConfigService.DefaultHostedServer
-                    : server;
+                    : server.TrimEnd('/');
 
-                if (!nonInteractive)
+                if (keyFromEnv && device)
+                    throw new InvalidOperationException("Choose either --device or --key-from-env, not both.");
+
+                var keyWasRequested = Environment.GetCommandLineArgs()
+                    .Any(argument => string.Equals(argument, "--key", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(argument, "-k", StringComparison.OrdinalIgnoreCase));
+                if (keyWasRequested && string.IsNullOrWhiteSpace(key) && !keyFromEnv)
+                    key = PromptForApiKey();
+
+                if (keyFromEnv)
                 {
-                    AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
+                    key = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
+                    if (string.IsNullOrWhiteSpace(key))
+                        throw new InvalidOperationException("AUTOMATON_API_KEY is not set.");
                 }
 
-                if (string.IsNullOrWhiteSpace(key))
+                if (!string.IsNullOrWhiteSpace(key))
                 {
-                    key = nonInteractive
-                        ? existing.ApiKey
-                        : PromptForValue("API key", existing.ApiKey, secret: true);
-                }
-
-                if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(key))
-                {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, "API key is required"));
-                    nextSteps.Add("Provide --key, answer the API key prompt, or override the server with --server when needed");
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
-                    if (asJson)
-                    {
-                        CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
-                    }
-                    else
-                    {
-                        CliDiagnosticsWriter.Write(failure);
-                    }
-                    Environment.ExitCode = 1;
+                    await LoginWithExistingKeyAsync(config, cwd, server, key, global, asJson, checks);
                     return;
                 }
 
-                server = server.TrimEnd('/');
-
-                using var client = new AutomatonApiClient(server, key);
-                var user = await client.GetUserProfileAsync();
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, $"credentials validated against {server}"));
-
-                var updated = new GlobalConfig { Server = server, ApiKey = key };
-                if (global)
-                {
-                    config.SaveGlobalConfig(updated);
-                }
-                else
-                {
-                    config.SaveProjectLocalConfig(cwd, updated);
-                }
-
-                var userName = user.TryGetProperty("name", out var name) ? name.GetString() : null;
-                var email = user.TryGetProperty("email", out var emailProperty) ? emailProperty.GetString() : null;
-                var userId = user.TryGetProperty("id", out var idProperty) ? idProperty.GetGuid().ToString() : null;
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {userName ?? email ?? userId}"));
-                var result = new CommandDiagnosticResult { Success = true, Summary = "Login complete", Checks = checks, NextSteps = [] };
-
-                if (asJson)
-                {
-                    CliJson.Write(new
-                    {
-                        success = true,
-                        summary = result.Summary,
-                        checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
-                        nextSteps = result.NextSteps,
-                        authMode = "apiKey",
-                        storage = global ? "global" : "local",
-                        server,
-                        user = new { id = userId, name = userName, email }
-                    });
-                    return;
-                }
-
-                AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as [bold]{userName ?? email ?? userId}[/]");
-                AnsiConsole.MarkupLine(global
-                    ? "[grey]Credentials saved to ~/.automaton/config.json[/]"
-                    : "[grey]Credentials saved to ./.automaton/config.json[/]");
+                await LoginWithDeviceAuthorizationAsync(config, cwd, server, global, device, asJson, checks);
             }
             catch (Exception ex)
             {
                 checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, false, ex.Message));
-                nextSteps.Add("Run automaton login with a valid API key");
+                nextSteps.Add("Run automaton login to start browser/device authorization");
                 var failure = new CommandDiagnosticResult { Success = false, Summary = "Login failed", Checks = checks, NextSteps = nextSteps.ToList() };
                 if (asJson)
                 {
@@ -122,23 +77,159 @@ public static class LoginCommand
                 {
                     CliDiagnosticsWriter.Write(failure);
                 }
+
                 Environment.ExitCode = 1;
             }
-        }, serverOption, keyOption, globalOption, jsonOption);
+        }, serverOption, keyOption, deviceOption, keyFromEnvOption, globalOption, jsonOption);
 
         return cmd;
     }
 
-    private static string? PromptForValue(string label, string? currentValue, bool secret)
+    private static async Task LoginWithDeviceAuthorizationAsync(
+        ConfigService config,
+        string cwd,
+        string server,
+        bool global,
+        bool forceDevice,
+        bool asJson,
+        List<CommandDiagnosticCheck> checks)
     {
-        var suffix = string.IsNullOrWhiteSpace(currentValue) ? string.Empty : " [leave blank to keep current]";
-        Console.Write($"{label}{suffix}: ");
-        var input = Console.ReadLine()?.Trim();
-        if (string.IsNullOrWhiteSpace(input))
+        using var client = new AutomatonApiClient(server);
+        var authorization = await client.CreateCliAuthorizationRequestAsync(Environment.MachineName);
+
+        if (!asJson)
         {
-            return currentValue;
+            AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
+            AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
+            AnsiConsole.MarkupLine($"[link={authorization.VerificationUrl}]{authorization.VerificationUrl}[/]");
+            AnsiConsole.MarkupLine($"Enter code: [bold]{authorization.UserCode}[/]");
         }
 
-        return input;
+        var browserOpened = !forceDevice && CliBrowserService.TryOpenUrl(authorization.VerificationUrl);
+        if (!browserOpened && !asJson)
+        {
+            AnsiConsole.MarkupLine("[yellow]A browser could not be opened. Open the URL above on another device.[/]");
+        }
+
+        if (!asJson)
+            AnsiConsole.MarkupLine("[grey]Waiting for authorization...[/]");
+
+        var deadline = DateTime.UtcNow.AddSeconds(authorization.ExpiresIn);
+        string? apiKey = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            var status = await client.PollCliAuthorizationAsync(authorization.RequestId, authorization.Verifier);
+            var state = status.TryGetProperty("status", out var stateProperty) ? stateProperty.GetString() : null;
+            if (string.Equals(state, "authorized", StringComparison.OrdinalIgnoreCase))
+            {
+                apiKey = status.GetProperty("apiKey").GetString();
+                break;
+            }
+
+            if (state is "expired" or "invalid" or "completed")
+                throw new InvalidOperationException("The CLI authorization request is no longer available.");
+
+            await Task.Delay(TimeSpan.FromSeconds(authorization.PollInterval));
+        }
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new TimeoutException("The CLI authorization request expired before it was approved.");
+
+        using var authenticatedClient = new AutomatonApiClient(server, apiKey);
+        var user = await authenticatedClient.GetUserProfileAsync();
+        await SaveCredentialsAsync(config, cwd, server, apiKey, global);
+
+        var displayName = GetUserDisplayName(user);
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
+
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = true,
+                summary = "Login complete",
+                checks = checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = Array.Empty<string>(),
+                authMode = "cliDeviceAuthorization",
+                storage = global ? "global" : "local",
+                server,
+                user = new { name = displayName }
+            });
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Signed in as [bold]{Markup.Escape(displayName)}[/]");
+        AnsiConsole.MarkupLine("[green]✓[/] Automaton CLI authorized");
+        AnsiConsole.MarkupLine(global
+            ? "[grey]✓ Credential saved securely to ~/.automaton/config.json[/]"
+            : "[grey]✓ Credential saved securely to ./.automaton/config.json[/]");
+    }
+
+    private static async Task LoginWithExistingKeyAsync(
+        ConfigService config,
+        string cwd,
+        string server,
+        string key,
+        bool global,
+        bool asJson,
+        List<CommandDiagnosticCheck> checks)
+    {
+        using var client = new AutomatonApiClient(server, key);
+        var user = await client.GetUserProfileAsync();
+        await SaveCredentialsAsync(config, cwd, server, key, global);
+
+        var displayName = GetUserDisplayName(user);
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, $"credentials validated against {server}"));
+        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
+        var result = new CommandDiagnosticResult { Success = true, Summary = "Login complete", Checks = checks, NextSteps = [] };
+
+        if (asJson)
+        {
+            CliJson.Write(new
+            {
+                success = true,
+                summary = result.Summary,
+                checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
+                nextSteps = result.NextSteps,
+                authMode = "apiKey",
+                storage = global ? "global" : "local",
+                server,
+                user = new { name = displayName }
+            });
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Authenticated as [bold]{Markup.Escape(displayName)}[/]");
+        AnsiConsole.MarkupLine(global
+            ? "[grey]Credentials saved to ~/.automaton/config.json[/]"
+            : "[grey]Credentials saved to ./.automaton/config.json[/]");
+    }
+
+    private static async Task SaveCredentialsAsync(ConfigService config, string cwd, string server, string apiKey, bool global)
+    {
+        var updated = new GlobalConfig { Server = server, ApiKey = apiKey };
+        if (global)
+            config.SaveGlobalConfig(updated);
+        else
+            config.SaveProjectLocalConfig(cwd, updated);
+
+        await Task.CompletedTask;
+    }
+
+    private static string GetUserDisplayName(System.Text.Json.JsonElement user)
+    {
+        if (user.TryGetProperty("name", out var name) && !string.IsNullOrWhiteSpace(name.GetString()))
+            return name.GetString()!;
+        if (user.TryGetProperty("email", out var email) && !string.IsNullOrWhiteSpace(email.GetString()))
+            return email.GetString()!;
+        return "Automaton user";
+    }
+
+    private static string PromptForApiKey()
+    {
+        return AnsiConsole.Prompt(
+            new TextPrompt<string>("API key")
+                .Secret());
     }
 }

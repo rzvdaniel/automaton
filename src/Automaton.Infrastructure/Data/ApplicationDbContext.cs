@@ -47,6 +47,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<RecentActivity> RecentActivities { get; set; }
         public virtual DbSet<ApiKey> ApiKeys { get; set; }
         public virtual DbSet<ApiKeyUser> ApiKeyUsers { get; set; }
+        public virtual DbSet<CliAuthorizationRequest> CliAuthorizationRequests { get; set; }
         public virtual DbSet<AiApiKey> AiApiKeys { get; set; }
         public virtual DbSet<AiProvider> AiProviders { get; set; }
         public virtual DbSet<AiModel> AiModels { get; set; }
@@ -694,6 +695,19 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => e.ApiKeyId, "IX_ApiKeyUser_ApiKeyId");
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.ApiKeyId).IsRequired();
+            });
+
+            modelBuilder.Entity<CliAuthorizationRequest>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UserCode).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.HashedVerifier).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.DeviceName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.RemoteIp).HasMaxLength(64);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.HasIndex(e => e.UserCode).IsUnique();
+                entity.HasIndex(e => e.ExpiresAt);
             });
 
             modelBuilder.Entity<AiApiKey>(entity =>

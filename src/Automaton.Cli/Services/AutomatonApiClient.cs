@@ -21,14 +21,17 @@ public class AutomatonApiClient : IDisposable
         DefaultIgnoreCondition       = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public AutomatonApiClient(string serverUrl, string apiKey)
+    public AutomatonApiClient(string serverUrl, string? apiKey = null)
     {
         _http = new HttpClient
         {
             BaseAddress = new Uri(serverUrl.TrimEnd('/') + "/"),
             Timeout     = TimeSpan.FromMinutes(5)
         };
-        _http.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            _http.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        }
     }
 
     // ── Apps ──────────────────────────────────────────────────────────────────
@@ -86,6 +89,29 @@ public class AutomatonApiClient : IDisposable
     {
         var payload = JsonSerializer.Serialize(new { name, description, scope }, JsonOptions);
         using var resp = await PostJsonAsync("api/ApiKeys", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<CliAuthorizationResponse> CreateCliAuthorizationRequestAsync(string deviceName, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { deviceName }, JsonOptions);
+        using var resp = await PostJsonAsync("api/cli-auth/requests", payload, ct);
+        await EnsureSuccessAsync(resp);
+        var json = await ReadJsonAsync(resp, ct);
+        return new CliAuthorizationResponse(
+            json.GetProperty("requestId").GetGuid(),
+            json.GetProperty("userCode").GetString()!,
+            json.GetProperty("verifier").GetString()!,
+            json.GetProperty("verificationUrl").GetString()!,
+            json.GetProperty("expiresIn").GetInt32(),
+            json.GetProperty("pollInterval").GetInt32());
+    }
+
+    public async Task<JsonElement> PollCliAuthorizationAsync(Guid requestId, string verifier, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { verifier }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/cli-auth/requests/{requestId}/poll", payload, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
     }
@@ -308,3 +334,11 @@ public class AutomatonApiClient : IDisposable
 
     public void Dispose() => _http.Dispose();
 }
+
+public sealed record CliAuthorizationResponse(
+    Guid RequestId,
+    string UserCode,
+    string Verifier,
+    string VerificationUrl,
+    int ExpiresIn,
+    int PollInterval);

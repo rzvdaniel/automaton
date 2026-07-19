@@ -38,10 +38,20 @@ Users cannot manually create **Runner** or **Infrastructure Runner enrollment** 
 
 ## CLI authentication
 
-Use a Developer / CLI key with the CLI:
+The normal CLI flow does not require manually creating a key. Run:
 
 ```bash
-automaton login --key ak_developer_xxx
+automaton login
+```
+
+The CLI opens Studio for explicit approval and creates a Developer / CLI credential
+only after approval. On a headless machine, use `automaton login --device` and open
+the displayed URL and code on another device.
+
+For existing or unattended credentials, use:
+
+```bash
+automaton login --key-from-env
 automaton deploy
 automaton publish
 ```
@@ -52,5 +62,3 @@ For unattended environments, prefer an environment variable or a masked prompt r
 $env:AUTOMATON_API_KEY = "ak_developer_xxx"
 automaton login
 ```
-
-Browser and device authorization for `automaton login` is planned. It should create a Developer / CLI key only after explicit approval in Studio.

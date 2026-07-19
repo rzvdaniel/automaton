@@ -94,7 +94,10 @@ The wrong conclusion is:
 
 - "I do not know this framework, so I will build a generic app"
 
-Do not paste your API key directly into the AI chat. Paste it into the terminal when `automaton login` asks for it.
+Do not paste API keys into the AI chat. The normal `automaton login` flow opens Studio
+and asks you to approve the CLI on this device. If no browser is available, open the
+displayed URL and code on another device. Manual keys are for advanced or unattended
+scenarios.
 
 ---
 
@@ -106,12 +109,17 @@ Authenticate the current machine or workspace:
 automaton login
 ```
 
-Get an API key from **API Keys → Generate New Key** (scope: `execute`).
-
-Explicit key login is still available when you need it:
+`automaton login` opens Studio and creates a Developer / CLI credential after explicit
+approval. For a remote or headless machine, force the device-code presentation:
 
 ```bash
-automaton login --key ak_developer_xxx
+automaton login --device
+```
+
+For CI/CD and other unattended environments, use a secret-manager environment variable:
+
+```bash
+automaton login --key-from-env
 automaton config --show
 ```
 
@@ -199,11 +207,17 @@ For an explicit no-build static app, use:
 
 ### `automaton login`
 
-Store CLI credentials and validate them against the server.
+Authorize the CLI through Studio and store the resulting Developer credential.
 
 ```bash
 automaton login
 ```
+
+Options:
+
+- `--device` — force the headless/device-code presentation;
+- `--key-from-env` — use `AUTOMATON_API_KEY` for unattended authentication; and
+- `--key <value>` — validate and store an existing key when explicitly required.
 
 By default, `login` uses the hosted Automaton server and saves credentials locally for the current project.
 
