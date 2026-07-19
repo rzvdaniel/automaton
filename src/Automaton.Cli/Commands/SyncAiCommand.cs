@@ -26,7 +26,7 @@ public static class SyncAiCommand
         cmd.SetHandler((string adapter, bool asJson, string? environmentName) =>
         {
             var cwd = Directory.GetCurrentDirectory();
-            var result = Sync(config, cwd, adapter, environmentName);
+            var result = Sync(config, cwd, adapter, environmentName, asJson);
 
             if (asJson)
             {
@@ -65,11 +65,18 @@ public static class SyncAiCommand
         return cmd;
     }
 
-    private static SyncAiResult Sync(ConfigService config, string directory, string adapter, string? environmentName)
+    private static SyncAiResult Sync(ConfigService config, string directory, string adapter, string? environmentName, bool nonInteractive)
     {
         try
         {
-            var (server, apiKey) = config.RequireCredentials(directory: directory, environmentName: environmentName);
+            var (server, apiKey) = nonInteractive
+                ? config.ResolveCredentials(directory: directory, environmentName: environmentName)
+                : config.RequireCredentials(directory: directory, environmentName: environmentName);
+            if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
+            {
+                throw new InvalidOperationException("CLI credentials are not configured. Run automaton login before syncing AI guidance.");
+            }
+
             using var client = new AutomatonApiClient(server, apiKey);
             var references = client.GetAiGuidanceExportAsync().GetAwaiter().GetResult();
             var syncResult = new AiGuidancePackService().Sync(directory, references, adapter);
