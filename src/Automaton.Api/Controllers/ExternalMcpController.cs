@@ -22,7 +22,7 @@ namespace Automaton.Api.Controllers;
 ///       "automaton": {
 ///         "type": "http",
 ///         "url": "https://your-server/api/mcp",
-///         "headers": { "X-API-Key": "ak_execute_xxx" }
+///         "headers": { "X-API-Key": "ak_workflow_xxx" }
 ///       }
 ///     }
 ///   }
@@ -42,9 +42,9 @@ namespace Automaton.Api.Controllers;
 ///   automaton runners  — list runners
 ///
 /// ## Auth
-///   X-API-Key: ak_execute_xxx  (header)
-///   ?api_key=ak_execute_xxx    (query parameter)
-///   Authorization: Bearer ak_execute_xxx  (Bearer with ak_ prefix)
+///   X-API-Key: ak_workflow_xxx  (header)
+///   ?api_key=ak_workflow_xxx    (query parameter)
+///   Authorization: Bearer ak_workflow_xxx  (Bearer with ak_ prefix)
 /// </summary>
 [ApiController]
 [Route("api/mcp")]

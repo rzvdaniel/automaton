@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.RegularExpressions;
@@ -28,6 +29,39 @@ public class ApiKeyServiceTests
             "API-key management should use the default web/JWT policy, not the API-key policy.");
         Assert.That(validationMethod, Is.Not.Null);
         Assert.That(validationMethod!.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true), Is.Not.Empty);
+    }
+
+    [TestCase(ApiKeyScope.Developer)]
+    [TestCase(ApiKeyScope.ReadOnly)]
+    [TestCase(ApiKeyScope.WorkflowExecution)]
+    [TestCase(ApiKeyScope.WebApp)]
+    public void UserCreatableScopes_AllowOnlyUserFacingKeyTypes(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeysController.UserCreatableScopes, Does.Contain(scope));
+    }
+
+    [TestCase(ApiKeyScope.Runner)]
+    [TestCase(ApiKeyScope.FullAccess)]
+    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    public void UserCreatableScopes_RejectSystemAndLegacyBroadKeyTypes(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeysController.UserCreatableScopes, Does.Not.Contain(scope));
+    }
+
+    [TestCase(ApiKeyScope.Runner)]
+    [TestCase(ApiKeyScope.FullAccess)]
+    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    public async Task CreateApiKey_RejectsNonUserCreatableScopes(ApiKeyScope scope)
+    {
+        var controller = new ApiKeysController(null!, null!, null!, null!);
+
+        var result = await controller.CreateApiKey(new CreateApiKeyRequest
+        {
+            Name = "Invalid key",
+            Scope = scope
+        });
+
+        Assert.That(result, Is.TypeOf<BadRequestObjectResult>());
     }
 
     [Test]

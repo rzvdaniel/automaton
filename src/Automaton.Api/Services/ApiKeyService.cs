@@ -46,7 +46,7 @@ public class ApiKeyService
         var prefix = scope switch
         {
             ApiKeyScope.ReadOnly => "ak_readonly_",
-            ApiKeyScope.Execute => "ak_execute_",
+            ApiKeyScope.WorkflowExecution => "ak_workflow_",
             ApiKeyScope.Runner => "ak_runner_",
             ApiKeyScope.WebApp => "ak_webapp_",
             ApiKeyScope.InfrastructureRunnerEnroll => "ak_infra_enroll_",

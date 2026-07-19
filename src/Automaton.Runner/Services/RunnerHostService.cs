@@ -939,13 +939,13 @@ public class RunnerHostService
                 WriteLine("?? Authentication troubleshooting:");
                 WriteLine("1. Verify the API key is valid (run 'auth' command with a valid key first)");
                 WriteLine("2. Check if the API key has expired in Automaton Studio");
-                WriteLine("3. Ensure the API key has sufficient scope (Runner, Execute, or FullAccess)");
+                WriteLine("3. Ensure the API key has the Runner scope (or a legacy FullAccess scope)");
                 WriteLine("4. Verify the Automaton Studio server is running and accessible");
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission for runner registration.");
-                WriteLine("?? Ensure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly').");
+                WriteLine("?? Ensure the API key has the 'Runner' scope (legacy 'FullAccess' is also accepted; 'ReadOnly' is not).");
             }
 
             return false;

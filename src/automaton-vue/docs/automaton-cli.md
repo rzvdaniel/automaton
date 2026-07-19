@@ -111,7 +111,7 @@ Get an API key from **API Keys → Generate New Key** (scope: `execute`).
 Explicit key login is still available when you need it:
 
 ```bash
-automaton login --key ak_execute_xxx
+automaton login --key ak_developer_xxx
 automaton config --show
 ```
 

@@ -1558,7 +1558,7 @@ public class AppsController : BaseController
     /// <remarks>
     /// curl example:
     ///   curl -X POST https://your-server/api/apps/{id}/upload \
-    ///     -H "X-API-Key: ak_execute_xxx" \
+    ///     -H "X-API-Key: ak_developer_xxx" \
     ///     -F "file=@myapp.zip"
     /// </remarks>
     [HttpPost("{id}/upload")]

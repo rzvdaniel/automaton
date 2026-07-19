@@ -11,9 +11,15 @@ public enum ApiKeyScope
     ReadOnly = 1,
     
     /// <summary>
-    /// Can execute workflows (includes ReadOnly permissions)
+    /// Can execute workflows (includes ReadOnly permissions).
     /// </summary>
-    Execute = 2,
+    WorkflowExecution = 2,
+
+    /// <summary>
+    /// Compatibility alias for the former Execute scope name.
+    /// </summary>
+    [Obsolete("Use WorkflowExecution instead.")]
+    Execute = WorkflowExecution,
     
     /// <summary>
     /// Runner credential used by registered runner processes.

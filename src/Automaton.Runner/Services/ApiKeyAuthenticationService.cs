@@ -143,7 +143,7 @@ public class ApiKeyAuthenticationService
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 WriteLine("The API key is valid but doesn't have permission to access runner operations.");
-                WriteLine("🔧 Make sure the API key has 'Runner', 'Execute', or 'FullAccess' scope (not 'ReadOnly') in Automaton Studio.");
+                WriteLine("🔧 Make sure the API key has the 'Runner' scope (legacy 'FullAccess' is also accepted; 'ReadOnly' is not) in Automaton Studio.");
             }
 
             return false;

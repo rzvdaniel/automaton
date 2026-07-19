@@ -24,7 +24,7 @@ Read account and execution data for monitoring, reporting, and dashboards. It ca
 
 ### Workflow Execution
 
-The internal scope remains `Execute` (value `2`, prefix `ak_execute_`) for compatibility. The user-facing name is **Workflow Execution**. It can run workflows and read their execution status, but does not provide general app-management access.
+The internal scope is `WorkflowExecution` (value `2`, prefix `ak_workflow_`). It can run workflows and read their execution status, but does not provide general app-management access. Existing `ak_execute_` credentials remain valid as legacy credentials.
 
 ### Web App (Experimental)
 

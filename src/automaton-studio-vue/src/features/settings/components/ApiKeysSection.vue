@@ -49,8 +49,9 @@ const createForm = ref<CreateApiKeyRequest>({
 
 // Advanced key types. Developer / CLI is the default and does not require a choice.
 const advancedScopeOptions = [
+  { label: 'Developer / CLI — Recommended', value: ApiKeyScope.Developer },
   { label: 'Read Only', value: ApiKeyScope.ReadOnly },
-  { label: 'Workflow Execution', value: ApiKeyScope.Execute },
+  { label: 'Workflow Execution', value: ApiKeyScope.WorkflowExecution },
   { label: 'Web App (Experimental)', value: ApiKeyScope.WebApp },
 ]
 
@@ -281,7 +282,7 @@ onMounted(() => {
       </template>
     </Column>
 
-    <Column field="scope" header="Scope" :sortable="true">
+    <Column field="scope" header="Key type" :sortable="true">
       <template #body="{ data }">
         <Tag :value="getScopeDisplayName(data.scope)" :severity="getScopeSeverity(data.scope)" />
       </template>

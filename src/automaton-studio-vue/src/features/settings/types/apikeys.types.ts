@@ -8,7 +8,7 @@
  */
 export const ApiKeyScope = {
   ReadOnly: 1,
-  Execute: 2,
+  WorkflowExecution: 2,
   Runner: 3,
   FullAccess: 4,
   WebApp: 5,
@@ -65,7 +65,7 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
   switch (scope) {
     case ApiKeyScope.ReadOnly:
       return 'Read Only'
-    case ApiKeyScope.Execute:
+    case ApiKeyScope.WorkflowExecution:
       return 'Workflow Execution'
     case ApiKeyScope.Runner:
       return 'Runner'
@@ -89,7 +89,7 @@ export function getScopeSeverity(
   switch (scope) {
     case ApiKeyScope.ReadOnly:
       return 'info'
-    case ApiKeyScope.Execute:
+    case ApiKeyScope.WorkflowExecution:
       return 'info'
     case ApiKeyScope.Runner:
       return 'info'
@@ -123,7 +123,7 @@ automaton publish`
 automaton-runner auth --api-key ${apiKey}
 export AUTOMATON_API_KEY="${apiKey}"`
 
-    case ApiKeyScope.Execute:
+    case ApiKeyScope.WorkflowExecution:
       return `Use this Workflow Execution key to run workflows and read their execution status.
 
 It does not provide general app-management access.`
