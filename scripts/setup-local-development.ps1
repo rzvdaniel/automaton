@@ -20,7 +20,7 @@ $helpers = Join-Path $PSScriptRoot 'local'
 if ($Reset) {
     Write-Warning 'Resetting the runtime-local stack will remove its containers, volumes, and hosted-runner containers.'
     docker compose -f $composeFile down --volumes --remove-orphans
-    $runnerNames = @(docker ps -a --filter 'name=automaton-hosted-runner-' --format '{{.Names}}')
+    $runnerNames = @(docker ps -a --filter 'label=automaton.environment=runtime-local' --filter 'label=automaton.compose-project=automaton-runtime-local' --format '{{.Names}}')
     foreach ($runnerName in $runnerNames) {
         if ($runnerName) { docker rm -f $runnerName | Out-Null }
     }
@@ -62,6 +62,7 @@ if ($ProvisionTestRunner) {
         } else {
             Write-Host "[OK] $email already has the active default plan; no plan mutation was sent." -ForegroundColor Green
         }
+        Invoke-RestMethod -Uri "https://api.automaton.test:8443/api/admin/hosted-runners/users/$($user.userId)/provision" -Method Post -Headers $headers -ContentType 'application/json' -Body '{}' -SkipCertificateCheck -TimeoutSec 30 | Out-Null
         $deadline = (Get-Date).AddMinutes(3)
         do {
             Start-Sleep -Seconds 5

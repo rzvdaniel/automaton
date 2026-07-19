@@ -119,11 +119,14 @@ Useful options:
 ```
 
 `-Reset` is destructive: it removes the runtime-local containers and volumes and
-any managed hosted-runner containers. It is never used during a normal setup.
+only managed hosted-runner containers carrying the runtime-local ownership labels.
+It is never used during a normal setup. Hosted runner containers created by another
+checkout or environment are intentionally left untouched.
 `-ProvisionTestRunner` prompts for an existing local administrator account, assigns
-the active default plan through the API, and waits for the real hosted-runner
-provisioning flow to reach `running`. The smoke-test application deployment is
-still performed separately through the normal CLI workflow.
+the active default plan when needed, explicitly requests hosted-runner provisioning
+through the API, and waits for the real provisioning flow to reach `running`. The
+smoke-test application deployment is still performed separately through the normal
+CLI workflow.
 
 ## Managed runners
 

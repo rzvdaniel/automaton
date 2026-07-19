@@ -6,17 +6,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $composeFile = Join-Path $RepositoryRoot 'docker-compose.runtime-local.yml'
-$baseUrls = @(
-    'https://api.automaton.test:8443/healthz',
-    'https://studio.automaton.test:8443',
-    'https://apps.automaton.test:8443/healthz'
+$expectedEndpoints = @(
+    @{ Name = 'API'; Uri = 'https://api.automaton.test:8443/healthz' },
+    @{ Name = 'Studio'; Uri = 'https://studio.automaton.test:8443' },
+    @{ Name = 'Website'; Uri = 'https://website.automaton.test:8443' },
+    @{ Name = 'Traefik'; Uri = 'http://localhost:8082/ping' }
 )
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 do {
     $apiReady = $false
     try {
-        $response = Invoke-WebRequest -Uri $baseUrls[0] -UseBasicParsing -SkipCertificateCheck -TimeoutSec 10
+        $response = Invoke-WebRequest -Uri $expectedEndpoints[0].Uri -UseBasicParsing -SkipCertificateCheck -TimeoutSec 10
         $apiReady = $response.StatusCode -eq 200
     } catch { }
     if ($apiReady) { break }
@@ -25,15 +26,13 @@ do {
 
 if (-not $apiReady) { throw "API did not become ready within $TimeoutSeconds seconds." }
 
-foreach ($url in $baseUrls[1..2]) {
+foreach ($endpoint in $expectedEndpoints) {
+    $url = $endpoint.Uri
     try {
         $response = Invoke-WebRequest -Uri $url -UseBasicParsing -SkipCertificateCheck -TimeoutSec 10
-        if ($response.StatusCode -ge 500) { throw "HTTP $($response.StatusCode)" }
+        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) { throw "HTTP $($response.StatusCode)" }
     } catch {
-        $statusCode = $_.Exception.Response.StatusCode.value__
-        if ($statusCode -lt 200 -or $statusCode -ge 500) {
-            throw "Local runtime endpoint failed: $url ($($_.Exception.Message))"
-        }
+        throw "Local runtime endpoint failed: $($endpoint.Name) $url ($($_.Exception.Message))"
     }
 }
 
@@ -56,10 +55,10 @@ SELECT CONCAT(
   '|', (SELECT COUNT(*) FROM HostedRunnerPlatformSettings WHERE ProvisioningEnabled = 1)
 );
 '@
-$bootstrapState = ($bootstrapSql | docker exec -i automaton-runtime-local-mysql mysql -uroot "-p$mysqlRootPassword" -D automaton -N -B 2>$null).Trim()
+$bootstrapState = ($bootstrapSql | docker compose -f $composeFile exec -T mysql mysql -uroot "-p$mysqlRootPassword" -D automaton -N -B 2>$null).Trim()
 if ($bootstrapState -ne '1|1|1|1') {
     throw "Local API bootstrap state is incomplete. Expected host, default plan, free specification, and provisioning enabled; got '$bootstrapState'."
 }
 
-Write-Host '[OK] API, Studio, Apps, and required runtime services are ready.' -ForegroundColor Green
+Write-Host '[OK] API, Studio, Website, Traefik, and required runtime services are ready.' -ForegroundColor Green
 Write-Host '[OK] Local runner host, seeded plan/specification, and provisioning setting are valid.' -ForegroundColor Green

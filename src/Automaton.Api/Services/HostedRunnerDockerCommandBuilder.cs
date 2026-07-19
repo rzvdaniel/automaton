@@ -33,6 +33,8 @@ public static class HostedRunnerDockerCommandBuilder
         {
             "docker run -d",
             $"--name {ShellQuote(runner.ContainerName)}",
+            "--label automaton.environment=runtime-local",
+            "--label automaton.compose-project=automaton-runtime-local",
             "--restart unless-stopped",
             $"--cpus {ShellQuote(cpu)}",
             $"--memory {ShellQuote($"{resources.MemoryLimitMb}m")}",
