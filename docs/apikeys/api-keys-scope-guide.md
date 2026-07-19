@@ -1,142 +1,56 @@
-# API Key Scopes and Permissions
+# API Key Types and Permissions
 
-## ?? **Recommended Approach**
+Automaton uses API keys for the CLI, workflow integrations, web apps, and managed runner processes.
 
-We've implemented a **hierarchical permission system** with **FullAccess as the default** to solve the confusion around which scope to choose for console runners.
+## Developer / CLI
 
-## ?? **API Key Scopes**
+The recommended user-created key type is **Developer / CLI** (internal scope value `7`, prefix `ak_developer_`). Use it with the Automaton CLI to:
 
-### **FullAccess (Recommended for Console Runners)** ??
-- **Value**: `4`
-- **Permissions**: All operations
-- **Use Cases**:
-  - ? Automaton.Runner.Console applications
-  - ? Automation scripts and CI/CD pipelines
-  - ? Development and testing environments
-  - ? Users who want "one key for everything"
+- read and update the user's apps;
+- deploy frontend and backend source;
+- publish and unpublish apps;
+- read deployment status and logs; and
+- download AI guidance and run ordinary user workflows.
 
-**What it can do**:
-- Register runners with the server
-- Execute workflows sent from the server
-- Read flow definitions and execution history
-- Report execution status and logs
-- All future permissions automatically included
+Developer keys do not grant API-key management, billing, administration, infrastructure-runner enrollment, or access to another user's resources. Studio account and administrator policies still apply separately.
 
-### **Runner** ??  
-- **Value**: `3`
-- **Permissions**: Runner operations + Execute + ReadOnly
-- **Use Cases**:
-  - ? Dedicated runner services
-  - ? Specific runner deployments
-  - ? When you want to limit to runner-specific operations
+## Advanced key types
 
-**What it can do**:
-- Register and operate runners
-- Execute workflows
-- Read flows and executions
-- Cannot access admin/management functions (future)
+Advanced types are available when an integration needs a narrower credential:
 
-### **Execute** ??
-- **Value**: `2` 
-- **Permissions**: Execute workflows + ReadOnly
-- **Use Cases**:
-  - ? External systems that trigger workflows
-  - ? API integrations that only execute
-  - ? CI/CD systems that run specific workflows
+### Read Only
 
-**What it can do**:
-- Execute workflows via API
-- Read flow definitions
-- Read execution history
-- Cannot register runners
+Read account and execution data for monitoring, reporting, and dashboards. It cannot mutate apps or execute workflows.
 
-### **ReadOnly** ??
-- **Value**: `1`
-- **Permissions**: Read-only access
-- **Use Cases**:
-  - ? Monitoring and reporting tools
-  - ? Dashboards and analytics
-  - ? Audit and compliance systems
+### Workflow Execution
 
-**What it can do**:
-- Read flow definitions
-- Read execution history and logs
-- Cannot execute or modify anything
+The internal scope remains `Execute` (value `2`, prefix `ak_execute_`) for compatibility. The user-facing name is **Workflow Execution**. It can run workflows and read their execution status, but does not provide general app-management access.
 
-## ?? **Why This Approach Works**
+### Web App (Experimental)
 
-### **1. Eliminates User Confusion**
-- **Default**: `FullAccess` - works for 95% of use cases
-- **Clear hierarchy**: Each scope includes permissions from lower levels
-- **Simple choice**: "Do I need restrictions? If not, use FullAccess"
+Web App keys remain experimental. They should not be embedded in browser code as permanent account-wide secrets. A future implementation should bind them to one app and use a restricted runtime identity or short-lived token exchange.
 
-### **2. Perfect for Console Runners**
-The `Automaton.Runner.Console` needs to:
-- ? **Register** itself with the server (Runner permission)
-- ? **Execute** workflows sent by the server (Execute permission)  
-- ? **Read** flow definitions and report status (ReadOnly permission)
+## System-generated credentials
 
-**FullAccess** provides all of these capabilities with a single key.
+Users cannot manually create **Runner** or **Infrastructure Runner enrollment** keys. Automaton generates those credentials for managed runner and host-registration workflows.
 
-### **3. Security Through Scope Limitation**
-When you DO need restrictions:
-- **ReadOnly**: For monitoring tools that shouldn't execute anything
-- **Execute**: For systems that run workflows but shouldn't register runners
-- **Runner**: For dedicated runner services with defined boundaries
+**Full Access** is retained only for legacy credentials and compatibility. It is not offered as a new user-facing key type.
 
-### **4. Future-Proof Design**
-- New permissions can be added to FullAccess automatically
-- Existing keys continue to work
-- Clear upgrade path from restricted to full access
+## CLI authentication
 
-## ?? **User Experience Flow**
+Use a Developer / CLI key with the CLI:
 
-### **Simple Path (95% of users)**:
-1. Click "Create API Key"
-2. Enter name: "My Console Runner" 
-3. **Scope is pre-selected as "FullAccess"** ?
-4. Click "Create" - works immediately with console runner
-
-### **Advanced Path (5% of users)**:
-1. Click "Create API Key"
-2. Enter name and choose specific scope for security/compliance
-3. Create key with limited permissions
-
-## ?? **Permission Matrix**
-
-| Operation | ReadOnly | Execute | Runner | FullAccess |
-|-----------|:--------:|:-------:|:------:|:----------:|
-| Read flows and executions | ? | ? | ? | ? |
-| Execute workflows | ? | ? | ? | ? |
-| Register runners | ? | ? | ? | ? |
-| All current permissions | ? | ? | ? | ? |
-| Future permissions | ? | ? | ? | ? |
-
-## ?? **UI Visual Hierarchy**
-
-```
-?? FullAccess    - Purple (Premium/Complete)
-?? Runner        - Blue (Primary runner color)
-?? Execute       - Green (Action/Go)
-?? ReadOnly      - Orange (Warning/Limited)
-```
-
-## ?? **Console Runner Documentation Update**
-
-The README now recommends:
 ```bash
-# 1. Create API key in Studio (FullAccess scope - default)
-# 2. Use with console runner
-export AUTOMATON_API_KEY="ak_fullaccess_1234567890abcdef"
-automaton-runner run --name "My-Runner" --server https://localhost:7091
+automaton login --key ak_developer_xxx
+automaton deploy
+automaton publish
 ```
 
-## ? **Benefits Achieved**
+For unattended environments, prefer an environment variable or a masked prompt rather than placing a secret directly in shell history:
 
-1. **?? Zero Confusion**: Default scope works for everyone
-2. **?? Better UX**: One-click setup for console runners  
-3. **?? Security Options**: Advanced users can still restrict permissions
-4. **?? Future-Proof**: Automatic inclusion of new permissions
-5. **?? Fully Tested**: 14 passing unit tests cover all scenarios
+```powershell
+$env:AUTOMATON_API_KEY = "ak_developer_xxx"
+automaton login
+```
 
-The hierarchical scope system provides the **best of both worlds**: simplicity for most users and flexibility for advanced security requirements! ??
+Browser and device authorization for `automaton login` is planned. It should create a Developer / CLI key only after explicit approval in Studio.

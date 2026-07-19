@@ -72,8 +72,8 @@ public sealed class InfrastructureRunnerRegistrationService(
             (rawPermanentKey, permanentKey) = await apiKeyService.CreateApiKeyAsync(
                 ownerId,
                 $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
+                ApiKeyScope.Runner,
                 "Issued by Infrastructure Runner self-registration.",
-                scope: ApiKeyScope.Runner,
                 saveChanges: false);
 
             if (existingRunner.ApiKeyId.HasValue)
@@ -91,8 +91,8 @@ public sealed class InfrastructureRunnerRegistrationService(
             (rawPermanentKey, permanentKey) = await apiKeyService.CreateApiKeyAsync(
                 ownerId,
                 $"Infrastructure Runner - {request.RunnerName}"[..Math.Min(100, $"Infrastructure Runner - {request.RunnerName}".Length)],
+                ApiKeyScope.Runner,
                 "Issued by Infrastructure Runner self-registration.",
-                scope: ApiKeyScope.Runner,
                 saveChanges: false);
 
             runner = new Runner

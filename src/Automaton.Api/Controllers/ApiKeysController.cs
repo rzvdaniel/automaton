@@ -11,6 +11,7 @@ namespace Automaton.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class ApiKeysController : BaseController
 {
     private readonly ApiKeyService apiKeyService;
@@ -47,9 +48,9 @@ public class ApiKeysController : BaseController
         var (apiKey, entity) = await apiKeyService.CreateApiKeyAsync(
             userId,
             request.Name,
+            request.Scope,
             request.Description,
-            request.ExpiresAt,
-            request.Scope);
+            request.ExpiresAt);
 
         return Ok(new CreateApiKeyResponse
         {
@@ -118,7 +119,7 @@ public class ApiKeysController : BaseController
 
         if (apiKeyEntity.Scope == ApiKeyScope.ReadOnly)
         {
-            return Forbid("API key does not have sufficient permissions for runner operations. Required: Runner, Execute, or FullAccess scope.");
+            return Forbid("API key does not have sufficient permissions for runner operations. Required: Runner, Workflow Execution, or Full Access scope.");
         }
 
         var userId = await dbContext.ApiKeyUsers

@@ -117,13 +117,13 @@ Before publishing to NuGet.org, you can test the exact package locally.
 Example:
 
 ```powershell
-automaton config --server https://api.automaton.monster --key ak_execute_xxx
+automaton config --server https://api.automaton.monster --key ak_developer_xxx
 ```
 
 If you want shared machine-wide settings instead, use:
 
 ```powershell
-automaton config --global --server https://api.automaton.monster --key ak_execute_xxx
+automaton config --global --server https://api.automaton.monster --key ak_developer_xxx
 ```
 
 The global path remains:

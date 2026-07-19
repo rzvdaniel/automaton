@@ -6,13 +6,30 @@ using System.Text.RegularExpressions;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Api.Controllers;
 using Automaton.Core.Enums;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Automaton.Api.Tests;
 
 [TestFixture]
 public class ApiKeyServiceTests
 {
+    [Test]
+    public void ApiKeyManagementRequiresWebAuthentication_WhileValidationRemainsAnonymous()
+    {
+        var controllerAuthorization = typeof(ApiKeysController)
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .Single();
+        var validationMethod = typeof(ApiKeysController).GetMethod(nameof(ApiKeysController.ValidateApiKey));
+
+        Assert.That(controllerAuthorization.Policy, Is.Null,
+            "API-key management should use the default web/JWT policy, not the API-key policy.");
+        Assert.That(validationMethod, Is.Not.Null);
+        Assert.That(validationMethod!.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true), Is.Not.Empty);
+    }
+
     [Test]
     public void SanitizeMetadataJson_RedactsSensitiveKeys()
     {
@@ -107,7 +124,10 @@ public class ApiKeyServiceTests
             authorizationService: null!,
             auditEventService);
 
-        var (apiKey, entity) = await service.CreateApiKeyAsync(userId, "Runner Key");
+        var (apiKey, entity) = await service.CreateApiKeyAsync(
+            userId,
+            "Developer CLI Key",
+            ApiKeyScope.Developer);
 
         Assert.That(entity.Scope, Is.EqualTo(ApiKeyScope.Developer));
         Assert.That(apiKey, Does.StartWith("ak_developer_"));
@@ -140,7 +160,7 @@ public class ApiKeyServiceTests
         var (_, entity) = await service.CreateApiKeyAsync(
             userId,
             "Infrastructure enrollment",
-            scope: ApiKeyScope.InfrastructureRunnerEnroll,
+            ApiKeyScope.InfrastructureRunnerEnroll,
             maximumUses: 1);
 
         Assert.That(await service.RevokeInfrastructureRunnerEnrollmentKeyAsync(entity.Id, userId), Is.True);

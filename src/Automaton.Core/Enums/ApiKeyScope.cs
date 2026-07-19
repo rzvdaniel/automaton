@@ -38,6 +38,7 @@ public enum ApiKeyScope
 
     /// <summary>
     /// Developer credential for the Automaton CLI and normal app lifecycle operations.
+    /// It does not grant API-key management, administration, billing, or infrastructure enrollment access.
     /// </summary>
     Developer = 7
 }

@@ -217,8 +217,8 @@ public sealed class RunnerEnrollmentService(
         var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
             enrollment.RequestedByUserId,
             $"Infrastructure Runner - {runnerName}"[..Math.Min(100, $"Infrastructure Runner - {runnerName}".Length)],
+            ApiKeyScope.Runner,
             "Issued by one-time Infrastructure Runner enrollment.",
-            scope: ApiKeyScope.Runner,
             saveChanges: false);
 
         var runner = new Runner

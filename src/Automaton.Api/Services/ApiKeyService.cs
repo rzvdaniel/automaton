@@ -34,9 +34,9 @@ public class ApiKeyService
     public async Task<(string apiKey, ApiKey entity)> CreateApiKeyAsync(
         Guid userId,
         string name,
+        ApiKeyScope scope,
         string? description = null,
         DateTime? expiresAt = null,
-        ApiKeyScope scope = ApiKeyScope.Developer,
         Guid? projectId = null,
         bool saveChanges = true,
         int? maximumUses = null)

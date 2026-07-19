@@ -70,7 +70,7 @@ public class AiGuidancePackServiceTests
         Assert.That(agentsContent, Does.Contain("This is an Automaton-managed local project"));
         Assert.That(agentsContent, Does.Contain("Do not invent a generic project structure before making that decision"));
         Assert.That(agentsContent, Does.Contain("automaton validate"));
-        Assert.That(agentsContent, Does.Contain("Do not create FastAPI, Flask, Express, or custom HTTP servers inside an Automaton backend"));
+        Assert.That(agentsContent, Does.Contain("Do not create Express, FastAPI, Flask, or custom HTTP servers unless Automaton guidance explicitly requires them"));
         Assert.That(agentsContent, Does.Contain("Do not treat this file as the full policy"));
         Assert.That(agentsContent, Does.Contain("If it does not exist and the user wants a new app here, run `automaton new"));
         Assert.That(agentsContent, Does.Contain("Do not run `automaton publish` unless the user explicitly requests publishing"));

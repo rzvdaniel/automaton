@@ -50,8 +50,8 @@ const createForm = ref<CreateApiKeyRequest>({
 // Advanced key types. Developer / CLI is the default and does not require a choice.
 const advancedScopeOptions = [
   { label: 'Read Only', value: ApiKeyScope.ReadOnly },
-  { label: 'Execute', value: ApiKeyScope.Execute },
-  { label: 'Web App', value: ApiKeyScope.WebApp },
+  { label: 'Workflow Execution', value: ApiKeyScope.Execute },
+  { label: 'Web App (Experimental)', value: ApiKeyScope.WebApp },
 ]
 
 // Load API keys
@@ -338,7 +338,7 @@ onMounted(() => {
         <InputText
           id="apiKeyName"
           v-model="createForm.name"
-          placeholder="My API Key"
+          placeholder="Development laptop, CI deployment, production VM…"
           class="w-full"
         />
       </div>
@@ -365,7 +365,7 @@ onMounted(() => {
           class="w-full"
         />
         <Button
-          :label="showAdvancedScopes ? 'Use Developer / CLI key' : 'Choose another key type'"
+          :label="showAdvancedScopes ? 'Hide advanced key types' : 'Show advanced key types'"
           link
           class="align-self-start p-0"
           @click="toggleAdvancedScopes"

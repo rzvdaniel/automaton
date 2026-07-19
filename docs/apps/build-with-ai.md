@@ -107,8 +107,8 @@ The rules are intentionally strict:
 ### Prerequisites
 
 1. **A running Automaton server** — local (`https://localhost:7091`) or hosted (`https://api.automaton.monster`)
-2. **An API key** — create one at **API Keys** → **New Key** → scope: `execute`
-   - Format: `ak_execute_xxx`
+2. **A Developer / CLI API key** — create one at **API Keys** → **New Key** → key type: `Developer / CLI`
+   - Format: `ak_developer_xxx`
 3. **Automaton CLI** — install once: `dotnet tool install -g Automaton.Cli` (requires .NET 9)
 
 ### Teach your AI the Automaton structure

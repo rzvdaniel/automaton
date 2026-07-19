@@ -48,9 +48,9 @@ public class AdminHostedRunnersController : ControllerBase
         var (rawKey, entity) = await apiKeyService.CreateApiKeyAsync(
             userContextService.GetUserId(),
             "Infrastructure Runner enrollment",
+            ApiKeyScope.InfrastructureRunnerEnroll,
             "Single-use credential for Infrastructure Runner host self-registration.",
             expiresAt,
-            ApiKeyScope.InfrastructureRunnerEnroll,
             saveChanges: true,
             maximumUses: 1);
 

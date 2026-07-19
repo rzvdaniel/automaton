@@ -445,9 +445,8 @@ public class HostedRunnerProvisioningService
         var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
             userId,
             $"{hostedRunner.Name} key",
-            "Generated for hosted runner container provisioning.",
-            null,
             ApiKeyScope.Runner,
+            "Generated for hosted runner container provisioning.",
             saveChanges: false);
 
         hostedRunner.ApiKeyId = apiKey.Id;
