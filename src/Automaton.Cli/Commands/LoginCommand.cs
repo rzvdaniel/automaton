@@ -14,7 +14,7 @@ public static class LoginCommand
         keyOption.Arity = ArgumentArity.ZeroOrOne;
         var deviceOption = new Option<bool>("--device", "Do not open a browser; display the authorization URL and code");
         var keyFromEnvOption = new Option<bool>("--key-from-env", "Read the existing API key from AUTOMATON_API_KEY");
-        var globalOption = new Option<bool>("--global", "Store credentials in ~/.automaton/config.json instead of the current project");
+        var localOption = new Option<bool>("--local", "Store credentials in the current project instead of ~/.automaton/config.json");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
         var cmd = new Command("login", "Authorize the Automaton CLI or validate an existing API key")
@@ -23,11 +23,11 @@ public static class LoginCommand
             keyOption,
             deviceOption,
             keyFromEnvOption,
-            globalOption,
+            localOption,
             jsonOption
         };
 
-        cmd.SetHandler(async (string? server, string? key, bool device, bool keyFromEnv, bool global, bool asJson) =>
+        cmd.SetHandler(async (string? server, string? key, bool device, bool keyFromEnv, bool local, bool asJson) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -35,6 +35,7 @@ public static class LoginCommand
             try
             {
                 var cwd = Directory.GetCurrentDirectory();
+                var global = !local;
                 var existing = config.ResolveExistingConfig(global, cwd);
                 server = string.IsNullOrWhiteSpace(server)
                     ? existing.Server ?? ConfigService.DefaultHostedServer
@@ -93,7 +94,7 @@ public static class LoginCommand
 
                 Environment.ExitCode = 1;
             }
-        }, serverOption, keyOption, deviceOption, keyFromEnvOption, globalOption, jsonOption);
+        }, serverOption, keyOption, deviceOption, keyFromEnvOption, localOption, jsonOption);
 
         return cmd;
     }

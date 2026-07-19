@@ -12,6 +12,7 @@ dotnet tool install --global Automaton.Cli
 
 ```bash
 automaton login
+automaton login --local
 automaton login --device
 automaton login --key-from-env
 automaton new "My App"
@@ -24,8 +25,10 @@ automaton --version
 ```
 
 `automaton login` opens Automaton Studio and waits for you to approve a short-lived
-device authorization request. If a browser cannot be opened, copy the displayed URL
-and code to another device. Use `--key-from-env` for CI/CD and other unattended flows.
+device authorization request, then stores the credential globally for reuse across
+Automaton apps. Use `automaton login --local` when a project needs an isolated
+credential. If a browser cannot be opened, copy the displayed URL and code to another
+device. Use `--key-from-env` for CI/CD and other unattended flows.
 
 ## Pull modes
 

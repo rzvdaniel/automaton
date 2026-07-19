@@ -9,28 +9,28 @@ public static class LogoutCommand
 {
     public static Command Build(ConfigService config)
     {
-        var globalOption = new Option<bool>("--global", "Clear credentials from ~/.automaton/config.json");
+        var localOption = new Option<bool>("--local", "Clear credentials from the current project instead of ~/.automaton/config.json");
         var allOption = new Option<bool>("--all", "Clear both project-local and global stored credentials");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
         var cmd = new Command("logout", "Clear stored CLI credentials")
         {
-            globalOption,
+            localOption,
             allOption,
             jsonOption
         };
 
-        cmd.SetHandler((bool global, bool all, bool asJson) =>
+        cmd.SetHandler((bool local, bool all, bool asJson) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
-                if (global && all)
+                if (local && all)
                 {
-                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, false, "use either --global or --all, not both"));
-                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Logout failed", Checks = checks, NextSteps = ["Choose one scope: local (default), --global, or --all"] };
+                    checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, false, "use either --local or --all, not both"));
+                    var failure = new CommandDiagnosticResult { Success = false, Summary = "Logout failed", Checks = checks, NextSteps = ["Choose one scope: global (default), --local, or --all"] };
                     if (asJson)
                     {
                         CliJson.Write(new { success = false, summary = failure.Summary, checks = failure.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }), nextSteps = failure.NextSteps });
@@ -44,8 +44,8 @@ public static class LogoutCommand
                 }
 
                 var cwd = Directory.GetCurrentDirectory();
-                var clearLocal = !global || all;
-                var clearGlobal = global || all;
+                var clearLocal = local || all;
+                var clearGlobal = !local || all;
 
                 var clearedLocal = clearLocal && config.ClearProjectLocalConfig(cwd);
                 var clearedGlobal = clearGlobal && config.ClearGlobalConfig();
@@ -53,7 +53,7 @@ public static class LogoutCommand
                 var envServer = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_SERVER"));
                 var envApiKey = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AUTOMATON_API_KEY"));
                 var envOverridesActive = envServer || envApiKey;
-                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, true, $"credentials cleared for scope { (all ? "all" : global ? "global" : "local") }"));
+                checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Logout, true, $"credentials cleared for scope { (all ? "all" : local ? "local" : "global") }"));
                 if (envOverridesActive)
                 {
                     checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Credentials, true, "environment variables still provide credentials", IsWarning: true));
@@ -68,7 +68,7 @@ public static class LogoutCommand
                         summary = result.Summary,
                         checks = result.Checks.Select(check => new { name = check.Name, success = check.Success, warning = check.IsWarning, error = check.Message }),
                         nextSteps = result.NextSteps,
-                        scope = all ? "all" : global ? "global" : "local",
+                        scope = all ? "all" : local ? "local" : "global",
                         cleared = new { local = clearedLocal, global = clearedGlobal },
                         envOverridesActive,
                         envOverrides = new { server = envServer, apiKey = envApiKey }
@@ -113,7 +113,7 @@ public static class LogoutCommand
                 }
                 Environment.ExitCode = 1;
             }
-        }, globalOption, allOption, jsonOption);
+        }, localOption, allOption, jsonOption);
 
         return cmd;
     }

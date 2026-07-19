@@ -146,7 +146,7 @@ public class ConfigServiceTests
     }
 
     [Test]
-    public void ResolveExistingConfig_WhenLocalScopeRequested_PrefersEnvironmentVariablesOverProjectLocalConfig()
+    public void ResolveExistingConfig_WhenLocalScopeRequested_UsesProjectLocalConfig()
     {
         var projectRoot = CreateTempDirectory();
         var configService = new ConfigService();
@@ -157,13 +157,10 @@ public class ConfigServiceTests
             ApiKey = "ak_local"
         });
 
-        Environment.SetEnvironmentVariable("AUTOMATON_SERVER", "https://env.example.com");
-        Environment.SetEnvironmentVariable("AUTOMATON_API_KEY", "ak_env");
-
         var resolved = configService.ResolveExistingConfig(global: false, directory: projectRoot);
 
-        Assert.That(resolved.Server, Is.EqualTo("https://env.example.com"));
-        Assert.That(resolved.ApiKey, Is.EqualTo("ak_env"));
+        Assert.That(resolved.Server, Is.EqualTo("https://local.example.com"));
+        Assert.That(resolved.ApiKey, Is.EqualTo("ak_local"));
     }
 
     [Test]

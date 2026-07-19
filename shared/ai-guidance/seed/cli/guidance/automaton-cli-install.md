@@ -34,20 +34,28 @@ Install decision rule:
 
 ## First-time login
 
-Preferred:
+Preferred machine-wide login:
 
 ```bash
 automaton login
 ```
 
-When prompted, the user should paste their Automaton API key. Do not ask the user to paste the key into chat unless there is no safer terminal prompt available.
+This opens Automaton Studio for browser/device authorization and stores the Developer credential in the global CLI configuration. The credential is reused by Automaton apps on this machine.
 
 `automaton login` authenticates the CLI. It should not scaffold app files.
 
-Advanced fallback when the user explicitly wants to pass the key non-interactively:
+For an isolated project credential, use:
 
 ```bash
-automaton login --key ak_execute_xxx
+automaton login --local
+```
+
+This stores the credential in the current project's `.automaton/config.json` and overrides the global credential for that project.
+
+Advanced fallback for CI/CD or another unattended environment:
+
+```bash
+AUTOMATON_API_KEY=ak_developer_xxx automaton login --key-from-env
 ```
 
 ## App creation handoff
@@ -71,7 +79,7 @@ For testing, account switching, or a clean auth reset:
 
 ```bash
 automaton logout
-automaton logout --global
+automaton logout --local
 automaton logout --all
 automaton login
 ```

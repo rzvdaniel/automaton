@@ -318,14 +318,7 @@ public class ConfigService
             return LoadGlobalConfig();
         }
 
-        var resolved = ResolveContext(directory: directory);
-        return new GlobalConfig
-        {
-            Server = resolved.Server,
-            ApiKey = resolved.ApiKey,
-            AppId = resolved.AppId,
-            PendingAuthorizationCompletion = resolved.PendingAuthorizationCompletion
-        };
+        return LoadProjectLocalConfig(directory ?? Directory.GetCurrentDirectory());
     }
 
     public ResolvedCliContext ResolveContext(AutomatonConfig? projectConfig = null, string? directory = null, string? environmentName = null)

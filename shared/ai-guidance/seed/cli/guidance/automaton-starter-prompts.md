@@ -2,7 +2,7 @@
 
 Use these as starter prompts for Codex, Claude Code, Copilot Chat, Cursor, and similar AI tools.
 
-Prefer the local generated Automaton guidance in the current folder after `automaton new` or `automaton link`. `automaton login` authenticates the CLI. `automaton new` creates `automaton.json` and local AI guidance. `automaton link` is only for existing apps. Use `https://automaton.monster/llms.txt` only as the fallback when local guidance is not available yet.
+Prefer the local generated Automaton guidance in the current folder after `automaton new` or `automaton link`. `automaton login` authenticates the machine globally through browser/device authorization. `automaton login --local` is only for project-specific credential isolation. `automaton new` creates `automaton.json` and local AI guidance. `automaton link` is only for existing apps. Use `https://automaton.monster/llms.txt` only as the fallback when local guidance is not available yet.
 
 ## Official generic starter prompt
 
@@ -20,7 +20,7 @@ Follow the instructions and references found there.
 ```text
 Update my existing Automaton Monster app using the Automaton CLI.
 
-First run `automaton --version`. If the CLI is missing, install it using the official Automaton instructions. Then run `automaton login` and let me paste my Automaton API key if prompted.
+First run `automaton --version`. If the CLI is missing, install it using the official Automaton instructions. Then run `automaton login` to authorize this machine through Automaton Studio. Do not ask the user to paste an API key for normal onboarding.
 
 Link this folder to app id [app-id] with `automaton link [app-id]`. Then follow the local generated guidance in `AGENTS.md` and `.automaton/agents/`. If local guidance is unavailable, read https://automaton.monster/llms.txt.
 
@@ -32,7 +32,7 @@ Deploy with `automaton deploy`. Ask before publishing. Only ask me to step in fo
 ```text
 Build [describe the app] as a frontend-only Automaton Monster app.
 
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Run `automaton login` and let me paste my API key if prompted. Then run `automaton new "[app-name]"` before creating app files.
+Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
@@ -44,7 +44,7 @@ Use Vite unless I ask for another framework. Put source in `frontend/`, build to
 ```text
 Build [describe the app] as a React app for Automaton Monster.
 
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Run `automaton login` and let me paste my API key if prompted. Then run `automaton new "[app-name]"` before creating app files.
+Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
@@ -56,7 +56,7 @@ Use Vite React under `frontend/`, build to `frontend/dist`, set Vite `base: './'
 ```text
 Build [describe the app] as a Vue app for Automaton Monster.
 
-Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Run `automaton login` and let me paste my API key if prompted. Then run `automaton new "[app-name]"` before creating app files.
+Use the Automaton CLI. Run `automaton --version`; if missing, install the official CLI. Ensure the machine is authenticated with `automaton login`; this reuses one global credential across apps. Then run `automaton new "[app-name]"` before creating app files.
 
 Follow the generated local guidance in `AGENTS.md` and `.automaton/agents/`. If it is missing, read https://automaton.monster/llms.txt.
 
