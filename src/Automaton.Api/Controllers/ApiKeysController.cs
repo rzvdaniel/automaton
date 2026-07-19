@@ -126,14 +126,9 @@ public class ApiKeysController : BaseController
 
         var apiKeyEntity = await apiKeyService.ValidateApiKeyAsync(request.ApiKey);
 
-        if (apiKeyEntity == null)
+        if (apiKeyEntity == null || !RunnerUsableScopes.Contains(apiKeyEntity.Scope))
         {
-            return Unauthorized(new { message = "Invalid or expired API key" });
-        }
-
-        if (!RunnerUsableScopes.Contains(apiKeyEntity.Scope))
-        {
-            return Forbid("This credential is not valid for Runner authentication.");
+            return Unauthorized(new { message = "Invalid Runner credential." });
         }
 
         var userId = await dbContext.ApiKeyUsers
