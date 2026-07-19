@@ -67,7 +67,7 @@ public class ConfigService
     public void SaveProjectConfig(string directory, AutomatonConfig config)
     {
         var path = Path.Combine(directory, ProjectConfigFileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(config, SerializerOptions));
+        WriteJsonAtomically(path, config);
 
         EnsureProjectIgnoreFile(directory);
     }
@@ -92,7 +92,7 @@ public class ConfigService
     {
         var configDir = Path.Combine(directory, ProjectConfigDirName);
         Directory.CreateDirectory(configDir);
-        File.WriteAllText(GetProjectLocalConfigPath(directory), JsonSerializer.Serialize(config, SerializerOptions));
+        WriteJsonAtomically(GetProjectLocalConfigPath(directory), config);
 
         EnsureProjectIgnoreFile(directory);
     }
@@ -107,7 +107,7 @@ public class ConfigService
         var projectRoot = FindNearestProjectRoot(directory) ?? directory;
         var configPath = GetProjectEnvironmentConfigPath(projectRoot, environmentName.Trim());
         Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
-        File.WriteAllText(configPath, JsonSerializer.Serialize(config, SerializerOptions));
+        WriteJsonAtomically(configPath, config);
 
         EnsureProjectIgnoreFile(projectRoot);
     }
@@ -117,7 +117,7 @@ public class ConfigService
         var projectRoot = FindNearestProjectRoot(directory) ?? directory;
         var path = GetProjectEnvironmentSelectionPath(projectRoot);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(selection, SerializerOptions));
+        WriteJsonAtomically(path, selection);
 
         EnsureProjectIgnoreFile(projectRoot);
     }
@@ -271,7 +271,36 @@ public class ConfigService
     public void SaveGlobalConfig(GlobalConfig config)
     {
         Directory.CreateDirectory(GlobalConfigDir);
-        File.WriteAllText(GlobalConfigFile, JsonSerializer.Serialize(config, SerializerOptions));
+        WriteJsonAtomically(GlobalConfigFile, config);
+    }
+
+    public void ClearPendingAuthorizationCompletion(string directory, ResolvedCliContext resolved)
+    {
+        switch (resolved.CredentialSource)
+        {
+            case CliCredentialSource.ProjectLocal:
+            {
+                var config = LoadProjectLocalConfig(directory);
+                config.PendingAuthorizationCompletion = null;
+                SaveProjectLocalConfig(directory, config);
+                break;
+            }
+            case CliCredentialSource.NamedEnvironment when !string.IsNullOrWhiteSpace(resolved.EnvironmentName):
+            {
+                var config = LoadNamedEnvironmentConfig(directory, resolved.EnvironmentName!)
+                    ?? throw new InvalidOperationException($"Environment '{resolved.EnvironmentName}' was not found.");
+                config.PendingAuthorizationCompletion = null;
+                SaveNamedEnvironmentConfig(directory, resolved.EnvironmentName!, config);
+                break;
+            }
+            case CliCredentialSource.Global:
+            {
+                var config = LoadGlobalConfig();
+                config.PendingAuthorizationCompletion = null;
+                SaveGlobalConfig(config);
+                break;
+            }
+        }
     }
 
     public bool ClearGlobalConfig()
@@ -295,7 +324,7 @@ public class ConfigService
             Server = resolved.Server,
             ApiKey = resolved.ApiKey,
             AppId = resolved.AppId,
-            PendingAuthorizationCompletion = LoadProjectLocalConfig(directory ?? Directory.GetCurrentDirectory()).PendingAuthorizationCompletion
+            PendingAuthorizationCompletion = resolved.PendingAuthorizationCompletion
         };
     }
 
@@ -312,6 +341,24 @@ public class ConfigService
         var envServer = Environment.GetEnvironmentVariable("AUTOMATON_SERVER");
         var envApiKey = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
 
+        var credentialSource = !string.IsNullOrWhiteSpace(envApiKey)
+            ? CliCredentialSource.EnvironmentVariable
+            : !string.IsNullOrWhiteSpace(namedEnvironment.ApiKey)
+                ? CliCredentialSource.NamedEnvironment
+                : !string.IsNullOrWhiteSpace(local.ApiKey)
+                    ? CliCredentialSource.ProjectLocal
+                    : !string.IsNullOrWhiteSpace(global.ApiKey)
+                        ? CliCredentialSource.Global
+                        : CliCredentialSource.None;
+
+        var selectedConfig = credentialSource switch
+        {
+            CliCredentialSource.NamedEnvironment => namedEnvironment,
+            CliCredentialSource.ProjectLocal => local,
+            CliCredentialSource.Global => global,
+            _ => null
+        };
+
         var server = envServer
             ?? namedEnvironment.Server
             ?? local.Server
@@ -326,7 +373,9 @@ public class ConfigService
             EnvironmentName = resolvedEnvironmentName,
             Server = server?.TrimEnd('/'),
             ApiKey = apiKey,
-            AppId = namedEnvironment.AppId?.Trim()
+            AppId = namedEnvironment.AppId?.Trim(),
+            CredentialSource = credentialSource,
+            PendingAuthorizationCompletion = selectedConfig?.PendingAuthorizationCompletion
         };
     }
 
@@ -448,5 +497,57 @@ public class ConfigService
             ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' was not found.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    private static void WriteJsonAtomically<T>(string path, T value)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException($"Cannot determine the configuration directory for '{path}'.");
+        }
+
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(directory, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        var contents = JsonSerializer.Serialize(value, SerializerOptions);
+
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(contents);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path))
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    File.Replace(tempPath, path, null);
+                }
+                else
+                {
+                    File.Move(tempPath, path, overwrite: true);
+                }
+            }
+            else
+            {
+                File.Move(tempPath, path);
+            }
+
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 }

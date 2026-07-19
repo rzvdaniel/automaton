@@ -13,6 +13,14 @@ namespace Automaton.Api.Services;
 
 public class ApiKeyService
 {
+    internal static readonly IReadOnlySet<ApiKeyScope> UserVisibleScopes = new HashSet<ApiKeyScope>
+    {
+        ApiKeyScope.Developer,
+        ApiKeyScope.ReadOnly,
+        ApiKeyScope.WorkflowExecution,
+        ApiKeyScope.WebApp
+    };
+
     private const int RawKeyLength = 40;
     private readonly ApplicationDbContext dbContext;
     private readonly ILogger<ApiKeyService> logger;
@@ -221,6 +229,7 @@ public class ApiKeyService
     {
         // Use authorization service query to get API keys filtered by project context
         return await authorizationService.GetApiKeysQueryByContext(projectId, userId)
+            .Where(ak => UserVisibleScopes.Contains(ak.Scope))
             .OrderByDescending(ak => ak.CreatedAt)
             .ToListAsync();
     }

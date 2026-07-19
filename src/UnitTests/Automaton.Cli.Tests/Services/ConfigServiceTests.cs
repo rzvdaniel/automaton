@@ -361,6 +361,31 @@ public class ConfigServiceTests
     }
 
     [Test]
+    public void ResolveContext_CarriesPendingCompletionFromTheSelectedNamedEnvironment()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        var requestId = Guid.NewGuid();
+        WriteEnvironment(projectRoot, "local", new GlobalConfig
+        {
+            Server = "https://local.example.com",
+            ApiKey = "ak_local",
+            PendingAuthorizationCompletion = new PendingCliAuthorizationCompletion
+            {
+                RequestId = requestId,
+                Server = "https://local.example.com",
+                Verifier = "local-verifier"
+            }
+        });
+
+        var resolved = configService.ResolveContext(directory: projectRoot, environmentName: "local");
+
+        Assert.That(resolved.CredentialSource, Is.EqualTo(CliCredentialSource.NamedEnvironment));
+        Assert.That(resolved.PendingAuthorizationCompletion?.RequestId, Is.EqualTo(requestId));
+        Assert.That(resolved.PendingAuthorizationCompletion?.Verifier, Is.EqualTo("local-verifier"));
+    }
+
+    [Test]
     public void ResolveContext_WhenNamedEnvironmentDoesNotExist_ThrowsClearError()
     {
         var projectRoot = CreateTempDirectory();

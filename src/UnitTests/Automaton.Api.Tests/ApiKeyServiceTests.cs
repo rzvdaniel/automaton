@@ -48,6 +48,23 @@ public class ApiKeyServiceTests
         Assert.That(ApiKeysController.UserCreatableScopes, Does.Not.Contain(scope));
     }
 
+    [TestCase(ApiKeyScope.Developer)]
+    [TestCase(ApiKeyScope.ReadOnly)]
+    [TestCase(ApiKeyScope.WorkflowExecution)]
+    [TestCase(ApiKeyScope.WebApp)]
+    public void UserVisibleScopes_IncludeOnlyUserManagedKeyTypes(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeyService.UserVisibleScopes, Does.Contain(scope));
+    }
+
+    [TestCase(ApiKeyScope.Runner)]
+    [TestCase(ApiKeyScope.FullAccess)]
+    [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]
+    public void UserVisibleScopes_ExcludeSystemManagedKeyTypes(ApiKeyScope scope)
+    {
+        Assert.That(ApiKeyService.UserVisibleScopes, Does.Not.Contain(scope));
+    }
+
     [TestCase(ApiKeyScope.Runner)]
     [TestCase(ApiKeyScope.FullAccess)]
     [TestCase(ApiKeyScope.InfrastructureRunnerEnroll)]

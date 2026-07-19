@@ -1,6 +1,9 @@
 using Automaton.Cli.Commands;
 using Automaton.Cli.Services;
 using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Invocation;
+using System.CommandLine.Parsing;
 
 var config = new ConfigService();
 
@@ -41,4 +44,21 @@ root.AddCommand(installAlias);
 
 root.Name = "automaton";
 
-return await root.InvokeAsync(args);
+var authorizationCompletion = new CliAuthorizationCompletionService(config);
+var builder = new CommandLineBuilder(root)
+    .AddMiddleware(async (context, next) =>
+    {
+        var commandName = context.ParseResult.CommandResult.Command.Name;
+        if (commandName is not ("login" or "logout" or "config" or "help")
+            && !await authorizationCompletion.TryCompletePendingAsync(
+                Directory.GetCurrentDirectory(),
+                cancellationToken: context.GetCancellationToken()))
+        {
+            Console.Error.WriteLine("Warning: CLI credential is saved, but server acknowledgement is pending. Automaton will retry automatically.");
+        }
+
+        await next(context);
+    }, MiddlewareOrder.Default)
+    .Build();
+
+return await builder.InvokeAsync(args);

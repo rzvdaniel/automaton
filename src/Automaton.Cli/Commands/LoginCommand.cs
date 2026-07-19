@@ -40,18 +40,17 @@ public static class LoginCommand
                     ? existing.Server ?? ConfigService.DefaultHostedServer
                     : server.TrimEnd('/');
 
-                if (existing.PendingAuthorizationCompletion is not null)
+                var completionService = new CliAuthorizationCompletionService(config);
+                if (existing.PendingAuthorizationCompletion is not null
+                    && !await completionService.TryCompletePendingAsync(cwd, global))
                 {
-                    var pending = existing.PendingAuthorizationCompletion;
-                    if (string.IsNullOrWhiteSpace(existing.ApiKey))
-                        throw new InvalidOperationException("A previous CLI credential is awaiting acknowledgement, but the saved credential is missing.");
-
-                    if (!await RetryCompletionAsync(pending.Server, pending.RequestId, pending.Verifier))
-                        throw new InvalidOperationException("A previous CLI credential is still awaiting server acknowledgement. Run automaton login again to retry it.");
-
-                    await SaveCredentialsAsync(config, cwd, pending.Server, existing.ApiKey, global, pending: null);
-                    server = pending.Server;
-                    key = existing.ApiKey;
+                    checks.Add(new CommandDiagnosticCheck(
+                        CommandDiagnosticCheckNames.Authentication,
+                        true,
+                        "credential is saved; server acknowledgement remains pending and will be retried automatically",
+                        IsWarning: true));
+                    if (!asJson)
+                        Console.Error.WriteLine("Warning: CLI credential is saved, but server acknowledgement is pending. Automaton will retry automatically.");
                 }
 
                 if (keyFromEnv && device)
@@ -166,9 +165,10 @@ public static class LoginCommand
                 Verifier = authorization.Verifier
             });
 
-        if (await RetryCompletionAsync(server, authorization.RequestId, authorization.Verifier))
+        var completionService = new CliAuthorizationCompletionService(config);
+        if (await completionService.TryCompletePendingAsync(cwd, global))
         {
-            await SaveCredentialsAsync(config, cwd, server, apiKey, global, pending: null);
+            // The completion service clears the pending state after the server acknowledges delivery.
         }
         else
         {
@@ -261,29 +261,6 @@ public static class LoginCommand
         AnsiConsole.MarkupLine(global
             ? "[grey]Credentials saved to ~/.automaton/config.json[/]"
             : "[grey]Credentials saved to ./.automaton/config.json[/]");
-    }
-
-    private static async Task<bool> RetryCompletionAsync(string server, Guid requestId, string verifier)
-    {
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                using var client = new AutomatonApiClient(server);
-                await client.CompleteCliAuthorizationAsync(requestId, verifier);
-                return true;
-            }
-            catch when (attempt < 2)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        return false;
     }
 
     private static async Task SaveCredentialsAsync(

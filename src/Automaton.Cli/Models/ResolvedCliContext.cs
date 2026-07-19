@@ -9,4 +9,17 @@ public sealed class ResolvedCliContext
     public string? ApiKey { get; init; }
 
     public string? AppId { get; init; }
+
+    public CliCredentialSource CredentialSource { get; init; }
+
+    public PendingCliAuthorizationCompletion? PendingAuthorizationCompletion { get; init; }
+}
+
+public enum CliCredentialSource
+{
+    None,
+    EnvironmentVariable,
+    NamedEnvironment,
+    ProjectLocal,
+    Global
 }
