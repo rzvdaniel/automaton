@@ -36,6 +36,7 @@ const showCreateDialog = ref(false)
 const showSuccessDialog = ref(false)
 const createLoading = ref(false)
 const newApiKeyData = ref<CreateApiKeyResponse | null>(null)
+const showAdvancedScopes = ref(false)
 const isEmailConfirmed = computed(() => authStore.user?.emailConfirmed ?? false)
 const lockedFeatureHint = 'Confirm your email to unlock API key creation.'
 
@@ -43,15 +44,13 @@ const lockedFeatureHint = 'Confirm your email to unlock API key creation.'
 const createForm = ref<CreateApiKeyRequest>({
   name: '',
   description: '',
-  scope: ApiKeyScope.Runner,
+  scope: ApiKeyScope.Developer,
 })
 
-// Scope options for dropdown
-const scopeOptions = [
+// Advanced key types. Developer / CLI is the default and does not require a choice.
+const advancedScopeOptions = [
   { label: 'Read Only', value: ApiKeyScope.ReadOnly },
   { label: 'Execute', value: ApiKeyScope.Execute },
-  { label: 'Runner', value: ApiKeyScope.Runner },
-  { label: 'Full Access', value: ApiKeyScope.FullAccess },
   { label: 'Web App', value: ApiKeyScope.WebApp },
 ]
 
@@ -88,9 +87,17 @@ function openCreateDialog() {
   createForm.value = {
     name: '',
     description: '',
-    scope: ApiKeyScope.Runner,
+    scope: ApiKeyScope.Developer,
   }
+  showAdvancedScopes.value = false
   showCreateDialog.value = true
+}
+
+function toggleAdvancedScopes() {
+  showAdvancedScopes.value = !showAdvancedScopes.value
+  if (!showAdvancedScopes.value) {
+    createForm.value.scope = ApiKeyScope.Developer
+  }
 }
 
 // Create API key
@@ -198,7 +205,7 @@ onMounted(() => {
   <div class="page-header">
     <div>
       <h2 class="page-title">API Keys</h2>
-      <p class="page-subtitle">Create keys for runners, workflow execution, web apps, and external integrations.</p>
+      <p class="page-subtitle">Use a Developer key with the Automaton CLI, or create an advanced key for a specific integration.</p>
     </div>
     <div class="page-actions">
       <span v-tooltip.left="!isEmailConfirmed ? lockedFeatureHint : undefined">
@@ -236,10 +243,9 @@ onMounted(() => {
       Create a scoped key for the job instead of reusing one broad credential everywhere.
     </p>
     <div class="api-keys-scopes mb-4">
-      <span class="scope-chip">Runner</span>
-      <span class="scope-chip">Execute</span>
+      <span class="scope-chip">Developer / CLI</span>
       <span class="scope-chip">Web App</span>
-      <span class="scope-chip">Full Access</span>
+      <span class="scope-chip">Read Only</span>
     </div>
     <span v-tooltip.bottom="!isEmailConfirmed ? lockedFeatureHint : undefined">
       <Button
@@ -338,15 +344,31 @@ onMounted(() => {
       </div>
 
       <div class="flex flex-column gap-2">
-        <label for="apiKeyScope" class="font-medium">Scope *</label>
+        <label class="font-medium">Key type</label>
+        <div v-if="!showAdvancedScopes" class="surface-ground border-round p-3">
+          <div class="flex align-items-center gap-2">
+            <span class="font-medium">Developer / CLI</span>
+            <Tag value="Recommended" severity="success" />
+          </div>
+          <p class="text-color-secondary text-sm mb-0 mt-2">
+            Use with the Automaton CLI to create, deploy, publish, and manage your apps.
+          </p>
+        </div>
         <Dropdown
+          v-else
           id="apiKeyScope"
           v-model="createForm.scope"
-          :options="scopeOptions"
+          :options="advancedScopeOptions"
           option-label="label"
           option-value="value"
-          placeholder="Select scope"
+          placeholder="Select key type"
           class="w-full"
+        />
+        <Button
+          :label="showAdvancedScopes ? 'Use Developer / CLI key' : 'Choose another key type'"
+          link
+          class="align-self-start p-0"
+          @click="toggleAdvancedScopes"
         />
       </div>
 

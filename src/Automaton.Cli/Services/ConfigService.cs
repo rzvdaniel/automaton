@@ -350,7 +350,7 @@ public class ConfigService
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            Console.Write("API key (ak_execute_xxx): ");
+            Console.Write("Developer API key (ak_developer_xxx): ");
             apiKey = Console.ReadLine()?.Trim();
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new InvalidOperationException("API key is required.");

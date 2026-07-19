@@ -12,6 +12,7 @@ export const ApiKeyScope = {
   Runner: 3,
   FullAccess: 4,
   WebApp: 5,
+  Developer: 7,
 } as const
 
 export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope]
@@ -72,6 +73,8 @@ export function getScopeDisplayName(scope: ApiKeyScope): string {
       return 'Full Access'
     case ApiKeyScope.WebApp:
       return 'Web App'
+    case ApiKeyScope.Developer:
+      return 'Developer / CLI'
     default:
       return 'Unknown'
   }
@@ -94,6 +97,8 @@ export function getScopeSeverity(
       return 'danger'
     case ApiKeyScope.WebApp:
       return 'warn'
+    case ApiKeyScope.Developer:
+      return 'success'
     default:
       return 'secondary'
   }
@@ -104,6 +109,13 @@ export function getScopeSeverity(
  */
 export function getUsageInstructions(apiKey: string, scope: ApiKeyScope): string {
   switch (scope) {
+    case ApiKeyScope.Developer:
+      return `Use this Developer key with the Automaton CLI:
+
+automaton login --key ${apiKey}
+automaton deploy
+automaton publish`
+
     case ApiKeyScope.Runner:
     case ApiKeyScope.Execute:
     case ApiKeyScope.FullAccess:

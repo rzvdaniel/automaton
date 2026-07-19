@@ -82,7 +82,8 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 - ✅ `.automatonignore` is created when needed
 - ✅ The generated app is frontend-only for Tetris unless backend logic is explicitly justified
 - ✅ Codex runs `automaton validate` before deploy
-- ✅ Codex does not require runner setup for a frontend-only Tetris app
+- ✅ `automaton deploy` follows the managed deployment path for the frontend-only app
+- ✅ A hosted runner may be provisioned on the first deploy, even though the app has no backend scripts
 - ✅ Codex runs `automaton deploy`
 - ✅ The app is previewable in Automaton Studio after deploy
 - ✅ Codex asks for confirmation before publish
@@ -184,7 +185,8 @@ Use the local generated Automaton guidance in this folder if it exists; otherwis
 - [ ] `automaton.json` created in current folder
 - [ ] No unwanted nested app folder
 - [ ] Tetris app scaffolded locally
-- [ ] No unnecessary backend or runner flow for frontend-only app
+- [ ] Frontend-only app deploys through the managed runtime flow
+- [ ] First deploy provisions or reuses the user's hosted runner as needed
 - [ ] `automaton validate` run before deploy
 - [ ] `automaton deploy` succeeded
 - [ ] App preview works in Studio

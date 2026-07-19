@@ -109,6 +109,9 @@ public class ApiKeyServiceTests
 
         var (apiKey, entity) = await service.CreateApiKeyAsync(userId, "Runner Key");
 
+        Assert.That(entity.Scope, Is.EqualTo(ApiKeyScope.Developer));
+        Assert.That(apiKey, Does.StartWith("ak_developer_"));
+
         var auditEvent = await dbContext.AuditEvents.SingleAsync();
 
         Assert.That(auditEvent.EventType, Is.EqualTo("ApiKeyCreated"));

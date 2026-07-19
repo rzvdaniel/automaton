@@ -19,7 +19,7 @@ public static class ConfigCommand
     public static Command Build(ConfigService config)
     {
         var serverOption = new Option<string?>("--server", "Automaton server URL (e.g. https://automaton.example.com)");
-        var keyOption    = new Option<string?>(["--key", "-k"], "API key (ak_execute_xxx)");
+        var keyOption    = new Option<string?>(["--key", "-k"], "Developer API key (ak_developer_xxx)");
         var showOption   = new Option<bool>("--show", "Print current configuration");
         var localOption  = new Option<bool>("--local", "Read or write ./.automaton/config.json for the current project (default)");
         var globalOption = new Option<bool>("--global", "Read or write ~/.automaton/config.json instead of project-local config");

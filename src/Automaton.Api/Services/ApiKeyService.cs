@@ -36,7 +36,7 @@ public class ApiKeyService
         string name,
         string? description = null,
         DateTime? expiresAt = null,
-        ApiKeyScope scope = ApiKeyScope.Runner,
+        ApiKeyScope scope = ApiKeyScope.Developer,
         Guid? projectId = null,
         bool saveChanges = true,
         int? maximumUses = null)
@@ -51,6 +51,7 @@ public class ApiKeyService
             ApiKeyScope.WebApp => "ak_webapp_",
             ApiKeyScope.InfrastructureRunnerEnroll => "ak_infra_enroll_",
             ApiKeyScope.FullAccess => "ak_fullaccess_",
+            ApiKeyScope.Developer => "ak_developer_",
             _ => "ak_"
         };
 

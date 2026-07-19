@@ -132,13 +132,24 @@ CLI workflow.
 
 The runtime-local stack now enables managed hosted runner provisioning.
 
-That means a backend-capable app can follow the normal product path:
+That means an app can follow the normal full-deployment product path, regardless
+of whether it contains backend code:
 
 - deploy from CLI or Studio
 - API requests managed runtime preparation
 - worker provisions a hosted runner container through the local Docker socket
 - runner connects back to API
-- app backend deploy proceeds on retry
+- app runtime deployment proceeds on retry
+
+For a frontend-only app, the runner still provides the managed runtime used by
+the full `Deploy App` or CLI package-deploy flow. The absence of backend scripts
+means there is no backend process to install, but it does not skip hosted-runner
+provisioning.
+
+Studio also exposes a separate `Deploy Frontend` action. That action only
+synchronizes frontend files and intentionally bypasses managed runner
+provisioning. Use the full `Deploy App` action when validating first-deployment
+hosted-runner bootstrap.
 
 The stack still does not start a permanent shared runner container up front. Hosted runners are created on demand per user.
 
@@ -338,7 +349,7 @@ For a clean machine or a fully reset local runtime:
 
 4. Restore the MySQL dump if needed.
 5. Log into Studio at [https://studio.automaton.test:8443](https://studio.automaton.test:8443).
-6. Deploy a backend-capable app. The first deploy may return a preparing/provisioning state while the hosted runner container is created.
+6. Deploy an app using the full Deploy App action or the CLI. The first deploy may return a preparing/provisioning state while the hosted runner container is created, including for frontend-only apps. The separate Studio Deploy Frontend action does not create a hosted runner.
 
 ## Script usage patterns
 
