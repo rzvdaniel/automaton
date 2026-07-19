@@ -980,7 +980,13 @@ namespace Automaton.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ApiKeyId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("CompletedAt")
@@ -1022,6 +1028,8 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApiKeyId");
 
                     b.HasIndex("ExpiresAt");
 

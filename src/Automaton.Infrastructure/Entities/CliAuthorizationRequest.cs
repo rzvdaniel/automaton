@@ -26,8 +26,10 @@ public class CliAuthorizationRequest
     public DateTime ExpiresAt { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public DateTime? CancelledAt { get; set; }
     [MaxLength(1000)]
     public string? EncryptedApiKey { get; set; }
     public DateTime? CredentialIssuedAt { get; set; }
+    public Guid? ApiKeyId { get; set; }
     public Guid? UserId { get; set; }
 }

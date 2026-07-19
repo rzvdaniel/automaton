@@ -705,6 +705,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.DeviceName).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.RemoteIp).HasMaxLength(64);
                 entity.Property(e => e.EncryptedApiKey).HasMaxLength(1000);
+                entity.HasIndex(e => e.ApiKeyId);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.ExpiresAt).IsRequired();
                 entity.HasIndex(e => e.UserCode).IsUnique();

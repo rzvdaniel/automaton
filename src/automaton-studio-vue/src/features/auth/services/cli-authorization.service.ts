@@ -24,3 +24,9 @@ export async function getCliAuthorizationDetails(
   )
   return data
 }
+
+export async function cancelCliAuthorization(requestId: string, userCode: string): Promise<void> {
+  await apiClient.post(`/api/cli-auth/requests/${encodeURIComponent(requestId)}/cancel`, {
+    userCode,
+  })
+}

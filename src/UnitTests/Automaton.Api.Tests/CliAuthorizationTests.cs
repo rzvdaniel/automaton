@@ -18,12 +18,14 @@ public class CliAuthorizationTests
         var poll = controller.GetMethod(nameof(CliAuthorizationController.Poll));
         var details = controller.GetMethod(nameof(CliAuthorizationController.GetDetails));
         var complete = controller.GetMethod(nameof(CliAuthorizationController.Complete));
+        var cancel = controller.GetMethod(nameof(CliAuthorizationController.Cancel));
 
         Assert.That(create!.GetCustomAttributes(typeof(AllowAnonymousAttribute), true), Is.Not.Empty);
         Assert.That(poll!.GetCustomAttributes(typeof(AllowAnonymousAttribute), true), Is.Not.Empty);
         Assert.That(approve!.GetCustomAttributes(typeof(AuthorizeAttribute), true), Is.Not.Empty);
         Assert.That(details!.GetCustomAttributes(typeof(AuthorizeAttribute), true), Is.Not.Empty);
         Assert.That(complete!.GetCustomAttributes(typeof(AllowAnonymousAttribute), true), Is.Not.Empty);
+        Assert.That(cancel!.GetCustomAttributes(typeof(AuthorizeAttribute), true), Is.Not.Empty);
     }
 
     [Test]

@@ -115,6 +115,11 @@ public sealed class CliAuthorizationService
             return CliAuthorizationPollResult.Expired;
         }
 
+        if (request.CancelledAt.HasValue)
+        {
+            return CliAuthorizationPollResult.Cancelled;
+        }
+
         if (!request.ApprovedAt.HasValue || !request.UserId.HasValue)
         {
             return CliAuthorizationPollResult.Pending;
@@ -144,6 +149,7 @@ public sealed class CliAuthorizationService
 
         request.EncryptedApiKey = credentialProtector.Protect(rawKey);
         request.CredentialIssuedAt = DateTime.UtcNow;
+        request.ApiKeyId = entity.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditEventService.WriteAsync(new AuditEventWriteRequest
@@ -217,6 +223,8 @@ public sealed class CliAuthorizationService
         var now = DateTime.UtcNow;
         var status = request.ExpiresAt <= now && !request.CompletedAt.HasValue
             ? "expired"
+            : request.CancelledAt.HasValue
+                ? "cancelled"
             : request.CompletedAt.HasValue
                 ? "completed"
                 : request.ApprovedAt.HasValue
@@ -229,6 +237,26 @@ public sealed class CliAuthorizationService
             request.CreatedAt,
             request.ExpiresAt,
             status);
+    }
+
+    public async Task<bool> CancelAsync(
+        Guid requestId,
+        string userCode,
+        CancellationToken cancellationToken)
+    {
+        var request = await dbContext.CliAuthorizationRequests
+            .FirstOrDefaultAsync(x => x.Id == requestId, cancellationToken);
+
+        if (request is null || !string.Equals(request.UserCode, userCode.Trim(), StringComparison.OrdinalIgnoreCase)
+            || request.CompletedAt.HasValue || request.CancelledAt.HasValue
+            || !string.IsNullOrWhiteSpace(request.EncryptedApiKey) || request.ExpiresAt <= DateTime.UtcNow)
+        {
+            return false;
+        }
+
+        request.CancelledAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private async Task<string> CreateUniqueUserCodeAsync(CancellationToken cancellationToken)
@@ -307,6 +335,7 @@ public sealed class CliAuthorizationPollResult
     public static CliAuthorizationPollResult Pending => new(null, null, "pending");
     public static CliAuthorizationPollResult Expired => new(null, null, "expired");
     public static CliAuthorizationPollResult Completed => new(null, null, "completed");
+    public static CliAuthorizationPollResult Cancelled => new(null, null, "cancelled");
     public static CliAuthorizationPollResult Invalid => new(null, null, "invalid");
     public CliAuthorizationPollResult(string apiKey, Guid userId) : this(apiKey, userId, "authorized") { }
 }

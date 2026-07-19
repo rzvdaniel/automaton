@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import { approveCliAuthorization, getCliAuthorizationDetails, type CliAuthorizationDetails } from '../services/cli-authorization.service'
+import { approveCliAuthorization, cancelCliAuthorization, getCliAuthorizationDetails, type CliAuthorizationDetails } from '../services/cli-authorization.service'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +15,7 @@ const approved = ref(false)
 const error = ref('')
 const loadingDetails = ref(true)
 const details = ref<CliAuthorizationDetails | null>(null)
+const cancelling = ref(false)
 
 onMounted(async () => {
   if (!requestId.value || !userCode.value) {
@@ -56,7 +57,18 @@ function returnToDashboard() {
 }
 
 function cancel() {
-  void router.push('/')
+  if (!requestId.value || !userCode.value) {
+    void router.push('/')
+    return
+  }
+
+  cancelling.value = true
+  void cancelCliAuthorization(requestId.value, userCode.value)
+    .catch(() => { error.value = 'The authorization request could not be cancelled.' })
+    .finally(() => {
+      cancelling.value = false
+      if (!error.value) void router.push('/')
+    })
 }
 
 function formatDate(value?: string) {
@@ -90,7 +102,7 @@ function formatDate(value?: string) {
             <div class="flex justify-content-between"><span class="text-color-secondary">Credential</span><span>Developer / CLI</span></div>
           </div>
           <div class="flex gap-2">
-            <Button label="Cancel" severity="secondary" outlined class="flex-1" @click="cancel" />
+            <Button label="Cancel" severity="secondary" outlined :loading="cancelling" class="flex-1" @click="cancel" />
             <Button label="Authorize Automaton CLI" icon="pi pi-check" :loading="approving || loadingDetails" :disabled="loadingDetails || !details" class="flex-1" @click="approve" />
           </div>
         </template>

@@ -89,6 +89,19 @@ public sealed class CliAuthorizationController : BaseController
         return details is null ? NotFound(new { message = "This CLI authorization request is unavailable." }) : Ok(details);
     }
 
+    [HttpPost("requests/{requestId:guid}/cancel")]
+    [Authorize]
+    public async Task<IActionResult> Cancel(
+        Guid requestId,
+        [FromBody] CancelCliAuthorizationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var cancelled = await authorizationService.CancelAsync(requestId, request.UserCode, cancellationToken);
+        return cancelled
+            ? Ok(new { cancelled = true })
+            : BadRequest(new { message = "This CLI authorization request is invalid, expired, or already completed." });
+    }
+
     [HttpPost("requests/{requestId:guid}/poll")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicyNames.ApiKeyValidation)]
@@ -144,4 +157,9 @@ public sealed class PollCliAuthorizationRequest
 public sealed class CompleteCliAuthorizationRequest
 {
     public required string Verifier { get; set; }
+}
+
+public sealed class CancelCliAuthorizationRequest
+{
+    public required string UserCode { get; set; }
 }

@@ -129,6 +129,9 @@ public static class LoginCommand
             if (state is "expired" or "invalid" or "completed")
                 throw new InvalidOperationException("The CLI authorization request is no longer available.");
 
+            if (state == "cancelled")
+                throw new InvalidOperationException("Authorization was cancelled in Studio.");
+
             await Task.Delay(TimeSpan.FromSeconds(authorization.PollInterval));
         }
 
@@ -136,13 +139,27 @@ public static class LoginCommand
             throw new TimeoutException("The CLI authorization request expired before it was approved.");
 
         using var authenticatedClient = new AutomatonApiClient(server, apiKey);
-        var user = await authenticatedClient.GetUserProfileAsync();
         await SaveCredentialsAsync(config, cwd, server, apiKey, global);
         await client.CompleteCliAuthorizationAsync(authorization.RequestId, authorization.Verifier);
 
-        var displayName = GetUserDisplayName(user);
+        string displayName;
+        try
+        {
+            var user = await authenticatedClient.GetUserProfileAsync();
+            displayName = GetUserDisplayName(user);
+        }
+        catch (Exception ex)
+        {
+            displayName = "Automaton user";
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true,
+                "credential saved; profile details could not be loaded", true));
+            if (!asJson)
+                AnsiConsole.MarkupLine($"[yellow]⚠[/] Signed in, but profile details could not be loaded: {Markup.Escape(ex.Message)}");
+        }
+
         checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.Authentication, true, "browser/device authorization completed"));
-        checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
+        if (!checks.Any(x => x.Name == CommandDiagnosticCheckNames.UserProfile))
+            checks.Add(new CommandDiagnosticCheck(CommandDiagnosticCheckNames.UserProfile, true, $"authenticated as {displayName}"));
 
         if (asJson)
         {
