@@ -41,7 +41,7 @@ https://automaton.monster/llms.txt
 Follow the instructions and references found there.
 ```
 
-Do not paste your API key directly into the AI chat. Paste it into the terminal when `automaton login` asks for it.
+Do not paste your API key into the AI chat. The normal `automaton login` flow opens Studio for explicit browser/device authorization. For CI/CD, set `AUTOMATON_API_KEY` in the environment and run the required CLI command directly.
 
 ## What this gives you
 

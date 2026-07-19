@@ -51,14 +51,14 @@ the displayed URL and code on another device.
 For existing or unattended credentials, use:
 
 ```bash
-automaton login --key-from-env
+export AUTOMATON_API_KEY=ak_developer_xxx
 automaton deploy
 automaton publish
 ```
 
-For unattended environments, prefer an environment variable or a masked prompt rather than placing a secret directly in shell history:
+Environment credentials are read automatically by CLI commands and are never persisted. Prefer an environment variable or secret manager rather than placing a secret directly in shell history:
 
 ```powershell
 $env:AUTOMATON_API_KEY = "ak_developer_xxx"
-automaton login
+automaton deploy
 ```

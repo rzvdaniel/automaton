@@ -10,10 +10,9 @@ public static class LoginCommand
     public static Command Build(ConfigService config)
     {
         var serverOption = new Option<string?>("--server", $"Automaton server URL (defaults to {ConfigService.DefaultHostedServer})");
-        var keyOption = new Option<string?>(["--key", "-k"], "Use an existing API key (prefer --key-from-env for automation)");
+        var keyOption = new Option<string?>(["--key", "-k"], "Use an existing API key");
         keyOption.Arity = ArgumentArity.ZeroOrOne;
         var deviceOption = new Option<bool>("--device", "Do not open a browser; display the authorization URL and code");
-        var keyFromEnvOption = new Option<bool>("--key-from-env", "Read the existing API key from AUTOMATON_API_KEY");
         var localOption = new Option<bool>("--local", "Store credentials in the current project instead of ~/.automaton/config.json");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
 
@@ -22,12 +21,11 @@ public static class LoginCommand
             serverOption,
             keyOption,
             deviceOption,
-            keyFromEnvOption,
             localOption,
             jsonOption
         };
 
-        cmd.SetHandler(async (string? server, string? key, bool device, bool keyFromEnv, bool local, bool asJson) =>
+        cmd.SetHandler(async (string? server, string? key, bool device, bool local, bool asJson) =>
         {
             var checks = new List<CommandDiagnosticCheck>();
             var nextSteps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -54,21 +52,11 @@ public static class LoginCommand
                         Console.Error.WriteLine("Warning: CLI credential is saved, but server acknowledgement is pending. Automaton will retry automatically.");
                 }
 
-                if (keyFromEnv && device)
-                    throw new InvalidOperationException("Choose either --device or --key-from-env, not both.");
-
                 var keyWasRequested = Environment.GetCommandLineArgs()
                     .Any(argument => string.Equals(argument, "--key", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(argument, "-k", StringComparison.OrdinalIgnoreCase));
-                if (keyWasRequested && string.IsNullOrWhiteSpace(key) && !keyFromEnv)
+                if (keyWasRequested && string.IsNullOrWhiteSpace(key))
                     key = PromptForApiKey();
-
-                if (keyFromEnv)
-                {
-                    key = Environment.GetEnvironmentVariable("AUTOMATON_API_KEY");
-                    if (string.IsNullOrWhiteSpace(key))
-                        throw new InvalidOperationException("AUTOMATON_API_KEY is not set.");
-                }
 
                 if (!string.IsNullOrWhiteSpace(key))
                 {
@@ -94,7 +82,7 @@ public static class LoginCommand
 
                 Environment.ExitCode = 1;
             }
-        }, serverOption, keyOption, deviceOption, keyFromEnvOption, localOption, jsonOption);
+        }, serverOption, keyOption, deviceOption, localOption, jsonOption);
 
         return cmd;
     }

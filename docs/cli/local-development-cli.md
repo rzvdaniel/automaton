@@ -248,16 +248,16 @@ automaton-dev config --show
 
 ## What `automaton login` writes
 
-By default, a successful `automaton login` saves project-local credentials to:
-
-```text
-<app-root>\.automaton\config.json
-```
-
-If you pass `--global`, it writes to:
+By default, a successful `automaton login` saves global machine credentials to:
 
 ```text
 %USERPROFILE%\.automaton\config.json
+```
+
+Use `--local` when the credential should apply only to the current project:
+
+```text
+<app-root>\.automaton\config.json
 ```
 
 This does not conflict with:

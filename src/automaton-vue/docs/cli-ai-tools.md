@@ -17,7 +17,7 @@ If you first need the app contract itself, read [Build an Automaton App](/build-
 2. Paste the starter prompt below.
 3. Let the AI install or verify the CLI.
 4. Let the AI run `automaton login`.
-5. Paste your API key into the terminal when prompted.
+5. Approve the CLI authorization in Studio when the browser/device flow opens.
 6. Let the AI create the app with `automaton new`.
 7. Let the AI build and deploy the app.
 8. Approve publishing when you are ready.
@@ -45,7 +45,7 @@ Only then implement the application.
 
 Do not paste your API key directly into the AI chat.
 
-Paste it into the terminal when `automaton login` asks for it.
+The normal `automaton login` flow opens Studio for explicit approval. For CI/CD, set `AUTOMATON_API_KEY` in the environment instead of persisting a credential.
 
 ## Existing app prompt
 

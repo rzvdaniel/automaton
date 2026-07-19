@@ -14,7 +14,6 @@ dotnet tool install --global Automaton.Cli
 automaton login
 automaton login --local
 automaton login --device
-automaton login --key-from-env
 automaton new "My App"
 automaton pull
 automaton pull my-remixed-app
@@ -28,7 +27,8 @@ automaton --version
 device authorization request, then stores the credential globally for reuse across
 Automaton apps. Use `automaton login --local` when a project needs an isolated
 credential. If a browser cannot be opened, copy the displayed URL and code to another
-device. Use `--key-from-env` for CI/CD and other unattended flows.
+device. For CI/CD and other unattended flows, set `AUTOMATON_API_KEY` and run the
+required command directly; environment credentials are never persisted.
 
 ## Pull modes
 

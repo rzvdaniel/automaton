@@ -20,7 +20,7 @@ Follow the instructions and references found there.
 ```text
 Update my existing Automaton Monster app using the Automaton CLI.
 
-First run `automaton --version`. If the CLI is missing, install it using the official Automaton instructions. Then run `automaton login` to authorize this machine through Automaton Studio. Do not ask the user to paste an API key for normal onboarding.
+First run `automaton --version`. If the CLI is missing, install it using the official Automaton instructions. Then run `automaton login` to authorize this machine through Automaton Studio. Do not ask the user to paste an API key for normal onboarding. For CI/CD, use the `AUTOMATON_API_KEY` environment variable directly with the required CLI command.
 
 Link this folder to app id [app-id] with `automaton link [app-id]`. Then follow the local generated guidance in `AGENTS.md` and `.automaton/agents/`. If local guidance is unavailable, read https://automaton.monster/llms.txt.
 

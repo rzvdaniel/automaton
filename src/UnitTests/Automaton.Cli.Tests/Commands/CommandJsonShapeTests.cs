@@ -116,35 +116,6 @@ public class CommandJsonShapeTests
     }
 
     [Test]
-    public async Task LoginCommand_WhenEnvironmentKeyIsMissing_ReturnsDiagnosticJsonFailure()
-    {
-        var projectRoot = CreateProjectRoot();
-        new ConfigService().SaveProjectLocalConfig(projectRoot, new GlobalConfig
-        {
-            Server = ConfigService.DefaultHostedServer,
-            ApiKey = string.Empty
-        });
-        var command = LoginCommand.Build(new ConfigService());
-
-        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json", "--key-from-env"]);
-
-        using var doc = JsonDocument.Parse(output);
-        var root = doc.RootElement;
-
-        Assert.That(root.GetProperty("success").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("summary").GetString(), Is.EqualTo("Login failed"));
-
-        var checks = root.GetProperty("checks").EnumerateArray().ToList();
-        var authenticationCheck = checks.Single(check =>
-            string.Equals(check.GetProperty("name").GetString(), CommandDiagnosticCheckNames.Authentication, StringComparison.Ordinal));
-
-        Assert.That(authenticationCheck.GetProperty("error").GetString(), Is.EqualTo("AUTOMATON_API_KEY is not set."));
-
-        var nextSteps = root.GetProperty("nextSteps").EnumerateArray().Select(step => step.GetString()).ToList();
-        Assert.That(nextSteps, Has.Some.Contains("browser/device authorization"));
-    }
-
-    [Test]
     public async Task WhoAmICommand_WhenNamedEnvironmentIsMissing_ReturnsDiagnosticJsonShape()
     {
         var projectRoot = CreateProjectRoot();

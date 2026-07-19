@@ -119,11 +119,11 @@ automaton login --device
 For CI/CD and other unattended environments, use a secret-manager environment variable:
 
 ```bash
-automaton login --key-from-env
-automaton config --show
+export AUTOMATON_API_KEY=ak_developer_xxx
+automaton deploy --non-interactive
 ```
 
-By default, `automaton login` stores project-local credentials in `./.automaton/config.json` and uses the hosted Automaton server automatically. Environment variables are mainly for CI/CD and internal development; normal users do not need them for the standard flow.
+By default, `automaton login` stores credentials globally in `~/.automaton/config.json` and reuses them across Automaton apps. Use `automaton login --local` when a project needs an isolated credential. Environment variables are read at command time and are never persisted.
 
 ---
 
@@ -216,10 +216,10 @@ automaton login
 Options:
 
 - `--device` — force the headless/device-code presentation;
-- `--key-from-env` — use `AUTOMATON_API_KEY` for unattended authentication; and
+- `--local` — save the credential in the current project's `.automaton/config.json` instead of the global CLI config; and
 - `--key <value>` — validate and store an existing key when explicitly required.
 
-By default, `login` uses the hosted Automaton server and saves credentials locally for the current project.
+By default, `login` uses the hosted Automaton server and saves credentials globally for reuse across projects.
 
 ### `automaton new`
 

@@ -55,8 +55,10 @@ This stores the credential in the current project's `.automaton/config.json` and
 Advanced fallback for CI/CD or another unattended environment:
 
 ```bash
-AUTOMATON_API_KEY=ak_developer_xxx automaton login --key-from-env
+AUTOMATON_API_KEY=ak_developer_xxx automaton deploy
 ```
+
+Environment credentials are read automatically by CLI commands and are never persisted by `automaton login`.
 
 ## App creation handoff
 
