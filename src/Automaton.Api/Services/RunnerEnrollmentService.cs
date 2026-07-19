@@ -220,7 +220,7 @@ public sealed class RunnerEnrollmentService(
             ApiKeyScope.Runner,
             "Issued by one-time Infrastructure Runner enrollment.",
             saveChanges: false,
-            source: ApiKeySource.RunnerProvisioning);
+            source: ApiKeySource.InfrastructureRunnerEnrollment);
 
         var runner = new Runner
         {
