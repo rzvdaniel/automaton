@@ -17,6 +17,7 @@ Use this skill when touching:
 ## Rules
 
 - Keep CLI behavior scriptable and friendly to AI coding agents.
+- JSON and other non-interactive modes must never prompt; resolve available credentials and return a structured failure when required input is missing.
 - Preserve the source/runtime split.
 - Do not include dependency folders, build output, caches, local environment files, secrets, logs, or VCS folders in source archives.
 - Treat `automaton.json` as the local link contract. Preserve it unless the command intentionally relinks the project.
