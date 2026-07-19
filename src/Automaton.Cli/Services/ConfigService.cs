@@ -263,7 +263,8 @@ public class ConfigService
         {
             Server = file.Server,
             ApiKey = file.ApiKey,
-            AppId = file.AppId
+            AppId = file.AppId,
+            PendingAuthorizationCompletion = file.PendingAuthorizationCompletion
         };
     }
 
@@ -293,7 +294,8 @@ public class ConfigService
         {
             Server = resolved.Server,
             ApiKey = resolved.ApiKey,
-            AppId = resolved.AppId
+            AppId = resolved.AppId,
+            PendingAuthorizationCompletion = LoadProjectLocalConfig(directory ?? Directory.GetCurrentDirectory()).PendingAuthorizationCompletion
         };
     }
 

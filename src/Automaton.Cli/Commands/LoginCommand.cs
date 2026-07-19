@@ -40,6 +40,20 @@ public static class LoginCommand
                     ? existing.Server ?? ConfigService.DefaultHostedServer
                     : server.TrimEnd('/');
 
+                if (existing.PendingAuthorizationCompletion is not null)
+                {
+                    var pending = existing.PendingAuthorizationCompletion;
+                    if (string.IsNullOrWhiteSpace(existing.ApiKey))
+                        throw new InvalidOperationException("A previous CLI credential is awaiting acknowledgement, but the saved credential is missing.");
+
+                    if (!await RetryCompletionAsync(pending.Server, pending.RequestId, pending.Verifier))
+                        throw new InvalidOperationException("A previous CLI credential is still awaiting server acknowledgement. Run automaton login again to retry it.");
+
+                    await SaveCredentialsAsync(config, cwd, pending.Server, existing.ApiKey, global, pending: null);
+                    server = pending.Server;
+                    key = existing.ApiKey;
+                }
+
                 if (keyFromEnv && device)
                     throw new InvalidOperationException("Choose either --device or --key-from-env, not both.");
 
@@ -139,8 +153,33 @@ public static class LoginCommand
             throw new TimeoutException("The CLI authorization request expired before it was approved.");
 
         using var authenticatedClient = new AutomatonApiClient(server, apiKey);
-        await SaveCredentialsAsync(config, cwd, server, apiKey, global);
-        await client.CompleteCliAuthorizationAsync(authorization.RequestId, authorization.Verifier);
+        await SaveCredentialsAsync(
+            config,
+            cwd,
+            server,
+            apiKey,
+            global,
+            new PendingCliAuthorizationCompletion
+            {
+                RequestId = authorization.RequestId,
+                Server = server,
+                Verifier = authorization.Verifier
+            });
+
+        if (await RetryCompletionAsync(server, authorization.RequestId, authorization.Verifier))
+        {
+            await SaveCredentialsAsync(config, cwd, server, apiKey, global, pending: null);
+        }
+        else
+        {
+            checks.Add(new CommandDiagnosticCheck(
+                CommandDiagnosticCheckNames.Authentication,
+                true,
+                "credential saved; server acknowledgement will be retried on the next CLI invocation",
+                IsWarning: true));
+            if (!asJson)
+                AnsiConsole.MarkupLine("[yellow]⚠[/] Credential saved; server acknowledgement will be retried on the next CLI invocation.");
+        }
 
         string displayName;
         try
@@ -224,9 +263,43 @@ public static class LoginCommand
             : "[grey]Credentials saved to ./.automaton/config.json[/]");
     }
 
-    private static async Task SaveCredentialsAsync(ConfigService config, string cwd, string server, string apiKey, bool global)
+    private static async Task<bool> RetryCompletionAsync(string server, Guid requestId, string verifier)
     {
-        var updated = new GlobalConfig { Server = server, ApiKey = apiKey };
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                using var client = new AutomatonApiClient(server);
+                await client.CompleteCliAuthorizationAsync(requestId, verifier);
+                return true;
+            }
+            catch when (attempt < 2)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task SaveCredentialsAsync(
+        ConfigService config,
+        string cwd,
+        string server,
+        string apiKey,
+        bool global,
+        PendingCliAuthorizationCompletion? pending = null)
+    {
+        var updated = global
+            ? config.LoadGlobalConfig()
+            : config.LoadProjectLocalConfig(cwd);
+        updated.Server = server;
+        updated.ApiKey = apiKey;
+        updated.PendingAuthorizationCompletion = pending;
         if (global)
             config.SaveGlobalConfig(updated);
         else

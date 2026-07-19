@@ -15,4 +15,14 @@ public class GlobalConfig
 
     /// <summary>Optional environment-specific linked app ID.</summary>
     public string? AppId { get; set; }
+
+    /// <summary>Retryable acknowledgement for a CLI credential saved before the server confirmed delivery.</summary>
+    public PendingCliAuthorizationCompletion? PendingAuthorizationCompletion { get; set; }
+}
+
+public sealed class PendingCliAuthorizationCompletion
+{
+    public Guid RequestId { get; set; }
+    public string Server { get; set; } = string.Empty;
+    public string Verifier { get; set; } = string.Empty;
 }

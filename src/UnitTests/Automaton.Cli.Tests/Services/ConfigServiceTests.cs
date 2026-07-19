@@ -63,6 +63,31 @@ public class ConfigServiceTests
     }
 
     [Test]
+    public void ProjectConfig_PreservesPendingCliAuthorizationCompletion()
+    {
+        var projectRoot = CreateTempDirectory();
+        var configService = new ConfigService();
+        var requestId = Guid.NewGuid();
+
+        configService.SaveProjectLocalConfig(projectRoot, new GlobalConfig
+        {
+            Server = "https://api.example.com",
+            ApiKey = "ak_developer_test",
+            PendingAuthorizationCompletion = new PendingCliAuthorizationCompletion
+            {
+                RequestId = requestId,
+                Server = "https://api.example.com",
+                Verifier = "verifier"
+            }
+        });
+
+        var saved = configService.LoadProjectLocalConfig(projectRoot);
+        Assert.That(saved.PendingAuthorizationCompletion, Is.Not.Null);
+        Assert.That(saved.PendingAuthorizationCompletion!.RequestId, Is.EqualTo(requestId));
+        Assert.That(saved.PendingAuthorizationCompletion.Verifier, Is.EqualTo("verifier"));
+    }
+
+    [Test]
     public void RequireCredentials_WhenLocalConfigExists_UsesLocalServerAndApiKey()
     {
         // Arrange
