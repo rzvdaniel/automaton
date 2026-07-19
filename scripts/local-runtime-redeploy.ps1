@@ -1,6 +1,6 @@
 param(
     [switch]$NoBuild,
-    [string[]]$Services = @("api", "worker", "studio", "runner")
+    [string[]]$Services = @("api", "worker", "studio", "website", "runner")
 )
 
 $ErrorActionPreference = "Stop"

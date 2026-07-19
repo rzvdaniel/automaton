@@ -96,6 +96,35 @@ docker compose -f docker-compose.runtime-local.yml down -v
 This removes the runtime-local containers and Docker volumes created by that compose file.
 It does not remove your SQL dump file.
 
+## Clean-machine bootstrap
+
+On Windows, the recommended entry point is:
+
+```powershell
+.\scripts\setup-local-development.ps1
+```
+
+The bootstrap script is idempotent and performs the local prerequisites, hosts-file,
+certificate, full-stack build/start, and readiness checks. It builds API, Worker,
+Studio, Website, and Runner so it also works on a machine without existing local
+images.
+
+Useful options:
+
+```powershell
+.\scripts\setup-local-development.ps1 -SkipBuild
+.\scripts\setup-local-development.ps1 -NoHostsFileChanges
+.\scripts\setup-local-development.ps1 -ProvisionTestRunner
+.\scripts\setup-local-development.ps1 -Reset
+```
+
+`-Reset` is destructive: it removes the runtime-local containers and volumes and
+any managed hosted-runner containers. It is never used during a normal setup.
+`-ProvisionTestRunner` prompts for an existing local administrator account, assigns
+the active default plan through the API, and waits for the real hosted-runner
+provisioning flow to reach `running`. The smoke-test application deployment is
+still performed separately through the normal CLI workflow.
+
 ## Managed runners
 
 The runtime-local stack now enables managed hosted runner provisioning.

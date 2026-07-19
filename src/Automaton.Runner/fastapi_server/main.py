@@ -417,7 +417,11 @@ async def health():
 
 if __name__ == "__main__":
     _print_startup_diagnostics()
-    workers = 1 if sys.platform == "win32" else 4
+    try:
+        configured_workers = int(os.environ.get("RUNNER_FASTAPI_WORKERS", "1"))
+    except ValueError:
+        configured_workers = 1
+    workers = 1 if sys.platform == "win32" else max(1, configured_workers)
     uvicorn.run(
         "main:app", host=FASTAPI_HOST, port=8001, workers=workers, log_level="info"
     )
