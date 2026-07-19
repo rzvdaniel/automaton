@@ -76,7 +76,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${LOCAL_RUNTIME_RABBITMQ_USER:-automaton}
       RABBITMQ_DEFAULT_PASS: ${LOCAL_RUNTIME_RABBITMQ_PASSWORD:-automaton}
     ports:
-      - "${LOCAL_RUNTIME_RABBITMQ_PORT:-5673}:5672"
+      - "${LOCAL_RUNTIME_RABBITMQ_PORT:-5672}:5672"
       - "${LOCAL_RUNTIME_RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
     volumes:
       - runtime-local-rabbitmq-data:/var/lib/rabbitmq
