@@ -1,9 +1,20 @@
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace Automaton.Api.Services;
 
 public sealed class AdminDocumentationService
 {
+    private static readonly HashSet<string> AllowedAssetExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".svg"
+    };
+
+    private static readonly FileExtensionContentTypeProvider AssetContentTypes = new();
     private static readonly Regex FrontMatterRegex = new(
         @"\A---\r?\n(?<frontMatter>[\s\S]*?)\r?\n---\r?\n?",
         RegexOptions.Compiled);
@@ -53,6 +64,39 @@ public sealed class AdminDocumentationService
             ContentMarkdown = parsed.Body,
             UpdatedAtUtc = updatedAtUtc
         };
+    }
+
+    public DocumentationAsset? GetAsset(string group, string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(group) || string.IsNullOrWhiteSpace(relativePath)
+            || group is "." or ".."
+            || group.Contains('/') || group.Contains('\\')
+            || relativePath.Contains('\0')
+            || relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == "..")
+            || Path.IsPathRooted(relativePath))
+        {
+            return null;
+        }
+
+        var adminRoot = Path.Combine(_environment.ContentRootPath, "Documentation", "Admin");
+        var assetsRoot = Path.GetFullPath(Path.Combine(adminRoot, group, "assets"));
+        var candidatePath = Path.GetFullPath(Path.Combine(assetsRoot, relativePath));
+        var assetsRootWithSeparator = assetsRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        if (!candidatePath.StartsWith(assetsRootWithSeparator, StringComparison.OrdinalIgnoreCase)
+            || !AllowedAssetExtensions.Contains(Path.GetExtension(candidatePath))
+            || !File.Exists(candidatePath))
+        {
+            return null;
+        }
+
+        if (!AssetContentTypes.TryGetContentType(candidatePath, out var contentType))
+        {
+            return null;
+        }
+
+        return new DocumentationAsset(candidatePath, contentType);
     }
 
     private List<DocumentationTopicDefinition> DiscoverTopics()
@@ -182,6 +226,8 @@ public sealed class AdminDocumentationService
         IReadOnlyDictionary<string, string> Metadata,
         string Body);
 }
+
+public sealed record DocumentationAsset(string AbsolutePath, string ContentType);
 
 public sealed class AdminDocumentationTopicListItemResponse
 {

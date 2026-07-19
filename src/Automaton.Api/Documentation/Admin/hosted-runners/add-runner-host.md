@@ -38,6 +38,10 @@ Available capacity = Total - Reserved - Existing runner allocations
 
 ## Onboarding sequence
 
+Administrators normally create remote Runner Hosts by installing and enrolling an Infrastructure Runner. The Infrastructure Runner reports host capabilities to Automaton and keeps the host record updated; it is not necessary to create the host manually first.
+
+[![Runner Hosts via Infrastructure Runner](./assets/runner-hosts-via-infrastructure-runners.png)](./assets/runner-hosts-via-infrastructure-runners.png)
+
 1. Select or create the host record.
 2. Choose **Install Infrastructure Runner** and run the provided installer on the target server.
 3. Wait for enrollment and confirm that the Infrastructure Runner appears online.

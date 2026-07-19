@@ -28,6 +28,11 @@ class DocumentationService {
     const { data } = await apiClient.get<AdminDocumentationTopic>(`/api/admin/documentation/${encodeURIComponent(key)}`)
     return data
   }
+
+  async getAdminAsset(url: string): Promise<Blob> {
+    const { data } = await apiClient.get<Blob>(url, { responseType: 'blob' })
+    return data
+  }
 }
 
 export const documentationService = new DocumentationService()

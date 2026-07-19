@@ -92,10 +92,10 @@
 	  <None Include="SystemPrompts\ExternalMcpInstructions.md">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-    <None Include="Documentation\Admin\**\*.md">
+    <Content Include="Documentation\Admin\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Watch Remove="AppData\media\**\*" />

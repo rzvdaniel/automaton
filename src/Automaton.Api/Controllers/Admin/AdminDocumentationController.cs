@@ -28,4 +28,11 @@ public sealed class AdminDocumentationController : ControllerBase
         var topic = await _service.GetTopicAsync(key, cancellationToken);
         return topic is null ? NotFound() : Ok(topic);
     }
+
+    [HttpGet("assets/{group}/{**path}")]
+    public IActionResult GetAsset(string group, string path)
+    {
+        var asset = _service.GetAsset(group, path);
+        return asset is null ? NotFound() : PhysicalFile(asset.AbsolutePath, asset.ContentType);
+    }
 }

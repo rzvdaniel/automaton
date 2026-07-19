@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import Drawer from 'primevue/drawer'
 import { marked } from 'marked'
 import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
@@ -22,6 +22,10 @@ const topicsLoading = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
 const topic = ref<AdminDocumentationTopic | null>(null)
+const contentRef = ref<HTMLElement | null>(null)
+const renderedMarkdown = ref('')
+const assetObjectUrls = new Set<string>()
+let assetHydrationGeneration = 0
 
 const drawerVisible = computed({
   get: () => state.visible,
@@ -33,7 +37,6 @@ const drawerVisible = computed({
 })
 
 const drawerTitle = computed(() => state.fallbackTitle || 'Documentation')
-const renderedMarkdown = computed(() => (topic.value ? marked.parse(topic.value.contentMarkdown) : ''))
 const groupedTopics = computed<DocumentationTopicGroup[]>(() => {
   const groups = new Map<string, DocumentationTopicGroup>()
 
@@ -53,6 +56,74 @@ const groupedTopics = computed<DocumentationTopicGroup[]>(() => {
 
   return Array.from(groups.values())
 })
+
+function clearAssetObjectUrls() {
+  for (const objectUrl of assetObjectUrls) {
+    URL.revokeObjectURL(objectUrl)
+  }
+  assetObjectUrls.clear()
+}
+
+function getAssetReference(value: string, group: string) {
+  const normalizedValue = value.replace(/^\.\//, '')
+  if (!normalizedValue.startsWith('assets/')) {
+    return null
+  }
+
+  const path = normalizedValue.slice('assets/'.length).split(/[?#]/, 1)[0] ?? ''
+  const segments = path.split('/').filter(Boolean)
+  if (!segments.length || segments.some(segment => segment === '.' || segment === '..')) {
+    return null
+  }
+
+  return `/api/admin/documentation/assets/${encodeURIComponent(group)}/${segments.map(encodeURIComponent).join('/')}`
+}
+
+async function hydrateDocumentationAssets(generation: number) {
+  await nextTick()
+  if (generation !== assetHydrationGeneration || !contentRef.value || !topic.value) {
+    return
+  }
+
+  const elements = [
+    ...Array.from(contentRef.value.querySelectorAll<HTMLImageElement>('img[src]')),
+    ...Array.from(contentRef.value.querySelectorAll<HTMLAnchorElement>('a[href]')),
+  ]
+  const assetUrls = new Map<string, Promise<string | null>>()
+
+  for (const element of elements) {
+    const reference = element instanceof HTMLImageElement ? element.getAttribute('src') : element.getAttribute('href')
+    if (!reference) {
+      continue
+    }
+
+    const assetUrl = getAssetReference(reference, topic.value.group)
+    if (!assetUrl) {
+      continue
+    }
+
+    if (!assetUrls.has(assetUrl)) {
+      assetUrls.set(assetUrl, documentationService.getAdminAsset(assetUrl).then(blob => {
+        const objectUrl = URL.createObjectURL(blob)
+        assetObjectUrls.add(objectUrl)
+        return objectUrl
+      }).catch(() => null))
+    }
+
+    const objectUrl = await assetUrls.get(assetUrl)!
+    if (!objectUrl || generation !== assetHydrationGeneration) {
+      continue
+    }
+
+    if (element instanceof HTMLImageElement) {
+      element.src = objectUrl
+    } else {
+      element.href = objectUrl
+      element.target = '_blank'
+      element.rel = 'noopener noreferrer'
+    }
+  }
+}
 
 const selectedTopicKey = computed(() => state.topicKey)
 
@@ -75,11 +146,18 @@ async function loadTopics() {
 }
 
 async function loadCurrentTopic(topicKey: string) {
+  const generation = ++assetHydrationGeneration
+  clearAssetObjectUrls()
+  renderedMarkdown.value = ''
   loading.value = true
   errorMessage.value = ''
 
   try {
     topic.value = await documentationService.getAdminTopic(topicKey)
+    const parsedMarkdown = marked.parse(topic.value.contentMarkdown)
+    renderedMarkdown.value = typeof parsedMarkdown === 'string' ? parsedMarkdown : await parsedMarkdown
+    loading.value = false
+    await hydrateDocumentationAssets(generation)
   } catch {
     topic.value = null
     errorMessage.value = 'Failed to load documentation.'
@@ -122,6 +200,10 @@ watch(
   () => state.visible,
   visible => {
     if (!visible) {
+      assetHydrationGeneration++
+      clearAssetObjectUrls()
+      renderedMarkdown.value = ''
+      topic.value = null
       loading.value = false
       topicsLoading.value = false
       errorMessage.value = ''
@@ -182,7 +264,7 @@ watch(
             <h1 class="documentation-topic-title">{{ topic.title }}</h1>
           </div>
 
-          <div class="documentation-content" v-html="renderedMarkdown" />
+          <div ref="contentRef" class="documentation-content" v-html="renderedMarkdown" />
         </article>
       </section>
     </div>
@@ -358,6 +440,15 @@ watch(
   border-left: 4px solid #c9d8ec;
   background: #f8fbff;
   color: #35527f;
+}
+
+.documentation-content :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem auto;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
 }
 
 @media (max-width: 960px) {

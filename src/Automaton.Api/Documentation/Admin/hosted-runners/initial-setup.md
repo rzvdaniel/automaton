@@ -11,6 +11,10 @@ Prepare Automaton so users on an eligible subscription plan can receive managed 
 
 ## Setup readiness
 
+The Hosted Runner model connects subscription plans, runner specifications, hosted runners, and runner hosts:
+
+[![Hosted Runner model](./assets/automaton-runtime-plans-runner-hosts-specifications.png)](./assets/automaton-runtime-plans-runner-hosts-specifications.png)
+
 Use this checklist before assigning a plan to a test user:
 
 ```text
