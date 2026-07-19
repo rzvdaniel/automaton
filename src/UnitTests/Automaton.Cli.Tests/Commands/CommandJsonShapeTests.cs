@@ -206,7 +206,7 @@ public class CommandJsonShapeTests
         var projectRoot = CreateProjectRoot();
         var command = SyncAiCommand.Build(new ConfigService());
 
-        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json"]);
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--json", "--env", "missing"]);
 
         AssertDiagnosticFailure(output, "AI guidance sync failed", CommandDiagnosticCheckNames.AiGuidance, "checks", "nextSteps");
     }
@@ -217,7 +217,7 @@ public class CommandJsonShapeTests
         var projectRoot = CreateProjectRoot();
         var command = SyncAiCommand.Build(new ConfigService());
 
-        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--adapter", "claude", "--json"]);
+        var output = await InvokeAndCaptureAsync(command, projectRoot, ["--adapter", "claude", "--json", "--env", "missing"]);
 
         using var doc = JsonDocument.Parse(output);
         Assert.That(doc.RootElement.GetProperty("success").GetBoolean(), Is.False);

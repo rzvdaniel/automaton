@@ -104,13 +104,21 @@ public static class LoginCommand
             AnsiConsole.MarkupLine($"[grey]Using server:[/] {server}");
             AnsiConsole.MarkupLine("Authorize Automaton CLI in your browser:");
             AnsiConsole.MarkupLine($"[link={authorization.VerificationUrl}]{authorization.VerificationUrl}[/]");
-            AnsiConsole.MarkupLine($"Enter code: [bold]{authorization.UserCode}[/]");
         }
 
         var browserOpened = !forceDevice && CliBrowserService.TryOpenUrl(authorization.VerificationUrl);
-        if (!browserOpened && !asJson)
+        if (!asJson && browserOpened)
+        {
+            AnsiConsole.MarkupLine($"Confirm this code in Studio: [bold]{authorization.UserCode}[/]");
+        }
+        else if (!asJson && forceDevice)
+        {
+            AnsiConsole.MarkupLine($"Open the URL above and enter this code: [bold]{authorization.UserCode}[/]");
+        }
+        else if (!asJson)
         {
             AnsiConsole.MarkupLine("[yellow]A browser could not be opened. Open the URL above on another device.[/]");
+            AnsiConsole.MarkupLine($"Enter this code: [bold]{authorization.UserCode}[/]");
         }
 
         if (!asJson)
