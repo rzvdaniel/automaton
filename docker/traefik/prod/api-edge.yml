@@ -16,7 +16,7 @@ http:
       middlewares:
         - api-https-headers
       tls:
-        certResolver: letsencrypt
+        certResolver: cloudflare
 
     studio-edge:
       entryPoints:
@@ -24,7 +24,7 @@ http:
       rule: "Host(`__STUDIO_DOMAIN__`)"
       service: studio-__STUDIO_COLOR__-edge
       tls:
-        certResolver: letsencrypt
+        certResolver: cloudflare
 
     website-edge:
       entryPoints:
@@ -32,7 +32,7 @@ http:
       rule: "Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`)"
       service: website-__WEBSITE_COLOR__-edge
       tls:
-        certResolver: letsencrypt
+        certResolver: cloudflare
 
     apps-edge:
       entryPoints:
@@ -42,7 +42,7 @@ http:
       middlewares:
         - api-https-headers
       tls:
-        certResolver: letsencrypt
+        certResolver: cloudflare
 
   middlewares:
     api-redirect:
@@ -71,3 +71,13 @@ http:
       loadBalancer:
         servers:
           - url: "http://website-__WEBSITE_COLOR__:80"
+
+tls:
+  stores:
+    default:
+      defaultGeneratedCert:
+        resolver: cloudflare
+        domain:
+          main: "__APPS_DOMAIN__"
+          sans:
+            - "*.__APPS_DOMAIN__"

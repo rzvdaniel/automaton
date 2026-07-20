@@ -16,7 +16,14 @@ Verify proxied DNS records for `automaton.monster`, `www`, `api`, `studio`, and 
 
 Use SSL/TLS mode `Full (strict)`, never Flexible.
 
-For dynamic app hostnames, use Traefik ACME DNS-01 with a Cloudflare API token restricted to the Automaton zone and only:
+Use one Traefik ACME DNS-01 certificate for the app host and wildcard. It must cover:
+
+```text
+apps.automaton.monster
+*.apps.automaton.monster
+```
+
+Use a Cloudflare API token restricted to the Automaton zone and only:
 
 ```text
 Zone:Read
@@ -40,13 +47,29 @@ Configure Traefik's resolver in `.prod-runtime/traefik/traefik.yml` with DNS-01:
 
 ```yaml
 certificatesResolvers:
-  letsencrypt:
+  cloudflare:
     acme:
       email: "__ACME_EMAIL__"
       storage: "/etc/traefik/acme/acme.json"
       dnsChallenge:
         provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+tls:
+  stores:
+    default:
+      defaultGeneratedCert:
+        resolver: cloudflare
+        domain:
+          main: "apps.automaton.monster"
+          sans:
+            - "*.apps.automaton.monster"
 ```
+
+Generated managed-app routers should use `tls: {}`. Do not attach the ACME resolver to
+every slug router, because that would create one certificate lifecycle per application.
 
 Persist `acme.json`, verify its permissions, and test certificate issuance after Traefik starts. Do not run Certbot and Traefik as competing certificate authorities for the same domains.
 

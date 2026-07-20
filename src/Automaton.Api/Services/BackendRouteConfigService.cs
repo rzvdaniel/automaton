@@ -110,8 +110,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
-            builder.AppendLine("      tls:");
-            builder.AppendLine("        certResolver: letsencrypt");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
@@ -121,8 +120,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-frontend:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
-            builder.AppendLine("      tls:");
-            builder.AppendLine("        certResolver: letsencrypt");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");
@@ -136,8 +134,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
-            builder.AppendLine("      tls:");
-            builder.AppendLine("        certResolver: letsencrypt");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/api`)\"");
             builder.AppendLine("      priority: 100");
             builder.AppendLine($"      service: \"{key}\"");
@@ -147,8 +144,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-frontend:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
-            builder.AppendLine("      tls:");
-            builder.AppendLine("        certResolver: letsencrypt");
+            builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");

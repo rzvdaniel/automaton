@@ -187,9 +187,9 @@ Use `APPS_DOMAIN` for public published apps. Public app URLs use the nested wild
 and routes each published slug host to the managed runner runtime endpoint written to
 `managed-runtime-routes.yml`. The base `apps` host remains the API-backed runtime entry
 point and is not a blue/green application service. Per-router ACME issuance is currently
-the interim implementation; production should move to a DNS-01 wildcard certificate for
-`*.apps.automaton.monster` as app volume grows, with that certificate configured as the
-Traefik default so dynamic app routers can use `tls: {}` without per-app issuance.
+not used for managed app routes. Traefik requests one DNS-01 wildcard certificate covering
+both `apps.automaton.monster` and `*.apps.automaton.monster`, then dynamic app routers use
+`tls: {}` without an app-specific certificate lifecycle.
 
 Managed runtime volumes:
 
@@ -695,11 +695,12 @@ nginx mounts `prod-published-apps` read-only. The API colors mount the same volu
 
 ## TLS Certificates
 
-The certificate presented for public apps must also cover `*.apps.automaton.monster`.
-The existing webroot Certbot helper issues the base service certificate names; wildcard
-certificates require a DNS-01-capable certificate workflow or an edge certificate managed
-by the DNS/proxy provider. Do not assume a certificate for `*.automaton.monster` covers the
-nested `*.apps.automaton.monster` names.
+The Traefik default certificate for public apps must cover both
+`apps.automaton.monster` and `*.apps.automaton.monster`. The wildcard requires DNS-01;
+do not assume a certificate for `*.automaton.monster` covers the nested app hostnames.
+The production Traefik dynamic configuration uses `defaultGeneratedCert` with the
+Cloudflare DNS-01 resolver, so generated app routes should retain `tls: {}` and must not
+request a certificate per slug.
 
 Issue or refresh the live certificate bundle:
 
