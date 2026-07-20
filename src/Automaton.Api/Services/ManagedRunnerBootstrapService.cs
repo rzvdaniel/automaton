@@ -84,8 +84,9 @@ public sealed class ManagedRunnerBootstrapService
                 cancellationToken);
 
         if (hostedRunner?.RunnerId is Guid runnerId &&
-            hostedRunner.Runner != null &&
-            RunnerPresenceEvaluator.IsOnline(hostedRunner.Runner.ConnectionId, hostedRunner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            hostedRunner.Runner is { } runner &&
+            RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose) &&
+            RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
             app.ExecutionRunnerId = runnerId;
             await dbContext.SaveChangesAsync(cancellationToken);

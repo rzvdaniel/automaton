@@ -186,7 +186,10 @@ Use `APPS_DOMAIN` for public published apps. Public app URLs use the nested wild
 `*.apps.automaton.monster` record pointing at the production edge. Traefik terminates TLS
 and routes each published slug host to the managed runner runtime endpoint written to
 `managed-runtime-routes.yml`. The base `apps` host remains the API-backed runtime entry
-point and is not a blue/green application service.
+point and is not a blue/green application service. Per-router ACME issuance is currently
+the interim implementation; production should move to a DNS-01 wildcard certificate for
+`*.apps.automaton.monster` as app volume grows, with that certificate configured as the
+Traefik default so dynamic app routers can use `tls: {}` without per-app issuance.
 
 Managed runtime volumes:
 

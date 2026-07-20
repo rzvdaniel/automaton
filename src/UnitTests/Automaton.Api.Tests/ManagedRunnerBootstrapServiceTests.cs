@@ -112,6 +112,53 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
+    public async Task EnsureRunnerAssignmentAsync_DoesNotAssignOnlineInfrastructureRunnerFromHostedRunnerRecord()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db);
+        var infrastructureRunner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-runner",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            ConnectionId = "infrastructure-connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow,
+            LastConnectedAtUtc = DateTime.UtcNow,
+            Status = "online"
+        };
+        db.Runners.Add(infrastructureRunner);
+        db.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = ownerId,
+            RunnerId = infrastructureRunner.Id,
+            Runner = infrastructureRunner,
+            Name = "Legacy Hosted Runner",
+            Status = HostedRunnerStatuses.Running,
+            ContainerName = "legacy-hosted-runner",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+    }
+
+    [Test]
     public async Task EnsureRunnerAssignmentAsync_ClearsLegacyInfrastructureAssignmentAndQueuesHostedRunner()
     {
         using var db = CreateDbContext();
