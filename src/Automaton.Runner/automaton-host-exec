@@ -6,6 +6,12 @@ if ! command -v nsenter >/dev/null 2>&1; then
   exit 127
 fi
 
+# Infrastructure commands are launched with bash --noprofile --norc. Once
+# nsenter switches into the host namespaces, retain a predictable host PATH so
+# commands installed in standard system locations (for example /usr/bin/docker)
+# can be resolved without relying on the container's environment.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "automaton-host-exec must run as root inside an infrastructure Runner." >&2
   exit 126

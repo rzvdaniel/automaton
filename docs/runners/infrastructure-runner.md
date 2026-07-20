@@ -130,6 +130,11 @@ automaton-host-exec apt-get update
 The helper uses `nsenter` against host PID 1. Mounting `/host` is useful for
 direct file access, but it is not itself a host execution environment.
 
+The helper establishes a standard host-safe `PATH` before entering the host
+namespaces. This allows commands installed in locations such as `/usr/bin`
+(including Docker on a normal Linux host) to work from the non-interactive
+Infrastructure Runner shell.
+
 Docker commands use the mounted host Docker socket and therefore manage the
 host Docker daemon:
 
