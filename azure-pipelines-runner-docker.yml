@@ -13,9 +13,12 @@
 #      - Password: your-access-token
 #      - Service connection name: DockerHub
 #
-# Trigger: Manual or on tags (e.g., v1.0.0, runner-v1.0.0)
+# Trigger: main Runner changes, manually, or on tags (e.g., v1.0.0, runner-v1.0.0)
 
 trigger:
+  branches:
+    include:
+      - main
   tags:
     include:
       - 'v*'
