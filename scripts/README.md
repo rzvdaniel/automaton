@@ -56,20 +56,20 @@ sudo ./setup-service.sh
 | `setup-service.sh` | Linux/macOS | Install/uninstall systemd/launchd service |
 | `test-service-debug.ps1` | Windows | Development testing (auto-reinstall) |
 | `dev-reinstall-cli.ps1` | Windows/PowerShell | Pack and install/update/reinstall/uninstall the local Automaton CLI tool |
-| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for nginx-based blue/green production deploys |
-| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color nginx serves for API, Studio, and website |
+| `prod-blue-green-common.sh` | Linux/macOS | Shared helper library for Traefik-based blue/green production deploys |
+| `prod-switch-blue-green.sh` | Linux/macOS | Show or change which color Traefik serves for API, Studio, and website |
 | `prod-redeploy-api.sh` | Linux/macOS | Rebuild and redeploy the production API with a blue/green cutover |
 | `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with a blue/green cutover |
 | `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with a blue/green cutover |
 | `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
 | `prod-reset-blue-green.sh` | Linux/macOS | Reset live routing state to all-blue after blue containers are confirmed running |
-| `prod-verify.sh` | Linux/macOS | Verify nginx config, live colors, origin URLs, and public Cloudflare URLs |
+| `prod-verify.sh` | Linux/macOS | Verify Traefik configuration and routing, live colors, origin URLs, and public Cloudflare URLs |
 
 ---
 
 ## 🚢 Production Docker Redeploy Helpers
 
-These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. nginx reads generated upstream selector files from `.prod-runtime/nginx/upstreams/`, and the scripts update those files before reloading nginx to point each hostname at the freshly deployed color.
+These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/green production redeploys. Traefik reads the generated dynamic configuration and blue/green selectors under `.prod-runtime/traefik/`, and the scripts update those files before reloading Traefik to point each hostname at the freshly deployed color.
 
 ```bash
 cd /opt/automaton

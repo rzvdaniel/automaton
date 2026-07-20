@@ -1,6 +1,6 @@
 # Production Docker Cheat Sheet
 
-This is the source of truth for the current nginx-based production stack.
+This is the source of truth for the current Traefik-based production stack.
 
 Use it for both:
 
@@ -557,7 +557,7 @@ cd /opt/automaton
 ./scripts/prod-redeploy-app-host.sh
 ```
 
-Use this only when `apps.automaton.monster` nginx config or `/runtime/automaton-api.js` changes. Publishing a user app does not use this script.
+Use this only when the `apps.automaton.monster` Traefik runtime configuration or `/runtime/automaton-api.js` changes. Publishing a user app does not use this script.
 
 Force a specific target color:
 
