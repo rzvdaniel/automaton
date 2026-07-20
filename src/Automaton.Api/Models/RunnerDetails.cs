@@ -27,6 +27,7 @@ public class RunnerDetails
     public Guid? RunnerHostId { get; set; }
     public string? InstallationId { get; set; }
     public bool IsInfrastructureRunner => string.Equals(Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase);
+    public bool CanExecuteApplications => RunnerCapabilities.CanExecuteApplications(Capabilities, Purpose);
 
     // Project context
     public AccessScope Scope { get; set; }

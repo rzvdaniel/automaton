@@ -42,4 +42,24 @@ public class RunnerCapabilitiesTests
                 [RunnerCapabilities.DockerManagement]),
             Is.True);
     }
+
+    [Test]
+    public void CanExecuteApplications_RequiresManagedApplicationHostingWithoutPrivilegedCapabilities()
+    {
+        Assert.That(
+            RunnerCapabilities.CanExecuteApplications(
+                [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.WorkflowExecution],
+                RunnerPurposes.Managed),
+            Is.True);
+        Assert.That(
+            RunnerCapabilities.CanExecuteApplications(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            Is.False);
+        Assert.That(
+            RunnerCapabilities.CanExecuteApplications(
+                [RunnerCapabilities.ApplicationHosting, RunnerCapabilities.DockerManagement],
+                RunnerPurposes.Managed),
+            Is.False);
+    }
 }

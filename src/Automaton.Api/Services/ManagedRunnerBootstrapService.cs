@@ -39,13 +39,20 @@ public sealed class ManagedRunnerBootstrapService
 
         if (app.ExecutionRunnerId.HasValue)
         {
-            var assignedRunner = await dbContext.Runners
-                .FirstOrDefaultAsync(x => x.Id == app.ExecutionRunnerId.Value, cancellationToken);
+            var assignedHostedRunner = await dbContext.HostedRunners
+                .Include(x => x.Runner)
+                .FirstOrDefaultAsync(x =>
+                    x.RunnerId == app.ExecutionRunnerId.Value &&
+                    x.UserId == ownerId &&
+                    x.DeletedAt == null &&
+                    x.Status != HostedRunnerStatuses.Disabled,
+                    cancellationToken);
+            var assignedRunner = assignedHostedRunner?.Runner;
 
-            // Infrastructure runners manage host capacity and must never become an
-            // app execution target. Repair legacy assignments lazily when the app
-            // next enters the managed-runtime flow.
-            if (assignedRunner == null || RunnerCapabilities.RequiresAdministrator(assignedRunner.CapabilitiesJson, assignedRunner.Purpose))
+            // Resolve assignments through the user's active HostedRunner record.
+            // The underlying Runner row can remain online after its HostedRunner
+            // has been soft-deleted, disabled, or reassigned.
+            if (assignedRunner == null || !RunnerCapabilities.CanExecuteApplications(assignedRunner.CapabilitiesJson, assignedRunner.Purpose))
             {
                 app.ExecutionRunnerId = null;
                 await dbContext.SaveChangesAsync(cancellationToken);

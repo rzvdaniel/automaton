@@ -3,7 +3,7 @@ http:
     api-http-redirect:
       entryPoints:
         - web
-      rule: "Host(`__API_DOMAIN__`) || Host(`__STUDIO_DOMAIN__`) || Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`) || Host(`__APPS_DOMAIN__`)"
+      rule: "Host(`__API_DOMAIN__`) || Host(`__STUDIO_DOMAIN__`) || Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`) || Host(`__APPS_DOMAIN__`) || HostRegexp(`^.+\\.__APPS_DOMAIN__$`)"
       middlewares:
         - api-redirect
       service: api-blue-edge

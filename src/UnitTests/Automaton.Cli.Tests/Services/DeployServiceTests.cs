@@ -226,6 +226,7 @@ public class DeployServiceTests
         Assert.That(readinessCalled, Is.True);
         Assert.That(result.Success, Is.False);
         Assert.That(result.NextSteps, Does.Contain("Managed runner could not be provisioned."));
+        Assert.That(result.Checks.Single(check => check.Name == DeployCheckNames.RunnerAssignment).IsWarning, Is.False);
     }
 
     [Test]

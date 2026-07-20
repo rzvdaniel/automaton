@@ -1,6 +1,6 @@
 name: automaton-prod
 
-# Production stack: nginx + MySQL + API + Studio + Website
+# Production stack: Traefik + MySQL + API + Studio + Website
 #
 # Runners are deployed independently — see docker-compose.runner.yml or
 # https://hub.docker.com/r/rzvdaniel/automaton-runner
@@ -14,7 +14,7 @@ name: automaton-prod
 # Cloudflare guidance:
 #   - keep @, www, api, studio, and apps proxied once the stack is live
 #   - set SSL/TLS mode to Full (strict)
-#   - nginx uses static upstream selector files instead of dynamic Docker discovery
+#   - Traefik uses generated dynamic configuration and blue/green selectors
 
 x-api-common: &api-common
   build:

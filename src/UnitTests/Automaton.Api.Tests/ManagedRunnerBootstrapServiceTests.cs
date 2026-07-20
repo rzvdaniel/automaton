@@ -86,6 +86,32 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
+    public async Task EnsureRunnerAssignmentAsync_ClearsSoftDeletedHostedRunnerAssignmentAndQueuesHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db);
+        var runner = SeedConnectedRunner(db);
+        SeedRunningHostedRunner(db, ownerId, planId, runner);
+        var hostedRunner = db.HostedRunners.Single();
+        hostedRunner.DeletedAt = DateTime.UtcNow;
+        app.ExecutionRunnerId = runner.Id;
+        db.SaveChanges();
+
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+    }
+
+    [Test]
     public async Task EnsureRunnerAssignmentAsync_ClearsLegacyInfrastructureAssignmentAndQueuesHostedRunner()
     {
         using var db = CreateDbContext();

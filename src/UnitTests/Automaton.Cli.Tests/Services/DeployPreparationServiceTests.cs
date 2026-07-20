@@ -50,7 +50,7 @@ public class DeployPreparationServiceTests
         var service = new DeployPreparationService(
             config,
             (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
-            (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([new RunnerSelectionItem("runner-2", "Runner Two", true)]),
+            (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([new RunnerSelectionItem("runner-2", "Runner Two", true, true)]),
             (_, _, _, runnerId, _) =>
             {
                 assignedRunner = runnerId;
@@ -73,8 +73,8 @@ public class DeployPreparationServiceTests
             config,
             (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
             (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([
-                new RunnerSelectionItem("runner-2", "Runner Two", true),
-                new RunnerSelectionItem("runner-3", "Runner Three", true)]),
+                new RunnerSelectionItem("runner-2", "Runner Two", true, true),
+                new RunnerSelectionItem("runner-3", "Runner Three", true, true)]),
             (_, _, _, _, _) => Task.CompletedTask);
 
         var result = await service.PrepareAsync(projectRoot, null);
@@ -112,7 +112,7 @@ public class DeployPreparationServiceTests
             config,
             (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
             (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([
-                new RunnerSelectionItem("infrastructure-1", "Infrastructure Runner", true, IsInfrastructureRunner: true)]),
+                new RunnerSelectionItem("infrastructure-1", "Infrastructure Runner", true, false)]),
             (_, _, _, _, _) => throw new InvalidOperationException("infrastructure runner must not be assigned"));
 
         var result = await service.PrepareAsync(projectRoot, null);
@@ -132,8 +132,8 @@ public class DeployPreparationServiceTests
             config,
             (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
             (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([
-                new RunnerSelectionItem("runner-2", "Runner Two", true),
-                new RunnerSelectionItem("runner-3", "Runner Three", true)]),
+                new RunnerSelectionItem("runner-2", "Runner Two", true, true),
+                new RunnerSelectionItem("runner-3", "Runner Three", true, true)]),
             (_, _, _, runnerId, _) =>
             {
                 assignedRunner = runnerId;

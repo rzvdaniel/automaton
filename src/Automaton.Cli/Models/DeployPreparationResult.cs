@@ -1,6 +1,6 @@
 namespace Automaton.Cli.Models;
 
-public sealed record RunnerSelectionItem(string Id, string Name, bool Connected, bool IsInfrastructureRunner = false);
+public sealed record RunnerSelectionItem(string Id, string Name, bool Connected, bool CanExecuteApplications = false);
 
 public sealed class DeployPreparationResult
 {

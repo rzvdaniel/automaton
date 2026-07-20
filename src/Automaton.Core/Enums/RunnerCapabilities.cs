@@ -95,4 +95,14 @@ public static class RunnerCapabilities
         => Deserialize(capabilitiesJson, purpose)
             .Intersect(PrivilegedCapabilities, StringComparer.OrdinalIgnoreCase)
             .Any();
+
+    public static bool CanExecuteApplications(IEnumerable<string>? capabilities, string? purpose = null)
+        => string.Equals(RunnerPurposes.Normalize(purpose), RunnerPurposes.Managed, StringComparison.Ordinal)
+            && Normalize(capabilities, purpose).Contains(ApplicationHosting, StringComparer.OrdinalIgnoreCase)
+            && !RequiresAdministrator(capabilities, purpose);
+
+    public static bool CanExecuteApplications(string? capabilitiesJson, string? purpose = null)
+        => string.Equals(RunnerPurposes.Normalize(purpose), RunnerPurposes.Managed, StringComparison.Ordinal)
+            && Includes(capabilitiesJson, ApplicationHosting, purpose)
+            && !RequiresAdministrator(capabilitiesJson, purpose);
 }

@@ -162,9 +162,11 @@ public sealed class DeployService
             if (!readiness.Ready)
             {
                 nextSteps.Add(readiness.NextStep);
-                AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message, IsWarning: true));
-                if (readiness.Message.Contains("provision", StringComparison.OrdinalIgnoreCase)
-                    || readiness.Message.Contains("runner", StringComparison.OrdinalIgnoreCase))
+                AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message));
+                if (readiness.State is DeployStateManagedRunnerProvisionFailed
+                    or DeployStateManagedRunnerWaitingForConnection
+                    or DeployStateManagedRuntimeUnavailable
+                    or DeployStatePreparingManagedRuntime)
                 {
                     AddManagedRuntimeNextSteps(
                         nextSteps,
