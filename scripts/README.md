@@ -62,8 +62,6 @@ sudo ./setup-service.sh
 | `prod-redeploy-studio.sh` | Linux/macOS | Rebuild and redeploy the production Studio with a blue/green cutover |
 | `prod-redeploy-website.sh` | Linux/macOS | Rebuild and redeploy the production website with a blue/green cutover |
 | `prod-redeploy-all.sh` | Linux/macOS | Rebuild and redeploy API, Studio, and website with blue/green cutovers |
-| `prod-issue-certs.sh` | Linux/macOS | Request or refresh the nginx TLS certificate bundle used by the public stack |
-| `prod-renew-certs.sh` | Linux/macOS | Run certbot renew and reload nginx |
 | `prod-reset-blue-green.sh` | Linux/macOS | Reset live routing state to all-blue after blue containers are confirmed running |
 | `prod-verify.sh` | Linux/macOS | Verify nginx config, live colors, origin URLs, and public Cloudflare URLs |
 
@@ -76,7 +74,6 @@ These helpers wrap `docker compose -f docker-compose.prod.yml ...` for blue/gree
 ```bash
 cd /opt/automaton
 ./scripts/prod-switch-blue-green.sh status
-./scripts/prod-issue-certs.sh
 ./scripts/prod-reset-blue-green.sh
 ./scripts/prod-redeploy-api.sh
 ./scripts/prod-redeploy-studio.sh
@@ -84,7 +81,6 @@ cd /opt/automaton
 ./scripts/prod-redeploy-website.sh --with-cli-assets
 ./scripts/prod-redeploy-all.sh
 ./scripts/prod-redeploy-all.sh --with-cli-assets
-./scripts/prod-renew-certs.sh
 ./scripts/prod-verify.sh
 ```
 

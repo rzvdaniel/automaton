@@ -162,6 +162,7 @@ STUDIO_DOMAIN=studio.automaton.monster
 WEBSITE_DOMAIN=automaton.monster
 APPS_DOMAIN=apps.automaton.monster
 ACME_EMAIL=you@example.com
+CF_DNS_API_TOKEN=<zone-scoped-cloudflare-dns-edit-token>
 MYSQL_ROOT_PASSWORD=strong-root-password
 MYSQL_DATABASE=automaton
 MYSQL_USER=automaton_user
@@ -173,11 +174,8 @@ RABBITMQ_PASSWORD=strong-rabbitmq-password
 Optional:
 
 ```env
-CERT_NAME=automaton.monster
 RUNNER_RECONNECT_GRACE_SECONDS=60
 ```
-
-Use `CERT_NAME` only if you want the certificate stored under a different folder name than `WEBSITE_DOMAIN`.
 
 Use `RUNNER_RECONNECT_GRACE_SECONDS` as the maximum API runner-drain timeout after cutover. The old API color asks connected runners to reconnect when idle, and the deploy script stops waiting as soon as the old color reports no connected runners. This means runners have acknowledged idleness by disconnecting from the old API; the API does not directly count runner operations. The timeout is a control-plane protection for in-flight SignalR work; it is not required for hosted app availability because Traefik routes hosted app traffic directly to runner runtime endpoints.
 
@@ -242,11 +240,11 @@ cd /opt/automaton
 chmod +x ./scripts/prod-*.sh
 ```
 
-### 10. Bootstrap certificates and first deploy
+### 10. Start Traefik and perform the first deploy
 
 ```bash
 cd /opt/automaton
-./scripts/prod-issue-certs.sh
+docker compose -f docker-compose.prod.yml up -d traefik
 docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue
 ./scripts/prod-reset-blue-green.sh
 ./scripts/prod-redeploy-all.sh --keep-previous
@@ -254,9 +252,9 @@ docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue web
 
 That does four things:
 
-- `prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx
+- Traefik uses `CF_DNS_API_TOKEN` and `ACME_EMAIL` to request and renew the app wildcard through Cloudflare DNS-01
 - `docker compose ... up -d --build api-blue studio-blue website-blue` creates a known all-blue baseline
-- `prod-reset-blue-green.sh` points nginx state at that all-blue baseline
+- `prod-reset-blue-green.sh` points blue/green state at that all-blue baseline
 - `prod-redeploy-all.sh --keep-previous` exercises the normal green deployment flow while keeping blue available for rollback
 
 ### 11. Verify locally on the server
@@ -509,16 +507,16 @@ Use this when reinstalling Automaton websites on a new server.
 6. Create `/opt/automaton/secrets/hosted_runner_ssh_key`, even as an empty placeholder if hosted runners are not in use.
 7. Open firewall ports `22`, `80`, and `443`.
 8. Run `chmod +x ./scripts/prod-*.sh`.
-9. Run `./scripts/prod-issue-certs.sh`.
-10. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
-11. Run `./scripts/prod-reset-blue-green.sh`.
-12. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
-13. Run `./scripts/prod-verify.sh`.
-14. Add the certificate renewal cron job from the TLS section.
+9. Configure `CF_DNS_API_TOKEN` and `ACME_EMAIL` in `.env`.
+10. Start Traefik with `docker compose -f docker-compose.prod.yml up -d traefik`; it creates or renews the wildcard certificate in the persistent ACME volume.
+11. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
+12. Run `./scripts/prod-reset-blue-green.sh`.
+13. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
+14. Run `./scripts/prod-verify.sh`.
 
 If migrating an existing production instance, copy `prod-api-appdata` and the database backup as the source of truth. `prod-published-apps` is generated output and can be rebuilt from published app metadata plus `live/frontend/` once a rebuild command exists.
 
-Fresh installs normally use `CERT_NAME=automaton.monster` or omit `CERT_NAME` entirely so it defaults to `WEBSITE_DOMAIN`. Only keep a suffix such as `CERT_NAME=automaton.monster-0001` on a migrated host where Certbot already created that certificate name.
+Fresh installs require `CF_DNS_API_TOKEN` scoped to the Automaton zone and `ACME_EMAIL` for Traefik DNS-01 certificate issuance.
 
 ## Single Service Redeploy
 
@@ -663,16 +661,14 @@ cd /opt/automaton
 cp .env.prod.example .env
 # edit .env and /opt/automaton/config/appsettings.Production.json
 chmod +x ./scripts/prod-*.sh
-./scripts/prod-issue-certs.sh
+docker compose -f docker-compose.prod.yml up -d traefik
 docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue
 ./scripts/prod-reset-blue-green.sh
 ./scripts/prod-redeploy-all.sh --keep-previous
 ```
 
-`prod-issue-certs.sh` bootstraps nginx with a temporary self-signed cert if needed, requests the real Let's Encrypt certificate bundle, and reloads nginx.
+The explicit Traefik startup obtains the default app certificate through Cloudflare DNS-01. The persistent `prod-traefik-acme` volume must remain intact across redeploys.
 The explicit blue startup plus `prod-reset-blue-green.sh` creates a predictable routing baseline before the first regular blue/green redeploy.
-
-The certificate helper removes only its own temporary bootstrap certificate directory before calling Certbot. If issuance fails, it restores that placeholder so nginx can still restart cleanly while you resolve ACME validation.
 
 ## Infrastructure Services
 
@@ -680,18 +676,18 @@ These services do not rebuild from local source in this repo:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml up -d mysql rabbitmq nginx
+docker compose -f docker-compose.prod.yml up -d mysql rabbitmq traefik
 ```
 
 Pull newer upstream images first if needed:
 
 ```bash
 cd /opt/automaton
-docker compose -f docker-compose.prod.yml pull mysql rabbitmq nginx
-docker compose -f docker-compose.prod.yml up -d mysql rabbitmq nginx
+docker compose -f docker-compose.prod.yml pull mysql rabbitmq traefik
+docker compose -f docker-compose.prod.yml up -d mysql rabbitmq traefik
 ```
 
-nginx mounts `prod-published-apps` read-only. The API colors mount the same volume read-write so publish/unpublish can update static app packages.
+Traefik mounts the persistent ACME volume and dynamic route directory. The API writes route configuration; do not remove either during normal deployment.
 
 ## TLS Certificates
 
@@ -706,38 +702,10 @@ Issue or refresh the live certificate bundle:
 
 ```bash
 cd /opt/automaton
-./scripts/prod-issue-certs.sh
+docker compose -f docker-compose.prod.yml up -d traefik
 ```
 
-Force a fresh cert request:
-
-```bash
-cd /opt/automaton
-./scripts/prod-issue-certs.sh --force-renewal
-```
-
-Run a normal renewal check:
-
-```bash
-cd /opt/automaton
-./scripts/prod-renew-certs.sh
-```
-
-Recommended production cron job:
-
-```bash
-sudo crontab -e
-```
-
-Add:
-
-```cron
-17 3 * * * cd /opt/automaton && ./scripts/prod-renew-certs.sh >> /var/log/automaton-cert-renew.log 2>&1
-```
-
-This checks renewal daily at `03:17` server time. Certbot only renews when the certificate is close to expiry, so running the check daily is normal.
-
-`prod-renew-certs.sh` runs `nginx -t` and then reloads nginx after the renew command. Reloading nginx is graceful: nginx keeps listening on `80/443`, starts workers with the current config, and lets old workers finish existing requests.
+Traefik renews the certificate automatically. Do not run Certbot or add a separate renewal cron job; that would create a competing certificate authority for the same public domains.
 
 ## Runner And CLI Downloads
 

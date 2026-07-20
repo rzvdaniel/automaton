@@ -8,7 +8,7 @@ name: automaton-prod
 # Prerequisites on the Hetzner server:
 #   1. Clone this repo to /opt/automaton
 #   2. Copy .env.prod.example to .env and fill in all values
-#   3. Run ./scripts/prod-issue-certs.sh once to bootstrap or renew TLS certs
+#   3. Configure CF_DNS_API_TOKEN and ACME_EMAIL; Traefik issues certificates through Cloudflare DNS-01
 #   4. Use ./scripts/prod-redeploy-all.sh for normal blue/green deploys
 #
 # Cloudflare guidance:
