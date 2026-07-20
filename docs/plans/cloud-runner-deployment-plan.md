@@ -1,5 +1,10 @@
 # Cloud Runner Deployment Plan v3 - Provider-Agnostic Architecture
 
+> **Superseded:** This is a historical planning document. The current
+> architecture creates servers externally and enrolls them through the
+> Infrastructure Runner. Automaton no longer provisions cloud servers through
+> provider API integrations or requires provider-specific credentials.
+
 ## Executive Summary
 
 This document outlines the v3 plan for implementing Cloud Runners with a **provider-agnostic architecture** that decouples the system from any specific hosting provider (Hetzner, AWS, Azure, on-premise, bare metal, etc.). The approach maintains the core concept of **Management Runners** executing flows to deploy/manage user Cloud Runner containers, but introduces flexibility to support multiple infrastructure providers and deployment scenarios.

@@ -185,34 +185,22 @@ Hetzner, AWS, DigitalOcean, Azure, bare metal, and local servers. The host is
 created or reconnected when the Runner registers, then validated before it can
 receive managed Runner workloads.
 
-Provisioning operations use a provider-neutral contract (`IRunnerHostInfrastructureProvider`).
-The Worker currently registers the Hetzner implementation, while provider selection is resolved
-by provider name. Provider API tokens remain Worker configuration and are never sent to an
-Infrastructure Runner or included in provisioning events.
-
-Runner Hosts now keep provider provisioning state separately from operational
+Runner Hosts keep enrollment/provisioning state separately from operational
 health/status. `ProvisioningStatus` progresses independently through values
-such as `pending`, `creatingServer`, `awaitingInfrastructureRunner`,
-`validating`, `ready`, or `failed`. Provider-owned identifiers and image/server
-choices are stored on the host so a future provider adapter can inspect,
-reboot, or delete the correct server without exposing provider credentials to a
-Runner.
+such as `pending`, `awaitingInfrastructureRunner`, `validating`, `ready`, or
+`failed`. Host metadata is maintained by the enrollment and Infrastructure
+Runner workflows; Automaton does not need cloud-provider credentials to manage
+the host.
 
 Scheduling requires a ready and validated host. Local Docker development hosts
 remain eligible after local bootstrap; remote hosts also require a linked
 Infrastructure Runner. A failed host validation records a durable failure and
 disables scheduling.
 
-The shared `IRunnerHostInfrastructureProvider` contract is intentionally small:
-create, inspect, reboot, and delete. The initial Hetzner adapter will use the
-Docker CE image and inject cloud-init. Cloud-init only creates the four Runner
-data directories and starts the existing privileged Runner image; Docker
-network setup, host validation, hosted-runner provisioning, repairs, and
-upgrades remain Infrastructure Runner responsibilities.
-
-Cloud-init contains only a short-lived, host-bound enrollment token. Hetzner
-provider API credentials remain in API/Worker configuration and are never
-passed to the provisioned host or Infrastructure Runner.
+Automaton does not create cloud servers or inject cloud-init. Create a
+Docker-capable server externally, install/enroll the Infrastructure Runner from
+Studio, and then use the Infrastructure Runner command channel for preparation,
+validation, hosted-runner provisioning, repairs, and upgrades.
 
 ## Host validation workflow
 
