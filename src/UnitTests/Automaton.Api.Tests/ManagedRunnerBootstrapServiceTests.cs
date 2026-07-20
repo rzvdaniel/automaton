@@ -5,6 +5,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
@@ -82,6 +83,64 @@ public class ManagedRunnerBootstrapServiceTests
 
         var refreshedApp = await db.WebApps.SingleAsync(x => x.Id == app.Id);
         Assert.That(refreshedApp.ExecutionRunnerId, Is.EqualTo(runner.Id));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ClearsLegacyInfrastructureAssignmentAndQueuesHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db);
+        var infrastructureRunner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-runner",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            ConnectionId = "infrastructure-connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow,
+            LastConnectedAtUtc = DateTime.UtcNow,
+            Status = "online"
+        };
+        db.Runners.Add(infrastructureRunner);
+        app.ExecutionRunnerId = infrastructureRunner.Id;
+        db.SaveChanges();
+
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ClearsMissingAssignmentAndQueuesHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        SeedRunnerHost(db);
+        app.ExecutionRunnerId = Guid.NewGuid();
+        db.SaveChanges();
+
+        var publisher = new RecordingEventPublisher();
+        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
     }
 
     [Test]

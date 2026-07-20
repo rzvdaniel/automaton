@@ -10,6 +10,7 @@ public sealed class DeployService
     private const string DeployStateManagedRunnerProvisionFailed = "managedRunnerProvisionFailed";
     private const string DeployStateManagedRunnerWaitingForConnection = "managedRunnerWaitingForConnection";
     private const string DeployStateManagedRuntimeUnavailable = "managedRuntimeUnavailable";
+    private const string DeployStateReady = "ready";
     private static readonly TimeSpan ManagedRuntimeTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ManagedRuntimePollInterval = TimeSpan.FromSeconds(3);
 
@@ -46,19 +47,9 @@ public sealed class DeployService
         Action<DeployCheckResult>? checkReported = null,
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
         Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
-        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
-        : this(config, progress, null, runBuildAsync, deployPackageAsync, createSnapshotAsync, null)
-    {
-    }
+        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null,
+        Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync = null)
 
-    private DeployService(
-        ConfigService config,
-        Action<string>? progress,
-        Action<DeployCheckResult>? checkReported,
-        Func<string, string, CancellationToken, Task<int>>? runBuildAsync,
-        Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync,
-        Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync,
-        Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync)
     {
         this.config = config;
         this.progress = progress;
@@ -162,14 +153,26 @@ public sealed class DeployService
             backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
         }
 
-        if (backendControllers > 0 && ensureManagedRuntimeReadyAsync != null)
+        // Every deployed app uses a managed hosted runner. Do not infer runtime
+        // eligibility from the presence of backend controllers: frontend-only apps
+        // need the same hosted runtime and may be the user's first deployment.
+        if (ensureManagedRuntimeReadyAsync != null)
         {
             var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
             if (!readiness.Ready)
             {
                 nextSteps.Add(readiness.NextStep);
                 AddCheck(checks, new DeployCheckResult(DeployCheckNames.RunnerAssignment, false, readiness.Message, IsWarning: true));
-                return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+                if (readiness.Message.Contains("provision", StringComparison.OrdinalIgnoreCase)
+                    || readiness.Message.Contains("runner", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddManagedRuntimeNextSteps(
+                        nextSteps,
+                        new DeployBackendResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true));
+                }
+
+                backendResult = new DeployBackendResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true);
+                return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
             }
         }
 
@@ -216,7 +219,7 @@ public sealed class DeployService
         return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
     }
 
-    private async Task<(bool Ready, string Message, string NextStep)> WaitForManagedRuntimeAsync(
+    private async Task<(bool Ready, string Message, string NextStep, string State)> WaitForManagedRuntimeAsync(
         string server,
         string apiKey,
         string appId,
@@ -232,7 +235,7 @@ public sealed class DeployService
             if (ready)
             {
                 ReportProgress("Managed runner connected.");
-                return (true, "Managed runner connected.", string.Empty);
+                return (true, "Managed runner connected.", string.Empty, DeployStateReady);
             }
 
             var state = readiness.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
@@ -242,7 +245,7 @@ public sealed class DeployService
             if (string.Equals(state, DeployStateManagedRuntimeUnavailable, StringComparison.Ordinal)
                 || string.Equals(state, DeployStateManagedRunnerProvisionFailed, StringComparison.Ordinal))
             {
-                return (false, message, message);
+                return (false, message, message, state ?? DeployStateManagedRuntimeUnavailable);
             }
 
             ReportProgress("Waiting for managed runner...");
@@ -251,7 +254,8 @@ public sealed class DeployService
 
         return (false,
             "Managed runner did not become ready before the timeout.",
-            "Managed runner did not connect within 5 minutes. Rerun automaton deploy to try again.");
+            "Managed runner did not connect within 5 minutes. Rerun automaton deploy to try again.",
+            DeployStateManagedRunnerWaitingForConnection);
     }
 
     private static DeployCheckResult ValidateAppLink(bool configFileExists, Models.AutomatonConfig? projectConfig, string? appId, ISet<string> nextSteps)

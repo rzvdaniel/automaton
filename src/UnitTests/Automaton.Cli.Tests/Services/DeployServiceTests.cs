@@ -1,5 +1,6 @@
 using Automaton.Cli.Models;
 using Automaton.Cli.Services;
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace Automaton.Cli.Tests.Services;
@@ -192,6 +193,39 @@ public class DeployServiceTests
         Assert.That(result.NextSteps, Does.Contain("Managed runtime is being prepared. Rerun automaton deploy in a moment."));
         Assert.That(result.NextSteps.Any(step => step.Contains("--runner", StringComparison.Ordinal)), Is.False);
         AssertCheck(result, DeployCheckNames.PackageDeploy, false, "Managed runtime is being prepared.");
+    }
+
+    [Test]
+    public async Task DeployAsync_WhenFrontendOnly_RequestsManagedRuntimeReadinessBeforeUpload()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Frontend App",
+            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+        });
+        SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+
+        var readinessCalled = false;
+        var service = new DeployService(
+            configService,
+            runBuildAsync: (_, _, _) => Task.FromResult(0),
+            deployPackageAsync: (_, _, _, _, _, _) => throw new InvalidOperationException("upload must wait for runtime readiness"),
+            createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")),
+            ensureManagedRuntimeReadyAsync: (_, _, _, _) =>
+            {
+                readinessCalled = true;
+                using var document = JsonDocument.Parse("{\"isReady\":false,\"state\":\"managedRunnerProvisionFailed\",\"message\":\"Managed runner could not be provisioned.\",\"requiresRetry\":true}");
+                return Task.FromResult(document.RootElement.Clone());
+            });
+
+        var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
+
+        Assert.That(readinessCalled, Is.True);
+        Assert.That(result.Success, Is.False);
+        Assert.That(result.NextSteps, Does.Contain("Managed runner could not be provisioned."));
     }
 
     [Test]

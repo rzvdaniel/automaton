@@ -259,7 +259,7 @@ public class PublishedAppStorageService
         {
             throw new InvalidOperationException(
                 "Published app index.html contains root-relative local URLs. " +
-                "Published apps are hosted under a slug path such as apps.automaton.monster/{slug}/ or /apps/{slug}/, so app-local assets and navigation must use relative URLs. " +
+                "Published apps are hosted at a slug hostname such as {slug}.apps.automaton.monster, so app-local assets and navigation must use relative URLs. " +
                 "For Vite, set base: './' in vite.config.ts. Offending references: " +
                 string.Join(", ", invalidReferences));
         }

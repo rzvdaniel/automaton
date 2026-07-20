@@ -104,6 +104,25 @@ public class DeployPreparationServiceTests
     }
 
     [Test]
+    public async Task PrepareAsync_DoesNotOfferInfrastructureRunnersForAppExecution()
+    {
+        var projectRoot = CreateProjectRoot(withBackend: true);
+        var config = CreateConfiguredService(projectRoot);
+        var service = new DeployPreparationService(
+            config,
+            (_, _, _, _) => Task.FromResult(new RemoteAppValidationInfo(null)),
+            (_, _, _) => Task.FromResult<IReadOnlyList<RunnerSelectionItem>>([
+                new RunnerSelectionItem("infrastructure-1", "Infrastructure Runner", true, IsInfrastructureRunner: true)]),
+            (_, _, _, _, _) => throw new InvalidOperationException("infrastructure runner must not be assigned"));
+
+        var result = await service.PrepareAsync(projectRoot, null);
+
+        Assert.That(result.Success, Is.True);
+        Assert.That(result.AvailableRunners, Is.Empty);
+        Assert.That(result.Checks.Any(check => check.Name == DeployCheckNames.RunnerLookup && !check.Success && check.IsWarning), Is.True);
+    }
+
+    [Test]
     public async Task PrepareAsync_WhenPreferredRunnerMatches_AssignsRequestedRunner()
     {
         var projectRoot = CreateProjectRoot(withBackend: true);

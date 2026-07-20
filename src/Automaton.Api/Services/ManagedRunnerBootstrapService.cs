@@ -2,6 +2,7 @@ using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.EntityFrameworkCore;
@@ -39,17 +40,27 @@ public sealed class ManagedRunnerBootstrapService
         if (app.ExecutionRunnerId.HasValue)
         {
             var assignedRunner = await dbContext.Runners
-                .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == app.ExecutionRunnerId.Value, cancellationToken);
 
-            if (assignedRunner != null &&
-                RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            // Infrastructure runners manage host capacity and must never become an
+            // app execution target. Repair legacy assignments lazily when the app
+            // next enters the managed-runtime flow.
+            if (assignedRunner == null || RunnerCapabilities.RequiresAdministrator(assignedRunner.CapabilitiesJson, assignedRunner.Purpose))
             {
-                return ManagedRunnerBootstrapResult.Ready(assignedRunner.Id);
+                app.ExecutionRunnerId = null;
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                if (RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
+                {
+                    return ManagedRunnerBootstrapResult.Ready(assignedRunner.Id);
+                }
+
+                return ManagedRunnerBootstrapResult.Unavailable(
+                    "No connected runner is assigned to this app.");
             }
 
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "No connected runner is assigned to this app.");
         }
 
         var user = await dbContext.Users

@@ -80,7 +80,11 @@ public sealed class DeployPreparationService
         }
 
         var runners = await _listRunnersAsync(server, apiKey, cancellationToken);
-        var connectedRunners = runners.Where(runner => runner.Connected).ToList();
+        // Infrastructure runners are host-control processes, not app execution
+        // targets. Managed runtime readiness handles hosted runners separately.
+        var connectedRunners = runners
+            .Where(runner => runner.Connected && !runner.IsInfrastructureRunner)
+            .ToList();
 
         if (!string.IsNullOrWhiteSpace(runnerPreference))
         {
@@ -231,9 +235,11 @@ public sealed class DeployPreparationService
                 var connected = runner.TryGetProperty("connectionId", out var connectionProperty)
                     && connectionProperty.ValueKind != JsonValueKind.Null
                     && !string.IsNullOrWhiteSpace(connectionProperty.GetString());
+                var isInfrastructureRunner = runner.TryGetProperty("isInfrastructureRunner", out var infrastructureProperty)
+                    && infrastructureProperty.ValueKind == JsonValueKind.True;
                 return string.IsNullOrWhiteSpace(id)
                     ? null
-                    : new RunnerSelectionItem(id, string.IsNullOrWhiteSpace(name) ? id : name!, connected);
+                    : new RunnerSelectionItem(id, string.IsNullOrWhiteSpace(name) ? id : name!, connected, isInfrastructureRunner);
             })
             .Where(runner => runner != null)
             .Cast<RunnerSelectionItem>()
