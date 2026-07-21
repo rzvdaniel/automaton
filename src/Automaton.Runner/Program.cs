@@ -343,6 +343,8 @@ public class Program
                 services.AddSingleton<ApiKeyAuthenticationService>();
                 services.AddSingleton<RunnerWorkspaceService>();
                 services.AddSingleton<RunnerBackendEnvironmentService>();
+                services.AddSingleton<AppActionDeploymentService>();
+                services.AddSingleton<AppActionExecutionService>();
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerBackendRegistry>();
                 services.AddSingleton<RunnerBackendProcessManager>();

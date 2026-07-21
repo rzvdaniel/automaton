@@ -47,6 +47,28 @@ export type DeployAppResult = {
   message?: string
   state?: string
   requiresRetry?: boolean
+  actions?: Array<{ key: string; status: string; deploymentHash?: string; message?: string }>
+}
+
+export type AppActionExecution = {
+  id: string
+  appId: string
+  moduleKey: string
+  status: string
+  exitCode?: number
+  errorCode?: string
+  failureSummary?: string
+  createdAtUtc: string
+  startedAtUtc?: string
+  completedAtUtc?: string
+}
+
+export type AppActionVersion = {
+  version: string
+  contentHash?: string
+  createdAtUtc: string
+  sizeBytes: number
+  isCurrent: boolean
 }
 
 class AppsService {
@@ -232,6 +254,52 @@ class AppsService {
   async deployApp(id: string): Promise<DeployAppResult> {
     const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {})
     return data
+  }
+
+  async runAction(id: string, actionKey: string, input: unknown): Promise<AppActionExecution> {
+    const { data } = await apiClient.post<AppActionExecution>(
+      `/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/executions`,
+      { input },
+    )
+    return data
+  }
+
+  async getActionArtifact(id: string, executionId: string, kind: 'logs' | 'result') {
+    const { data } = await apiClient.get<{ available: boolean; content?: string; message?: string }>(
+      `/api/apps/${id}/action-executions/${executionId}/${kind}`,
+    )
+    return data
+  }
+
+  async cancelAction(id: string, executionId: string): Promise<boolean> {
+    const { data } = await apiClient.post<{ cancelled: boolean }>(
+      `/api/apps/${id}/action-executions/${executionId}/cancel`,
+      {},
+    )
+    return data.cancelled
+  }
+
+  async getActionExecution(id: string, executionId: string): Promise<AppActionExecution> {
+    const { data } = await apiClient.get<AppActionExecution>(`/api/apps/${id}/action-executions/${executionId}`)
+    return data
+  }
+
+  async listActionExecutions(id: string): Promise<AppActionExecution[]> {
+    const { data } = await apiClient.get<AppActionExecution[]>(`/api/apps/${id}/action-executions`)
+    return data
+  }
+
+  async listActionVersions(id: string, actionKey: string): Promise<AppActionVersion[]> {
+    const { data } = await apiClient.get<{ versions: AppActionVersion[] }>(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions`)
+    return data.versions
+  }
+
+  async rollbackAction(id: string, actionKey: string, version: string): Promise<void> {
+    await apiClient.post(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/rollback`, { version })
+  }
+
+  async deleteActionVersion(id: string, actionKey: string, version: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${id}/actions/${encodeURIComponent(actionKey)}/versions/${encodeURIComponent(version)}`)
   }
 
   async deployFrontend(id: string): Promise<{

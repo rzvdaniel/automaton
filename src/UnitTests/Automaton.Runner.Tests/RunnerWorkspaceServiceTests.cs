@@ -38,7 +38,7 @@ public class RunnerWorkspaceServiceTests
         var fullWorkspaceRoot = Path.GetFullPath(workspaceRoot);
 
         Assert.That(service.WorkspaceRoot, Is.EqualTo(fullWorkspaceRoot));
-        Assert.That(service.GetAppBackendDirectory(appId), Is.EqualTo(Path.Combine(fullWorkspaceRoot, "apps", appId.ToString(), "backend")));
+        Assert.That(service.GetAppBackendDirectory(appId), Is.EqualTo(Path.Combine(fullWorkspaceRoot, "apps", appId.ToString(), "runtime", "backend")));
         Assert.That(service.GetAppDataDirectory(appId), Is.EqualTo(Path.Combine(fullWorkspaceRoot, "data", appId.ToString())));
         Assert.That(service.GetAppVenvDirectory(appId), Is.EqualTo(Path.Combine(fullWorkspaceRoot, "apps", appId.ToString(), "venv")));
         Assert.That(service.GetFastApiScriptsRoot(), Is.EqualTo(Path.Combine(fullWorkspaceRoot, "apps")));
@@ -54,7 +54,7 @@ public class RunnerWorkspaceServiceTests
         Assert.That(service.UsesLegacyScriptsLayout, Is.True);
         Assert.That(service.AppsRoot, Is.EqualTo(Path.GetFullPath(scriptsRoot)));
         Assert.That(service.GetFastApiScriptsRoot(), Is.EqualTo(Path.GetFullPath(scriptsRoot)));
-        Assert.That(service.GetAppBackendDirectory(appId), Is.EqualTo(Path.Combine(Path.GetFullPath(scriptsRoot), appId.ToString(), "backend")));
+        Assert.That(service.GetAppBackendDirectory(appId), Is.EqualTo(Path.Combine(Path.GetFullPath(scriptsRoot), appId.ToString(), "runtime", "backend")));
         Assert.That(service.GetAppVenvDirectory(appId), Is.EqualTo(Path.Combine(Path.GetFullPath(scriptsRoot), appId.ToString(), "venv")));
         Assert.That(service.GetAppDataDirectory(appId), Is.EqualTo(Path.Combine(Path.GetFullPath(scriptsRoot), appId.ToString(), "data")));
     }
@@ -69,6 +69,19 @@ public class RunnerWorkspaceServiceTests
         var resolved = service.ResolveRunnerFilePath(appId, "nested/file.txt", AppRunnerFileAreas.Data);
 
         Assert.That(resolved, Is.EqualTo(Path.Combine(Path.GetFullPath(workspaceRoot), "data", appId.ToString(), "nested", "file.txt")));
+    }
+
+    [Test]
+    public void ResolvesActionRuntimePathsUnderAppRuntimeRoot()
+    {
+        var workspaceRoot = Path.Combine(Path.GetTempPath(), "runner-workspace", Guid.NewGuid().ToString());
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", workspaceRoot);
+        var appId = Guid.NewGuid();
+
+        var current = service.GetAppActionCurrentDirectory(appId, "send-email");
+
+        Assert.That(current, Is.EqualTo(Path.Combine(Path.GetFullPath(workspaceRoot), "apps", appId.ToString(), "runtime", "actions", "send-email", "current")));
+        Assert.That(() => service.GetAppActionCurrentDirectory(appId, "../escape"), Throws.TypeOf<InvalidOperationException>());
     }
 
     [Test]

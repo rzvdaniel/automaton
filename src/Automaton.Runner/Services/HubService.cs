@@ -41,6 +41,16 @@ public class HubService
     private const string ReadAppBackendFileMethod = "ReadAppBackendFile";
     private const string DeleteAppBackendFileMethod = "DeleteAppBackendFile";
     private const string DeployAppPackageMethod = "DeployAppPackage";
+    private const string ExecuteAppActionModuleMethod = "ExecuteAppActionModule";
+    private const string CancelAppModuleExecutionMethod = "CancelAppModuleExecution";
+    private const string ReadAppModuleExecutionLogsMethod = "ReadAppModuleExecutionLogs";
+    private const string ReadAppModuleExecutionResultMethod = "ReadAppModuleExecutionResult";
+    private const string ListAppActionModulesMethod = "ListAppActionModules";
+    private const string ListAppActionVersionsMethod = "ListAppActionVersions";
+    private const string RestoreAppActionVersionMethod = "RestoreAppActionVersion";
+    private const string DeleteAppActionVersionMethod = "DeleteAppActionVersion";
+    private const string PrepareAppActionModuleMethod = "PrepareAppActionModule";
+    private const string SynchronizeAppActionModulesMethod = "SynchronizeAppActionModules";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
     private const string HeartbeatMethod = "Heartbeat";
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -57,6 +67,8 @@ public class HubService
     private readonly RunnerBackendEnvironmentService backendEnvironmentService;
     private readonly RunnerDeploymentService runnerDeploymentService;
     private readonly InfrastructureCommandService infrastructureCommandService;
+    private readonly AppActionExecutionService appActionExecutionService;
+    private readonly AppActionDeploymentService actionDeploymentService;
     private bool isReconnecting = false;
     private bool shouldKeepRetrying = true;
     private CancellationTokenSource? retryTokenSource;
@@ -75,7 +87,9 @@ public class HubService
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerBackendEnvironmentService backendEnvironmentService,
         RunnerDeploymentService runnerDeploymentService,
-        InfrastructureCommandService infrastructureCommandService)
+        InfrastructureCommandService infrastructureCommandService,
+        AppActionExecutionService appActionExecutionService,
+        AppActionDeploymentService actionDeploymentService)
     {
         this.configService = configService;
         this.apiKeyAuthService = apiKeyAuthService;
@@ -86,6 +100,8 @@ public class HubService
         this.backendEnvironmentService = backendEnvironmentService;
         this.runnerDeploymentService = runnerDeploymentService;
         this.infrastructureCommandService = infrastructureCommandService;
+        this.appActionExecutionService = appActionExecutionService;
+        this.actionDeploymentService = actionDeploymentService;
         this.logger = Log.ForContext<HubService>();
         
         // Configure resilient connection policy
@@ -99,6 +115,9 @@ public class HubService
     public async Task<bool> ConnectAsync()
     {
         CleanupStaleTempFiles();
+        var removedActionArtifacts = appActionExecutionService.CleanupExpiredArtifacts();
+        if (removedActionArtifacts > 0)
+            logger.Debug("Removed {ArtifactDirectoryCount} expired Action execution artifact directories", removedActionArtifacts);
         try
         {
             var apiKey = await apiKeyAuthService.GetValidApiKeyAsync();
@@ -406,6 +425,27 @@ public class HubService
             {
                 return await runnerDeploymentService.DeployPackage(request);
             });
+
+            connection.On<ExecuteAppActionModuleRequest, AppActionExecutionResult>(ExecuteAppActionModuleMethod, request =>
+                appActionExecutionService.ExecuteAsync(request));
+            connection.On<CancelAppModuleExecutionRequest, bool>(CancelAppModuleExecutionMethod, request =>
+                Task.FromResult(appActionExecutionService.Cancel(request.ExecutionId)));
+            connection.On<ReadAppModuleExecutionArtifactRequest, AppModuleExecutionArtifactResponse>(ReadAppModuleExecutionLogsMethod, request =>
+                Task.FromResult(appActionExecutionService.ReadLogs(request)));
+            connection.On<ReadAppModuleExecutionArtifactRequest, AppModuleExecutionArtifactResponse>(ReadAppModuleExecutionResultMethod, request =>
+                Task.FromResult(appActionExecutionService.ReadResult(request)));
+            connection.On<Guid, AppActionModulesResponse>(ListAppActionModulesMethod, appId =>
+                Task.FromResult(actionDeploymentService.ListModules(appId)));
+            connection.On<AppActionModuleRequest, AppActionVersionsResponse>(ListAppActionVersionsMethod, request =>
+                Task.FromResult(actionDeploymentService.ListVersions(request.AppId, request.ActionKey)));
+            connection.On<AppActionVersionRequest, AppActionVersionOperationResponse>(RestoreAppActionVersionMethod, request =>
+                Task.FromResult(actionDeploymentService.RestoreVersion(request.AppId, request.ActionKey, request.Version)));
+            connection.On<AppActionVersionRequest, AppActionVersionOperationResponse>(DeleteAppActionVersionMethod, request =>
+                Task.FromResult(actionDeploymentService.DeleteVersion(request.AppId, request.ActionKey, request.Version)));
+            connection.On<PrepareAppActionModuleRequest, AppActionDeploymentResult>(PrepareAppActionModuleMethod, request =>
+                actionDeploymentService.PrepareModuleAsync(request, CancellationToken.None));
+            connection.On<SynchronizeAppActionModulesRequest, int>(SynchronizeAppActionModulesMethod, request =>
+                Task.FromResult(actionDeploymentService.SynchronizeModules(request)));
 
             // Handle connection events
             connection.Closed += async (error) =>

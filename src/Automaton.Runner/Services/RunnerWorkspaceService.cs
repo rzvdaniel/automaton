@@ -55,6 +55,25 @@ public class RunnerWorkspaceService
 
     public string GetAppRuntimeFrontendDirectory(Guid appId) => GetFullPath(GetAppRuntimeRoot(appId), "frontend");
 
+    public string GetAppSourceActionsDirectory(Guid appId) => GetFullPath(GetAppSourceRoot(appId), "actions");
+
+    public string GetAppRuntimeActionsDirectory(Guid appId) => GetFullPath(GetAppRuntimeRoot(appId), "actions");
+
+    public string GetAppActionRuntimeRoot(Guid appId, string actionKey)
+    {
+        AppActionManifestParser.ValidateKey(actionKey);
+        return GetFullPath(GetAppRuntimeActionsDirectory(appId), actionKey);
+    }
+
+    public string GetAppActionCurrentDirectory(Guid appId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "current");
+
+    public string GetAppActionVersionsDirectory(Guid appId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "versions");
+
+    public string GetAppActionExecutionsDirectory(Guid appId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "executions");
+
     public string GetAppBackendDirectory(Guid appId)
     {
         return GetFullPath(GetAppRuntimeRoot(appId), "backend");

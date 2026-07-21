@@ -26,6 +26,7 @@ import BuildVisualWorkspace from '../components/BuildVisualWorkspace.vue'
 import BackendServerFiles from '../components/BackendServerFiles.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
+import AppActionContextBar from '../components/AppActionContextBar.vue'
 
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
@@ -57,6 +58,10 @@ const appId = computed(() => route.params.id as string)
 // Always prefer route app ID to avoid leaking previous app chat context/memory.
 // The store may still hold the previously opened app until loadApp finishes.
 const resolvedAppId = computed(() => appId.value || editorStore.currentApp?.id || '')
+const selectedActionKey = computed(() => {
+  const match = editorStore.activeFilePath?.replace(/\\/g, '/').match(/(?:^|\/)actions\/([a-z][a-z0-9-]{0,63})(?:\/|$)/)
+  return match?.[1] ?? null
+})
 
 // Capture initial prompt once at setup time — using ref so clearing the URL query
 // via router.replace() doesn't wipe the value before AiAssistant.onMounted reads it.
@@ -1269,6 +1274,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                             />
                           </div>
                         </div>
+
+                        <AppActionContextBar
+                          v-if="selectedActionKey && resolvedAppId"
+                          :app-id="resolvedAppId"
+                          :action-key="selectedActionKey"
+                        />
 
                         <!-- Editor Content -->
                         <div class="editor-content">

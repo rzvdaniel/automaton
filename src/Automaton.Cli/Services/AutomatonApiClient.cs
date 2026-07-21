@@ -69,6 +69,57 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
+    public async Task<JsonElement> RunAppActionAsync(string appId, string actionKey, JsonElement input, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { input }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/executions", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> GetAppActionExecutionAsync(string appId, Guid executionId, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/action-executions/{executionId}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> GetAppActionArtifactAsync(string appId, Guid executionId, bool result, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/action-executions/{executionId}/{(result ? "result" : "logs")}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> CancelAppActionExecutionAsync(string appId, Guid executionId, CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync($"api/apps/{appId}/action-executions/{executionId}/cancel", "{}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> ListAppActionVersionsAsync(string appId, string actionKey, CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/versions", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> RestoreAppActionVersionAsync(string appId, string actionKey, string version, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { version }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/rollback", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<JsonElement> DeleteAppActionVersionAsync(string appId, string actionKey, string version, CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync($"api/apps/{appId}/actions/{Uri.EscapeDataString(actionKey)}/versions/{Uri.EscapeDataString(version)}", ct);
+        await EnsureSuccessAsync(resp);
+        return await ReadJsonAsync(resp, ct);
+    }
+
     public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(new { executionRunnerId = runnerId }, JsonOptions);

@@ -82,7 +82,7 @@ public static class ZipService
     public static Stream CreateDeployPackageZip(
         string projectRoot,
         string appId,
-        string frontendDeployDir,
+        string? frontendDeployDir,
         string? backendDeployDir,
         DeployScopeConfig? sourceScopeConfig,
         FrontendConfig? frontendConfig,
@@ -110,20 +110,23 @@ public static class ZipService
                 additionalIgnorePatterns: SourceIgnorePatterns,
                 scopeConfig: sourceScopeConfig);
 
-            AddDirectoryWithPrefix(
-                archive,
-                frontendDeployDir,
-                frontendDeployDir,
-                "runtime/frontend",
-                includeAutomatonConfig: false,
-                additionalIgnorePatterns: null,
-                scopeConfig: frontendConfig == null
-                    ? null
-                    : new DeployScopeConfig
-                    {
-                        Include = frontendConfig.Include,
-                        Exclude = frontendConfig.Exclude
-                    });
+            if (!string.IsNullOrWhiteSpace(frontendDeployDir))
+            {
+                AddDirectoryWithPrefix(
+                    archive,
+                    frontendDeployDir,
+                    frontendDeployDir,
+                    "runtime/frontend",
+                    includeAutomatonConfig: false,
+                    additionalIgnorePatterns: null,
+                    scopeConfig: frontendConfig == null
+                        ? null
+                        : new DeployScopeConfig
+                        {
+                            Include = frontendConfig.Include,
+                            Exclude = frontendConfig.Exclude
+                        });
+            }
 
             if (!string.IsNullOrWhiteSpace(backendDeployDir))
             {

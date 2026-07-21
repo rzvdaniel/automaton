@@ -7,19 +7,25 @@ namespace Automaton.Runner.Console.Services;
 
 public class RunnerDeploymentService
 {
+    private const long MaximumPackageBytes = 100L * 1024 * 1024;
+    private const long MaximumExtractedBytes = 250L * 1024 * 1024;
+    private const int MaximumArchiveEntries = 20_000;
     private readonly RunnerWorkspaceService runnerWorkspaceService;
     private readonly RunnerBackendEnvironmentService backendEnvironmentService;
     private readonly IAppBackendProcessManager backendProcessManager;
+    private readonly AppActionDeploymentService actionDeploymentService;
     private readonly ILogger logger;
 
     public RunnerDeploymentService(
         RunnerWorkspaceService runnerWorkspaceService,
         RunnerBackendEnvironmentService backendEnvironmentService,
-        IAppBackendProcessManager backendProcessManager)
+        IAppBackendProcessManager backendProcessManager,
+        AppActionDeploymentService actionDeploymentService)
     {
         this.runnerWorkspaceService = runnerWorkspaceService;
         this.backendEnvironmentService = backendEnvironmentService;
         this.backendProcessManager = backendProcessManager;
+        this.actionDeploymentService = actionDeploymentService;
         logger = Log.ForContext<RunnerDeploymentService>();
     }
 
@@ -35,17 +41,22 @@ public class RunnerDeploymentService
             {
                 throw new FileNotFoundException("Deployment package was not found on the runner.", request.PackagePath);
             }
+            if (new FileInfo(request.PackagePath).Length > MaximumPackageBytes)
+                throw new InvalidOperationException("Deployment package exceeds the 100 MB limit.");
 
             Directory.CreateDirectory(tempExtractRoot);
-            ZipFile.ExtractToDirectory(request.PackagePath, tempExtractRoot);
+            ExtractPackageSafely(request.PackagePath, tempExtractRoot);
 
             var manifest = LoadManifest(tempExtractRoot);
+            ValidateIncomingActions(tempExtractRoot);
             var snapshotPath = CreateSnapshotIfNeeded(appId);
 
             if (request.Clean)
             {
                 CleanDeploymentRoots(appId);
             }
+
+            SynchronizeActionRoots(appId, tempExtractRoot);
 
             var sourceCount = CopyTreeIfExists(
                 Path.Combine(tempExtractRoot, "source"),
@@ -55,6 +66,9 @@ public class RunnerDeploymentService
                 runnerWorkspaceService.GetAppRuntimeRoot(appId));
 
             logs.Add($"Deployed {sourceCount} source file(s) and {runtimeCount} runtime file(s).");
+
+            var actionResults = await actionDeploymentService.PrepareAllAsync(appId);
+            logs.AddRange(actionResults.Select(result => $"Action {result.ActionKey}: {result.Status}."));
 
             var runtimeBackendDir = runnerWorkspaceService.GetAppBackendDirectory(appId);
             if (Directory.Exists(runtimeBackendDir))
@@ -89,7 +103,8 @@ public class RunnerDeploymentService
                 SourceFilesDeployed = sourceCount,
                 RuntimeFilesDeployed = runtimeCount,
                 SnapshotPath = snapshotPath,
-                Logs = logs
+                Logs = logs,
+                Actions = actionResults.ToList()
             };
         }
         catch (Exception ex)
@@ -184,8 +199,36 @@ public class RunnerDeploymentService
     private void CleanDeploymentRoots(Guid appId)
     {
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId));
-        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId));
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeFrontendDirectory(appId));
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppBackendDirectory(appId));
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppVenvDirectory(appId));
+    }
+
+    private static void ValidateIncomingActions(string extractRoot)
+    {
+        var sourceRoot = Path.Combine(extractRoot, "source");
+        foreach (var action in AppActionManifestParser.Discover(sourceRoot))
+        {
+            var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
+            var actionRoot = Path.GetFullPath(action.DirectoryPath);
+            if (!entrypoint.StartsWith(actionRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(entrypoint))
+                throw new InvalidOperationException($"Action '{action.Key}' entrypoint does not exist inside its Action folder.");
+        }
+    }
+
+    private void SynchronizeActionRoots(Guid appId, string extractRoot)
+    {
+        var incomingRoot = Path.Combine(extractRoot, "source", "actions");
+        if (!Directory.Exists(incomingRoot)) return;
+        var incomingKeys = Directory.GetDirectories(incomingRoot).Select(Path.GetFileName).ToHashSet(StringComparer.Ordinal);
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceActionsDirectory(appId));
+        var runtimeRoot = runnerWorkspaceService.GetAppRuntimeActionsDirectory(appId);
+        if (!Directory.Exists(runtimeRoot)) return;
+        foreach (var deployedDirectory in Directory.GetDirectories(runtimeRoot))
+        {
+            var key = Path.GetFileName(deployedDirectory);
+            if (!incomingKeys.Contains(key)) Directory.Delete(deployedDirectory, recursive: true);
+        }
     }
 
     private static int CopyTreeIfExists(string sourceRoot, string destinationRoot)
@@ -219,6 +262,31 @@ public class RunnerDeploymentService
         if (Directory.Exists(path))
         {
             Directory.Delete(path, recursive: true);
+        }
+    }
+
+    private static void ExtractPackageSafely(string packagePath, string destinationRoot)
+    {
+        using var archive = ZipFile.OpenRead(packagePath);
+        if (archive.Entries.Count > MaximumArchiveEntries)
+            throw new InvalidOperationException($"Deployment package exceeds the {MaximumArchiveEntries} entry limit.");
+        var totalBytes = 0L;
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name)) continue;
+            var unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
+            if (unixFileType is 0xA000 or 0x6000 or 0x2000)
+                throw new InvalidOperationException($"Deployment package contains an unsupported link or device entry: {entry.FullName}");
+            AppActionManifestParser.ValidateRelativePath(entry.FullName, "package entry");
+            totalBytes = checked(totalBytes + entry.Length);
+            if (totalBytes > MaximumExtractedBytes)
+                throw new InvalidOperationException("Deployment package exceeds the 250 MB extracted-size limit.");
+            var target = Path.GetFullPath(Path.Combine(destinationRoot, entry.FullName.Replace('/', Path.DirectorySeparatorChar)));
+            var fullRoot = Path.GetFullPath(destinationRoot);
+            if (!target.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Deployment package entry escapes the staging directory.");
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            entry.ExtractToFile(target, overwrite: true);
         }
     }
 }
