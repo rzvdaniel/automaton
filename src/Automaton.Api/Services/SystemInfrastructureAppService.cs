@@ -89,7 +89,7 @@ public sealed class SystemInfrastructureAppService
                 new ExecuteAppActionModuleRequest
                 {
                     ExecutionId = execution.Id, AppId = AppId, ActionKey = RunnerInfoActionKey,
-                    ExpectedDeploymentHash = sourceHash, Input = inputDocument.RootElement.Clone()
+                    ExpectedDeploymentHash = sourceHash, SystemInfrastructure = true, Input = inputDocument.RootElement.Clone()
                 }, cancellationToken);
             execution.Status = result.Status; execution.ExitCode = result.ExitCode; execution.ErrorCode = result.ErrorCode;
             execution.FailureSummary = result.FailureSummary; execution.CompletedAtUtc = result.CompletedAtUtc;

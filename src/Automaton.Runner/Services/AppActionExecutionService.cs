@@ -33,7 +33,10 @@ public sealed class AppActionExecutionService
         if (!File.Exists(manifestPath))
             throw new InvalidOperationException($"Action '{request.ActionKey}' is not deployed.");
 
-        var manifest = AppActionManifestParser.ParseFile(manifestPath, request.ActionKey);
+        var allowPrivileged = request.SystemInfrastructure
+            && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"))
+                == Automaton.Core.Enums.RunnerPurposes.Infrastructure;
+        var manifest = AppActionManifestParser.ParseFile(manifestPath, request.ActionKey, allowPrivilegedCapabilities: allowPrivileged);
         var metadataPath = Path.Combine(currentDirectory, ".automaton-action-deployment.json");
         var deploymentHash = ReadDeploymentHash(metadataPath);
         if (!string.IsNullOrWhiteSpace(request.ExpectedDeploymentHash)

@@ -40,6 +40,7 @@ public sealed class ExecuteAppActionModuleRequest
     public string ActionKey { get; set; } = string.Empty;
     public string? ExpectedDeploymentHash { get; set; }
     public int? TimeoutSeconds { get; set; }
+    public bool SystemInfrastructure { get; set; }
     public JsonElement Input { get; set; }
     public Dictionary<string, string> Secrets { get; set; } = [];
 }
