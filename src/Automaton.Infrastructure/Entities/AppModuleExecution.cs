@@ -16,6 +16,7 @@ public class AppModuleExecution
     public string? FailureSummary { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? StartedAtUtc { get; set; }
+    public DateTime? ExecutionDeadlineUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
     public DateTime? LogsAvailableUntilUtc { get; set; }
     public DateTime? ResultAvailableUntilUtc { get; set; }

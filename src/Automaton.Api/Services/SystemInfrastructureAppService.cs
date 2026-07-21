@@ -75,7 +75,8 @@ public sealed class SystemInfrastructureAppService
             Id = Guid.NewGuid(), AppId = AppId, ModuleType = AppModuleTypes.Action, ModuleKey = RunnerInfoActionKey,
             RunnerId = runner.Id, TriggerType = AppModuleTriggerTypes.Internal, RequestedByUserId = requestedByUserId,
             Status = AppModuleExecutionStatuses.Running, DeploymentHash = sourceHash,
-            CreatedAtUtc = DateTime.UtcNow, StartedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow, StartedAtUtc = DateTime.UtcNow,
+            ExecutionDeadlineUtc = DateTime.UtcNow.AddSeconds(manifest.Spec.TimeoutSeconds + 300)
         };
         db.AppModuleExecutions.Add(execution);
         await db.SaveChangesAsync(cancellationToken);

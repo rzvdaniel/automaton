@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,18 +27,20 @@ public sealed class AppModuleExecutionReconciliationService : BackgroundService
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var cutoff = DateTime.UtcNow - StaleAfter;
-        var stale = await db.AppModuleExecutions
-            .Where(execution =>
-                (execution.Status == AppModuleExecutionStatuses.Dispatching && execution.CreatedAtUtc < cutoff)
-                || (execution.Status == AppModuleExecutionStatuses.Running
-                    && (execution.StartedAtUtc == null || execution.StartedAtUtc < cutoff)))
+        var candidates = await db.AppModuleExecutions
+            .Where(execution => execution.Status == AppModuleExecutionStatuses.Dispatching
+                || execution.Status == AppModuleExecutionStatuses.Running)
             .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var stale = candidates.Where(execution => IsStale(execution, now, cutoff)).ToList();
 
         foreach (var execution in stale)
         {
             execution.Status = AppModuleExecutionStatuses.Lost;
             execution.ErrorCode = AppModuleExecutionErrorCodes.RunnerUnavailable;
-            execution.FailureSummary = "Execution was not confirmed before the API reconciliation timeout.";
+            execution.FailureSummary = execution.Status == AppModuleExecutionStatuses.Dispatching
+                ? "Execution dispatch was not confirmed before the reconciliation timeout."
+                : "Execution exceeded its configured deadline without a terminal result.";
             execution.CompletedAtUtc = DateTime.UtcNow;
         }
 
@@ -45,4 +48,11 @@ public sealed class AppModuleExecutionReconciliationService : BackgroundService
             await db.SaveChangesAsync(cancellationToken);
         return stale.Count;
     }
+
+    public static bool IsStale(AppModuleExecution execution, DateTime nowUtc, DateTime dispatchCutoffUtc)
+        => execution.Status == AppModuleExecutionStatuses.Dispatching
+            ? execution.CreatedAtUtc < dispatchCutoffUtc
+            : execution.Status == AppModuleExecutionStatuses.Running
+                && execution.ExecutionDeadlineUtc is { } deadline
+                && deadline < nowUtc;
 }

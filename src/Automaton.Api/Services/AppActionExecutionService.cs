@@ -18,14 +18,16 @@ public sealed class AppActionExecutionService
 {
     private readonly ApplicationDbContext db;
     private readonly AppsService appsService;
+    private readonly AppFileStorageService fileStorageService;
     private readonly ResourceAuthorizationService authorizationService;
     private readonly IHubContext<AutomatonHub> hub;
     private readonly IServiceScopeFactory scopeFactory;
 
-    public AppActionExecutionService(ApplicationDbContext db, AppsService appsService, ResourceAuthorizationService authorizationService, IHubContext<AutomatonHub> hub, IServiceScopeFactory scopeFactory)
+    public AppActionExecutionService(ApplicationDbContext db, AppsService appsService, AppFileStorageService fileStorageService, ResourceAuthorizationService authorizationService, IHubContext<AutomatonHub> hub, IServiceScopeFactory scopeFactory)
     {
         this.db = db;
         this.appsService = appsService;
+        this.fileStorageService = fileStorageService;
         this.authorizationService = authorizationService;
         this.hub = hub;
         this.scopeFactory = scopeFactory;
@@ -45,11 +47,13 @@ public sealed class AppActionExecutionService
         if (runner == null || string.IsNullOrWhiteSpace(runner.ConnectionId))
             throw new InvalidOperationException("The assigned Runner is unavailable.");
 
+        var timeoutSeconds = ResolveActionTimeoutSeconds(app.OwnerId ?? userId, appId, actionKey);
         var execution = new AppModuleExecution
         {
             Id = Guid.NewGuid(), AppId = appId, ModuleType = AppModuleTypes.Action, ModuleKey = actionKey,
             RunnerId = runner.Id, TriggerType = AppModuleTriggerTypes.Manual, RequestedByUserId = userId,
             Status = AppModuleExecutionStatuses.Dispatching, CreatedAtUtc = DateTime.UtcNow,
+            ExecutionDeadlineUtc = DateTime.UtcNow.AddSeconds(timeoutSeconds + 300),
             CorrelationId = System.Diagnostics.Activity.Current?.TraceId.ToString()
         };
         db.AppModuleExecutions.Add(execution);
@@ -73,6 +77,21 @@ public sealed class AppActionExecutionService
             }
         });
         return execution;
+    }
+
+    private int ResolveActionTimeoutSeconds(Guid ownerId, Guid appId, string actionKey)
+    {
+        try
+        {
+            var manifestPath = Path.Combine(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId), "actions", actionKey, "action.yaml");
+            return File.Exists(manifestPath)
+                ? AppActionManifestParser.ParseFile(manifestPath, actionKey).Spec.TimeoutSeconds
+                : AppActionManifestParser.MaximumTimeoutSeconds;
+        }
+        catch
+        {
+            return AppActionManifestParser.MaximumTimeoutSeconds;
+        }
     }
 
     internal async Task DispatchAsync(Guid executionId, string connectionId, string inputJson)

@@ -612,6 +612,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
 
+                    b.Property<DateTime?>("ExecutionDeadlineUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int?>("ExitCode")
                         .HasColumnType("int");
 
