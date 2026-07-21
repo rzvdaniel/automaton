@@ -34,6 +34,7 @@ public class RunnerDeploymentService
         var logs = new List<string>();
         var appId = request.AppId;
         var tempExtractRoot = Path.Combine(Path.GetTempPath(), "automaton-deploy", Guid.NewGuid().ToString("N"));
+        string? snapshotPath = null;
 
         try
         {
@@ -49,7 +50,7 @@ public class RunnerDeploymentService
 
             var manifest = LoadManifest(tempExtractRoot);
             ValidateIncomingActions(tempExtractRoot);
-            var snapshotPath = CreateSnapshotIfNeeded(appId);
+            snapshotPath = CreateSnapshotIfNeeded(appId);
 
             if (request.Clean)
             {
@@ -109,6 +110,19 @@ public class RunnerDeploymentService
         }
         catch (Exception ex)
         {
+            if (snapshotPath != null)
+            {
+                try
+                {
+                    RestoreSnapshot(appId, snapshotPath);
+                    logs.Add("Deployment failed; the previous App snapshot was restored.");
+                }
+                catch (Exception restoreException)
+                {
+                    logger.Error(restoreException, "Failed to restore App snapshot after deployment failure for {AppId}", appId);
+                    logs.Add("Deployment failed and automatic snapshot restoration also failed.");
+                }
+            }
             logger.Error(ex, "Failed to deploy app package for app {AppId}", appId);
             logs.Add(ex.Message);
             return new DeployAppPackageResult
@@ -202,6 +216,22 @@ public class RunnerDeploymentService
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeFrontendDirectory(appId));
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppBackendDirectory(appId));
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppVenvDirectory(appId));
+    }
+
+    private void RestoreSnapshot(Guid appId, string snapshotPath)
+    {
+        if (!Directory.Exists(snapshotPath))
+            throw new DirectoryNotFoundException("The previous App snapshot is unavailable.");
+
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceRoot(appId));
+        DeleteDirectoryIfExists(runnerWorkspaceService.GetAppRuntimeRoot(appId));
+
+        var snapshotSource = Path.Combine(snapshotPath, "source");
+        var snapshotRuntime = Path.Combine(snapshotPath, "runtime");
+        if (Directory.Exists(snapshotSource))
+            CopyDirectory(snapshotSource, runnerWorkspaceService.GetAppSourceRoot(appId));
+        if (Directory.Exists(snapshotRuntime))
+            CopyDirectory(snapshotRuntime, runnerWorkspaceService.GetAppRuntimeRoot(appId));
     }
 
     private static void ValidateIncomingActions(string extractRoot)
