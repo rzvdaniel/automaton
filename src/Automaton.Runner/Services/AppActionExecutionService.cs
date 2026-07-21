@@ -80,8 +80,10 @@ public sealed class AppActionExecutionService
                 ?? throw new InvalidOperationException("Action runtime could not be started.");
             await process.StandardInput.WriteAsync(input.AsMemory(), linked.Token);
             process.StandardInput.Close();
-            var stdoutTask = ReadLimitedAsync(process.StandardOutput, MaximumResultBytes, linked.Token);
-            var stderrTask = ReadLimitedAsync(process.StandardError, MaximumLogBytes, linked.Token, truncate: true);
+            // Always drain both pipes until EOF. Stopping reads when a limit is reached can
+            // fill the OS pipe and deadlock a child process before it exits.
+            var stdoutTask = ReadStreamAsync(process.StandardOutput, MaximumResultBytes, truncate: false);
+            var stderrTask = ReadStreamAsync(process.StandardError, MaximumLogBytes, truncate: true);
             try
             {
                 await process.WaitForExitAsync(linked.Token);
@@ -92,18 +94,24 @@ public sealed class AppActionExecutionService
                 var cancelled = cancellationToken.IsCancellationRequested || activeExecution.ManualCancellationRequested;
                 var status = cancelled ? AppModuleExecutionStatuses.Cancelled : AppModuleExecutionStatuses.TimedOut;
                 var errorCode = cancelled ? AppModuleExecutionErrorCodes.Cancelled : AppModuleExecutionErrorCodes.TimedOut;
-                await File.WriteAllTextAsync(logsPath, await SafeReadAsync(stderrTask), CancellationToken.None);
+                var cancelledStderr = await stderrTask;
+                await stdoutTask;
+                await File.WriteAllTextAsync(logsPath, cancelledStderr.Content, CancellationToken.None);
                 return Completed(request.ExecutionId, status, null, errorCode, errorCode, deploymentHash, startedAt, logs: true, result: false);
             }
 
             var stdout = await stdoutTask;
             var stderr = await stderrTask;
-            await File.WriteAllTextAsync(logsPath, stderr, CancellationToken.None);
+            await File.WriteAllTextAsync(logsPath, stderr.Content, CancellationToken.None);
+            if (stdout.ExceededLimit)
+                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
+                    AppModuleExecutionErrorCodes.ResultTooLarge, "Action output exceeded its configured limit.",
+                    deploymentHash, startedAt, logs: true, result: false);
             if (process.ExitCode != 0)
-                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(stderr, 1000), deploymentHash, startedAt, true, false);
+                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(stderr.Content, 1000), deploymentHash, startedAt, true, false);
             try
             {
-                using var outputDocument = JsonDocument.Parse(stdout);
+                using var outputDocument = JsonDocument.Parse(stdout.Content);
                 var outputValidationError = AppActionSchemaValidator.Validate(outputDocument.RootElement, manifest.Spec.Output);
                 if (outputValidationError != null)
                     return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
@@ -113,19 +121,13 @@ public sealed class AppActionExecutionService
             {
                 return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.InvalidResult, "Action stdout was not valid JSON.", deploymentHash, startedAt, true, false);
             }
-            await File.WriteAllTextAsync(resultPath, stdout, CancellationToken.None);
+            await File.WriteAllTextAsync(resultPath, stdout.Content, CancellationToken.None);
             return Completed(request.ExecutionId, AppModuleExecutionStatuses.Succeeded, process.ExitCode, null, null, deploymentHash, startedAt, true, true);
         }
         catch (Win32Exception ex)
         {
             return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, null,
                 AppModuleExecutionErrorCodes.RuntimeUnavailable, Limit(ex.Message, 1000), deploymentHash, startedAt, false, false);
-        }
-        catch (AppActionOutputLimitException)
-        {
-            return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, null,
-                AppModuleExecutionErrorCodes.ResultTooLarge, "Action output exceeded its configured limit.",
-                deploymentHash, startedAt, logs: false, result: false);
         }
         finally
         {
@@ -202,26 +204,45 @@ public sealed class AppActionExecutionService
         return startInfo;
     }
 
-    private static async Task<string> ReadLimitedAsync(StreamReader reader, int maxBytes, CancellationToken cancellationToken, bool truncate = false)
+    private static async Task<StreamCapture> ReadStreamAsync(StreamReader reader, int maxBytes, bool truncate)
     {
         var buffer = new char[4096];
         var builder = new StringBuilder();
+        var exceededLimit = false;
         while (true)
         {
-            var read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
+            var read = await reader.ReadAsync(buffer.AsMemory(), CancellationToken.None);
             if (read == 0) break;
-            builder.Append(buffer, 0, read);
-            if (Encoding.UTF8.GetByteCount(builder.ToString()) > maxBytes && truncate)
-                return Limit(builder.ToString(), maxBytes / 2) + "\n[logs truncated by Automaton]";
-            if (Encoding.UTF8.GetByteCount(builder.ToString()) > maxBytes)
-                throw new AppActionOutputLimitException();
+            var chunk = new string(buffer, 0, read);
+            if (Encoding.UTF8.GetByteCount(chunk) + Encoding.UTF8.GetByteCount(builder.ToString()) > maxBytes)
+            {
+                exceededLimit = true;
+                if (truncate) continue;
+
+                var remainingBytes = Math.Max(0, maxBytes - Encoding.UTF8.GetByteCount(builder.ToString()));
+                if (remainingBytes > 0)
+                    builder.Append(TruncateUtf8(chunk, remainingBytes));
+                continue;
+            }
+            builder.Append(chunk);
         }
-        return builder.ToString();
+        var content = builder.ToString();
+        if (truncate && exceededLimit)
+            content += "\n[logs truncated by Automaton]";
+        return new StreamCapture(content, exceededLimit);
     }
 
-    private static async Task<string> SafeReadAsync(Task<string> task)
+    private static string TruncateUtf8(string value, int maxBytes)
     {
-        try { return await task; } catch { return string.Empty; }
+        if (Encoding.UTF8.GetByteCount(value) <= maxBytes) return value;
+        var builder = new StringBuilder();
+        foreach (var character in value)
+        {
+            var candidate = builder.ToString() + character;
+            if (Encoding.UTF8.GetByteCount(candidate) > maxBytes) break;
+            builder.Append(character);
+        }
+        return builder.ToString();
     }
 
     private static AppActionExecutionResult Completed(Guid id, string status, int? exitCode, string? errorCode, string? summary, string? hash, DateTime started, bool logs, bool result)
@@ -252,5 +273,5 @@ public sealed class AppActionExecutionService
         public volatile bool ManualCancellationRequested;
     }
 
-    private sealed class AppActionOutputLimitException : Exception;
+    private sealed record StreamCapture(string Content, bool ExceededLimit);
 }
