@@ -56,9 +56,17 @@ public sealed class AppActionExecutionService
         var connectionId = runner.ConnectionId;
         _ = Task.Run(async () =>
         {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<AppActionExecutionService>()
-                .DispatchAsync(executionId, connectionId, inputJson);
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<AppActionExecutionService>()
+                    .DispatchAsync(executionId, connectionId, inputJson);
+            }
+            catch
+            {
+                // The hosted reconciler marks the persisted record Lost if dispatch
+                // fails before a terminal result is saved.
+            }
         });
         return execution;
     }
