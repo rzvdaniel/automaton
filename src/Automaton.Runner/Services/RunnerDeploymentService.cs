@@ -219,8 +219,12 @@ public class RunnerDeploymentService
     private void SynchronizeActionRoots(Guid appId, string extractRoot)
     {
         var incomingRoot = Path.Combine(extractRoot, "source", "actions");
-        if (!Directory.Exists(incomingRoot)) return;
-        var incomingKeys = Directory.GetDirectories(incomingRoot).Select(Path.GetFileName).ToHashSet(StringComparer.Ordinal);
+        // Deployment packages are complete source snapshots. A missing actions/
+        // directory therefore means that the App now has zero Actions (ZIP files
+        // cannot reliably represent empty directories).
+        var incomingKeys = Directory.Exists(incomingRoot)
+            ? Directory.GetDirectories(incomingRoot).Select(Path.GetFileName).ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string?>(StringComparer.Ordinal);
         DeleteDirectoryIfExists(runnerWorkspaceService.GetAppSourceActionsDirectory(appId));
         var runtimeRoot = runnerWorkspaceService.GetAppRuntimeActionsDirectory(appId);
         if (!Directory.Exists(runtimeRoot)) return;
