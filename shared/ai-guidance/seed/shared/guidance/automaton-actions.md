@@ -2,6 +2,8 @@
 
 Actions are executable modules owned by an Automaton App. They are never standalone resources. Use an Action for finite background work such as imports, exports, reports, notifications, maintenance, and long-running jobs that should not run inside the App backend process.
 
+Author Actions in the local App checkout and deploy them with `automaton deploy`. The API relays the deployment package; the Runner stores the deployed source snapshot, prepared runtime, versions, logs, and results. Studio inspects and operates deployed Actions but is not the canonical Action source editor.
+
 ## Layout
 
 ```text

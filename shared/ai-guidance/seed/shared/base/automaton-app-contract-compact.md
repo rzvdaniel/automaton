@@ -7,6 +7,7 @@ Use this compact contract for in-product app editing where linked documents are 
 - Keep `automaton.json` in the app root when it exists.
 - In Studio, file tools edit the app source surfaces rather than the local CLI scaffold directly.
 - Studio-backed app source is organized around optional frontend, backend, and Action module source roots.
+- Author and deploy Actions from the local App/Git checkout with `automaton deploy`; Studio operates deployed Action runtime state.
 - Frontend source normally lives in `frontend/`.
 - Frontend build output normally lives in `frontend/dist/`.
 - Backend source, when needed, lives in `backend/`.
