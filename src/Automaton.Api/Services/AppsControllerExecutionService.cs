@@ -239,7 +239,6 @@ public class AppsControllerExecutionService
         if (result.Success)
         {
             var deployedAtUtc = DateTime.UtcNow;
-            await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
             {
                 metadata.DevelopmentMode = AppDevelopmentModes.Local;
@@ -312,7 +311,9 @@ public class AppsControllerExecutionService
         });
 
         var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
-        var actionDeployments = await DeployStudioActionsAsync(appId, ownerId, cancellationToken);
+        // Studio operates deployed runtime state; Action source is deployed through
+        // the CLI package path and is not copied from API-side source storage here.
+        var actionDeployments = new List<AppActionDeploymentResult>();
         await backendRouteConfigService.RefreshAsync(cancellationToken);
 
         return new DeployAppResponse

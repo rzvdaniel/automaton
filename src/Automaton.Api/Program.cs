@@ -356,7 +356,6 @@ services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped<AppActionExecutionService>();
-services.AddScoped<SystemInfrastructureAppService>();
 services.AddHostedService<AppModuleExecutionReconciliationService>();
 services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
@@ -533,10 +532,6 @@ var app = applicationBuilder.Build();
 var logSuccessfulRequests = configurationManager.GetValue<bool>("RequestLogging:LogSuccessfulRequests");
 
 await app.ApplyMigrationsAsync();
-await using (var systemAppScope = app.Services.CreateAsyncScope())
-{
-    await systemAppScope.ServiceProvider.GetRequiredService<SystemInfrastructureAppService>().EnsureSeededAsync();
-}
 await app.Services.SeedLocalRunnerHostAsync();
 
 app.UseForwardedHeaders();
