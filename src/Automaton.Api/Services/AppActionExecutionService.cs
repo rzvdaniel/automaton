@@ -18,13 +18,15 @@ public sealed class AppActionExecutionService
 {
     private readonly ApplicationDbContext db;
     private readonly AppsService appsService;
+    private readonly ResourceAuthorizationService authorizationService;
     private readonly IHubContext<AutomatonHub> hub;
     private readonly IServiceScopeFactory scopeFactory;
 
-    public AppActionExecutionService(ApplicationDbContext db, AppsService appsService, IHubContext<AutomatonHub> hub, IServiceScopeFactory scopeFactory)
+    public AppActionExecutionService(ApplicationDbContext db, AppsService appsService, ResourceAuthorizationService authorizationService, IHubContext<AutomatonHub> hub, IServiceScopeFactory scopeFactory)
     {
         this.db = db;
         this.appsService = appsService;
+        this.authorizationService = authorizationService;
         this.hub = hub;
         this.scopeFactory = scopeFactory;
     }
@@ -34,6 +36,8 @@ public sealed class AppActionExecutionService
         AppActionManifestParser.ValidateKey(actionKey);
         var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
             ?? throw new KeyNotFoundException("App not found.");
+        if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
+            throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
         if (!app.ExecutionRunnerId.HasValue)
             throw new InvalidOperationException("No Runner is assigned to this App.");
 
@@ -134,6 +138,7 @@ public sealed class AppActionExecutionService
     public async Task<AppActionVersionOperationResponse> RestoreVersionAsync(Guid appId, string actionKey, string version, Guid userId, CancellationToken cancellationToken)
     {
         AppActionManifestParser.ValidateKey(actionKey);
+        await EnsureCanUpdateAsync(appId, userId, cancellationToken);
         var connectionId = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
         return await hub.Clients.Client(connectionId).InvokeAsync<AppActionVersionOperationResponse>(
             AutomatonHubMethods.RestoreAppActionVersion, new AppActionVersionRequest(appId, actionKey, version), cancellationToken);
@@ -142,6 +147,7 @@ public sealed class AppActionExecutionService
     public async Task<AppActionVersionOperationResponse> DeleteVersionAsync(Guid appId, string actionKey, string version, Guid userId, CancellationToken cancellationToken)
     {
         AppActionManifestParser.ValidateKey(actionKey);
+        await EnsureCanUpdateAsync(appId, userId, cancellationToken);
         var connectionId = await GetAuthorizedRunnerConnectionAsync(appId, userId, cancellationToken);
         return await hub.Clients.Client(connectionId).InvokeAsync<AppActionVersionOperationResponse>(
             AutomatonHubMethods.DeleteAppActionVersion, new AppActionVersionRequest(appId, actionKey, version), cancellationToken);
@@ -157,6 +163,8 @@ public sealed class AppActionExecutionService
 
     public async Task<bool> CancelAsync(Guid appId, Guid executionId, Guid userId, CancellationToken cancellationToken)
     {
+        if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
+            throw new UnauthorizedAccessException("You do not have permission to cancel Actions in this App.");
         var execution = await GetAsync(appId, executionId, userId, cancellationToken);
         if (!execution.RunnerId.HasValue) return false;
         var connectionId = await db.Runners.Where(x => x.Id == execution.RunnerId).Select(x => x.ConnectionId).SingleOrDefaultAsync(cancellationToken);
@@ -191,6 +199,14 @@ public sealed class AppActionExecutionService
         var connectionId = await db.Runners.AsNoTracking().Where(runner => runner.Id == app.ExecutionRunnerId.Value)
             .Select(runner => runner.ConnectionId).SingleOrDefaultAsync(cancellationToken);
         return !string.IsNullOrWhiteSpace(connectionId) ? connectionId : throw new InvalidOperationException("The assigned Runner is unavailable.");
+    }
+
+    private async Task EnsureCanUpdateAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
+    {
+        _ = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
+            ?? throw new KeyNotFoundException("App not found.");
+        if (!await authorizationService.CanUpdateAppAsync(appId, userId, cancellationToken))
+            throw new UnauthorizedAccessException("You do not have permission to deploy or modify this App.");
     }
 
     private static string? Limit(string? value, int max) => value?.Length > max ? value[..max] : value;
