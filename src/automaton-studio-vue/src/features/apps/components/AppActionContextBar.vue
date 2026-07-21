@@ -16,6 +16,7 @@ const logs = ref<string | null>(null)
 const result = ref<string | null>(null)
 const recent = ref<AppActionExecution[]>([])
 const versions = ref<AppActionVersion[]>([])
+const deploymentMessage = ref<string | null>(null)
 const terminalStatuses = new Set(['Succeeded', 'Failed', 'TimedOut', 'Cancelled', 'RunnerUnavailable', 'Lost'])
 const isActive = computed(() => execution.value != null && !terminalStatuses.has(execution.value.status))
 
@@ -27,9 +28,11 @@ async function refreshContext() {
     ])
     recent.value = allExecutions.filter(item => item.moduleKey === props.actionKey).slice(0, 5)
     versions.value = actionVersions
-  } catch {
+    deploymentMessage.value = null
+  } catch (error) {
     recent.value = []
     versions.value = []
+    deploymentMessage.value = error instanceof Error ? error.message : 'This Action is not deployed on the assigned Runner.'
   }
 }
 
@@ -90,6 +93,7 @@ watch(() => props.actionKey, refreshContext)
 <template>
   <div class="action-context-bar">
     <span><i class="pi pi-bolt" /> Action: <strong>{{ actionKey }}</strong></span>
+    <small v-if="deploymentMessage" class="deployment-message">{{ deploymentMessage }}</small>
     <Button label="Run" icon="pi pi-play" size="small" @click="visible = true" />
   </div>
   <Dialog v-model:visible="visible" modal :header="`Run ${actionKey}`" :style="{ width: 'min(42rem, 92vw)' }">
@@ -119,6 +123,7 @@ watch(() => props.actionKey, refreshContext)
 
 <style scoped>
 .action-context-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; border-bottom: 1px solid var(--surface-border); background: var(--surface-50); }
+.deployment-message { color: var(--orange-700); flex: 1; }
 .input-label { display: block; margin-bottom: .4rem; font-weight: 600; }
 .input-editor { width: 100%; font-family: var(--font-family-monospace, monospace); }
 .execution-summary { margin-top: 1rem; }
