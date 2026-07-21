@@ -15,11 +15,13 @@ public sealed class AppActionDeploymentService
     private const int DefaultMaximumVersionsPerAction = 10;
     private const long DefaultMaximumVersionBytesPerAction = 1L * 1024 * 1024 * 1024;
     private readonly RunnerWorkspaceService workspace;
+    private readonly AppActionExecutionCoordinator coordinator;
     private readonly ILogger logger = Log.ForContext<AppActionDeploymentService>();
 
-    public AppActionDeploymentService(RunnerWorkspaceService workspace)
+    public AppActionDeploymentService(RunnerWorkspaceService workspace, AppActionExecutionCoordinator? coordinator = null)
     {
         this.workspace = workspace;
+        this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
     }
 
     public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(Guid appId, CancellationToken cancellationToken = default)
@@ -171,6 +173,7 @@ public sealed class AppActionDeploymentService
 
     private async Task<AppActionDeploymentResult> PrepareAsync(Guid appId, DiscoveredAppAction action, CancellationToken cancellationToken)
     {
+        using var actionLock = await coordinator.EnterAsync(appId, action.Key, cancellationToken);
         var contentHash = ComputeContentHash(action.DirectoryPath);
         var currentDirectory = workspace.GetAppActionCurrentDirectory(appId, action.Key);
         if (string.Equals(ReadCurrentHash(currentDirectory), contentHash, StringComparison.Ordinal))

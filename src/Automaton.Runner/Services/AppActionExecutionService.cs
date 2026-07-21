@@ -14,12 +14,14 @@ public sealed class AppActionExecutionService
     private const int MaximumLogBytes = 4_194_304;
     private static readonly TimeSpan ArtifactRetention = TimeSpan.FromHours(24);
     private readonly RunnerWorkspaceService workspace;
+    private readonly AppActionExecutionCoordinator coordinator;
     private readonly ConcurrentDictionary<Guid, ActiveExecution> active = new();
     private readonly SemaphoreSlim concurrencyGate = new(4, 4);
 
-    public AppActionExecutionService(RunnerWorkspaceService workspace)
+    public AppActionExecutionService(RunnerWorkspaceService workspace, AppActionExecutionCoordinator? coordinator = null)
     {
         this.workspace = workspace;
+        this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
     }
 
     public async Task<AppActionExecutionResult> ExecuteAsync(ExecuteAppActionModuleRequest request, CancellationToken cancellationToken = default)
@@ -27,6 +29,7 @@ public sealed class AppActionExecutionService
         await concurrencyGate.WaitAsync(cancellationToken);
         try
         {
+        using var actionLock = await coordinator.EnterAsync(request.AppId, request.ActionKey, cancellationToken);
         AppActionManifestParser.ValidateKey(request.ActionKey);
         var currentDirectory = workspace.GetAppActionCurrentDirectory(request.AppId, request.ActionKey);
         var manifestPath = Path.Combine(currentDirectory, "action.yaml");
