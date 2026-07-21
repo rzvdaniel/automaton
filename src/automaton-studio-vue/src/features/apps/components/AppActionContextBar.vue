@@ -32,6 +32,9 @@ async function refreshContext() {
   } catch (error) {
     recent.value = []
     versions.value = []
+    execution.value = null
+    logs.value = null
+    result.value = null
     deploymentMessage.value = error instanceof Error ? error.message : 'This Action is not deployed on the assigned Runner.'
   }
 }
@@ -104,7 +107,7 @@ watch(() => props.actionKey, refreshContext)
     <pre v-if="result" class="artifact"><strong>Result</strong>\n{{ result }}</pre>
     <template #footer>
       <Button v-if="isActive" label="Cancel" severity="danger" outlined @click="cancel" />
-      <Button label="Run" icon="pi pi-play" :loading="running" @click="run" />
+    <Button label="Run" icon="pi pi-play" :loading="running" :disabled="deploymentMessage != null" @click="run" />
     </template>
     <div v-if="recent.length" class="context-section">
       <strong>Recent executions</strong>
