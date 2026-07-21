@@ -1,0 +1,6 @@
+{
+  "name": "Automaton Infrastructure",
+  "source": {
+    "include": ["actions/**"]
+  }
+}

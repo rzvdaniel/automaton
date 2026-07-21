@@ -3,6 +3,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Security.Claims;
 
 namespace Automaton.Api.Services;
 
@@ -15,15 +16,18 @@ public class ResourceAuthorizationService
     private readonly ApplicationDbContext dbContext;
     private readonly UserContextService userContextService;
     private readonly Serilog.ILogger logger;
+    private readonly IHttpContextAccessor httpContextAccessor;
 
     private Guid UserId => userContextService.GetUserId();
 
     public ResourceAuthorizationService(
         ApplicationDbContext dbContext,
-        UserContextService userContextService)
+        UserContextService userContextService,
+        IHttpContextAccessor? httpContextAccessor = null)
     {
         this.dbContext = dbContext;
         this.userContextService = userContextService;
+        this.httpContextAccessor = httpContextAccessor ?? new HttpContextAccessor();
         this.logger = Log.ForContext<ResourceAuthorizationService>();
     }
 
@@ -45,6 +49,7 @@ public class ResourceAuthorizationService
     /// </summary>
     public async Task<bool> CanAccessAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
+        if (Automaton.Core.Models.InfrastructureAppTrust.IsTrustedApp(appId) && IsTrustedInfrastructureAdministrator(userId)) return true;
         // Check personal ownership
         var hasPersonalAccess = await dbContext.WebAppUsers
             .AnyAsync(u => u.WebAppId == appId && u.UserId == userId, cancellationToken);
@@ -83,6 +88,7 @@ public class ResourceAuthorizationService
     /// </summary>
     public async Task<bool> CanUpdateAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
+        if (Automaton.Core.Models.InfrastructureAppTrust.IsTrustedApp(appId) && IsTrustedInfrastructureAdministrator(userId)) return true;
         // Check personal ownership
         var hasPersonalAccess = await dbContext.WebAppUsers
             .AnyAsync(u => u.WebAppId == appId && u.UserId == userId, cancellationToken);
@@ -122,6 +128,7 @@ public class ResourceAuthorizationService
     /// </summary>
     public async Task<bool> CanDeleteAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
+        if (Automaton.Core.Models.InfrastructureAppTrust.IsTrustedApp(appId)) return false;
         // Check personal ownership
         var hasPersonalAccess = await dbContext.WebAppUsers
             .AnyAsync(u => u.WebAppId == appId && u.UserId == userId, cancellationToken);
@@ -154,6 +161,7 @@ public class ResourceAuthorizationService
     /// </summary>
     public async Task<bool> CanExecuteAppAsync(Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
+        if (Automaton.Core.Models.InfrastructureAppTrust.IsTrustedApp(appId) && IsTrustedInfrastructureAdministrator(userId)) return true;
         // Check personal ownership
         var hasPersonalAccess = await dbContext.WebAppUsers
             .AnyAsync(u => u.WebAppId == appId && u.UserId == userId, cancellationToken);
@@ -181,6 +189,16 @@ public class ResourceAuthorizationService
     }
 
     #endregion
+
+    private bool IsTrustedInfrastructureAdministrator(Guid userId)
+    {
+        var principal = httpContextAccessor.HttpContext?.User;
+        var currentUserId = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+        return principal?.Identity?.IsAuthenticated == true
+            && Guid.TryParse(currentUserId, out var authenticatedUserId)
+            && authenticatedUserId == userId
+            && (principal.IsInRole(UserRole.Administrator) || principal.IsInRole(UserRole.SystemAdministrator));
+    }
 
     #region Flows Authorization
 

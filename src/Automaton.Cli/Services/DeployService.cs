@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Automaton.Cli.Models;
+using Automaton.Core.Models;
 
 namespace Automaton.Cli.Services;
 
@@ -100,9 +101,16 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
         }
 
-        var frontendCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, nextSteps, out var deployDirectory);
+        var actionsCheck = ValidateActions(directory, nextSteps, out var actionCount);
+        AddCheck(checks, actionsCheck);
+        if (!actionsCheck.Success)
+        {
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
+        }
+
+        var frontendCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, actionCount > 0, nextSteps, out var deployDirectory);
         AddCheck(checks, frontendCheck);
-        if (!frontendCheck.Success || deployDirectory == null)
+        if (!frontendCheck.Success)
         {
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
         }
@@ -323,8 +331,13 @@ public sealed class DeployService
         return new DeployCheckResult(DeployCheckNames.Build, true, "build completed successfully");
     }
 
-    private static DeployCheckResult ValidateFrontendPackage(string directory, string? deployDir, ISet<string> nextSteps, out string? resolvedDeployDirectory)
+    private static DeployCheckResult ValidateFrontendPackage(string directory, string? deployDir, bool hasActions, ISet<string> nextSteps, out string? resolvedDeployDirectory)
     {
+        if (string.IsNullOrWhiteSpace(deployDir) && hasActions)
+        {
+            resolvedDeployDirectory = null;
+            return new DeployCheckResult(DeployCheckNames.FrontendPackage, true, "no frontend configured; deploying an Actions-only App");
+        }
         try
         {
             resolvedDeployDirectory = ZipService.ResolveDeployDirectory(directory, deployDir);
@@ -344,6 +357,30 @@ public sealed class DeployService
         }
 
         return new DeployCheckResult(DeployCheckNames.FrontendPackage, true, $"deploy directory ready: {Path.GetRelativePath(directory, resolvedDeployDirectory)}");
+    }
+
+    private static DeployCheckResult ValidateActions(string directory, ISet<string> nextSteps, out int actionCount)
+    {
+        try
+        {
+            var actions = AppActionManifestParser.Discover(directory);
+            foreach (var action in actions)
+            {
+                var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
+                var actionRoot = Path.GetFullPath(action.DirectoryPath);
+                if (!entrypoint.StartsWith(actionRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                    || !File.Exists(entrypoint))
+                    throw new InvalidOperationException($"Action '{action.Key}' entrypoint '{action.Manifest.Spec.Entrypoint}' does not exist.");
+            }
+            actionCount = actions.Count;
+            return new DeployCheckResult("actions", true, actionCount == 0 ? "no Actions found" : $"validated {actionCount} Action module(s)");
+        }
+        catch (Exception ex)
+        {
+            actionCount = 0;
+            nextSteps.Add("Fix Action manifests under actions/{action-key}/action.yaml and rerun automaton deploy");
+            return new DeployCheckResult("actions", false, ex.Message);
+        }
     }
 
     private static DeployCheckResult ValidateBackendPackage(
@@ -455,6 +492,12 @@ public sealed class DeployService
         var runtimeFiles = deployResult.TryGetProperty("runtimeFilesDeployed", out var runtimeProperty) ? runtimeProperty.GetInt32() : 0;
         var success = deployResult.TryGetProperty("success", out var successProperty) && successProperty.GetBoolean();
         var message = deployResult.TryGetProperty("message", out var messageProperty) ? messageProperty.GetString() : null;
+        if (deployResult.TryGetProperty("actions", out var actionsProperty) && actionsProperty.ValueKind == JsonValueKind.Array)
+        {
+            var actionSummary = string.Join("; ", actionsProperty.EnumerateArray().Select(action =>
+                $"Action {action.GetProperty("actionKey").GetString()}: {action.GetProperty("status").GetString()}"));
+            if (!string.IsNullOrWhiteSpace(actionSummary)) message = string.IsNullOrWhiteSpace(message) ? actionSummary : $"{message} {actionSummary}";
+        }
         var runnerCount = deployResult.TryGetProperty("runnerCount", out var runnerCountProperty) ? runnerCountProperty.GetInt32() : 0;
         var state = deployResult.TryGetProperty("state", out var stateProperty) ? stateProperty.GetString() : null;
         var requiresRetry = deployResult.TryGetProperty("requiresRetry", out var requiresRetryProperty) && requiresRetryProperty.GetBoolean();

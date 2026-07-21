@@ -75,6 +75,7 @@ public class DeployPackageResponse
     public string? SnapshotPath { get; set; }
     public string? Message { get; set; }
     public List<string>? Logs { get; set; }
+    public List<Automaton.Core.Models.AppActionDeploymentResult> Actions { get; set; } = [];
 }
 
 public class DeployAppResponse
@@ -90,6 +91,7 @@ public class DeployAppResponse
     public string? Message { get; set; }
     public DateTime? FrontendRuntimeDeployedAtUtc { get; set; }
     public DateTime? BackendRuntimeDeployedAtUtc { get; set; }
+    public List<Automaton.Core.Models.AppActionDeploymentResult> Actions { get; set; } = [];
 }
 
 // ── Execution request/response models ────────────────────────────────────────

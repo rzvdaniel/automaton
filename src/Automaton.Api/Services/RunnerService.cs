@@ -441,6 +441,18 @@ public class RunnerService
         runner.LastDisconnectedAtUtc = DateTime.UtcNow;
         runner.Status = RunnerConnectivityStatuses.Offline;
 
+        var lostExecutions = await dbContext.AppModuleExecutions
+            .Where(execution => execution.RunnerId == runner.Id
+                && (execution.Status == AppModuleExecutionStatuses.Dispatching || execution.Status == AppModuleExecutionStatuses.Running))
+            .ToListAsync(cancellationToken);
+        foreach (var execution in lostExecutions)
+        {
+            execution.Status = AppModuleExecutionStatuses.Lost;
+            execution.ErrorCode = AppModuleExecutionErrorCodes.RunnerUnavailable;
+            execution.FailureSummary = "Runner disconnected before execution completion was confirmed.";
+            execution.CompletedAtUtc = DateTime.UtcNow;
+        }
+
         dbContext.Entry(runner).State = EntityState.Modified;
         await CloseMatchingOpenSessionAsync(
             runner.Id,

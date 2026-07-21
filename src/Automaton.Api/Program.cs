@@ -355,6 +355,8 @@ services.AddSingleton<TunnelRequestRegistry>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
+services.AddScoped<AppActionExecutionService>();
+services.AddHostedService<AppModuleExecutionReconciliationService>();
 services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
@@ -531,6 +533,23 @@ var logSuccessfulRequests = configurationManager.GetValue<bool>("RequestLogging:
 
 await app.ApplyMigrationsAsync();
 await app.Services.SeedLocalRunnerHostAsync();
+await using (var infrastructureScope = app.Services.CreateAsyncScope())
+{
+    var infrastructureDb = infrastructureScope.ServiceProvider.GetRequiredService<Automaton.Api.Data.ApplicationDbContext>();
+    if (!await infrastructureDb.WebApps.AnyAsync(item => item.Id == Automaton.Core.Models.InfrastructureAppTrust.PlatformAppId))
+    {
+        infrastructureDb.WebApps.Add(new Automaton.Api.Entities.WebApp
+        {
+            Id = Automaton.Core.Models.InfrastructureAppTrust.PlatformAppId,
+            Name = Automaton.Core.Models.InfrastructureAppTrust.PlatformAppName,
+            Summary = "Platform-owned infrastructure Action modules.",
+            Description = "Internal Automaton infrastructure operations.",
+            Definition = "{}", IsPublished = false, IsForkable = false,
+            RequiresAuthentication = true, Created = DateTime.UtcNow, Updated = DateTime.UtcNow
+        });
+        await infrastructureDb.SaveChangesAsync();
+    }
+}
 
 app.UseForwardedHeaders();
 

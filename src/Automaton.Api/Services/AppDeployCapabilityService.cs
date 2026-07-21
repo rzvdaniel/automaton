@@ -19,6 +19,9 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
     {
         var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, appId);
         var frontendDeployMode = fileStorageService.GetFrontendStudioDeployMode(ownerId, appId);
+        var actionsRoot = Path.Combine(fileStorageService.GetAppSourceDirectoryPath(ownerId, appId), "actions");
+        var actionsAvailable = Directory.Exists(actionsRoot)
+            && Directory.EnumerateDirectories(actionsRoot).Any(directory => File.Exists(Path.Combine(directory, "action.yaml")));
 
         // Design rule:
         // The UI never decides what is deployable. Studio always asks the backend for the
@@ -52,7 +55,7 @@ public class AppDeployCapabilityService : IAppDeployCapabilityService
         var canDeployAppFromStudio =
             (canDeployFrontendFromStudio || !metadata.Frontend.SourceAvailable) &&
             (canDeployBackendFromStudio || !metadata.Backend.SourceAvailable) &&
-            (metadata.Frontend.SourceAvailable || metadata.Backend.SourceAvailable);
+            (metadata.Frontend.SourceAvailable || metadata.Backend.SourceAvailable || actionsAvailable);
 
         return new AppDeployCapabilitiesResponse
         {

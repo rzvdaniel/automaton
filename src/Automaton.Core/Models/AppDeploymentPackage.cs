@@ -17,6 +17,7 @@ public sealed class DeployAppPackageRequest
     public Guid AppId { get; set; }
     public string PackagePath { get; set; } = string.Empty;
     public bool Clean { get; set; }
+    public bool SystemInfrastructure { get; set; }
 }
 
 public sealed class DeployAppPackageResult
@@ -28,4 +29,13 @@ public sealed class DeployAppPackageResult
     public int RunnerCount { get; set; }
     public string? SnapshotPath { get; set; }
     public List<string>? Logs { get; set; }
+    public List<AppActionDeploymentResult> Actions { get; set; } = [];
+}
+
+public sealed class AppActionDeploymentResult
+{
+    public string ActionKey { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? ContentHash { get; set; }
+    public string? Message { get; set; }
 }

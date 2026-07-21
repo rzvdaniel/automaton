@@ -1,0 +1,10 @@
+apiVersion: automaton.dev/v1
+kind: Action
+metadata:
+  name: Infrastructure Runner Info
+  key: infrastructure-runner-info
+  description: Returns harmless structured host and Runner information.
+spec:
+  runtime: bash
+  entrypoint: main.sh
+  timeoutSeconds: 30

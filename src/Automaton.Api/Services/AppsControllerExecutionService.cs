@@ -13,6 +13,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using System.Text;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using static Automaton.Api.Hubs.AutomatonHub;
 
 namespace Automaton.Api.Services;
@@ -231,14 +232,19 @@ public class AppsControllerExecutionService
                 {
                     AppId = appId,
                     PackagePath = completion.LocalPath,
-                    Clean = clean
+                    Clean = clean,
+                    SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
+                        && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
                 },
                 cancellationToken);
 
         if (result.Success)
         {
-            var deployedAtUtc = DateTime.UtcNow;
+            // Keep API source as the compatibility copy used by Studio, pull,
+            // remix, and fork flows. Runner-deployed Action content remains the
+            // runtime authority and is never reconstructed from this copy.
             await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
+            var deployedAtUtc = DateTime.UtcNow;
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
             {
                 metadata.DevelopmentMode = AppDevelopmentModes.Local;
@@ -268,7 +274,8 @@ public class AppsControllerExecutionService
             RuntimeFilesDeployed = result.RuntimeFilesDeployed,
             SnapshotPath = result.SnapshotPath,
             Message = result.Message,
-            Logs = result.Logs
+            Logs = result.Logs,
+            Actions = result.Actions
         };
     }
 
@@ -310,6 +317,9 @@ public class AppsControllerExecutionService
         });
 
         var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
+        // Studio operates deployed runtime state; Action source is deployed through
+        // the CLI package path and is not copied from API-side source storage here.
+        var actionDeployments = new List<AppActionDeploymentResult>();
         await backendRouteConfigService.RefreshAsync(cancellationToken);
 
         return new DeployAppResponse
@@ -322,10 +332,64 @@ public class AppsControllerExecutionService
             FrontendAction = frontendSync.Updated ? "updated" : "preserved",
             BackendAction = backendSync.Updated ? "updated" : "preserved",
             BackendDeploy = backendDeploy,
+            Actions = actionDeployments,
             Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
             FrontendRuntimeDeployedAtUtc = deployedAtUtc,
             BackendRuntimeDeployedAtUtc = deployedAtUtc
         };
+    }
+
+    private async Task<List<AppActionDeploymentResult>> DeployStudioActionsAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var sourceRoot = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
+        var actions = AppActionManifestParser.Discover(sourceRoot);
+        var runner = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).FirstOrDefault();
+        if (runner == null || string.IsNullOrWhiteSpace(runner.ConnectionId))
+            throw new InvalidOperationException("No connected Runner is assigned to this App.");
+        var results = new List<AppActionDeploymentResult>(actions.Count);
+        foreach (var action in actions)
+        {
+            var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
+            if (!File.Exists(entrypoint)) throw new InvalidOperationException($"Action '{action.Key}' entrypoint does not exist.");
+            var sourceZip = CreateActionSourceZip(action.DirectoryPath);
+            var contentHash = ComputeActionContentHash(action.DirectoryPath);
+            results.Add(await automatonHub.Clients.Client(runner.ConnectionId).InvokeAsync<AppActionDeploymentResult>(
+                AutomatonHubMethods.PrepareAppActionModule,
+                new PrepareAppActionModuleRequest(appId, action.Key, sourceZip, contentHash, SystemInfrastructure: false),
+                cancellationToken));
+        }
+        await automatonHub.Clients.Client(runner.ConnectionId).InvokeAsync<int>(
+            AutomatonHubMethods.SynchronizeAppActionModules,
+            new SynchronizeAppActionModulesRequest(appId, actions.Select(action => action.Key).ToList()), cancellationToken);
+        return results;
+    }
+
+    private static byte[] CreateActionSourceZip(string directory)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var file in Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
+                .Where(file => !Path.GetRelativePath(directory, file).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Any(segment => segment is ".venv" or "__pycache__")))
+                archive.CreateEntryFromFile(file, Path.GetRelativePath(directory, file).Replace('\\', '/'), CompressionLevel.Optimal);
+        }
+        return stream.ToArray();
+    }
+
+    private static string ComputeActionContentHash(string directory)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var file in Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
+            .Where(file => !Path.GetRelativePath(directory, file).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Any(segment => segment is ".venv" or "__pycache__"))
+            .OrderBy(file => Path.GetRelativePath(directory, file), StringComparer.Ordinal))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(Path.GetRelativePath(directory, file).Replace('\\', '/')));
+            hash.AppendData([0]);
+            hash.AppendData(File.ReadAllBytes(file));
+        }
+        return $"sha256:{Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant()}";
     }
 
     public async Task<DeployAppResponse> DeployFrontendAsync(Guid appId, Guid ownerId)

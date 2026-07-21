@@ -60,6 +60,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<WebAppStep> WebAppSteps { get; set; }
         public virtual DbSet<AppVersion> AppVersions { get; set; }
         public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
+        public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
         public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
         public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
@@ -184,6 +185,25 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.AppId, e.Category, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.AppId, e.Level, e.CreatedAtUtc });
                 entity.HasIndex(e => e.EventType);
+            });
+
+            modelBuilder.Entity<AppModuleExecution>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ModuleType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.ModuleKey).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.TriggerType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.DeploymentHash).HasMaxLength(80);
+                entity.Property(e => e.ErrorCode).HasMaxLength(80);
+                entity.Property(e => e.FailureSummary).HasMaxLength(1000);
+                entity.Property(e => e.CorrelationId).HasMaxLength(128);
+                entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.AppId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
+                entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<Runner>().WithMany().HasForeignKey(e => e.RunnerId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.RequestedByUserId).OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<FlowExecutionUser>(entity =>
