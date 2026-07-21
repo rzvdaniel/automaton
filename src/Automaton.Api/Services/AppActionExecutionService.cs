@@ -2,6 +2,7 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
 using Automaton.Core.Models;
+using Automaton.Core.Enums;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -104,12 +105,15 @@ public sealed class AppActionExecutionService
             execution.StartedAtUtc = DateTime.UtcNow;
             await db.SaveChangesAsync();
             using var inputDocument = JsonDocument.Parse(inputJson);
+            var runnerPurpose = await db.Runners.AsNoTracking().Where(item => item.Id == execution.RunnerId).Select(item => item.Purpose).SingleOrDefaultAsync();
             var result = await hub.Clients.Client(connectionId).InvokeAsync<AppActionExecutionResult>(
                 AutomatonHubMethods.ExecuteAppActionModule,
                 new ExecuteAppActionModuleRequest
                 {
                     ExecutionId = execution.Id, AppId = execution.AppId, ActionKey = execution.ModuleKey,
-                    Input = inputDocument.RootElement.Clone()
+                    Input = inputDocument.RootElement.Clone(),
+                    SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(execution.AppId)
+                        && string.Equals(runnerPurpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
                 }, CancellationToken.None);
             ApplyResult(execution, result);
         }

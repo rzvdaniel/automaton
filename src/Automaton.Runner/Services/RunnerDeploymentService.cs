@@ -49,7 +49,7 @@ public class RunnerDeploymentService
             ExtractPackageSafely(request.PackagePath, tempExtractRoot);
 
             var manifest = LoadManifest(tempExtractRoot);
-            ValidateIncomingActions(tempExtractRoot);
+            ValidateIncomingActions(tempExtractRoot, request.SystemInfrastructure);
             snapshotPath = CreateSnapshotIfNeeded(appId);
 
             if (request.Clean)
@@ -68,7 +68,7 @@ public class RunnerDeploymentService
 
             logs.Add($"Deployed {sourceCount} source file(s) and {runtimeCount} runtime file(s).");
 
-            var actionResults = await actionDeploymentService.PrepareAllAsync(appId);
+            var actionResults = await actionDeploymentService.PrepareAllAsync(appId, request.SystemInfrastructure);
             logs.AddRange(actionResults.Select(result => $"Action {result.ActionKey}: {result.Status}."));
 
             var runtimeBackendDir = runnerWorkspaceService.GetAppBackendDirectory(appId);
@@ -234,10 +234,10 @@ public class RunnerDeploymentService
             CopyDirectory(snapshotRuntime, runnerWorkspaceService.GetAppRuntimeRoot(appId));
     }
 
-    private static void ValidateIncomingActions(string extractRoot)
+    private static void ValidateIncomingActions(string extractRoot, bool allowPrivilegedCapabilities)
     {
         var sourceRoot = Path.Combine(extractRoot, "source");
-        foreach (var action in AppActionManifestParser.Discover(sourceRoot))
+        foreach (var action in AppActionManifestParser.Discover(sourceRoot, allowPrivilegedCapabilities))
         {
             var entrypoint = Path.GetFullPath(Path.Combine(action.DirectoryPath, action.Manifest.Spec.Entrypoint));
             var actionRoot = Path.GetFullPath(action.DirectoryPath);

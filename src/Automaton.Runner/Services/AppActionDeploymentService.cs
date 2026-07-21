@@ -24,9 +24,11 @@ public sealed class AppActionDeploymentService
         this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
     }
 
-    public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(Guid appId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(Guid appId, bool allowPrivilegedCapabilities = false, CancellationToken cancellationToken = default)
     {
-        var actions = AppActionManifestParser.Discover(workspace.GetAppSourceRoot(appId));
+        if (allowPrivilegedCapabilities && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")) != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
+            throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
+        var actions = AppActionManifestParser.Discover(workspace.GetAppSourceRoot(appId), allowPrivilegedCapabilities);
         var results = new List<AppActionDeploymentResult>(actions.Count);
         foreach (var action in actions)
         {

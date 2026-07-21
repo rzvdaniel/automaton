@@ -232,12 +232,18 @@ public class AppsControllerExecutionService
                 {
                     AppId = appId,
                     PackagePath = completion.LocalPath,
-                    Clean = clean
+                    Clean = clean,
+                    SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
+                        && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
                 },
                 cancellationToken);
 
         if (result.Success)
         {
+            // Keep API source as the compatibility copy used by Studio, pull,
+            // remix, and fork flows. Runner-deployed Action content remains the
+            // runtime authority and is never reconstructed from this copy.
+            await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
             var deployedAtUtc = DateTime.UtcNow;
             await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
             {
