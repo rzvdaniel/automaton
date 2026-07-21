@@ -345,6 +345,7 @@ public class Program
                 services.AddSingleton<RunnerBackendEnvironmentService>();
                 services.AddSingleton<AppActionDeploymentService>();
                 services.AddSingleton<AppActionExecutionService>();
+                services.AddHostedService<AppActionArtifactCleanupService>();
                 services.AddSingleton<RunnerDeploymentService>();
                 services.AddSingleton<RunnerBackendRegistry>();
                 services.AddSingleton<RunnerBackendProcessManager>();
