@@ -12,8 +12,8 @@ public sealed class AppActionDeploymentService
 {
     private const string DeploymentMetadataFileName = ".automaton-action-deployment.json";
     private static readonly TimeSpan DependencyPreparationTimeout = TimeSpan.FromMinutes(10);
-    private const int MaximumVersionsPerAction = 10;
-    private const long MaximumVersionBytesPerAction = 1L * 1024 * 1024 * 1024;
+    private const int DefaultMaximumVersionsPerAction = 10;
+    private const long DefaultMaximumVersionBytesPerAction = 1L * 1024 * 1024 * 1024;
     private readonly RunnerWorkspaceService workspace;
     private readonly ILogger logger = Log.ForContext<AppActionDeploymentService>();
 
@@ -382,10 +382,12 @@ public sealed class AppActionDeploymentService
             .Select(path => new { Path = path, Created = Directory.GetCreationTimeUtc(path), Size = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length) })
             .OrderByDescending(item => item.Created).ToList();
         var retainedBytes = 0L;
+        var maximumVersions = ReadPositiveIntEnvironment("AUTOMATON_ACTION_MAX_VERSIONS", DefaultMaximumVersionsPerAction, 1, 1000);
+        var maximumBytes = ReadPositiveLongEnvironment("AUTOMATON_ACTION_MAX_VERSION_BYTES", DefaultMaximumVersionBytesPerAction, 1L * 1024 * 1024, 100L * 1024 * 1024 * 1024);
         for (var index = 0; index < versions.Count; index++)
         {
             var version = versions[index];
-            if (index < MaximumVersionsPerAction && retainedBytes + version.Size <= MaximumVersionBytesPerAction)
+            if (index < maximumVersions && retainedBytes + version.Size <= maximumBytes)
             {
                 retainedBytes += version.Size;
                 continue;
@@ -393,6 +395,16 @@ public sealed class AppActionDeploymentService
             Directory.Delete(version.Path, recursive: true);
         }
     }
+
+    private static int ReadPositiveIntEnvironment(string name, int fallback, int minimum, int maximum)
+        => int.TryParse(Environment.GetEnvironmentVariable(name), out var value)
+            ? Math.Clamp(value, minimum, maximum)
+            : fallback;
+
+    private static long ReadPositiveLongEnvironment(string name, long fallback, long minimum, long maximum)
+        => long.TryParse(Environment.GetEnvironmentVariable(name), out var value)
+            ? Math.Clamp(value, minimum, maximum)
+            : fallback;
 
     private static string EnsureChildPath(string root, string child)
     {
