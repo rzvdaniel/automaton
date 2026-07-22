@@ -64,14 +64,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             logger.LogInformation("Ignoring duplicate infrastructure Action request for terminal operation {OperationId}", message.OperationId);
             return;
         }
-
-
-        if (!await TryClaimExecutionAsync(deployment, cancellationToken))
-        {
-            logger.LogInformation("Ignoring duplicate infrastructure Action request for claimed operation {OperationId} in state {Status}", message.OperationId, deployment.Status);
-            return;
-        }
-
         var secretSanitizer = SecretValueSanitizer.Empty;
         try
         {
@@ -99,23 +91,6 @@ public sealed class InfrastructureActionProvisioningHandler(
                 && message.SecretGrantIds.Count == 0)
                 throw new UnauthorizedAccessException("The infrastructure Action has no enrollment credential grant.");
 
-            ExecutionSecretLease? secretLease = null;
-            if (message.SecretGrantIds.Count > 0)
-            {
-                secretLease = await secretGrantService.LeaseAsync(
-                    new SecretGrantScope(
-                        message.OperationId,
-                        InfrastructureAppTrust.PlatformAppId,
-                        message.ActionKey,
-                        infrastructureRunner.Id,
-                        host.Id,
-                        SecretOwnerTypes.HostedRunner,
-                        hostedRunner.Id),
-                    message.SecretGrantIds,
-                    cancellationToken);
-                secretSanitizer = new SecretValueSanitizer(secretLease.EnvironmentVariables.Values);
-            }
-
             using var inputDocument = JsonDocument.Parse(message.InputJson);
             var now = DateTime.UtcNow;
             var execution = new AppModuleExecution
@@ -134,8 +109,28 @@ public sealed class InfrastructureActionProvisioningHandler(
                 ExecutionDeadlineUtc = now.AddSeconds(module.TimeoutSeconds + 300),
                 CorrelationId = $"hosted-runner-operation:{message.OperationId:N}"
             };
-            db.AppModuleExecutions.Add(execution);
-            await db.SaveChangesAsync(cancellationToken);
+            if (!await TryClaimAndCreateExecutionAsync(deployment, execution, cancellationToken))
+            {
+                logger.LogInformation("Ignoring duplicate infrastructure Action request for claimed operation {OperationId} in state {Status}", message.OperationId, deployment.Status);
+                return;
+            }
+
+            ExecutionSecretLease? secretLease = null;
+            if (message.SecretGrantIds.Count > 0)
+            {
+                secretLease = await secretGrantService.LeaseAsync(
+                    new SecretGrantScope(
+                        message.OperationId,
+                        InfrastructureAppTrust.PlatformAppId,
+                        message.ActionKey,
+                        infrastructureRunner.Id,
+                        host.Id,
+                        SecretOwnerTypes.HostedRunner,
+                        hostedRunner.Id),
+                    message.SecretGrantIds,
+                    cancellationToken);
+                secretSanitizer = new SecretValueSanitizer(secretLease.EnvironmentVariables.Values);
+            }
 
             var result = await hub.Clients.Client(infrastructureRunner.ConnectionId!)
                 .InvokeAsync<AppActionExecutionResult>(
@@ -197,6 +192,15 @@ public sealed class InfrastructureActionProvisioningHandler(
 
             await ApplySuccessfulOperationAsync(hostedRunner, deployment, message.ActionKey, root, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (LifecycleClaimPersistenceException ex)
+        {
+            db.ChangeTracker.Clear();
+            logger.LogWarning(
+                "Infrastructure Action claim persistence failed for operation {OperationId}; CAP will retry. {ExceptionType}",
+                message.OperationId,
+                ex.InnerException?.GetType().Name ?? ex.GetType().Name);
+            throw;
         }
         catch (Exception ex)
         {
@@ -309,7 +313,10 @@ public sealed class InfrastructureActionProvisioningHandler(
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
 
-    private async Task<bool> TryClaimExecutionAsync(HostedRunnerDeployment deployment, CancellationToken cancellationToken)
+    internal async Task<bool> TryClaimAndCreateExecutionAsync(
+        HostedRunnerDeployment deployment,
+        AppModuleExecution execution,
+        CancellationToken cancellationToken)
     {
         var claimable = new[]
         {
@@ -318,23 +325,42 @@ public sealed class InfrastructureActionProvisioningHandler(
             HostedRunnerDeploymentStatuses.Running // Compatibility with operations queued before this rollout.
         };
 
-        if (db.Database.IsRelational())
+        await using var transaction = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        try
         {
-            var affected = await db.HostedRunnerDeployments
-                .Where(x => x.Id == deployment.Id && claimable.Contains(x.Status))
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Executing),
-                    cancellationToken);
-            if (affected != 1) return false;
-        }
-        else if (!claimable.Contains(deployment.Status, StringComparer.Ordinal))
-        {
-            return false;
-        }
+            if (db.Database.IsRelational())
+            {
+                var affected = await db.HostedRunnerDeployments
+                    .Where(x => x.Id == deployment.Id && claimable.Contains(x.Status))
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Executing),
+                        cancellationToken);
+                if (affected != 1)
+                {
+                    await transaction!.RollbackAsync(cancellationToken);
+                    return false;
+                }
+            }
+            else if (!claimable.Contains(deployment.Status, StringComparer.Ordinal))
+            {
+                return false;
+            }
 
-        deployment.Status = HostedRunnerDeploymentStatuses.Executing;
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
+            deployment.Status = HostedRunnerDeploymentStatuses.Executing;
+            db.AppModuleExecutions.Add(execution);
+            await db.SaveChangesAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            if (transaction != null) await transaction.RollbackAsync(CancellationToken.None);
+            throw new LifecycleClaimPersistenceException(
+                "The hosted Runner lifecycle claim and execution record could not be committed.",
+                ex);
+        }
     }
 
     private static string RedactCredentialPatterns(string value)
@@ -344,3 +370,6 @@ public sealed class InfrastructureActionProvisioningHandler(
             "[REDACTED]",
             RegexOptions.CultureInvariant);
 }
+
+internal sealed class LifecycleClaimPersistenceException(string message, Exception innerException)
+    : InvalidOperationException(message, innerException);

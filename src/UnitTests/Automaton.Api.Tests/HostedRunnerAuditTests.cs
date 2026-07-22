@@ -11,6 +11,8 @@ using Automaton.Messaging.Events;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -335,6 +337,88 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task InfrastructureActionClaim_RollsBackWhenExecutionInsertFailsAndRetrySucceeds()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
+        await connection.OpenAsync();
+        var interceptor = new FailExecutionInsertOnceInterceptor();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE HostedRunnerDeployments (
+                Id TEXT NOT NULL PRIMARY KEY,
+                HostedRunnerId TEXT NOT NULL,
+                Action TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                CommandPreview TEXT NULL,
+                Logs TEXT NULL,
+                Error TEXT NULL,
+                StartedAt TEXT NOT NULL,
+                FinishedAt TEXT NULL
+            );
+            CREATE TABLE AppModuleExecutions (
+                Id TEXT NOT NULL PRIMARY KEY,
+                HostedRunnerOperationId TEXT NULL,
+                AppId TEXT NOT NULL,
+                ModuleType TEXT NOT NULL,
+                ModuleKey TEXT NOT NULL,
+                RunnerId TEXT NULL,
+                TriggerType TEXT NOT NULL,
+                RequestedByUserId TEXT NULL,
+                Status TEXT NOT NULL,
+                DeploymentHash TEXT NULL,
+                ExitCode INTEGER NULL,
+                ErrorCode TEXT NULL,
+                FailureSummary TEXT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                StartedAtUtc TEXT NULL,
+                ExecutionDeadlineUtc TEXT NULL,
+                CompletedAtUtc TEXT NULL,
+                LogsAvailableUntilUtc TEXT NULL,
+                ResultAvailableUntilUtc TEXT NULL,
+                CorrelationId TEXT NULL
+            );
+            CREATE UNIQUE INDEX IX_AppModuleExecutions_HostedRunnerOperationId
+                ON AppModuleExecutions (HostedRunnerOperationId);
+            """);
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = Guid.NewGuid(),
+            Action = HostedRunnerDeploymentActions.Restart,
+            Status = HostedRunnerDeploymentStatuses.Queued,
+            StartedAt = DateTime.UtcNow
+        };
+        db.HostedRunnerDeployments.Add(deployment);
+        await db.SaveChangesAsync();
+        var handler = new InfrastructureActionProvisioningHandler(
+            db, null!, null!, null!, null!, null!,
+            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+
+        Assert.ThrowsAsync<LifecycleClaimPersistenceException>(() =>
+            handler.TryClaimAndCreateExecutionAsync(
+                deployment,
+                CreateInfrastructureExecution(deployment.Id),
+                CancellationToken.None));
+
+        db.ChangeTracker.Clear();
+        var retryDeployment = await db.HostedRunnerDeployments.SingleAsync(x => x.Id == deployment.Id);
+        Assert.That(retryDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
+
+        var claimed = await handler.TryClaimAndCreateExecutionAsync(
+            retryDeployment,
+            CreateInfrastructureExecution(deployment.Id),
+            CancellationToken.None);
+
+        Assert.That(claimed, Is.True);
+        Assert.That(retryDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Executing));
+        Assert.That(await db.AppModuleExecutions.CountAsync(x => x.HostedRunnerOperationId == deployment.Id), Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task RunnerRegistration_CorrelatesByHostedRunnerIdAndCompletesReprovision()
     {
         using var db = CreateDbContext();
@@ -622,6 +706,18 @@ public class HostedRunnerAuditTests
         return new ApplicationDbContext(options);
     }
 
+    private static AppModuleExecution CreateInfrastructureExecution(Guid operationId) => new()
+    {
+        Id = Guid.NewGuid(),
+        HostedRunnerOperationId = operationId,
+        AppId = InfrastructureAppTrust.PlatformAppId,
+        ModuleType = AppModuleTypes.Action,
+        ModuleKey = "restart-hosted-runner",
+        TriggerType = AppModuleTriggerTypes.Internal,
+        Status = AppModuleExecutionStatuses.Running,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
     private static void SeedUser(ApplicationDbContext db, Guid userId, Guid planId)
     {
         db.Users.Add(new ApplicationUser
@@ -871,6 +967,26 @@ public class HostedRunnerAuditTests
         public T Value => value;
 
         public T Get(string? name) => value;
+    }
+
+    private sealed class FailExecutionInsertOnceInterceptor : SaveChangesInterceptor
+    {
+        private bool failNext = true;
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (failNext && eventData.Context!.ChangeTracker.Entries<AppModuleExecution>()
+                    .Any(x => x.State == EntityState.Added))
+            {
+                failNext = false;
+                throw new InvalidOperationException("Simulated execution insert failure.");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
     }
 
     private sealed class NoOpAuditEventService : IAuditEventService

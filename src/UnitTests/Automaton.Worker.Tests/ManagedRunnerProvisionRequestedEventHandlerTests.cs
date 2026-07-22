@@ -50,9 +50,9 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         db.RunnerHosts.Add(host);
         db.HostedRunners.Add(runner);
         await db.SaveChangesAsync();
-        var publisher = new RecordingPublisher();
+        var publisher = new RecordingPublisher { FailNext = true };
         var handler = new ManagedRunnerProvisionRequestedEventHandler(
-            db, publisher,
+            db, publisher, new RollbackTransactionalEventExecutor(db),
             new OptionsSnapshot(new HostedRunnerOptions
             {
                 Enabled = true, DockerImage = "automaton/runner:test",
@@ -67,6 +67,9 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             HostedRunnerId = runner.Id, UserId = runner.UserId, RunnerHostId = host.Id,
             SecretGrantIds = [grantId], CorrelationId = "correlation"
         };
+        Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(durableRequest));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
+
         await handler.HandleAsync(durableRequest);
 
         var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
@@ -81,15 +84,69 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
 
         await handler.HandleAsync(durableRequest);
         Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
+
+        var disabledDeployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = runner.Id,
+            Action = HostedRunnerDeploymentActions.Reprovision,
+            Status = HostedRunnerDeploymentStatuses.Queued
+        };
+        runner.Deployments.Add(disabledDeployment);
+        db.HostedRunnerDeployments.Add(disabledDeployment);
+        await db.SaveChangesAsync();
+        var disabledHandler = new ManagedRunnerProvisionRequestedEventHandler(
+            db, publisher, new RollbackTransactionalEventExecutor(db),
+            new OptionsSnapshot(new HostedRunnerOptions { Enabled = false }),
+            NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
+
+        await disabledHandler.HandleAsync(new ManagedRunnerProvisionRequestedEvent
+        {
+            OperationId = disabledDeployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = host.Id
+        });
+
+        Assert.That(disabledDeployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
+        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
     }
 
     private sealed class RecordingPublisher : IEventPublisher
     {
         public List<object> Messages { get; } = [];
+        public bool FailNext { get; set; }
         public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
         {
+            if (FailNext)
+            {
+                FailNext = false;
+                throw new InvalidOperationException("Simulated outbox write failure.");
+            }
             Messages.Add(message);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RollbackTransactionalEventExecutor(ApplicationDbContext db) : ITransactionalEventExecutor
+    {
+        public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+        {
+            var snapshots = db.ChangeTracker.Entries()
+                .ToDictionary(entry => entry, entry => entry.CurrentValues.Clone());
+            try
+            {
+                await operation(cancellationToken);
+            }
+            catch
+            {
+                foreach (var (entry, values) in snapshots)
+                {
+                    entry.CurrentValues.SetValues(values);
+                    entry.State = EntityState.Modified;
+                }
+                await db.SaveChangesAsync(CancellationToken.None);
+                throw;
+            }
         }
     }
 

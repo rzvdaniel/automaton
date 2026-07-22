@@ -57,6 +57,7 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
         .SetApplicationName("Automaton.Worker");
 }
 builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
+builder.Services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();

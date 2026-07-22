@@ -13,6 +13,7 @@ namespace Automaton.Worker.Handlers;
 public sealed class ManagedRunnerProvisionRequestedEventHandler(
     ApplicationDbContext dbContext,
     IEventPublisher eventPublisher,
+    ITransactionalEventExecutor transactionalEventExecutor,
     IOptionsSnapshot<HostedRunnerOptions> options,
     ILogger<ManagedRunnerProvisionRequestedEventHandler> logger) : IEventHandler<ManagedRunnerProvisionRequestedEvent>
 {
@@ -41,12 +42,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         if (deployment == null)
         {
             logger.LogWarning("Managed runner provisioning operation {OperationId} no longer exists", message.OperationId);
-            return;
-        }
-
-        if (!await TryClaimDispatchAsync(deployment, cancellationToken))
-        {
-            logger.LogInformation("Ignoring duplicate managed runner provisioning request for operation {OperationId} in state {Status}", deployment.Id, deployment.Status);
             return;
         }
 
@@ -97,13 +92,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             runnerName = hostedRunner.Name
         });
 
-        hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-        hostedRunner.LastError = null;
-        hostedRunner.UpdatedAt = DateTime.UtcNow;
-        deployment.Error = null;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+        var infrastructureRequest = new InfrastructureActionExecutionRequestedEvent
         {
             OperationId = deployment.Id,
             HostedRunnerId = hostedRunner.Id,
@@ -115,7 +104,26 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             InputJson = input,
             SecretGrantIds = message.SecretGrantIds,
             CorrelationId = message.CorrelationId
+        };
+
+        var claimed = false;
+        await transactionalEventExecutor.ExecuteAsync(async transactionCancellationToken =>
+        {
+            claimed = await TryClaimDispatchAsync(deployment, transactionCancellationToken);
+            if (!claimed) return;
+
+            hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+            hostedRunner.LastError = null;
+            hostedRunner.UpdatedAt = DateTime.UtcNow;
+            deployment.Error = null;
+            await dbContext.SaveChangesAsync(transactionCancellationToken);
+            await eventPublisher.PublishAsync(infrastructureRequest, transactionCancellationToken);
         }, cancellationToken);
+
+        if (!claimed)
+        {
+            logger.LogInformation("Ignoring duplicate managed runner provisioning request for operation {OperationId} in state {Status}", deployment.Id, deployment.Status);
+        }
     }
 
     private async Task FailAsync(
