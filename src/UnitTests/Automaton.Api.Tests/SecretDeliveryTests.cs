@@ -1,4 +1,5 @@
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
@@ -187,6 +188,25 @@ public sealed class SecretDeliveryTests
         var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
         persistedVersion.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
         persistedGrant.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        for (var index = 0; index < 500; index++)
+        {
+            db.ExecutionSecretGrants.Add(new ExecutionSecretGrant
+            {
+                Id = Guid.NewGuid(),
+                OperationId = Guid.NewGuid(),
+                SecretVersionId = persistedVersion.Id,
+                AppId = persistedGrant.AppId,
+                ActionKey = persistedGrant.ActionKey,
+                RunnerId = persistedGrant.RunnerId,
+                RunnerHostId = persistedGrant.RunnerHostId,
+                DeliveryType = persistedGrant.DeliveryType,
+                DeliveryPolicy = SecretDeliveryPolicies.SingleDelivery,
+                TargetName = $"BATCHED_TOKEN_{index}",
+                MaximumReads = 1,
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            });
+        }
         await db.SaveChangesAsync();
 
         using var services = new ServiceCollection()
@@ -198,10 +218,10 @@ public sealed class SecretDeliveryTests
         await cleanup.CleanupAsync(CancellationToken.None);
 
         Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
-        Assert.That((await db.ExecutionSecretGrants.SingleAsync()).RevokedAtUtc, Is.Not.Null);
+        Assert.That(await db.ExecutionSecretGrants.CountAsync(x => x.RevokedAtUtc != null), Is.EqualTo(501));
         Assert.That(await db.SecretDefinitions.CountAsync(), Is.EqualTo(1));
         Assert.That(await db.SecretVersions.CountAsync(), Is.EqualTo(1));
-        Assert.That(await db.ExecutionSecretGrants.CountAsync(), Is.EqualTo(1));
+        Assert.That(await db.ExecutionSecretGrants.CountAsync(), Is.EqualTo(501));
     }
 
     private static SecretGrantScope CreateScope(Guid ownerId) => new(
