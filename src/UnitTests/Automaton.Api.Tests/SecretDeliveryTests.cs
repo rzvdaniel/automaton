@@ -112,7 +112,8 @@ public sealed class SecretDeliveryTests
             scope,
             "RETRYABLE_CREDENTIAL",
             DateTime.UtcNow.AddMinutes(5),
-            CancellationToken.None);
+            CancellationToken.None,
+            SecretDeliveryPolicies.RetryableDelivery);
 
         await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
         Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -124,6 +125,41 @@ public sealed class SecretDeliveryTests
         var retry = await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
         Assert.That(retry.EnvironmentVariables["RETRYABLE_CREDENTIAL"], Is.EqualTo("temporary-value"));
         Assert.That(persistedGrant.ReadCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task SingleDelivery_DoesNotResolveAgainAfterAmbiguousDispatch()
+    {
+        await using var db = CreateDbContext();
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var store = new SecretStore(db, protector);
+        var grants = new ExecutionSecretGrantService(db, protector);
+        var ownerId = Guid.NewGuid();
+        var scope = CreateScope(ownerId);
+        var version = await store.CreateVersionAsync(
+            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+            "single-disclosure",
+            "single-delivery-value",
+            DateTime.UtcNow.AddMinutes(10),
+            CancellationToken.None);
+        var grantId = await grants.CreateGrantAsync(
+            version.SecretVersionId,
+            scope,
+            "SINGLE_DELIVERY_CREDENTIAL",
+            DateTime.UtcNow.AddMinutes(5),
+            CancellationToken.None,
+            SecretDeliveryPolicies.SingleDelivery);
+
+        await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
+        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        Assert.That(persistedGrant.DeliveredAtUtc, Is.Not.Null);
+        Assert.That(persistedGrant.ConsumedAtUtc, Is.Null);
+        persistedGrant.LeaseExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await db.SaveChangesAsync();
+
+        Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            grants.LeaseAsync(scope, [grantId], CancellationToken.None));
+        Assert.That(persistedGrant.ReadCount, Is.EqualTo(1));
     }
 
     [Test]

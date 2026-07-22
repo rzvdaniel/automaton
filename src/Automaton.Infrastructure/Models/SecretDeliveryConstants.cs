@@ -14,3 +14,9 @@ public static class SecretDeliveryTypes
 {
     public const string EnvironmentVariable = "environmentVariable";
 }
+
+public static class SecretDeliveryPolicies
+{
+    public const string SingleDelivery = "singleDelivery";
+    public const string RetryableDelivery = "retryableDelivery";
+}

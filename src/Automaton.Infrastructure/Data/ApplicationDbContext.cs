@@ -376,6 +376,10 @@ namespace Automaton.Api.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ActionKey).IsRequired().HasMaxLength(64);
                 entity.Property(e => e.DeliveryType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.DeliveryPolicy)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(SecretDeliveryPolicies.SingleDelivery);
                 entity.Property(e => e.TargetName).IsRequired().HasMaxLength(200);
                 entity.HasIndex(e => new { e.OperationId, e.RevokedAtUtc, e.ConsumedAtUtc });
                 entity.HasIndex(e => new { e.ExpiresAtUtc, e.RevokedAtUtc });

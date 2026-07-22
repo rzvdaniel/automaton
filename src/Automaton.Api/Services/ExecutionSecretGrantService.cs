@@ -21,7 +21,8 @@ public sealed partial class ExecutionSecretGrantService(
         SecretGrantScope scope,
         string targetName,
         DateTime expiresAtUtc,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string deliveryPolicy = SecretDeliveryPolicies.SingleDelivery)
     {
         ValidateScope(scope);
         if (!EnvironmentTargetRegex().IsMatch(targetName))
@@ -29,6 +30,8 @@ public sealed partial class ExecutionSecretGrantService(
         var now = DateTime.UtcNow;
         if (expiresAtUtc <= now)
             throw new ArgumentException("The grant expiry must be in the future.", nameof(expiresAtUtc));
+        if (deliveryPolicy is not (SecretDeliveryPolicies.SingleDelivery or SecretDeliveryPolicies.RetryableDelivery))
+            throw new ArgumentException("The secret delivery policy is invalid.", nameof(deliveryPolicy));
 
         var version = await db.SecretVersions
             .Include(x => x.SecretDefinition)
@@ -48,8 +51,9 @@ public sealed partial class ExecutionSecretGrantService(
             RunnerId = scope.RunnerId,
             RunnerHostId = scope.RunnerHostId,
             DeliveryType = SecretDeliveryTypes.EnvironmentVariable,
+            DeliveryPolicy = deliveryPolicy,
             TargetName = targetName,
-            MaximumReads = MaximumResolutionAttempts,
+            MaximumReads = deliveryPolicy == SecretDeliveryPolicies.SingleDelivery ? 1 : MaximumResolutionAttempts,
             CreatedAtUtc = now,
             ExpiresAtUtc = expiresAtUtc
         };
@@ -101,17 +105,21 @@ public sealed partial class ExecutionSecretGrantService(
                             && x.ConsumedAtUtc == null
                             && x.RevokedAtUtc == null
                             && x.ExpiresAtUtc > now
+                            && (x.DeliveryPolicy != SecretDeliveryPolicies.SingleDelivery || x.DeliveredAtUtc == null)
                             && (x.LeaseExpiresAtUtc == null || x.LeaseExpiresAtUtc <= now)
                             && x.ReadCount < x.MaximumReads)
                         .ExecuteUpdateAsync(setters => setters
                             .SetProperty(x => x.LeasedAtUtc, now)
                             .SetProperty(x => x.LeaseExpiresAtUtc, leaseExpiresAtUtc)
+                            .SetProperty(x => x.DeliveredAtUtc, x => x.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery ? now : x.DeliveredAtUtc)
                             .SetProperty(x => x.ReadCount, x => x.ReadCount + 1),
                             cancellationToken);
                     if (claimed != 1)
                         throw new UnauthorizedAccessException("A secret grant could not be leased.");
                     grant.LeasedAtUtc = now;
                     grant.LeaseExpiresAtUtc = leaseExpiresAtUtc;
+                    if (grant.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery)
+                        grant.DeliveredAtUtc = now;
                     grant.ReadCount++;
                 }
             }
@@ -121,6 +129,8 @@ public sealed partial class ExecutionSecretGrantService(
                 {
                     grant.LeasedAtUtc = now;
                     grant.LeaseExpiresAtUtc = leaseExpiresAtUtc;
+                    if (grant.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery)
+                        grant.DeliveredAtUtc = now;
                     grant.ReadCount++;
                 }
                 await db.SaveChangesAsync(cancellationToken);
@@ -183,6 +193,8 @@ public sealed partial class ExecutionSecretGrantService(
             throw new UnauthorizedAccessException("A secret grant does not match the requested execution scope.");
         if (!string.Equals(grant.DeliveryType, SecretDeliveryTypes.EnvironmentVariable, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("The secret delivery type is not supported.");
+        if (grant.DeliveryPolicy == SecretDeliveryPolicies.SingleDelivery && grant.DeliveredAtUtc.HasValue)
+            throw new UnauthorizedAccessException("A single-delivery secret grant was already disclosed.");
         if (grant.ExpiresAtUtc <= now || grant.RevokedAtUtc.HasValue || grant.ConsumedAtUtc.HasValue)
             throw new UnauthorizedAccessException("A secret grant is expired, revoked, or already consumed.");
         if (grant.LeaseExpiresAtUtc > now)

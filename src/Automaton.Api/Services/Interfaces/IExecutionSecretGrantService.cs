@@ -9,7 +9,8 @@ public interface IExecutionSecretGrantService
         SecretGrantScope scope,
         string targetName,
         DateTime expiresAtUtc,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string deliveryPolicy = SecretDeliveryPolicies.SingleDelivery);
 
     Task<ExecutionSecretLease> LeaseAsync(
         SecretGrantScope scope,

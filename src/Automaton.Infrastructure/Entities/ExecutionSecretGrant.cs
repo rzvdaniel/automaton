@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Automaton.Api.Models;
 
 namespace Automaton.Api.Entities;
 
@@ -21,6 +22,9 @@ public sealed class ExecutionSecretGrant
     [Required, MaxLength(40)]
     public string DeliveryType { get; set; } = string.Empty;
 
+    [Required, MaxLength(40)]
+    public string DeliveryPolicy { get; set; } = SecretDeliveryPolicies.SingleDelivery;
+
     [Required, MaxLength(200)]
     public string TargetName { get; set; } = string.Empty;
 
@@ -30,6 +34,7 @@ public sealed class ExecutionSecretGrant
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime? LeasedAtUtc { get; set; }
     public DateTime? LeaseExpiresAtUtc { get; set; }
+    public DateTime? DeliveredAtUtc { get; set; }
     public DateTime? ConsumedAtUtc { get; set; }
     public DateTime? RevokedAtUtc { get; set; }
 }

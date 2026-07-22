@@ -221,7 +221,8 @@ public sealed class RunnerEnrollmentService(
                     hostedRunner.Id),
                 "AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN",
                 expiresAtUtc,
-                cancellationToken);
+                cancellationToken,
+                SecretDeliveryPolicies.SingleDelivery);
             await db.SaveChangesAsync(cancellationToken);
 
             await auditEventService.WriteAsync(new AuditEventWriteRequest

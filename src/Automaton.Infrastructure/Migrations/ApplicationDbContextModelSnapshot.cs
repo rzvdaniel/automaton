@@ -1214,6 +1214,16 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<DateTime?>("DeliveredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DeliveryPolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("singleDelivery");
+
                     b.Property<string>("DeliveryType")
                         .IsRequired()
                         .HasMaxLength(40)
