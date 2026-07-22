@@ -255,6 +255,84 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task RunnerRegistration_CorrelatesByHostedRunnerIdAndCompletesReprovision()
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db);
+        SeedUser(db, userId, planId);
+        var pendingResources = new HostedRunnerResources
+        {
+            CpuLimit = 2,
+            MemoryLimitMb = 2048,
+            MemoryReservationMb = 1024,
+            PidsLimit = 256,
+            DiskLimitMb = 8192
+        };
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Name = "old-display-name",
+            ContainerName = "automaton-hosted-runner-registration-test",
+            Status = HostedRunnerStatuses.Provisioning,
+            SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                SourceSpecificationRevision = 1,
+                Resources = new HostedRunnerResources { CpuLimit = 1, MemoryLimitMb = 1024, DiskLimitMb = 4096 }
+            },
+            PendingSpecificationSnapshot = new HostedRunnerSpecificationSnapshot
+            {
+                SourceSpecificationRevision = 2,
+                Resources = pendingResources
+            },
+            CreatedAt = DateTime.UtcNow
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Reprovision,
+            Status = HostedRunnerDeploymentStatuses.Running,
+            StartedAt = DateTime.UtcNow
+        };
+        hostedRunner.Deployments.Add(deployment);
+        db.HostedRunners.Add(hostedRunner);
+        db.SaveChanges();
+
+        var httpContextAccessor = CreateHttpContextAccessor(userId, "runner-owner@automaton.test");
+        var userContext = new UserContextService(httpContextAccessor);
+        var audit = new AuditEventService(db, userContext, httpContextAccessor);
+        var runnerService = new RunnerService(
+            db,
+            userContext,
+            automatonHub: null!,
+            authorizationService: null!,
+            new ApiInstanceIdentityService(),
+            audit,
+            applicationEventService: null!,
+            managedRunnerAppAssignmentService: null!);
+        var runnerId = Guid.NewGuid();
+
+        await runnerService.Add(new RunnerDetails
+        {
+            Id = runnerId,
+            Name = "new-display-name",
+            Purpose = Automaton.Core.Enums.RunnerPurposes.Managed,
+            HostedRunnerId = hostedRunner.Id
+        });
+
+        Assert.That(hostedRunner.RunnerId, Is.EqualTo(runnerId));
+        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Running));
+        Assert.That(hostedRunner.PendingSpecificationSnapshot, Is.Null);
+        Assert.That(hostedRunner.SpecificationSnapshot.SourceSpecificationRevision, Is.EqualTo(2));
+        Assert.That(hostedRunner.SpecificationSnapshot.Resources.MemoryLimitMb, Is.EqualTo(2048));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
+        Assert.That(deployment.FinishedAt, Is.Not.Null);
+        Assert.That(await db.AuditEvents.AnyAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionSucceeded), Is.True);
+    }
+
+    [Test]
     public async Task PrepareProvisioningAsync_DoesNotMoveRunningRunnerWhenPlanSpecificationChanges()
     {
         using var db = CreateDbContext();
