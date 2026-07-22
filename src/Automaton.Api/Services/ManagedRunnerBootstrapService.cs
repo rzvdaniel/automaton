@@ -137,6 +137,7 @@ public sealed class ManagedRunnerBootstrapService
         await eventPublisher.PublishAsync(
             new ManagedRunnerProvisionRequestedEvent
             {
+                OperationId = preparation.OperationId,
                 HostedRunnerId = preparation.HostedRunner.Id,
                 UserId = ownerId,
                 RunnerHostId = preparation.HostedRunner.RunnerHostId ?? Guid.Empty,

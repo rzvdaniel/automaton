@@ -44,7 +44,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         {
             Id = Guid.NewGuid(), HostedRunnerId = runner.Id,
             Action = HostedRunnerDeploymentActions.Provision,
-            Status = HostedRunnerDeploymentStatuses.Running
+            Status = HostedRunnerDeploymentStatuses.Queued
         };
         runner.Deployments.Add(deployment);
         db.RunnerHosts.Add(host);
@@ -63,6 +63,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         var grantId = Guid.NewGuid();
         var durableRequest = new ManagedRunnerProvisionRequestedEvent
         {
+            OperationId = deployment.Id,
             HostedRunnerId = runner.Id, UserId = runner.UserId, RunnerHostId = host.Id,
             SecretGrantIds = [grantId], CorrelationId = "correlation"
         };
@@ -76,7 +77,10 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("ak_runner_"));
         Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("EnrollmentToken"));
         Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
-        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));
+
+        await handler.HandleAsync(durableRequest);
+        Assert.That(publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Count(), Is.EqualTo(1));
     }
 
     private sealed class RecordingPublisher : IEventPublisher

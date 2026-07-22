@@ -239,7 +239,7 @@ public class RunnerService
         var deployment = hostedRunner.Deployments
             .Where(x =>
                 (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
-                && x.Status == HostedRunnerDeploymentStatuses.Running)
+                && x.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration)
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefault();
 
@@ -282,7 +282,7 @@ public class RunnerService
         var deployment = hostedRunner.Deployments
             .Where(x =>
                 (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
-                && (x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.Succeeded))
+                && (x.Status == HostedRunnerDeploymentStatuses.WaitingForRegistration || x.Status == HostedRunnerDeploymentStatuses.Succeeded))
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefault();
 

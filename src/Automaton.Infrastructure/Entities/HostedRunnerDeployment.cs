@@ -13,6 +13,7 @@ public class HostedRunnerDeployment
 
     public Guid HostedRunnerId { get; set; }
     public virtual HostedRunner HostedRunner { get; set; } = null!;
+    public virtual AppModuleExecution? AppModuleExecution { get; set; }
 
     [Required, MaxLength(40)]
     public string Action { get; set; } = HostedRunnerDeploymentActions.Provision;

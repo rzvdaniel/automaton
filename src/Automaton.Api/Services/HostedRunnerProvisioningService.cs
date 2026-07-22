@@ -206,7 +206,7 @@ public class HostedRunnerProvisioningService
 
         var deployment = AddDeployment(
             hostedRunner,
-            HostedRunnerDeploymentStatuses.Running,
+            HostedRunnerDeploymentStatuses.Queued,
             $"Trusted infrastructure Action: {(createdHostedRunner ? "provision-hosted-runner" : "reprovision-hosted-runner")} on Runner Host '{host.Name}'.",
             options.Enabled
                 ? "Managed runner provisioning queued."
@@ -233,7 +233,7 @@ public class HostedRunnerProvisioningService
                 await capacityTransaction.CommitAsync(cancellationToken);
             }
 
-            return new HostedRunnerPreparationResult(hostedRunner, secretGrantIds, true);
+            return new HostedRunnerPreparationResult(hostedRunner, secretGrantIds, true, deployment.Id);
         }
         finally
         {
@@ -261,6 +261,7 @@ public class HostedRunnerProvisioningService
 
         await eventPublisher.PublishAsync(new ManagedRunnerProvisionRequestedEvent
         {
+            OperationId = preparation.OperationId,
             HostedRunnerId = hostedRunner.Id,
             UserId = hostedRunner.UserId,
             RunnerHostId = hostedRunner.RunnerHostId ?? Guid.Empty,
@@ -370,7 +371,9 @@ public class HostedRunnerProvisioningService
             Logs = status is HostedRunnerDeploymentStatuses.Failed ? null : message,
             Error = status is HostedRunnerDeploymentStatuses.Failed ? message : null,
             StartedAt = DateTime.UtcNow,
-            FinishedAt = status is HostedRunnerDeploymentStatuses.Running ? null : DateTime.UtcNow
+            FinishedAt = status is HostedRunnerDeploymentStatuses.Failed or HostedRunnerDeploymentStatuses.Skipped
+                ? DateTime.UtcNow
+                : null
         };
         db.HostedRunnerDeployments.Add(deployment);
         return deployment;
@@ -517,4 +520,5 @@ public class HostedRunnerProvisioningService
 public sealed record HostedRunnerPreparationResult(
     HostedRunner HostedRunner,
     IReadOnlyList<Guid> SecretGrantIds,
-    bool ShouldPublishProvisionRequest);
+    bool ShouldPublishProvisionRequest,
+    Guid OperationId = default);

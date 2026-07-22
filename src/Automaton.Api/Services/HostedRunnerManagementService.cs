@@ -70,7 +70,7 @@ public class HostedRunnerManagementService
         var deployment = AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentActions.Deprovision,
-            HostedRunnerDeploymentStatuses.Running,
+            HostedRunnerDeploymentStatuses.Queued,
             "Trusted infrastructure Action: delete-hosted-runner.",
             "Hosted runner deletion requested.");
         await db.SaveChangesAsync(cancellationToken);
@@ -129,7 +129,7 @@ public class HostedRunnerManagementService
         var deployment = AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentActions.Restart,
-            HostedRunnerDeploymentStatuses.Running,
+            HostedRunnerDeploymentStatuses.Queued,
             "Trusted infrastructure Action: restart-hosted-runner.",
             "Restart requested.");
 
@@ -240,7 +240,9 @@ public class HostedRunnerManagementService
             Logs = status is HostedRunnerDeploymentStatuses.Failed ? null : message,
             Error = status is HostedRunnerDeploymentStatuses.Failed ? message : null,
             StartedAt = DateTime.UtcNow,
-            FinishedAt = status is HostedRunnerDeploymentStatuses.Running ? null : DateTime.UtcNow
+            FinishedAt = status is HostedRunnerDeploymentStatuses.Failed or HostedRunnerDeploymentStatuses.Skipped
+                ? DateTime.UtcNow
+                : null
         };
 
         db.HostedRunnerDeployments.Add(deployment);

@@ -42,6 +42,19 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
+        var existingExecution = await db.AppModuleExecutions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.HostedRunnerOperationId == message.OperationId, cancellationToken);
+        if (existingExecution != null)
+        {
+            logger.LogInformation(
+                "Ignoring duplicate infrastructure Action request for operation {OperationId}; execution {ExecutionId} already exists with status {Status}",
+                message.OperationId,
+                existingExecution.Id,
+                existingExecution.Status);
+            return;
+        }
+
         if (deployment.Status is HostedRunnerDeploymentStatuses.Succeeded
             or HostedRunnerDeploymentStatuses.Failed
             or HostedRunnerDeploymentStatuses.Skipped
@@ -49,6 +62,13 @@ public sealed class InfrastructureActionProvisioningHandler(
                 && string.Equals(deployment.Logs, WaitingForRegistrationLog, StringComparison.Ordinal))
         {
             logger.LogInformation("Ignoring duplicate infrastructure Action request for terminal operation {OperationId}", message.OperationId);
+            return;
+        }
+
+
+        if (!await TryClaimExecutionAsync(deployment, cancellationToken))
+        {
+            logger.LogInformation("Ignoring duplicate infrastructure Action request for claimed operation {OperationId} in state {Status}", message.OperationId, deployment.Status);
             return;
         }
 
@@ -101,6 +121,7 @@ public sealed class InfrastructureActionProvisioningHandler(
             var execution = new AppModuleExecution
             {
                 Id = Guid.NewGuid(),
+                HostedRunnerOperationId = message.OperationId,
                 AppId = InfrastructureAppTrust.PlatformAppId,
                 ModuleType = AppModuleTypes.Action,
                 ModuleKey = message.ActionKey,
@@ -225,6 +246,7 @@ public sealed class InfrastructureActionProvisioningHandler(
         {
             hostedRunner.ContainerId = result.TryGetProperty("containerId", out var containerId) ? containerId.GetString() : null;
             hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForRegistration;
             deployment.Logs = WaitingForRegistrationLog;
             return;
         }
@@ -286,6 +308,35 @@ public sealed class InfrastructureActionProvisioningHandler(
     }
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
+
+    private async Task<bool> TryClaimExecutionAsync(HostedRunnerDeployment deployment, CancellationToken cancellationToken)
+    {
+        var claimable = new[]
+        {
+            HostedRunnerDeploymentStatuses.Queued,
+            HostedRunnerDeploymentStatuses.Dispatching,
+            HostedRunnerDeploymentStatuses.Running // Compatibility with operations queued before this rollout.
+        };
+
+        if (db.Database.IsRelational())
+        {
+            var affected = await db.HostedRunnerDeployments
+                .Where(x => x.Id == deployment.Id && claimable.Contains(x.Status))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Executing),
+                    cancellationToken);
+            if (affected != 1) return false;
+        }
+        else if (!claimable.Contains(deployment.Status, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        deployment.Status = HostedRunnerDeploymentStatuses.Executing;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static string RedactCredentialPatterns(string value)
         => Regex.Replace(
             value ?? string.Empty,

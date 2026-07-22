@@ -203,6 +203,11 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.CorrelationId).HasMaxLength(128);
                 entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.AppId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
+                entity.HasIndex(e => e.HostedRunnerOperationId).IsUnique();
+                entity.HasOne(e => e.HostedRunnerOperation)
+                    .WithOne(e => e.AppModuleExecution)
+                    .HasForeignKey<AppModuleExecution>(e => e.HostedRunnerOperationId)
+                    .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
                 entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne<Runner>().WithMany().HasForeignKey(e => e.RunnerId).OnDelete(DeleteBehavior.SetNull);

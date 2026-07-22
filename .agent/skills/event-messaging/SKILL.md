@@ -78,6 +78,7 @@ Shared layer:
 - Use past-tense event names for facts that already happened, such as `UserRegisteredEvent`.
 - Never put plaintext credentials, tokens, private keys, connection strings, or decrypted secret values in event contracts. Durable events may carry only scoped secret/grant/reference IDs; resolve values just in time at the trusted execution boundary.
 - Treat event-contract rollouts as API/Worker compatibility changes. Mixed versions must fail closed when a required reference is absent, and deployment notes must identify the safe rollout order.
+- For `ManagedRunnerProvisionRequestedEvent.OperationId`, deploy the API producer before the Worker consumer. The old Worker tolerates the added field, while the new Worker deliberately rejects legacy messages without an operation ID; drain old provisioning messages before switching the Worker.
 
 ## Allowed dependency boundaries
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Automaton.Api.Data;
+using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
@@ -19,6 +20,12 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
 
     public async Task HandleAsync(ManagedRunnerProvisionRequestedEvent message, CancellationToken cancellationToken = default)
     {
+        if (message.OperationId == Guid.Empty)
+        {
+            logger.LogWarning("Managed runner provisioning request has no operation id and was rejected");
+            return;
+        }
+
         var hostedRunner = await dbContext.HostedRunners
             .Include(x => x.RunnerHost)
             .Include(x => x.Deployments)
@@ -30,16 +37,29 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             return;
         }
 
+        var deployment = hostedRunner.Deployments.FirstOrDefault(x => x.Id == message.OperationId);
+        if (deployment == null)
+        {
+            logger.LogWarning("Managed runner provisioning operation {OperationId} no longer exists", message.OperationId);
+            return;
+        }
+
+        if (!await TryClaimDispatchAsync(deployment, cancellationToken))
+        {
+            logger.LogInformation("Ignoring duplicate managed runner provisioning request for operation {OperationId} in state {Status}", deployment.Id, deployment.Status);
+            return;
+        }
+
         var host = hostedRunner.RunnerHost;
         if (host?.InfrastructureRunnerId == null)
         {
-            await FailAsync(hostedRunner, "The selected Runner Host has no Infrastructure Runner assigned.", message.CorrelationId, cancellationToken);
+            await FailAsync(hostedRunner, deployment, "The selected Runner Host has no Infrastructure Runner assigned.", message.CorrelationId, cancellationToken);
             return;
         }
 
         if (!string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.InfrastructureRunner, StringComparison.Ordinal))
         {
-            await FailAsync(hostedRunner, "Normal hosted Runner provisioning requires an Infrastructure Runner transport.", message.CorrelationId, cancellationToken);
+            await FailAsync(hostedRunner, deployment, "Normal hosted Runner provisioning requires an Infrastructure Runner transport.", message.CorrelationId, cancellationToken);
             return;
         }
 
@@ -51,17 +71,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
 
         if (message.SecretGrantIds.Count == 0)
         {
-            await FailAsync(hostedRunner, "The hosted Runner provisioning request has no enrollment credential grant.", message.CorrelationId, cancellationToken);
-            return;
-        }
-
-        var deployment = hostedRunner.Deployments
-            .Where(x => x.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)
-            .OrderByDescending(x => x.StartedAt)
-            .FirstOrDefault();
-        if (deployment == null)
-        {
-            await FailAsync(hostedRunner, "The hosted Runner provisioning operation was not found.", message.CorrelationId, cancellationToken);
+            await FailAsync(hostedRunner, deployment, "The hosted Runner provisioning request has no enrollment credential grant.", message.CorrelationId, cancellationToken);
             return;
         }
 
@@ -90,7 +100,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         hostedRunner.Status = HostedRunnerStatuses.Provisioning;
         hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
-        deployment.Status = HostedRunnerDeploymentStatuses.Running;
         deployment.Error = null;
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -111,6 +120,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
 
     private async Task FailAsync(
         Automaton.Api.Entities.HostedRunner hostedRunner,
+        HostedRunnerDeployment deployment,
         string error,
         string correlationId,
         CancellationToken cancellationToken)
@@ -118,16 +128,9 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         hostedRunner.Status = HostedRunnerStatuses.Failed;
         hostedRunner.LastError = error;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
-        var deployment = hostedRunner.Deployments
-            .Where(x => x.Action is HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)
-            .OrderByDescending(x => x.StartedAt)
-            .FirstOrDefault();
-        if (deployment != null)
-        {
-            deployment.Status = HostedRunnerDeploymentStatuses.Failed;
-            deployment.Error = error;
-            deployment.FinishedAt = DateTime.UtcNow;
-        }
+        deployment.Status = HostedRunnerDeploymentStatuses.Failed;
+        deployment.Error = error;
+        deployment.FinishedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         await eventPublisher.PublishAsync(new ManagedRunnerProvisionFailedEvent
         {
@@ -136,5 +139,26 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             Error = error,
             CorrelationId = correlationId
         }, cancellationToken);
+    }
+
+    private async Task<bool> TryClaimDispatchAsync(HostedRunnerDeployment deployment, CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsRelational())
+        {
+            var affected = await dbContext.HostedRunnerDeployments
+                .Where(x => x.Id == deployment.Id && x.Status == HostedRunnerDeploymentStatuses.Queued)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(x => x.Status, HostedRunnerDeploymentStatuses.Dispatching),
+                    cancellationToken);
+            if (affected != 1) return false;
+        }
+        else if (deployment.Status != HostedRunnerDeploymentStatuses.Queued)
+        {
+            return false;
+        }
+
+        deployment.Status = HostedRunnerDeploymentStatuses.Dispatching;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

@@ -94,7 +94,11 @@ public static class HostedRunnerDeploymentActions
 public static class HostedRunnerDeploymentStatuses
 {
     public const string Pending = "pending";
+    public const string Queued = "queued";
+    public const string Dispatching = "dispatching";
+    public const string Executing = "executing";
     public const string Running = "running";
+    public const string WaitingForRegistration = "waitingForRegistration";
     public const string Succeeded = "succeeded";
     public const string Failed = "failed";
     public const string Skipped = "skipped";

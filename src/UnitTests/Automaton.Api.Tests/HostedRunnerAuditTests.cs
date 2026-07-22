@@ -6,6 +6,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Models;
 using Automaton.Messaging.Events;
 
 using Microsoft.AspNetCore.Http;
@@ -226,7 +227,7 @@ public class HostedRunnerAuditTests
             Id = Guid.NewGuid(),
             HostedRunnerId = runner.Id,
             Action = HostedRunnerDeploymentActions.Provision,
-            Status = HostedRunnerDeploymentStatuses.Running,
+            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
             Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.",
             StartedAt = DateTime.UtcNow
         };
@@ -255,7 +256,82 @@ public class HostedRunnerAuditTests
         }, CancellationToken.None);
 
         Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
-        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForRegistration));
+    }
+
+    [Test]
+    public async Task InfrastructureActionHandler_DuplicateDeliveryReusesExistingOperationExecution()
+    {
+        using var db = CreateDbContext();
+        var runner = new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            RunnerHostId = Guid.NewGuid(),
+            Name = "hosted-runner",
+            ContainerName = "automaton-hosted-runner",
+            Status = HostedRunnerStatuses.Provisioning,
+            CreatedAt = DateTime.UtcNow
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = runner.Id,
+            Action = HostedRunnerDeploymentActions.Provision,
+            Status = HostedRunnerDeploymentStatuses.Executing,
+            StartedAt = DateTime.UtcNow
+        };
+        var execution = new AppModuleExecution
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerOperationId = deployment.Id,
+            AppId = InfrastructureAppTrust.PlatformAppId,
+            ModuleType = AppModuleTypes.Action,
+            ModuleKey = "provision-hosted-runner",
+            TriggerType = AppModuleTriggerTypes.Internal,
+            Status = AppModuleExecutionStatuses.Running,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        runner.Deployments.Add(deployment);
+        db.HostedRunners.Add(runner);
+        db.AppModuleExecutions.Add(execution);
+        db.SaveChanges();
+
+        var handler = new InfrastructureActionProvisioningHandler(
+            db,
+            hub: null!,
+            new NoOpEventPublisher(),
+            new NoOpAuditEventService(),
+            secretGrantService: null!,
+            actionDeploymentService: null!,
+            logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+        var message = new InfrastructureActionExecutionRequestedEvent
+        {
+            OperationId = deployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = runner.RunnerHostId!.Value,
+            ActionKey = "provision-hosted-runner",
+            InputJson = "{}"
+        };
+
+        await Task.WhenAll(
+            handler.HandleAsync(message, CancellationToken.None),
+            handler.HandleAsync(message, CancellationToken.None));
+
+        Assert.That(await db.AppModuleExecutions.CountAsync(x => x.HostedRunnerOperationId == deployment.Id), Is.EqualTo(1));
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Executing));
+    }
+
+    [Test]
+    public void AppModuleExecution_HasUniqueHostedRunnerOperationIndex()
+    {
+        using var db = CreateDbContext();
+        var entity = db.Model.FindEntityType(typeof(AppModuleExecution));
+        var index = entity!.GetIndexes().Single(x =>
+            x.Properties.Select(p => p.Name).SequenceEqual(new[] { nameof(AppModuleExecution.HostedRunnerOperationId) }));
+
+        Assert.That(index.IsUnique, Is.True);
     }
 
     [Test]
@@ -297,7 +373,7 @@ public class HostedRunnerAuditTests
             Id = Guid.NewGuid(),
             HostedRunnerId = hostedRunner.Id,
             Action = HostedRunnerDeploymentActions.Reprovision,
-            Status = HostedRunnerDeploymentStatuses.Running,
+            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
             StartedAt = DateTime.UtcNow
         };
         hostedRunner.Deployments.Add(deployment);
@@ -464,7 +540,7 @@ public class HostedRunnerAuditTests
         {
             AuditEventTypes.RunnerRestartRequested
         }));
-        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
+        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
     }
 
     [Test]
@@ -485,7 +561,7 @@ public class HostedRunnerAuditTests
         await managementService.RestartAsAdminAsync(hostedRunner.Id, CancellationToken.None);
 
         Assert.That(db.AuditEvents.Any(x => x.EventType == AuditEventTypes.RunnerRestartFailed), Is.False);
-        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
+        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
     }
 
     [Test]

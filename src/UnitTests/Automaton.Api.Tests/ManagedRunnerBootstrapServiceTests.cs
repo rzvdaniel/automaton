@@ -37,6 +37,7 @@ public class ManagedRunnerBootstrapServiceTests
         Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
         Assert.That(result.RequiresRetry, Is.True);
         Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
+        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Single().OperationId, Is.Not.EqualTo(Guid.Empty));
 
         var hostedRunner = await db.HostedRunners.SingleAsync();
         Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));

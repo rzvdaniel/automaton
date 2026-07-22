@@ -622,6 +622,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
 
+                    b.Property<Guid?>("HostedRunnerOperationId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("LogsAvailableUntilUtc")
                         .HasColumnType("datetime(6)");
 
@@ -658,6 +661,9 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("varchar(40)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("HostedRunnerOperationId")
+                        .IsUnique();
 
                     b.HasIndex("RequestedByUserId");
 
@@ -3496,6 +3502,11 @@ namespace Automaton.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Automaton.Api.Entities.HostedRunnerDeployment", "HostedRunnerOperation")
+                        .WithOne("AppModuleExecution")
+                        .HasForeignKey("Automaton.Api.Entities.AppModuleExecution", "HostedRunnerOperationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("RequestedByUserId")
@@ -3505,6 +3516,8 @@ namespace Automaton.Api.Migrations
                         .WithMany()
                         .HasForeignKey("RunnerId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("HostedRunnerOperation");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AppVersion", b =>
@@ -4256,6 +4269,11 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
                     b.Navigation("Deployments");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerDeployment", b =>
+                {
+                    b.Navigation("AppModuleExecution");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerSpecification", b =>
