@@ -52,6 +52,7 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
+        var secretSanitizer = SecretValueSanitizer.Empty;
         try
         {
             if (hostedRunner.UserId != message.UserId || hostedRunner.RunnerHostId != message.RunnerHostId)
@@ -92,6 +93,7 @@ public sealed class InfrastructureActionProvisioningHandler(
                         hostedRunner.Id),
                     message.SecretGrantIds,
                     cancellationToken);
+                secretSanitizer = new SecretValueSanitizer(secretLease.EnvironmentVariables.Values);
             }
 
             using var inputDocument = JsonDocument.Parse(message.InputJson);
@@ -156,9 +158,9 @@ public sealed class InfrastructureActionProvisioningHandler(
                 }, cancellationToken);
             }
 
-            ApplyExecutionResult(execution, result);
+            ApplyExecutionResult(execution, result, secretSanitizer);
             if (!string.Equals(result.Status, AppModuleExecutionStatuses.Succeeded, StringComparison.Ordinal))
-                throw new InvalidOperationException(result.FailureSummary ?? result.ErrorCode ?? "Infrastructure Action failed.");
+                throw new InvalidOperationException(execution.FailureSummary ?? result.ErrorCode ?? "Infrastructure Action failed.");
 
             var artifact = await hub.Clients.Client(infrastructureRunner.ConnectionId!)
                 .InvokeAsync<AppModuleExecutionArtifactResponse>(
@@ -167,7 +169,7 @@ public sealed class InfrastructureActionProvisioningHandler(
                     cancellationToken);
             if (!artifact.Available || string.IsNullOrWhiteSpace(artifact.Content))
                 throw new InvalidOperationException("Infrastructure Action completed without a result artifact.");
-            using var resultDocument = JsonDocument.Parse(artifact.Content);
+            using var resultDocument = JsonDocument.Parse(secretSanitizer.Sanitize(artifact.Content));
             var root = resultDocument.RootElement;
             if (!root.TryGetProperty("success", out var success) || !success.GetBoolean())
                 throw new InvalidOperationException("Infrastructure Action reported an unsuccessful host mutation.");
@@ -177,11 +179,19 @@ public sealed class InfrastructureActionProvisioningHandler(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Infrastructure Action provisioning failed for hosted Runner {HostedRunnerId}", hostedRunner.Id);
+            var sanitizedError = Limit(
+                RedactCredentialPatterns(secretSanitizer.Sanitize(ex.Message)),
+                2000);
+            logger.LogError(
+                "Infrastructure Action provisioning failed for hosted Runner {HostedRunnerId}. {ExceptionType} at {ExceptionLocation}: {FailureSummary}",
+                hostedRunner.Id,
+                ex.GetType().Name,
+                $"{ex.TargetSite?.DeclaringType?.FullName}.{ex.TargetSite?.Name}",
+                sanitizedError);
             hostedRunner.Status = message.ActionKey == "delete-hosted-runner"
                 ? HostedRunnerStatuses.DeleteFailed
                 : HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = Limit(RedactSecrets(ex.Message), 2000);
+            hostedRunner.LastError = sanitizedError;
             hostedRunner.UpdatedAt = DateTime.UtcNow;
             deployment.Status = HostedRunnerDeploymentStatuses.Failed;
             deployment.Error = hostedRunner.LastError;
@@ -259,12 +269,15 @@ public sealed class InfrastructureActionProvisioningHandler(
         }, cancellationToken);
     }
 
-    private static void ApplyExecutionResult(AppModuleExecution execution, AppActionExecutionResult result)
+    private static void ApplyExecutionResult(
+        AppModuleExecution execution,
+        AppActionExecutionResult result,
+        SecretValueSanitizer sanitizer)
     {
         execution.Status = result.Status;
         execution.ExitCode = result.ExitCode;
         execution.ErrorCode = result.ErrorCode;
-        execution.FailureSummary = result.FailureSummary;
+        execution.FailureSummary = sanitizer.Sanitize(result.FailureSummary);
         execution.DeploymentHash = result.DeploymentHash ?? execution.DeploymentHash;
         execution.StartedAtUtc = result.StartedAtUtc;
         execution.CompletedAtUtc = result.CompletedAtUtc;
@@ -273,6 +286,10 @@ public sealed class InfrastructureActionProvisioningHandler(
     }
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
-    private static string RedactSecrets(string value)
-        => Regex.Replace(value ?? string.Empty, @"ak_[A-Za-z0-9_-]+", "ak_***", RegexOptions.CultureInvariant);
+    private static string RedactCredentialPatterns(string value)
+        => Regex.Replace(
+            value ?? string.Empty,
+            @"(?:ak|re)_[A-Za-z0-9_-]+",
+            "[REDACTED]",
+            RegexOptions.CultureInvariant);
 }
