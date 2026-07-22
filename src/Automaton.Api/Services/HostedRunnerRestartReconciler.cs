@@ -75,7 +75,8 @@ public sealed class HostedRunnerRestartReconciler(
                 Outcome = AuditOutcomes.Failed,
                 Message = $"Hosted runner '{operation.HostedRunner.Name}' restart reconnect timed out",
                 TargetUserId = operation.HostedRunner.UserId,
-                Metadata = new { OperationId = operation.Id, Error = operation.Error }
+                Metadata = new { OperationId = operation.Id, Error = operation.Error },
+                FailOnError = true
             }, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
             failed++;

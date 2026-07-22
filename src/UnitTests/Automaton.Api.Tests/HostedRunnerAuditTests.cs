@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Data.Common;
 using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
@@ -558,6 +559,63 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public async Task RestartConfirmationRollsBackWhenHostedRunnerUpdateFailsThenRetries()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
+        await connection.OpenAsync();
+        var interceptor = new FailHostedRunnerUpdateOnceInterceptor();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).AddInterceptors(interceptor).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE HostedRunners (
+                Id TEXT NOT NULL PRIMARY KEY, UserId TEXT NOT NULL, Name TEXT NOT NULL,
+                Status TEXT NOT NULL, LastError TEXT NULL, UpdatedAt TEXT NULL
+            );
+            CREATE TABLE HostedRunnerDeployments (
+                Id TEXT NOT NULL PRIMARY KEY, HostedRunnerId TEXT NOT NULL, Action TEXT NOT NULL,
+                Status TEXT NOT NULL, ExpectedRunnerId TEXT NULL, PreviousConnectionId TEXT NULL,
+                ReconnectAfterUtc TEXT NULL, ReconnectDeadlineUtc TEXT NULL, StartedAt TEXT NOT NULL,
+                FinishedAt TEXT NULL, Error TEXT NULL, Logs TEXT NULL
+            );
+            CREATE TABLE RunnerConnectionSessions (
+                Id TEXT NOT NULL PRIMARY KEY, RunnerId TEXT NOT NULL, ConnectionId TEXT NOT NULL,
+                ConnectedAtUtc TEXT NOT NULL
+            );
+            """);
+        var now = DateTime.UtcNow;
+        var hostedRunnerId = Guid.NewGuid();
+        var runner = new Runner { Id = Guid.NewGuid(), Name = "restart", ConnectionId = "new", Status = "online" };
+        var operationId = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO HostedRunners (Id, UserId, Name, Status) VALUES ({hostedRunnerId}, {Guid.NewGuid()}, {"restart"}, {HostedRunnerStatuses.Failed});
+            INSERT INTO HostedRunnerDeployments
+                (Id, HostedRunnerId, Action, Status, ExpectedRunnerId, PreviousConnectionId, ReconnectAfterUtc, ReconnectDeadlineUtc, StartedAt)
+            VALUES ({operationId}, {hostedRunnerId}, {HostedRunnerDeploymentActions.Restart}, {HostedRunnerDeploymentStatuses.WaitingForReconnect},
+                {runner.Id}, {"old"}, {now.AddMinutes(-1)}, {now.AddMinutes(1)}, {now.AddMinutes(-2)});
+            INSERT INTO RunnerConnectionSessions (Id, RunnerId, ConnectionId, ConnectedAtUtc)
+            VALUES ({Guid.NewGuid()}, {runner.Id}, {runner.ConnectionId}, {now});
+            """);
+        var runnerService = new RunnerService(
+            db, userContextService: null!, automatonHub: null!, authorizationService: null!,
+            new ApiInstanceIdentityService(), new NoOpAuditEventService(),
+            applicationEventService: null!, managedRunnerAppAssignmentService: null!);
+
+        Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None));
+        db.ChangeTracker.Clear();
+        Assert.That(await db.HostedRunnerDeployments.Select(x => x.Status).SingleAsync(),
+            Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
+        Assert.That(await db.HostedRunners.Select(x => x.Status).SingleAsync(), Is.EqualTo(HostedRunnerStatuses.Failed));
+
+        await runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None);
+        db.ChangeTracker.Clear();
+        Assert.That(await db.HostedRunnerDeployments.Select(x => x.Status).SingleAsync(),
+            Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
+        Assert.That(await db.HostedRunners.Select(x => x.Status).SingleAsync(), Is.EqualTo(HostedRunnerStatuses.Running));
+    }
+
+    [Test]
     public async Task PrepareProvisioningAsync_DoesNotMoveRunningRunnerWhenPlanSpecificationChanges()
     {
         using var db = CreateDbContext();
@@ -1047,6 +1105,25 @@ public class HostedRunnerAuditTests
             }
 
             return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class FailHostedRunnerUpdateOnceInterceptor : DbCommandInterceptor
+    {
+        private bool failNext = true;
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (failNext && command.CommandText.Contains("UPDATE \"HostedRunners\"", StringComparison.Ordinal))
+            {
+                failNext = false;
+                throw new InvalidOperationException("Simulated hosted Runner state update failure.");
+            }
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
         }
     }
 
