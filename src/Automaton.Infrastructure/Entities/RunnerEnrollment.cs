@@ -16,6 +16,9 @@ public class RunnerEnrollment
     public Guid RunnerHostId { get; set; }
     public virtual RunnerHost RunnerHost { get; set; } = null!;
 
+    public Guid? HostedRunnerId { get; set; }
+    public Guid? SecretVersionId { get; set; }
+
     [Required]
     public Guid RequestedByUserId { get; set; }
 

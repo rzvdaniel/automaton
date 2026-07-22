@@ -53,9 +53,9 @@ def main() -> None:
     api_url = str(request["apiUrl"])
     if not api_url.startswith(("https://", "http://")):
         raise ValueError("apiUrl must be an HTTP(S) URL")
-    api_key = os.environ.get("AUTOMATON_PROVISION_RUNNER_API_KEY", "")
-    if not api_key.startswith("ak_runner_"):
-        raise ValueError("Runner API key was not provided")
+    enrollment_token = os.environ.get("AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN", "")
+    if not enrollment_token.startswith("re_"):
+        raise ValueError("Runner enrollment token was not provided")
 
     data_root = PurePosixPath(str(request["dataRoot"]))
     if not data_root.is_absolute() or ".." in data_root.parts:
@@ -91,7 +91,7 @@ def main() -> None:
         "--pids-limit", str(pids_limit),
         "--network", network,
         "-e", f"AUTOMATON_SERVER_URL={api_url}",
-        "-e", f"AUTOMATON_API_KEY={api_key}",
+        "-e", f"AUTOMATON_ENROLLMENT_TOKEN={enrollment_token}",
         "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
         "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
         "-v", f"{config_path}:/home/automaton/.config/AutomatonRunner",

@@ -16,7 +16,6 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
     ILogger<ManagedRunnerProvisionRequestedEventHandler> logger) : IEventHandler<ManagedRunnerProvisionRequestedEvent>
 {
     private const string ProvisionActionKey = "provision-hosted-runner";
-    private const string RunnerApiKeyEnvironmentVariable = "AUTOMATON_PROVISION_RUNNER_API_KEY";
 
     public async Task HandleAsync(ManagedRunnerProvisionRequestedEvent message, CancellationToken cancellationToken = default)
     {
@@ -47,6 +46,12 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         if (!options.Value.Enabled)
         {
             logger.LogInformation("Managed runner provisioning skipped for hosted runner {HostedRunnerId} because HostedRunners:Enabled=false", hostedRunner.Id);
+            return;
+        }
+
+        if (message.SecretGrantIds.Count == 0)
+        {
+            await FailAsync(hostedRunner, "The hosted Runner provisioning request has no enrollment credential grant.", message.CorrelationId, cancellationToken);
             return;
         }
 
@@ -99,10 +104,7 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
                 ? "reprovision-hosted-runner"
                 : ProvisionActionKey,
             InputJson = input,
-            Secrets = new Dictionary<string, string>
-            {
-                [RunnerApiKeyEnvironmentVariable] = message.RunnerApiKey
-            },
+            SecretGrantIds = message.SecretGrantIds,
             CorrelationId = message.CorrelationId
         }, cancellationToken);
     }

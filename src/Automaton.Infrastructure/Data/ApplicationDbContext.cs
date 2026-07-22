@@ -332,12 +332,22 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.FailureReason).HasMaxLength(1000);
 
                 entity.HasIndex(e => e.RunnerHostId);
+                entity.HasIndex(e => e.HostedRunnerId);
                 entity.HasIndex(e => e.EnrollmentTokenHash).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
+                entity.HasIndex(e => new { e.HostedRunnerId, e.Status });
                 entity.HasOne(e => e.RunnerHost)
                     .WithMany(e => e.RunnerEnrollments)
                     .HasForeignKey(e => e.RunnerHostId)
                     .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<HostedRunner>()
+                    .WithMany()
+                    .HasForeignKey(e => e.HostedRunnerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne<SecretVersion>()
+                    .WithMany()
+                    .HasForeignKey(e => e.SecretVersionId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<SecretDefinition>(entity =>

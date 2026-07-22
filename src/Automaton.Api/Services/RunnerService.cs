@@ -221,7 +221,7 @@ public class RunnerService
             .FirstOrDefault(x =>
                 x.UserId == UserId &&
                 (hostedRunnerId.HasValue ? x.Id == hostedRunnerId.Value : x.Name == runner.Name) &&
-                x.RunnerId == null &&
+                (x.RunnerId == null || x.RunnerId == runner.Id) &&
                 x.DeletedAt == null &&
                 (x.Status == HostedRunnerStatuses.Pending || x.Status == HostedRunnerStatuses.Provisioning));
 

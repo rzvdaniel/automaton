@@ -140,7 +140,7 @@ public sealed class ManagedRunnerBootstrapService
                 HostedRunnerId = preparation.HostedRunner.Id,
                 UserId = ownerId,
                 RunnerHostId = preparation.HostedRunner.RunnerHostId ?? Guid.Empty,
-                RunnerApiKey = preparation.RawApiKey ?? string.Empty
+                SecretGrantIds = preparation.SecretGrantIds
             },
             cancellationToken);
 

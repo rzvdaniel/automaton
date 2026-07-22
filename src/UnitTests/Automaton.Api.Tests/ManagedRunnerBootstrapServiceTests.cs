@@ -243,11 +243,7 @@ public class ManagedRunnerBootstrapServiceTests
     {
         var provisioningService = new HostedRunnerProvisioningService(
             db,
-            new ApiKeyService(
-                db,
-                NullLogger<ApiKeyService>.Instance,
-                authorizationService: null!,
-                new NoOpAuditEventService()),
+            TestRunnerEnrollmentFactory.Create(db, new NoOpAuditEventService()),
             publisher,
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {

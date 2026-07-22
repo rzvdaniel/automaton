@@ -13,6 +13,11 @@ public sealed record RunnerEnrollmentCreatedResponse
     public string DockerImage { get; init; } = "automaton-runner:latest";
 }
 
+public sealed record HostedRunnerEnrollmentMaterial(
+    Guid EnrollmentId,
+    Guid SecretGrantId,
+    DateTime ExpiresAtUtc);
+
 public sealed record RunnerEnrollmentExchangeRequest
 {
     public string EnrollmentToken { get; init; } = string.Empty;

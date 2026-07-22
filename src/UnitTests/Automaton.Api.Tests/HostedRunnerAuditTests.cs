@@ -75,10 +75,13 @@ public class HostedRunnerAuditTests
 
         Assert.That(auditEvents.Select(x => x.EventType), Is.EqualTo(new[]
         {
-            AuditEventTypes.HostedRunnerProvisioningRequested
+            AuditEventTypes.HostedRunnerProvisioningRequested,
+            AuditEventTypes.RunnerEnrollmentCreated
         }));
         Assert.That(auditEvents[0].Outcome, Is.EqualTo(AuditOutcomes.Success));
         Assert.That(runner!.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
+        Assert.That(await db.SecretVersions.CountAsync(), Is.EqualTo(1));
+        Assert.That(await db.ExecutionSecretGrants.CountAsync(), Is.EqualTo(1));
     }
 
     [Test]
@@ -237,8 +240,9 @@ public class HostedRunnerAuditTests
             hub: null!,
             new NoOpEventPublisher(),
             new NoOpAuditEventService(),
+            secretGrantService: null!,
             actionDeploymentService: null!,
-            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+            logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
         {
@@ -706,7 +710,7 @@ public class HostedRunnerAuditTests
 
         return new HostedRunnerProvisioningService(
             db,
-            apiKeyService,
+            TestRunnerEnrollmentFactory.Create(db, auditEventService, options),
             new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
             new HostedRunnerSpecificationResolver(db),

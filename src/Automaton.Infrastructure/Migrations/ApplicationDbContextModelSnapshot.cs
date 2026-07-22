@@ -2442,6 +2442,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
 
+                    b.Property<Guid?>("HostedRunnerId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("InstallationId")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -2454,6 +2457,9 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<Guid?>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid?>("SecretVersionId")
                         .HasColumnType("char(36)");
 
                     b.Property<string>("Status")
@@ -2469,7 +2475,13 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("EnrollmentTokenHash")
                         .IsUnique();
 
+                    b.HasIndex("HostedRunnerId");
+
                     b.HasIndex("RunnerHostId");
+
+                    b.HasIndex("SecretVersionId");
+
+                    b.HasIndex("HostedRunnerId", "Status");
 
                     b.HasIndex("RunnerHostId", "Status");
 
@@ -4009,11 +4021,21 @@ namespace Automaton.Api.Migrations
 
             modelBuilder.Entity("Automaton.Api.Entities.RunnerEnrollment", b =>
                 {
+                    b.HasOne("Automaton.Api.Entities.HostedRunner", null)
+                        .WithMany()
+                        .HasForeignKey("HostedRunnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
                         .WithMany("RunnerEnrollments")
                         .HasForeignKey("RunnerHostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.SecretVersion", null)
+                        .WithMany()
+                        .HasForeignKey("SecretVersionId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("RunnerHost");
                 });

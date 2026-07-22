@@ -20,6 +20,7 @@ public sealed class InfrastructureActionProvisioningHandler(
     IHubContext<AutomatonHub> hub,
     IEventPublisher eventPublisher,
     IAuditEventService auditEventService,
+    IExecutionSecretGrantService secretGrantService,
     TrustedInfrastructureActionDeploymentService actionDeploymentService,
     ILogger<InfrastructureActionProvisioningHandler> logger)
 {
@@ -73,6 +74,26 @@ public sealed class InfrastructureActionProvisioningHandler(
             var module = await actionDeploymentService.EnsureDeployedAsync(
                 infrastructureRunner.ConnectionId!, message.ActionKey, cancellationToken);
 
+            if (message.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner"
+                && message.SecretGrantIds.Count == 0)
+                throw new UnauthorizedAccessException("The infrastructure Action has no enrollment credential grant.");
+
+            ExecutionSecretLease? secretLease = null;
+            if (message.SecretGrantIds.Count > 0)
+            {
+                secretLease = await secretGrantService.LeaseAsync(
+                    new SecretGrantScope(
+                        message.OperationId,
+                        InfrastructureAppTrust.PlatformAppId,
+                        message.ActionKey,
+                        infrastructureRunner.Id,
+                        host.Id,
+                        SecretOwnerTypes.HostedRunner,
+                        hostedRunner.Id),
+                    message.SecretGrantIds,
+                    cancellationToken);
+            }
+
             using var inputDocument = JsonDocument.Parse(message.InputJson);
             var now = DateTime.UtcNow;
             var execution = new AppModuleExecution
@@ -105,9 +126,35 @@ public sealed class InfrastructureActionProvisioningHandler(
                         TimeoutSeconds = module.TimeoutSeconds,
                         SystemInfrastructure = true,
                         Input = inputDocument.RootElement.Clone(),
-                        Secrets = message.Secrets
+                        Secrets = secretLease == null
+                            ? []
+                            : new Dictionary<string, string>(secretLease.EnvironmentVariables, StringComparer.Ordinal)
                     },
                     cancellationToken);
+
+            if (secretLease != null)
+            {
+                await secretGrantService.MarkConsumedAsync(secretLease.GrantIds, cancellationToken);
+                await auditEventService.WriteAsync(new AuditEventWriteRequest
+                {
+                    Action = AuditActions.Succeeded,
+                    EntityType = AuditEntityTypes.ExecutionSecretGrant,
+                    EntityId = secretLease.GrantIds.First(),
+                    EventType = AuditEventTypes.ExecutionSecretGrantDelivered,
+                    Outcome = AuditOutcomes.Success,
+                    Message = "Execution-scoped credentials were delivered to an Infrastructure Runner.",
+                    TargetUserId = hostedRunner.UserId,
+                    Metadata = new
+                    {
+                        message.OperationId,
+                        AppId = InfrastructureAppTrust.PlatformAppId,
+                        message.ActionKey,
+                        RunnerId = infrastructureRunner.Id,
+                        RunnerHostId = host.Id,
+                        GrantIds = secretLease.GrantIds
+                    }
+                }, cancellationToken);
+            }
 
             ApplyExecutionResult(execution, result);
             if (!string.Equals(result.Status, AppModuleExecutionStatuses.Succeeded, StringComparison.Ordinal))

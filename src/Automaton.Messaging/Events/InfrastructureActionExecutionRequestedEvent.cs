@@ -8,6 +8,6 @@ public sealed class InfrastructureActionExecutionRequestedEvent
     public Guid RunnerHostId { get; init; }
     public string ActionKey { get; init; } = string.Empty;
     public string InputJson { get; init; } = "{}";
-    public Dictionary<string, string> Secrets { get; init; } = [];
+    public IReadOnlyList<Guid> SecretGrantIds { get; init; } = Array.Empty<Guid>();
     public string CorrelationId { get; init; } = string.Empty;
 }

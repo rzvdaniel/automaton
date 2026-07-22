@@ -83,18 +83,53 @@ public sealed partial class ExecutionSecretGrantService(
                 throw new UnauthorizedAccessException("One or more secret grants were not found.");
 
             var now = DateTime.UtcNow;
-            var values = new Dictionary<string, string>(StringComparer.Ordinal);
+            var targets = new HashSet<string>(StringComparer.Ordinal);
             foreach (var grant in grants)
             {
                 ValidateGrant(grant, scope, now);
-                if (!values.TryAdd(grant.TargetName, protector.Unprotect(grant.SecretVersion.ProtectedValue)))
+                if (!targets.Add(grant.TargetName))
                     throw new UnauthorizedAccessException("Secret grants contain duplicate delivery targets.");
-                grant.LeasedAtUtc = now;
-                grant.LeaseExpiresAtUtc = now.Add(LeaseDuration);
-                grant.ReadCount++;
             }
 
-            await db.SaveChangesAsync(cancellationToken);
+            var leaseExpiresAtUtc = now.Add(LeaseDuration);
+            if (db.Database.IsRelational())
+            {
+                foreach (var grant in grants)
+                {
+                    var claimed = await db.ExecutionSecretGrants
+                        .Where(x => x.Id == grant.Id
+                            && x.ConsumedAtUtc == null
+                            && x.RevokedAtUtc == null
+                            && x.ExpiresAtUtc > now
+                            && (x.LeaseExpiresAtUtc == null || x.LeaseExpiresAtUtc <= now)
+                            && x.ReadCount < x.MaximumReads)
+                        .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(x => x.LeasedAtUtc, now)
+                            .SetProperty(x => x.LeaseExpiresAtUtc, leaseExpiresAtUtc)
+                            .SetProperty(x => x.ReadCount, x => x.ReadCount + 1),
+                            cancellationToken);
+                    if (claimed != 1)
+                        throw new UnauthorizedAccessException("A secret grant could not be leased.");
+                    grant.LeasedAtUtc = now;
+                    grant.LeaseExpiresAtUtc = leaseExpiresAtUtc;
+                    grant.ReadCount++;
+                }
+            }
+            else
+            {
+                foreach (var grant in grants)
+                {
+                    grant.LeasedAtUtc = now;
+                    grant.LeaseExpiresAtUtc = leaseExpiresAtUtc;
+                    grant.ReadCount++;
+                }
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            var values = grants.ToDictionary(
+                grant => grant.TargetName,
+                grant => protector.Unprotect(grant.SecretVersion.ProtectedValue),
+                StringComparer.Ordinal);
             if (transaction != null)
                 await transaction.CommitAsync(cancellationToken);
             return new(values, ids);
@@ -117,7 +152,9 @@ public sealed partial class ExecutionSecretGrantService(
         var now = DateTime.UtcNow;
         foreach (var grant in grants)
         {
-            if (!grant.LeasedAtUtc.HasValue || grant.ConsumedAtUtc.HasValue || grant.RevokedAtUtc.HasValue)
+            if (grant.ConsumedAtUtc.HasValue)
+                continue;
+            if (!grant.LeasedAtUtc.HasValue || grant.RevokedAtUtc.HasValue)
                 throw new InvalidOperationException("A delivered grant is not in a consumable state.");
             grant.ConsumedAtUtc = now;
             grant.LeaseExpiresAtUtc = null;

@@ -76,6 +76,8 @@ Shared layer:
 - Do not place identity-orchestrating services in `Automaton.Infrastructure` if they depend on identity abstractions.
 - Shared topic names must live in `EventTopics`.
 - Use past-tense event names for facts that already happened, such as `UserRegisteredEvent`.
+- Never put plaintext credentials, tokens, private keys, connection strings, or decrypted secret values in event contracts. Durable events may carry only scoped secret/grant/reference IDs; resolve values just in time at the trusted execution boundary.
+- Treat event-contract rollouts as API/Worker compatibility changes. Mixed versions must fail closed when a required reference is absent, and deployment notes must identify the safe rollout order.
 
 ## Allowed dependency boundaries
 
@@ -133,6 +135,8 @@ Never leave the same side effect active in both API and Worker unless duplicate 
 - Reintroducing RabbitMQ topology/plumbing into shared contracts.
 - Scattering event topic strings instead of using `EventTopics`.
 - Publishing outside the transactional boundary when the event must reflect a committed DB change.
+- Persisting a credential in CAP/RabbitMQ payloads instead of an execution-scoped grant ID.
+- Deploying a producer with a changed required contract before every consumer can understand it.
 - Moving email/admin notifications to the Worker before confirming the log-only pipeline works.
 - Moving a side effect to the Worker without also wiring the required host configuration, especially `EmailConfig` for SMTP-backed email delivery.
 

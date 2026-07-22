@@ -26,7 +26,7 @@ public class HostedRunnerProvisioningService
     ];
 
     private readonly ApplicationDbContext db;
-    private readonly ApiKeyService apiKeyService;
+    private readonly RunnerEnrollmentService runnerEnrollmentService;
     private readonly IEventPublisher eventPublisher;
     private readonly HostedRunnerOptions options;
     private readonly IHostedRunnerSpecificationResolver specificationResolver;
@@ -35,7 +35,7 @@ public class HostedRunnerProvisioningService
 
     public HostedRunnerProvisioningService(
         ApplicationDbContext db,
-        ApiKeyService apiKeyService,
+        RunnerEnrollmentService runnerEnrollmentService,
         IEventPublisher eventPublisher,
         IOptionsSnapshot<HostedRunnerOptions> options,
         IHostedRunnerSpecificationResolver specificationResolver,
@@ -43,7 +43,7 @@ public class HostedRunnerProvisioningService
         ILogger<HostedRunnerProvisioningService> logger)
     {
         this.db = db;
-        this.apiKeyService = apiKeyService;
+        this.runnerEnrollmentService = runnerEnrollmentService;
         this.eventPublisher = eventPublisher;
         this.options = options.Value;
         this.specificationResolver = specificationResolver;
@@ -115,13 +115,13 @@ public class HostedRunnerProvisioningService
         var requestedSnapshot = HostedRunnerSpecificationSnapshotFactory.Create(specification, now);
         if (!forceProvision && hostedRunner is { RunnerId: not null, Status: HostedRunnerStatuses.Running })
         {
-            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            return new HostedRunnerPreparationResult(hostedRunner, [], false);
         }
 
         if (!forceProvision && !createdHostedRunner && hostedRunner.Status is
             HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning)
         {
-            return new HostedRunnerPreparationResult(hostedRunner, null, false);
+            return new HostedRunnerPreparationResult(hostedRunner, [], false);
         }
 
         var previousHostId = hostedRunner.RunnerHostId;
@@ -158,7 +158,7 @@ public class HostedRunnerProvisioningService
                     await capacityTransaction.CommitAsync(cancellationToken);
                 }
 
-                return new HostedRunnerPreparationResult(hostedRunner, null, false);
+                return new HostedRunnerPreparationResult(hostedRunner, [], false);
             }
 
             hostedRunner.RunnerHostId = host.Id;
@@ -176,7 +176,6 @@ public class HostedRunnerProvisioningService
                 hostedRunner.Status = HostedRunnerStatuses.Reprovisioning;
             }
 
-            var rawApiKey = await EnsureProvisioningApiKeyAsync(hostedRunner, userId, cancellationToken);
             hostedRunner.Status = options.Enabled
                 ? HostedRunnerStatuses.Provisioning
                 : HostedRunnerStatuses.Pending;
@@ -205,7 +204,7 @@ public class HostedRunnerProvisioningService
             },
             cancellationToken);
 
-        AddDeployment(
+        var deployment = AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentStatuses.Running,
             $"Trusted infrastructure Action: {(createdHostedRunner ? "provision-hosted-runner" : "reprovision-hosted-runner")} on Runner Host '{host.Name}'.",
@@ -215,12 +214,26 @@ public class HostedRunnerProvisioningService
             createdHostedRunner ? HostedRunnerDeploymentActions.Provision : HostedRunnerDeploymentActions.Reprovision);
 
             await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
+            IReadOnlyList<Guid> secretGrantIds = [];
+            if (options.Enabled)
+            {
+                var infrastructureRunnerId = host.InfrastructureRunnerId
+                    ?? throw new InvalidOperationException("The selected Runner Host has no Infrastructure Runner assigned.");
+                var actionKey = createdHostedRunner ? "provision-hosted-runner" : "reprovision-hosted-runner";
+                var enrollment = await runnerEnrollmentService.CreateHostedRunnerAsync(
+                    hostedRunner.Id,
+                    deployment.Id,
+                    actionKey,
+                    infrastructureRunnerId,
+                    cancellationToken);
+                secretGrantIds = [enrollment.SecretGrantId];
+            }
             if (capacityTransaction != null)
             {
                 await capacityTransaction.CommitAsync(cancellationToken);
             }
 
-            return new HostedRunnerPreparationResult(hostedRunner, rawApiKey, true);
+            return new HostedRunnerPreparationResult(hostedRunner, secretGrantIds, true);
         }
         finally
         {
@@ -251,7 +264,7 @@ public class HostedRunnerProvisioningService
             HostedRunnerId = hostedRunner.Id,
             UserId = hostedRunner.UserId,
             RunnerHostId = hostedRunner.RunnerHostId ?? Guid.Empty,
-            RunnerApiKey = preparation.RawApiKey ?? string.Empty
+            SecretGrantIds = preparation.SecretGrantIds
         }, cancellationToken);
         logger.LogInformation("Hosted runner {HostedRunnerId} provisioning queued through the trusted infrastructure Action", hostedRunner.Id);
         return hostedRunner;
@@ -339,36 +352,6 @@ public class HostedRunnerProvisioningService
 
     private bool IsMySqlProvider()
         => db.Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true;
-
-    private async Task<string> EnsureProvisioningApiKeyAsync(HostedRunner hostedRunner, Guid userId, CancellationToken cancellationToken)
-    {
-        var requiresFreshRawKey = options.Enabled && options.DeploymentMode != HostedRunnerDeploymentModes.DryRun;
-        if (!requiresFreshRawKey && hostedRunner.ApiKeyId != null)
-        {
-            return string.Empty;
-        }
-
-        if (requiresFreshRawKey && hostedRunner.ApiKeyId != null && hostedRunner.RunnerId == null)
-        {
-            var priorKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == hostedRunner.ApiKeyId, cancellationToken);
-            if (priorKey != null)
-            {
-                db.ApiKeys.Remove(priorKey);
-                hostedRunner.ApiKeyId = null;
-            }
-        }
-
-        var (rawApiKey, apiKey) = await apiKeyService.CreateApiKeyAsync(
-            userId,
-            $"{hostedRunner.Name} key",
-            ApiKeyScope.Runner,
-            "Generated for hosted runner container provisioning.",
-            saveChanges: false,
-            source: ApiKeySource.RunnerProvisioning);
-
-        hostedRunner.ApiKeyId = apiKey.Id;
-        return rawApiKey;
-    }
 
     private HostedRunnerDeployment AddDeployment(
         HostedRunner runner,
@@ -533,5 +516,5 @@ public class HostedRunnerProvisioningService
 
 public sealed record HostedRunnerPreparationResult(
     HostedRunner HostedRunner,
-    string? RawApiKey,
+    IReadOnlyList<Guid> SecretGrantIds,
     bool ShouldPublishProvisionRequest);

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using System.Text.Json;
 
 namespace Automaton.Worker.Tests;
 
@@ -59,17 +60,21 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
             }),
             NullLogger<ManagedRunnerProvisionRequestedEventHandler>.Instance);
 
-        await handler.HandleAsync(new ManagedRunnerProvisionRequestedEvent
+        var grantId = Guid.NewGuid();
+        var durableRequest = new ManagedRunnerProvisionRequestedEvent
         {
             HostedRunnerId = runner.Id, UserId = runner.UserId, RunnerHostId = host.Id,
-            RunnerApiKey = "ak_runner_secret", CorrelationId = "correlation"
-        });
+            SecretGrantIds = [grantId], CorrelationId = "correlation"
+        };
+        await handler.HandleAsync(durableRequest);
 
         var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
         Assert.That(request.ActionKey, Is.EqualTo("provision-hosted-runner"));
         Assert.That(request.OperationId, Is.EqualTo(deployment.Id));
-        Assert.That(request.InputJson, Does.Not.Contain("ak_runner_secret"));
-        Assert.That(request.Secrets["AUTOMATON_PROVISION_RUNNER_API_KEY"], Is.EqualTo("ak_runner_secret"));
+        Assert.That(request.SecretGrantIds, Is.EqualTo(new[] { grantId }));
+        Assert.That(JsonSerializer.Serialize(durableRequest), Does.Not.Contain("ak_runner_"));
+        Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("ak_runner_"));
+        Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("EnrollmentToken"));
         Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
     }

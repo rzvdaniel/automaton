@@ -134,7 +134,7 @@ public class AdminSubscriptionPlansControllerAuditTests
             auditEventService);
         var hostedRunnerProvisioningService = new HostedRunnerProvisioningService(
             dbContext,
-            apiKeyService,
+            TestRunnerEnrollmentFactory.Create(dbContext, auditEventService),
             new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {

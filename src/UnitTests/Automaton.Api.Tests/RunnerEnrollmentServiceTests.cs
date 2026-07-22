@@ -1,5 +1,6 @@
 using Automaton.Api.Data;
 using Automaton.Api.Config;
+using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
@@ -7,6 +8,9 @@ using Automaton.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.DataProtection;
+using Automaton.Core.Enums;
+using Automaton.Core.Models;
 
 namespace Automaton.Api.Tests;
 
@@ -82,25 +86,115 @@ public class RunnerEnrollmentServiceTests
         Assert.That(first.EnrollmentToken, Is.Not.EqualTo(second.EnrollmentToken));
     }
 
+    [Test]
+    public async Task HostedRunnerEnrollment_UsesScopedOneTimeToken_ThenIssuesDurableCredential()
+    {
+        await using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var infrastructureRunner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infrastructure-host-1",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure)
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-1",
+            Provider = RunnerHostProviders.Hetzner,
+            InfrastructureRunnerId = infrastructureRunner.Id
+        };
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            RunnerHostId = host.Id,
+            Name = "managed-user",
+            ContainerName = "automaton-managed-user",
+            Status = HostedRunnerStatuses.Provisioning
+        };
+        var operationId = Guid.NewGuid();
+        db.Runners.Add(infrastructureRunner);
+        db.RunnerHosts.Add(host);
+        db.HostedRunners.Add(hostedRunner);
+        await db.SaveChangesAsync();
+
+        var auditService = new RecordingAuditEventService();
+        var apiKeyService = new ApiKeyService(
+            db,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ApiKeyService>.Instance,
+            authorizationService: null!,
+            auditService);
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var grantService = new ExecutionSecretGrantService(db, protector);
+        var service = new RunnerEnrollmentService(
+            db,
+            apiKeyService,
+            auditService,
+            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
+            Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
+            new SecretStore(db, protector),
+            grantService,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
+
+        var material = await service.CreateHostedRunnerAsync(
+            hostedRunner.Id,
+            operationId,
+            "provision-hosted-runner",
+            infrastructureRunner.Id,
+            CancellationToken.None);
+        var storedVersion = await db.SecretVersions.SingleAsync();
+        Assert.That(storedVersion.ProtectedValue, Does.Not.StartWith("re_"));
+        var lease = await grantService.LeaseAsync(
+            new SecretGrantScope(
+                operationId,
+                InfrastructureAppTrust.PlatformAppId,
+                "provision-hosted-runner",
+                infrastructureRunner.Id,
+                host.Id,
+                SecretOwnerTypes.HostedRunner,
+                hostedRunner.Id),
+            [material.SecretGrantId],
+            CancellationToken.None);
+        var enrollmentToken = lease.EnvironmentVariables["AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN"];
+        Assert.That(enrollmentToken, Does.StartWith("re_"));
+        Assert.That((await db.RunnerEnrollments.SingleAsync()).EnrollmentTokenHash, Does.Not.Contain(enrollmentToken));
+
+        var exchange = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
+        {
+            EnrollmentToken = enrollmentToken,
+            RunnerName = hostedRunner.Name,
+            RunnerVersion = "test",
+            MachineName = "managed-host"
+        }, CancellationToken.None);
+
+        Assert.That(exchange, Is.Not.Null);
+        Assert.That(exchange!.ApiKey, Does.StartWith("ak_runner_"));
+        Assert.That(exchange.Purpose, Is.EqualTo(RunnerPurposes.Managed));
+        Assert.That((await db.HostedRunners.SingleAsync()).RunnerId, Is.EqualTo(exchange.RunnerId));
+        Assert.That((await db.RunnerEnrollments.SingleAsync()).Status, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
+        Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
+        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        Assert.That(persistedGrant.ConsumedAtUtc, Is.Not.Null);
+        Assert.That(persistedGrant.RevokedAtUtc, Is.Not.Null);
+
+        var replay = await service.ExchangeAsync(
+            new RunnerEnrollmentExchangeRequest { EnrollmentToken = enrollmentToken },
+            CancellationToken.None);
+        Assert.That(replay, Is.Null);
+        Assert.That(await db.ApiKeys.CountAsync(), Is.EqualTo(1));
+    }
+
     private static RunnerEnrollmentService CreateService(ApplicationDbContext db)
     {
         var httpContextAccessor = new HttpContextAccessor();
         var userContextService = new UserContextService(httpContextAccessor);
         var authorizationService = new ResourceAuthorizationService(db, userContextService);
         var auditService = new RecordingAuditEventService();
-        var apiKeyService = new ApiKeyService(
-            db,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ApiKeyService>.Instance,
-            authorizationService,
-            auditService);
-
-        return new RunnerEnrollmentService(
-            db,
-            apiKeyService,
-            auditService,
-            Options.Create(new RunnerEnrollmentOptions { TokenLifetimeMinutes = 15 }),
-            Options.Create(new HostedRunnerOptions { DockerImage = "test/automaton-runner:latest" }),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
+        return TestRunnerEnrollmentFactory.Create(db, auditService);
     }
 
     private static ApplicationDbContext CreateDbContext()

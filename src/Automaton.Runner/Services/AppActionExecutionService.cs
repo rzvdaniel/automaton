@@ -53,6 +53,11 @@ public sealed class AppActionExecutionService
         var logsPath = Path.Combine(executionDirectory, "stderr.log");
         var resultPath = Path.Combine(executionDirectory, "result.json");
         var startedAt = DateTime.UtcNow;
+        var secretValues = request.Secrets.Values
+            .Where(value => !string.IsNullOrEmpty(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderByDescending(value => value.Length)
+            .ToArray();
         if (Encoding.UTF8.GetByteCount(input) > MaximumInputBytes)
             return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, null, AppModuleExecutionErrorCodes.InvalidInput,
                 "Action input exceeds the 1 MB limit.", deploymentHash, startedAt, logs: false, result: false);
@@ -102,22 +107,24 @@ public sealed class AppActionExecutionService
                 var errorCode = cancelled ? AppModuleExecutionErrorCodes.Cancelled : AppModuleExecutionErrorCodes.TimedOut;
                 var cancelledStderr = await stderrTask;
                 await stdoutTask;
-                await File.WriteAllTextAsync(logsPath, cancelledStderr.Content, CancellationToken.None);
+                await File.WriteAllTextAsync(logsPath, RedactSecrets(cancelledStderr.Content, secretValues), CancellationToken.None);
                 return Completed(request.ExecutionId, status, null, errorCode, errorCode, deploymentHash, startedAt, logs: true, result: false);
             }
 
             var stdout = await stdoutTask;
             var stderr = await stderrTask;
-            await File.WriteAllTextAsync(logsPath, stderr.Content, CancellationToken.None);
+            var redactedStdout = RedactSecrets(stdout.Content, secretValues);
+            var redactedStderr = RedactSecrets(stderr.Content, secretValues);
+            await File.WriteAllTextAsync(logsPath, redactedStderr, CancellationToken.None);
             if (stdout.ExceededLimit)
                 return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
                     AppModuleExecutionErrorCodes.ResultTooLarge, "Action output exceeded its configured limit.",
                     deploymentHash, startedAt, logs: true, result: false);
             if (process.ExitCode != 0)
-                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(stderr.Content, 1000), deploymentHash, startedAt, true, false);
+                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(redactedStderr, 1000), deploymentHash, startedAt, true, false);
             try
             {
-                using var outputDocument = JsonDocument.Parse(stdout.Content);
+                using var outputDocument = JsonDocument.Parse(redactedStdout);
                 var outputValidationError = AppActionSchemaValidator.Validate(outputDocument.RootElement, manifest.Spec.Output);
                 if (outputValidationError != null)
                     return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
@@ -127,7 +134,7 @@ public sealed class AppActionExecutionService
             {
                 return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.InvalidResult, "Action stdout was not valid JSON.", deploymentHash, startedAt, true, false);
             }
-            await File.WriteAllTextAsync(resultPath, stdout.Content, CancellationToken.None);
+            await File.WriteAllTextAsync(resultPath, redactedStdout, CancellationToken.None);
             return Completed(request.ExecutionId, AppModuleExecutionStatuses.Succeeded, process.ExitCode, null, null, deploymentHash, startedAt, true, true);
         }
         catch (Win32Exception ex)
@@ -272,6 +279,19 @@ public sealed class AppActionExecutionService
     }
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
+
+    private static string RedactSecrets(string value, IReadOnlyCollection<string> secretValues)
+    {
+        var redacted = value;
+        foreach (var secret in secretValues)
+        {
+            redacted = redacted.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+            var jsonEncoded = JsonSerializer.Serialize(secret);
+            if (jsonEncoded.Length > 2)
+                redacted = redacted.Replace(jsonEncoded[1..^1], "[REDACTED]", StringComparison.Ordinal);
+        }
+        return redacted;
+    }
 
     private sealed class ActiveExecution(CancellationTokenSource source)
     {
