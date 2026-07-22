@@ -301,6 +301,7 @@ public class HostedRunnerAuditTests
                 PreviousConnectionId TEXT NULL,
                 ReconnectAfterUtc TEXT NULL,
                 ReconnectDeadlineUtc TEXT NULL,
+                LastRecoveryAttemptUtc TEXT NULL,
                 FinishedAt TEXT NULL
             );
             CREATE TABLE AppModuleExecutions (

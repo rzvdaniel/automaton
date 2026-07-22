@@ -36,9 +36,10 @@ public sealed class AppModuleExecutionReconciliationService : BackgroundService
 
         foreach (var execution in stale)
         {
+            var wasDispatching = execution.Status == AppModuleExecutionStatuses.Dispatching;
             execution.Status = AppModuleExecutionStatuses.Lost;
             execution.ErrorCode = AppModuleExecutionErrorCodes.RunnerUnavailable;
-            execution.FailureSummary = execution.Status == AppModuleExecutionStatuses.Dispatching
+            execution.FailureSummary = wasDispatching
                 ? "Execution dispatch was not confirmed before the reconciliation timeout."
                 : "Execution exceeded its configured deadline without a terminal result.";
             execution.CompletedAtUtc = DateTime.UtcNow;

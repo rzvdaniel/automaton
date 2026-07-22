@@ -32,5 +32,6 @@ public class HostedRunnerDeployment
     public string? PreviousConnectionId { get; set; }
     public DateTime? ReconnectAfterUtc { get; set; }
     public DateTime? ReconnectDeadlineUtc { get; set; }
+    public DateTime? LastRecoveryAttemptUtc { get; set; }
     public DateTime? FinishedAt { get; set; }
 }

@@ -28,4 +28,6 @@ public class HostedRunnerOptions
     public int SshConnectTimeoutSeconds { get; set; } = 20;
     public int SshCommandTimeoutSeconds { get; set; } = 180;
     public int RestartReconnectTimeoutSeconds { get; set; } = 120;
+    public int LifecycleRecoveryDelaySeconds { get; set; } = 300;
+    public int LifecycleRecoveryRetrySeconds { get; set; } = 300;
 }

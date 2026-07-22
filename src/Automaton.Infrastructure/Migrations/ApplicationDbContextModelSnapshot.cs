@@ -1508,6 +1508,9 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid>("HostedRunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<DateTime?>("LastRecoveryAttemptUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("Logs")
                         .HasColumnType("longtext");
 
@@ -1537,6 +1540,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("HostedRunnerId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("Status", "LastRecoveryAttemptUtc");
 
                     b.HasIndex("Status", "ReconnectDeadlineUtc");
 
