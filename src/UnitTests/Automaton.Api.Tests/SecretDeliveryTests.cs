@@ -3,6 +3,8 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Automaton.Api.Tests;
 
@@ -122,6 +124,48 @@ public sealed class SecretDeliveryTests
         var retry = await grants.LeaseAsync(scope, [grantId], CancellationToken.None);
         Assert.That(retry.EnvironmentVariables["RETRYABLE_CREDENTIAL"], Is.EqualTo("temporary-value"));
         Assert.That(persistedGrant.ReadCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task Cleanup_RevokesExpiredGrantAndVersionWithoutDeletingMetadata()
+    {
+        await using var db = CreateDbContext();
+        var protector = new DataProtectionSecretProtector(new EphemeralDataProtectionProvider());
+        var store = new SecretStore(db, protector);
+        var grants = new ExecutionSecretGrantService(db, protector);
+        var ownerId = Guid.NewGuid();
+        var scope = CreateScope(ownerId);
+        var version = await store.CreateVersionAsync(
+            new SecretOwner(SecretOwnerTypes.HostedRunner, ownerId),
+            "expiring-secret",
+            "cleanup-secret",
+            DateTime.UtcNow.AddMinutes(10),
+            CancellationToken.None);
+        await grants.CreateGrantAsync(
+            version.SecretVersionId,
+            scope,
+            "AUTOMATON_TOKEN",
+            DateTime.UtcNow.AddMinutes(5),
+            CancellationToken.None);
+        var persistedVersion = await db.SecretVersions.SingleAsync();
+        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        persistedVersion.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        persistedGrant.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        await db.SaveChangesAsync();
+
+        using var services = new ServiceCollection()
+            .AddSingleton(db)
+            .BuildServiceProvider();
+        var cleanup = new SecretGrantCleanupService(
+            services.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<SecretGrantCleanupService>.Instance);
+        await cleanup.CleanupAsync(CancellationToken.None);
+
+        Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
+        Assert.That((await db.ExecutionSecretGrants.SingleAsync()).RevokedAtUtc, Is.Not.Null);
+        Assert.That(await db.SecretDefinitions.CountAsync(), Is.EqualTo(1));
+        Assert.That(await db.SecretVersions.CountAsync(), Is.EqualTo(1));
+        Assert.That(await db.ExecutionSecretGrants.CountAsync(), Is.EqualTo(1));
     }
 
     private static SecretGrantScope CreateScope(Guid ownerId) => new(
