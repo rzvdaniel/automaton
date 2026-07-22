@@ -12,7 +12,11 @@ probe = subprocess.run(
     ["automaton-host-exec", "docker", "container", "inspect", container_name],
     check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 if probe.returncode == 0:
-    subprocess.run(["automaton-host-exec", "docker", "rm", "-f", container_name], check=True)
+    result = subprocess.run(
+        ["automaton-host-exec", "docker", "rm", "-f", container_name],
+        check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"Host command failed with exit status {result.returncode}")
 elif "No such" not in probe.stderr:
     raise RuntimeError(probe.stderr.strip() or "Docker container inspection failed")
 print(json.dumps({"success": True, "containerName": container_name}, separators=(",", ":")))
