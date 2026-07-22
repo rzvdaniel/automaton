@@ -43,7 +43,7 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
-    public async Task EnsureHostedRunnerForUserPlanAsync_WritesRequestedAndSucceededAuditEvents()
+    public async Task EnsureHostedRunnerForUserPlanAsync_WritesRequestedAuditAndQueuesProvisioning()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -74,18 +74,14 @@ public class HostedRunnerAuditTests
 
         Assert.That(auditEvents.Select(x => x.EventType), Is.EqualTo(new[]
         {
-            AuditEventTypes.HostedRunnerProvisioningRequested,
-            AuditEventTypes.HostedRunnerProvisioningSucceeded
+            AuditEventTypes.HostedRunnerProvisioningRequested
         }));
-
         Assert.That(auditEvents[0].Outcome, Is.EqualTo(AuditOutcomes.Success));
-        Assert.That(auditEvents[1].Outcome, Is.EqualTo(AuditOutcomes.Success));
-        Assert.That(auditEvents[1].MetadataJson, Does.Not.Contain("ak_runner_"));
-        Assert.That(auditEvents[1].MetadataJson, Does.Contain("container-123"));
+        Assert.That(runner!.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
     }
 
     [Test]
-    public async Task EnsureHostedRunnerForUserPlanAsync_WritesFailedAuditEventWithSafeSummary()
+    public async Task EnsureHostedRunnerForUserPlanAsync_DoesNotRunDockerSynchronously()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -110,13 +106,8 @@ public class HostedRunnerAuditTests
 
         Assert.That(runner, Is.Not.Null);
 
-        var failedEvent = await db.AuditEvents
-            .SingleAsync(x => x.EventType == AuditEventTypes.HostedRunnerProvisioningFailed);
-
-        Assert.That(failedEvent.Outcome, Is.EqualTo(AuditOutcomes.Failed));
-        Assert.That(failedEvent.Message, Does.Contain("provisioning failed"));
-        Assert.That(failedEvent.MetadataJson, Does.Contain("failureSummary"));
-        Assert.That(failedEvent.MetadataJson, Does.Not.Contain("token=abc"));
+        Assert.That(runner!.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
+        Assert.That(await db.AuditEvents.AnyAsync(x => x.EventType == AuditEventTypes.HostedRunnerProvisioningFailed), Is.False);
     }
 
     [Test]
@@ -288,7 +279,7 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
-    public async Task RestartAsAdminAsync_WritesRequestedAndSucceededAuditEvents()
+    public async Task RestartAsAdminAsync_WritesRequestedAuditAndQueuesAction()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -310,15 +301,13 @@ public class HostedRunnerAuditTests
 
         Assert.That(auditEvents.Select(x => x.EventType), Is.EqualTo(new[]
         {
-            AuditEventTypes.RunnerRestartRequested,
-            AuditEventTypes.RunnerRestartSucceeded
+            AuditEventTypes.RunnerRestartRequested
         }));
-
-        Assert.That(auditEvents[^1].Outcome, Is.EqualTo(AuditOutcomes.Success));
+        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
     }
 
     [Test]
-    public void RestartAsAdminAsync_WritesFailedAuditEvent()
+    public async Task RestartAsAdminAsync_DoesNotExecuteDockerSynchronously()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -332,17 +321,14 @@ public class HostedRunnerAuditTests
                 ScriptResult = new HostedRunnerRemoteExecutionResult(false, 125, string.Empty, "docker restart secret=abc failed")
             });
 
-        Assert.ThrowsAsync<InvalidOperationException>(() =>
-            managementService.RestartAsAdminAsync(hostedRunner.Id, CancellationToken.None));
+        await managementService.RestartAsAdminAsync(hostedRunner.Id, CancellationToken.None);
 
-        var failedEvent = db.AuditEvents.Single(x => x.EventType == AuditEventTypes.RunnerRestartFailed);
-        Assert.That(failedEvent.Outcome, Is.EqualTo(AuditOutcomes.Failed));
-        Assert.That(failedEvent.MetadataJson, Does.Contain("failureSummary"));
-        Assert.That(failedEvent.MetadataJson, Does.Not.Contain("secret=abc"));
+        Assert.That(db.AuditEvents.Any(x => x.EventType == AuditEventTypes.RunnerRestartFailed), Is.False);
+        Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
     }
 
     [Test]
-    public async Task ReprovisionAsAdminAsync_WritesRequestedAndSucceededAuditEvents()
+    public async Task ReprovisionAsAdminAsync_WritesRequestedAuditAndWaitsForRegistration()
     {
         using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -366,9 +352,9 @@ public class HostedRunnerAuditTests
             .ToListAsync();
 
         Assert.That(eventTypes, Does.Contain(AuditEventTypes.RunnerReprovisionRequested));
-        Assert.That(eventTypes, Does.Contain(AuditEventTypes.RunnerReprovisionSucceeded));
+        Assert.That(eventTypes, Does.Not.Contain(AuditEventTypes.RunnerReprovisionSucceeded));
         Assert.That(eventTypes, Does.Contain(AuditEventTypes.HostedRunnerProvisioningRequested));
-        Assert.That(eventTypes, Does.Contain(AuditEventTypes.HostedRunnerProvisioningSucceeded));
+        Assert.That(eventTypes, Does.Not.Contain(AuditEventTypes.HostedRunnerProvisioningSucceeded));
     }
 
     [Test]
@@ -562,7 +548,7 @@ public class HostedRunnerAuditTests
         return new HostedRunnerProvisioningService(
             db,
             apiKeyService,
-            new HostedRunnerRemoteCommandExecutorResolver([remoteExecutor]),
+            new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(options),
             new HostedRunnerSpecificationResolver(db),
             auditEventService,
@@ -590,7 +576,7 @@ public class HostedRunnerAuditTests
         return new HostedRunnerManagementService(
             db,
             provisioningService,
-            new HostedRunnerRemoteCommandExecutorResolver([remoteExecutor]),
+            new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = true,
@@ -616,15 +602,13 @@ public class HostedRunnerAuditTests
         };
     }
 
-    private sealed class FakeHostedRunnerRemoteCommandExecutor : IHostedRunnerRemoteCommandExecutor
+    private sealed class FakeHostedRunnerRemoteCommandExecutor
     {
         public HostedRunnerRemoteExecutionResult ScriptResult { get; init; } =
             new(true, 0, string.Empty, string.Empty);
 
         public HostedRunnerRemoteExecutionResult ProvisionResult { get; init; } =
             new(true, 0, "container-default", string.Empty);
-
-        public bool CanHandle(RunnerHost host, HostedRunnerOptions options) => true;
 
         public Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
             RunnerHost host,

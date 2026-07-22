@@ -115,4 +115,34 @@ public class AppActionManifestParserTests
         Assert.That(AppActionSchemaValidator.Validate(wrongType.RootElement, manifest.Spec.Input), Does.Contain("string"));
         Assert.That(AppActionSchemaValidator.Validate(valid.RootElement, manifest.Spec.Input), Is.Null);
     }
+
+    [TestCase("provision-hosted-runner")]
+    [TestCase("reprovision-hosted-runner")]
+    [TestCase("restart-hosted-runner")]
+    [TestCase("delete-hosted-runner")]
+    public void ParsesTrustedInfrastructureLifecycleAction(string actionKey)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var actionRoot = Path.Combine(repositoryRoot, "system-apps", "automaton-infrastructure", "actions", actionKey);
+
+        var manifest = AppActionManifestParser.ParseFile(
+            Path.Combine(actionRoot, "action.yaml"),
+            actionKey,
+            allowPrivilegedCapabilities: true);
+
+        Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Docker));
+        Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Host));
+        Assert.That(File.Exists(Path.Combine(actionRoot, manifest.Spec.Entrypoint)), Is.True);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "system-apps"))) return directory.FullName;
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("Repository root was not found from the test output directory.");
+    }
 }

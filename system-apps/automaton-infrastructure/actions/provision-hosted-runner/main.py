@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import PurePosixPath
+
+
+SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
+
+
+def require_name(value: object, field: str) -> str:
+    text = str(value or "")
+    if not SAFE_NAME.fullmatch(text):
+        raise ValueError(f"{field} contains unsupported characters")
+    return text
+
+
+def require_positive_int(value: object, field: str) -> int:
+    number = int(value)
+    if number <= 0:
+        raise ValueError(f"{field} must be positive")
+    return number
+
+
+def host(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["automaton-host-exec", *arguments],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if check and result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"Host command failed with exit status {result.returncode}")
+    return result
+
+
+def main() -> None:
+    request = json.load(sys.stdin)
+    runner_id = require_name(request["hostedRunnerId"], "hostedRunnerId")
+    container_name = require_name(request["containerName"], "containerName")
+    runner_name = require_name(request["runnerName"], "runnerName")
+    image = str(request["image"])
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/:@-]{0,299}", image):
+        raise ValueError("image is invalid")
+    network = require_name(request["networkName"], "networkName")
+    runtime_network = request.get("runtimeNetworkName")
+    if runtime_network:
+        runtime_network = require_name(runtime_network, "runtimeNetworkName")
+    volume = require_name(request["volumeName"], "volumeName")
+    api_url = str(request["apiUrl"])
+    if not api_url.startswith(("https://", "http://")):
+        raise ValueError("apiUrl must be an HTTP(S) URL")
+    api_key = os.environ.get("AUTOMATON_PROVISION_RUNNER_API_KEY", "")
+    if not api_key.startswith("ak_runner_"):
+        raise ValueError("Runner API key was not provided")
+
+    data_root = PurePosixPath(str(request["dataRoot"]))
+    if not data_root.is_absolute() or ".." in data_root.parts:
+        raise ValueError("dataRoot must be an absolute safe path")
+    runner_root = data_root / runner_id
+    config_path = str(runner_root / "config")
+    logs_path = str(runner_root / "logs")
+
+    memory_mb = require_positive_int(request["memoryMb"], "memoryMb")
+    reservation_mb = require_positive_int(request["memoryReservationMb"], "memoryReservationMb")
+    pids_limit = require_positive_int(request["pidsLimit"], "pidsLimit")
+    runner_port = require_positive_int(request["runnerPort"], "runnerPort")
+    cpu_limit = float(request["cpuLimit"])
+    if cpu_limit <= 0:
+        raise ValueError("cpuLimit must be positive")
+
+    host("mkdir", "-p", config_path, logs_path)
+    host("chown", "-R", "1000:1000", config_path, logs_path)
+    host("docker", "volume", "create", volume)
+    if host("docker", "network", "inspect", network, check=False).returncode != 0:
+        host("docker", "network", "create", network)
+    if runtime_network and host("docker", "network", "inspect", runtime_network, check=False).returncode != 0:
+        host("docker", "network", "create", runtime_network)
+    host("docker", "rm", "-f", container_name, check=False)
+
+    docker_arguments = [
+        "docker", "run", "-d",
+        "--name", container_name,
+        "--restart", "unless-stopped",
+        "--cpus", str(cpu_limit),
+        "--memory", f"{memory_mb}m",
+        "--memory-reservation", f"{reservation_mb}m",
+        "--pids-limit", str(pids_limit),
+        "--network", network,
+        "-e", f"AUTOMATON_SERVER_URL={api_url}",
+        "-e", f"AUTOMATON_API_KEY={api_key}",
+        "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
+        "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
+        "-v", f"{config_path}:/home/automaton/.config/AutomatonRunner",
+        "-v", f"{volume}:/automaton/workspace",
+        "-v", f"{logs_path}:/app/logs",
+    ]
+    published_port = request.get("publishedPort")
+    if published_port is not None:
+        published_port = require_positive_int(published_port, "publishedPort")
+        docker_arguments.extend(["-p", f"{published_port}:{runner_port}"])
+    docker_arguments.append(image)
+
+    container_id = host(*docker_arguments).stdout.strip()
+    if runtime_network and runtime_network != network:
+        host("docker", "network", "connect", runtime_network, container_name, check=False)
+
+    response = {
+        "success": True,
+        "containerId": container_id,
+        "containerName": container_name,
+    }
+    if published_port is not None:
+        response["publishedPort"] = published_port
+    print(json.dumps(response, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()

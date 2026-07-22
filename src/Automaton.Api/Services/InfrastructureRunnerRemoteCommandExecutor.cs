@@ -20,18 +20,8 @@ namespace Automaton.Api.Services;
 public sealed class InfrastructureRunnerRemoteCommandExecutor(
     ApplicationDbContext db,
     IHubContext<AutomatonHub> automatonHub,
-    ILogger<InfrastructureRunnerRemoteCommandExecutor> logger) : IHostedRunnerRemoteCommandExecutor, IInfrastructureRunnerCommandExecutor
+    ILogger<InfrastructureRunnerRemoteCommandExecutor> logger) : IInfrastructureRunnerCommandExecutor
 {
-    public bool CanHandle(RunnerHost host, HostedRunnerOptions options)
-        => host.InfrastructureRunnerId.HasValue
-           && string.Equals(host.ProvisioningTransport, RunnerHostProvisioningTransports.InfrastructureRunner, StringComparison.Ordinal);
-
-    public Task<HostedRunnerRemoteExecutionResult> ExecuteProvisionScriptAsync(
-        RunnerHost host,
-        string script,
-        CancellationToken cancellationToken)
-        => ExecuteScriptAsync(host, script, cancellationToken);
-
     public async Task<HostedRunnerRemoteExecutionResult> ExecuteScriptAsync(
         RunnerHost host,
         string script,

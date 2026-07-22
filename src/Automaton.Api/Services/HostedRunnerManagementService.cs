@@ -4,6 +4,9 @@ using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +16,7 @@ public class HostedRunnerManagementService
 {
     private readonly ApplicationDbContext db;
     private readonly HostedRunnerProvisioningService provisioningService;
-    private readonly IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver;
+    private readonly IEventPublisher eventPublisher;
     private readonly HostedRunnerOptions options;
     private readonly IAuditEventService auditEventService;
     private readonly UserContextService userContextService;
@@ -24,7 +27,7 @@ public class HostedRunnerManagementService
     public HostedRunnerManagementService(
         ApplicationDbContext db,
         HostedRunnerProvisioningService provisioningService,
-        IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
+        IEventPublisher eventPublisher,
         IOptionsSnapshot<HostedRunnerOptions> options,
         IAuditEventService auditEventService,
         UserContextService userContextService,
@@ -32,7 +35,7 @@ public class HostedRunnerManagementService
     {
         this.db = db;
         this.provisioningService = provisioningService;
-        this.remoteCommandExecutorResolver = remoteCommandExecutorResolver;
+        this.eventPublisher = eventPublisher;
         this.options = options.Value;
         this.auditEventService = auditEventService;
         this.userContextService = userContextService;
@@ -54,8 +57,6 @@ public class HostedRunnerManagementService
     public async Task DeleteAsAdminAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
     {
         var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
-        var host = hostedRunner.RunnerHost;
-
         hostedRunner.Status = HostedRunnerStatuses.Deleting;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         var appAssignments = await db.WebApps
@@ -66,82 +67,14 @@ public class HostedRunnerManagementService
             app.ExecutionRunnerId = null;
         }
 
-        AddDeployment(
+        var deployment = AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentActions.Deprovision,
             HostedRunnerDeploymentStatuses.Running,
-            $"docker rm -f {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)}",
+            "Trusted infrastructure Action: delete-hosted-runner.",
             "Hosted runner deletion requested.");
         await db.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            if (host != null && !string.IsNullOrWhiteSpace(hostedRunner.ContainerName))
-            {
-                var executor = remoteCommandExecutorResolver.Resolve(host, options);
-                var script = string.Join('\n', new[]
-                {
-                    "set -eu",
-                    $"docker rm -f {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)} >/dev/null 2>&1 || true"
-                });
-                var result = await executor.ExecuteScriptAsync(host, script, cancellationToken);
-                if (!result.Succeeded)
-                {
-                    throw new InvalidOperationException(BuildRemoteFailureMessage(result));
-                }
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.DeleteFailed;
-            hostedRunner.LastError = ex.Message;
-            hostedRunner.UpdatedAt = DateTime.UtcNow;
-            var deployment = hostedRunner.Deployments.OrderByDescending(x => x.StartedAt).First();
-            CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, null, ex.Message);
-            await db.SaveChangesAsync(cancellationToken);
-            await auditEventService.WriteAsync(new AuditEventWriteRequest
-            {
-                Action = AuditActions.Failed,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = hostedRunner.Id,
-                EventType = AuditEventTypes.HostedRunnerDeleteFailed,
-                Outcome = AuditOutcomes.Failed,
-                Message = $"Hosted runner '{hostedRunner.Name}' deletion failed",
-                TargetUserId = hostedRunner.UserId,
-                Metadata = new { hostedRunner.Name, hostedRunner.ContainerName, Error = ex.Message }
-            }, cancellationToken);
-            throw;
-        }
-
-        var completedDeployment = hostedRunner.Deployments.OrderByDescending(x => x.StartedAt).First();
-        CompleteDeployment(completedDeployment, HostedRunnerDeploymentStatuses.Succeeded, null, null);
-        hostedRunner.ApiKeyId = null;
-        hostedRunner.RunnerId = null;
-        hostedRunner.ContainerId = null;
-        hostedRunner.RuntimeEndpoint = null;
-        hostedRunner.Status = HostedRunnerStatuses.Deleted;
-        hostedRunner.DeletedAt = DateTime.UtcNow;
-        hostedRunner.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-
-        await auditEventService.WriteAsync(new AuditEventWriteRequest
-        {
-            Action = AuditActions.Deleted,
-            EntityType = AuditEntityTypes.HostedRunner,
-            EntityId = hostedRunner.Id,
-            EventType = AuditEventTypes.HostedRunnerDeleted,
-            Outcome = AuditOutcomes.Success,
-            Message = $"Hosted runner '{hostedRunner.Name}' was deleted",
-            TargetUserId = hostedRunner.UserId,
-            Metadata = new
-            {
-                hostedRunner.Name,
-                hostedRunner.RunnerId,
-                hostedRunner.RunnerHostId,
-                hostedRunner.ContainerName
-            }
-        }, cancellationToken);
-
+        await PublishLifecycleActionAsync(hostedRunner, deployment, "delete-hosted-runner", cancellationToken);
     }
 
     public async Task RestartOwnedHostedRunnerByRunnerIdAsync(Guid runnerId, CancellationToken cancellationToken)
@@ -197,102 +130,13 @@ public class HostedRunnerManagementService
             hostedRunner,
             HostedRunnerDeploymentActions.Restart,
             HostedRunnerDeploymentStatuses.Running,
-            $"docker restart {hostedRunner.ContainerName}",
+            "Trusted infrastructure Action: restart-hosted-runner.",
             "Restart requested.");
 
         await db.SaveChangesAsync(cancellationToken);
 
-        IHostedRunnerRemoteCommandExecutor executor;
-        try
-        {
-            executor = remoteCommandExecutorResolver.Resolve(host, options);
-        }
-        catch (InvalidOperationException ex)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = ex.Message;
-            hostedRunner.UpdatedAt = DateTime.UtcNow;
-            CompleteDeployment(
-                deployment,
-                HostedRunnerDeploymentStatuses.Failed,
-                null,
-                hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            throw new InvalidOperationException(hostedRunner.LastError);
-        }
-        var script = string.Join('\n', new[]
-        {
-            "set -eu",
-            $"docker restart {HostedRunnerDockerCommandBuilder.ShellQuote(hostedRunner.ContainerName)}"
-        });
-
-        var executionResult = await executor.ExecuteScriptAsync(host, script, cancellationToken);
-        if (!executionResult.Succeeded)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = BuildRemoteFailureMessage(executionResult);
-            var failureSummary = $"Hosted runner restart failed with exit status {executionResult.ExitStatus}.";
-            hostedRunner.UpdatedAt = DateTime.UtcNow;
-            CompleteDeployment(
-                deployment,
-                HostedRunnerDeploymentStatuses.Failed,
-                executionResult.StandardOutput,
-                hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            await auditEventService.WriteAsync(
-                new AuditEventWriteRequest
-                {
-                    Action = AuditActions.Failed,
-                    EntityType = AuditEntityTypes.HostedRunner,
-                    EntityId = hostedRunner.Id,
-                    EventType = AuditEventTypes.RunnerRestartFailed,
-                    Outcome = AuditOutcomes.Failed,
-                    Message = $"Hosted runner '{hostedRunner.Name}' restart failed",
-                    TargetUserId = hostedRunner.UserId,
-                    Metadata = new
-                    {
-                        hostedRunner.Name,
-                        hostedRunner.RunnerId,
-                        hostedRunner.RunnerHostId,
-                        RunnerHostName = host.Name,
-                        hostedRunner.ContainerName,
-                        FailureSummary = failureSummary
-                    }
-                },
-                cancellationToken);
-            throw new InvalidOperationException(hostedRunner.LastError);
-        }
-
-        hostedRunner.LastError = null;
-        hostedRunner.UpdatedAt = DateTime.UtcNow;
-        CompleteDeployment(
-            deployment,
-            HostedRunnerDeploymentStatuses.Succeeded,
-            executionResult.StandardOutput,
-            string.IsNullOrWhiteSpace(executionResult.StandardError) ? null : executionResult.StandardError);
-        await db.SaveChangesAsync(cancellationToken);
-        await auditEventService.WriteAsync(
-            new AuditEventWriteRequest
-            {
-                Action = AuditActions.Succeeded,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = hostedRunner.Id,
-                EventType = AuditEventTypes.RunnerRestartSucceeded,
-                Outcome = AuditOutcomes.Success,
-                Message = $"Hosted runner '{hostedRunner.Name}' restart succeeded",
-                TargetUserId = hostedRunner.UserId,
-                Metadata = new
-                {
-                    hostedRunner.Name,
-                    hostedRunner.RunnerId,
-                    hostedRunner.RunnerHostId,
-                    RunnerHostName = host.Name,
-                    hostedRunner.ContainerName
-                }
-            },
-            cancellationToken);
-
-        logger.LogInformation("Hosted runner {HostedRunnerId} restarted on host {HostId}", hostedRunner.Id, host.Id);
+        await PublishLifecycleActionAsync(hostedRunner, deployment, "restart-hosted-runner", cancellationToken);
+        logger.LogInformation("Hosted runner {HostedRunnerId} restart queued on host {HostId}", hostedRunner.Id, host.Id);
         return hostedRunner;
     }
 
@@ -329,13 +173,6 @@ public class HostedRunnerManagementService
         hostedRunner.LastError = null;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
 
-        AddDeployment(
-            hostedRunner,
-            HostedRunnerDeploymentActions.Reprovision,
-            HostedRunnerDeploymentStatuses.Succeeded,
-            null,
-            "Hosted runner reprovision requested. Starting a fresh deployment cycle.");
-
         await db.SaveChangesAsync(cancellationToken);
 
         var reprovisioned = await provisioningService.EnsureHostedRunnerAsync(
@@ -365,27 +202,6 @@ public class HostedRunnerManagementService
                 cancellationToken);
             throw new InvalidOperationException("Hosted runner reprovisioning could not start.");
         }
-
-        await auditEventService.WriteAsync(
-            new AuditEventWriteRequest
-            {
-                Action = AuditActions.Succeeded,
-                EntityType = AuditEntityTypes.HostedRunner,
-                EntityId = reprovisioned.Id,
-                EventType = AuditEventTypes.RunnerReprovisionSucceeded,
-                Outcome = AuditOutcomes.Success,
-                Message = $"Hosted runner '{reprovisioned.Name}' reprovision started",
-                TargetUserId = reprovisioned.UserId,
-                Metadata = new
-                {
-                    reprovisioned.Name,
-                    reprovisioned.RunnerId,
-                    reprovisioned.RunnerHostId,
-                    reprovisioned.HostedRunnerSpecificationId,
-                    reprovisioned.Status
-                }
-            },
-            cancellationToken);
 
         return reprovisioned;
     }
@@ -431,25 +247,23 @@ public class HostedRunnerManagementService
         return deployment;
     }
 
-    private static void CompleteDeployment(
-        HostedRunnerDeployment deployment,
-        string status,
-        string? logs,
-        string? error)
+    private Task PublishLifecycleActionAsync(HostedRunner runner, HostedRunnerDeployment deployment, string actionKey, CancellationToken cancellationToken)
     {
-        deployment.Status = status;
-        deployment.Logs = logs;
-        deployment.Error = error;
-        deployment.FinishedAt = DateTime.UtcNow;
-    }
-
-    private static string BuildRemoteFailureMessage(HostedRunnerRemoteExecutionResult result)
-    {
-        if (!string.IsNullOrWhiteSpace(result.StandardError))
+        var hostId = runner.RunnerHostId ?? throw new InvalidOperationException("Hosted runner has no assigned host.");
+        return eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
         {
-            return result.StandardError;
-        }
-
-        return $"Remote command failed with exit status {result.ExitStatus}.";
+            OperationId = deployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = hostId,
+            ActionKey = actionKey,
+            InputJson = JsonSerializer.Serialize(new
+            {
+                operationId = deployment.Id,
+                hostedRunnerId = runner.Id,
+                containerName = runner.ContainerName
+            }),
+            CorrelationId = Guid.NewGuid().ToString("N")
+        }, cancellationToken);
     }
 }

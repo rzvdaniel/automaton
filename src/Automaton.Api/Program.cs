@@ -196,6 +196,9 @@ services.AddAuthorization(options =>
 services.AddHttpClient();
 services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>();
 services.AddSingleton<IEventPublisher, CapEventPublisher>();
+services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
+services.AddScoped<InfrastructureActionProvisioningHandler>();
+services.AddScoped<TrustedInfrastructureActionDeploymentService>();
 services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 services.AddCap(options =>
 {
@@ -414,12 +417,8 @@ services.AddScoped<IAiGuidanceRuntimeService, AiGuidanceRuntimeService>();
 services.AddScoped<IAutomatonGuidanceRuntimeProvider, AiGuidanceRuntimeService>();
 services.AddScoped<AdminAiGuidanceService>();
 services.AddScoped<AdminDocumentationService>();
-services.AddScoped<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
-services.AddScoped<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
-services.AddScoped<IHostedRunnerRemoteCommandExecutor, InfrastructureRunnerRemoteCommandExecutor>();
 services.AddScoped<InfrastructureRunnerRemoteCommandExecutor>();
 services.AddScoped<IInfrastructureRunnerCommandExecutor>(sp => sp.GetRequiredService<InfrastructureRunnerRemoteCommandExecutor>());
-services.AddScoped<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 services.AddScoped<HostedRunnerProvisioningService>();
 services.AddScoped<IHostedRunnerSpecificationResolver, HostedRunnerSpecificationResolver>();
 services.AddScoped<HostedRunnerManagementService>();

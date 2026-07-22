@@ -174,8 +174,9 @@ public class RunnerService
 
         var result = await dbContext.SaveChangesAsync(cancellationToken);
 
-        LinkHostedRunnerAfterRegistration(runner);
+        var completedHostedRunnerAction = LinkHostedRunnerAfterRegistration(runner, runnerModel.HostedRunnerId);
         result += await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteHostedRunnerRegistrationCompletionAuditAsync(completedHostedRunnerAction, runner, cancellationToken);
 
         await auditEventService.WriteAsync(new AuditEventWriteRequest
         {
@@ -213,26 +214,27 @@ public class RunnerService
             select userRole).AnyAsync(cancellationToken);
     }
 
-    private void LinkHostedRunnerAfterRegistration(Runner runner)
+    private string? LinkHostedRunnerAfterRegistration(Runner runner, Guid? hostedRunnerId)
     {
         var hostedRunner = dbContext.HostedRunners
             .Include(x => x.Deployments)
             .FirstOrDefault(x =>
                 x.UserId == UserId &&
-                x.Name == runner.Name &&
+                (hostedRunnerId.HasValue ? x.Id == hostedRunnerId.Value : x.Name == runner.Name) &&
                 x.RunnerId == null &&
                 x.DeletedAt == null &&
                 (x.Status == HostedRunnerStatuses.Pending || x.Status == HostedRunnerStatuses.Provisioning));
 
         if (hostedRunner == null)
         {
-            return;
+            return null;
         }
 
         hostedRunner.RunnerId = runner.Id;
         hostedRunner.Status = HostedRunnerStatuses.Running;
         hostedRunner.ProvisionedAt ??= DateTime.UtcNow;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
+        ApplyPendingHostedRunnerSpecification(hostedRunner);
 
         var deployment = hostedRunner.Deployments
             .Where(x => x.Action == HostedRunnerDeploymentActions.Provision && x.Status == HostedRunnerDeploymentStatuses.Running)
@@ -247,15 +249,16 @@ public class RunnerService
         }
 
         logger.Debug("Hosted runner {HostedRunnerId} linked to registered runner {RunnerId}", hostedRunner.Id, runner.Id);
+        return deployment?.Action;
     }
 
-    private void LinkHostedRunnerAfterReconnect(Runner runner, Guid userId)
+    private string? LinkHostedRunnerAfterReconnect(Runner runner, Guid userId, Guid? hostedRunnerId)
     {
         var hostedRunner = dbContext.HostedRunners
             .Include(x => x.Deployments)
             .FirstOrDefault(x =>
                 x.UserId == userId &&
-                x.Name == runner.Name &&
+                (hostedRunnerId.HasValue ? x.Id == hostedRunnerId.Value : x.Name == runner.Name) &&
                 x.RunnerId == null &&
                 x.DeletedAt == null &&
                 (x.Status == HostedRunnerStatuses.Pending
@@ -264,7 +267,7 @@ public class RunnerService
 
         if (hostedRunner == null)
         {
-            return;
+            return null;
         }
 
         hostedRunner.RunnerId = runner.Id;
@@ -272,6 +275,7 @@ public class RunnerService
         hostedRunner.ProvisionedAt ??= DateTime.UtcNow;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
         hostedRunner.LastError = null;
+        ApplyPendingHostedRunnerSpecification(hostedRunner);
 
         var deployment = hostedRunner.Deployments
             .Where(x =>
@@ -289,6 +293,35 @@ public class RunnerService
         }
 
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
+        return deployment?.Action;
+    }
+
+    private async Task WriteHostedRunnerRegistrationCompletionAuditAsync(string? action, Runner runner, CancellationToken cancellationToken)
+    {
+        if (action is not (HostedRunnerDeploymentActions.Provision or HostedRunnerDeploymentActions.Reprovision)) return;
+        var hostedRunner = await dbContext.HostedRunners.AsNoTracking().SingleAsync(x => x.RunnerId == runner.Id && x.DeletedAt == null, cancellationToken);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Succeeded,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = hostedRunner.Id,
+            EventType = action == HostedRunnerDeploymentActions.Reprovision
+                ? AuditEventTypes.RunnerReprovisionSucceeded
+                : AuditEventTypes.HostedRunnerProvisioningSucceeded,
+            Outcome = AuditOutcomes.Success,
+            Message = $"Hosted runner '{hostedRunner.Name}' registered successfully after {action.ToLowerInvariant()}",
+            TargetUserId = hostedRunner.UserId,
+            Metadata = new { hostedRunner.Name, hostedRunner.RunnerHostId, RunnerId = runner.Id, DeploymentAction = action }
+        }, cancellationToken);
+    }
+
+    private static void ApplyPendingHostedRunnerSpecification(HostedRunner hostedRunner)
+    {
+        if (hostedRunner.PendingSpecificationSnapshot == null) return;
+        hostedRunner.SpecificationSnapshot = hostedRunner.PendingSpecificationSnapshot;
+        hostedRunner.HostedRunnerSpecificationId = hostedRunner.SpecificationSnapshot.SourceSpecificationId;
+        hostedRunner.SpecificationRevision = hostedRunner.SpecificationSnapshot.SourceSpecificationRevision;
+        hostedRunner.PendingSpecificationSnapshot = null;
     }
 
     public async Task UpdateConnection(Guid runnerId, Guid userId, RunnerDetails runnerConnection, CancellationToken cancellationToken)
@@ -346,8 +379,9 @@ public class RunnerService
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        LinkHostedRunnerAfterReconnect(runner, userId);
+        var completedHostedRunnerAction = LinkHostedRunnerAfterReconnect(runner, userId, runnerConnection.HostedRunnerId);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteHostedRunnerRegistrationCompletionAuditAsync(completedHostedRunnerAction, runner, cancellationToken);
         await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
 
         await WriteRunnerApplicationEventsAsync(

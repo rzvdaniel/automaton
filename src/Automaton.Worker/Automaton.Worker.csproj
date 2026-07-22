@@ -12,7 +12,6 @@
     <PackageReference Include="DotNetCore.CAP.MySql" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.RabbitMQ" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
-    <PackageReference Include="SSH.NET" Version="2024.2.0" />
     <PackageReference Include="Serilog" Version="4.1.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />

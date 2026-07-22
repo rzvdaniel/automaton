@@ -5,6 +5,8 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -25,7 +27,7 @@ public class HostedRunnerProvisioningService
 
     private readonly ApplicationDbContext db;
     private readonly ApiKeyService apiKeyService;
-    private readonly IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver;
+    private readonly IEventPublisher eventPublisher;
     private readonly HostedRunnerOptions options;
     private readonly IHostedRunnerSpecificationResolver specificationResolver;
     private readonly IAuditEventService auditEventService;
@@ -34,7 +36,7 @@ public class HostedRunnerProvisioningService
     public HostedRunnerProvisioningService(
         ApplicationDbContext db,
         ApiKeyService apiKeyService,
-        IHostedRunnerRemoteCommandExecutorResolver remoteCommandExecutorResolver,
+        IEventPublisher eventPublisher,
         IOptionsSnapshot<HostedRunnerOptions> options,
         IHostedRunnerSpecificationResolver specificationResolver,
         IAuditEventService auditEventService,
@@ -42,7 +44,7 @@ public class HostedRunnerProvisioningService
     {
         this.db = db;
         this.apiKeyService = apiKeyService;
-        this.remoteCommandExecutorResolver = remoteCommandExecutorResolver;
+        this.eventPublisher = eventPublisher;
         this.options = options.Value;
         this.specificationResolver = specificationResolver;
         this.auditEventService = auditEventService;
@@ -206,10 +208,11 @@ public class HostedRunnerProvisioningService
         AddDeployment(
             hostedRunner,
             HostedRunnerDeploymentStatuses.Running,
-            HostedRunnerDockerCommandBuilder.BuildPreview(hostedRunner, host, options),
+            $"Trusted infrastructure Action: {(createdHostedRunner ? "provision-hosted-runner" : "reprovision-hosted-runner")} on Runner Host '{host.Name}'.",
             options.Enabled
                 ? "Managed runner provisioning queued."
-                : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.");
+                : "Hosted runner provisioning is disabled. Enable HostedRunners:Enabled after adding a host and validating capacity.",
+            createdHostedRunner ? HostedRunnerDeploymentActions.Provision : HostedRunnerDeploymentActions.Reprovision);
 
             await SaveProvisioningCheckpointAsync(hostedRunner, cancellationToken);
             if (capacityTransaction != null)
@@ -232,11 +235,6 @@ public class HostedRunnerProvisioningService
     {
         var preparation = await PrepareProvisioningAsync(userId, Guid.Empty, cancellationToken, forceProvision: true);
         var hostedRunner = preparation.HostedRunner;
-        var host = hostedRunner.RunnerHostId.HasValue
-            ? await db.RunnerHosts
-                .Include(x => x.InfrastructureRunner)
-                .FirstOrDefaultAsync(x => x.Id == hostedRunner.RunnerHostId.Value, cancellationToken)
-            : null;
         if (!preparation.ShouldPublishProvisionRequest)
         {
             return hostedRunner.Status == HostedRunnerStatuses.Failed ? null : hostedRunner;
@@ -248,98 +246,14 @@ public class HostedRunnerProvisioningService
             return hostedRunner;
         }
 
-        if (host == null)
+        await eventPublisher.PublishAsync(new ManagedRunnerProvisionRequestedEvent
         {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = "No runner host is assigned for hosted runner provisioning.";
-            var deployment = await db.HostedRunnerDeployments
-                .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
-                .OrderByDescending(x => x.StartedAt)
-                .FirstAsync(cancellationToken);
-            CompleteDeployment(deployment, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            await WriteProvisioningCompletionAuditAsync(
-                hostedRunner,
-                host?.Name,
-                AuditEventTypes.HostedRunnerProvisioningFailed,
-                "Failed",
-                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
-                hostedRunner.LastError,
-                cancellationToken);
-            return hostedRunner;
-        }
-
-        var deploymentRecord = await db.HostedRunnerDeployments
-            .Where(x => x.HostedRunnerId == hostedRunner.Id && x.Action == HostedRunnerDeploymentActions.Provision)
-            .OrderByDescending(x => x.StartedAt)
-            .FirstAsync(cancellationToken);
-
-        IHostedRunnerRemoteCommandExecutor executor;
-        try
-        {
-            executor = remoteCommandExecutorResolver.Resolve(host, options);
-        }
-        catch (InvalidOperationException ex)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = ex.Message;
-            CompleteDeployment(deploymentRecord, HostedRunnerDeploymentStatuses.Failed, null, hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            await WriteProvisioningCompletionAuditAsync(
-                hostedRunner,
-                host.Name,
-                AuditEventTypes.HostedRunnerProvisioningFailed,
-                "Failed",
-                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
-                hostedRunner.LastError,
-                cancellationToken);
-            return hostedRunner;
-        }
-        var provisionScript = HostedRunnerDockerCommandBuilder.BuildProvisionScript(hostedRunner, host, options, preparation.RawApiKey!);
-        var executionResult = await executor.ExecuteProvisionScriptAsync(host, provisionScript, cancellationToken);
-        if (!executionResult.Succeeded)
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Failed;
-            hostedRunner.LastError = BuildRemoteFailureMessage(executionResult);
-            CompleteDeployment(deploymentRecord, HostedRunnerDeploymentStatuses.Failed, executionResult.StandardOutput, hostedRunner.LastError);
-            await db.SaveChangesAsync(cancellationToken);
-            await WriteProvisioningCompletionAuditAsync(
-                hostedRunner,
-                host.Name,
-                AuditEventTypes.HostedRunnerProvisioningFailed,
-                "Failed",
-                $"Hosted runner '{hostedRunner.Name}' provisioning failed",
-                $"Hosted runner provisioning failed with exit status {executionResult.ExitStatus}.",
-                cancellationToken);
-            return hostedRunner;
-        }
-
-        hostedRunner.ContainerId = executionResult.ContainerId;
-        if (hostedRunner.PendingSpecificationSnapshot != null)
-        {
-            hostedRunner.SpecificationSnapshot = hostedRunner.PendingSpecificationSnapshot;
-            hostedRunner.HostedRunnerSpecificationId = hostedRunner.SpecificationSnapshot.SourceSpecificationId;
-            hostedRunner.SpecificationRevision = hostedRunner.SpecificationSnapshot.SourceSpecificationRevision;
-            hostedRunner.PendingSpecificationSnapshot = null;
-        }
-        hostedRunner.LastError = null;
-        hostedRunner.UpdatedAt = DateTime.UtcNow;
-        CompleteDeployment(
-            deploymentRecord,
-            HostedRunnerDeploymentStatuses.Succeeded,
-            executionResult.StandardOutput,
-            string.IsNullOrWhiteSpace(executionResult.StandardError) ? null : executionResult.StandardError);
-
-        await db.SaveChangesAsync(cancellationToken);
-        await WriteProvisioningCompletionAuditAsync(
-            hostedRunner,
-            host.Name,
-            AuditEventTypes.HostedRunnerProvisioningSucceeded,
-            "Success",
-            $"Hosted runner '{hostedRunner.Name}' provisioning succeeded",
-            null,
-            cancellationToken);
-        logger.LogInformation("Hosted runner {HostedRunnerId} prepared for user {UserId} on host {HostId}", hostedRunner.Id, userId, host.Id);
+            HostedRunnerId = hostedRunner.Id,
+            UserId = hostedRunner.UserId,
+            RunnerHostId = hostedRunner.RunnerHostId ?? Guid.Empty,
+            RunnerApiKey = preparation.RawApiKey ?? string.Empty
+        }, cancellationToken);
+        logger.LogInformation("Hosted runner {HostedRunnerId} provisioning queued through the trusted infrastructure Action", hostedRunner.Id);
         return hostedRunner;
     }
 
@@ -475,28 +389,6 @@ public class HostedRunnerProvisioningService
         };
         db.HostedRunnerDeployments.Add(deployment);
         return deployment;
-    }
-
-    private static void CompleteDeployment(
-        HostedRunnerDeployment deployment,
-        string status,
-        string? logs,
-        string? error)
-    {
-        deployment.Status = status;
-        deployment.Logs = logs;
-        deployment.Error = error;
-        deployment.FinishedAt = DateTime.UtcNow;
-    }
-
-    private static string BuildRemoteFailureMessage(HostedRunnerRemoteExecutionResult result)
-    {
-        if (!string.IsNullOrWhiteSpace(result.StandardError))
-        {
-            return result.StandardError;
-        }
-
-        return $"Remote provisioning command failed with exit status {result.ExitStatus}.";
     }
 
     private static string BuildRunnerName(Guid userId) => $"Hosted Runner {userId.ToString("N")[..8]}";

@@ -61,9 +61,6 @@ builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
-builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, SshHostedRunnerRemoteCommandExecutor>();
-builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutor, LocalDockerHostedRunnerRemoteCommandExecutor>();
-builder.Services.AddTransient<IHostedRunnerRemoteCommandExecutorResolver, HostedRunnerRemoteCommandExecutorResolver>();
 builder.Services.AddHostedService<CliAuthorizationCleanupService>();
 builder.Services.AddCap(options =>
 {

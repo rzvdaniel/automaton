@@ -876,6 +876,9 @@ public class RunnerHostService
                 RunnerHostId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_HOST_ID"), out var runnerHostId)
                     ? (Guid?)runnerHostId
                     : null,
+                HostedRunnerId = Guid.TryParse(Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID"), out var hostedRunnerId)
+                    ? (Guid?)hostedRunnerId
+                    : null,
                 InstallationId = installationId,
             };
 

@@ -27,6 +27,7 @@ COPY src/Automaton.Steps/ ./Automaton.Steps/
 COPY src/Automaton.Ai/ ./Automaton.Ai/
 COPY src/Automaton.AiGuidance/ ./Automaton.AiGuidance/
 COPY src/Automaton.Mcp/ ./Automaton.Mcp/
+COPY system-apps/ /system-apps/
 COPY shared/ai-guidance/ /shared/ai-guidance/
 COPY scripts/install-infrastructure-runner.sh /scripts/install-infrastructure-runner.sh
 
@@ -42,7 +43,7 @@ WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl docker.io \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
