@@ -201,11 +201,12 @@ public class AdminHostedRunnersController : ControllerBase
             if (request.HostedRunnerSchedulingEnabled.Value
                 && (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
                     || !host.ValidatedAtUtc.HasValue
+                    || !host.ApprovedAtUtc.HasValue
                     || host.Status != RunnerHostStatuses.Active
-                    || (host.ProvisioningTransport != RunnerHostProvisioningTransports.LocalDocker
-                        && !host.InfrastructureRunnerId.HasValue)))
+                    || host.ProvisioningTransport != RunnerHostProvisioningTransports.InfrastructureRunner
+                    || !host.InfrastructureRunnerId.HasValue))
             {
-                return Conflict(new { message = "A host must be Ready, validated, active, and correctly bound before scheduling can be enabled." });
+                return Conflict(new { message = "A host must be Ready, validated, approved, active, and bound to an Infrastructure Runner before scheduling can be enabled." });
             }
             host.HostedRunnerSchedulingEnabled = request.HostedRunnerSchedulingEnabled.Value;
         }

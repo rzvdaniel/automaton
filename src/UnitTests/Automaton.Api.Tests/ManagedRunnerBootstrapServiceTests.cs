@@ -350,16 +350,15 @@ public class ManagedRunnerBootstrapServiceTests
             Name = "host-a",
             Provider = remote ? RunnerHostProviders.Hetzner : RunnerHostProviders.Local,
             Status = RunnerHostStatuses.Active,
-            ProvisioningTransport = remote
-                ? RunnerHostProvisioningTransports.Ssh
-                : RunnerHostProvisioningTransports.LocalDocker,
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
             RuntimeConnectivityMode = remote
                 ? RunnerHostRuntimeConnectivityModes.PublicHostPort
                 : RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
             ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
             ValidatedAtUtc = DateTime.UtcNow,
+            ApprovedAtUtc = DateTime.UtcNow,
             PublicIp = remote ? "203.0.113.10" : null,
-            InfrastructureRunnerId = remote ? Guid.NewGuid() : null,
+            InfrastructureRunnerId = Guid.NewGuid(),
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,

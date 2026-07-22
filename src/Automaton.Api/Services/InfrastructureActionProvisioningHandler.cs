@@ -23,6 +23,8 @@ public sealed class InfrastructureActionProvisioningHandler(
     TrustedInfrastructureActionDeploymentService actionDeploymentService,
     ILogger<InfrastructureActionProvisioningHandler> logger)
 {
+    private const string WaitingForRegistrationLog = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+
     public async Task HandleAsync(InfrastructureActionExecutionRequestedEvent message, CancellationToken cancellationToken)
     {
         var hostedRunner = await db.HostedRunners
@@ -39,8 +41,21 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
+        if (deployment.Status is HostedRunnerDeploymentStatuses.Succeeded
+            or HostedRunnerDeploymentStatuses.Failed
+            or HostedRunnerDeploymentStatuses.Skipped
+            || (message.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner")
+                && string.Equals(deployment.Logs, WaitingForRegistrationLog, StringComparison.Ordinal))
+        {
+            logger.LogInformation("Ignoring duplicate infrastructure Action request for terminal operation {OperationId}", message.OperationId);
+            return;
+        }
+
         try
         {
+            if (hostedRunner.UserId != message.UserId || hostedRunner.RunnerHostId != message.RunnerHostId)
+                throw new UnauthorizedAccessException("The infrastructure Action request does not match the hosted Runner assignment.");
+
             var infrastructureRunner = host?.InfrastructureRunner
                 ?? throw new InvalidOperationException("The selected Runner Host has no Infrastructure Runner assigned.");
             if (host!.Status != RunnerHostStatuses.Active
@@ -73,7 +88,7 @@ public sealed class InfrastructureActionProvisioningHandler(
                 CreatedAtUtc = now,
                 StartedAtUtc = now,
                 ExecutionDeadlineUtc = now.AddSeconds(module.TimeoutSeconds + 300),
-                CorrelationId = message.CorrelationId
+                CorrelationId = $"hosted-runner-operation:{message.OperationId:N}"
             };
             db.AppModuleExecutions.Add(execution);
             await db.SaveChangesAsync(cancellationToken);
@@ -153,7 +168,7 @@ public sealed class InfrastructureActionProvisioningHandler(
         {
             hostedRunner.ContainerId = result.TryGetProperty("containerId", out var containerId) ? containerId.GetString() : null;
             hostedRunner.Status = HostedRunnerStatuses.Provisioning;
-            deployment.Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.";
+            deployment.Logs = WaitingForRegistrationLog;
             return;
         }
 

@@ -19,6 +19,7 @@ public class AutomatonHub : Hub
     private const string RunnerPurposeHeader = "RunnerPurpose";
     private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
+    private const string HostedRunnerIdHeader = "HostedRunnerId";
 
     private readonly RunnerService runnerService;
     private readonly AppsService appsService;
@@ -237,6 +238,9 @@ public class AutomatonHub : Hub
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                 httpContext.Request.Headers[RunnerPurposeHeader].ToString()),
             RunnerHostId = Guid.TryParse(httpContext.Request.Headers[RunnerHostIdHeader].ToString(), out var hostId) ? hostId : null,
+            HostedRunnerId = Guid.TryParse(httpContext.Request.Headers[HostedRunnerIdHeader].ToString(), out var hostedRunnerId)
+                ? hostedRunnerId
+                : null,
             IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
             ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
             ApiColor = apiInstanceIdentityService.ApiColor,

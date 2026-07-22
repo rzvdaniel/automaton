@@ -6,6 +6,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Messaging.Events;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -143,6 +144,8 @@ public class HostedRunnerAuditTests
         using var db = CreateDbContext();
         var planId = SeedHostedRunnerPlan(db);
         var localHost = SeedRunnerHost(db);
+        localHost.ProvisioningTransport = RunnerHostProvisioningTransports.LocalDocker;
+        localHost.InfrastructureRunnerId = null;
         localHost.HostedRunnerSchedulingEnabled = false;
 
         var remoteHost = new RunnerHost
@@ -153,8 +156,10 @@ public class HostedRunnerAuditTests
             PublicIp = "203.0.113.10",
             InfrastructureRunnerId = Guid.NewGuid(),
             Status = RunnerHostStatuses.Active,
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
             ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
             ValidatedAtUtc = DateTime.UtcNow,
+            ApprovedAtUtc = DateTime.UtcNow,
             HostedRunnerSchedulingEnabled = true,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
@@ -174,6 +179,79 @@ public class HostedRunnerAuditTests
 
         Assert.That(prepared.HostedRunner.RunnerHostId, Is.EqualTo(remoteHost.Id));
         Assert.That(prepared.HostedRunner.RunnerHostId, Is.Not.EqualTo(localHost.Id));
+    }
+
+    [Test]
+    public async Task PrepareProvisioningAsync_DoesNotSelectLocalDockerHostWithoutInfrastructureRunner()
+    {
+        using var db = CreateDbContext();
+        var planId = SeedHostedRunnerPlan(db);
+        var localHost = SeedRunnerHost(db);
+        localHost.ProvisioningTransport = RunnerHostProvisioningTransports.LocalDocker;
+        localHost.InfrastructureRunnerId = null;
+        localHost.HostedRunnerSchedulingEnabled = true;
+        db.SaveChanges();
+
+        var service = CreateProvisioningService(
+            db,
+            Guid.NewGuid(),
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            new HostedRunnerOptions { Enabled = false });
+
+        var prepared = await service.PrepareProvisioningAsync(Guid.NewGuid(), planId);
+
+        Assert.That(prepared.HostedRunner.RunnerHostId, Is.Null);
+        Assert.That(prepared.HostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
+    }
+
+    [Test]
+    public async Task InfrastructureActionHandler_DoesNotReplayProvisioningAfterHostMutationCompleted()
+    {
+        using var db = CreateDbContext();
+        var runner = new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            RunnerHostId = Guid.NewGuid(),
+            Name = "hosted-runner",
+            ContainerName = "automaton-hosted-runner",
+            Status = HostedRunnerStatuses.Provisioning,
+            CreatedAt = DateTime.UtcNow
+        };
+        var deployment = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = runner.Id,
+            Action = HostedRunnerDeploymentActions.Provision,
+            Status = HostedRunnerDeploymentStatuses.Running,
+            Logs = "Infrastructure Action completed; waiting for the hosted Runner to register.",
+            StartedAt = DateTime.UtcNow
+        };
+        runner.Deployments.Add(deployment);
+        db.HostedRunners.Add(runner);
+        db.HostedRunnerDeployments.Add(deployment);
+        db.SaveChanges();
+
+        var handler = new InfrastructureActionProvisioningHandler(
+            db,
+            hub: null!,
+            new NoOpEventPublisher(),
+            new NoOpAuditEventService(),
+            actionDeploymentService: null!,
+            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+
+        await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
+        {
+            OperationId = deployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = runner.RunnerHostId!.Value,
+            ActionKey = "provision-hosted-runner",
+            InputJson = "{}"
+        }, CancellationToken.None);
+
+        Assert.That(await db.AppModuleExecutions.CountAsync(), Is.Zero);
+        Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Running));
     }
 
     [Test]
@@ -241,6 +319,7 @@ public class HostedRunnerAuditTests
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
             ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
             ValidatedAtUtc = DateTime.UtcNow,
+            ApprovedAtUtc = DateTime.UtcNow,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,
@@ -468,10 +547,12 @@ public class HostedRunnerAuditTests
             Name = "host-a",
             Provider = RunnerHostProviders.Local,
             Status = RunnerHostStatuses.Active,
-            ProvisioningTransport = RunnerHostProvisioningTransports.LocalDocker,
+            ProvisioningTransport = RunnerHostProvisioningTransports.InfrastructureRunner,
+            InfrastructureRunnerId = Guid.NewGuid(),
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.LocalDockerNetwork,
             ProvisioningStatus = RunnerHostProvisioningStatuses.Ready,
             ValidatedAtUtc = DateTime.UtcNow,
+            ApprovedAtUtc = DateTime.UtcNow,
             TotalCpuCores = 8,
             TotalMemoryMb = 16384,
             TotalDiskMb = 65536,
@@ -632,5 +713,22 @@ public class HostedRunnerAuditTests
         public T Value => value;
 
         public T Get(string? name) => value;
+    }
+
+    private sealed class NoOpAuditEventService : IAuditEventService
+    {
+        public Task WriteAsync(AuditEventWriteRequest request, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task WriteAsync(
+            string action,
+            string entityType,
+            Guid? entityId,
+            string message,
+            object? metadata = null,
+            string outcome = "Success",
+            bool failOnError = false,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

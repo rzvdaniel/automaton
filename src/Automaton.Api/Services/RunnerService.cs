@@ -237,7 +237,9 @@ public class RunnerService
         ApplyPendingHostedRunnerSpecification(hostedRunner);
 
         var deployment = hostedRunner.Deployments
-            .Where(x => x.Action == HostedRunnerDeploymentActions.Provision && x.Status == HostedRunnerDeploymentStatuses.Running)
+            .Where(x =>
+                (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
+                && x.Status == HostedRunnerDeploymentStatuses.Running)
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefault();
 

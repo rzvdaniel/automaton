@@ -23,6 +23,7 @@ public class HubService
     private const string RunnerPurposeHeader = "RunnerPurpose";
     private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
+    private const string HostedRunnerIdHeader = "HostedRunnerId";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
@@ -283,6 +284,11 @@ public class HubService
                     if (!string.IsNullOrWhiteSpace(runnerHostId))
                     {
                         options.Headers.Add(RunnerHostIdHeader, runnerHostId);
+                    }
+                    var hostedRunnerId = Environment.GetEnvironmentVariable("AUTOMATON_HOSTED_RUNNER_ID");
+                    if (!string.IsNullOrWhiteSpace(hostedRunnerId))
+                    {
+                        options.Headers.Add(HostedRunnerIdHeader, hostedRunnerId);
                     }
                     
                     // Bypass SSL validation in development mode (for self-signed certificates)

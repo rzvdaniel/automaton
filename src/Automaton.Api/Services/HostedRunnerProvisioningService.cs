@@ -285,8 +285,9 @@ public class HostedRunnerProvisioningService
                         && x.HostedRunnerSchedulingEnabled
                         && x.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
                         && x.ValidatedAtUtc != null
-                        && (x.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
-                            || x.InfrastructureRunnerId != null))
+                        && x.ApprovedAtUtc != null
+                        && x.ProvisioningTransport == RunnerHostProvisioningTransports.InfrastructureRunner
+                        && x.InfrastructureRunnerId != null)
             .OrderBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -312,8 +313,9 @@ public class HostedRunnerProvisioningService
                          && x.HostedRunnerSchedulingEnabled
                          && x.ProvisioningStatus == RunnerHostProvisioningStatuses.Ready
                          && x.ValidatedAtUtc != null
-                         && (x.ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
-                             || x.InfrastructureRunnerId != null),
+                         && x.ApprovedAtUtc != null
+                         && x.ProvisioningTransport == RunnerHostProvisioningTransports.InfrastructureRunner
+                         && x.InfrastructureRunnerId != null,
                     cancellationToken);
             if (host == null)
             {
