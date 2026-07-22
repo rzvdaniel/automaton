@@ -84,6 +84,7 @@ public sealed class HostedRunnerRegistrationReconciler(
 
                 var enrollments = await db.RunnerEnrollments
                     .Where(x => x.HostedRunnerId == hostedRunner.Id
+                        && x.OperationId == operationId
                         && (x.Status == RunnerEnrollmentStatuses.Pending || x.Status == RunnerEnrollmentStatuses.Claimed))
                     .ToListAsync(transactionalToken);
                 var secretVersionIds = enrollments

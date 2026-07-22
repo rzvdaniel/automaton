@@ -17,6 +17,8 @@ public class RunnerEnrollment
     public virtual RunnerHost RunnerHost { get; set; } = null!;
 
     public Guid? HostedRunnerId { get; set; }
+    public Guid? OperationId { get; set; }
+    public virtual HostedRunnerDeployment? Operation { get; set; }
     public Guid? SecretVersionId { get; set; }
 
     [Required]

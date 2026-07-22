@@ -189,6 +189,7 @@ public sealed class RunnerEnrollmentService(
                 Id = Guid.NewGuid(),
                 RunnerHostId = runnerHostId,
                 HostedRunnerId = hostedRunner.Id,
+                OperationId = operationId,
                 RequestedByUserId = hostedRunner.UserId,
                 ExpectedPurpose = RunnerPurposes.Managed,
                 ExpectedCapabilitiesJson = RunnerCapabilities.Serialize(
@@ -440,7 +441,16 @@ public sealed class RunnerEnrollmentService(
     {
         var hostedRunner = await db.HostedRunners
             .FirstOrDefaultAsync(x => x.Id == enrollment.HostedRunnerId && x.DeletedAt == null, cancellationToken);
+        var operation = enrollment.OperationId.HasValue
+            ? await db.HostedRunnerDeployments.FirstOrDefaultAsync(
+                x => x.Id == enrollment.OperationId.Value && x.HostedRunnerId == enrollment.HostedRunnerId,
+                cancellationToken)
+            : null;
         if (hostedRunner == null
+            || operation == null
+            || operation.Status != HostedRunnerDeploymentStatuses.WaitingForRegistration
+            || operation.RegistrationDeadlineUtc is not DateTime registrationDeadline
+            || registrationDeadline <= now
             || hostedRunner.RunnerHostId != host.Id
             || hostedRunner.UserId != enrollment.RequestedByUserId
             || host.InfrastructureRunnerId == null

@@ -2471,6 +2471,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
 
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("char(36)");
+
                     b.Property<Guid>("RequestedByUserId")
                         .HasColumnType("char(36)");
 
@@ -2497,6 +2500,8 @@ namespace Automaton.Api.Migrations
                         .IsUnique();
 
                     b.HasIndex("HostedRunnerId");
+
+                    b.HasIndex("OperationId");
 
                     b.HasIndex("RunnerHostId");
 
@@ -4054,6 +4059,11 @@ namespace Automaton.Api.Migrations
                         .HasForeignKey("HostedRunnerId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Automaton.Api.Entities.HostedRunnerDeployment", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Automaton.Api.Entities.RunnerHost", "RunnerHost")
                         .WithMany("RunnerEnrollments")
                         .HasForeignKey("RunnerHostId")
@@ -4064,6 +4074,8 @@ namespace Automaton.Api.Migrations
                         .WithMany()
                         .HasForeignKey("SecretVersionId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Operation");
 
                     b.Navigation("RunnerHost");
                 });

@@ -24,6 +24,8 @@ public sealed class HostedRunnerRegistrationReconcilerTests
         var runnerId = Guid.NewGuid();
         var secretVersionId = Guid.NewGuid();
         var operationId = Guid.NewGuid();
+        var retryOperationId = Guid.NewGuid();
+        var retrySecretVersionId = Guid.NewGuid();
         db.HostedRunners.Add(new HostedRunner
         {
             Id = hostedRunnerId,
@@ -55,6 +57,14 @@ public sealed class HostedRunnerRegistrationReconcilerTests
             Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
             RegistrationDeadlineUtc = now.AddMinutes(-1)
         });
+        db.HostedRunnerDeployments.Add(new HostedRunnerDeployment
+        {
+            Id = retryOperationId,
+            HostedRunnerId = hostedRunnerId,
+            Action = HostedRunnerDeploymentActions.Reprovision,
+            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
+            RegistrationDeadlineUtc = now.AddMinutes(10)
+        });
         db.RunnerEnrollments.Add(new RunnerEnrollment
         {
             Id = Guid.NewGuid(),
@@ -65,8 +75,17 @@ public sealed class HostedRunnerRegistrationReconcilerTests
             EnrollmentTokenHash = Guid.NewGuid().ToString("N"),
             InstallationId = "installation",
             Status = RunnerEnrollmentStatuses.Pending,
+            OperationId = operationId,
             ExpiresAtUtc = now.AddMinutes(-1),
             SecretVersionId = secretVersionId
+        });
+        db.RunnerEnrollments.Add(new RunnerEnrollment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunnerId, OperationId = retryOperationId,
+            RunnerHostId = Guid.NewGuid(), RequestedByUserId = Guid.NewGuid(), ExpectedPurpose = "managed",
+            EnrollmentTokenHash = Guid.NewGuid().ToString("N"), InstallationId = "retry-installation",
+            Status = RunnerEnrollmentStatuses.Pending, ExpiresAtUtc = now.AddMinutes(10),
+            SecretVersionId = retrySecretVersionId
         });
         db.SecretVersions.Add(new SecretVersion
         {
@@ -75,11 +94,21 @@ public sealed class HostedRunnerRegistrationReconcilerTests
             Version = 1,
             ProtectedValue = "protected"
         });
+        db.SecretVersions.Add(new SecretVersion
+        {
+            Id = retrySecretVersionId, SecretDefinitionId = Guid.NewGuid(), Version = 1, ProtectedValue = "retry-protected"
+        });
         db.ExecutionSecretGrants.Add(new ExecutionSecretGrant
         {
             Id = Guid.NewGuid(), OperationId = operationId, SecretVersionId = secretVersionId,
             AppId = Guid.NewGuid(), ActionKey = "provision-hosted-runner", RunnerId = Guid.NewGuid(),
             DeliveryType = "environmentVariable", TargetName = "TOKEN", ExpiresAtUtc = now.AddMinutes(-1)
+        });
+        db.ExecutionSecretGrants.Add(new ExecutionSecretGrant
+        {
+            Id = Guid.NewGuid(), OperationId = retryOperationId, SecretVersionId = retrySecretVersionId,
+            AppId = Guid.NewGuid(), ActionKey = "reprovision-hosted-runner", RunnerId = Guid.NewGuid(),
+            DeliveryType = "environmentVariable", TargetName = "TOKEN", ExpiresAtUtc = now.AddMinutes(10)
         });
         await db.SaveChangesAsync();
 
@@ -92,9 +121,10 @@ public sealed class HostedRunnerRegistrationReconcilerTests
         Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
         db.ChangeTracker.Clear();
 
-        var deployment = await db.HostedRunnerDeployments.SingleAsync();
+        var deployment = await db.HostedRunnerDeployments.SingleAsync(x => x.Id == operationId);
         var runner = await db.HostedRunners.SingleAsync();
-        var enrollment = await db.RunnerEnrollments.SingleAsync();
+        var enrollment = await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId);
+        var retryEnrollment = await db.RunnerEnrollments.SingleAsync(x => x.OperationId == retryOperationId);
         Assert.Multiple(() =>
         {
             Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
@@ -105,9 +135,12 @@ public sealed class HostedRunnerRegistrationReconcilerTests
             Assert.That(runner.RuntimePort, Is.Null);
             Assert.That(runner.RuntimeEndpoint, Is.Null);
             Assert.That(enrollment.Status, Is.EqualTo(RunnerEnrollmentStatuses.Revoked));
+            Assert.That(retryEnrollment.Status, Is.EqualTo(RunnerEnrollmentStatuses.Pending));
         });
-        Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
-        Assert.That((await db.ExecutionSecretGrants.SingleAsync()).RevokedAtUtc, Is.Not.Null);
+        Assert.That((await db.SecretVersions.SingleAsync(x => x.Id == secretVersionId)).RevokedAtUtc, Is.Not.Null);
+        Assert.That((await db.SecretVersions.SingleAsync(x => x.Id == retrySecretVersionId)).RevokedAtUtc, Is.Null);
+        Assert.That((await db.ExecutionSecretGrants.SingleAsync(x => x.OperationId == operationId)).RevokedAtUtc, Is.Not.Null);
+        Assert.That((await db.ExecutionSecretGrants.SingleAsync(x => x.OperationId == retryOperationId)).RevokedAtUtc, Is.Null);
         Assert.That((await db.ApiKeys.SingleAsync()).IsActive, Is.False);
         Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionFailedEvent>().Count(), Is.EqualTo(1));
     }

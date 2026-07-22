@@ -338,6 +338,7 @@ namespace Automaton.Api.Data
 
                 entity.HasIndex(e => e.RunnerHostId);
                 entity.HasIndex(e => e.HostedRunnerId);
+                entity.HasIndex(e => e.OperationId);
                 entity.HasIndex(e => e.EnrollmentTokenHash).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
                 entity.HasIndex(e => new { e.HostedRunnerId, e.Status });
@@ -348,6 +349,10 @@ namespace Automaton.Api.Data
                 entity.HasOne<HostedRunner>()
                     .WithMany()
                     .HasForeignKey(e => e.HostedRunnerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Operation)
+                    .WithMany()
+                    .HasForeignKey(e => e.OperationId)
                     .OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne<SecretVersion>()
                     .WithMany()

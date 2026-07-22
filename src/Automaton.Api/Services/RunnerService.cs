@@ -230,6 +230,8 @@ public class RunnerService
             return null;
         }
 
+        if (!IsRegistrationAttemptCurrent(runner, hostedRunner)) return null;
+
         hostedRunner.RunnerId = runner.Id;
         hostedRunner.Status = HostedRunnerStatuses.Running;
         hostedRunner.ProvisionedAt ??= DateTime.UtcNow;
@@ -272,16 +274,7 @@ public class RunnerService
             return null;
         }
 
-        var registrationTimedOut = hostedRunner.Deployments.Any(x =>
-            (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
-            && x.Status == HostedRunnerDeploymentStatuses.Failed
-            && x.RegistrationDeadlineUtc <= DateTime.UtcNow
-            && x.Error == HostedRunnerDeploymentErrors.RegistrationTimedOut);
-        if (registrationTimedOut)
-        {
-            logger.Warning("Rejected late reconnect for hosted runner {HostedRunnerId} after registration timeout", hostedRunner.Id);
-            return null;
-        }
+        if (!IsRegistrationAttemptCurrent(runner, hostedRunner)) return null;
 
         hostedRunner.RunnerId = runner.Id;
         hostedRunner.Status = HostedRunnerStatuses.Running;
@@ -307,6 +300,28 @@ public class RunnerService
 
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
         return deployment?.Action;
+    }
+
+    private bool IsRegistrationAttemptCurrent(Runner runner, HostedRunner hostedRunner)
+    {
+        var operationId = dbContext.RunnerEnrollments
+            .Where(x => x.HostedRunnerId == hostedRunner.Id && x.RunnerId == runner.Id && x.OperationId != null)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => x.OperationId)
+            .FirstOrDefault();
+        if (!operationId.HasValue) return true;
+
+        var operation = hostedRunner.Deployments.FirstOrDefault(x => x.Id == operationId.Value);
+        var isCurrent = operation != null
+            && operation.Status is HostedRunnerDeploymentStatuses.WaitingForRegistration or HostedRunnerDeploymentStatuses.Succeeded
+            && (operation.Status == HostedRunnerDeploymentStatuses.Succeeded
+                || operation.RegistrationDeadlineUtc > DateTime.UtcNow);
+        if (!isCurrent)
+            logger.Warning(
+                "Rejected Runner {RunnerId} registration for stale hosted Runner operation {OperationId}",
+                runner.Id,
+                operationId);
+        return isCurrent;
     }
 
     private async Task WriteHostedRunnerRegistrationCompletionAuditAsync(string? action, Runner runner, CancellationToken cancellationToken)

@@ -87,7 +87,7 @@ public class RunnerEnrollmentServiceTests
     }
 
     [Test]
-    public async Task HostedRunnerEnrollment_UsesScopedOneTimeToken_ThenIssuesDurableCredential()
+    public async Task HostedRunnerEnrollment_RejectsTimedOutAttemptAndAllowsFreshOperation()
     {
         await using var db = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -117,9 +117,26 @@ public class RunnerEnrollmentServiceTests
             Status = HostedRunnerStatuses.Provisioning
         };
         var operationId = Guid.NewGuid();
+        var priorOperation = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(),
+            HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Provision,
+            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
+            RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(15)
+        };
+        var currentOperation = new HostedRunnerDeployment
+        {
+            Id = operationId,
+            HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Reprovision,
+            Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
+            RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(15)
+        };
         db.Runners.Add(infrastructureRunner);
         db.RunnerHosts.Add(host);
         db.HostedRunners.Add(hostedRunner);
+        db.HostedRunnerDeployments.AddRange(priorOperation, currentOperation);
         await db.SaveChangesAsync();
 
         var auditService = new RecordingAuditEventService();
@@ -140,13 +157,43 @@ public class RunnerEnrollmentServiceTests
             grantService,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<RunnerEnrollmentService>.Instance);
 
+        var priorMaterial = await service.CreateHostedRunnerAsync(
+            hostedRunner.Id,
+            priorOperation.Id,
+            "provision-hosted-runner",
+            infrastructureRunner.Id,
+            CancellationToken.None);
+        var priorLease = await grantService.LeaseAsync(
+            new SecretGrantScope(
+                priorOperation.Id,
+                InfrastructureAppTrust.PlatformAppId,
+                "provision-hosted-runner",
+                infrastructureRunner.Id,
+                host.Id,
+                SecretOwnerTypes.HostedRunner,
+                hostedRunner.Id),
+            [priorMaterial.SecretGrantId],
+            CancellationToken.None);
+        var priorToken = priorLease.EnvironmentVariables["AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN"];
+        priorOperation.Status = HostedRunnerDeploymentStatuses.Failed;
+        priorOperation.RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(-1);
+        priorOperation.Error = HostedRunnerDeploymentErrors.RegistrationTimedOut;
+        priorOperation.FinishedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
         var material = await service.CreateHostedRunnerAsync(
             hostedRunner.Id,
             operationId,
             "provision-hosted-runner",
             infrastructureRunner.Id,
             CancellationToken.None);
-        var storedVersion = await db.SecretVersions.SingleAsync();
+        Assert.That(material.SecretGrantId, Is.Not.EqualTo(priorMaterial.SecretGrantId));
+        Assert.That(await service.ExchangeAsync(
+            new RunnerEnrollmentExchangeRequest { EnrollmentToken = priorToken },
+            CancellationToken.None), Is.Null);
+
+        var currentEnrollment = await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId);
+        var storedVersion = await db.SecretVersions.SingleAsync(x => x.Id == currentEnrollment.SecretVersionId);
         Assert.That(storedVersion.ProtectedValue, Does.Not.StartWith("re_"));
         var lease = await grantService.LeaseAsync(
             new SecretGrantScope(
@@ -161,7 +208,8 @@ public class RunnerEnrollmentServiceTests
             CancellationToken.None);
         var enrollmentToken = lease.EnvironmentVariables["AUTOMATON_PROVISION_RUNNER_ENROLLMENT_TOKEN"];
         Assert.That(enrollmentToken, Does.StartWith("re_"));
-        Assert.That((await db.RunnerEnrollments.SingleAsync()).EnrollmentTokenHash, Does.Not.Contain(enrollmentToken));
+        Assert.That(currentEnrollment.EnrollmentTokenHash, Does.Not.Contain(enrollmentToken));
+        Assert.That(currentEnrollment.OperationId, Is.EqualTo(operationId));
 
         var exchange = await service.ExchangeAsync(new RunnerEnrollmentExchangeRequest
         {
@@ -175,9 +223,9 @@ public class RunnerEnrollmentServiceTests
         Assert.That(exchange!.ApiKey, Does.StartWith("ak_runner_"));
         Assert.That(exchange.Purpose, Is.EqualTo(RunnerPurposes.Managed));
         Assert.That((await db.HostedRunners.SingleAsync()).RunnerId, Is.EqualTo(exchange.RunnerId));
-        Assert.That((await db.RunnerEnrollments.SingleAsync()).Status, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
-        Assert.That((await db.SecretVersions.SingleAsync()).RevokedAtUtc, Is.Not.Null);
-        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync();
+        Assert.That((await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId)).Status, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
+        Assert.That((await db.SecretVersions.SingleAsync(x => x.Id == currentEnrollment.SecretVersionId)).RevokedAtUtc, Is.Not.Null);
+        var persistedGrant = await db.ExecutionSecretGrants.SingleAsync(x => x.Id == material.SecretGrantId);
         Assert.That(persistedGrant.ConsumedAtUtc, Is.Not.Null);
         Assert.That(persistedGrant.RevokedAtUtc, Is.Not.Null);
 
