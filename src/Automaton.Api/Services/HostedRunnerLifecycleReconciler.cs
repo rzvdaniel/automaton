@@ -220,5 +220,6 @@ public sealed class HostedRunnerLifecycleReconciler(
 
     private static bool IsTerminal(string status) => status is
         AppModuleExecutionStatuses.Succeeded or AppModuleExecutionStatuses.Failed or
-        AppModuleExecutionStatuses.TimedOut or AppModuleExecutionStatuses.Cancelled or AppModuleExecutionStatuses.Lost;
+        AppModuleExecutionStatuses.TimedOut or AppModuleExecutionStatuses.Cancelled or
+        AppModuleExecutionStatuses.RunnerUnavailable or AppModuleExecutionStatuses.Lost;
 }
