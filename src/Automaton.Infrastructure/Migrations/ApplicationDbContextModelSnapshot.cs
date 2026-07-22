@@ -1194,6 +1194,79 @@ namespace Automaton.Api.Migrations
                     b.ToTable("CustomStepUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ExecutionSecretGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ActionKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("AppId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("ConsumedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DeliveryType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LeasedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("MaximumReads")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("ReadCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("SecretVersionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("TargetName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunnerId");
+
+                    b.HasIndex("SecretVersionId");
+
+                    b.HasIndex("ExpiresAtUtc", "RevokedAtUtc");
+
+                    b.HasIndex("OperationId", "RevokedAtUtc", "ConsumedAtUtc");
+
+                    b.ToTable("ExecutionSecretGrants");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.Flow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2679,6 +2752,82 @@ namespace Automaton.Api.Migrations
                     b.ToTable("ScheduleUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.SecretDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CurrentVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("OwnerType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerType", "OwnerId", "DeletedAtUtc");
+
+                    b.HasIndex("OwnerType", "OwnerId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SecretDefinitions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.SecretVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ProtectedValue")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("SecretDefinitionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc", "RevokedAtUtc");
+
+                    b.HasIndex("SecretDefinitionId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("SecretVersions");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3412,6 +3561,17 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ExecutionSecretGrant", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.SecretVersion", "SecretVersion")
+                        .WithMany("Grants")
+                        .HasForeignKey("SecretVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SecretVersion");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.FlowExecutionLog", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.FlowExecution", "FlowExecution")
@@ -3897,6 +4057,17 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.SecretVersion", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.SecretDefinition", "SecretDefinition")
+                        .WithMany("Versions")
+                        .HasForeignKey("SecretDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SecretDefinition");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariableUser", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.SensitiveVariable", null)
@@ -4110,6 +4281,16 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.Schedule", b =>
                 {
                     b.Navigation("ScheduleUsers");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.SecretDefinition", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.SecretVersion", b =>
+                {
+                    b.Navigation("Grants");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>

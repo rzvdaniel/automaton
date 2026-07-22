@@ -61,6 +61,9 @@ namespace Automaton.Api.Data
         public virtual DbSet<AppVersion> AppVersions { get; set; }
         public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
         public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
+        public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
+        public virtual DbSet<SecretVersion> SecretVersions { get; set; }
+        public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
         public virtual DbSet<Setting> Settings { get; set; }
         public virtual DbSet<SensitiveVariable> SensitiveVariables { get; set; }
         public virtual DbSet<SensitiveVariableUser> SensitiveVariableUsers { get; set; }
@@ -334,6 +337,42 @@ namespace Automaton.Api.Data
                 entity.HasOne(e => e.RunnerHost)
                     .WithMany(e => e.RunnerEnrollments)
                     .HasForeignKey(e => e.RunnerHostId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SecretDefinition>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.OwnerType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+                entity.HasIndex(e => new { e.OwnerType, e.OwnerId, e.Name }).IsUnique();
+                entity.HasIndex(e => new { e.OwnerType, e.OwnerId, e.DeletedAtUtc });
+            });
+
+            modelBuilder.Entity<SecretVersion>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ProtectedValue).IsRequired().HasColumnType("longtext");
+                entity.HasIndex(e => new { e.SecretDefinitionId, e.Version }).IsUnique();
+                entity.HasIndex(e => new { e.ExpiresAtUtc, e.RevokedAtUtc });
+                entity.HasOne(e => e.SecretDefinition)
+                    .WithMany(e => e.Versions)
+                    .HasForeignKey(e => e.SecretDefinitionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ExecutionSecretGrant>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ActionKey).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.DeliveryType).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.TargetName).IsRequired().HasMaxLength(200);
+                entity.HasIndex(e => new { e.OperationId, e.RevokedAtUtc, e.ConsumedAtUtc });
+                entity.HasIndex(e => new { e.ExpiresAtUtc, e.RevokedAtUtc });
+                entity.HasIndex(e => e.RunnerId);
+                entity.HasOne(e => e.SecretVersion)
+                    .WithMany(e => e.Grants)
+                    .HasForeignKey(e => e.SecretVersionId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 

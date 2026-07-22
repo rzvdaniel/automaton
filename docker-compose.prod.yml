@@ -38,11 +38,13 @@ x-api-common: &api-common
     HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
+    DataProtection__KeysPath: /app/data-protection-keys
   volumes:
     - prod-api-appdata:/app/AppData
     - prod-published-apps:/app/AppData/published-apps
     - ./.prod-runtime/traefik/dynamic:/app/AppData/traefik-dynamic
     - prod-api-logs:/app/logs
+    - prod-api-dataprotection:/app/data-protection-keys
     - /opt/automaton/config/appsettings.Production.json:/app/appsettings.Production.json:ro
     - /opt/automaton/secrets/hosted_runner_ssh_key:/run/secrets/hosted_runner_ssh_key:ro
   networks:
@@ -227,6 +229,7 @@ volumes:
   prod-published-apps:
   prod-traefik-acme:
   prod-api-logs:
+  prod-api-dataprotection:
   prod-worker-logs:
   prod-worker-dataprotection:
 

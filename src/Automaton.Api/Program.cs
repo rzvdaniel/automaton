@@ -9,6 +9,7 @@ using Hangfire.MySql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
@@ -91,6 +92,14 @@ services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 .AddDefaultTokenProviders();
 
 services.AddAutomatonIdentity();
+
+var dataProtectionKeysPath = configurationManager["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+        .SetApplicationName("Automaton.Api");
+}
 
 // Configure cookie authentication to not redirect API requests
 services.ConfigureApplicationCookie(options =>
@@ -199,6 +208,10 @@ services.AddSingleton<IEventPublisher, CapEventPublisher>();
 services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
 services.AddScoped<InfrastructureActionProvisioningHandler>();
 services.AddScoped<TrustedInfrastructureActionDeploymentService>();
+services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+services.AddScoped<ISecretStore, SecretStore>();
+services.AddScoped<IExecutionSecretGrantService, ExecutionSecretGrantService>();
+services.AddHostedService<SecretGrantCleanupService>();
 services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 services.AddCap(options =>
 {
