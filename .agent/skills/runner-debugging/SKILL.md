@@ -31,6 +31,7 @@ Backend app files deployed to a runner are runner-side runtime files. Do not con
 - Preserve reconnect behavior unless intentionally changing it.
 - Keep diagnostics actionable but redacted.
 - Keep app backend files isolated per app/user as the current architecture requires.
+- Treat App Action `ExecutionId` as an idempotency key. Persist Runner acceptance before starting the process, return the same in-flight or terminal result for duplicates, and never restart a process when a persisted non-terminal acceptance makes the outcome ambiguous.
 
 ## Debug checklist
 

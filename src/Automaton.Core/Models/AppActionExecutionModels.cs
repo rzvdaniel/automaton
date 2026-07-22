@@ -31,6 +31,7 @@ public static class AppModuleExecutionErrorCodes
     public const string RuntimeUnavailable = "RuntimeUnavailable";
     public const string RunnerUnavailable = "RunnerUnavailable";
     public const string PlatformError = "PlatformError";
+    public const string AmbiguousDispatch = "AmbiguousDispatch";
 }
 
 public sealed class ExecuteAppActionModuleRequest

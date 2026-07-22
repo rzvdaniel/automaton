@@ -26,11 +26,33 @@ public sealed class AppActionExecutionService
 
     public async Task<AppActionExecutionResult> ExecuteAsync(ExecuteAppActionModuleRequest request, CancellationToken cancellationToken = default)
     {
+        if (active.TryGetValue(request.ExecutionId, out var existingExecution))
+            return await existingExecution.Completion.Task.WaitAsync(cancellationToken);
+
         await concurrencyGate.WaitAsync(cancellationToken);
         try
         {
         using var actionLock = await coordinator.EnterAsync(request.AppId, request.ActionKey, cancellationToken);
+        if (active.TryGetValue(request.ExecutionId, out existingExecution))
+            return await existingExecution.Completion.Task.WaitAsync(cancellationToken);
         AppActionManifestParser.ValidateKey(request.ActionKey);
+        var executionDirectory = Path.Combine(workspace.GetAppActionExecutionsDirectory(request.AppId, request.ActionKey), request.ExecutionId.ToString("N"));
+        var statePath = Path.Combine(executionDirectory, ".automaton-execution.json");
+        var persistedState = ReadExecutionState(statePath);
+        if (persistedState != null)
+        {
+            if (persistedState.Terminal) return persistedState.Result;
+            return Completed(
+                request.ExecutionId,
+                AppModuleExecutionStatuses.Lost,
+                null,
+                AppModuleExecutionErrorCodes.AmbiguousDispatch,
+                "Runner acceptance was recorded, but completion was not confirmed after interruption.",
+                persistedState.Result.DeploymentHash,
+                persistedState.Result.StartedAtUtc,
+                logs: false,
+                result: false);
+        }
         var currentDirectory = workspace.GetAppActionCurrentDirectory(request.AppId, request.ActionKey);
         var manifestPath = Path.Combine(currentDirectory, "action.yaml");
         if (!File.Exists(manifestPath))
@@ -48,7 +70,6 @@ public sealed class AppActionExecutionService
 
         var input = request.Input.ValueKind == JsonValueKind.Undefined ? "null" : request.Input.GetRawText();
 
-        var executionDirectory = Path.Combine(workspace.GetAppActionExecutionsDirectory(request.AppId, request.ActionKey), request.ExecutionId.ToString("N"));
         Directory.CreateDirectory(executionDirectory);
         var logsPath = Path.Combine(executionDirectory, "stderr.log");
         var resultPath = Path.Combine(executionDirectory, "result.json");
@@ -80,7 +101,35 @@ public sealed class AppActionExecutionService
         linked.CancelAfter(timeout);
         var activeExecution = new ActiveExecution(linked);
         if (!active.TryAdd(request.ExecutionId, activeExecution))
-            throw new InvalidOperationException("Execution is already active.");
+        {
+            if (active.TryGetValue(request.ExecutionId, out existingExecution))
+                return await existingExecution.Completion.Task.WaitAsync(cancellationToken);
+            return Completed(
+                request.ExecutionId,
+                AppModuleExecutionStatuses.Lost,
+                null,
+                AppModuleExecutionErrorCodes.AmbiguousDispatch,
+                "Runner execution ownership changed before acceptance could be confirmed.",
+                deploymentHash,
+                startedAt,
+                logs: false,
+                result: false);
+        }
+
+        WriteExecutionState(statePath, new RunnerActionExecutionState(false, new AppActionExecutionResult
+        {
+            ExecutionId = request.ExecutionId,
+            Status = AppModuleExecutionStatuses.Running,
+            DeploymentHash = deploymentHash,
+            StartedAtUtc = startedAt
+        }));
+
+        AppActionExecutionResult Finish(AppActionExecutionResult result)
+        {
+            WriteExecutionState(statePath, new RunnerActionExecutionState(true, result));
+            activeExecution.Completion.TrySetResult(result);
+            return result;
+        }
 
         try
         {
@@ -108,7 +157,7 @@ public sealed class AppActionExecutionService
                 var cancelledStderr = await stderrTask;
                 await stdoutTask;
                 await File.WriteAllTextAsync(logsPath, RedactSecrets(cancelledStderr.Content, secretValues), CancellationToken.None);
-                return Completed(request.ExecutionId, status, null, errorCode, errorCode, deploymentHash, startedAt, logs: true, result: false);
+                return Finish(Completed(request.ExecutionId, status, null, errorCode, errorCode, deploymentHash, startedAt, logs: true, result: false));
             }
 
             var stdout = await stdoutTask;
@@ -117,33 +166,48 @@ public sealed class AppActionExecutionService
             var redactedStderr = RedactSecrets(stderr.Content, secretValues);
             await File.WriteAllTextAsync(logsPath, redactedStderr, CancellationToken.None);
             if (stdout.ExceededLimit)
-                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
+                return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
                     AppModuleExecutionErrorCodes.ResultTooLarge, "Action output exceeded its configured limit.",
-                    deploymentHash, startedAt, logs: true, result: false);
+                    deploymentHash, startedAt, logs: true, result: false));
             if (process.ExitCode != 0)
-                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(redactedStderr, 1000), deploymentHash, startedAt, true, false);
+                return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.ProcessFailed, Limit(redactedStderr, 1000), deploymentHash, startedAt, true, false));
             try
             {
                 using var outputDocument = JsonDocument.Parse(redactedStdout);
                 var outputValidationError = AppActionSchemaValidator.Validate(outputDocument.RootElement, manifest.Spec.Output);
                 if (outputValidationError != null)
-                    return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
-                        AppModuleExecutionErrorCodes.InvalidResult, outputValidationError, deploymentHash, startedAt, true, false);
+                    return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode,
+                        AppModuleExecutionErrorCodes.InvalidResult, outputValidationError, deploymentHash, startedAt, true, false));
             }
             catch (JsonException)
             {
-                return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.InvalidResult, "Action stdout was not valid JSON.", deploymentHash, startedAt, true, false);
+                return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, process.ExitCode, AppModuleExecutionErrorCodes.InvalidResult, "Action stdout was not valid JSON.", deploymentHash, startedAt, true, false));
             }
             await File.WriteAllTextAsync(resultPath, redactedStdout, CancellationToken.None);
-            return Completed(request.ExecutionId, AppModuleExecutionStatuses.Succeeded, process.ExitCode, null, null, deploymentHash, startedAt, true, true);
+            return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Succeeded, process.ExitCode, null, null, deploymentHash, startedAt, true, true));
         }
         catch (Win32Exception ex)
         {
-            return Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, null,
-                AppModuleExecutionErrorCodes.RuntimeUnavailable, Limit(ex.Message, 1000), deploymentHash, startedAt, false, false);
+            return Finish(Completed(request.ExecutionId, AppModuleExecutionStatuses.Failed, null,
+                AppModuleExecutionErrorCodes.RuntimeUnavailable, Limit(ex.Message, 1000), deploymentHash, startedAt, false, false));
         }
         finally
         {
+            if (!activeExecution.Completion.Task.IsCompleted)
+            {
+                var interrupted = Completed(
+                    request.ExecutionId,
+                    AppModuleExecutionStatuses.Lost,
+                    null,
+                    AppModuleExecutionErrorCodes.AmbiguousDispatch,
+                    "Runner execution ended without a confirmed result.",
+                    deploymentHash,
+                    startedAt,
+                    logs: false,
+                    result: false);
+                WriteExecutionState(statePath, new RunnerActionExecutionState(true, interrupted));
+                activeExecution.Completion.TrySetResult(interrupted);
+            }
             active.TryRemove(request.ExecutionId, out _);
         }
         }
@@ -293,11 +357,35 @@ public sealed class AppActionExecutionService
         return redacted;
     }
 
+    private static RunnerActionExecutionState? ReadExecutionState(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<RunnerActionExecutionState>(File.ReadAllText(path));
+        }
+        catch (JsonException)
+        {
+            return new RunnerActionExecutionState(false, new AppActionExecutionResult());
+        }
+    }
+
+    private static void WriteExecutionState(string path, RunnerActionExecutionState state)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporaryPath = path + ".tmp";
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(state));
+        File.Move(temporaryPath, path, overwrite: true);
+    }
+
     private sealed class ActiveExecution(CancellationTokenSource source)
     {
         public CancellationTokenSource Source { get; } = source;
+        public TaskCompletionSource<AppActionExecutionResult> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         public volatile bool ManualCancellationRequested;
     }
 
+    private sealed record RunnerActionExecutionState(bool Terminal, AppActionExecutionResult Result);
     private sealed record StreamCapture(string Content, bool ExceededLimit);
 }

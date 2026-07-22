@@ -7,6 +7,81 @@ namespace Automaton.Runner.Console.Tests;
 public class AppActionExecutionServiceTests
 {
     [Test]
+    public async Task DuplicateExecutionId_ReusesTerminalResultAndDoesNotRestartInterruptedExecution()
+    {
+        var original = Environment.GetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT");
+        var root = Path.Combine(Path.GetTempPath(), "automaton-action-idempotency", Guid.NewGuid().ToString("N"));
+        Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", root);
+        try
+        {
+            var workspace = new RunnerWorkspaceService();
+            var service = new AppActionExecutionService(workspace);
+            var appId = Guid.NewGuid();
+            const string actionKey = "idempotent";
+            var terminalExecutionId = Guid.NewGuid();
+            var terminalDirectory = Path.Combine(
+                workspace.GetAppActionExecutionsDirectory(appId, actionKey),
+                terminalExecutionId.ToString("N"));
+            Directory.CreateDirectory(terminalDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(terminalDirectory, ".automaton-execution.json"),
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    Terminal = true,
+                    Result = new Automaton.Core.Models.AppActionExecutionResult
+                    {
+                        ExecutionId = terminalExecutionId,
+                        Status = Automaton.Core.Models.AppModuleExecutionStatuses.Succeeded,
+                        StartedAtUtc = DateTime.UtcNow.AddSeconds(-1),
+                        CompletedAtUtc = DateTime.UtcNow
+                    }
+                }));
+
+            var terminal = await service.ExecuteAsync(new Automaton.Core.Models.ExecuteAppActionModuleRequest
+            {
+                ExecutionId = terminalExecutionId,
+                AppId = appId,
+                ActionKey = actionKey
+            });
+
+            Assert.That(terminal.Status, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionStatuses.Succeeded));
+
+            var interruptedExecutionId = Guid.NewGuid();
+            var interruptedDirectory = Path.Combine(
+                workspace.GetAppActionExecutionsDirectory(appId, actionKey),
+                interruptedExecutionId.ToString("N"));
+            Directory.CreateDirectory(interruptedDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(interruptedDirectory, ".automaton-execution.json"),
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    Terminal = false,
+                    Result = new Automaton.Core.Models.AppActionExecutionResult
+                    {
+                        ExecutionId = interruptedExecutionId,
+                        Status = Automaton.Core.Models.AppModuleExecutionStatuses.Running,
+                        StartedAtUtc = DateTime.UtcNow
+                    }
+                }));
+
+            var interrupted = await service.ExecuteAsync(new Automaton.Core.Models.ExecuteAppActionModuleRequest
+            {
+                ExecutionId = interruptedExecutionId,
+                AppId = appId,
+                ActionKey = actionKey
+            });
+
+            Assert.That(interrupted.Status, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionStatuses.Lost));
+            Assert.That(interrupted.ErrorCode, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionErrorCodes.AmbiguousDispatch));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_WORKSPACE_ROOT", original);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task OversizedStdoutAndStderrAreDrainedAndClassifiedWithoutDeadlock()
     {
         if (OperatingSystem.IsWindows())
@@ -122,16 +197,20 @@ public class AppActionExecutionServiceTests
 
             using var input = System.Text.Json.JsonDocument.Parse("{}");
             var service = new AppActionExecutionService(workspace);
-            var result = await service.ExecuteAsync(new Automaton.Core.Models.ExecuteAppActionModuleRequest
+            var request = new Automaton.Core.Models.ExecuteAppActionModuleRequest
             {
                 ExecutionId = executionId,
                 AppId = appId,
                 ActionKey = actionKey,
                 Input = input.RootElement.Clone(),
                 Secrets = new Dictionary<string, string> { ["DELIVERED_SECRET"] = secret }
-            });
+            };
+            var result = await service.ExecuteAsync(request);
+            var duplicateResult = await service.ExecuteAsync(request);
 
             Assert.That(result.Status, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionStatuses.Succeeded));
+            Assert.That(duplicateResult.Status, Is.EqualTo(result.Status));
+            Assert.That(duplicateResult.StartedAtUtc, Is.EqualTo(result.StartedAtUtc));
             var logs = service.ReadLogs(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, actionKey, executionId));
             var output = service.ReadResult(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, actionKey, executionId));
             Assert.That(logs.Content, Does.Not.Contain(secret));

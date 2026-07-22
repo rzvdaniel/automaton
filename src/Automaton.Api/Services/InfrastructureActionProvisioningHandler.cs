@@ -42,17 +42,15 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
-        var existingExecution = await db.AppModuleExecutions
-            .AsNoTracking()
+        var execution = await db.AppModuleExecutions
             .FirstOrDefaultAsync(x => x.HostedRunnerOperationId == message.OperationId, cancellationToken);
-        if (existingExecution != null)
+        if (execution != null && IsTerminalExecution(execution.Status))
         {
             logger.LogInformation(
-                "Ignoring duplicate infrastructure Action request for operation {OperationId}; execution {ExecutionId} already exists with status {Status}",
+                "Reconciling terminal infrastructure Action operation {OperationId} from execution {ExecutionId} with status {Status}",
                 message.OperationId,
-                existingExecution.Id,
-                existingExecution.Status);
-            return;
+                execution.Id,
+                execution.Status);
         }
 
         if (deployment.Status is HostedRunnerDeploymentStatuses.Succeeded
@@ -93,30 +91,41 @@ public sealed class InfrastructureActionProvisioningHandler(
 
             using var inputDocument = JsonDocument.Parse(message.InputJson);
             var now = DateTime.UtcNow;
-            var execution = new AppModuleExecution
+            if (execution == null)
             {
-                Id = Guid.NewGuid(),
-                HostedRunnerOperationId = message.OperationId,
-                AppId = InfrastructureAppTrust.PlatformAppId,
-                ModuleType = AppModuleTypes.Action,
-                ModuleKey = message.ActionKey,
-                RunnerId = infrastructureRunner.Id,
-                TriggerType = AppModuleTriggerTypes.Internal,
-                Status = AppModuleExecutionStatuses.Running,
-                DeploymentHash = module.ContentHash,
-                CreatedAtUtc = now,
-                StartedAtUtc = now,
-                ExecutionDeadlineUtc = now.AddSeconds(module.TimeoutSeconds + 300),
-                CorrelationId = $"hosted-runner-operation:{message.OperationId:N}"
-            };
-            if (!await TryClaimAndCreateExecutionAsync(deployment, execution, cancellationToken))
+                execution = new AppModuleExecution
+                {
+                    Id = Guid.NewGuid(),
+                    HostedRunnerOperationId = message.OperationId,
+                    AppId = InfrastructureAppTrust.PlatformAppId,
+                    ModuleType = AppModuleTypes.Action,
+                    ModuleKey = message.ActionKey,
+                    RunnerId = infrastructureRunner.Id,
+                    TriggerType = AppModuleTriggerTypes.Internal,
+                    Status = AppModuleExecutionStatuses.Dispatching,
+                    DeploymentHash = module.ContentHash,
+                    CreatedAtUtc = now,
+                    StartedAtUtc = now,
+                    ExecutionDeadlineUtc = now.AddSeconds(module.TimeoutSeconds + 300),
+                    CorrelationId = $"hosted-runner-operation:{message.OperationId:N}"
+                };
+                if (!await TryClaimAndCreateExecutionAsync(deployment, execution, cancellationToken))
+                {
+                    logger.LogInformation("Ignoring duplicate infrastructure Action request for claimed operation {OperationId} in state {Status}", message.OperationId, deployment.Status);
+                    return;
+                }
+            }
+            else
             {
-                logger.LogInformation("Ignoring duplicate infrastructure Action request for claimed operation {OperationId} in state {Status}", message.OperationId, deployment.Status);
-                return;
+                logger.LogWarning(
+                    "Retrying interrupted infrastructure Action dispatch for operation {OperationId} with execution {ExecutionId} in state {Status}",
+                    message.OperationId,
+                    execution.Id,
+                    execution.Status);
             }
 
             ExecutionSecretLease? secretLease = null;
-            if (message.SecretGrantIds.Count > 0)
+            if (!IsTerminalExecution(execution.Status) && message.SecretGrantIds.Count > 0)
             {
                 secretLease = await secretGrantService.LeaseAsync(
                     new SecretGrantScope(
@@ -132,23 +141,25 @@ public sealed class InfrastructureActionProvisioningHandler(
                 secretSanitizer = new SecretValueSanitizer(secretLease.EnvironmentVariables.Values);
             }
 
-            var result = await hub.Clients.Client(infrastructureRunner.ConnectionId!)
-                .InvokeAsync<AppActionExecutionResult>(
-                    AutomatonHubMethods.ExecuteAppActionModule,
-                    new ExecuteAppActionModuleRequest
-                    {
-                        ExecutionId = execution.Id,
-                        AppId = InfrastructureAppTrust.PlatformAppId,
-                        ActionKey = message.ActionKey,
-                        ExpectedDeploymentHash = module.ContentHash,
-                        TimeoutSeconds = module.TimeoutSeconds,
-                        SystemInfrastructure = true,
-                        Input = inputDocument.RootElement.Clone(),
-                        Secrets = secretLease == null
-                            ? []
-                            : new Dictionary<string, string>(secretLease.EnvironmentVariables, StringComparer.Ordinal)
-                    },
-                    cancellationToken);
+            var result = IsTerminalExecution(execution.Status)
+                ? ToExecutionResult(execution)
+                : await hub.Clients.Client(infrastructureRunner.ConnectionId!)
+                    .InvokeAsync<AppActionExecutionResult>(
+                        AutomatonHubMethods.ExecuteAppActionModule,
+                        new ExecuteAppActionModuleRequest
+                        {
+                            ExecutionId = execution.Id,
+                            AppId = InfrastructureAppTrust.PlatformAppId,
+                            ActionKey = message.ActionKey,
+                            ExpectedDeploymentHash = module.ContentHash,
+                            TimeoutSeconds = module.TimeoutSeconds,
+                            SystemInfrastructure = true,
+                            Input = inputDocument.RootElement.Clone(),
+                            Secrets = secretLease == null
+                                ? []
+                                : new Dictionary<string, string>(secretLease.EnvironmentVariables, StringComparer.Ordinal)
+                        },
+                        cancellationToken);
 
             if (secretLease != null)
             {
@@ -221,6 +232,13 @@ public sealed class InfrastructureActionProvisioningHandler(
             deployment.Status = HostedRunnerDeploymentStatuses.Failed;
             deployment.Error = hostedRunner.LastError;
             deployment.FinishedAt = DateTime.UtcNow;
+            if (execution != null && !IsTerminalExecution(execution.Status))
+            {
+                execution.Status = AppModuleExecutionStatuses.Lost;
+                execution.ErrorCode = AppModuleExecutionErrorCodes.AmbiguousDispatch;
+                execution.FailureSummary = hostedRunner.LastError;
+                execution.CompletedAtUtc = DateTime.UtcNow;
+            }
             await db.SaveChangesAsync(CancellationToken.None);
             await WriteLifecycleAuditAsync(hostedRunner, message.ActionKey, succeeded: false, hostedRunner.LastError, CancellationToken.None);
             if (message.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner")
@@ -312,6 +330,30 @@ public sealed class InfrastructureActionProvisioningHandler(
     }
 
     private static string Limit(string value, int max) => value.Length <= max ? value : value[..max];
+
+    private static bool IsTerminalExecution(string status) => status is
+        AppModuleExecutionStatuses.Succeeded or
+        AppModuleExecutionStatuses.Failed or
+        AppModuleExecutionStatuses.TimedOut or
+        AppModuleExecutionStatuses.Cancelled or
+        AppModuleExecutionStatuses.RunnerUnavailable or
+        AppModuleExecutionStatuses.Lost;
+
+    private static AppActionExecutionResult ToExecutionResult(AppModuleExecution execution) => new()
+    {
+        ExecutionId = execution.Id,
+        Status = execution.Status,
+        ExitCode = execution.ExitCode,
+        ErrorCode = execution.ErrorCode,
+        FailureSummary = execution.FailureSummary,
+        DeploymentHash = execution.DeploymentHash,
+        StartedAtUtc = execution.StartedAtUtc ?? execution.CreatedAtUtc,
+        CompletedAtUtc = execution.CompletedAtUtc ?? DateTime.UtcNow,
+        LogsExpireAtUtc = execution.LogsAvailableUntilUtc,
+        ResultExpireAtUtc = execution.ResultAvailableUntilUtc,
+        LogsAvailable = execution.LogsAvailableUntilUtc > DateTime.UtcNow,
+        ResultAvailable = execution.ResultAvailableUntilUtc > DateTime.UtcNow
+    };
 
     internal async Task<bool> TryClaimAndCreateExecutionAsync(
         HostedRunnerDeployment deployment,
