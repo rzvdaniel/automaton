@@ -66,8 +66,7 @@ public class HostedRunnerAuditTests
             },
             new HostedRunnerOptions
             {
-                Enabled = true,
-                DeploymentMode = HostedRunnerDeploymentModes.SshDocker
+                Enabled = true
             });
 
         var runner = await service.EnsureHostedRunnerAsync(userId);
@@ -107,8 +106,7 @@ public class HostedRunnerAuditTests
             },
             new HostedRunnerOptions
             {
-                Enabled = true,
-                DeploymentMode = HostedRunnerDeploymentModes.SshDocker
+                Enabled = true
             });
 
         var runner = await service.EnsureHostedRunnerAsync(userId);
@@ -1024,8 +1022,7 @@ public class HostedRunnerAuditTests
             remoteExecutor,
             new HostedRunnerOptions
             {
-                Enabled = true,
-                DeploymentMode = HostedRunnerDeploymentModes.SshDocker
+                Enabled = true
             });
 
         return new HostedRunnerManagementService(
@@ -1034,8 +1031,7 @@ public class HostedRunnerAuditTests
             new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
-                Enabled = true,
-                DeploymentMode = HostedRunnerDeploymentModes.SshDocker
+                Enabled = true
             }),
             auditEventService,
             userContextService,

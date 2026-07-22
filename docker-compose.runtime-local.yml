@@ -131,7 +131,6 @@ services:
       PublishedApps__RuntimeProxyAuthKey: ${LOCAL_RUNTIME_PROXY_AUTH_KEY:-local-runtime-secret}
       PublishedApps__TraefikDynamicConfigRoot: /app/AppData/traefik-dynamic
       HostedRunners__Enabled: "true"
-      HostedRunners__DeploymentMode: localDocker
       HostedRunners__ServerUrl: http://api:8080
       HostedRunners__DockerImage: automaton-runtime-local-runner:latest
       HostedRunners__DockerNetwork: automaton-runtime-local-runner
@@ -187,18 +186,10 @@ services:
       EmailConfig__SendEmailsInDevelopment: "true"
       Logging__File__Path: /app/logs
       HostedRunners__Enabled: "true"
-      HostedRunners__DeploymentMode: localDocker
       HostedRunners__ServerUrl: http://api:8080
       HostedRunners__DockerImage: automaton-runtime-local-runner:latest
       HostedRunners__DockerNetwork: automaton-runtime-local-runner
       HostedRunners__RuntimeDockerNetwork: automaton-runtime-local-runner
-      HostedRunners__AutoCreateLocalRunnerHost: "true"
-      HostedRunners__LocalRunnerHostName: runtime-local-docker
-      # These values are scheduler capacity budgets for the auto-seeded local RunnerHost.
-      # They are not auto-detected hardware specs.
-      HostedRunners__LocalRunnerHostCpuCores: "8"
-      HostedRunners__LocalRunnerHostMemoryMb: "16384"
-      HostedRunners__LocalRunnerHostDiskMb: "65536"
     volumes:
       - runtime-local-worker-logs:/app/logs
       - runtime-local-worker-dataprotection:/app/data-protection-keys

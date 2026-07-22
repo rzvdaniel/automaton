@@ -12,7 +12,7 @@ namespace Automaton.Api.Tests;
 public class LocalRunnerHostBootstrapServiceTests
 {
     [Test]
-    public async Task SeedAsync_CreatesLocalRunnerHost_WhenEnabledForLocalDocker()
+    public async Task SeedAsync_CreatesLocalRunnerHost_WhenAutoCreationIsEnabled()
     {
         await using var dbContext = CreateDbContext();
         var service = new LocalRunnerHostBootstrapService(
@@ -21,7 +21,6 @@ public class LocalRunnerHostBootstrapServiceTests
             {
                 Enabled = true,
                 AutoCreateLocalRunnerHost = true,
-                DeploymentMode = HostedRunnerDeploymentModes.LocalDocker,
                 LocalRunnerHostName = "runtime-local-docker",
                 LocalRunnerHostCpuCores = 12m,
                 LocalRunnerHostMemoryMb = 24576,

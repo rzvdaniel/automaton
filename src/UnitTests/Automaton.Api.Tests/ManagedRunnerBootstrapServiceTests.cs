@@ -249,7 +249,6 @@ public class ManagedRunnerBootstrapServiceTests
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = true,
-                DeploymentMode = HostedRunnerDeploymentModes.SshDocker,
                 RuntimePort = 8080
             }),
             new HostedRunnerSpecificationResolver(db),

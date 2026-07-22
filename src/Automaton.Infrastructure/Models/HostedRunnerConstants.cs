@@ -112,10 +112,3 @@ public static class HostedRunnerDeploymentErrors
     public const string LifecycleExecutionFailed = "The infrastructure Action execution ended before the hosted Runner lifecycle operation completed.";
     public const string LifecycleResultAmbiguous = "The infrastructure Action succeeded, but its lifecycle result was not durably applied.";
 }
-
-public static class HostedRunnerDeploymentModes
-{
-    public const string DryRun = "dryRun";
-    public const string SshDocker = "sshDocker";
-    public const string LocalDocker = "localDocker";
-}

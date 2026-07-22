@@ -198,7 +198,6 @@ public class HostedRunnerProvisioningService
                     hostedRunner.HostedRunnerSpecificationId,
                     hostedRunner.SpecificationRevision,
                     Resources = requestedSnapshot.Resources,
-                    DeploymentMode = options.DeploymentMode,
                     IsProvisioningEnabled = options.Enabled
                 }
             },

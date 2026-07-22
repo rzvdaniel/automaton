@@ -15,9 +15,7 @@ public sealed class LocalRunnerHostBootstrapService(
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         var config = options.Value;
-        if (!config.Enabled ||
-            !config.AutoCreateLocalRunnerHost ||
-            !string.Equals(config.DeploymentMode, HostedRunnerDeploymentModes.LocalDocker, StringComparison.Ordinal))
+        if (!config.Enabled || !config.AutoCreateLocalRunnerHost)
         {
             return;
         }

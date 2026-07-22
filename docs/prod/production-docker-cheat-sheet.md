@@ -206,21 +206,7 @@ runtime port, and stores an endpoint such as `http://<runner-host-address>:20000
 Open the configured range on each remote runner host, restricted to the API or
 proxy network that needs to reach the runner runtime.
 
-### 7. Add hosted-runner SSH key if needed
-
-If you use hosted-runner provisioning from the API, create:
-
-```bash
-chmod 700 /opt/automaton/secrets
-touch /opt/automaton/secrets/hosted_runner_ssh_key
-chmod 600 /opt/automaton/secrets/hosted_runner_ssh_key
-```
-
-Then put the private key contents into that file.
-
-If you do not use hosted-runner provisioning yet, you can still create an empty placeholder file so the API bind mount resolves cleanly.
-
-### 8. Open the firewall
+### 7. Open the firewall
 
 If you use UFW:
 
@@ -504,15 +490,14 @@ Use this when reinstalling Automaton websites on a new server.
 3. Clone the repository to `/opt/automaton`.
 4. Create `/opt/automaton/config/appsettings.Production.json`.
 5. Create `/opt/automaton/.env` from `.env.prod.example`.
-6. Create `/opt/automaton/secrets/hosted_runner_ssh_key`, even as an empty placeholder if hosted runners are not in use.
-7. Open firewall ports `22`, `80`, and `443`.
-8. Run `chmod +x ./scripts/prod-*.sh`.
-9. Configure `CF_DNS_API_TOKEN` and `ACME_EMAIL` in `.env`.
-10. Start Traefik with `docker compose -f docker-compose.prod.yml up -d traefik`; it creates or renews the wildcard certificate in the persistent ACME volume.
-11. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
-12. Run `./scripts/prod-reset-blue-green.sh`.
-13. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
-14. Run `./scripts/prod-verify.sh`.
+6. Open firewall ports `22`, `80`, and `443`.
+7. Run `chmod +x ./scripts/prod-*.sh`.
+8. Configure `CF_DNS_API_TOKEN` and `ACME_EMAIL` in `.env`.
+9. Start Traefik with `docker compose -f docker-compose.prod.yml up -d traefik`; it creates or renews the wildcard certificate in the persistent ACME volume.
+10. Run `docker compose -f docker-compose.prod.yml up -d --build api-blue studio-blue website-blue`.
+11. Run `./scripts/prod-reset-blue-green.sh`.
+12. Run `./scripts/prod-redeploy-all.sh --keep-previous`.
+13. Run `./scripts/prod-verify.sh`.
 
 If migrating an existing production instance, copy `prod-api-appdata` and the database backup as the source of truth. `prod-published-apps` is generated output and can be rebuilt from published app metadata plus `live/frontend/` once a rebuild command exists.
 
