@@ -104,6 +104,10 @@ public class HostedRunnerManagementService
         {
             throw new InvalidOperationException("Hosted runner has no assigned host.");
         }
+        if (!hostedRunner.RunnerId.HasValue)
+        {
+            throw new InvalidOperationException("Hosted runner has no linked Runner identity to confirm after restart.");
+        }
 
         await auditEventService.WriteAsync(
             new AuditEventWriteRequest
@@ -132,6 +136,9 @@ public class HostedRunnerManagementService
             HostedRunnerDeploymentStatuses.Queued,
             "Trusted infrastructure Action: restart-hosted-runner.",
             "Restart requested.");
+        deployment.ExpectedRunnerId = hostedRunner.RunnerId;
+        deployment.PreviousConnectionId = hostedRunner.Runner?.ConnectionId;
+        deployment.ReconnectAfterUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Automaton.Api.Data;
+using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
@@ -11,6 +12,7 @@ using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace Automaton.Api.Services;
@@ -22,6 +24,7 @@ public sealed class InfrastructureActionProvisioningHandler(
     IAuditEventService auditEventService,
     IExecutionSecretGrantService secretGrantService,
     TrustedInfrastructureActionDeploymentService actionDeploymentService,
+    IOptions<HostedRunnerOptions> hostedRunnerOptions,
     ILogger<InfrastructureActionProvisioningHandler> logger)
 {
     private const string WaitingForRegistrationLog = "Infrastructure Action completed; waiting for the hosted Runner to register.";
@@ -56,6 +59,7 @@ public sealed class InfrastructureActionProvisioningHandler(
         if (deployment.Status is HostedRunnerDeploymentStatuses.Succeeded
             or HostedRunnerDeploymentStatuses.Failed
             or HostedRunnerDeploymentStatuses.Skipped
+            or HostedRunnerDeploymentStatuses.WaitingForReconnect
             || (message.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner")
                 && string.Equals(deployment.Logs, WaitingForRegistrationLog, StringComparison.Ordinal))
         {
@@ -254,7 +258,7 @@ public sealed class InfrastructureActionProvisioningHandler(
         }
     }
 
-    private async Task ApplySuccessfulOperationAsync(
+    internal async Task ApplySuccessfulOperationAsync(
         HostedRunner hostedRunner,
         HostedRunnerDeployment deployment,
         string actionKey,
@@ -273,14 +277,24 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
+        if (actionKey == "restart-hosted-runner")
+        {
+            deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
+            if (!deployment.ExpectedRunnerId.HasValue)
+                throw new InvalidOperationException("The restart operation has no expected Runner identity.");
+            var now = DateTime.UtcNow;
+            var timeoutSeconds = Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900);
+            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
+            deployment.ReconnectAfterUtc ??= deployment.StartedAt;
+            deployment.ReconnectDeadlineUtc = now.AddSeconds(timeoutSeconds);
+            deployment.Logs = "Restart command completed; waiting for the hosted Runner to reconnect and heartbeat.";
+            return;
+        }
+
         deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
         deployment.FinishedAt = DateTime.UtcNow;
         deployment.Logs = $"Trusted infrastructure Action '{actionKey}' completed.";
-        if (actionKey == "restart-hosted-runner")
-        {
-            hostedRunner.Status = HostedRunnerStatuses.Running;
-        }
-        else if (actionKey == "delete-hosted-runner")
+        if (actionKey == "delete-hosted-runner")
         {
             hostedRunner.ApiKeyId = null;
             hostedRunner.RunnerId = null;

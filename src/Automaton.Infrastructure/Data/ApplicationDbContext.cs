@@ -510,11 +510,13 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.CommandPreview).HasColumnType("longtext");
                 entity.Property(e => e.Logs).HasColumnType("longtext");
                 entity.Property(e => e.Error).HasColumnType("longtext");
+                entity.Property(e => e.PreviousConnectionId).HasMaxLength(120);
                 entity.Property(e => e.StartedAt).IsRequired();
 
                 entity.HasIndex(e => e.HostedRunnerId);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => new { e.Status, e.RegistrationDeadlineUtc });
+                entity.HasIndex(e => new { e.Status, e.ReconnectDeadlineUtc });
 
                 entity.HasOne(e => e.HostedRunner)
                     .WithMany(e => e.Deployments)

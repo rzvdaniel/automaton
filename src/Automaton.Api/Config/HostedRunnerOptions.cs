@@ -27,4 +27,5 @@ public class HostedRunnerOptions
     public string? SshPrivateKeyPassphrase { get; set; }
     public int SshConnectTimeoutSeconds { get; set; } = 20;
     public int SshCommandTimeoutSeconds { get; set; } = 180;
+    public int RestartReconnectTimeoutSeconds { get; set; } = 120;
 }

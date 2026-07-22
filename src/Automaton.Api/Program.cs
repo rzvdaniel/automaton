@@ -207,6 +207,7 @@ services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>(
 services.AddSingleton<IEventPublisher, CapEventPublisher>();
 services.AddTransient<InfrastructureActionExecutionRequestedCapSubscriber>();
 services.AddScoped<InfrastructureActionProvisioningHandler>();
+services.AddScoped<HostedRunnerRestartReconciler>();
 services.AddScoped<TrustedInfrastructureActionDeploymentService>();
 services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
 services.AddScoped<ISecretStore, SecretStore>();
@@ -373,6 +374,7 @@ services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped<AppActionExecutionService>();
 services.AddHostedService<AppModuleExecutionReconciliationService>();
+services.AddHostedService<HostedRunnerRestartReconciliationService>();
 services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();

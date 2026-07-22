@@ -99,6 +99,7 @@ public static class HostedRunnerDeploymentStatuses
     public const string Executing = "executing";
     public const string Running = "running";
     public const string WaitingForRegistration = "waitingForRegistration";
+    public const string WaitingForReconnect = "waitingForReconnect";
     public const string Succeeded = "succeeded";
     public const string Failed = "failed";
     public const string Skipped = "skipped";
@@ -107,6 +108,7 @@ public static class HostedRunnerDeploymentStatuses
 public static class HostedRunnerDeploymentErrors
 {
     public const string RegistrationTimedOut = "The hosted Runner did not register before its enrollment deadline.";
+    public const string RestartReconnectTimedOut = "The restart command succeeded, but the hosted Runner did not reconnect and heartbeat before the deadline.";
 }
 
 public static class HostedRunnerDeploymentModes

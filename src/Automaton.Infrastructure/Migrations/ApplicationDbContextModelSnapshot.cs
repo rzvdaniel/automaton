@@ -1499,6 +1499,9 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("Error")
                         .HasColumnType("longtext");
 
+                    b.Property<Guid?>("ExpectedRunnerId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("FinishedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1507,6 +1510,16 @@ namespace Automaton.Api.Migrations
 
                     b.Property<string>("Logs")
                         .HasColumnType("longtext");
+
+                    b.Property<string>("PreviousConnectionId")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<DateTime?>("ReconnectAfterUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ReconnectDeadlineUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("RegistrationDeadlineUtc")
                         .HasColumnType("datetime(6)");
@@ -1524,6 +1537,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("HostedRunnerId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("Status", "ReconnectDeadlineUtc");
 
                     b.HasIndex("Status", "RegistrationDeadlineUtc");
 

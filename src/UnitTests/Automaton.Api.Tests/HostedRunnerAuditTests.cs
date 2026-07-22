@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
@@ -245,6 +246,7 @@ public class HostedRunnerAuditTests
             new NoOpAuditEventService(),
             secretGrantService: null!,
             actionDeploymentService: null!,
+            hostedRunnerOptions: Options.Create(new HostedRunnerOptions()),
             logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
@@ -294,6 +296,10 @@ public class HostedRunnerAuditTests
                 Error TEXT NULL,
                 StartedAt TEXT NOT NULL,
                 RegistrationDeadlineUtc TEXT NULL,
+                ExpectedRunnerId TEXT NULL,
+                PreviousConnectionId TEXT NULL,
+                ReconnectAfterUtc TEXT NULL,
+                ReconnectDeadlineUtc TEXT NULL,
                 FinishedAt TEXT NULL
             );
             CREATE TABLE AppModuleExecutions (
@@ -332,7 +338,7 @@ public class HostedRunnerAuditTests
         db.HostedRunnerDeployments.Add(deployment);
         await db.SaveChangesAsync();
         var handler = new InfrastructureActionProvisioningHandler(
-            db, null!, null!, null!, null!, null!,
+            db, null!, null!, null!, null!, null!, Options.Create(new HostedRunnerOptions()),
             NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         Assert.ThrowsAsync<LifecycleClaimPersistenceException>(() =>
@@ -431,6 +437,124 @@ public class HostedRunnerAuditTests
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
         Assert.That(deployment.FinishedAt, Is.Not.Null);
         Assert.That(await db.AuditEvents.AnyAsync(x => x.EventType == AuditEventTypes.RunnerReprovisionSucceeded), Is.True);
+    }
+
+    [Test]
+    public async Task RestartCompletesOnlyAfterHeartbeatOnNewConnectionSession()
+    {
+        using var db = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(), Name = "managed-restart", ConnectionId = "new-connection",
+            Status = RunnerConnectivityStatuses.Online, LastHeartbeatAtUtc = now
+        };
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = userId, RunnerId = runner.Id,
+            Name = "managed-restart", ContainerName = "managed-restart",
+            Status = HostedRunnerStatuses.Running
+        };
+        var operation = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Restart,
+            Status = HostedRunnerDeploymentStatuses.WaitingForReconnect,
+            ExpectedRunnerId = runner.Id,
+            PreviousConnectionId = "old-connection",
+            ReconnectAfterUtc = now.AddSeconds(-5),
+            ReconnectDeadlineUtc = now.AddMinutes(2)
+        };
+        hostedRunner.Deployments.Add(operation);
+        var session = new RunnerConnectionSession
+        {
+            Id = Guid.NewGuid(), RunnerId = runner.Id, ConnectionId = runner.ConnectionId,
+            ConnectedAtUtc = now.AddSeconds(-10)
+        };
+        db.AddRange(runner, hostedRunner, session);
+        db.SaveChanges();
+
+        var httpContextAccessor = CreateHttpContextAccessor(userId, "runner-owner@automaton.test");
+        var userContext = new UserContextService(httpContextAccessor);
+        var runnerService = new RunnerService(
+            db, userContext, automatonHub: null!, authorizationService: null!,
+            new ApiInstanceIdentityService(), new AuditEventService(db, userContext, httpContextAccessor),
+            applicationEventService: null!, managedRunnerAppAssignmentService: null!);
+
+        await runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None);
+        Assert.That(operation.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
+
+        session.ConnectedAtUtc = now.AddSeconds(1);
+        await db.SaveChangesAsync();
+        await runnerService.CompleteHostedRunnerRestartAsync(runner, CancellationToken.None);
+
+        Assert.That(operation.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Succeeded));
+        Assert.That(operation.FinishedAt, Is.Not.Null);
+        Assert.That(await db.AuditEvents.CountAsync(x => x.EventType == AuditEventTypes.RunnerRestartSucceeded), Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task RestartCommandSuccessWaitsForReconnectInsteadOfCompletingOperation()
+    {
+        using var db = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), RunnerId = runnerId,
+            Name = "restart-command", ContainerName = "restart-command", Status = HostedRunnerStatuses.Running
+        };
+        var operation = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Restart,
+            Status = HostedRunnerDeploymentStatuses.Executing,
+            ExpectedRunnerId = runnerId
+        };
+        var handler = new InfrastructureActionProvisioningHandler(
+            db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
+            Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
+            NullLogger<InfrastructureActionProvisioningHandler>.Instance);
+        using var result = JsonDocument.Parse("{}");
+
+        await handler.ApplySuccessfulOperationAsync(
+            hostedRunner, operation, "restart-hosted-runner", result.RootElement, CancellationToken.None);
+
+        Assert.That(operation.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.WaitingForReconnect));
+        Assert.That(operation.FinishedAt, Is.Null);
+        Assert.That(operation.ReconnectAfterUtc, Is.Not.Null);
+        Assert.That(operation.ReconnectDeadlineUtc, Is.GreaterThan(operation.ReconnectAfterUtc));
+        Assert.That(operation.ReconnectDeadlineUtc, Is.LessThanOrEqualTo(DateTime.UtcNow.AddSeconds(61)));
+    }
+
+    [Test]
+    public async Task RestartReconnectTimeoutFailsOnceWithDistinctReason()
+    {
+        using var db = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var hostedRunner = new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "timed-out-restart",
+            ContainerName = "timed-out-restart", Status = HostedRunnerStatuses.Running
+        };
+        var operation = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = hostedRunner.Id,
+            Action = HostedRunnerDeploymentActions.Restart,
+            Status = HostedRunnerDeploymentStatuses.WaitingForReconnect,
+            ReconnectAfterUtc = now.AddMinutes(-3), ReconnectDeadlineUtc = now.AddMinutes(-1)
+        };
+        hostedRunner.Deployments.Add(operation);
+        db.HostedRunners.Add(hostedRunner);
+        db.SaveChanges();
+        var reconciler = new HostedRunnerRestartReconciler(
+            db, new NoOpAuditEventService(), NullLogger<HostedRunnerRestartReconciler>.Instance);
+
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.EqualTo(1));
+        Assert.That(await reconciler.ReconcileAsync(now, CancellationToken.None), Is.Zero);
+        Assert.That(operation.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Failed));
+        Assert.That(operation.Error, Is.EqualTo(HostedRunnerDeploymentErrors.RestartReconnectTimedOut));
+        Assert.That(hostedRunner.Status, Is.EqualTo(HostedRunnerStatuses.Failed));
     }
 
     [Test]

@@ -340,7 +340,8 @@ public class HostedRunnerProvisioningService
 
             var assigned = host.HostedRunners.Where(r =>
                 r.Id != excludedHostedRunnerId &&
-                OccupyingStatuses.Contains(r.Status) &&
+                (OccupyingStatuses.Contains(r.Status)
+                    || r.Status == HostedRunnerStatuses.Failed && r.ContainerId != null) &&
                 r.DeletedAt == null);
             if (host.ReservedCpuCores + assigned.Sum(r => r.SpecificationSnapshot.Resources.CpuLimit) + requested.CpuLimit <= host.TotalCpuCores
                 && host.ReservedMemoryMb + assigned.Sum(r => r.SpecificationSnapshot.Resources.MemoryLimitMb) + requested.MemoryLimitMb <= host.TotalMemoryMb

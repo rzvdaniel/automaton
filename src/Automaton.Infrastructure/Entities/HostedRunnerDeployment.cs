@@ -27,5 +27,10 @@ public class HostedRunnerDeployment
 
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RegistrationDeadlineUtc { get; set; }
+    public Guid? ExpectedRunnerId { get; set; }
+    [MaxLength(120)]
+    public string? PreviousConnectionId { get; set; }
+    public DateTime? ReconnectAfterUtc { get; set; }
+    public DateTime? ReconnectDeadlineUtc { get; set; }
     public DateTime? FinishedAt { get; set; }
 }
