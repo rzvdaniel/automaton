@@ -509,6 +509,7 @@ namespace Automaton.Api.Data
 
                 entity.HasIndex(e => e.HostedRunnerId);
                 entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => new { e.Status, e.RegistrationDeadlineUtc });
 
                 entity.HasOne(e => e.HostedRunner)
                     .WithMany(e => e.Deployments)

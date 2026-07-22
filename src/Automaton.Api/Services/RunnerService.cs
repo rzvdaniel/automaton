@@ -272,6 +272,17 @@ public class RunnerService
             return null;
         }
 
+        var registrationTimedOut = hostedRunner.Deployments.Any(x =>
+            (x.Action == HostedRunnerDeploymentActions.Provision || x.Action == HostedRunnerDeploymentActions.Reprovision)
+            && x.Status == HostedRunnerDeploymentStatuses.Failed
+            && x.RegistrationDeadlineUtc <= DateTime.UtcNow
+            && x.Error == HostedRunnerDeploymentErrors.RegistrationTimedOut);
+        if (registrationTimedOut)
+        {
+            logger.Warning("Rejected late reconnect for hosted runner {HostedRunnerId} after registration timeout", hostedRunner.Id);
+            return null;
+        }
+
         hostedRunner.RunnerId = runner.Id;
         hostedRunner.Status = HostedRunnerStatuses.Running;
         hostedRunner.ProvisionedAt ??= DateTime.UtcNow;

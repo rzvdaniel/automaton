@@ -1508,6 +1508,9 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("Logs")
                         .HasColumnType("longtext");
 
+                    b.Property<DateTime?>("RegistrationDeadlineUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1521,6 +1524,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("HostedRunnerId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("Status", "RegistrationDeadlineUtc");
 
                     b.ToTable("HostedRunnerDeployments");
                 });

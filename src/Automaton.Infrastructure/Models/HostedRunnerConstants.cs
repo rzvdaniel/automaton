@@ -104,6 +104,11 @@ public static class HostedRunnerDeploymentStatuses
     public const string Skipped = "skipped";
 }
 
+public static class HostedRunnerDeploymentErrors
+{
+    public const string RegistrationTimedOut = "The hosted Runner did not register before its enrollment deadline.";
+}
+
 public static class HostedRunnerDeploymentModes
 {
     public const string DryRun = "dryRun";

@@ -58,11 +58,13 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
 builder.Services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
+builder.Services.AddScoped<HostedRunnerRegistrationReconciler>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
 builder.Services.AddHostedService<CliAuthorizationCleanupService>();
+builder.Services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")

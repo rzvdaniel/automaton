@@ -227,6 +227,8 @@ public class HostedRunnerProvisioningService
                     infrastructureRunnerId,
                     cancellationToken);
                 secretGrantIds = [enrollment.SecretGrantId];
+                deployment.RegistrationDeadlineUtc = enrollment.ExpiresAtUtc;
+                await db.SaveChangesAsync(cancellationToken);
             }
             if (capacityTransaction != null)
             {

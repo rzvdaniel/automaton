@@ -293,6 +293,7 @@ public class HostedRunnerAuditTests
                 Logs TEXT NULL,
                 Error TEXT NULL,
                 StartedAt TEXT NOT NULL,
+                RegistrationDeadlineUtc TEXT NULL,
                 FinishedAt TEXT NULL
             );
             CREATE TABLE AppModuleExecutions (

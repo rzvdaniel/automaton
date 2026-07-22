@@ -26,5 +26,6 @@ public class HostedRunnerDeployment
     public string? Error { get; set; }
 
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? RegistrationDeadlineUtc { get; set; }
     public DateTime? FinishedAt { get; set; }
 }
