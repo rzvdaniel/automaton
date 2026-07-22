@@ -29,4 +29,7 @@ public sealed class SecretValueSanitizer
             sanitized = sanitized.Replace(representation, "[REDACTED]", StringComparison.Ordinal);
         return sanitized;
     }
+
+    public string? SanitizeNullable(string? value)
+        => value == null ? null : Sanitize(value);
 }

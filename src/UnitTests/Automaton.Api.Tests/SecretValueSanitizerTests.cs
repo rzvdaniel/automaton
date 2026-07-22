@@ -17,5 +17,6 @@ public sealed class SecretValueSanitizerTests
         Assert.That(sanitized, Does.Not.Contain(secret));
         Assert.That(sanitized, Does.Not.Contain(jsonEscaped));
         Assert.That(sanitized, Does.Contain("[REDACTED]"));
+        Assert.That(sanitizer.SanitizeNullable(null), Is.Null);
     }
 }

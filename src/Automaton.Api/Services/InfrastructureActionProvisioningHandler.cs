@@ -276,8 +276,8 @@ public sealed class InfrastructureActionProvisioningHandler(
     {
         execution.Status = result.Status;
         execution.ExitCode = result.ExitCode;
-        execution.ErrorCode = result.ErrorCode;
-        execution.FailureSummary = sanitizer.Sanitize(result.FailureSummary);
+        execution.ErrorCode = sanitizer.SanitizeNullable(result.ErrorCode);
+        execution.FailureSummary = sanitizer.SanitizeNullable(result.FailureSummary);
         execution.DeploymentHash = result.DeploymentHash ?? execution.DeploymentHash;
         execution.StartedAtUtc = result.StartedAtUtc;
         execution.CompletedAtUtc = result.CompletedAtUtc;
