@@ -234,6 +234,119 @@ public class ZipServiceTests
     }
 
     [Test]
+    public void CreateZip_WhenPatternIsRooted_OnlyExcludesRootMatch()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "dist"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "nested", "dist"));
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "/dist/\r\n/.env\r\n");
+        File.WriteAllText(Path.Combine(projectRoot, "dist", "root.js"), "skip");
+        File.WriteAllText(Path.Combine(projectRoot, "nested", "dist", "nested.js"), "keep");
+        File.WriteAllText(Path.Combine(projectRoot, ".env"), "skip");
+        File.WriteAllText(Path.Combine(projectRoot, "nested", ".env"), "keep");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Not.Contain("dist/root.js"));
+        Assert.That(entries, Does.Contain("nested/dist/nested.js"));
+        Assert.That(entries, Does.Not.Contain(".env"));
+        Assert.That(entries, Does.Contain("nested/.env"));
+    }
+
+    [Test]
+    public void CreateZip_WhenFilenameGlobIsUnrooted_ExcludesMatchesAtAnyDepth()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "data"));
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "*.db");
+        File.WriteAllText(Path.Combine(projectRoot, "root.db"), "skip");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "data", "nested.db"), "skip");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Not.Contain("root.db"));
+        Assert.That(entries, Does.Not.Contain("backend/data/nested.db"));
+    }
+
+    [Test]
+    public void CreateZip_WhenLaterRuleMatches_UsesLastMatchingRule()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "fixtures"));
+        File.WriteAllText(
+            Path.Combine(projectRoot, ".automatonignore"),
+            "*.db\r\n!backend\\fixtures\\example.db\r\n*.db\r\n");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "fixtures", "example.db"), "skip");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Not.Contain("backend/fixtures/example.db"));
+    }
+
+    [Test]
+    public void CreateZip_WhenNestedDatabaseIsNegated_ReincludesIt()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "fixtures"));
+        File.WriteAllText(
+            Path.Combine(projectRoot, ".automatonignore"),
+            "*.db\r\n!backend/fixtures/example.db\r\n");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "fixtures", "example.db"), "keep");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "fixtures", "local.db"), "skip");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Contain("backend/fixtures/example.db"));
+        Assert.That(entries, Does.Not.Contain("backend/fixtures/local.db"));
+    }
+
+    [Test]
+    public void CreateZip_WhenIgnoredDirectoryHasPathSpecificNegations_ReopensSubtree()
+    {
+        var projectRoot = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(projectRoot, "fixtures", "private"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "fixtures", "public"));
+        File.WriteAllText(
+            Path.Combine(projectRoot, ".automatonignore"),
+            "fixtures/\r\n!fixtures/public/\r\n!fixtures/public/example.db\r\n");
+        File.WriteAllText(Path.Combine(projectRoot, "fixtures", "private", "secret.db"), "skip");
+        File.WriteAllText(Path.Combine(projectRoot, "fixtures", "public", "example.db"), "keep");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Not.Contain("fixtures/private/secret.db"));
+        Assert.That(entries, Does.Contain("fixtures/public/example.db"));
+    }
+
+    [Test]
+    public void CreateZip_WhenIgnoreFileHasWhitespaceCommentsAndCrLf_ParsesMeaningfulRules()
+    {
+        var projectRoot = CreateTempDirectory();
+        File.WriteAllText(
+            Path.Combine(projectRoot, ".automatonignore"),
+            "\r\n  # comment\r\n  *.log  \r\n\r\n");
+        File.WriteAllText(Path.Combine(projectRoot, "debug.log"), "skip");
+        File.WriteAllText(Path.Combine(projectRoot, "index.html"), "keep");
+
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
+
+        Assert.That(entries, Does.Not.Contain("debug.log"));
+        Assert.That(entries, Does.Contain("index.html"));
+    }
+
+    [Test]
     public void CreateZip_WhenScopeExcludeMatches_SkipsFile()
     {
         var projectRoot = CreateTempDirectory();

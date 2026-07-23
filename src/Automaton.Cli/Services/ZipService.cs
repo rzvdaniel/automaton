@@ -13,6 +13,7 @@ namespace Automaton.Cli.Services;
 public static class ZipService
 {
     private const string IgnoreFileName = ".automatonignore";
+    private sealed record IgnoreRule(Matcher Matcher, bool IsNegation, string Pattern);
 
     public static readonly string[] MandatoryIgnorePatterns =
     {
@@ -191,7 +192,7 @@ public static class ZipService
         ZipArchive archive,
         string rootDir,
         string currentDir,
-        (Matcher Mandatory, Matcher Project) ignoreMatchers,
+        (Matcher Mandatory, IReadOnlyList<IgnoreRule> Project) ignoreMatchers,
         Matcher? includeMatcher,
         IEnumerable<string>? additionalExcludes)
     {
@@ -206,7 +207,18 @@ public static class ZipService
         foreach (var dir in Directory.GetDirectories(currentDir))
         {
             var relativeDir = Path.GetRelativePath(rootDir, dir).Replace('\\', '/');
-            if (IsIgnored(ignoreMatchers, relativeDir, isDirectory: true)) continue;
+            if (ignoreMatchers.Mandatory.Match(relativeDir).HasMatches
+                || ignoreMatchers.Mandatory.Match(relativeDir + "/").HasMatches)
+            {
+                continue;
+            }
+
+            var projectResult = EvaluateProjectRules(ignoreMatchers.Project, relativeDir, isDirectory: true);
+            if (projectResult.IsIgnored
+                && !CanLaterNegationReopenDirectory(ignoreMatchers.Project, projectResult.LastMatchIndex, relativeDir))
+            {
+                continue;
+            }
 
             AddDirectory(archive, rootDir, dir, ignoreMatchers, includeMatcher, additionalExcludes);
         }
@@ -235,12 +247,12 @@ public static class ZipService
         }
     }
 
-    private static (Matcher Mandatory, Matcher Project) CreateIgnoreMatchers(
+    private static (Matcher Mandatory, IReadOnlyList<IgnoreRule> Project) CreateIgnoreMatchers(
         string projectRoot,
         bool includeAutomatonConfig)
     {
         var mandatoryMatcher = new Matcher(StringComparison.OrdinalIgnoreCase);
-        var projectMatcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        var projectRules = new List<IgnoreRule>();
 
         foreach (var pattern in MandatoryIgnorePatterns)
         {
@@ -254,10 +266,10 @@ public static class ZipService
 
         foreach (var pattern in LoadCustomIgnorePatterns(projectRoot))
         {
-            AddIgnorePattern(projectMatcher, pattern);
+            projectRules.Add(CreateIgnoreRule(pattern));
         }
 
-        return (mandatoryMatcher, projectMatcher);
+        return (mandatoryMatcher, projectRules);
     }
 
     private static Matcher? CreateIncludeMatcher(IEnumerable<string>? includePatterns)
@@ -293,21 +305,37 @@ public static class ZipService
 
     private static void AddIgnorePattern(Matcher matcher, string pattern)
     {
+        var normalized = NormalizeIgnorePattern(pattern, out _, out var isRooted);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return;
+
+        AddIgnoreGlobPatterns(matcher, normalized, isRooted);
+    }
+
+    private static IgnoreRule CreateIgnoreRule(string pattern)
+    {
+        var normalized = NormalizeIgnorePattern(pattern, out var isNegation, out var isRooted);
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        AddIgnoreGlobPatterns(matcher, normalized, isRooted);
+        return new IgnoreRule(matcher, isNegation, normalized);
+    }
+
+    private static string NormalizeIgnorePattern(string pattern, out bool isNegation, out bool isRooted)
+    {
         var normalized = pattern.Replace('\\', '/').Trim();
-        var isNegation = normalized.StartsWith("!", StringComparison.Ordinal);
+        isNegation = normalized.StartsWith("!", StringComparison.Ordinal);
         if (isNegation)
-        {
-            normalized = normalized[1..];
-        }
+            normalized = normalized[1..].TrimStart();
 
         if (normalized.StartsWith("./", StringComparison.Ordinal))
             normalized = normalized[2..];
 
-        var isRooted = normalized.StartsWith("/", StringComparison.Ordinal);
-        normalized = normalized.TrimStart('/');
-        if (string.IsNullOrWhiteSpace(normalized))
-            return;
+        isRooted = normalized.StartsWith("/", StringComparison.Ordinal);
+        return normalized.TrimStart('/');
+    }
 
+    private static void AddIgnoreGlobPatterns(Matcher matcher, string normalized, bool isRooted)
+    {
         var patterns = new List<string>();
         if (normalized.EndsWith("/", StringComparison.Ordinal))
         {
@@ -331,10 +359,7 @@ public static class ZipService
 
         foreach (var candidate in patterns)
         {
-            if (isNegation)
-                matcher.AddExclude(candidate);
-            else
-                matcher.AddInclude(candidate);
+            matcher.AddInclude(candidate);
         }
     }
 
@@ -356,17 +381,62 @@ public static class ZipService
     }
 
     private static bool IsIgnored(
-        (Matcher Mandatory, Matcher Project) matchers,
+        (Matcher Mandatory, IReadOnlyList<IgnoreRule> Project) matchers,
         string relativePath,
         bool isDirectory = false)
     {
-        if (matchers.Mandatory.Match(relativePath).HasMatches
-            || matchers.Project.Match(relativePath).HasMatches)
+        if (matchers.Mandatory.Match(relativePath).HasMatches)
             return true;
 
-        return isDirectory
-            && (matchers.Mandatory.Match(relativePath + "/").HasMatches
-                || matchers.Project.Match(relativePath + "/").HasMatches);
+        if (isDirectory && matchers.Mandatory.Match(relativePath + "/").HasMatches)
+            return true;
+
+        return EvaluateProjectRules(matchers.Project, relativePath, isDirectory).IsIgnored;
+    }
+
+    private static (bool IsIgnored, int LastMatchIndex) EvaluateProjectRules(
+        IReadOnlyList<IgnoreRule> rules,
+        string relativePath,
+        bool isDirectory)
+    {
+        var isIgnored = false;
+        var lastMatchIndex = -1;
+        for (var i = 0; i < rules.Count; i++)
+        {
+            if (!rules[i].Matcher.Match(relativePath).HasMatches
+                && (!isDirectory || !rules[i].Matcher.Match(relativePath + "/").HasMatches))
+            {
+                continue;
+            }
+
+            isIgnored = !rules[i].IsNegation;
+            lastMatchIndex = i;
+        }
+
+        return (isIgnored, lastMatchIndex);
+    }
+
+    private static bool CanLaterNegationReopenDirectory(
+        IReadOnlyList<IgnoreRule> rules,
+        int lastMatchIndex,
+        string relativeDirectory)
+    {
+        var directoryPrefix = relativeDirectory.TrimEnd('/') + "/";
+        for (var i = lastMatchIndex + 1; i < rules.Count; i++)
+        {
+            if (!rules[i].IsNegation)
+                continue;
+
+            var pattern = rules[i].Pattern.TrimEnd('/');
+            if (pattern.StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase)
+                || pattern.StartsWith("**/", StringComparison.Ordinal)
+                || pattern.Split('/')[0].IndexOfAny(['*', '?', '[']) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsExcludedByScope(string relativePath, Matcher? includeMatcher, IEnumerable<string>? excludePatterns)
