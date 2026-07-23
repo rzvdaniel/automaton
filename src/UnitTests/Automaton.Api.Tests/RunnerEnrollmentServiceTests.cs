@@ -116,6 +116,18 @@ public class RunnerEnrollmentServiceTests
             ContainerName = "automaton-managed-user",
             Status = HostedRunnerStatuses.Provisioning
         };
+        var priorManagedRunner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = hostedRunner.Name,
+            Purpose = RunnerPurposes.Managed,
+            InstallationId = $"hr_{hostedRunner.Id:N}"
+        };
+        var priorManagedRunnerUser = new RunnerUser
+        {
+            RunnerId = priorManagedRunner.Id,
+            UserId = userId
+        };
         var operationId = Guid.NewGuid();
         var priorOperation = new HostedRunnerDeployment
         {
@@ -133,7 +145,8 @@ public class RunnerEnrollmentServiceTests
             Status = HostedRunnerDeploymentStatuses.WaitingForRegistration,
             RegistrationDeadlineUtc = DateTime.UtcNow.AddMinutes(15)
         };
-        db.Runners.Add(infrastructureRunner);
+        db.Runners.AddRange(infrastructureRunner, priorManagedRunner);
+        db.RunnerUsers.Add(priorManagedRunnerUser);
         db.RunnerHosts.Add(host);
         db.HostedRunners.Add(hostedRunner);
         db.HostedRunnerDeployments.AddRange(priorOperation, currentOperation);
@@ -222,6 +235,9 @@ public class RunnerEnrollmentServiceTests
         Assert.That(exchange, Is.Not.Null);
         Assert.That(exchange!.ApiKey, Does.StartWith("ak_runner_"));
         Assert.That(exchange.Purpose, Is.EqualTo(RunnerPurposes.Managed));
+        Assert.That(exchange.RunnerId, Is.EqualTo(priorManagedRunner.Id));
+        Assert.That(await db.Runners.CountAsync(x => x.InstallationId == priorManagedRunner.InstallationId), Is.EqualTo(1));
+        Assert.That((await db.Runners.SingleAsync(x => x.Id == priorManagedRunner.Id)).ApiKeyId, Is.Not.Null);
         Assert.That((await db.HostedRunners.SingleAsync()).RunnerId, Is.EqualTo(exchange.RunnerId));
         Assert.That((await db.RunnerEnrollments.SingleAsync(x => x.OperationId == operationId)).Status, Is.EqualTo(RunnerEnrollmentStatuses.Completed));
         Assert.That((await db.SecretVersions.SingleAsync(x => x.Id == currentEnrollment.SecretVersionId)).RevokedAtUtc, Is.Not.Null);

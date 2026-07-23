@@ -475,19 +475,54 @@ public sealed class RunnerEnrollmentService(
             "Issued after one-time hosted Runner enrollment.",
             saveChanges: false,
             source: ApiKeySource.RunnerProvisioning);
-        var runner = new Runner
+
+        var runner = await db.Runners
+            .Include(x => x.RunnerUsers)
+            .FirstOrDefaultAsync(x => x.InstallationId == enrollment.InstallationId, cancellationToken);
+        if (runner != null)
         {
-            Id = Guid.NewGuid(),
-            Name = runnerName,
-            Status = RunnerConnectivityStatuses.Unknown,
-            Version = request.RunnerVersion,
-            MachineName = request.MachineName,
-            Purpose = RunnerPurposes.Managed,
-            CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed),
-            InstallationId = enrollment.InstallationId
-        };
-        db.Runners.Add(runner);
-        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = hostedRunner.UserId });
+            if (!string.Equals(runner.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase)
+                || !runner.RunnerUsers.Any(x => x.UserId == hostedRunner.UserId))
+            {
+                enrollment.Status = RunnerEnrollmentStatuses.Failed;
+                enrollment.FailureReason = "The hosted Runner installation identity belongs to another Runner.";
+                await db.SaveChangesAsync(cancellationToken);
+                return null;
+            }
+
+            if (runner.ApiKeyId.HasValue)
+            {
+                var oldKey = await db.ApiKeys.FirstOrDefaultAsync(x => x.Id == runner.ApiKeyId.Value, cancellationToken);
+                if (oldKey != null)
+                    oldKey.IsActive = false;
+            }
+
+            runner.Name = runnerName;
+            runner.Status = RunnerConnectivityStatuses.Unknown;
+            runner.Version = request.RunnerVersion;
+            runner.MachineName = request.MachineName;
+            runner.ConnectionId = null;
+            runner.Purpose = RunnerPurposes.Managed;
+            runner.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed);
+        }
+        else
+        {
+            runner = new Runner
+            {
+                Id = Guid.NewGuid(),
+                Name = runnerName,
+                Status = RunnerConnectivityStatuses.Unknown,
+                Version = request.RunnerVersion,
+                MachineName = request.MachineName,
+                Purpose = RunnerPurposes.Managed,
+                CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, RunnerPurposes.Managed),
+                InstallationId = enrollment.InstallationId
+            };
+            db.Runners.Add(runner);
+            db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = hostedRunner.UserId });
+        }
+
+        runner.ApiKeyId = apiKey.Id;
         hostedRunner.RunnerId = runner.Id;
         hostedRunner.ApiKeyId = apiKey.Id;
         hostedRunner.LastError = null;
