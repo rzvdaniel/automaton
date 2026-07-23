@@ -27,18 +27,18 @@ Use this skill when touching:
 
 ## Source archive exclusions
 
-Archive logic must exclude at least:
-
-- `node_modules/`
-- `dist/`
-- `.vite/`
-- `.venv/`
-- `__pycache__/`
-- `.git/`
-- `.env`
-- logs
-- local database files
-- generated runtime output
+- Keep hardcoded exclusions limited to Automaton-local state and VCS metadata that
+  must never be uploaded.
+- Put framework, dependency, build, environment, log, and database defaults in the
+  scaffolded `.automatonignore` so projects can adjust them.
+- Treat `.automatonignore` as independent from `.gitignore`; never inherit Git
+  exclusions silently.
+- Support Git-style root-relative patterns, directory patterns, globs, and negation.
+- Preserve `automaton.json` in editable source snapshots while excluding it from
+  runtime-only uploads.
+- Do not automatically exclude `backend.deployDir` from editable source: in the
+  standard project model it is also `source/backend/`. Use explicit `source.exclude`
+  rules for genuinely generated runtime directories.
 
 When changing archive behavior, test nested exclusions, not only root-level folders.
 

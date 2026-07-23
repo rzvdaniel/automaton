@@ -235,12 +235,13 @@ public class ConfigService
         var lines = new List<string>
         {
             "# Patterns excluded by automaton deploy",
-            "# Add one pattern per line. Use a trailing / for directories.",
+            "# Add one pattern per line. Use /pattern for project-root paths,",
+            "# a trailing / for directories, and !pattern to re-include files.",
             "# Blank lines and lines starting with # are ignored.",
             string.Empty
         };
 
-        lines.AddRange(ZipService.DefaultIgnorePatterns);
+        lines.AddRange(ZipService.ScaffoldIgnorePatterns);
         File.WriteAllLines(path, lines);
     }
 
