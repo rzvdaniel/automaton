@@ -476,10 +476,6 @@ public class RunnerService
             if (host != null)
             {
                 host.LastHeartbeatAtUtc = runner.LastHeartbeatAtUtc;
-                if (string.IsNullOrWhiteSpace(host.PublicIp) && !string.IsNullOrWhiteSpace(runner.IpAddress))
-                {
-                    host.PublicIp = runner.IpAddress;
-                }
             }
         }
 

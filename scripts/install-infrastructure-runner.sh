@@ -16,6 +16,8 @@ AUTOMATON_API_KEY="${AUTOMATON_API_KEY:-}"
 AUTOMATON_ENROLLMENT_TOKEN="${AUTOMATON_ENROLLMENT_TOKEN:-}"
 AUTOMATON_RUNNER_IMAGE="${AUTOMATON_RUNNER_IMAGE:-automaton-runner:latest}"
 AUTOMATON_RUNNER_NAME="${AUTOMATON_RUNNER_NAME:-}"
+AUTOMATON_PUBLIC_IP="${AUTOMATON_PUBLIC_IP:-}"
+AUTOMATON_PRIVATE_IP="${AUTOMATON_PRIVATE_IP:-}"
 AUTOMATON_CONTAINER_NAME="${AUTOMATON_CONTAINER_NAME:-automaton-infrastructure-runner}"
 AUTOMATON_ROOT="${AUTOMATON_ROOT:-/var/lib/automaton}"
 AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-$AUTOMATON_ROOT/infrastructure-runner}"
@@ -41,6 +43,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runner-name)
       AUTOMATON_RUNNER_NAME="${2:-}"
+      shift 2
+      ;;
+    --public-ip)
+      AUTOMATON_PUBLIC_IP="${2:-}"
+      shift 2
+      ;;
+    --private-ip)
+      AUTOMATON_PRIVATE_IP="${2:-}"
       shift 2
       ;;
     --container-name)
@@ -132,6 +142,14 @@ fi
 
 if [[ -n "$AUTOMATON_RUNNER_NAME" ]]; then
   docker_args+=( -e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME" )
+fi
+
+if [[ -n "$AUTOMATON_PUBLIC_IP" ]]; then
+  docker_args+=( -e "AUTOMATON_PUBLIC_IP=$AUTOMATON_PUBLIC_IP" )
+fi
+
+if [[ -n "$AUTOMATON_PRIVATE_IP" ]]; then
+  docker_args+=( -e "AUTOMATON_PRIVATE_IP=$AUTOMATON_PRIVATE_IP" )
 fi
 
 docker_args+=( "$AUTOMATON_RUNNER_IMAGE" )

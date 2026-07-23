@@ -199,6 +199,12 @@ public class AdminHostedRunnersController : ControllerBase
         if (request.HostedRunnerSchedulingEnabled.HasValue)
         {
             if (request.HostedRunnerSchedulingEnabled.Value
+                && host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort
+                && !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
+            {
+                return Conflict(new { message = addressError });
+            }
+            if (request.HostedRunnerSchedulingEnabled.Value
                 && (host.ProvisioningStatus != RunnerHostProvisioningStatuses.Ready
                     || !host.ValidatedAtUtc.HasValue
                     || !host.ApprovedAtUtc.HasValue

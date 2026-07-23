@@ -142,8 +142,12 @@ public sealed class InfrastructureRunnerRegistrationService(
         runner.Purpose = purpose;
         runner.CapabilitiesJson = RunnerCapabilities.Serialize(capabilities, purpose);
         runner.InstallationId = request.InstallationId;
-        host.PublicIp = request.PublicIp ?? host.PublicIp;
-        host.PrivateIp = request.PrivateIp ?? host.PrivateIp;
+        // An administrator-approved runtime address is authoritative. Runner
+        // reports may fill an empty address, but reinstalling must not replace it.
+        if (string.IsNullOrWhiteSpace(host.PublicIp) && !string.IsNullOrWhiteSpace(request.PublicIp))
+            host.PublicIp = request.PublicIp;
+        if (string.IsNullOrWhiteSpace(host.PrivateIp) && !string.IsNullOrWhiteSpace(request.PrivateIp))
+            host.PrivateIp = request.PrivateIp;
         host.TotalCpuCores = request.CpuCores.GetValueOrDefault(host.TotalCpuCores);
         host.TotalMemoryMb = request.MemoryMb.GetValueOrDefault(host.TotalMemoryMb);
         host.TotalDiskMb = request.DiskMb.GetValueOrDefault(host.TotalDiskMb);

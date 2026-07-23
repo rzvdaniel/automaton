@@ -85,6 +85,8 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             Id = Guid.NewGuid(),
             Name = "host-test",
             Provider = RunnerHostProviders.Hetzner,
+            PublicIp = "203.0.113.10",
+            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
             ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
             ValidatedAtUtc = DateTime.UtcNow,
             HostedRunnerSchedulingEnabled = false,
@@ -109,6 +111,51 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
         Assert.That(approved.ApprovedAtUtc, Is.Not.Null);
         Assert.That(approved.ApprovedByUserId, Is.Not.Null);
         Assert.That(approved.IsSchedulingEligible, Is.True);
+    }
+
+    [Test]
+    public void HostApproval_RejectsPublicConnectivityWithoutPublicAddress()
+    {
+        using var db = CreateDbContext();
+        var apiKey = new ApiKey { Id = Guid.NewGuid(), Name = "infra", HashedKey = "hash", KeyPrefix = "ak_runner_test", CreatedAt = DateTime.UtcNow };
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "infra-test",
+            Purpose = RunnerPurposes.Infrastructure,
+            ApiKey = apiKey,
+            ApiKeyId = apiKey.Id,
+            ConnectionId = "connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow
+        };
+        var host = new RunnerHost
+        {
+            Id = Guid.NewGuid(),
+            Name = "host-test",
+            Provider = RunnerHostProviders.Hetzner,
+            RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
+            ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
+            ValidatedAtUtc = DateTime.UtcNow,
+            HostedRunnerSchedulingEnabled = false,
+            InfrastructureRunner = runner,
+            InfrastructureRunnerId = runner.Id
+        };
+        db.ApiKeys.Add(apiKey);
+        db.Runners.Add(runner);
+        db.RunnerHosts.Add(host);
+        db.SaveChanges();
+
+        var service = new InfrastructureRunnerHostApprovalService(
+            db,
+            new RecordingAuditEventService(),
+            NullLogger<InfrastructureRunnerHostApprovalService>.Instance,
+            new NullHubContext<AutomatonHub>());
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ApproveAsync(host.Id, Guid.NewGuid(), CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("public IPv4"));
+        Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
     }
 
     [Test]

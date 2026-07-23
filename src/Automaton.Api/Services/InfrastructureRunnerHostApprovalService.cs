@@ -30,6 +30,9 @@ public sealed class InfrastructureRunnerHostApprovalService(
                 throw new InvalidOperationException("Only a host awaiting approval can be approved.");
             if (!host.ValidatedAtUtc.HasValue)
                 throw new InvalidOperationException("The Runner host must pass validation before approval.");
+            if (host.RuntimeConnectivityMode == RunnerHostRuntimeConnectivityModes.PublicHostPort &&
+                !RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(host.PublicIp, out var addressError))
+                throw new InvalidOperationException(addressError);
             if (host.InfrastructureRunner == null || host.InfrastructureRunnerId != host.InfrastructureRunner.Id)
                 throw new InvalidOperationException("The Runner host has no correctly bound Infrastructure Runner.");
             if (!string.Equals(host.InfrastructureRunner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))

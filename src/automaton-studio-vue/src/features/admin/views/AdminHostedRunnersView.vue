@@ -57,6 +57,8 @@ const installationDialogVisible = ref(false)
 const installationKey = ref<InfrastructureRunnerEnrollmentKey | null>(null)
 const recentInstallationKeys = ref<InfrastructureRunnerEnrollmentKey[]>([])
 const installationReplaceHost = ref<RunnerHost | null>(null)
+const installationPublicIp = ref('')
+const installationPrivateIp = ref('')
 const generatingInstallationKey = ref(false)
 const validatingHostId = ref<string | null>(null)
 const approvingHostId = ref<string | null>(null)
@@ -254,6 +256,8 @@ async function loadInfrastructureRunnerEnrollmentKeys() {
 async function generateInfrastructureRunnerInstallationKey(host?: RunnerHost) {
   generatingInstallationKey.value = true
   installationReplaceHost.value = host ?? null
+  installationPublicIp.value = host?.publicIp ?? ''
+  installationPrivateIp.value = host?.privateIp ?? ''
   try {
     installationKey.value = await adminHostedRunnersService.createInfrastructureRunnerEnrollmentKey()
     await loadInfrastructureRunnerEnrollmentKeys()
@@ -272,7 +276,9 @@ function infrastructureRunnerInstallCommand(): string {
   const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
   const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
   const replaceArgument = installationReplaceHost.value ? ' --replace' : ''
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
+  const publicIpArgument = installationPublicIp.value.trim() ? ` --public-ip ${quote(installationPublicIp.value.trim())}` : ''
+  const privateIpArgument = installationPrivateIp.value.trim() ? ` --private-ip ${quote(installationPrivateIp.value.trim())}` : ''
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${publicIpArgument}${privateIpArgument}${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
 }
 
 async function revokeInstallationKey(key: InfrastructureRunnerEnrollmentKey) {
@@ -978,6 +984,18 @@ watch(() => route.path, refreshAll)
             size="small"
             @click="revokeInstallationKey(installationKey)"
           />
+        </div>
+        <div>
+          <div class="grid">
+            <div class="col-12 md:col-6">
+              <label for="infrastructure-public-ip" class="block text-color-secondary text-sm mb-2">Public IPv4 address</label>
+              <InputText id="infrastructure-public-ip" v-model="installationPublicIp" class="w-full" placeholder="46.62.194.8" />
+            </div>
+            <div class="col-12 md:col-6">
+              <label for="infrastructure-private-ip" class="block text-color-secondary text-sm mb-2">Private IP address (optional)</label>
+              <InputText id="infrastructure-private-ip" v-model="installationPrivateIp" class="w-full" placeholder="10.0.0.4" />
+            </div>
+          </div>
         </div>
         <div>
           <div class="text-color-secondary text-sm mb-2">Installation command</div>
