@@ -174,6 +174,7 @@ public class DeployPreparationServiceTests
             },
             Backend = new BackendConfig
             {
+                SourceDir = "backend",
                 DeployDir = "backend"
             }
         });

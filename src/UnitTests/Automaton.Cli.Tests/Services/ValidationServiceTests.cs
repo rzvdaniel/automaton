@@ -72,6 +72,7 @@ public class ValidationServiceTests
             },
             Backend = new BackendConfig
             {
+                SourceDir = "backend",
                 DeployDir = "backend"
             }
         });
@@ -127,6 +128,7 @@ public class ValidationServiceTests
             },
             Backend = new BackendConfig
             {
+                SourceDir = "backend",
                 DeployDir = "backend"
             }
         });
@@ -227,6 +229,36 @@ public class ValidationServiceTests
         Assert.That(warning.Success, Is.True);
         Assert.That(warning.IsWarning, Is.True);
         Assert.That(result.Success, Is.True);
+    }
+
+    [Test]
+    public async Task ValidateAsync_WhenBackendSourceDirIsMissing_FailsWithMigrationMessage()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "Backend App",
+            Frontend = new FrontendConfig
+            {
+                DeployDir = "frontend/dist"
+            },
+            Backend = new BackendConfig
+            {
+                DeployDir = "backend"
+            }
+        });
+        SaveEnvironment(configService, projectRoot, "local", "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend"));
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "controller.py"), "print('backend')");
+
+        var service = new ValidationService(configService, (_, _, _, _) =>
+            Task.FromResult(new RemoteAppValidationInfo("runner-1")));
+
+        var result = await service.ValidateAsync(projectRoot);
+
+        AssertCheck(result, ValidationCheckNames.BackendDeployShape, false, "backend.sourceDir is required");
     }
 
     [Test]

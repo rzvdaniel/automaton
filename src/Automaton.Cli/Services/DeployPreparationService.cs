@@ -44,7 +44,9 @@ public sealed class DeployPreparationService
             return new DeployPreparationResult { Success = true };
         }
 
-        if (CountBackendControllers(directory, projectConfig.Backend?.DeployDir) == 0)
+        if (projectConfig.Backend == null
+            || string.IsNullOrWhiteSpace(projectConfig.Backend.SourceDir)
+            || CountBackendControllers(directory, projectConfig.Backend.DeployDir) == 0)
         {
             return new DeployPreparationResult { Success = true };
         }

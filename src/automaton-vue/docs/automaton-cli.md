@@ -153,6 +153,7 @@ For AI-generated local apps and most framework apps, use nested frontend/backend
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -176,6 +177,7 @@ Minimal unlinked local scaffold:
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -187,7 +189,8 @@ Minimal unlinked local scaffold:
 | `name` | Yes | Display name |
 | `frontend.build` | Optional | Frontend build command to run before upload. For default Vite apps use `cd frontend && npm install && npm run build`. |
 | `frontend.deployDir` | Required for build-based frontend deploys | Directory uploaded as public frontend runtime. For default Vite apps use `frontend/dist`. |
-| `backend.deployDir` | Optional | Directory uploaded as backend runtime for runner execution. Usually `backend`. |
+| `backend.sourceDir` | Required when `backend` exists | Editable backend source directory. Usually `backend`. |
+| `backend.deployDir` | Required when `backend` exists | Directory uploaded as backend runtime. Interpreted apps may also use `backend`; built apps can use a generated directory such as `backend/dist`. |
 
 For an explicit no-build static app, use:
 

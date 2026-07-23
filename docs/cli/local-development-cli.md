@@ -120,6 +120,7 @@ my-app/
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }

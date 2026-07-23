@@ -179,6 +179,7 @@ For the default AI-generated local app, use nested frontend/backend config:
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -197,6 +198,7 @@ If the app is only scaffolded locally and not linked yet, this temporary file sh
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -236,7 +238,9 @@ automaton deploy
 automaton deploy --runner <runner-id-or-name>
 ```
 
-This uploads `frontend.deployDir` as public frontend runtime, uploads `backend.deployDir` as runner backend runtime when present, and then triggers backend deployment. Re-run after any change.
+This uploads `frontend.deployDir` as public frontend runtime, preserves
+`backend.sourceDir` as editable source, uploads `backend.deployDir` as runner
+backend runtime, and then triggers backend deployment. Re-run after any change.
 
 If the app has no backend scripts, a successful deploy may finish with `No backend scripts found`.
 

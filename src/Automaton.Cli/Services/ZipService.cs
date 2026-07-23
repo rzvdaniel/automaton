@@ -74,17 +74,27 @@ public static class ZipService
                 "Use 'frontend/dist' for build-based apps or '.' for an explicit no-build static app.");
         }
 
-        var explicitPath = Path.GetFullPath(Path.Combine(projectRoot, deployDir));
+        return ResolveProjectDirectory(projectRoot, deployDir, "deployDir");
+    }
+
+    public static string ResolveProjectDirectory(string projectRoot, string? configuredDirectory, string settingName)
+    {
+        if (string.IsNullOrWhiteSpace(configuredDirectory))
+        {
+            throw new InvalidOperationException($"{settingName} is required in automaton.json");
+        }
+
+        var explicitPath = Path.GetFullPath(Path.Combine(projectRoot, configuredDirectory));
         var fullProjectRoot = Path.GetFullPath(projectRoot);
         if (!explicitPath.StartsWith(fullProjectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(explicitPath, fullProjectRoot, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"deployDir '{deployDir}' points outside the project root");
+            throw new InvalidOperationException($"{settingName} '{configuredDirectory}' points outside the project root");
         }
 
         if (Directory.Exists(explicitPath)) return explicitPath;
         throw new DirectoryNotFoundException(
-            $"deployDir '{deployDir}' configured in automaton.json does not exist: {explicitPath}");
+            $"{settingName} '{configuredDirectory}' configured in automaton.json does not exist: {explicitPath}");
     }
 
     /// <summary>
@@ -129,6 +139,10 @@ public static class ZipService
                 projectRoot,
                 "source",
                 includeAutomatonConfig: true,
+                additionalMandatoryIgnorePatterns: GetBackendRuntimeSourceExclusions(
+                    projectRoot,
+                    backendDeployDir,
+                    backendConfig),
                 scopeConfig: sourceScopeConfig);
 
             if (!string.IsNullOrWhiteSpace(frontendDeployDir))
@@ -139,6 +153,7 @@ public static class ZipService
                     frontendDeployDir,
                     "runtime/frontend",
                     includeAutomatonConfig: false,
+                    additionalMandatoryIgnorePatterns: null,
                     scopeConfig: frontendConfig == null
                         ? null
                         : new DeployScopeConfig
@@ -156,6 +171,7 @@ public static class ZipService
                     backendDeployDir,
                     "runtime/backend",
                     includeAutomatonConfig: false,
+                    additionalMandatoryIgnorePatterns: null,
                     scopeConfig: backendConfig == null
                         ? null
                         : new DeployScopeConfig
@@ -230,9 +246,13 @@ public static class ZipService
         string sourceDir,
         string entryPrefix,
         bool includeAutomatonConfig,
+        IEnumerable<string>? additionalMandatoryIgnorePatterns,
         DeployScopeConfig? scopeConfig)
     {
-        var ignoreMatchers = CreateIgnoreMatchers(projectRoot, includeAutomatonConfig);
+        var ignoreMatchers = CreateIgnoreMatchers(
+            projectRoot,
+            includeAutomatonConfig,
+            additionalMandatoryIgnorePatterns);
         var includeMatcher = CreateIncludeMatcher(scopeConfig?.Include);
 
         foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
@@ -249,7 +269,8 @@ public static class ZipService
 
     private static (Matcher Mandatory, IReadOnlyList<IgnoreRule> Project) CreateIgnoreMatchers(
         string projectRoot,
-        bool includeAutomatonConfig)
+        bool includeAutomatonConfig,
+        IEnumerable<string>? additionalMandatoryIgnorePatterns = null)
     {
         var mandatoryMatcher = new Matcher(StringComparison.OrdinalIgnoreCase);
         var projectRules = new List<IgnoreRule>();
@@ -264,12 +285,48 @@ public static class ZipService
             AddIgnorePattern(mandatoryMatcher, pattern);
         }
 
+        if (additionalMandatoryIgnorePatterns != null)
+        {
+            foreach (var pattern in additionalMandatoryIgnorePatterns)
+            {
+                AddIgnorePattern(mandatoryMatcher, pattern);
+            }
+        }
+
         foreach (var pattern in LoadCustomIgnorePatterns(projectRoot))
         {
             projectRules.Add(CreateIgnoreRule(pattern));
         }
 
         return (mandatoryMatcher, projectRules);
+    }
+
+    private static IEnumerable<string> GetBackendRuntimeSourceExclusions(
+        string projectRoot,
+        string? backendDeployDirectory,
+        BackendConfig? backendConfig)
+    {
+        if (string.IsNullOrWhiteSpace(backendDeployDirectory)
+            || string.IsNullOrWhiteSpace(backendConfig?.SourceDir))
+        {
+            yield break;
+        }
+
+        var fullProjectRoot = Path.GetFullPath(projectRoot);
+        var fullSourceDirectory = Path.GetFullPath(Path.Combine(fullProjectRoot, backendConfig.SourceDir));
+        var fullDeployDirectory = Path.GetFullPath(backendDeployDirectory);
+        if (string.Equals(fullSourceDirectory, fullDeployDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            yield break;
+        }
+
+        var relativeDeployDirectory = Path.GetRelativePath(fullProjectRoot, fullDeployDirectory)
+            .Replace('\\', '/')
+            .Trim('/');
+        if (!string.IsNullOrWhiteSpace(relativeDeployDirectory))
+        {
+            yield return $"/{relativeDeployDirectory}/";
+        }
     }
 
     private static Matcher? CreateIncludeMatcher(IEnumerable<string>? includePatterns)

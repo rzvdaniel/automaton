@@ -76,6 +76,7 @@ For local CLI apps, `automaton.json` now uses explicit nested config:
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -84,12 +85,15 @@ For local CLI apps, `automaton.json` now uses explicit nested config:
 Deploy behavior:
 1. Run `frontend.build` when configured.
 2. Upload `frontend.deployDir` into `live/frontend/`.
-3. Upload `backend.deployDir` into `live/backend/` when configured.
-4. Trigger backend runner deployment from `live/backend/`.
-5. Keep runner-side `RUNNER_SCRIPTS_DIR/{appId}/data/` intact across backend deploys.
+3. Preserve `backend.sourceDir` as editable source.
+4. Upload `backend.deployDir` into `live/backend/` when configured.
+5. Trigger backend runner deployment from `live/backend/`.
+6. Keep runner-side `RUNNER_SCRIPTS_DIR/{appId}/data/` intact across backend deploys.
 
 Packaging rules:
 - CLI deploy uploads archives, not one HTTP request per file.
+- When `backend.deployDir` differs from `backend.sourceDir`, source packaging
+  excludes the generated runtime directory automatically.
 - Source packaging must exclude nested dependency and build folders such as `frontend/node_modules/`, `node_modules/`, `frontend/dist/`, and other nested `dist/` outputs. If those leak into the source archive, deploy size and server-side extraction cost spike for no product value.
 
 There is no automatic fallback to `dist/`, `frontend/`, or project root. `frontend.deployDir` must be explicit unless the caller intentionally overrides it with `automaton deploy --dir ...`.
@@ -163,6 +167,7 @@ Avoid these assumptions:
 
 - Public runtime comes only from `frontend.deployDir`.
 - Runner backend runtime comes only from `backend.deployDir`.
+- Editable backend source comes from `backend.sourceDir`.
 - Persistent runner app data lives under `AUTOMATON_APP_DATA_DIR` and survives backend redeploys.
 - Default AI-generated local apps should use `frontend/` + Vite and deploy only `frontend/dist/`.
 - Root static apps remain supported, but only as an explicit no-build exception.

@@ -86,10 +86,16 @@ In `automaton.json`, point Automaton to the backend folder:
     "deployDir": "frontend/dist"
   },
   "backend": {
+    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
 ```
+
+`sourceDir` identifies editable backend code. `deployDir` identifies the runtime
+package. They are the same for ordinary interpreted Python apps. A built backend
+can instead use a generated directory such as `backend/dist`; Automaton excludes
+that distinct runtime directory from editable source snapshots.
 
 If the local scaffold exists but is not linked yet, the same config shape is valid without `appId` until you run `automaton create` or `automaton link`.
 

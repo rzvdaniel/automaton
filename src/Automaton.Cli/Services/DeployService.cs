@@ -115,7 +115,7 @@ public sealed class DeployService
             return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
         }
 
-        var backendCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
+        var backendCheck = ValidateBackendPackage(directory, projectConfig.Backend, nextSteps, out var backendDirectory, out var backendControllers);
         AddCheck(checks, backendCheck);
         if (!skipBackend && !backendCheck.Success)
         {
@@ -157,7 +157,7 @@ public sealed class DeployService
 
         if (backendControllers == 0 || backendDirectory == null)
         {
-            nextSteps.Add("Add backend.deployDir to automaton.json when the app gains a backend.");
+            nextSteps.Add("Add backend.sourceDir and backend.deployDir to automaton.json when the app gains a backend.");
             backendResult = new DeployBackendResult(true, 0, "no backend controllers found");
         }
 
@@ -385,7 +385,7 @@ public sealed class DeployService
 
     private static DeployCheckResult ValidateBackendPackage(
         string directory,
-        string? deployDir,
+        BackendConfig? backendConfig,
         ISet<string> nextSteps,
         out string? resolvedBackendDirectory,
         out int backendControllers)
@@ -394,21 +394,36 @@ public sealed class DeployService
         backendControllers = 0;
 
         var conventionalBackendDirectory = Path.Combine(directory, "backend");
-        if (string.IsNullOrWhiteSpace(deployDir))
+        if (backendConfig == null)
         {
             if (Directory.Exists(conventionalBackendDirectory)
                 && Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length > 0)
             {
-                nextSteps.Add("Add backend.deployDir to automaton.json, usually 'backend'");
-                return new DeployCheckResult(DeployCheckNames.BackendPackage, false, "backend controllers were found, but backend.deployDir is missing from automaton.json");
+                nextSteps.Add("Add backend.sourceDir and backend.deployDir to automaton.json");
+                return new DeployCheckResult(DeployCheckNames.BackendPackage, false, "backend controllers were found, but backend configuration is missing from automaton.json");
             }
 
             return new DeployCheckResult(DeployCheckNames.BackendPackage, true, "no backend deploy configured");
         }
 
+        if (string.IsNullOrWhiteSpace(backendConfig.SourceDir))
+        {
+            nextSteps.Add("Add backend.sourceDir to automaton.json, usually 'backend'");
+            return new DeployCheckResult(DeployCheckNames.BackendPackage, false, "backend.sourceDir is required when backend is configured");
+        }
+
         try
         {
-            resolvedBackendDirectory = ZipService.ResolveDeployDirectory(directory, deployDir);
+            var sourceDirectory = ZipService.ResolveProjectDirectory(directory, backendConfig.SourceDir, "backend.sourceDir");
+            resolvedBackendDirectory = ZipService.ResolveProjectDirectory(directory, backendConfig.DeployDir, "backend.deployDir");
+            if (!string.Equals(sourceDirectory, resolvedBackendDirectory, StringComparison.OrdinalIgnoreCase)
+                && sourceDirectory.StartsWith(
+                    resolvedBackendDirectory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                nextSteps.Add("Set backend.deployDir to the same directory as backend.sourceDir or to a generated runtime directory outside it");
+                return new DeployCheckResult(DeployCheckNames.BackendPackage, false, "backend.deployDir cannot contain backend.sourceDir");
+            }
         }
         catch (Exception ex)
         {

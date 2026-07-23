@@ -133,6 +133,7 @@ public class ConfigServiceTests
             },
             Backend = new BackendConfig
             {
+                SourceDir = "backend",
                 DeployDir = "backend"
             }
         };

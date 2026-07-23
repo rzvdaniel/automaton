@@ -39,6 +39,9 @@ Public serving should use deployed frontend output only. It must not expose back
 - Keep plain root HTML/CSS/JS support only for explicit no-build static apps.
 - Default generated local frontend apps to `frontend/` with a build pipeline that outputs to `frontend/dist/`.
 - Default generated backend apps to `backend/` when a backend is requested.
+- Require backend configuration to distinguish editable `backend.sourceDir` from
+  runtime `backend.deployDir`. When they differ, omit the runtime directory from
+  editable source snapshots.
 
 ## Runtime app data
 

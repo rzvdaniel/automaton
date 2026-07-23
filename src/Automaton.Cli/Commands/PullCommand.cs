@@ -148,6 +148,7 @@ public static class PullCommand
             Backend = hasBackend
                 ? new BackendConfig
                 {
+                    SourceDir = "backend",
                     DeployDir = "backend"
                 }
                 : null

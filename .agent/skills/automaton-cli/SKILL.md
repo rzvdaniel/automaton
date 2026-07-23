@@ -36,9 +36,10 @@ Use this skill when touching:
 - Support Git-style root-relative patterns, directory patterns, globs, and negation.
 - Preserve `automaton.json` in editable source snapshots while excluding it from
   runtime-only uploads.
-- Do not automatically exclude `backend.deployDir` from editable source: in the
-  standard project model it is also `source/backend/`. Use explicit `source.exclude`
-  rules for genuinely generated runtime directories.
+- Require `backend.sourceDir` whenever backend configuration is present.
+- If `backend.deployDir` differs from `backend.sourceDir`, exclude the runtime
+  directory from editable source snapshots while packaging it under
+  `runtime/backend/`.
 
 When changing archive behavior, test nested exclusions, not only root-level folders.
 

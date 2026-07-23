@@ -90,6 +90,7 @@ public static class StatusCommand
                             build = appConfig.Frontend?.Build,
                             deployDir = appConfig.Frontend?.DeployDir,
                             resolvedDeployDir = deployDirectory,
+                            backendSourceDir = appConfig.Backend?.SourceDir,
                             backendDeployDir = appConfig.Backend?.DeployDir,
                             backendScripts
                         },
@@ -114,6 +115,7 @@ public static class StatusCommand
                 table.AddRow("server", server);
                 table.AddRow("build", string.IsNullOrWhiteSpace(appConfig.Frontend?.Build) ? "-" : appConfig.Frontend.Build);
                 table.AddRow("frontend deploy dir", deployDirectory == null ? "-" : Path.GetRelativePath(cwd, deployDirectory));
+                table.AddRow("backend source dir", string.IsNullOrWhiteSpace(appConfig.Backend?.SourceDir) ? "-" : appConfig.Backend.SourceDir);
                 table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
                 table.AddRow("backend scripts", backendScripts.ToString());
                 table.AddRow("runner", string.IsNullOrWhiteSpace(executionRunnerId) ? "-" : executionRunnerId);

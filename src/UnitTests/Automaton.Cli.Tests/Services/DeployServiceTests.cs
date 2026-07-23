@@ -100,7 +100,7 @@ public class DeployServiceTests
         {
             Name = "App",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Backend = new BackendConfig { SourceDir = "backend", DeployDir = "backend" }
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -139,7 +139,7 @@ public class DeployServiceTests
         {
             Name = "App",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Backend = new BackendConfig { SourceDir = "backend", DeployDir = "backend" }
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -168,7 +168,7 @@ public class DeployServiceTests
         {
             Name = "App",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Backend = new BackendConfig { SourceDir = "backend", DeployDir = "backend" }
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -238,7 +238,7 @@ public class DeployServiceTests
         {
             Name = "App",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Backend = new BackendConfig { SourceDir = "backend", DeployDir = "backend" }
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);
@@ -274,7 +274,7 @@ public class DeployServiceTests
         {
             Name = "App",
             Frontend = new FrontendConfig { DeployDir = "frontend/dist" },
-            Backend = new BackendConfig { DeployDir = "backend" }
+            Backend = new BackendConfig { SourceDir = "backend", DeployDir = "backend" }
         });
         SaveEnvironment(configService, projectRoot, "https://api.example.com", "ak_test", Guid.NewGuid().ToString());
         WriteFrontendIndexHtml(projectRoot);

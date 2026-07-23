@@ -7,6 +7,7 @@ public sealed class NewAppService
 {
     private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
     private const string FrontendDeployDirectory = "frontend/dist";
+    private const string BackendSourceDirectory = "backend";
     private const string BackendDeployDirectory = "backend";
 
     private readonly ConfigService _config;
@@ -163,6 +164,7 @@ public sealed class NewAppService
             },
             Backend = existingConfig?.Backend ?? new BackendConfig
             {
+                SourceDir = BackendSourceDirectory,
                 DeployDir = BackendDeployDirectory
             },
             Source = existingConfig?.Source

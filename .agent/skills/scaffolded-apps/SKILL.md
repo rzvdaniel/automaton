@@ -26,7 +26,7 @@ frontend/
   src/
   public/
   dist/          # build output, not source
-backend/         # optional, only when backend requested
+backend/         # optional editable backend source
 automaton.json
 AGENTS.md        # optional generated app instructions
 ```
@@ -37,6 +37,8 @@ Rules:
 - Do not put editable source under `dist/`.
 - Do not commit or archive `node_modules/`, `dist/`, `.vite/`, `.venv/`, `__pycache__/`, `.git/`, `.env`, logs, or local caches.
 - Keep backend optional.
+- Scaffold backend configuration with explicit `backend.sourceDir` and
+  `backend.deployDir`; interpreted backends may intentionally use `backend` for both.
 - If backend exists, make runner requirements clear.
 - Keep generated instructions short and operational.
 - Prefer Vite + TypeScript or JavaScript for frontend scaffolds unless the user requested another framework.
