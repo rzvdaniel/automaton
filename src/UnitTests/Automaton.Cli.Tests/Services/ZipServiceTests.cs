@@ -414,41 +414,6 @@ public class ZipServiceTests
     }
 
     [Test]
-    public void CreateDeployPackageZip_WhenBackendRuntimeDiffersFromSource_SeparatesArchiveSurfaces()
-    {
-        var projectRoot = CreateTempDirectory();
-        var frontendDeployDirectory = Path.Combine(projectRoot, "frontend", "dist");
-        var backendDeployDirectory = Path.Combine(projectRoot, "backend", "dist");
-        Directory.CreateDirectory(frontendDeployDirectory);
-        Directory.CreateDirectory(backendDeployDirectory);
-
-        File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
-        File.WriteAllText(Path.Combine(projectRoot, "backend", "controller.py"), "print('source')");
-        File.WriteAllText(Path.Combine(backendDeployDirectory, "controller.py"), "print('runtime')");
-        File.WriteAllText(Path.Combine(frontendDeployDirectory, "index.html"), "<html></html>");
-
-        using var zipStream = ZipService.CreateDeployPackageZip(
-            projectRoot,
-            "app-123",
-            frontendDeployDirectory,
-            backendDeployDirectory,
-            sourceScopeConfig: null,
-            frontendConfig: new FrontendConfig(),
-            backendConfig: new BackendConfig
-            {
-                SourceDir = "backend",
-                DeployDir = "backend/dist"
-            });
-        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-        var entries = archive.Entries.Select(entry => entry.FullName).ToArray();
-
-        Assert.That(entries, Does.Contain("source/backend/controller.py"));
-        Assert.That(entries, Does.Not.Contain("source/backend/dist/controller.py"));
-        Assert.That(entries, Does.Contain("runtime/backend/controller.py"));
-        Assert.That(entries, Does.Contain("runtime/frontend/index.html"));
-    }
-
-    [Test]
     public void ResolveDeployDirectory_WhenDistExists_PrefersDist()
     {
         var projectRoot = CreateTempDirectory();

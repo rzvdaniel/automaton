@@ -13,7 +13,6 @@ public sealed class ValidationService
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -213,15 +212,15 @@ public sealed class ValidationService
             ? Directory.GetFiles(conventionalBackendDirectory, "*.py", SearchOption.AllDirectories).Length
             : 0;
 
-        var backendConfig = projectConfig?.Backend;
-        if (backendConfig == null)
+        var backendDeployDir = projectConfig?.Backend?.DeployDir;
+        if (string.IsNullOrWhiteSpace(backendDeployDir))
         {
             if (conventionalBackendControllers > 0)
             {
                 return new ValidationCheckResult(
                     ValidationCheckNames.BackendDeployShape,
                     false,
-                    "backend controllers were found, but backend configuration is missing from automaton.json");
+                    "backend controllers were found, but backend.deployDir is missing from automaton.json");
             }
 
             return new ValidationCheckResult(
@@ -230,32 +229,14 @@ public sealed class ValidationService
                 "no backend deploy configured");
         }
 
-        if (string.IsNullOrWhiteSpace(backendConfig.SourceDir))
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendDeployShape,
-                false,
-                "backend.sourceDir is required when backend is configured; set it to the editable backend directory");
-        }
-
-        string backendSourceDirectory;
         string backendDirectory;
         try
         {
-            backendSourceDirectory = ZipService.ResolveProjectDirectory(directory, backendConfig.SourceDir, "backend.sourceDir");
-            backendDirectory = ZipService.ResolveProjectDirectory(directory, backendConfig.DeployDir, "backend.deployDir");
+            backendDirectory = ZipService.ResolveDeployDirectory(directory, backendDeployDir);
         }
         catch (Exception ex)
         {
             return new ValidationCheckResult(ValidationCheckNames.BackendDeployShape, false, ex.Message);
-        }
-
-        if (IsStrictParentDirectory(backendDirectory, backendSourceDirectory))
-        {
-            return new ValidationCheckResult(
-                ValidationCheckNames.BackendDeployShape,
-                false,
-                "backend.deployDir cannot contain backend.sourceDir; use the same directory for interpreted apps or a separate generated runtime directory");
         }
 
         backendControllers = Directory.GetFiles(backendDirectory, "*.py", SearchOption.AllDirectories).Length;
@@ -263,12 +244,6 @@ public sealed class ValidationService
             ValidationCheckNames.BackendDeployShape,
             true,
             $"backend directory ready: {Path.GetRelativePath(directory, backendDirectory)}");
-    }
-
-    private static bool IsStrictParentDirectory(string possibleParent, string child)
-    {
-        return !string.Equals(possibleParent, child, StringComparison.OrdinalIgnoreCase)
-            && child.StartsWith(possibleParent.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     private static ValidationCheckResult ValidateBackendRunner(

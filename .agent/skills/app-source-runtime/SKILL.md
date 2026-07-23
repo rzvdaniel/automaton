@@ -39,9 +39,6 @@ Public serving should use deployed frontend output only. It must not expose back
 - Keep plain root HTML/CSS/JS support only for explicit no-build static apps.
 - Default generated local frontend apps to `frontend/` with a build pipeline that outputs to `frontend/dist/`.
 - Default generated backend apps to `backend/` when a backend is requested.
-- Require backend configuration to distinguish editable `backend.sourceDir` from
-  runtime `backend.deployDir`. When they differ, omit the runtime directory from
-  editable source snapshots.
 
 ## Runtime app data
 
@@ -95,6 +92,8 @@ For changes in this area, verify:
 
 - source editing still uses `source/`
 - CLI pull still prefers `source/`
+- CLI pull preserves all portable paths under `source/`, not only conventional
+  frontend and backend folders
 - fork/remix never copies `live/backend/`
 - sensitive extensions and backend paths are not publicly served
 - source archives exclude generated output, dependencies, caches, secrets, logs, and local-only files

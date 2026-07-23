@@ -36,21 +36,23 @@ Use this skill when touching:
 - Support Git-style root-relative patterns, directory patterns, globs, and negation.
 - Preserve `automaton.json` in editable source snapshots while excluding it from
   runtime-only uploads.
-- Require `backend.sourceDir` whenever backend configuration is present.
-- If `backend.deployDir` differs from `backend.sourceDir`, exclude the runtime
-  directory from editable source snapshots while packaging it under
-  `runtime/backend/`.
+- Do not automatically exclude `backend.deployDir` from editable source: in the
+  standard project model it is also `source/backend/`. Use explicit `source.exclude`
+  rules for genuinely generated runtime directories.
 
 When changing archive behavior, test nested exclusions, not only root-level folders.
 
 ## Pull behavior
 
-`automaton pull` should prefer editable source content.
+`automaton pull` should preserve the complete editable source snapshot without
+assuming source exists only under `frontend/` and `backend/`.
 
 Verify:
 
 - existing linked projects still pull correctly
 - pull into a fresh folder creates or preserves `automaton.json` correctly
+- AI-defined source roots such as `shared/`, `packages/`, and `schemas/` are retained
+- remote paths are validated before writing into the local target
 - local files are not overwritten silently
 - `source/frontend/` and `source/backend/` are preferred over runtime output
 - backend runtime files, secrets, logs, runner state, and user data are not pulled as editable source

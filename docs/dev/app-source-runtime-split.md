@@ -122,7 +122,6 @@ Default frontend-plus-backend config:
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -157,13 +156,11 @@ For frontend deploy:
 
 For backend deploy:
 
-1. Resolve and preserve editable `backend.sourceDir`.
-2. Resolve `backend.deployDir`.
-3. Exclude a distinct deploy directory from the editable source snapshot.
-4. Apply backend deploy exclusions.
-5. Upload zip entries relative to `backend.deployDir`.
-6. API writes the result to `live/backend/`.
-7. Runner deployment reads only `live/backend/`.
+1. Resolve `backend.deployDir`.
+2. Apply backend deploy exclusions.
+3. Upload zip entries relative to `backend.deployDir`.
+4. API writes the result to `live/backend/`.
+5. Runner deployment reads only `live/backend/`.
 
 For Studio-created apps, backend deployment may sync `source/backend/` into `live/backend/` immediately before runner deployment. This makes `live/backend/` the deployed package while preserving `source/backend/` as the editable source.
 
@@ -311,7 +308,6 @@ Backend editor writes to `source/backend/`. Deploy Backend packages to `live/bac
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -376,7 +372,6 @@ Recommended default config:
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }

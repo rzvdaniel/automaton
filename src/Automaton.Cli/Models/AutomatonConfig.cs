@@ -44,14 +44,8 @@ public sealed class FrontendConfig
 public sealed class BackendConfig
 {
     /// <summary>
-    /// Editable backend source directory relative to the project root.
+    /// Backend deploy directory relative to the project root.
     /// Example: "backend".
-    /// </summary>
-    public string? SourceDir { get; set; }
-
-    /// <summary>
-    /// Backend runtime directory relative to the project root.
-    /// Example: "backend" for interpreted apps or "backend/dist" for built apps.
     /// </summary>
     public string? DeployDir { get; set; }
 

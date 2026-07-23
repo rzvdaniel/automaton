@@ -51,7 +51,6 @@ public class NewAppServiceTests
         Assert.That(config.Name, Is.EqualTo("My App"));
         Assert.That(config.Frontend?.Build, Is.EqualTo("cd frontend && npm install && npm run build"));
         Assert.That(config.Frontend?.DeployDir, Is.EqualTo("frontend/dist"));
-        Assert.That(config.Backend?.SourceDir, Is.EqualTo("backend"));
         Assert.That(config.Backend?.DeployDir, Is.EqualTo("backend"));
         var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-123"));
@@ -100,7 +99,6 @@ public class NewAppServiceTests
             },
             Backend = new BackendConfig
             {
-                SourceDir = "api",
                 DeployDir = "api"
             }
         });
@@ -116,7 +114,6 @@ public class NewAppServiceTests
         var config = configService.LoadProjectConfig(projectRoot);
         Assert.That(config.Frontend?.Build, Is.EqualTo("npm run custom-build"));
         Assert.That(config.Frontend?.DeployDir, Is.EqualTo("custom-dist"));
-        Assert.That(config.Backend?.SourceDir, Is.EqualTo("api"));
         Assert.That(config.Backend?.DeployDir, Is.EqualTo("api"));
         var env = configService.LoadNamedEnvironmentConfig(projectRoot, "local");
         Assert.That(env!.AppId, Is.EqualTo("app-123"));

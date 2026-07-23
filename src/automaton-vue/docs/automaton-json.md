@@ -24,7 +24,7 @@ my-app/
 - Friendly app name with `name`
 - Optional project server override with `server`
 - Frontend build and deploy output with `frontend`
-- Backend editable source and runtime directories with `backend`
+- Backend deploy directory with `backend`
 
 ## Most common shape
 
@@ -40,7 +40,6 @@ For the default local app layout, use:
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -75,7 +74,6 @@ That is a valid temporary local state.
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -132,8 +130,7 @@ Use this only for an explicit plain HTML/CSS/JS app with no frontend build step:
 | `frontend.deployDir` | Required for frontend deploys | Directory uploaded as public frontend runtime |
 | `frontend.include` | Optional | Extra frontend include patterns |
 | `frontend.exclude` | Optional | Extra frontend exclude patterns |
-| `backend.sourceDir` | Required when `backend` exists | Editable backend source directory |
-| `backend.deployDir` | Required when `backend` exists | Directory uploaded as runner backend runtime |
+| `backend.deployDir` | Optional | Directory uploaded as runner backend runtime |
 | `backend.include` | Optional | Extra backend include patterns |
 | `backend.exclude` | Optional | Extra backend exclude patterns |
 | `source.include` | Optional | Extra source upload include patterns |
@@ -143,11 +140,9 @@ Use this only for an explicit plain HTML/CSS/JS app with no frontend build step:
 
 - `automaton deploy` uploads `frontend.deployDir` as public frontend runtime.
 - `automaton deploy` uploads `backend.deployDir` as backend runtime when present.
-- When `backend.sourceDir` and `backend.deployDir` differ, the deploy directory is omitted from the editable source snapshot.
-- Interpreted backends may intentionally use `backend` for both directories.
 - `frontend/src/` is not public by itself. Only `frontend.deployDir` becomes public runtime.
 - Backend runtime files are not publicly served.
-- If backend files exist but `backend.sourceDir` or `backend.deployDir` is missing, `automaton validate` and `automaton deploy` fail clearly.
+- If backend Python files exist but `backend.deployDir` is missing, `automaton validate` and `automaton deploy` should fail clearly.
 
 ## Related docs
 

@@ -86,8 +86,7 @@ public static class PullCommand
         WriteStart(nonInteractive, appConfig.Name, targetDir);
 
         using var client = new AutomatonApiClient(server, apiKey);
-        var files = await ListSourceFilesAsync(client, resolved.AppId);
-        var sourceFiles = files.Where(IsPortableSourceFile).ToList();
+        var sourceFiles = await ListSourceFilesAsync(client, resolved.AppId);
 
         if (sourceFiles.Count == 0)
         {
@@ -121,8 +120,7 @@ public static class PullCommand
         Directory.CreateDirectory(targetDir);
         WriteStart(nonInteractive, appName, targetDir);
 
-        var files = await ListSourceFilesAsync(client, appId);
-        var sourceFiles = files.Where(IsPortableSourceFile).ToList();
+        var sourceFiles = await ListSourceFilesAsync(client, appId);
         if (sourceFiles.Count == 0)
         {
             throw new InvalidOperationException("This app does not have portable source files to pull. Runtime frontend fallback is not enabled.");
@@ -130,29 +128,46 @@ public static class PullCommand
 
         await DownloadFilesAsync(client, appId, sourceFiles, targetDir, nonInteractive);
 
-        var hasFrontend = sourceFiles.Any(path => path.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase));
-        var hasBackend = sourceFiles.Any(path => path.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
-        var isBuildBasedFrontend = hasFrontend && File.Exists(Path.Combine(targetDir, "frontend", "package.json"));
-
-        config.SaveProjectConfig(targetDir, new AutomatonConfig
+        var pulledConfig = config.TryLoadProjectConfig(targetDir);
+        if (pulledConfig == null)
         {
-            Name = appName,
-            Slug = slug,
-            Frontend = hasFrontend
-                ? new FrontendConfig
-                {
-                    Build = isBuildBasedFrontend ? FrontendBuildCommand : null,
-                    DeployDir = isBuildBasedFrontend ? "frontend/dist" : "frontend"
-                }
-                : null,
-            Backend = hasBackend
-                ? new BackendConfig
-                {
-                    SourceDir = "backend",
-                    DeployDir = "backend"
-                }
-                : null
-        });
+            var hasFrontend = sourceFiles.Any(path => path.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase));
+            var hasBackend = sourceFiles.Any(path => path.StartsWith("backend/", StringComparison.OrdinalIgnoreCase));
+            var isBuildBasedFrontend = hasFrontend && File.Exists(Path.Combine(targetDir, "frontend", "package.json"));
+            pulledConfig = new AutomatonConfig
+            {
+                Name = appName,
+                Slug = slug,
+                Frontend = hasFrontend
+                    ? new FrontendConfig
+                    {
+                        Build = isBuildBasedFrontend ? FrontendBuildCommand : null,
+                        DeployDir = isBuildBasedFrontend ? "frontend/dist" : "frontend"
+                    }
+                    : null,
+                Backend = hasBackend
+                    ? new BackendConfig
+                    {
+                        DeployDir = "backend"
+                    }
+                    : null
+            };
+        }
+        else
+        {
+            pulledConfig.Name = appName;
+            pulledConfig.Slug = slug;
+        }
+
+        config.SaveProjectConfig(targetDir, pulledConfig);
+        var environment = config.LoadNamedEnvironmentConfig(targetDir, ConfigService.DefaultEnvironmentName) ?? new GlobalConfig();
+        environment.Server = server;
+        environment.ApiKey = apiKey;
+        environment.AppId = appId;
+        config.SaveNamedEnvironmentConfig(targetDir, ConfigService.DefaultEnvironmentName, environment);
+        config.SaveProjectEnvironmentSelection(
+            targetDir,
+            new ProjectEnvironmentSelection { Default = ConfigService.DefaultEnvironmentName });
 
         string? guidanceWarning = null;
         AiGuidanceSyncResult? guidance = null;
@@ -217,8 +232,15 @@ public static class PullCommand
             }
         }
 
+        return SelectSourceFiles(files);
+    }
+
+    internal static List<string> SelectSourceFiles(IEnumerable<string> files)
+    {
         return files
-            .Where(f => !f.Equals("automaton.json", StringComparison.OrdinalIgnoreCase))
+            .Where(file => !string.IsNullOrWhiteSpace(file))
+            .Select(file => file.Replace('\\', '/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
@@ -261,7 +283,7 @@ public static class PullCommand
     private static async Task DownloadFileAsync(AutomatonApiClient client, string appId, string targetDir, string filePath)
     {
         var content = await client.ReadScopedFileAsync(appId, "source", filePath);
-        var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
+        var localPath = ResolveTargetPath(targetDir, filePath);
         Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
         await File.WriteAllTextAsync(localPath, content, Encoding.UTF8);
     }
@@ -272,7 +294,7 @@ public static class PullCommand
 
         foreach (var filePath in files)
         {
-            var localPath = Path.Combine(targetDir, filePath.Replace('/', Path.DirectorySeparatorChar));
+            var localPath = ResolveTargetPath(targetDir, filePath);
             if (File.Exists(localPath))
             {
                 overwritePaths.Add(filePath);
@@ -381,10 +403,31 @@ public static class PullCommand
         throw new InvalidOperationException($"No accessible app matched slug '{appIdentifier}'.");
     }
 
-    private static bool IsPortableSourceFile(string relativePath)
+    internal static string ResolveTargetPath(string targetDirectory, string relativePath)
     {
-        return relativePath.StartsWith("frontend/", StringComparison.OrdinalIgnoreCase)
-            || relativePath.StartsWith("backend/", StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new InvalidOperationException("Remote source contained an empty file path.");
+        }
+
+        var normalizedRelativePath = relativePath
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
+        if (Path.IsPathRooted(normalizedRelativePath))
+        {
+            throw new InvalidOperationException($"Remote source path must be project-relative: {relativePath}");
+        }
+
+        var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+        var fullPath = Path.GetFullPath(Path.Combine(fullTargetDirectory, normalizedRelativePath));
+        if (!fullPath.StartsWith(
+                fullTargetDirectory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Remote source path points outside the target directory: {relativePath}");
+        }
+
+        return fullPath;
     }
 
     private static string SanitizeDirectoryName(string value)

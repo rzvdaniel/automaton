@@ -97,7 +97,9 @@ The rules are intentionally strict:
 
 - `automaton pull` refreshes the current linked local folder.
 - `automaton pull <app-id-or-slug>` creates a new linked local folder from an existing Studio app.
-- Pull downloads `source/frontend` and `source/backend` only.
+- Pull downloads the complete editable `source/` snapshot, including AI-defined
+  folders such as `shared/`, `packages/`, `schemas/`, or custom backend roots.
+- Pull preserves the remote `automaton.json` deployment contract when present.
 - Pull never downloads `live/backend`.
 - Pull does not fall back to `live/frontend` unless an explicit future flag enables it.
 - In interactive mode, `automaton pull` warns before overwriting matching local files and asks for confirmation.
@@ -179,7 +181,6 @@ For the default AI-generated local app, use nested frontend/backend config:
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -198,7 +199,6 @@ If the app is only scaffolded locally and not linked yet, this temporary file sh
     "deployDir": "frontend/dist"
   },
   "backend": {
-    "sourceDir": "backend",
     "deployDir": "backend"
   }
 }
@@ -238,9 +238,7 @@ automaton deploy
 automaton deploy --runner <runner-id-or-name>
 ```
 
-This uploads `frontend.deployDir` as public frontend runtime, preserves
-`backend.sourceDir` as editable source, uploads `backend.deployDir` as runner
-backend runtime, and then triggers backend deployment. Re-run after any change.
+This uploads `frontend.deployDir` as public frontend runtime, uploads `backend.deployDir` as runner backend runtime when present, and then triggers backend deployment. Re-run after any change.
 
 If the app has no backend scripts, a successful deploy may finish with `No backend scripts found`.
 
