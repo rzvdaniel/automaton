@@ -44,10 +44,10 @@ public class ZipServiceTests
         Assert.That(File.Exists(ignoreFile), Is.True);
 
         var content = File.ReadAllText(ignoreFile);
-        Assert.That(content, Does.Contain(".automaton/"));
         Assert.That(content, Does.Contain("node_modules/"));
-        Assert.That(content, Does.Contain("automaton.json"));
-        Assert.That(content, Does.Contain(".automatonignore"));
+        Assert.That(content, Does.Contain("!.env.example"));
+        Assert.That(content, Does.Not.Contain("automaton.json"));
+        Assert.That(content, Does.Not.Contain(".automatonignore"));
     }
 
     [Test]
@@ -97,12 +97,12 @@ public class ZipServiceTests
         // Assert
         Assert.That(entries, Does.Contain("index.html"));
         Assert.That(entries, Does.Not.Contain(".automaton/config.json"));
-        Assert.That(entries, Does.Not.Contain(".github/copilot-instructions.md"));
-        Assert.That(entries, Does.Not.Contain(".github/skills/automaton-app/SKILL.md"));
-        Assert.That(entries, Does.Not.Contain("AGENTS.md"));
-        Assert.That(entries, Does.Not.Contain("CLAUDE.md"));
+        Assert.That(entries, Does.Contain(".github/copilot-instructions.md"));
+        Assert.That(entries, Does.Contain(".github/skills/automaton-app/SKILL.md"));
+        Assert.That(entries, Does.Contain("AGENTS.md"));
+        Assert.That(entries, Does.Contain("CLAUDE.md"));
         Assert.That(entries, Does.Not.Contain("automaton.json"));
-        Assert.That(entries, Does.Not.Contain("node_modules/pkg/index.js"));
+        Assert.That(entries, Does.Contain("node_modules/pkg/index.js"));
     }
 
     [Test]
@@ -115,6 +115,12 @@ public class ZipServiceTests
 
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
         File.WriteAllText(Path.Combine(projectRoot, ".gitignore"), "dist/");
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"),
+            ".gitignore" + Environment.NewLine
+            + ".env.*" + Environment.NewLine
+            + "*.log" + Environment.NewLine
+            + "*.sqlite" + Environment.NewLine
+            + "dist/");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('source');");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", ".env.production"), "SECRET=value");
         File.WriteAllText(Path.Combine(projectRoot, "backend", "debug.log"), "local log");
@@ -144,6 +150,7 @@ public class ZipServiceTests
         Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "node_modules", "vite"));
 
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "node_modules/");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('source');");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "node_modules", "vite", "index.js"), "console.log('dep');");
 
@@ -166,6 +173,8 @@ public class ZipServiceTests
         Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "__pycache__"));
 
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"),
+            "dist/" + Environment.NewLine + ".venv/" + Environment.NewLine + "__pycache__/");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.ts"), "console.log('source');");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "index.js"), "console.log('build');");
         File.WriteAllText(Path.Combine(projectRoot, "backend", ".venv", "lib", "x.py"), "print('venv')");
@@ -208,18 +217,20 @@ public class ZipServiceTests
     }
 
     [Test]
-    public void CreateZip_WhenAutomatonIgnoreContainsNegation_ThrowsClearError()
+    public void CreateZip_WhenAutomatonIgnoreContainsNegation_ReincludesMatchingFile()
     {
         // Arrange
         var projectRoot = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "!keep-me.txt");
+        File.WriteAllText(Path.Combine(projectRoot, ".automatonignore"), "*.txt" + Environment.NewLine + "!keep-me.txt");
         File.WriteAllText(Path.Combine(projectRoot, "keep-me.txt"), "content");
+        File.WriteAllText(Path.Combine(projectRoot, "skip-me.txt"), "content");
 
-        // Act
-        var ex = Assert.Throws<InvalidOperationException>(() => ZipService.CreateZip(projectRoot, projectRoot));
+        using var zipStream = ZipService.CreateZip(projectRoot, projectRoot);
+        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
+        var entries = archive.Entries.Select(e => e.FullName).ToArray();
 
-        // Assert
-        Assert.That(ex!.Message, Does.Contain("does not support negation patterns yet"));
+        Assert.That(entries, Does.Contain("keep-me.txt"));
+        Assert.That(entries, Does.Not.Contain("skip-me.txt"));
     }
 
     [Test]
