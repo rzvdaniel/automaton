@@ -223,7 +223,9 @@ public class RunnerService
                 (hostedRunnerId.HasValue ? x.Id == hostedRunnerId.Value : x.Name == runner.Name) &&
                 (x.RunnerId == null || x.RunnerId == runner.Id) &&
                 x.DeletedAt == null &&
-                (x.Status == HostedRunnerStatuses.Pending || x.Status == HostedRunnerStatuses.Provisioning));
+                (x.Status == HostedRunnerStatuses.Pending
+                    || x.Status == HostedRunnerStatuses.Provisioning
+                    || x.Status == HostedRunnerStatuses.Reprovisioning));
 
         if (hostedRunner == null)
         {
@@ -263,10 +265,11 @@ public class RunnerService
             .FirstOrDefault(x =>
                 x.UserId == userId &&
                 (hostedRunnerId.HasValue ? x.Id == hostedRunnerId.Value : x.Name == runner.Name) &&
-                x.RunnerId == null &&
+                (x.RunnerId == null || x.RunnerId == runner.Id) &&
                 x.DeletedAt == null &&
                 (x.Status == HostedRunnerStatuses.Pending
                     || x.Status == HostedRunnerStatuses.Provisioning
+                    || x.Status == HostedRunnerStatuses.Reprovisioning
                     || x.Status == HostedRunnerStatuses.Failed));
 
         if (hostedRunner == null)

@@ -368,6 +368,7 @@ public class HostedRunnerAuditTests
         var userId = Guid.NewGuid();
         var planId = SeedHostedRunnerPlan(db);
         SeedUser(db, userId, planId);
+        var runnerId = Guid.NewGuid();
         var pendingResources = new HostedRunnerResources
         {
             CpuLimit = 2,
@@ -380,9 +381,10 @@ public class HostedRunnerAuditTests
         {
             Id = Guid.NewGuid(),
             UserId = userId,
+            RunnerId = runnerId,
             Name = "old-display-name",
             ContainerName = "automaton-hosted-runner-registration-test",
-            Status = HostedRunnerStatuses.Provisioning,
+            Status = HostedRunnerStatuses.Reprovisioning,
             SpecificationSnapshot = new HostedRunnerSpecificationSnapshot
             {
                 SourceSpecificationRevision = 1,
@@ -419,7 +421,6 @@ public class HostedRunnerAuditTests
             audit,
             applicationEventService: null!,
             managedRunnerAppAssignmentService: null!);
-        var runnerId = Guid.NewGuid();
 
         await runnerService.Add(new RunnerDetails
         {
