@@ -78,13 +78,13 @@ cd /opt/automaton
 ./scripts/prod-redeploy-api.sh
 ./scripts/prod-redeploy-studio.sh
 ./scripts/prod-redeploy-website.sh
-./scripts/prod-redeploy-website.sh --with-cli-assets
 ./scripts/prod-redeploy-all.sh
-./scripts/prod-redeploy-all.sh --with-cli-assets
 ./scripts/prod-verify.sh
 ```
 
-Use `--with-cli-assets` only when `src/Automaton.Cli` changed and the public website should serve updated CLI downloads.
+CLI releases are independent of website deployment. When `src/Automaton.Cli` changes,
+run `azure-pipelines-cli.yml` against `main` to publish the .NET global tool package
+to NuGet.org; see `docs/prod/cli-nuget-publishing.md`.
 Add `--keep-previous` if you want the old color to remain running after the cutover for an easy rollback window.
 These production shell scripts are committed with the executable bit set, so a normal `git pull` on Linux should not show them as locally modified just because you ran `chmod +x` once.
 
