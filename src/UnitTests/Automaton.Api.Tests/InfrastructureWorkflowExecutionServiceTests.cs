@@ -85,7 +85,7 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
             Id = Guid.NewGuid(),
             Name = "host-test",
             Provider = RunnerHostProviders.Hetzner,
-            PublicIp = "203.0.113.10",
+            PublicIp = "8.8.8.8",
             RuntimeConnectivityMode = RunnerHostRuntimeConnectivityModes.PublicHostPort,
             ProvisioningStatus = RunnerHostProvisioningStatuses.AwaitingApproval,
             ValidatedAtUtc = DateTime.UtcNow,
@@ -156,6 +156,18 @@ public sealed class InfrastructureWorkflowExecutionServiceTests
 
         Assert.That(exception!.Message, Does.Contain("public IPv4"));
         Assert.That(host.HostedRunnerSchedulingEnabled, Is.False);
+    }
+
+    [TestCase("192.0.2.10")]
+    [TestCase("198.18.0.1")]
+    [TestCase("198.51.100.10")]
+    [TestCase("203.0.113.10")]
+    public void PublicAddressValidation_RejectsSpecialPurposeRanges(string address)
+    {
+        var valid = RunnerHostRuntimeAddressValidator.TryValidatePublicIpv4(address, out var error);
+
+        Assert.That(valid, Is.False);
+        Assert.That(error, Does.Contain("publicly routable"));
     }
 
     [Test]
