@@ -28,6 +28,13 @@ public static class ZipService
         ".idea/",
         "AGENTS.md",
         "CLAUDE.md",
+        "**/.gitignore",
+        "**/.env",
+        "**/.env.*",
+        "**/*.log",
+        "**/*.db",
+        "**/*.sqlite",
+        "**/*.sqlite3",
         "automaton.json",
         ".automatonignore"
     };

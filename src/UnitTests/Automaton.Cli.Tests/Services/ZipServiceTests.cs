@@ -111,9 +111,14 @@ public class ZipServiceTests
         var projectRoot = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "src"));
         Directory.CreateDirectory(Path.Combine(projectRoot, "frontend", "dist", "assets"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "backend", "data"));
 
         File.WriteAllText(Path.Combine(projectRoot, "automaton.json"), "{}");
+        File.WriteAllText(Path.Combine(projectRoot, ".gitignore"), "dist/");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "src", "main.js"), "console.log('source');");
+        File.WriteAllText(Path.Combine(projectRoot, "frontend", ".env.production"), "SECRET=value");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "debug.log"), "local log");
+        File.WriteAllText(Path.Combine(projectRoot, "backend", "data", "local.sqlite"), "local database");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "index.html"), "<html></html>");
         File.WriteAllText(Path.Combine(projectRoot, "frontend", "dist", "assets", "app.js"), "console.log('runtime');");
 
@@ -123,6 +128,10 @@ public class ZipServiceTests
 
         Assert.That(entries, Does.Contain("automaton.json"));
         Assert.That(entries, Does.Contain("frontend/src/main.js"));
+        Assert.That(entries, Does.Not.Contain(".gitignore"));
+        Assert.That(entries, Does.Not.Contain("frontend/.env.production"));
+        Assert.That(entries, Does.Not.Contain("backend/debug.log"));
+        Assert.That(entries, Does.Not.Contain("backend/data/local.sqlite"));
         Assert.That(entries, Does.Not.Contain("frontend/dist/index.html"));
         Assert.That(entries, Does.Not.Contain("frontend/dist/assets/app.js"));
     }
