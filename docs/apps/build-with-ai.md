@@ -97,7 +97,10 @@ The rules are intentionally strict:
 
 - `automaton pull` refreshes the current linked local folder.
 - `automaton pull <app-id-or-slug>` creates a new linked local folder from an existing Studio app.
-- Pull downloads `source/frontend` and `source/backend` only.
+- A fresh pull retains the selected CLI environment; pass `--env <name>` to choose one explicitly.
+- Pull downloads the complete editable `source/` snapshot, including AI-defined
+  folders such as `shared/`, `packages/`, `schemas/`, or custom backend roots.
+- Pull preserves the remote `automaton.json` deployment contract when present.
 - Pull never downloads `live/backend`.
 - Pull does not fall back to `live/frontend` unless an explicit future flag enables it.
 - In interactive mode, `automaton pull` warns before overwriting matching local files and asks for confirmation.

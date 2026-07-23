@@ -44,12 +44,15 @@ When changing archive behavior, test nested exclusions, not only root-level fold
 
 ## Pull behavior
 
-`automaton pull` should prefer editable source content.
+`automaton pull` should preserve the complete editable source snapshot without
+assuming source exists only under `frontend/` and `backend/`.
 
 Verify:
 
 - existing linked projects still pull correctly
 - pull into a fresh folder creates or preserves `automaton.json` correctly
+- AI-defined source roots such as `shared/`, `packages/`, and `schemas/` are retained
+- remote paths are validated before writing into the local target
 - local files are not overwritten silently
 - `source/frontend/` and `source/backend/` are preferred over runtime output
 - backend runtime files, secrets, logs, runner state, and user data are not pulled as editable source

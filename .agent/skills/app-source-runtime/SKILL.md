@@ -92,6 +92,8 @@ For changes in this area, verify:
 
 - source editing still uses `source/`
 - CLI pull still prefers `source/`
+- CLI pull preserves all portable paths under `source/`, not only conventional
+  frontend and backend folders
 - fork/remix never copies `live/backend/`
 - sensitive extensions and backend paths are not publicly served
 - source archives exclude generated output, dependencies, caches, secrets, logs, and local-only files

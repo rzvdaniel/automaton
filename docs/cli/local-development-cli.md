@@ -169,6 +169,7 @@ Currently supported on the main local/live workflow commands:
 - `status --env <name>`
 - `deploy --env <name>`
 - `open --env <name>`
+- `pull --env <name>`
 
 When `--env` is omitted, the CLI uses this order:
 
@@ -176,7 +177,7 @@ When `--env` is omitted, the CLI uses this order:
 2. `.automaton/environments/live.json` if it exists
 3. fallback credential resolution for commands that do not require a linked environment file
 
-For `automaton new`, `automaton create`, and `automaton link`, omitting `--env` creates or updates the `live` environment automatically.
+For `automaton new`, `automaton create`, and `automaton link`, omitting `--env` creates or updates the `live` environment automatically. For `automaton pull <app-id-or-slug>`, the selected environment is retained in the newly linked project; use `--env <name>` to choose it explicitly.
 
 For deploy, the CLI prints the resolved target before making changes. Example:
 
