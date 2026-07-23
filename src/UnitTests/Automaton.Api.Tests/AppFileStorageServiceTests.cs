@@ -139,6 +139,29 @@ public class AppFileStorageServiceTests
     }
 
     [Test]
+    public async Task WriteRuntimeFileAsync_AllowsWebManifest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var service = CreateStorageService(root);
+            var userId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            const string manifest = """{"name":"Test App","start_url":"./"}""";
+
+            await service.WriteRuntimeFileAsync(userId, appId, "site.webmanifest", manifest);
+
+            Assert.That(await service.ReadRuntimeFileAsync(userId, appId, "site.webmanifest"), Is.EqualTo(manifest));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task RestoreVersionAsync_RestoresNestedFilesSnapshotIntoSourceOnly()
     {
         var root = Path.Combine(Path.GetTempPath(), "automaton-app-storage-tests", Guid.NewGuid().ToString("N"));

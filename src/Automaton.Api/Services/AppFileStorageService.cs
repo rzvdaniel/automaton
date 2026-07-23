@@ -28,7 +28,7 @@ public class AppFileStorageService
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         // Web files
-        ".html", ".htm", ".css", ".js", ".mjs", ".json", ".xml",
+        ".html", ".htm", ".css", ".js", ".mjs", ".json", ".xml", ".webmanifest",
         // Text/documentation
         ".txt", ".md", ".markdown",
         // Images
