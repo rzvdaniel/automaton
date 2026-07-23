@@ -19,6 +19,7 @@ public static class PullCommand
 {
     private const string FrontendBuildCommand = "cd frontend && npm install && npm run build";
     private const int OverwritePreviewCount = 10;
+    internal sealed record SourceDownload(string RemotePath, string LocalPath);
 
     public static Command Build(ConfigService config)
     {
@@ -28,16 +29,18 @@ public static class PullCommand
             "Target directory (defaults to current directory for refresh mode, or a new subfolder in the current directory for app mode)");
         var forceOption = new Option<bool>("--force", "Overwrite matching local files without prompting");
         var nonInteractiveOption = new Option<bool>("--non-interactive", "Disable progress rendering and use plain output");
+        var environmentOption = new Option<string?>("--env", "Environment name to use and retain in a newly pulled project");
 
         var cmd = new Command("pull", "Download editable app source files from the server")
         {
             appArgument,
             dirOption,
             forceOption,
-            nonInteractiveOption
+            nonInteractiveOption,
+            environmentOption
         };
 
-        cmd.SetHandler(async (string? app, string? dir, bool force, bool nonInteractiveFlag) =>
+        cmd.SetHandler(async (string? app, string? dir, bool force, bool nonInteractiveFlag, string? environmentName) =>
         {
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag);
 
@@ -47,11 +50,11 @@ public static class PullCommand
 
                 if (string.IsNullOrWhiteSpace(app))
                 {
-                    await PullIntoLinkedProjectAsync(config, cwd, dir, force, nonInteractive);
+                    await PullIntoLinkedProjectAsync(config, cwd, dir, force, nonInteractive, environmentName);
                     return;
                 }
 
-                await PullIntoNewProjectAsync(config, cwd, app.Trim(), dir, nonInteractive);
+                await PullIntoNewProjectAsync(config, cwd, app.Trim(), dir, nonInteractive, environmentName);
             }
             catch (Exception ex)
             {
@@ -66,21 +69,21 @@ public static class PullCommand
 
                 Environment.Exit(1);
             }
-        }, appArgument, dirOption, forceOption, nonInteractiveOption);
+        }, appArgument, dirOption, forceOption, nonInteractiveOption, environmentOption);
 
         return cmd;
     }
 
-    private static async Task PullIntoLinkedProjectAsync(ConfigService config, string cwd, string? dir, bool force, bool nonInteractive)
+    private static async Task PullIntoLinkedProjectAsync(ConfigService config, string cwd, string? dir, bool force, bool nonInteractive, string? environmentName)
     {
         var appConfig = config.LoadProjectConfig(cwd);
-        var resolved = config.ResolveContext(appConfig, cwd);
+        var resolved = config.ResolveContext(appConfig, cwd, environmentName);
         if (string.IsNullOrWhiteSpace(resolved.AppId))
         {
             throw new InvalidOperationException("No appId is configured for the selected environment.");
         }
 
-        var (server, apiKey) = config.RequireCredentials(appConfig, cwd);
+        var (server, apiKey) = config.RequireCredentials(appConfig, cwd, environmentName);
         var targetDir = dir ?? cwd;
 
         WriteStart(nonInteractive, appConfig.Name, targetDir);
@@ -94,15 +97,17 @@ public static class PullCommand
             return;
         }
 
-        var overwritePaths = GetOverwritePaths(sourceFiles, targetDir);
+        var downloads = PrepareDownloads(sourceFiles, targetDir);
+        var overwritePaths = GetOverwritePaths(downloads);
         EnsureOverwriteApproved(overwritePaths, force, nonInteractive);
 
-        await DownloadFilesAsync(client, resolved.AppId, sourceFiles, targetDir, nonInteractive);
+        await DownloadFilesAsync(client, resolved.AppId, downloads, nonInteractive);
     }
 
-    private static async Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive)
+    private static async Task PullIntoNewProjectAsync(ConfigService config, string cwd, string appIdentifier, string? dir, bool nonInteractive, string? environmentName)
     {
-        var (server, apiKey) = config.RequireCredentials(directory: cwd);
+        var resolved = config.ResolveContext(directory: cwd, environmentName: environmentName);
+        var (server, apiKey) = config.RequireCredentials(directory: cwd, environmentName: environmentName);
         using var client = new AutomatonApiClient(server, apiKey);
 
         var app = await ResolveAppAsync(client, appIdentifier);
@@ -117,16 +122,17 @@ public static class PullCommand
             throw new InvalidOperationException($"Target directory already exists and is not empty: {targetDir}");
         }
 
-        Directory.CreateDirectory(targetDir);
-        WriteStart(nonInteractive, appName, targetDir);
-
         var sourceFiles = await ListSourceFilesAsync(client, appId);
         if (sourceFiles.Count == 0)
         {
             throw new InvalidOperationException("This app does not have portable source files to pull. Runtime frontend fallback is not enabled.");
         }
 
-        await DownloadFilesAsync(client, appId, sourceFiles, targetDir, nonInteractive);
+        var downloads = PrepareDownloads(sourceFiles, targetDir);
+        Directory.CreateDirectory(targetDir);
+        WriteStart(nonInteractive, appName, targetDir);
+
+        await DownloadFilesAsync(client, appId, downloads, nonInteractive);
 
         var pulledConfig = config.TryLoadProjectConfig(targetDir);
         if (pulledConfig == null)
@@ -160,14 +166,15 @@ public static class PullCommand
         }
 
         config.SaveProjectConfig(targetDir, pulledConfig);
-        var environment = config.LoadNamedEnvironmentConfig(targetDir, ConfigService.DefaultEnvironmentName) ?? new GlobalConfig();
+        var selectedEnvironmentName = resolved.EnvironmentName ?? ConfigService.DefaultEnvironmentName;
+        var environment = config.LoadNamedEnvironmentConfig(targetDir, selectedEnvironmentName) ?? new GlobalConfig();
         environment.Server = server;
         environment.ApiKey = apiKey;
         environment.AppId = appId;
-        config.SaveNamedEnvironmentConfig(targetDir, ConfigService.DefaultEnvironmentName, environment);
+        config.SaveNamedEnvironmentConfig(targetDir, selectedEnvironmentName, environment);
         config.SaveProjectEnvironmentSelection(
             targetDir,
-            new ProjectEnvironmentSelection { Default = ConfigService.DefaultEnvironmentName });
+            new ProjectEnvironmentSelection { Default = selectedEnvironmentName });
 
         string? guidanceWarning = null;
         AiGuidanceSyncResult? guidance = null;
@@ -240,24 +247,23 @@ public static class PullCommand
         return files
             .Where(file => !string.IsNullOrWhiteSpace(file))
             .Select(file => file.Replace('\\', '/'))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .ToList();
     }
 
     private static async Task DownloadFilesAsync(
         AutomatonApiClient client,
         string appId,
-        IReadOnlyList<string> files,
-        string targetDir,
+        IReadOnlyList<SourceDownload> downloads,
         bool nonInteractive)
     {
         var written = 0;
 
         if (nonInteractive)
         {
-            foreach (var filePath in files)
+            foreach (var download in downloads)
             {
-                await DownloadFileAsync(client, appId, targetDir, filePath);
+                await DownloadFileAsync(client, appId, download);
                 written++;
             }
 
@@ -268,10 +274,10 @@ public static class PullCommand
         await AnsiConsole.Progress()
             .StartAsync(async ctx =>
             {
-                var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: files.Count);
-                foreach (var filePath in files)
+                var task = ctx.AddTask("[cyan]Downloading files[/]", maxValue: downloads.Count);
+                foreach (var download in downloads)
                 {
-                    await DownloadFileAsync(client, appId, targetDir, filePath);
+                    await DownloadFileAsync(client, appId, download);
                     written++;
                     task.Increment(1);
                 }
@@ -280,24 +286,22 @@ public static class PullCommand
         AnsiConsole.MarkupLine($"[green]✓[/] Downloaded [bold]{written}[/] file(s)");
     }
 
-    private static async Task DownloadFileAsync(AutomatonApiClient client, string appId, string targetDir, string filePath)
+    private static async Task DownloadFileAsync(AutomatonApiClient client, string appId, SourceDownload download)
     {
-        var content = await client.ReadScopedFileAsync(appId, "source", filePath);
-        var localPath = ResolveTargetPath(targetDir, filePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-        await File.WriteAllTextAsync(localPath, content, Encoding.UTF8);
+        var content = await client.ReadScopedFileAsync(appId, "source", download.RemotePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(download.LocalPath)!);
+        await File.WriteAllTextAsync(download.LocalPath, content, Encoding.UTF8);
     }
 
-    private static List<string> GetOverwritePaths(IEnumerable<string> files, string targetDir)
+    private static List<string> GetOverwritePaths(IEnumerable<SourceDownload> downloads)
     {
         var overwritePaths = new List<string>();
 
-        foreach (var filePath in files)
+        foreach (var download in downloads)
         {
-            var localPath = ResolveTargetPath(targetDir, filePath);
-            if (File.Exists(localPath))
+            if (File.Exists(download.LocalPath))
             {
-                overwritePaths.Add(filePath);
+                overwritePaths.Add(download.RemotePath);
             }
         }
 
@@ -420,14 +424,36 @@ public static class PullCommand
 
         var fullTargetDirectory = Path.GetFullPath(targetDirectory);
         var fullPath = Path.GetFullPath(Path.Combine(fullTargetDirectory, normalizedRelativePath));
-        if (!fullPath.StartsWith(
-                fullTargetDirectory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
-                StringComparison.OrdinalIgnoreCase))
+        var relative = Path.GetRelativePath(fullTargetDirectory, fullPath);
+        if (Path.IsPathRooted(relative)
+            || relative.Equals("..", StringComparison.Ordinal)
+            || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
             throw new InvalidOperationException($"Remote source path points outside the target directory: {relativePath}");
         }
 
         return fullPath;
+    }
+
+    internal static List<SourceDownload> PrepareDownloads(IEnumerable<string> files, string targetDirectory)
+    {
+        var downloads = files
+            .Select(remotePath => new SourceDownload(remotePath, ResolveTargetPath(targetDirectory, remotePath)))
+            .ToList();
+
+        if (OperatingSystem.IsWindows())
+        {
+            var collision = downloads
+                .GroupBy(download => download.LocalPath, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (collision is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Remote source paths collide on this case-insensitive filesystem: {string.Join(", ", collision.Select(download => download.RemotePath))}");
+            }
+        }
+
+        return downloads;
     }
 
     private static string SanitizeDirectoryName(string value)

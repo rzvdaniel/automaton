@@ -26,6 +26,14 @@ public class PullCommandTests
         Assert.That(files, Does.Contain("server/output/app.runtimeconfig.json"));
     }
 
+    [Test]
+    public void SelectSourceFiles_PreservesCaseDistinctRemotePaths()
+    {
+        var files = PullCommand.SelectSourceFiles(["Models/User.cs", "models/User.cs"]);
+
+        Assert.That(files, Is.EqualTo(new[] { "Models/User.cs", "models/User.cs" }));
+    }
+
     [TestCase("../outside.txt")]
     [TestCase(@"..\outside.txt")]
     [TestCase("/absolute.txt")]
@@ -49,5 +57,41 @@ public class PullCommandTests
         Assert.That(
             resolved,
             Is.EqualTo(Path.Combine(targetDirectory, "packages", "shared", "schema.json")));
+    }
+
+    [Test]
+    public void PrepareDownloads_WhenAnyPathIsInvalid_ThrowsBeforeReturningAnyDownloads()
+    {
+        var targetDirectory = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+
+        Assert.Throws<InvalidOperationException>(
+            () => PullCommand.PrepareDownloads(["frontend/src/main.ts", "../outside.txt"], targetDirectory));
+    }
+
+    [Test]
+    [Platform(Exclude = "Win")]
+    public void ResolveTargetPath_WhenCaseVariantSiblingEscapesTarget_Throws()
+    {
+        var parentDirectory = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(parentDirectory, "MyApp");
+
+        Assert.Throws<InvalidOperationException>(
+            () => PullCommand.ResolveTargetPath(targetDirectory, "../myapp/outside.txt"));
+    }
+
+    [Test]
+    public void PrepareDownloads_WhenPathsCollideOnCaseInsensitiveWindows_Throws()
+    {
+        var targetDirectory = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => PullCommand.PrepareDownloads(["Models/User.cs", "models/User.cs"], targetDirectory));
+            return;
+        }
+
+        var downloads = PullCommand.PrepareDownloads(["Models/User.cs", "models/User.cs"], targetDirectory);
+        Assert.That(downloads, Has.Count.EqualTo(2));
     }
 }
