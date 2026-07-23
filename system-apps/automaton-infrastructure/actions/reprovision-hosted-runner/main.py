@@ -8,12 +8,20 @@ from pathlib import PurePosixPath
 
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$")
+SAFE_RUNNER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,159}$")
 
 
 def require_name(value: object, field: str) -> str:
     text = str(value or "")
     if not SAFE_NAME.fullmatch(text):
         raise ValueError(f"{field} contains unsupported characters")
+    return text
+
+
+def require_runner_name(value: object) -> str:
+    text = str(value or "")
+    if not SAFE_RUNNER_NAME.fullmatch(text):
+        raise ValueError("runnerName contains unsupported characters")
     return text
 
 
@@ -41,7 +49,7 @@ def main() -> None:
     request = json.load(sys.stdin)
     runner_id = require_name(request["hostedRunnerId"], "hostedRunnerId")
     container_name = require_name(request["containerName"], "containerName")
-    runner_name = require_name(request["runnerName"], "runnerName")
+    runner_name = require_runner_name(request["runnerName"])
     image = str(request["image"])
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/:@-]{0,299}", image):
         raise ValueError("image is invalid")
