@@ -37,6 +37,7 @@ x-api-common: &api-common
     HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
+    HostedRunners__RuntimePort: ${HOSTED_RUNNER_RUNTIME_PORT:-8080}
     DataProtection__KeysPath: /app/data-protection-keys
   volumes:
     - prod-api-appdata:/app/AppData
@@ -74,6 +75,7 @@ x-worker-common: &worker-common
     HostedRunners__DockerImage: ${HOSTED_RUNNER_DOCKER_IMAGE:-rzvdaniel/automaton-runner:latest}
     HostedRunners__DockerNetwork: ${HOSTED_RUNNER_DOCKER_NETWORK:-automaton-runtime}
     HostedRunners__RuntimeDockerNetwork: ${HOSTED_RUNNER_RUNTIME_DOCKER_NETWORK:-automaton-runtime}
+    HostedRunners__RuntimePort: ${HOSTED_RUNNER_RUNTIME_PORT:-8080}
   volumes:
     - prod-worker-logs:/app/logs
     - prod-worker-dataprotection:/app/data-protection-keys

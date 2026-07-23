@@ -79,6 +79,10 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         Assert.That(JsonSerializer.Serialize(durableRequest), Does.Not.Contain("ak_runner_"));
         Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("ak_runner_"));
         Assert.That(JsonSerializer.Serialize(request), Does.Not.Contain("EnrollmentToken"));
+        using (var input = JsonDocument.Parse(request.InputJson))
+        {
+            Assert.That(input.RootElement.GetProperty("runnerPort").GetInt32(), Is.EqualTo(8080));
+        }
         Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));
 

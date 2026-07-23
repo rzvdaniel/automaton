@@ -7,6 +7,7 @@ public class HostedRunnerOptions
     public string DockerImage { get; set; } = "automaton-runner:latest";
     public string DockerNetwork { get; set; } = "automaton_runner_network";
     public string? RuntimeDockerNetwork { get; set; }
-    public int RuntimePort { get; set; } = 8001;
+    // The public runtime gateway owns this port. FastAPI remains internal on 8001.
+    public int RuntimePort { get; set; } = 8080;
     public string DataRoot { get; set; } = "/opt/automaton/hosted-runners";
 }
