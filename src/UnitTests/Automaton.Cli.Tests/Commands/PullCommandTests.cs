@@ -80,11 +80,11 @@ public class PullCommandTests
     }
 
     [Test]
-    public void PrepareDownloads_WhenPathsCollideOnCaseInsensitiveWindows_Throws()
+    public void PrepareDownloads_WhenPathsCollideOnCaseInsensitiveFilesystem_Throws()
     {
         var targetDirectory = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
 
-        if (OperatingSystem.IsWindows())
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
         {
             Assert.Throws<InvalidOperationException>(
                 () => PullCommand.PrepareDownloads(["Models/User.cs", "models/User.cs"], targetDirectory));
@@ -93,5 +93,34 @@ public class PullCommandTests
 
         var downloads = PullCommand.PrepareDownloads(["Models/User.cs", "models/User.cs"], targetDirectory);
         Assert.That(downloads, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void PrepareDownloads_WhenDestinationParentIsReparsePoint_Throws()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-pull-tests", Guid.NewGuid().ToString("N"));
+        var targetDirectory = Path.Combine(root, "project");
+        Directory.CreateDirectory(targetDirectory);
+        var linkedDirectory = Path.Combine(targetDirectory, "shared");
+        var outsideDirectory = Path.Combine(root, "outside");
+        Directory.CreateDirectory(outsideDirectory);
+
+        try
+        {
+            Directory.CreateSymbolicLink(linkedDirectory, outsideDirectory);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Assert.Ignore("The test environment does not allow symbolic links.");
+            return;
+        }
+        catch (IOException)
+        {
+            Assert.Ignore("The test environment does not allow symbolic links.");
+            return;
+        }
+
+        Assert.Throws<InvalidOperationException>(
+            () => PullCommand.PrepareDownloads(["shared/file.txt"], targetDirectory));
     }
 }

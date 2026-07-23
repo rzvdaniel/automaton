@@ -441,7 +441,12 @@ public static class PullCommand
             .Select(remotePath => new SourceDownload(remotePath, ResolveTargetPath(targetDirectory, remotePath)))
             .ToList();
 
-        if (OperatingSystem.IsWindows())
+        foreach (var download in downloads)
+        {
+            EnsureNoReparsePoints(download.LocalPath);
+        }
+
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
         {
             var collision = downloads
                 .GroupBy(download => download.LocalPath, StringComparer.OrdinalIgnoreCase)
@@ -454,6 +459,31 @@ public static class PullCommand
         }
 
         return downloads;
+    }
+
+    private static void EnsureNoReparsePoints(string path)
+    {
+        var current = Path.GetFullPath(path);
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (File.Exists(current) || Directory.Exists(current))
+            {
+                var attributes = File.GetAttributes(current);
+                if (attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    throw new InvalidOperationException(
+                        $"Remote source path cannot be written through a symbolic link or junction: {path}");
+                }
+            }
+
+            var parent = Directory.GetParent(current)?.FullName;
+            if (parent is null || string.Equals(parent, current, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            current = parent;
+        }
     }
 
     private static string SanitizeDirectoryName(string value)
