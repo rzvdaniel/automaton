@@ -27,6 +27,7 @@ import BackendServerFiles from '../components/BackendServerFiles.vue'
 import AppEditorSideNav from '../components/AppEditorSideNav.vue'
 import AppEditorWorkspaceBar from '../components/AppEditorWorkspaceBar.vue'
 import AppActionContextBar from '../components/AppActionContextBar.vue'
+import ActionSchedulingPanel from '../components/ActionSchedulingPanel.vue'
 
 const CodeEditor = defineAsyncComponent(() => import('../components/CodeEditor.vue'))
 
@@ -84,7 +85,7 @@ const selectedRunnerId = ref<string | null>(null)
 const hasRunners = ref<boolean | null>(null) // null = not yet loaded
 
 // Active view tab
-const activeTab = ref<'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'>('build')
+const activeTab = ref<'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'>('build')
 const appEditorNavGroups = [
   {
     label: 'Develop',
@@ -105,6 +106,7 @@ const appEditorNavGroups = [
     label: 'Manage',
     items: [
       { key: 'versions', label: 'Restore Points', icon: 'pi pi-history' },
+      { key: 'actions', label: 'Actions', icon: 'pi pi-bolt' },
       { key: 'storage', label: 'Storage', icon: 'pi pi-database', disabled: true },
       { key: 'variables', label: 'Variables', icon: 'pi pi-sliders-h', disabled: true },
       { key: 'services', label: 'Services', icon: 'pi pi-server', disabled: true },
@@ -239,6 +241,7 @@ function handleSideNavSelect(target: string) {
     case 'build':
     case 'files':
     case 'versions':
+    case 'actions':
     case 'services':
     case 'logs':
     case 'settings':
@@ -1191,6 +1194,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
               @version-restored="handleVersionRestored"
               @version-created="handleVersionCreated"
             />
+          </div>
+          <div v-if="activeTab === 'actions' && resolvedAppId" class="panel-view">
+            <ActionSchedulingPanel :app-id="resolvedAppId" />
           </div>
 
           <!-- Settings View -->

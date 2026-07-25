@@ -12,7 +12,7 @@ interface NavGroup {
 }
 
 defineProps<{
-  activeItem: 'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'
+  activeItem: 'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'
   groups: ReadonlyArray<NavGroup>
 }>()
 

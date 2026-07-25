@@ -11,7 +11,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 const { isDark } = useUserSettings()
 
 const props = defineProps<{
-  activeTab: 'build' | 'files' | 'versions' | 'services' | 'logs' | 'settings'
+  activeTab: 'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'
   appName: string
   isEditingName: boolean
   editingName: string

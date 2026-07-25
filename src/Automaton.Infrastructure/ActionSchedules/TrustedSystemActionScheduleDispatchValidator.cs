@@ -12,6 +12,7 @@ public interface ITrustedSystemActionScheduleDispatchValidator
 public interface ITrustedSystemActionManifestSource
 {
     AppActionManifest? Find(string actionKey);
+    IReadOnlyList<AppActionManifest> List();
 }
 
 public sealed class TrustedSystemActionManifestSource : ITrustedSystemActionManifestSource
@@ -21,6 +22,13 @@ public sealed class TrustedSystemActionManifestSource : ITrustedSystemActionMani
         var root = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure");
         return AppActionManifestParser.Discover(root, allowPrivilegedCapabilities: true)
             .SingleOrDefault(x => x.Key == actionKey)?.Manifest;
+    }
+
+    public IReadOnlyList<AppActionManifest> List()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "SystemApps", "automaton-infrastructure");
+        return AppActionManifestParser.Discover(root, allowPrivilegedCapabilities: true)
+            .Select(x => x.Manifest).ToList();
     }
 }
 

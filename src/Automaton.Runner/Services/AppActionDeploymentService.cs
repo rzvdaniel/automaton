@@ -54,7 +54,9 @@ public sealed class AppActionDeploymentService
                 if (!File.Exists(manifestPath)) continue;
                 var manifest = AppActionManifestParser.ParseFile(manifestPath, key, allowPrivilegedCapabilities: true);
                 actions.Add(new(key, manifest.Metadata.Name, manifest.Metadata.Description, manifest.Spec.Runtime,
-                    manifest.Spec.Entrypoint, manifest.Spec.TimeoutSeconds, ReadCurrentHash(current)));
+                    manifest.Spec.Entrypoint, manifest.Spec.TimeoutSeconds, ReadCurrentHash(current),
+                    manifest.Spec.Schedulable, manifest.Spec.AllowedExecutionScopes,
+                    manifest.Spec.MinimumIntervalSeconds, manifest.Spec.Input));
             }
             catch (Exception ex)
             {

@@ -91,5 +91,6 @@ public sealed class TrustedSystemActionScheduleDispatchValidatorTests
     private sealed class StubSource(AppActionManifest? manifest) : ITrustedSystemActionManifestSource
     {
         public AppActionManifest? Find(string actionKey) => manifest;
+        public IReadOnlyList<AppActionManifest> List() => manifest == null ? [] : [manifest];
     }
 }

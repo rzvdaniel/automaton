@@ -78,7 +78,18 @@ public sealed record AppActionVersionRequest(Guid AppId, string ActionKey, strin
 public sealed record AppActionVersionInfo(string Version, string? ContentHash, DateTime CreatedAtUtc, long SizeBytes, bool IsCurrent = false);
 public sealed record AppActionVersionsResponse(IReadOnlyList<AppActionVersionInfo> Versions);
 public sealed record AppActionVersionOperationResponse(bool Success, string Message, string? ContentHash = null);
-public sealed record AppActionModuleInfo(string Key, string? Name, string? Description, string Runtime, string Entrypoint, int TimeoutSeconds, string? ContentHash);
+public sealed record AppActionModuleInfo(
+    string Key,
+    string? Name,
+    string? Description,
+    string Runtime,
+    string Entrypoint,
+    int TimeoutSeconds,
+    string? ContentHash,
+    bool Schedulable,
+    IReadOnlyList<string> AllowedExecutionScopes,
+    int MinimumIntervalSeconds,
+    Dictionary<string, object?>? InputSchema);
 public sealed record AppActionModulesResponse(IReadOnlyList<AppActionModuleInfo> Actions);
 public sealed record PrepareAppActionModuleRequest(Guid AppId, string ActionKey, byte[] SourceZip, string ExpectedContentHash, bool SystemInfrastructure);
 public sealed record SynchronizeAppActionModulesRequest(Guid AppId, IReadOnlyList<string> ActionKeys);
