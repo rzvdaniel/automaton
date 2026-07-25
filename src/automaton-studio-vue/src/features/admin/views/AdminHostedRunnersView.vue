@@ -46,6 +46,8 @@ const deleteConfirmationRunnerId = ref<string | null>(null)
 const deleteDataConfirmation = ref('')
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
+const hostedDeletePollMaxAttempts = 40
+const hostedDeletePollDelayMs = 1500
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -224,6 +226,22 @@ async function pollHostedRunnerUntilRunning(hostedRunnerId: string) {
   }
 
   return false
+}
+
+async function pollHostedRunnerDeletion(hostedRunnerId: string): Promise<'succeeded' | 'failed' | 'pending'> {
+  for (let attempt = 0; attempt < hostedDeletePollMaxAttempts; attempt += 1) {
+    await delay(hostedDeletePollDelayMs)
+
+    const latestHostedRunners = await adminHostedRunnersService.getHostedRunners()
+    hostedRunners.value = latestHostedRunners
+    const runner = latestHostedRunners.find((candidate) => candidate.id === hostedRunnerId)
+
+    // Successfully deleted Runners are intentionally omitted from this admin list.
+    if (!runner) return 'succeeded'
+    if (runner.status === 'deleteFailed' || runner.latestDeployment?.status === 'failed') return 'failed'
+  }
+
+  return 'pending'
 }
 
 async function loadProvisioningOptions() {
@@ -488,16 +506,53 @@ async function confirmDeleteHostedRunner(runner: HostedRunner, dataDisposition: 
     return
   }
   deletingRunnerId.value = runner.id
+  let requestAccepted = false
   try {
     await adminHostedRunnersService.deleteHostedRunner(runner.id, dataDisposition)
-    const detail = dataDisposition === 'delete'
-      ? `${runner.name} and its persistent data were deleted.`
-      : `${runner.name} was deleted and its persistent data was preserved.`
-    toast.add({ severity: 'success', summary: 'Deleted', detail, life: 4000 })
-    await refreshAll()
+    requestAccepted = true
+    const requestedDetail = dataDisposition === 'delete'
+      ? 'Deletion requested. The Runner and its persistent data will be removed after the infrastructure operation completes.'
+      : 'Deletion requested. The Runner container will be removed and its persistent data preserved.'
+    toast.add({ severity: 'info', summary: 'Deletion requested', detail: requestedDetail, life: 5000 })
+
+    const outcome = await pollHostedRunnerDeletion(runner.id)
+    await loadHosts()
+    if (outcome === 'succeeded') {
+      const completedDetail = dataDisposition === 'delete'
+        ? `${runner.name} and its persistent data were deleted.`
+        : `${runner.name} was deleted and its persistent data was preserved.`
+      toast.add({ severity: 'success', summary: 'Deletion completed', detail: completedDetail, life: 4000 })
+    } else if (outcome === 'failed') {
+      const failedRunner = hostedRunners.value.find((candidate) => candidate.id === runner.id)
+      toast.add({
+        severity: 'error',
+        summary: 'Deletion failed',
+        detail: failedRunner?.latestDeployment?.error || failedRunner?.lastError || 'The infrastructure operation failed.',
+        life: 6000,
+      })
+    } else {
+      toast.add({
+        severity: 'info',
+        summary: 'Deletion still in progress',
+        detail: 'The infrastructure operation has not completed yet. Check the deployment status for the final result.',
+        life: 6000,
+      })
+    }
     selectedRunner.value = hostedRunners.value.find((candidate) => candidate.id === runner.id) ?? null
   } catch {
-    toast.add({ severity: 'error', summary: 'Delete failed', detail: 'Failed to delete the hosted runner.', life: 4000 })
+    toast.add(requestAccepted
+      ? {
+          severity: 'warn',
+          summary: 'Unable to monitor deletion',
+          detail: 'Deletion was requested, but Studio could not retrieve the final infrastructure operation status.',
+          life: 6000,
+        }
+      : {
+          severity: 'error',
+          summary: 'Delete request failed',
+          detail: 'Failed to request hosted Runner deletion.',
+          life: 4000,
+        })
   } finally {
     deletingRunnerId.value = null
     deleteConfirmationRunnerId.value = null

@@ -219,23 +219,63 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         )
         self.assertEqual(sum(call[:3] == ("docker", "volume", "inspect") for call in calls), 2)
         self.assertEqual(sum(call[:3] == ("docker", "volume", "rm") for call in calls), 2)
+        inspection_indexes = [
+            index
+            for index, call in enumerate(calls)
+            if call[:3] == ("docker", "volume", "inspect")
+        ]
+        mutation_indexes = [
+            index
+            for index, call in enumerate(calls)
+            if call[:3] in (("docker", "rm", "-f"), ("docker", "volume", "rm"))
+        ]
+        self.assertLess(max(inspection_indexes), min(mutation_indexes))
 
     def test_delete_refuses_unlabeled_or_mismatched_volume(self):
         invalid_labels = [
             {},
-            volume_labels("system", "88888888-8888-4888-8888-888888888888"),
-            {**volume_labels("system"), "automaton.storage-scope": "user"},
+            volume_labels("user", "88888888-8888-4888-8888-888888888888"),
+            {**volume_labels("user"), "automaton.storage-scope": "system"},
         ]
         for labels in invalid_labels:
             with self.subTest(labels=labels):
-                with self.assertRaisesRegex(RuntimeError, "ownership labels"):
-                    self.run_delete_action(
-                        False,
-                        {
-                            SYSTEM_VOLUME: labels,
-                            USER_VOLUME: volume_labels("user"),
-                        },
-                    )
+                module = load_action("delete-hosted-runner")
+                calls = []
+                request = {
+                    "operationId": "0f24f98f-0f23-4929-b5d7-cdfe27215aac",
+                    "hostedRunnerId": RUNNER_ID,
+                    "containerName": "automaton-hosted-runner-test",
+                    "preserveVolumes": False,
+                    "systemVolumeName": SYSTEM_VOLUME,
+                    "userVolumeName": USER_VOLUME,
+                }
+                labels_by_volume = {
+                    SYSTEM_VOLUME: volume_labels("system"),
+                    USER_VOLUME: labels,
+                }
+
+                def fake_host(*arguments):
+                    calls.append(arguments)
+                    if arguments[:3] == ("docker", "volume", "inspect"):
+                        name = arguments[3]
+                        return subprocess.CompletedProcess(
+                            arguments,
+                            0,
+                            json.dumps([{"Name": name, "Labels": labels_by_volume[name]}]),
+                            "",
+                        )
+                    return subprocess.CompletedProcess(arguments, 0, "", "")
+
+                with (
+                    patch.object(module, "host", side_effect=fake_host),
+                    patch.object(sys, "stdin", io.StringIO(json.dumps(request))),
+                    patch.object(sys, "stdout", io.StringIO()),
+                    self.assertRaisesRegex(RuntimeError, "ownership labels"),
+                ):
+                    module.main()
+
+                self.assertFalse(any(call[:3] == ("docker", "volume", "rm") for call in calls))
+                self.assertFalse(any(call[:3] == ("docker", "rm", "-f") for call in calls))
 
     def test_delete_requires_boolean_volume_disposition(self):
         with self.assertRaisesRegex(ValueError, "explicitly"):

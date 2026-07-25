@@ -40,6 +40,16 @@ def inspect_owned_volume(
     return True
 
 
+def remove_container(container_name: str) -> None:
+    probe = host("docker", "container", "inspect", container_name)
+    if probe.returncode == 0:
+        result = host("docker", "rm", "-f", container_name)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or f"Host command failed with exit status {result.returncode}")
+    elif "No such" not in probe.stderr:
+        raise RuntimeError(probe.stderr.strip() or "Docker container inspection failed")
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     runner_uuid = uuid.UUID(str(request["hostedRunnerId"]))
@@ -48,27 +58,26 @@ def main() -> None:
     container_name = str(request["containerName"])
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,159}", container_name):
         raise ValueError("containerName contains unsupported characters")
-    probe = host("docker", "container", "inspect", container_name)
-    if probe.returncode == 0:
-        result = host("docker", "rm", "-f", container_name)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or f"Host command failed with exit status {result.returncode}")
-    elif "No such" not in probe.stderr:
-        raise RuntimeError(probe.stderr.strip() or "Docker container inspection failed")
     preserve_volumes = request.get("preserveVolumes")
     if not isinstance(preserve_volumes, bool):
         raise ValueError("preserveVolumes must explicitly be true or false")
+    validated_volumes: list[str] = []
     if not preserve_volumes:
         for field in ("systemVolumeName", "userVolumeName"):
             volume_name = str(request[field])
             expected_scope = "system" if field == "systemVolumeName" else "user"
             if volume_name != f"automaton-hosted-runner-{runner_id_compact}-{expected_scope}":
                 raise ValueError(f"{field} is not an Automaton hosted Runner volume name")
-            if not inspect_owned_volume(volume_name, runner_id, expected_scope):
-                continue
-            result = host("docker", "volume", "rm", volume_name)
-            if result.returncode != 0 and "No such volume" not in result.stderr:
-                raise RuntimeError(result.stderr.strip() or f"Could not remove {field}")
+            if inspect_owned_volume(volume_name, runner_id, expected_scope):
+                validated_volumes.append(volume_name)
+
+    # Do not mutate the container or either volume until every destructive
+    # target has passed its ownership checks.
+    remove_container(container_name)
+    for volume_name in validated_volumes:
+        result = host("docker", "volume", "rm", volume_name)
+        if result.returncode != 0 and "No such volume" not in result.stderr:
+            raise RuntimeError(result.stderr.strip() or f"Could not remove Docker volume {volume_name}")
     print(json.dumps({"success": True, "containerName": container_name}, separators=(",", ":")))
 
 

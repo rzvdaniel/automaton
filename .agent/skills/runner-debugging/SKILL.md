@@ -33,6 +33,7 @@ Backend app files deployed to a runner are runner-side runtime files. Do not con
 - Keep app backend files isolated per app/user as the current architecture requires.
 - Treat App Action `ExecutionId` as an idempotency key. Persist Runner acceptance before starting the process, return the same in-flight or terminal result for duplicates, and never restart a process when a persisted non-terminal acceptance makes the outcome ambiguous.
 - Before reusing or deleting an Automaton-owned Docker volume, inspect it and fail closed unless its managed, resource, owner, and storage-scope labels match the server-derived identity. A deterministic name alone is not proof of ownership.
+- For a destructive operation with multiple targets, validate every target before mutating any of them. A conflict on one volume must leave the container and all other volumes untouched.
 - Do not mount one volume root at multiple unrelated container paths. Mount one storage root and map workspace, logs, home, and system configuration to distinct subdirectories or use separately labeled deterministic volumes.
 - Make persistent-data disposition explicit for destructive Runner lifecycle operations. Preserve and delete paths must be distinct in the API contract, and permanent deletion requires stronger confirmation.
 
