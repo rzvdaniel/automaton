@@ -14,6 +14,11 @@ public class PlanCapabilitiesSerializerTests
             Assert.That(capabilities.Version, Is.EqualTo(1));
             Assert.That(capabilities.HostedRunner.Enabled, Is.False);
             Assert.That(capabilities.HostedRunner.Visibility, Is.EqualTo(HostedRunnerVisibility.Disabled));
+            Assert.That(capabilities.ScheduledActions.Enabled, Is.True);
+            Assert.That(capabilities.ScheduledActions.MaximumSchedules, Is.EqualTo(10));
+            Assert.That(capabilities.ScheduledActions.MinimumIntervalSeconds, Is.EqualTo(300));
+            Assert.That(capabilities.ScheduledActions.MaximumConcurrentExecutions, Is.EqualTo(1));
+            Assert.That(capabilities.ScheduledActions.MonthlyExecutionLimit, Is.EqualTo(5000));
         });
     }
 

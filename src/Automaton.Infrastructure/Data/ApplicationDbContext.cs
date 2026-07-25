@@ -61,6 +61,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<AppVersion> AppVersions { get; set; }
         public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
         public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
+        public virtual DbSet<ActionSchedule> ActionSchedules { get; set; }
         public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
         public virtual DbSet<SecretVersion> SecretVersions { get; set; }
         public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
@@ -132,6 +133,24 @@ namespace Automaton.Api.Data
                     .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasIndex(e => e.SubscriptionPlanId);
+            });
+
+            modelBuilder.Entity<ActionSchedule>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ActionKey).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Description).HasMaxLength(2000);
+                entity.Property(e => e.ExecutionScope).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.ScheduleType).IsRequired().HasMaxLength(16);
+                entity.Property(e => e.CronExpression).HasMaxLength(120);
+                entity.Property(e => e.TimeZone).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ConcurrencyPolicy).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.MisfirePolicy).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.InputJson).IsRequired().HasColumnType("longtext");
+                entity.HasIndex(e => new { e.OwnerUserId, e.ApplicationId });
+                entity.HasIndex(e => new { e.Enabled, e.NextRunAtUtc });
+                entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Flow>(entity =>

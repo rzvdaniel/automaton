@@ -25,6 +25,28 @@ public static class AppActionCapabilities
     public static readonly IReadOnlySet<string> Supported = Privileged;
 }
 
+public static class AppActionExecutionScopes
+{
+    public const string Worker = "Worker";
+    public const string AppRunner = "AppRunner";
+    public const string InfrastructureRunner = "InfrastructureRunner";
+    public static readonly IReadOnlySet<string> Supported = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Worker, AppRunner, InfrastructureRunner
+    };
+}
+
+public static class AppActionConcurrencyPolicies
+{
+    public const string Allow = "Allow";
+    public const string SkipIfRunning = "SkipIfRunning";
+    public const string Queue = "Queue";
+    public static readonly IReadOnlySet<string> Supported = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Allow, SkipIfRunning, Queue
+    };
+}
+
 public sealed class AppActionManifest
 {
     public string ApiVersion { get; set; } = string.Empty;
@@ -48,6 +70,10 @@ public sealed class AppActionSpec
     public Dictionary<string, object?>? Input { get; set; }
     public Dictionary<string, object?>? Output { get; set; }
     public List<string> Capabilities { get; set; } = [];
+    public bool Schedulable { get; set; }
+    public List<string> AllowedExecutionScopes { get; set; } = [];
+    public string DefaultConcurrencyPolicy { get; set; } = "SkipIfRunning";
+    public int MinimumIntervalSeconds { get; set; } = 300;
 }
 
 public sealed record DiscoveredAppAction(
@@ -137,6 +163,14 @@ public static class AppActionManifestParser
             throw new InvalidOperationException($"Action capability '{unsupportedCapability}' is not supported.");
         if (!allowPrivilegedCapabilities && manifest.Spec.Capabilities.Any(AppActionCapabilities.Privileged.Contains))
             throw new InvalidOperationException("Normal App Actions cannot request privileged host or Docker capabilities.");
+        if (manifest.Spec.MinimumIntervalSeconds < 1)
+            throw new InvalidOperationException("Action minimumIntervalSeconds must be positive.");
+        if (!AppActionConcurrencyPolicies.Supported.Contains(manifest.Spec.DefaultConcurrencyPolicy))
+            throw new InvalidOperationException("Action defaultConcurrencyPolicy is invalid.");
+        if (manifest.Spec.AllowedExecutionScopes.Any(scope => !AppActionExecutionScopes.Supported.Contains(scope)))
+            throw new InvalidOperationException("Action allowedExecutionScopes contains an invalid scope.");
+        if (manifest.Spec.Schedulable && manifest.Spec.AllowedExecutionScopes.Count == 0)
+            throw new InvalidOperationException("Schedulable Actions must declare allowedExecutionScopes.");
     }
 
     public static void ValidateKey(string key)

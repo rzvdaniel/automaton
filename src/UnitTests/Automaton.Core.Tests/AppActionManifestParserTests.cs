@@ -27,6 +27,38 @@ public class AppActionManifestParserTests
         Assert.That(manifest.Spec.TimeoutSeconds, Is.EqualTo(60));
     }
 
+    [Test]
+    public void ParsesExplicitSchedulingPolicy()
+    {
+        var yaml = ValidManifest.Replace(
+            "timeoutSeconds: 60",
+            """
+            timeoutSeconds: 60
+              schedulable: true
+              allowedExecutionScopes:
+                - AppRunner
+              defaultConcurrencyPolicy: Queue
+              minimumIntervalSeconds: 600
+            """);
+
+        var manifest = AppActionManifestParser.Parse(yaml, "hello");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(manifest.Spec.Schedulable, Is.True);
+            Assert.That(manifest.Spec.AllowedExecutionScopes, Is.EqualTo(new[] { "AppRunner" }));
+            Assert.That(manifest.Spec.DefaultConcurrencyPolicy, Is.EqualTo("Queue"));
+            Assert.That(manifest.Spec.MinimumIntervalSeconds, Is.EqualTo(600));
+        });
+    }
+
+    [Test]
+    public void RejectsSchedulableManifestWithoutAllowedScope()
+    {
+        var yaml = ValidManifest.Replace("timeoutSeconds: 60", "timeoutSeconds: 60\n  schedulable: true");
+        Assert.That(() => AppActionManifestParser.Parse(yaml, "hello"), Throws.InvalidOperationException);
+    }
+
     [TestCase("../main.py")]
     [TestCase("/main.py")]
     [TestCase("nested//main.py")]

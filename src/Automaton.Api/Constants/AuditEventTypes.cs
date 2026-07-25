@@ -18,6 +18,11 @@ public static class AuditEventTypes
     public const string AppDeployStarted = "AppDeployStarted";
     public const string AppDeploySucceeded = "AppDeploySucceeded";
     public const string AppDeployFailed = "AppDeployFailed";
+    public const string ActionScheduleCreated = "ActionScheduleCreated";
+    public const string ActionScheduleUpdated = "ActionScheduleUpdated";
+    public const string ActionScheduleEnabled = "ActionScheduleEnabled";
+    public const string ActionScheduleDisabled = "ActionScheduleDisabled";
+    public const string ActionScheduleDeleted = "ActionScheduleDeleted";
     public const string RunnerAssignedToApp = "RunnerAssignedToApp";
     public const string RunnerUnassignedFromApp = "RunnerUnassignedFromApp";
     public const string RunnerCreated = "RunnerCreated";

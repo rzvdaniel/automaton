@@ -7,8 +7,18 @@ public sealed class PlanCapabilities
 {
     public int Version { get; set; } = 1;
     public HostedRunnerCapability HostedRunner { get; set; } = new();
+    public ScheduledActionsCapability ScheduledActions { get; set; } = new();
 
     public static PlanCapabilities Default => new();
+}
+
+public sealed class ScheduledActionsCapability
+{
+    public bool Enabled { get; set; } = true;
+    public int MaximumSchedules { get; set; } = 10;
+    public int MinimumIntervalSeconds { get; set; } = 300;
+    public int MaximumConcurrentExecutions { get; set; } = 1;
+    public int MonthlyExecutionLimit { get; set; } = 5000;
 }
 
 public sealed class HostedRunnerCapability
@@ -78,10 +88,17 @@ public static class PlanCapabilitiesSerializer
     {
         capabilities.Version = capabilities.Version <= 0 ? 1 : capabilities.Version;
         capabilities.HostedRunner ??= new HostedRunnerCapability();
+        capabilities.ScheduledActions ??= new ScheduledActionsCapability();
 
         var runner = capabilities.HostedRunner;
         runner.Visibility = HostedRunnerVisibility.IsValid(runner.Visibility)
             ? runner.Visibility
             : HostedRunnerVisibility.Disabled;
+
+        var schedules = capabilities.ScheduledActions;
+        schedules.MaximumSchedules = schedules.MaximumSchedules > 0 ? schedules.MaximumSchedules : 10;
+        schedules.MinimumIntervalSeconds = schedules.MinimumIntervalSeconds > 0 ? schedules.MinimumIntervalSeconds : 300;
+        schedules.MaximumConcurrentExecutions = schedules.MaximumConcurrentExecutions > 0 ? schedules.MaximumConcurrentExecutions : 1;
+        schedules.MonthlyExecutionLimit = schedules.MonthlyExecutionLimit > 0 ? schedules.MonthlyExecutionLimit : 5000;
     }
 }
