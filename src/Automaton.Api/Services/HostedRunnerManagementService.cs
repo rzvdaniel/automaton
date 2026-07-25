@@ -270,7 +270,10 @@ public class HostedRunnerManagementService
             {
                 operationId = deployment.Id,
                 hostedRunnerId = runner.Id,
-                containerName = runner.ContainerName
+                containerName = runner.ContainerName,
+                preserveVolumes = true,
+                systemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
+                userVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
             }),
             CorrelationId = Guid.NewGuid().ToString("N")
         }, cancellationToken);

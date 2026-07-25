@@ -203,9 +203,13 @@ public sealed class AdminHostedRunnerSpecificationsController(
 
     private static bool ResourcesEqual(HostedRunnerResources a, HostedRunnerResources b)
         => a.CpuLimit == b.CpuLimit && a.MemoryLimitMb == b.MemoryLimitMb && a.MemoryReservationMb == b.MemoryReservationMb
-           && a.DiskLimitMb == b.DiskLimitMb && a.PidsLimit == b.PidsLimit && a.MaximumApps == b.MaximumApps;
+           && a.DiskLimitMb == b.DiskLimitMb && a.PidsLimit == b.PidsLimit
+           && a.SharedMemoryMb == b.SharedMemoryMb
+           && a.DockerLogMaxSizeMb == b.DockerLogMaxSizeMb
+           && a.DockerLogMaxFiles == b.DockerLogMaxFiles
+           && a.MaximumApps == b.MaximumApps;
 
-    private static string? Validate(string? code, string name, HostedRunnerResources resources)
+    internal static string? Validate(string? code, string name, HostedRunnerResources resources)
     {
         if (code != null && (string.IsNullOrWhiteSpace(code) || code.Length > 80)) return "Code is required and must be at most 80 characters.";
         if (string.IsNullOrWhiteSpace(name) || name.Length > 160) return "Name is required and must be at most 160 characters.";
@@ -214,6 +218,9 @@ public sealed class AdminHostedRunnerSpecificationsController(
         if (resources.MemoryReservationMb < HostedRunnerSpecificationLimits.MinimumMemoryReservationMb || resources.MemoryReservationMb > resources.MemoryLimitMb) return "Memory reservation must be no greater than the memory limit.";
         if (resources.DiskLimitMb is < HostedRunnerSpecificationLimits.MinimumDiskLimitMb or > HostedRunnerSpecificationLimits.MaximumDiskLimitMb) return "Disk limit is outside the supported range.";
         if (resources.PidsLimit is < HostedRunnerSpecificationLimits.MinimumPidsLimit or > HostedRunnerSpecificationLimits.MaximumPidsLimit) return "PID limit is outside the supported range.";
+        if (resources.SharedMemoryMb is < HostedRunnerSpecificationLimits.MinimumSharedMemoryMb or > HostedRunnerSpecificationLimits.MaximumSharedMemoryMb) return "Shared memory limit is outside the supported range.";
+        if (resources.DockerLogMaxSizeMb is < HostedRunnerSpecificationLimits.MinimumDockerLogMaxSizeMb or > HostedRunnerSpecificationLimits.MaximumDockerLogMaxSizeMb) return "Docker log size limit is outside the supported range.";
+        if (resources.DockerLogMaxFiles is < HostedRunnerSpecificationLimits.MinimumDockerLogMaxFiles or > HostedRunnerSpecificationLimits.MaximumDockerLogMaxFiles) return "Docker log file count is outside the supported range.";
         if (resources.MaximumApps is < HostedRunnerSpecificationLimits.MinimumApps or > HostedRunnerSpecificationLimits.MaximumApps) return "Maximum applications is outside the supported range.";
         return null;
     }
@@ -222,7 +229,7 @@ public sealed class AdminHostedRunnerSpecificationsController(
         => new(settings.ProvisioningEnabled, settings.UpdatedAtUtc);
 }
 
-public sealed record HostedRunnerResourcesDto(decimal CpuLimit, int MemoryLimitMb, int MemoryReservationMb, int DiskLimitMb, int PidsLimit, int MaximumApps);
+public sealed record HostedRunnerResourcesDto(decimal CpuLimit, int MemoryLimitMb, int MemoryReservationMb, int DiskLimitMb, int PidsLimit, int SharedMemoryMb, int DockerLogMaxSizeMb, int DockerLogMaxFiles, int MaximumApps);
 public sealed record CreateHostedRunnerSpecificationRequest(string Name, string Code, string? Description, HostedRunnerResources Resources);
 public sealed record UpdateHostedRunnerSpecificationRequest(string Name, string? Description, bool IsActive, HostedRunnerResources Resources);
 public sealed record UpdateHostedRunnerPlatformSettingsRequest(bool ProvisioningEnabled);

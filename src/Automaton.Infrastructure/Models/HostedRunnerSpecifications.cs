@@ -4,11 +4,14 @@ using Automaton.Api.Entities;
 
 public sealed class HostedRunnerResources
 {
-    public decimal CpuLimit { get; set; } = 0.25m;
-    public int MemoryLimitMb { get; set; } = 768;
+    public decimal CpuLimit { get; set; } = 0.50m;
+    public int MemoryLimitMb { get; set; } = 384;
     public int MemoryReservationMb { get; set; } = 256;
-    public int DiskLimitMb { get; set; } = 2048;
-    public int PidsLimit { get; set; } = 128;
+    public int DiskLimitMb { get; set; } = 512;
+    public int PidsLimit { get; set; } = 256;
+    public int SharedMemoryMb { get; set; } = 64;
+    public int DockerLogMaxSizeMb { get; set; } = 10;
+    public int DockerLogMaxFiles { get; set; } = 3;
     public int MaximumApps { get; set; } = 3;
 }
 
@@ -51,6 +54,9 @@ public static class HostedRunnerSpecificationSnapshotFactory
             MemoryReservationMb = resources.MemoryReservationMb,
             DiskLimitMb = resources.DiskLimitMb,
             PidsLimit = resources.PidsLimit,
+            SharedMemoryMb = resources.SharedMemoryMb,
+            DockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,
+            DockerLogMaxFiles = resources.DockerLogMaxFiles,
             MaximumApps = resources.MaximumApps
         };
 }
@@ -76,6 +82,12 @@ public static class HostedRunnerSpecificationLimits
     public const int MaximumDiskLimitMb = 102_400;
     public const int MinimumPidsLimit = 32;
     public const int MaximumPidsLimit = 4096;
+    public const int MinimumSharedMemoryMb = 16;
+    public const int MaximumSharedMemoryMb = 1024;
+    public const int MinimumDockerLogMaxSizeMb = 1;
+    public const int MaximumDockerLogMaxSizeMb = 1024;
+    public const int MinimumDockerLogMaxFiles = 1;
+    public const int MaximumDockerLogMaxFiles = 20;
     public const int MinimumApps = 1;
     public const int MaximumApps = 100;
 }

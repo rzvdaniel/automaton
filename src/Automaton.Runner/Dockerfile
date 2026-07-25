@@ -128,7 +128,7 @@ RUN chmod +x /usr/local/bin/automaton-host-exec
 RUN pip install --no-cache-dir -r /app/fastapi_server/requirements.txt
 
 # Pre-create writable directories so named volumes inherit correct ownership
-RUN mkdir -p /automaton/workspace/apps /automaton/workspace/data /automaton/workspace/cache /automaton/workspace/runner /app/logs /app/config
+RUN mkdir -p /automaton/workspace/apps /automaton/workspace/data /automaton/workspace/cache /automaton/workspace/runner /app/logs /app/config /home/automaton/.config/AutomatonRunner
 
 # Set ownership for non-root user
 RUN chown -R automaton:automaton /app /automaton

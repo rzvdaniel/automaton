@@ -16,6 +16,23 @@ namespace Automaton.Worker.Tests;
 public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
 {
     [Test]
+    public void FreeSpecificationDefaultsMatchHostedRunnerPlatformContract()
+    {
+        var resources = new HostedRunnerResources();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resources.CpuLimit, Is.EqualTo(0.50m));
+            Assert.That(resources.MemoryLimitMb, Is.EqualTo(384));
+            Assert.That(resources.DiskLimitMb, Is.EqualTo(512));
+            Assert.That(resources.PidsLimit, Is.EqualTo(256));
+            Assert.That(resources.SharedMemoryMb, Is.EqualTo(64));
+            Assert.That(resources.DockerLogMaxSizeMb, Is.EqualTo(10));
+            Assert.That(resources.DockerLogMaxFiles, Is.EqualTo(3));
+        });
+    }
+
+    [Test]
     public async Task PublishesTrustedInfrastructureActionWithoutRunningDocker()
     {
         await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -36,9 +53,11 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
                 Resources = new HostedRunnerResources
                 {
                     CpuLimit = 1, MemoryLimitMb = 1024, MemoryReservationMb = 512,
-                    PidsLimit = 256, DiskLimitMb = 4096
+                    PidsLimit = 256, DiskLimitMb = 4096, SharedMemoryMb = 96,
+                    DockerLogMaxSizeMb = 20, DockerLogMaxFiles = 4
                 }
-            }
+            },
+            HostedRunnerSpecificationId = Guid.NewGuid()
         };
         var deployment = new HostedRunnerDeployment
         {
@@ -82,6 +101,16 @@ public sealed class ManagedRunnerProvisionRequestedEventHandlerTests
         using (var input = JsonDocument.Parse(request.InputJson))
         {
             Assert.That(input.RootElement.GetProperty("runnerPort").GetInt32(), Is.EqualTo(8080));
+            Assert.That(input.RootElement.GetProperty("cpuLimit").GetDecimal(), Is.EqualTo(1));
+            Assert.That(input.RootElement.GetProperty("memoryMb").GetInt32(), Is.EqualTo(1024));
+            Assert.That(input.RootElement.GetProperty("pidsLimit").GetInt32(), Is.EqualTo(256));
+            Assert.That(input.RootElement.GetProperty("sharedMemoryMb").GetInt32(), Is.EqualTo(96));
+            Assert.That(input.RootElement.GetProperty("dockerLogMaxSizeMb").GetInt32(), Is.EqualTo(20));
+            Assert.That(input.RootElement.GetProperty("dockerLogMaxFiles").GetInt32(), Is.EqualTo(4));
+            Assert.That(input.RootElement.GetProperty("systemVolumeName").GetString(),
+                Is.EqualTo($"automaton-hosted-runner-{runner.Id:N}-system"));
+            Assert.That(input.RootElement.GetProperty("userVolumeName").GetString(),
+                Is.EqualTo($"automaton-hosted-runner-{runner.Id:N}-user"));
         }
         Assert.That(runner.Status, Is.EqualTo(HostedRunnerStatuses.Provisioning));
         Assert.That(deployment.Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Dispatching));

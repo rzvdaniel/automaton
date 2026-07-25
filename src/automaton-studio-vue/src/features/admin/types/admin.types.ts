@@ -583,6 +583,9 @@ export interface HostedRunnerResources {
   memoryReservationMb: number
   diskLimitMb: number
   pidsLimit: number
+  sharedMemoryMb: number
+  dockerLogMaxSizeMb: number
+  dockerLogMaxFiles: number
   maximumApps: number
 }
 
