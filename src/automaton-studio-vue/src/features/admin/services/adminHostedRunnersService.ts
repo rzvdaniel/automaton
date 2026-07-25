@@ -104,8 +104,10 @@ class AdminHostedRunnersService {
     return response.data
   }
 
-  async deleteHostedRunner(id: string): Promise<void> {
-    await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`)
+  async deleteHostedRunner(id: string, dataDisposition: 'preserve' | 'delete'): Promise<void> {
+    await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`, {
+      data: { dataDisposition },
+    })
   }
 
   async getSpecifications(): Promise<HostedRunnerSpecification[]> {

@@ -43,6 +43,7 @@ const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
 const deleteConfirmationRunnerId = ref<string | null>(null)
+const deleteDataConfirmation = ref('')
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
 const hostDialogVisible = ref(false)
@@ -478,13 +479,21 @@ async function reprovisionHostedRunner(runner: HostedRunner) {
 
 function deleteHostedRunner(runner: HostedRunner) {
   deleteConfirmationRunnerId.value = runner.id
+  deleteDataConfirmation.value = ''
 }
 
-async function confirmDeleteHostedRunner(runner: HostedRunner) {
+async function confirmDeleteHostedRunner(runner: HostedRunner, dataDisposition: 'preserve' | 'delete') {
+  if (dataDisposition === 'delete' && deleteDataConfirmation.value !== runner.name) {
+    toast.add({ severity: 'warn', summary: 'Confirmation required', detail: `Type ${runner.name} to permanently delete its data.`, life: 4000 })
+    return
+  }
   deletingRunnerId.value = runner.id
   try {
-    await adminHostedRunnersService.deleteHostedRunner(runner.id)
-    toast.add({ severity: 'success', summary: 'Deleted', detail: `${runner.name} was deleted.`, life: 3000 })
+    await adminHostedRunnersService.deleteHostedRunner(runner.id, dataDisposition)
+    const detail = dataDisposition === 'delete'
+      ? `${runner.name} and its persistent data were deleted.`
+      : `${runner.name} was deleted and its persistent data was preserved.`
+    toast.add({ severity: 'success', summary: 'Deleted', detail, life: 4000 })
     await refreshAll()
     selectedRunner.value = hostedRunners.value.find((candidate) => candidate.id === runner.id) ?? null
   } catch {
@@ -492,6 +501,7 @@ async function confirmDeleteHostedRunner(runner: HostedRunner) {
   } finally {
     deletingRunnerId.value = null
     deleteConfirmationRunnerId.value = null
+    deleteDataConfirmation.value = ''
   }
 }
 
@@ -1187,10 +1197,27 @@ watch(() => route.path, refreshAll)
             <i class="pi pi-exclamation-triangle" />
             <span>Delete Hosted Runner</span>
           </div>
-          <p class="mt-0 mb-3 text-color-secondary">This will remove the managed container, unassign all applications, release the hosted runner, and cannot be undone.</p>
-          <div class="flex justify-content-end gap-2">
+          <p class="mt-0 mb-3 text-color-secondary">Choose what happens to the Runner's persistent system and user volumes.</p>
+          <div class="border-1 surface-border border-round p-3 mb-3">
+            <div class="font-medium mb-1">Preserve persistent data</div>
+            <div class="text-color-secondary text-sm mb-3">Remove the container and unassign applications, but keep both named volumes for recovery.</div>
+            <Button label="Remove container and preserve data" icon="pi pi-box" outlined @click="confirmDeleteHostedRunner(selectedRunner, 'preserve')" />
+          </div>
+          <div class="border-1 border-red-300 border-round p-3 mb-3">
+            <div class="font-medium text-color-danger mb-1">Permanently delete persistent data</div>
+            <div class="text-color-secondary text-sm mb-2">This removes the container and both named volumes. This cannot be undone.</div>
+            <label for="delete-runner-data-confirmation" class="block text-sm mb-1">Type <strong>{{ selectedRunner.name }}</strong> to confirm</label>
+            <InputText id="delete-runner-data-confirmation" v-model="deleteDataConfirmation" class="w-full mb-3" autocomplete="off" />
+            <Button
+              label="Remove container and permanently delete data"
+              icon="pi pi-trash"
+              severity="danger"
+              :disabled="deleteDataConfirmation !== selectedRunner.name"
+              @click="confirmDeleteHostedRunner(selectedRunner, 'delete')"
+            />
+          </div>
+          <div class="flex justify-content-end">
             <Button label="Cancel" text @click="deleteConfirmationRunnerId = null" />
-            <Button label="Delete hosted runner" icon="pi pi-trash" severity="danger" @click="confirmDeleteHostedRunner(selectedRunner)" />
           </div>
         </div>
         <template v-else>

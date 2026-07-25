@@ -54,8 +54,16 @@ public class HostedRunnerManagementService
         return await ReprovisionCoreAsync(hostedRunner, cancellationToken);
     }
 
-    public async Task DeleteAsAdminAsync(Guid hostedRunnerId, CancellationToken cancellationToken)
+    public async Task DeleteAsAdminAsync(
+        Guid hostedRunnerId,
+        string disposition,
+        CancellationToken cancellationToken)
     {
+        if (!HostedRunnerDataDispositions.IsValid(disposition))
+        {
+            throw new ArgumentException("Data disposition must be 'preserve' or 'delete'.", nameof(disposition));
+        }
+
         var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
         hostedRunner.Status = HostedRunnerStatuses.Deleting;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
@@ -74,7 +82,7 @@ public class HostedRunnerManagementService
             "Trusted infrastructure Action: delete-hosted-runner.",
             "Hosted runner deletion requested.");
         await db.SaveChangesAsync(cancellationToken);
-        await PublishLifecycleActionAsync(hostedRunner, deployment, "delete-hosted-runner", cancellationToken);
+        await PublishDeleteActionAsync(hostedRunner, deployment, disposition, cancellationToken);
     }
 
     public async Task RestartOwnedHostedRunnerByRunnerIdAsync(Guid runnerId, CancellationToken cancellationToken)
@@ -142,7 +150,7 @@ public class HostedRunnerManagementService
 
         await db.SaveChangesAsync(cancellationToken);
 
-        await PublishLifecycleActionAsync(hostedRunner, deployment, "restart-hosted-runner", cancellationToken);
+        await PublishRestartActionAsync(hostedRunner, deployment, cancellationToken);
         logger.LogInformation("Hosted runner {HostedRunnerId} restart queued on host {HostId}", hostedRunner.Id, host.Id);
         return hostedRunner;
     }
@@ -256,7 +264,10 @@ public class HostedRunnerManagementService
         return deployment;
     }
 
-    private Task PublishLifecycleActionAsync(HostedRunner runner, HostedRunnerDeployment deployment, string actionKey, CancellationToken cancellationToken)
+    private Task PublishRestartActionAsync(
+        HostedRunner runner,
+        HostedRunnerDeployment deployment,
+        CancellationToken cancellationToken)
     {
         var hostId = runner.RunnerHostId ?? throw new InvalidOperationException("Hosted runner has no assigned host.");
         return eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
@@ -265,13 +276,37 @@ public class HostedRunnerManagementService
             HostedRunnerId = runner.Id,
             UserId = runner.UserId,
             RunnerHostId = hostId,
-            ActionKey = actionKey,
+            ActionKey = "restart-hosted-runner",
+            InputJson = JsonSerializer.Serialize(new
+            {
+                operationId = deployment.Id,
+                hostedRunnerId = runner.Id,
+                containerName = runner.ContainerName
+            }),
+            CorrelationId = Guid.NewGuid().ToString("N")
+        }, cancellationToken);
+    }
+
+    private Task PublishDeleteActionAsync(
+        HostedRunner runner,
+        HostedRunnerDeployment deployment,
+        string disposition,
+        CancellationToken cancellationToken)
+    {
+        var hostId = runner.RunnerHostId ?? throw new InvalidOperationException("Hosted runner has no assigned host.");
+        return eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+        {
+            OperationId = deployment.Id,
+            HostedRunnerId = runner.Id,
+            UserId = runner.UserId,
+            RunnerHostId = hostId,
+            ActionKey = "delete-hosted-runner",
             InputJson = JsonSerializer.Serialize(new
             {
                 operationId = deployment.Id,
                 hostedRunnerId = runner.Id,
                 containerName = runner.ContainerName,
-                preserveVolumes = true,
+                preserveVolumes = disposition == HostedRunnerDataDispositions.Preserve,
                 systemVolumeName = $"automaton-hosted-runner-{runner.Id:N}-system",
                 userVolumeName = $"automaton-hosted-runner-{runner.Id:N}-user"
             }),

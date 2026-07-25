@@ -287,9 +287,17 @@ public class AdminHostedRunnersController : ControllerBase
     }
 
     [HttpDelete("runners/{id:guid}")]
-    public async Task<IActionResult> DeleteHostedRunner(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteHostedRunner(
+        Guid id,
+        DeleteHostedRunnerRequest? request,
+        CancellationToken cancellationToken)
     {
-        await managementService.DeleteAsAdminAsync(id, cancellationToken);
+        if (!HostedRunnerDataDispositions.IsValid(request?.DataDisposition))
+        {
+            return BadRequest(new { message = "Data disposition must be 'preserve' or 'delete'." });
+        }
+
+        await managementService.DeleteAsAdminAsync(id, request!.DataDisposition, cancellationToken);
         return NoContent();
     }
 
@@ -459,6 +467,8 @@ public class AdminHostedRunnersController : ControllerBase
         };
     }
 }
+
+public sealed record DeleteHostedRunnerRequest(string DataDisposition);
 
 public record RunnerHostResponse
 {

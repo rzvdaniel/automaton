@@ -91,6 +91,14 @@ public static class HostedRunnerDeploymentActions
     public const string Reprovision = "reprovision";
 }
 
+public static class HostedRunnerDataDispositions
+{
+    public const string Preserve = "preserve";
+    public const string Delete = "delete";
+
+    public static bool IsValid(string? value) => value is Preserve or Delete;
+}
+
 public static class HostedRunnerDeploymentStatuses
 {
     public const string Pending = "pending";

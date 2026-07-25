@@ -45,6 +45,40 @@ def host(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str
     return result
 
 
+def inspect_volume(volume_name: str) -> dict[str, str] | None:
+    result = host("docker", "volume", "inspect", volume_name, check=False)
+    if result.returncode != 0:
+        if "No such volume" in result.stderr:
+            return None
+        raise RuntimeError(result.stderr.strip() or f"Could not inspect Docker volume {volume_name}")
+    try:
+        payload = json.loads(result.stdout)
+        labels = payload[0]["Labels"]
+    except (json.JSONDecodeError, IndexError, KeyError, TypeError) as error:
+        raise RuntimeError(f"Docker returned invalid metadata for volume {volume_name}") from error
+    return labels or {}
+
+
+def ensure_owned_volume(volume_name: str, runner_id: str, storage_scope: str) -> None:
+    expected_labels = {
+        "automaton.managed": "true",
+        "automaton.resource": "hosted-runner-volume",
+        "automaton.hosted-runner-id": runner_id,
+        "automaton.storage-scope": storage_scope,
+    }
+    labels = inspect_volume(volume_name)
+    if labels is None:
+        label_arguments = [
+            argument
+            for key, value in expected_labels.items()
+            for argument in ("--label", f"{key}={value}")
+        ]
+        host("docker", "volume", "create", *label_arguments, volume_name)
+        labels = inspect_volume(volume_name)
+    if labels is None or any(labels.get(key) != value for key, value in expected_labels.items()):
+        raise RuntimeError(f"Docker volume {volume_name} does not have the expected Automaton ownership labels")
+
+
 def main() -> None:
     request = json.load(sys.stdin)
     runner_id = str(uuid.UUID(str(request["hostedRunnerId"])))
@@ -84,15 +118,8 @@ def main() -> None:
     if cpu_limit <= 0:
         raise ValueError("cpuLimit must be positive")
 
-    common_volume_labels = [
-        "--label", "automaton.managed=true",
-        "--label", "automaton.resource=hosted-runner-volume",
-        "--label", f"automaton.hosted-runner-id={runner_id}",
-    ]
-    host("docker", "volume", "create", *common_volume_labels,
-         "--label", "automaton.storage-scope=system", system_volume)
-    host("docker", "volume", "create", *common_volume_labels,
-         "--label", "automaton.storage-scope=user", user_volume)
+    ensure_owned_volume(system_volume, runner_id, "system")
+    ensure_owned_volume(user_volume, runner_id, "user")
     if host("docker", "network", "inspect", network, check=False).returncode != 0:
         host("docker", "network", "create", network)
     if runtime_network and host("docker", "network", "inspect", runtime_network, check=False).returncode != 0:
@@ -123,9 +150,8 @@ def main() -> None:
         "-e", f"AUTOMATON_ENROLLMENT_TOKEN={enrollment_token}",
         "-e", f"AUTOMATON_RUNNER_NAME={runner_name}",
         "-e", f"AUTOMATON_HOSTED_RUNNER_ID={runner_id}",
-        "-v", f"{system_volume}:/home/automaton/.config/AutomatonRunner",
-        "-v", f"{user_volume}:/automaton/workspace",
-        "-v", f"{user_volume}:/app/logs",
+        "-v", f"{system_volume}:/automaton/system",
+        "-v", f"{user_volume}:/automaton/storage",
     ]
     published_port = request.get("publishedPort")
     if published_port is not None:
