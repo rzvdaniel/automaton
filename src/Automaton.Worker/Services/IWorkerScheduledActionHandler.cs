@@ -5,5 +5,11 @@ namespace Automaton.Worker.Services;
 public interface IWorkerScheduledActionHandler
 {
     string ActionKey { get; }
-    Task ExecuteAsync(JsonElement input, CancellationToken cancellationToken);
+    Task ExecuteAsync(WorkerScheduledActionContext context, CancellationToken cancellationToken);
 }
+
+public sealed record WorkerScheduledActionContext(
+    Guid ExecutionId,
+    Guid OccurrenceId,
+    string IdempotencyKey,
+    JsonElement Input);

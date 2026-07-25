@@ -14,15 +14,18 @@ public sealed class ActionScheduleService
 {
     private readonly ApplicationDbContext db;
     private readonly IActionScheduleTargetResolver targets;
+    private readonly ITrustedSystemActionScheduleDispatchValidator trustedSystemSchedules;
     private readonly IAuditEventService auditEvents;
 
     public ActionScheduleService(
         ApplicationDbContext db,
         IActionScheduleTargetResolver targets,
+        ITrustedSystemActionScheduleDispatchValidator trustedSystemSchedules,
         IAuditEventService auditEvents)
     {
         this.db = db;
         this.targets = targets;
+        this.trustedSystemSchedules = trustedSystemSchedules;
         this.auditEvents = auditEvents;
     }
 
@@ -170,7 +173,9 @@ public sealed class ActionScheduleService
             throw new InvalidOperationException("Execution scope is invalid.");
         ValidateMisfirePolicy(schedule.MisfirePolicy);
 
-        var manifest = await targets.ResolveAsync(schedule.ApplicationId, schedule.ActionKey, userId, system, ct);
+        var manifest = system
+            ? await trustedSystemSchedules.ValidateAsync(schedule, ct)
+            : await targets.ResolveAsync(schedule.ApplicationId, schedule.ActionKey, userId, system: false, ct);
         if (!manifest.Spec.Schedulable) throw new InvalidOperationException("The Action manifest does not allow scheduling.");
         if (!manifest.Spec.AllowedExecutionScopes.Contains(schedule.ExecutionScope, StringComparer.Ordinal))
             throw new InvalidOperationException("The Action manifest does not allow the requested execution scope.");

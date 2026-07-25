@@ -1,6 +1,7 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Models;
+using Automaton.Api.Services;
 using Automaton.Core.Models;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
@@ -14,6 +15,7 @@ public sealed class ActionScheduleProcessor(
     ApplicationDbContext db,
     IEventPublisher events,
     ITransactionalEventExecutor transactions,
+    ITrustedSystemActionScheduleDispatchValidator trustedSchedules,
     IEnumerable<IWorkerScheduledActionHandler> workerHandlers,
     ILogger<ActionScheduleProcessor> logger)
 {
@@ -97,7 +99,7 @@ public sealed class ActionScheduleProcessor(
         }, cancellationToken);
     }
 
-    private async Task DispatchWorkerOccurrencesAsync(DateTime nowUtc, CancellationToken cancellationToken)
+    internal async Task DispatchWorkerOccurrencesAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
         var ids = await db.ActionScheduleOccurrences.AsNoTracking()
             .Where(x => (x.Status == ActionScheduleOccurrenceStatuses.Published
@@ -112,15 +114,28 @@ public sealed class ActionScheduleProcessor(
                 .SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == id, cancellationToken);
             if (existing != null)
             {
+                var terminalStatus = existing.Status == AppModuleExecutionStatuses.Succeeded
+                    ? ActionScheduleOccurrenceStatuses.Dispatched
+                    : ActionScheduleOccurrenceStatuses.Failed;
+                var ambiguous = existing.Status is not (
+                    AppModuleExecutionStatuses.Succeeded
+                    or AppModuleExecutionStatuses.Failed
+                    or AppModuleExecutionStatuses.Lost);
+                if (ambiguous)
+                {
+                    await db.AppModuleExecutions.Where(x => x.Id == existing.Id)
+                        .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(x => x.Status, AppModuleExecutionStatuses.Lost)
+                            .SetProperty(x => x.FailureSummary, "Worker stopped after accepting this scheduled execution; automatic replay was suppressed.")
+                            .SetProperty(x => x.CompletedAtUtc, nowUtc), cancellationToken);
+                }
                 await db.ActionScheduleOccurrences.Where(x => x.Id == id)
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(x => x.ExecutionId, existing.Id)
-                        .SetProperty(x => x.Status,
-                            existing.Status == AppModuleExecutionStatuses.Succeeded
-                                ? ActionScheduleOccurrenceStatuses.Dispatched
-                                : existing.Status == AppModuleExecutionStatuses.Failed
-                                    ? ActionScheduleOccurrenceStatuses.Failed
-                                    : ActionScheduleOccurrenceStatuses.Dispatching)
+                        .SetProperty(x => x.Status, terminalStatus)
+                        .SetProperty(x => x.FailureSummary, ambiguous
+                            ? "Worker execution outcome was ambiguous; automatic replay was suppressed."
+                            : existing.FailureSummary)
                         .SetProperty(x => x.UpdatedAtUtc, nowUtc), cancellationToken);
                 continue;
             }
@@ -138,6 +153,25 @@ public sealed class ActionScheduleProcessor(
             var occurrence = await db.ActionScheduleOccurrences.Include(x => x.Schedule)
                 .SingleAsync(x => x.Id == id, cancellationToken);
             var handler = workerHandlers.SingleOrDefault(x => x.ActionKey == occurrence.Schedule.ActionKey);
+            try
+            {
+                var manifest = await trustedSchedules.ValidateAsync(occurrence.Schedule, cancellationToken);
+                if (occurrence.Schedule.ExecutionScope != ActionExecutionScopes.Worker)
+                    throw new InvalidOperationException("The scheduled Action is not a Worker Action.");
+                ValidateWorkerHandler(manifest, handler);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                occurrence.Status = ActionScheduleOccurrenceStatuses.Failed;
+                occurrence.FailureSummary = Bound(ex.Message, 2000);
+                occurrence.UpdatedAtUtc = DateTime.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+                continue;
+            }
             var execution = new AppModuleExecution
             {
                 Id = Guid.NewGuid(),
@@ -152,12 +186,19 @@ public sealed class ActionScheduleProcessor(
                 CorrelationId = occurrence.IdempotencyKey
             };
             db.AppModuleExecutions.Add(execution);
+            occurrence.ExecutionId = execution.Id;
+            occurrence.UpdatedAtUtc = nowUtc;
+            occurrence.Schedule.LastExecutionId = execution.Id;
+            await db.SaveChangesAsync(cancellationToken);
+
             try
             {
-                if (handler == null)
-                    throw new InvalidOperationException("No trusted Worker handler is registered for this system Action.");
                 using var input = JsonDocument.Parse(occurrence.Schedule.InputJson);
-                await handler.ExecuteAsync(input.RootElement.Clone(), cancellationToken);
+                await handler!.ExecuteAsync(new WorkerScheduledActionContext(
+                    execution.Id,
+                    occurrence.Id,
+                    occurrence.IdempotencyKey,
+                    input.RootElement.Clone()), cancellationToken);
                 execution.Status = AppModuleExecutionStatuses.Succeeded;
                 execution.CompletedAtUtc = DateTime.UtcNow;
                 occurrence.Status = ActionScheduleOccurrenceStatuses.Dispatched;
@@ -165,14 +206,12 @@ public sealed class ActionScheduleProcessor(
             catch (Exception ex)
             {
                 execution.Status = AppModuleExecutionStatuses.Failed;
-                execution.FailureSummary = ex.Message.Length <= 1000 ? ex.Message : ex.Message[..1000];
+                execution.FailureSummary = Bound(ex.Message, 1000);
                 execution.CompletedAtUtc = DateTime.UtcNow;
                 occurrence.Status = ActionScheduleOccurrenceStatuses.Failed;
-                occurrence.FailureSummary = ex.Message.Length <= 2000 ? ex.Message : ex.Message[..2000];
+                occurrence.FailureSummary = Bound(ex.Message, 2000);
             }
-            occurrence.ExecutionId = execution.Id;
             occurrence.UpdatedAtUtc = DateTime.UtcNow;
-            occurrence.Schedule.LastExecutionId = execution.Id;
             await db.SaveChangesAsync(cancellationToken);
         }
     }
@@ -180,7 +219,7 @@ public sealed class ActionScheduleProcessor(
     private async Task DispatchQueuedAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
         var queued = await db.ActionScheduleOccurrences.AsNoTracking()
-            .Where(x => x.Status == ActionScheduleOccurrenceStatuses.Queued && x.Schedule.Enabled)
+            .Where(x => x.Status == ActionScheduleOccurrenceStatuses.Queued)
             .OrderBy(x => x.ScheduledForUtc).Select(x => new { x.Id, x.ScheduleId }).Take(50).ToListAsync(cancellationToken);
         foreach (var item in queued)
         {
@@ -201,7 +240,10 @@ public sealed class ActionScheduleProcessor(
                         .SetProperty(x => x.UpdatedAtUtc, nowUtc), ct);
                 if (changed == 0) return;
                 var occurrence = await db.ActionScheduleOccurrences.AsNoTracking().SingleAsync(x => x.Id == item.Id, ct);
-                await events.PublishAsync(ToEvent(occurrence), ct);
+                var scope = await db.ActionSchedules.Where(x => x.Id == item.ScheduleId)
+                    .Select(x => x.ExecutionScope).SingleAsync(ct);
+                if (scope != ActionExecutionScopes.Worker)
+                    await events.PublishAsync(ToEvent(occurrence), ct);
             }, cancellationToken);
         }
     }
@@ -291,6 +333,17 @@ public sealed class ActionScheduleProcessor(
     internal static string CreateIdempotencyKey(Guid scheduleId, DateTime scheduledForUtc)
         => $"schedule:{scheduleId}:{DateTime.SpecifyKind(scheduledForUtc, DateTimeKind.Utc):O}";
 
+    internal static bool IsQueuedDispatchEligible(ActionScheduleOccurrence occurrence)
+        => occurrence.Status == ActionScheduleOccurrenceStatuses.Queued;
+
+    internal static void ValidateWorkerHandler(
+        AppActionManifest manifest,
+        IWorkerScheduledActionHandler? handler)
+    {
+        if (handler == null || !string.Equals(handler.ActionKey, manifest.Metadata.Key, StringComparison.Ordinal))
+            throw new InvalidOperationException("No matching trusted Worker handler is registered for this system Action.");
+    }
+
     private static ScheduledActionExecutionRequestedEvent ToEvent(ActionScheduleOccurrence occurrence) => new()
     {
         OccurrenceId = occurrence.Id,
@@ -305,4 +358,7 @@ public sealed class ActionScheduleProcessor(
         schedule.LeaseExpiresAtUtc = null;
         schedule.UpdatedAtUtc = DateTime.UtcNow;
     }
+
+    private static string Bound(string value, int maximumLength)
+        => value.Length <= maximumLength ? value : value[..maximumLength];
 }

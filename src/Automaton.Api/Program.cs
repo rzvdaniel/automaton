@@ -377,6 +377,8 @@ services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped<AppActionExecutionService>();
 services.AddScoped<ActionScheduleService>();
 services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
+services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
+services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
 services.AddScoped<ScheduledActionExecutionHandler>();
 services.AddHostedService<AppModuleExecutionReconciliationService>();
 services.AddHostedService<HostedRunnerRestartReconciliationService>();

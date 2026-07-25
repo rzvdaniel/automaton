@@ -29,11 +29,21 @@ occurrence-to-execution link for redelivery safety.
 The Worker owns schedule calculation, misfire handling, concurrency policy, and
 trusted in-process Worker handlers. The API owns App Runner and Infrastructure
 Runner dispatch. Infrastructure targets are resolved from server-side host and
-Runner records; schedule input cannot provide an arbitrary Runner connection.
+Runner records; the administrator-provided host ID never selects an arbitrary
+Runner connection directly. Routing metadata should move out of Action input
+before generic System schedule editing is exposed.
 Dispatch revalidates the current plan, authorization, Action manifest, scope, and
 input before execution.
+
+Before a trusted Worker handler runs, the Worker persists a `Running` execution
+and links it to the occurrence. Handlers receive the execution ID, occurrence ID,
+and occurrence idempotency key. If the Worker stops after acceptance without
+recording a terminal result, stale recovery marks the execution `Lost` and does
+not replay potentially completed side effects automatically.
 
 `Allow`, `SkipIfRunning`, and `Queue` are supported. `Skip` and `RunOnceNow`
 misfires advance the schedule without waiting for execution completion, while
 `CatchUp` remains rejected. Expired claims and dispatch leases are recoverable;
 disabling a schedule cancels occurrences that have not started dispatch.
+An automatically completed one-time schedule does not cancel its durable queued
+occurrence; it remains eligible after concurrency capacity becomes available.
