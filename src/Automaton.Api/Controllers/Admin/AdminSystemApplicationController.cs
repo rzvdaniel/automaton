@@ -38,7 +38,7 @@ public sealed class AdminSystemApplicationController(
                 inputSchema = manifest.Spec.Input,
                 timeoutSeconds = manifest.Spec.TimeoutSeconds,
                 minimumIntervalSeconds = manifest.Spec.MinimumIntervalSeconds,
-                deployedHash = lastExecution?.DeploymentHash,
+                lastExecutedHash = lastExecution?.DeploymentHash,
                 scheduleCount = schedules.Count(x => x.ActionKey == manifest.Metadata.Key),
                 lastExecution = lastExecution == null ? null : new
                 {

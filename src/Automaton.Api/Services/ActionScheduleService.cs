@@ -36,6 +36,9 @@ public sealed class ActionScheduleService
         return await query.OrderBy(x => x.Name).ToListAsync(ct);
     }
 
+    public Task<ScheduledActionsCapability> GetCapabilityAsync(Guid userId, CancellationToken ct)
+        => GetCapabilityAsync(userId, administrator: false, ct);
+
     public async Task<ActionSchedule> GetAsync(Guid id, Guid userId, bool administrator, CancellationToken ct)
         => await FindAuthorizedAsync(id, userId, administrator, ct);
 

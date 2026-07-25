@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
@@ -15,7 +15,10 @@ import {
   type ActionModule,
   type ActionSchedule,
   type SaveSchedule,
+  type SchedulingCapability,
 } from '../services/action-schedules.service'
+import { localInputToUtc, utcToLocalInput } from '../utils/schedule-time'
+import { isCurrentScheduleLoad } from '../utils/schedule-load'
 
 const props = defineProps<{ appId: string }>()
 const confirm = useConfirm()
@@ -24,12 +27,21 @@ const actions = ref<ActionModule[]>([])
 const schedules = ref<ActionSchedule[]>([])
 const executions = ref<ActionExecution[]>([])
 const loading = ref(true)
+const pending = ref(false)
 const error = ref('')
 const warning = ref('')
 const dialogVisible = ref(false)
 const logsVisible = ref(false)
 const logsContent = ref('')
 const editingId = ref<string>()
+const capability = ref<SchedulingCapability>({
+  enabled: false,
+  maximumSchedules: 0,
+  minimumIntervalSeconds: 0,
+  maximumConcurrentExecutions: 0,
+  monthlyExecutionLimit: 0,
+})
+let loadGeneration = 0
 const inputText = ref('{}')
 const form = reactive<SaveSchedule>({
   applicationId: props.appId,
@@ -46,43 +58,58 @@ const form = reactive<SaveSchedule>({
 })
 const schedulableActions = computed(() => actions.value.filter((action) => action.schedulable && action.allowedExecutionScopes.includes('AppRunner')))
 const selectedAction = computed(() => actions.value.find((action) => action.key === form.actionKey))
+const actionOptions = computed(() => schedulableActions.value.map((action) => ({
+  ...action,
+  displayLabel: action.name || action.key,
+})))
+const effectiveMinimumInterval = computed(() => Math.max(
+  capability.value.minimumIntervalSeconds,
+  selectedAction.value?.minimumIntervalSeconds ?? 0,
+))
 
 function formatDate(value?: string) {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'
 }
 
-async function load() {
+async function load(requestedAppId = props.appId) {
+  const generation = ++loadGeneration
   loading.value = true
   error.value = ''
   warning.value = ''
   try {
-    const [actionResult, allSchedules, allExecutions] = await Promise.all([
-      actionSchedulesService.listActions(props.appId).then((value) => ({ value, error: '' })).catch(() => ({ value: [] as ActionModule[], error: 'The assigned Runner is unavailable, so deployed Action metadata cannot be refreshed.' })),
+    const [actionResult, allSchedules, allExecutions, currentCapability] = await Promise.all([
+      actionSchedulesService.listActions(requestedAppId).then((value) => ({ value, error: '' })).catch(() => ({ value: [] as ActionModule[], error: 'The assigned Runner is unavailable, so deployed Action metadata cannot be refreshed.' })),
       actionSchedulesService.listSchedules(),
-      actionSchedulesService.listExecutions(props.appId),
+      actionSchedulesService.listExecutions(requestedAppId),
+      actionSchedulesService.capability(),
     ])
+    if (!isCurrentScheduleLoad(requestedAppId, props.appId, generation, loadGeneration)) return
     actions.value = actionResult.value
     warning.value = actionResult.error
-    schedules.value = allSchedules.filter((item) => item.applicationId === props.appId)
+    schedules.value = allSchedules.filter((item) => item.applicationId === requestedAppId)
     executions.value = allExecutions
+    capability.value = currentCapability
   } catch (reason: any) {
+    if (!isCurrentScheduleLoad(requestedAppId, props.appId, generation, loadGeneration)) return
     error.value = reason?.response?.data?.message || reason?.response?.data || 'Scheduling information could not be loaded.'
   } finally {
-    loading.value = false
+    if (generation === loadGeneration) loading.value = false
   }
 }
 
 function openEditor(schedule?: ActionSchedule) {
   editingId.value = schedule?.id
+  const actionKey = schedule?.actionKey || schedulableActions.value[0]?.key || ''
+  const actionMinimum = actions.value.find((action) => action.key === actionKey)?.minimumIntervalSeconds ?? 0
   Object.assign(form, {
     applicationId: props.appId,
-    actionKey: schedule?.actionKey || schedulableActions.value[0]?.key || '',
+    actionKey,
     name: schedule?.name || '',
     description: schedule?.description,
     executionScope: 'AppRunner',
     scheduleType: schedule?.scheduleType || 'Interval',
-    runAtUtc: schedule?.runAtUtc,
-    intervalSeconds: schedule?.intervalSeconds || 300,
+    runAtUtc: utcToLocalInput(schedule?.runAtUtc),
+    intervalSeconds: schedule?.intervalSeconds || Math.max(capability.value.minimumIntervalSeconds, actionMinimum),
     cronExpression: schedule?.cronExpression,
     timeZone: schedule?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Etc/UTC',
     enabled: schedule?.enabled ?? true,
@@ -94,10 +121,17 @@ function openEditor(schedule?: ActionSchedule) {
 }
 
 async function save() {
+  pending.value = true
   try {
-    form.input = JSON.parse(inputText.value)
-    if (form.scheduleType === 'OneTime' && form.runAtUtc) form.runAtUtc = new Date(form.runAtUtc).toISOString()
-    const value = { ...form }
+    const input = JSON.parse(inputText.value)
+    if (form.scheduleType === 'Interval' && (form.intervalSeconds ?? 0) < effectiveMinimumInterval.value)
+      throw new Error(`Interval must be at least ${effectiveMinimumInterval.value} seconds.`)
+    const value: SaveSchedule = {
+      ...form,
+      applicationId: props.appId,
+      input,
+      runAtUtc: form.scheduleType === 'OneTime' ? localInputToUtc(form.runAtUtc) : undefined,
+    }
     editingId.value
       ? await actionSchedulesService.update(editingId.value, value)
       : await actionSchedulesService.create(value)
@@ -106,16 +140,17 @@ async function save() {
     await load()
   } catch (reason: any) {
     toast.add({ severity: 'error', summary: 'Schedule not saved', detail: reason?.response?.data?.message || reason?.response?.data || reason.message, life: 6000 })
-  }
+  } finally { pending.value = false }
 }
 
 async function toggle(schedule: ActionSchedule) {
+  pending.value = true
   try {
     await actionSchedulesService.setEnabled(schedule.id, !schedule.enabled)
     await load()
   } catch (reason: any) {
     toast.add({ severity: 'error', summary: 'Schedule not changed', detail: reason?.response?.data?.message || reason?.response?.data, life: 5000 })
-  }
+  } finally { pending.value = false }
 }
 
 function remove(schedule: ActionSchedule) {
@@ -126,8 +161,13 @@ function remove(schedule: ActionSchedule) {
     rejectProps: { label: 'Cancel', outlined: true },
     acceptProps: { label: 'Delete', severity: 'danger' },
     accept: async () => {
-      await actionSchedulesService.remove(schedule.id)
-      await load()
+      pending.value = true
+      try {
+        await actionSchedulesService.remove(schedule.id)
+        await load()
+      } catch (reason: any) {
+        toast.add({ severity: 'error', summary: 'Schedule not deleted', detail: reason?.response?.data?.message || reason?.response?.data || reason.message, life: 5000 })
+      } finally { pending.value = false }
     },
   })
 }
@@ -143,16 +183,32 @@ async function showLogs(execution: ActionExecution) {
 }
 
 onMounted(load)
+watch(
+  () => props.appId,
+  async (newAppId, oldAppId) => {
+    if (!newAppId || newAppId === oldAppId) return
+    loadGeneration++
+    dialogVisible.value = false
+    logsVisible.value = false
+    editingId.value = undefined
+    inputText.value = '{}'
+    actions.value = []
+    schedules.value = []
+    executions.value = []
+    form.applicationId = newAppId
+    await load(newAppId)
+  },
+)
 </script>
 
 <template>
   <div class="scheduling-panel">
     <div class="panel-header">
       <div><h2>Actions</h2><p>Run and schedule deployed Actions for this app.</p></div>
-      <Button label="New schedule" icon="pi pi-calendar-plus" :disabled="!schedulableActions.length" @click="openEditor()" />
+      <Button label="New schedule" icon="pi pi-calendar-plus" :disabled="pending || !capability.enabled || !schedulableActions.length" @click="openEditor()" />
     </div>
     <div v-if="loading" class="state">Loading Actions and schedules…</div>
-    <div v-else-if="error" class="state error">{{ error }} <Button label="Retry" text @click="load" /></div>
+    <div v-else-if="error" class="state error">{{ error }} <Button label="Retry" text @click="() => load()" /></div>
     <template v-else>
       <div v-if="warning" class="state warning">{{ warning }}</div>
       <section>
@@ -164,7 +220,7 @@ onMounted(load)
             <template #subtitle>{{ action.key }}</template>
             <template #content>
               <p>{{ action.description || 'No description provided.' }}</p>
-              <small>Minimum interval: {{ action.minimumIntervalSeconds }} seconds · Timeout: {{ action.timeoutSeconds }} seconds</small>
+              <small>Effective minimum interval: {{ Math.max(capability.minimumIntervalSeconds, action.minimumIntervalSeconds) }} seconds · Timeout: {{ action.timeoutSeconds }} seconds</small>
             </template>
           </Card>
         </div>
@@ -175,9 +231,9 @@ onMounted(load)
         <div v-for="schedule in schedules" :key="schedule.id" class="row">
           <div><strong>{{ schedule.name }}</strong><span>{{ schedule.actionKey }} · Next: {{ formatDate(schedule.nextRunAtUtc) }}</span></div>
           <span :class="['status', schedule.enabled ? 'enabled' : 'disabled']">{{ schedule.enabled ? 'Enabled' : 'Disabled' }}</span>
-          <Button icon="pi pi-pencil" text rounded aria-label="Edit schedule" @click="openEditor(schedule)" />
-          <Button :icon="schedule.enabled ? 'pi pi-pause' : 'pi pi-play'" text rounded :aria-label="schedule.enabled ? 'Disable schedule' : 'Enable schedule'" @click="toggle(schedule)" />
-          <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Delete schedule" @click="remove(schedule)" />
+          <Button icon="pi pi-pencil" text rounded :disabled="pending" aria-label="Edit schedule" @click="openEditor(schedule)" />
+          <Button :icon="schedule.enabled ? 'pi pi-pause' : 'pi pi-play'" text rounded :disabled="pending" :aria-label="schedule.enabled ? 'Disable schedule' : 'Enable schedule'" @click="toggle(schedule)" />
+          <Button icon="pi pi-trash" severity="danger" text rounded :disabled="pending" aria-label="Delete schedule" @click="remove(schedule)" />
         </div>
       </section>
       <section>
@@ -192,20 +248,23 @@ onMounted(load)
     </template>
     <Dialog v-model:visible="dialogVisible" modal :header="editingId ? 'Edit schedule' : 'New schedule'" class="schedule-dialog">
       <div class="form-grid">
-        <label>Action<Select v-model="form.actionKey" :options="schedulableActions" option-label="name" option-value="key" class="w-full" /></label>
+        <label>Action<Select v-model="form.actionKey" :options="actionOptions" option-label="displayLabel" option-value="key" class="w-full" /></label>
         <label>Name<InputText v-model="form.name" class="w-full" /></label>
         <label>Schedule type<Select v-model="form.scheduleType" :options="['OneTime', 'Interval', 'Cron']" class="w-full" /></label>
         <label v-if="form.scheduleType === 'OneTime'">Run at<input v-model="form.runAtUtc" type="datetime-local" class="native-input" /></label>
-        <label v-if="form.scheduleType === 'Interval'">Interval seconds<input v-model.number="form.intervalSeconds" type="number" class="native-input" /></label>
+        <label v-if="form.scheduleType === 'Interval'">Interval seconds<input v-model.number="form.intervalSeconds" type="number" :min="effectiveMinimumInterval" class="native-input" /></label>
         <label v-if="form.scheduleType === 'Cron'">Cron expression<InputText v-model="form.cronExpression" placeholder="0 * * * *" class="w-full" /></label>
-        <small v-if="selectedAction">Minimum interval: {{ selectedAction.minimumIntervalSeconds }} seconds.</small>
+        <small v-if="selectedAction">
+          Effective minimum: {{ effectiveMinimumInterval }} seconds (the stricter of your plan and this Action).
+          <span v-if="form.scheduleType === 'Cron'">Consecutive cron occurrences must also respect this minimum; the server validates the full schedule.</span>
+        </small>
         <label>Time zone<InputText v-model="form.timeZone" class="w-full" /></label>
         <label>Concurrency<Select v-model="form.concurrencyPolicy" :options="['Allow', 'SkipIfRunning', 'Queue']" class="w-full" /></label>
         <label>Misfire policy<Select v-model="form.misfirePolicy" :options="['Skip', 'RunOnceNow']" class="w-full" /></label>
         <label>Action input (JSON)<Textarea v-model="inputText" rows="6" class="w-full" /></label>
         <label class="toggle"><ToggleSwitch v-model="form.enabled" /> Enabled</label>
       </div>
-      <template #footer><Button label="Cancel" text @click="dialogVisible = false" /><Button label="Save" @click="save" /></template>
+      <template #footer><Button label="Cancel" text :disabled="pending" @click="dialogVisible = false" /><Button label="Save" :loading="pending" :disabled="pending" @click="save" /></template>
     </Dialog>
     <Dialog v-model:visible="logsVisible" modal header="Execution logs" class="schedule-dialog">
       <pre class="logs">{{ logsContent }}</pre>

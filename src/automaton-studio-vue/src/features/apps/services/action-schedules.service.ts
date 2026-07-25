@@ -61,9 +61,20 @@ export interface SaveSchedule {
   input: Record<string, unknown>
 }
 
+export interface SchedulingCapability {
+  enabled: boolean
+  maximumSchedules: number
+  minimumIntervalSeconds: number
+  maximumConcurrentExecutions: number
+  monthlyExecutionLimit: number
+}
+
 export const actionSchedulesService = {
   async listSchedules(): Promise<ActionSchedule[]> {
     return (await apiClient.get('/api/action-schedules')).data
+  },
+  async capability(): Promise<SchedulingCapability> {
+    return (await apiClient.get('/api/action-schedules/capability')).data
   },
   async create(value: SaveSchedule): Promise<ActionSchedule> {
     return (await apiClient.post('/api/action-schedules', value)).data

@@ -48,7 +48,7 @@ onMounted(load)
           <template #title>{{ action.name || action.key }}</template><template #subtitle>{{ action.key }}</template>
           <template #content>
             <p>{{ action.description || 'No description.' }}</p>
-            <dl><dt>Trust</dt><dd>{{ action.trustLevel }}</dd><dt>Scopes</dt><dd>{{ action.allowedExecutionScopes.join(', ') || 'None' }}</dd><dt>Schedulable</dt><dd>{{ action.schedulable ? 'Yes' : 'No' }}</dd><dt>Timeout</dt><dd>{{ action.timeoutSeconds }}s</dd><dt>Minimum interval</dt><dd>{{ action.minimumIntervalSeconds }}s</dd><dt>Deployed hash</dt><dd>{{ action.deployedHash || 'Not reported' }}</dd><dt>Schedules</dt><dd>{{ action.scheduleCount }}</dd><dt>Last execution</dt><dd>{{ action.lastExecution?.status || '—' }}</dd></dl>
+            <dl><dt>Trust</dt><dd>{{ action.trustLevel }}</dd><dt>Scopes</dt><dd>{{ action.allowedExecutionScopes.join(', ') || 'None' }}</dd><dt>Schedulable</dt><dd>{{ action.schedulable ? 'Yes' : 'No' }}</dd><dt>Timeout</dt><dd>{{ action.timeoutSeconds }}s</dd><dt>Minimum interval</dt><dd>{{ action.minimumIntervalSeconds }}s</dd><dt>Last executed version</dt><dd>{{ action.lastExecutedHash || 'Not reported' }}</dd><dt>Schedules</dt><dd>{{ action.scheduleCount }}</dd><dt>Last execution</dt><dd>{{ action.lastExecution?.status || '—' }}</dd></dl>
             <details><summary>Input schema</summary><pre>{{ JSON.stringify(action.inputSchema || {}, null, 2) }}</pre></details>
           </template>
         </Card>

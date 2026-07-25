@@ -1196,7 +1196,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
             />
           </div>
           <div v-if="activeTab === 'actions' && resolvedAppId" class="panel-view">
-            <ActionSchedulingPanel :app-id="resolvedAppId" />
+            <ActionSchedulingPanel :key="resolvedAppId" :app-id="resolvedAppId" />
           </div>
 
           <!-- Settings View -->

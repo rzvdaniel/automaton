@@ -11,7 +11,7 @@ export interface SystemAction {
   inputSchema?: Record<string, unknown>
   timeoutSeconds: number
   minimumIntervalSeconds: number
-  deployedHash?: string
+  lastExecutedHash?: string
   scheduleCount: number
   lastExecution?: ActionExecution
 }

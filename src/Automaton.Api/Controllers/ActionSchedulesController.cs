@@ -17,6 +17,7 @@ public sealed class ActionSchedulesController : ControllerBase
     private bool IsAdministrator => User.IsInRole("Administrators");
 
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Ok(await schedules.ListAsync(users.GetUserId(), IsAdministrator, ct));
+    [HttpGet("capability")] public async Task<IActionResult> Capability(CancellationToken ct) => Ok(await schedules.GetCapabilityAsync(users.GetUserId(), ct));
     [HttpGet("{id:guid}")] public async Task<IActionResult> Get(Guid id, CancellationToken ct) => Ok(await schedules.GetAsync(id, users.GetUserId(), IsAdministrator, ct));
     [HttpPost] public async Task<IActionResult> Create([FromBody] SaveActionScheduleRequest request, CancellationToken ct)
     {
