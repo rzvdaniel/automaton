@@ -139,6 +139,7 @@ namespace Automaton.Api.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ActionKey).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.OwnerType).IsRequired().HasMaxLength(16);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.Description).HasMaxLength(2000);
                 entity.Property(e => e.ExecutionScope).IsRequired().HasMaxLength(32);
@@ -148,9 +149,12 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ConcurrencyPolicy).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.MisfirePolicy).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.InputJson).IsRequired().HasColumnType("longtext");
-                entity.HasIndex(e => new { e.OwnerUserId, e.ApplicationId });
+                entity.HasIndex(e => new { e.OwnerType, e.OwnerUserId, e.ApplicationId });
                 entity.HasIndex(e => new { e.Enabled, e.NextRunAtUtc });
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
+                entity.ToTable(table => table.HasCheckConstraint(
+                    "CK_ActionSchedules_Owner",
+                    "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)"));
             });
 
             modelBuilder.Entity<Flow>(entity =>

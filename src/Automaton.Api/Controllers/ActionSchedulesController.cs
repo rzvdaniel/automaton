@@ -7,6 +7,7 @@ namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy = "AllowApiKey")]
+[TypeFilter<ActionScheduleExceptionFilter>]
 [Route("api/action-schedules")]
 public sealed class ActionSchedulesController : ControllerBase
 {

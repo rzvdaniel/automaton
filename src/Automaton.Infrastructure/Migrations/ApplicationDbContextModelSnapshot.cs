@@ -115,7 +115,12 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("NextRunAtUtc")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<Guid>("OwnerUserId")
+                    b.Property<string>("OwnerType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("char(36)");
 
                     b.Property<DateTime?>("RunAtUtc")
@@ -136,11 +141,16 @@ namespace Automaton.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OwnerUserId");
+
                     b.HasIndex("Enabled", "NextRunAtUtc");
 
-                    b.HasIndex("OwnerUserId", "ApplicationId");
+                    b.HasIndex("OwnerType", "OwnerUserId", "ApplicationId");
 
-                    b.ToTable("ActionSchedules");
+                    b.ToTable("ActionSchedules", t =>
+                        {
+                            t.HasCheckConstraint("CK_ActionSchedules_Owner", "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
@@ -3561,8 +3571,7 @@ namespace Automaton.Api.Migrations
                     b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>

@@ -7,6 +7,12 @@ public static class ActionScheduleTypes
     public const string Cron = "Cron";
 }
 
+public static class ActionScheduleOwnerTypes
+{
+    public const string User = "User";
+    public const string System = "System";
+}
+
 public static class ActionExecutionScopes
 {
     public const string Worker = "Worker";
@@ -31,7 +37,8 @@ public static class ActionScheduleMisfirePolicies
 public sealed class ActionSchedule
 {
     public Guid Id { get; set; }
-    public Guid OwnerUserId { get; set; }
+    public string OwnerType { get; set; } = ActionScheduleOwnerTypes.User;
+    public Guid? OwnerUserId { get; set; }
     public Guid ApplicationId { get; set; }
     public string ActionKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;

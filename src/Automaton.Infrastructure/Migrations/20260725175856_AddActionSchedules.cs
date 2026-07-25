@@ -16,7 +16,9 @@ namespace Automaton.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
-                    OwnerUserId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
+                    OwnerType = table.Column<string>(type: "varchar(16)", maxLength: 16, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    OwnerUserId = table.Column<Guid>(type: "char(36)", nullable: true, collation: "ascii_general_ci"),
                     ApplicationId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     ActionKey = table.Column<string>(type: "varchar(64)", maxLength: 64, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -50,6 +52,7 @@ namespace Automaton.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ActionSchedules", x => x.Id);
+                    table.CheckConstraint("CK_ActionSchedules_Owner", "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)");
                     table.ForeignKey(
                         name: "FK_ActionSchedules_AspNetUsers_OwnerUserId",
                         column: x => x.OwnerUserId,
@@ -65,9 +68,14 @@ namespace Automaton.Infrastructure.Migrations
                 columns: new[] { "Enabled", "NextRunAtUtc" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ActionSchedules_OwnerUserId_ApplicationId",
+                name: "IX_ActionSchedules_OwnerType_OwnerUserId_ApplicationId",
                 table: "ActionSchedules",
-                columns: new[] { "OwnerUserId", "ApplicationId" });
+                columns: new[] { "OwnerType", "OwnerUserId", "ApplicationId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ActionSchedules_OwnerUserId",
+                table: "ActionSchedules",
+                column: "OwnerUserId");
         }
 
         /// <inheritdoc />

@@ -375,6 +375,7 @@ services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
 services.AddScoped<AppActionExecutionService>();
 services.AddScoped<ActionScheduleService>();
+services.AddScoped<IActionScheduleTargetResolver, ActionScheduleTargetResolver>();
 services.AddHostedService<AppModuleExecutionReconciliationService>();
 services.AddHostedService<HostedRunnerRestartReconciliationService>();
 services.AddHostedService<HostedRunnerLifecycleReconciliationService>();
