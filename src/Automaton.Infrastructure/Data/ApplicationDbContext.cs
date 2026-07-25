@@ -62,6 +62,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<AppVersionStep> AppVersionSteps { get; set; }
         public virtual DbSet<AppModuleExecution> AppModuleExecutions { get; set; }
         public virtual DbSet<ActionSchedule> ActionSchedules { get; set; }
+        public virtual DbSet<ActionScheduleOccurrence> ActionScheduleOccurrences { get; set; }
         public virtual DbSet<SecretDefinition> SecretDefinitions { get; set; }
         public virtual DbSet<SecretVersion> SecretVersions { get; set; }
         public virtual DbSet<ExecutionSecretGrant> ExecutionSecretGrants { get; set; }
@@ -149,12 +150,24 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ConcurrencyPolicy).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.MisfirePolicy).IsRequired().HasMaxLength(32);
                 entity.Property(e => e.InputJson).IsRequired().HasColumnType("longtext");
+                entity.Property(e => e.LeaseOwner).HasMaxLength(128);
                 entity.HasIndex(e => new { e.OwnerType, e.OwnerUserId, e.ApplicationId });
                 entity.HasIndex(e => new { e.Enabled, e.NextRunAtUtc });
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_ActionSchedules_Owner",
                     "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)"));
+            });
+
+            modelBuilder.Entity<ActionScheduleOccurrence>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.FailureSummary).HasMaxLength(2000);
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => new { e.ScheduleId, e.Status, e.ScheduledForUtc });
+                entity.HasOne(e => e.Schedule).WithMany().HasForeignKey(e => e.ScheduleId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Flow>(entity =>
@@ -227,6 +240,7 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });
                 entity.HasIndex(e => new { e.AppId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
                 entity.HasIndex(e => e.HostedRunnerOperationId).IsUnique();
+                entity.HasIndex(e => e.ScheduleOccurrenceId).IsUnique();
                 entity.HasOne(e => e.HostedRunnerOperation)
                     .WithOne(e => e.AppModuleExecution)
                     .HasForeignKey<AppModuleExecution>(e => e.HostedRunnerOperationId)

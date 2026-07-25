@@ -89,6 +89,14 @@ public sealed class ActionScheduleService
         else
         {
             schedule.NextRunAtUtc = null;
+            await db.ActionScheduleOccurrences
+                .Where(x => x.ScheduleId == schedule.Id
+                    && (x.Status == ActionScheduleOccurrenceStatuses.Queued
+                        || x.Status == ActionScheduleOccurrenceStatuses.Published))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, ActionScheduleOccurrenceStatuses.Skipped)
+                    .SetProperty(x => x.FailureSummary, "Schedule disabled before dispatch.")
+                    .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), ct);
         }
         schedule.Enabled = enabled;
         schedule.UpdatedAtUtc = DateTime.UtcNow;
@@ -103,6 +111,15 @@ public sealed class ActionScheduleService
         db.ActionSchedules.Remove(schedule);
         await db.SaveChangesAsync(ct);
         await AuditAsync(schedule, AuditEventTypes.ActionScheduleDeleted, "delete", "Action schedule deleted", ct);
+    }
+
+    public async Task ValidateForDispatchAsync(ActionSchedule schedule, CancellationToken ct)
+    {
+        var system = schedule.OwnerType == ActionScheduleOwnerTypes.System;
+        var userId = schedule.OwnerUserId ?? Guid.Empty;
+        var capability = await GetCapabilityAsync(userId, administrator: system, ct);
+        if (!capability.Enabled) throw new InvalidOperationException("Scheduled Actions are not enabled for this plan.");
+        await ValidateEffectiveAsync(schedule, userId, administrator: system, capability, DateTime.UtcNow, ct);
     }
 
     private async Task ApplyAsync(ActionSchedule schedule, SaveActionScheduleRequest request, Guid userId, bool administrator, ScheduledActionsCapability capability, CancellationToken ct)

@@ -308,6 +308,7 @@ public class HostedRunnerAuditTests
             CREATE TABLE AppModuleExecutions (
                 Id TEXT NOT NULL PRIMARY KEY,
                 HostedRunnerOperationId TEXT NULL,
+                ScheduleOccurrenceId TEXT NULL,
                 AppId TEXT NOT NULL,
                 ModuleType TEXT NOT NULL,
                 ModuleKey TEXT NOT NULL,

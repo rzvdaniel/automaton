@@ -34,6 +34,16 @@ public static class ActionScheduleMisfirePolicies
     public const string CatchUp = "CatchUp";
 }
 
+public static class ActionScheduleOccurrenceStatuses
+{
+    public const string Queued = "Queued";
+    public const string Published = "Published";
+    public const string Dispatching = "Dispatching";
+    public const string Dispatched = "Dispatched";
+    public const string Skipped = "Skipped";
+    public const string Failed = "Failed";
+}
+
 public sealed class ActionSchedule
 {
     public Guid Id { get; set; }
@@ -56,6 +66,24 @@ public sealed class ActionSchedule
     public string ConcurrencyPolicy { get; set; } = ActionScheduleConcurrencyPolicies.SkipIfRunning;
     public string MisfirePolicy { get; set; } = ActionScheduleMisfirePolicies.Skip;
     public string InputJson { get; set; } = "{}";
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public string? LeaseOwner { get; set; }
+    public DateTime? LeaseExpiresAtUtc { get; set; }
+}
+
+public sealed class ActionScheduleOccurrence
+{
+    public Guid Id { get; set; }
+    public Guid ScheduleId { get; set; }
+    public ActionSchedule Schedule { get; set; } = null!;
+    public DateTime ScheduledForUtc { get; set; }
+    public DateTime TriggeredAtUtc { get; set; }
+    public Guid? ExecutionId { get; set; }
+    public int Attempt { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public string Status { get; set; } = ActionScheduleOccurrenceStatuses.Published;
+    public string? FailureSummary { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

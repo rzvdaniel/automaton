@@ -11,8 +11,9 @@ namespace Automaton.Api.Services;
 
 public static class AppModuleTriggerTypes
 {
-    public const string Manual = "Manual";
-    public const string Internal = "Internal";
+    public const string Manual = AppModuleTriggerKinds.Manual;
+    public const string Internal = AppModuleTriggerKinds.Internal;
+    public const string Scheduled = AppModuleTriggerKinds.Scheduled;
 }
 
 public sealed class AppActionExecutionService
@@ -33,7 +34,20 @@ public sealed class AppActionExecutionService
     }
 
     public async Task<AppModuleExecution> ExecuteAsync(Guid appId, string actionKey, Guid userId, JsonElement input, CancellationToken cancellationToken)
+        => await ExecuteAsync(appId, actionKey, userId, input, null, AppModuleTriggerTypes.Manual, cancellationToken);
+
+    public async Task<AppModuleExecution> ExecuteScheduledAsync(
+        Guid appId, string actionKey, Guid userId, JsonElement input, Guid occurrenceId, CancellationToken cancellationToken)
+        => await ExecuteAsync(appId, actionKey, userId, input, occurrenceId, AppModuleTriggerTypes.Scheduled, cancellationToken);
+
+    private async Task<AppModuleExecution> ExecuteAsync(
+        Guid appId, string actionKey, Guid userId, JsonElement input, Guid? occurrenceId, string triggerType, CancellationToken cancellationToken)
     {
+        if (occurrenceId.HasValue)
+        {
+            var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrenceId, cancellationToken);
+            if (existing != null) return existing;
+        }
         AppActionManifestParser.ValidateKey(actionKey);
         var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
             ?? throw new KeyNotFoundException("App not found.");
@@ -50,11 +64,44 @@ public sealed class AppActionExecutionService
             AutomatonHubMethods.ListAppActionModules, appId, cancellationToken);
         var deployedAction = deployed.Actions.SingleOrDefault(item => string.Equals(item.Key, actionKey, StringComparison.Ordinal))
             ?? throw new KeyNotFoundException("Action is not deployed on the assigned Runner.");
+        return await CreateAndDispatchAsync(
+            appId, actionKey, userId, input, occurrenceId, triggerType, runner, deployedAction, cancellationToken);
+    }
+
+    internal async Task<AppModuleExecution> ExecuteScheduledOnRunnerAsync(
+        Guid appId,
+        string actionKey,
+        JsonElement input,
+        Guid occurrenceId,
+        Runner runner,
+        AppActionModuleInfo deployedAction,
+        CancellationToken cancellationToken)
+    {
+        var existing = await db.AppModuleExecutions.SingleOrDefaultAsync(x => x.ScheduleOccurrenceId == occurrenceId, cancellationToken);
+        if (existing != null) return existing;
+        if (string.IsNullOrWhiteSpace(runner.ConnectionId))
+            throw new InvalidOperationException("The selected Runner is unavailable.");
+        return await CreateAndDispatchAsync(
+            appId, actionKey, null, input, occurrenceId, AppModuleTriggerTypes.Scheduled, runner, deployedAction, cancellationToken);
+    }
+
+    private async Task<AppModuleExecution> CreateAndDispatchAsync(
+        Guid appId,
+        string actionKey,
+        Guid? userId,
+        JsonElement input,
+        Guid? occurrenceId,
+        string triggerType,
+        Runner runner,
+        AppActionModuleInfo deployedAction,
+        CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
         var execution = new AppModuleExecution
         {
             Id = Guid.NewGuid(), AppId = appId, ModuleType = AppModuleTypes.Action, ModuleKey = actionKey,
-            RunnerId = runner.Id, TriggerType = AppModuleTriggerTypes.Manual, RequestedByUserId = userId,
+            RunnerId = runner.Id, TriggerType = triggerType, RequestedByUserId = userId,
+            ScheduleOccurrenceId = occurrenceId,
             Status = AppModuleExecutionStatuses.Dispatching, CreatedAtUtc = now,
             DeploymentHash = deployedAction.ContentHash,
             ExecutionDeadlineUtc = now.AddSeconds(deployedAction.TimeoutSeconds + 300),

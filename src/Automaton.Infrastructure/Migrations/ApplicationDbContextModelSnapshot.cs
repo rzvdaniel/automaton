@@ -102,6 +102,13 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("LastTriggeredAtUtc")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
                     b.Property<string>("MisfirePolicy")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -151,6 +158,57 @@ namespace Automaton.Api.Migrations
                         {
                             t.HasCheckConstraint("CK_ActionSchedules_Owner", "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.ActionScheduleOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("ExecutionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("FailureSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<Guid>("ScheduleId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("ScheduledForUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime>("TriggeredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("ScheduleId", "Status", "ScheduledForUtc");
+
+                    b.ToTable("ActionScheduleOccurrences");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
@@ -749,6 +807,9 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ScheduleOccurrenceId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("StartedAtUtc")
                         .HasColumnType("datetime(6)");
 
@@ -770,6 +831,9 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RequestedByUserId");
 
                     b.HasIndex("RunnerId");
+
+                    b.HasIndex("ScheduleOccurrenceId")
+                        .IsUnique();
 
                     b.HasIndex("AppId", "CreatedAtUtc");
 
@@ -3572,6 +3636,17 @@ namespace Automaton.Api.Migrations
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.ActionScheduleOccurrence", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ActionSchedule", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>

@@ -20,6 +20,13 @@ public static class AppModuleExecutionStatuses
     public const string Lost = "Lost";
 }
 
+public static class AppModuleTriggerKinds
+{
+    public const string Manual = "Manual";
+    public const string Internal = "Internal";
+    public const string Scheduled = "Scheduled";
+}
+
 public static class AppModuleExecutionErrorCodes
 {
     public const string ProcessFailed = "ProcessFailed";
