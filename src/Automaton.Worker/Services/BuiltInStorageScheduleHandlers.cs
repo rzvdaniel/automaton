@@ -3,6 +3,7 @@ using Automaton.Api.Entities;
 using Automaton.Api.Models;
 using Automaton.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 namespace Automaton.Worker.Services;
 
@@ -60,8 +61,7 @@ public sealed class BuiltInStorageScheduleSeeder(
                     existing.UpdatedAtUtc = now;
                 }
                 ReconcileDefinition(existing, key, name, now);
-                try { await db.SaveChangesAsync(cancellationToken); }
-                catch (DbUpdateException) { db.ChangeTracker.Clear(); }
+                await SaveWithDuplicateRecoveryAsync(db, key, name, now, cancellationToken);
                 continue;
             }
 
@@ -77,10 +77,56 @@ public sealed class BuiltInStorageScheduleSeeder(
                 MisfirePolicy = ActionScheduleMisfirePolicies.Skip, InputJson = "{}",
                 CreatedAtUtc = now, UpdatedAtUtc = now
             });
+            await SaveWithDuplicateRecoveryAsync(db, key, name, now, cancellationToken);
             logger.LogInformation("Seeded built-in system storage schedule {ActionKey}", key);
-            try { await db.SaveChangesAsync(cancellationToken); }
-            catch (DbUpdateException) { db.ChangeTracker.Clear(); }
         }
+    }
+
+    private static async Task SaveWithDuplicateRecoveryAsync(ApplicationDbContext db, string key, string name,
+        DateTime now, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueSystemIdentityViolation(ex))
+        {
+            db.ChangeTracker.Clear();
+            var winner = await db.ActionSchedules.SingleAsync(x => x.SystemIdentity == key, cancellationToken);
+            EnsureEnabled(winner, now);
+            ReconcileDefinition(winner, key, name, now);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static void EnsureEnabled(ActionSchedule schedule, DateTime now)
+    {
+        if (!schedule.Enabled || !schedule.NextRunAtUtc.HasValue)
+        {
+            schedule.Enabled = true;
+            schedule.NextRunAtUtc = now.AddMinutes(1);
+            schedule.UpdatedAtUtc = now;
+        }
+    }
+
+    private static bool IsUniqueSystemIdentityViolation(DbUpdateException exception)
+    {
+        for (var current = exception.InnerException; current != null; current = current.InnerException)
+        {
+            var message = current.Message;
+            var typeName = current.GetType().Name;
+            if (!message.Contains("SystemIdentity", StringComparison.OrdinalIgnoreCase) &&
+                !message.Contains("IX_ActionSchedules_SystemIdentity", StringComparison.OrdinalIgnoreCase)) continue;
+
+            if (typeName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) &&
+                message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase)) return true;
+            if (typeName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+            {
+                var number = current.GetType().GetProperty("Number", BindingFlags.Public | BindingFlags.Instance)?.GetValue(current);
+                if (number is int code && code == 1062) return true;
+            }
+        }
+        return false;
     }
 
     private static void ReconcileDefinition(ActionSchedule schedule, string key, string name, DateTime now)
