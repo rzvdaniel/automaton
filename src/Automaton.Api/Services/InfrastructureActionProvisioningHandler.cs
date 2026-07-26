@@ -281,7 +281,16 @@ public sealed class InfrastructureActionProvisioningHandler(
                 hostedRunner.Status = message.ActionKey == "delete-hosted-runner"
                     ? HostedRunnerStatuses.DeleteFailed
                     : HostedRunnerStatuses.Failed;
+                if (message.ActionKey == StorageEnforcementActions.SuspendHostedRunner)
+                    hostedRunner.EnforcementState = HostedRunnerEnforcementStates.GracePeriod;
+                else if (message.ActionKey == StorageEnforcementActions.ResumeHostedRunner)
+                {
+                    hostedRunner.Status = HostedRunnerStatuses.Suspended;
+                    hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+                }
                 hostedRunner.LastError = sanitizedError;
+                if (message.ActionKey is StorageEnforcementActions.SuspendHostedRunner or StorageEnforcementActions.ResumeHostedRunner)
+                    hostedRunner.LastEnforcementReason = sanitizedError;
             }
             hostedRunner.UpdatedAt = DateTime.UtcNow;
             deployment.Status = HostedRunnerDeploymentStatuses.Failed;
@@ -351,6 +360,9 @@ public sealed class InfrastructureActionProvisioningHandler(
         if (actionKey == StorageEnforcementActions.SuspendHostedRunner)
         {
             hostedRunner.Status = HostedRunnerStatuses.Suspended;
+            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+            hostedRunner.SuspendedAtUtc = DateTime.UtcNow;
+            hostedRunner.LastEnforcementReason = "Hosted Runner container was stopped after the storage grace period.";
             deployment.Logs = "Hosted Runner container stopped; persistent volumes were preserved.";
             deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
             deployment.FinishedAt = DateTime.UtcNow;
@@ -361,6 +373,7 @@ public sealed class InfrastructureActionProvisioningHandler(
         if (actionKey == StorageEnforcementActions.ResumeHostedRunner)
         {
             hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
             deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
             deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
             deployment.ReconnectAfterUtc ??= deployment.StartedAt;
@@ -444,8 +457,8 @@ public sealed class InfrastructureActionProvisioningHandler(
         var eventType = actionKey switch
         {
             "restart-hosted-runner" => succeeded ? AuditEventTypes.RunnerRestartSucceeded : AuditEventTypes.RunnerRestartFailed,
-            StorageEnforcementActions.SuspendHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested : AuditEventTypes.RunnerRestartFailed,
-            StorageEnforcementActions.ResumeHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementResumeRequested : AuditEventTypes.RunnerRestartFailed,
+            StorageEnforcementActions.SuspendHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementSuspensionSucceeded : StorageTelemetryAuditEvents.EnforcementSuspensionFailed,
+            StorageEnforcementActions.ResumeHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementResumeSucceeded : StorageTelemetryAuditEvents.EnforcementResumeFailed,
             "delete-hosted-runner" => succeeded ? AuditEventTypes.HostedRunnerDeleted : AuditEventTypes.HostedRunnerDeleteFailed,
             StorageTelemetryActions.MeasureHostedRunnerStorage => succeeded ? AuditEventTypes.HostedRunnerStorageVerificationSucceeded : AuditEventTypes.HostedRunnerStorageVerificationFailed,
             _ => succeeded ? AuditEventTypes.HostedRunnerProvisioningSucceeded : AuditEventTypes.HostedRunnerProvisioningFailed

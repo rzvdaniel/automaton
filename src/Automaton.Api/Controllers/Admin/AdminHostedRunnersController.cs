@@ -56,6 +56,8 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
+        if (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended)
+            return Conflict(new { message = "Resume the suspended Runner before extending its grace period." });
         var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
         var key = $"storage-verification:{id:N}:admin:{window}";
         var existing = await db.HostedRunnerStorageVerifications
@@ -95,12 +97,14 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
+        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending)
+            return Conflict(new { message = "Resume the suspended Runner before clearing enforcement state." });
         runner.EnforcementState = HostedRunnerEnforcementStates.GracePeriod;
         runner.GracePeriodEndsAtUtc = DateTime.UtcNow.AddHours(Math.Clamp(request.Hours, 1, 720));
         runner.LastEnforcementReason = "Grace period extended by an administrator.";
         runner.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementGracePeriodStarted, "Grace period extended by an administrator.", cancellationToken);
+        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementGraceExtended, "Grace period extended by an administrator.", cancellationToken);
         return Ok(new { runner.Id, runner.EnforcementState, runner.GracePeriodEndsAtUtc });
     }
 
@@ -115,7 +119,7 @@ public class AdminHostedRunnersController : ControllerBase
         runner.LastEnforcementReason = "Enforcement state cleared by an administrator.";
         runner.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementGracePeriodStarted, "Enforcement state cleared by an administrator.", cancellationToken);
+        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementCleared, "Enforcement state cleared by an administrator.", cancellationToken);
         return Ok(new { runner.Id, runner.EnforcementState });
     }
 
@@ -135,7 +139,7 @@ public class AdminHostedRunnersController : ControllerBase
         {
             OperationId = operation.Id, HostedRunnerId = id, UserId = runner.UserId, RunnerHostId = runner.RunnerHostId.Value,
             ActionKey = actionKey,
-            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, containerName = runner.ContainerName }),
+            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
             CorrelationId = $"admin-storage-enforcement:{operation.Id:N}"
         }, cancellationToken);
         await WriteEnforcementAuditAsync(runner,

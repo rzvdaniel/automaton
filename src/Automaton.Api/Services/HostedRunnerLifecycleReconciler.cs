@@ -204,6 +204,8 @@ public sealed class HostedRunnerLifecycleReconciler(
         {
             HostedRunnerDeploymentActions.Restart => "restart-hosted-runner",
             HostedRunnerDeploymentActions.Deprovision => "delete-hosted-runner",
+            HostedRunnerDeploymentActions.Suspend => StorageEnforcementActions.SuspendHostedRunner,
+            HostedRunnerDeploymentActions.Resume => StorageEnforcementActions.ResumeHostedRunner,
             _ => throw new InvalidOperationException($"Unsupported lifecycle recovery action '{operation.Action}'.")
         };
         return new InfrastructureActionExecutionRequestedEvent
@@ -212,7 +214,7 @@ public sealed class HostedRunnerLifecycleReconciler(
             RunnerHostId = host.Id, ActionKey = actionKey,
             InputJson = JsonSerializer.Serialize(new
             {
-                operationId = operation.Id, hostedRunnerId = hostedRunner.Id, containerName = hostedRunner.ContainerName
+                operationId = operation.Id, hostedRunnerId = hostedRunner.Id, expectedContainerName = hostedRunner.ContainerName
             }),
             CorrelationId = $"hosted-runner-recovery:{operation.Id:N}"
         };

@@ -89,7 +89,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             await db.SaveChangesAsync();
         }
         var service = new HostedRunnerStorageReconciliationService(
-            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), Options.Create(new StorageTelemetryOptions()));
+            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), new NoOpTransactionalEventExecutor(), Options.Create(new StorageTelemetryOptions()));
 
         await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
 
@@ -121,7 +121,7 @@ public class HostedRunnerStorageReconciliationServiceTests
             await db.SaveChangesAsync();
         }
         var service = new HostedRunnerStorageReconciliationService(
-            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(),
+            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), new NoOpTransactionalEventExecutor(),
             Options.Create(new StorageTelemetryOptions { OverLimitGracePeriodHours = 1 }));
         await service.EnforceAsync(default);
         await using (var verifyScope = provider.CreateAsyncScope())
@@ -137,7 +137,7 @@ public class HostedRunnerStorageReconciliationServiceTests
         var finalDb = finalScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.Multiple(() =>
         {
-            Assert.That(finalDb.HostedRunners.Single().EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.Suspended));
+            Assert.That(finalDb.HostedRunners.Single().EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.SuspensionPending));
             Assert.That(finalDb.HostedRunnerDeployments.Count(x => x.Action == HostedRunnerDeploymentActions.Suspend), Is.EqualTo(1));
         });
     }
@@ -159,7 +159,7 @@ public class HostedRunnerStorageReconciliationServiceTests
         });
         db.SaveChanges();
         var service = new HostedRunnerStorageReconciliationService(
-            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(),
+            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), new NoOpTransactionalEventExecutor(),
             Options.Create(options ?? new StorageTelemetryOptions()));
         return new Fixture(provider, scope, db, service);
     }
@@ -168,6 +168,11 @@ public class HostedRunnerStorageReconciliationServiceTests
     {
         public Task PublishAsync<TEvent>(TEvent message, CancellationToken cancellationToken = default) where TEvent : class =>
             Task.CompletedTask;
+    }
+
+    private sealed class NoOpTransactionalEventExecutor : ITransactionalEventExecutor
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default) => operation(cancellationToken);
     }
 
     private sealed class Fixture(

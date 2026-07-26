@@ -153,6 +153,8 @@ public class AppActionManifestParserTests
     [TestCase("restart-hosted-runner")]
     [TestCase("delete-hosted-runner")]
     [TestCase("measure-hosted-runner-storage")]
+    [TestCase("suspend-hosted-runner")]
+    [TestCase("resume-hosted-runner")]
     public void ParsesTrustedInfrastructureLifecycleAction(string actionKey)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -166,6 +168,21 @@ public class AppActionManifestParserTests
         Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Docker));
         Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Host));
         Assert.That(File.Exists(Path.Combine(actionRoot, manifest.Spec.Entrypoint)), Is.True);
+    }
+
+    [Test]
+    public void ParsesTrustedWorkerEnforcementAction()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var actionRoot = Path.Combine(repositoryRoot, "system-apps", "automaton-infrastructure", "actions", "enforce-hosted-runner-storage");
+        var manifest = AppActionManifestParser.ParseFile(Path.Combine(actionRoot, "action.yaml"), "enforce-hosted-runner-storage", allowPrivilegedCapabilities: true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(manifest.Spec.Schedulable, Is.True);
+            Assert.That(manifest.Spec.AllowedExecutionScopes, Does.Contain("Worker"));
+            Assert.That(manifest.Spec.MinimumIntervalSeconds, Is.EqualTo(60));
+            Assert.That(File.Exists(Path.Combine(actionRoot, manifest.Spec.Entrypoint)), Is.True);
+        });
     }
 
     private static string FindRepositoryRoot()

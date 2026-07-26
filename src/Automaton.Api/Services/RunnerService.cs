@@ -317,6 +317,27 @@ public class RunnerService
             deployment.Error = null;
         }
 
+        var enforcementResume = hostedRunner.Deployments
+            .Where(x => x.Action == HostedRunnerDeploymentActions.Resume &&
+                x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
+            .OrderByDescending(x => x.StartedAt)
+            .FirstOrDefault();
+        if (enforcementResume != null)
+        {
+            enforcementResume.Status = HostedRunnerDeploymentStatuses.Succeeded;
+            enforcementResume.FinishedAt = DateTime.UtcNow;
+            enforcementResume.Logs = "Hosted Runner reconnected after storage enforcement recovery.";
+            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
+            hostedRunner.RecoveredAtUtc = DateTime.UtcNow;
+            hostedRunner.LastEnforcementReason = "Runner reconnected after authoritative storage recovery.";
+            dbContext.AuditEvents.Add(new AuditEvent
+            {
+                Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = hostedRunner.Id,
+                TargetUserId = hostedRunner.UserId, Outcome = "Success", EventType = StorageTelemetryAuditEvents.EnforcementRecovered,
+                Message = "Hosted Runner recovered after storage enforcement.", CreatedAtUtc = DateTime.UtcNow
+            });
+        }
+
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);
         return deployment?.Action;
     }

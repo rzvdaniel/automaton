@@ -30,7 +30,9 @@ public static class HostedRunnerEnforcementStates
 {
     public const string None = "None";
     public const string GracePeriod = "GracePeriod";
+    public const string SuspensionPending = "SuspensionPending";
     public const string Suspended = "Suspended";
+    public const string ResumePending = "ResumePending";
     public const string Recovered = "Recovered";
 }
 
@@ -77,4 +79,11 @@ public static class StorageTelemetryAuditEvents
     public const string EnforcementGracePeriodStarted = "HostedRunnerStorageGracePeriodStarted";
     public const string EnforcementSuspensionRequested = "HostedRunnerStorageSuspensionRequested";
     public const string EnforcementResumeRequested = "HostedRunnerStorageResumeRequested";
+    public const string EnforcementSuspensionSucceeded = "HostedRunnerStorageSuspensionSucceeded";
+    public const string EnforcementSuspensionFailed = "HostedRunnerStorageSuspensionFailed";
+    public const string EnforcementResumeSucceeded = "HostedRunnerStorageResumeSucceeded";
+    public const string EnforcementResumeFailed = "HostedRunnerStorageResumeFailed";
+    public const string EnforcementRecovered = "HostedRunnerStorageRecovered";
+    public const string EnforcementCleared = "HostedRunnerStorageCleared";
+    public const string EnforcementGraceExtended = "HostedRunnerStorageGraceExtended";
 }

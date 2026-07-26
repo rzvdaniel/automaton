@@ -12,6 +12,7 @@ namespace Automaton.Worker.Services;
 public sealed class HostedRunnerStorageReconciliationService(
     IServiceScopeFactory scopeFactory,
     IEventPublisher eventPublisher,
+    ITransactionalEventExecutor transactionalEventExecutor,
     IOptions<StorageTelemetryOptions> telemetryOptions)
 {
     internal Task<int> ReconcileAsync(CancellationToken cancellationToken)
@@ -28,7 +29,8 @@ public sealed class HostedRunnerStorageReconciliationService(
             .Include(x => x.RunnerHost)
             .Where(x => x.DeletedAt == null && x.RunnerHostId != null &&
                 (x.StorageState == HostedRunnerStorageStates.OverLimit ||
-                 x.EnforcementState == HostedRunnerEnforcementStates.GracePeriod || x.EnforcementState == HostedRunnerEnforcementStates.Suspended))
+                 x.EnforcementState == HostedRunnerEnforcementStates.GracePeriod || x.EnforcementState == HostedRunnerEnforcementStates.SuspensionPending ||
+                 x.EnforcementState == HostedRunnerEnforcementStates.Suspended || x.EnforcementState == HostedRunnerEnforcementStates.ResumePending))
             .ToListAsync(cancellationToken);
         var changed = 0;
         foreach (var runner in runners)
@@ -44,8 +46,7 @@ public sealed class HostedRunnerStorageReconciliationService(
             {
                 if (await QueueLifecycleActionAsync(db, runner, StorageEnforcementActions.ResumeHostedRunner, now, cancellationToken))
                 {
-                    runner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
-                    runner.RecoveredAtUtc = now;
+                    runner.EnforcementState = HostedRunnerEnforcementStates.ResumePending;
                     runner.LastEnforcementReason = $"Authoritative usage recovered to {usagePercent:0.##}% (threshold {options.RecoveryPercent:0.##}%).";
                     runner.UpdatedAt = now;
                     changed++;
@@ -66,8 +67,7 @@ public sealed class HostedRunnerStorageReconciliationService(
             if (runner.EnforcementState == HostedRunnerEnforcementStates.GracePeriod && runner.GracePeriodEndsAtUtc <= now &&
                 await QueueLifecycleActionAsync(db, runner, StorageEnforcementActions.SuspendHostedRunner, now, cancellationToken))
             {
-                runner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
-                runner.SuspendedAtUtc = now;
+                runner.EnforcementState = HostedRunnerEnforcementStates.SuspensionPending;
                 runner.LastEnforcementReason = "Authoritative usage remained above the allowance after the grace period.";
                 db.AuditEvents.Add(CreateEnforcementAudit(runner, StorageTelemetryAuditEvents.EnforcementSuspensionRequested, runner.LastEnforcementReason, now));
                 changed++;
@@ -93,14 +93,17 @@ public sealed class HostedRunnerStorageReconciliationService(
             Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = now,
             Logs = $"Trusted infrastructure Action '{actionKey}' queued for storage enforcement."
         };
-        db.HostedRunnerDeployments.Add(operation);
-        await db.SaveChangesAsync(cancellationToken);
-        await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+        await transactionalEventExecutor.ExecuteAsync(async token =>
         {
-            OperationId = operation.Id, HostedRunnerId = runner.Id, UserId = runner.UserId,
-            RunnerHostId = host.Id, ActionKey = actionKey,
-            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, containerName = runner.ContainerName }),
-            CorrelationId = $"storage-enforcement:{operation.Id:N}"
+            db.HostedRunnerDeployments.Add(operation);
+            await db.SaveChangesAsync(token);
+            await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+            {
+                OperationId = operation.Id, HostedRunnerId = runner.Id, UserId = runner.UserId,
+                RunnerHostId = host.Id, ActionKey = actionKey,
+                InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, expectedContainerName = runner.ContainerName }),
+                CorrelationId = $"storage-enforcement:{operation.Id:N}"
+            }, token);
         }, cancellationToken);
         return true;
     }

@@ -1,0 +1,15 @@
+apiVersion: automaton.dev/v1
+kind: Action
+metadata:
+  name: Enforce Hosted Runner Storage
+  key: enforce-hosted-runner-storage
+  description: Evaluates authoritative hosted Runner storage enforcement through the Worker.
+spec:
+  runtime: bash
+  entrypoint: main.sh
+  timeoutSeconds: 120
+  schedulable: true
+  allowedExecutionScopes: [Worker]
+  minimumIntervalSeconds: 60
+  input: { type: object }
+  output: { type: object }
