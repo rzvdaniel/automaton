@@ -61,6 +61,7 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
 builder.Services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 builder.Services.AddScoped<HostedRunnerRegistrationReconciler>();
+builder.Services.AddScoped<HostedRunnerStorageReconciliationService>();
 builder.Services.AddScoped<ActionScheduleProcessor>();
 builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
 builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
