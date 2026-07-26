@@ -32,6 +32,7 @@ public class HostedRunnerProvisioningService
     private readonly IHostedRunnerSpecificationResolver specificationResolver;
     private readonly IAuditEventService auditEventService;
     private readonly ILogger<HostedRunnerProvisioningService> logger;
+    private readonly StorageTelemetryOptions storageTelemetryOptions;
 
     public HostedRunnerProvisioningService(
         ApplicationDbContext db,
@@ -40,7 +41,8 @@ public class HostedRunnerProvisioningService
         IOptionsSnapshot<HostedRunnerOptions> options,
         IHostedRunnerSpecificationResolver specificationResolver,
         IAuditEventService auditEventService,
-        ILogger<HostedRunnerProvisioningService> logger)
+        ILogger<HostedRunnerProvisioningService> logger,
+        IOptions<StorageTelemetryOptions>? storageTelemetryOptions = null)
     {
         this.db = db;
         this.runnerEnrollmentService = runnerEnrollmentService;
@@ -49,6 +51,7 @@ public class HostedRunnerProvisioningService
         this.specificationResolver = specificationResolver;
         this.auditEventService = auditEventService;
         this.logger = logger;
+        this.storageTelemetryOptions = storageTelemetryOptions?.Value ?? new StorageTelemetryOptions();
     }
 
     public async Task<HostedRunnerPreparationResult> PrepareProvisioningAsync(
@@ -130,6 +133,11 @@ public class HostedRunnerProvisioningService
             hostedRunner.HostedRunnerSpecificationId = specification.Id;
             hostedRunner.SpecificationRevision = specification.Revision;
             hostedRunner.SpecificationSnapshot = requestedSnapshot;
+            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
+        }
+        else if (hostedRunner.StorageAllowanceBytes <= 0)
+        {
+            hostedRunner.StorageAllowanceBytes = requestedSnapshot.Resources.DiskLimitMb * 1024L * 1024L;
         }
         hostedRunner.UpdatedAt = now;
 
@@ -294,7 +302,9 @@ public class HostedRunnerProvisioningService
         Guid? excludedHostedRunnerId,
         CancellationToken cancellationToken)
     {
-        var hosts = await db.RunnerHosts
+        var requestedStorageBytes = requested.DiskLimitMb * 1024L * 1024L;
+        var now = DateTime.UtcNow;
+        var hosts = (await db.RunnerHosts
             .AsNoTracking()
             .Where(x => x.Status == RunnerHostStatuses.Active
                         && x.HostedRunnerSchedulingEnabled
@@ -304,7 +314,11 @@ public class HostedRunnerProvisioningService
                         && x.ProvisioningTransport == RunnerHostProvisioningTransports.InfrastructureRunner
                         && x.InfrastructureRunnerId != null)
             .OrderBy(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken))
+            .Where(x => StorageTelemetryPolicy.CanScheduleHostedRunners(
+                x.StorageState, x.StorageAvailableBytes, x.StorageReserveRequiredBytes ?? long.MaxValue, requestedStorageBytes,
+                x.CreatedAt, x.StorageMeasuredAtUtc, now, storageTelemetryOptions))
+            .ToList();
 
         foreach (var candidate in hosts)
         {
@@ -333,6 +347,12 @@ public class HostedRunnerProvisioningService
                          && x.InfrastructureRunnerId != null,
                     cancellationToken);
             if (host == null)
+            {
+                continue;
+            }
+            if (!StorageTelemetryPolicy.CanScheduleHostedRunners(
+                    host.StorageState, host.StorageAvailableBytes, host.StorageReserveRequiredBytes ?? long.MaxValue, requestedStorageBytes,
+                    host.CreatedAt, host.StorageMeasuredAtUtc, now, storageTelemetryOptions))
             {
                 continue;
             }

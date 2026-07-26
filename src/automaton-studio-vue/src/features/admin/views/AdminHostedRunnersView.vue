@@ -42,7 +42,27 @@ const provisioningUserId = ref<string | null>(null)
 const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
+const verifyingStorageRunnerId = ref<string | null>(null)
 const deleteConfirmationRunnerId = ref<string | null>(null)
+
+const formatStorage = (bytes?: number) => {
+  if (bytes === undefined || bytes === null) return 'Unknown'
+  const gib = bytes / (1024 ** 3)
+  return `${gib.toFixed(gib >= 10 ? 1 : 2)} GB`
+}
+
+const verifyStorage = async (runner: HostedRunner) => {
+  verifyingStorageRunnerId.value = runner.id
+  try {
+    await adminHostedRunnersService.verifyHostedRunnerStorage(runner.id)
+    toast.add({ severity: 'info', summary: 'Verification requested', detail: 'Host-side storage verification has been queued.', life: 5000 })
+    await loadHostedRunners()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Verification failed', detail: error instanceof Error ? error.message : 'Unable to request storage verification.', life: 6000 })
+  } finally {
+    verifyingStorageRunnerId.value = null
+  }
+}
 const deleteDataConfirmation = ref('')
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
@@ -1315,6 +1335,31 @@ watch(() => route.path, refreshAll)
         <div v-if="selectedRunner.lastError">
           <div class="text-color-secondary text-sm mb-2">Last error</div>
           <Textarea :model-value="selectedRunner.lastError" readonly auto-resize class="w-full" />
+        </div>
+        <div class="surface-50 border-round p-3">
+          <div class="flex justify-content-between align-items-center mb-3">
+            <div class="font-semibold">Storage telemetry</div>
+            <Button
+              label="Verify storage now"
+              icon="pi pi-refresh"
+              size="small"
+              :loading="verifyingStorageRunnerId === selectedRunner.id"
+              @click="verifyStorage(selectedRunner)"
+            />
+          </div>
+          <div class="grid">
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Usage / allowance</div><div>{{ formatStorage(selectedRunner.storageTotalBytes) }} / {{ formatStorage(selectedRunner.storageAllowanceBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">State</div><Tag :value="selectedRunner.storageState" :severity="statusSeverity(selectedRunner.storageState)" /></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Measured</div><div>{{ formatDateTime(selectedRunner.storageMeasuredAtUtc) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Source</div><div>{{ selectedRunner.storageMeasurementSource }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verified usage</div><div>{{ formatStorage(selectedRunner.storageVerifiedTotalBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Latest self-report</div><div>{{ formatStorage(selectedRunner.storageSelfReportedTotalBytes) }} · {{ formatDateTime(selectedRunner.storageSelfReportedAtUtc) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Host available / reserve</div><div>{{ formatStorage(selectedRunner.hostStorageAvailableBytes) }} / {{ formatStorage(selectedRunner.hostStorageReserveRequiredBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verification</div><div>{{ selectedRunner.storageVerificationStatus || 'Not requested' }}<span v-if="selectedRunner.storageVerificationReason"> · {{ selectedRunner.storageVerificationReason }}</span></div></div>
+          </div>
+          <Message severity="info" :closable="false">Storage is measured approximately hourly. The allowance is monitored by Automaton; it is not a hard filesystem quota.</Message>
+          <Message v-if="selectedRunner.storageMeasurementError" severity="warn" :closable="false">{{ selectedRunner.storageMeasurementError }}</Message>
+          <Message v-if="selectedRunner.storageVerificationError" severity="warn" :closable="false">{{ selectedRunner.storageVerificationError }}</Message>
         </div>
         <div v-if="selectedRunner.latestDeployment?.logs">
           <div class="text-color-secondary text-sm mb-2">Deployment log</div>

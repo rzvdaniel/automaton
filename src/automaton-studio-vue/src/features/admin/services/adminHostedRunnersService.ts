@@ -104,6 +104,10 @@ class AdminHostedRunnersService {
     return response.data
   }
 
+  async verifyHostedRunnerStorage(id: string): Promise<void> {
+    await apiClient.post(`/api/admin/hosted-runners/runners/${id}/verify-storage`)
+  }
+
   async deleteHostedRunner(id: string, dataDisposition: 'preserve' | 'delete'): Promise<void> {
     await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`, {
       data: { dataDisposition },

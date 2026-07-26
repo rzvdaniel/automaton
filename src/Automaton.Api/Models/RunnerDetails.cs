@@ -35,4 +35,12 @@ public class RunnerDetails
     public string? ProjectName { get; set; }
     public Guid? HostedRunnerId { get; set; }
     public bool IsHostedRunner { get; set; }
+    public long? StorageAllowanceBytes { get; set; }
+    public long? StorageTotalBytes { get; set; }
+    public decimal? StorageUsagePercent { get; set; }
+    public DateTime? StorageMeasuredAtUtc { get; set; }
+    public string? StorageMeasurementSource { get; set; }
+    public string? StorageMeasurementStatus { get; set; }
+    public string? StorageState { get; set; }
+    public string? StorageMeasurementError { get; set; }
 }

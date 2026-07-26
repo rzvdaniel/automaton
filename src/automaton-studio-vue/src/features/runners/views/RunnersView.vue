@@ -104,6 +104,12 @@ function formatRelativeTime(value?: string | null) {
   return formatDateTime(value)
 }
 
+function formatStorage(bytes?: number | null) {
+  if (bytes === undefined || bytes === null) return 'Not measured'
+  const gibibytes = bytes / (1024 ** 3)
+  return `${gibibytes.toFixed(gibibytes >= 10 ? 1 : 2)} GB`
+}
+
 // Get status color for grid view indicator
 function getStatusColor(status: RunnerStatus): string {
   return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'
@@ -561,7 +567,27 @@ onUnmounted(() => {
               <span class="text-color-secondary text-sm">Version</span>
               <span>{{ runner.version || 'Unknown' }}</span>
             </div>
+            <template v-if="runner.isHostedRunner">
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Storage</span>
+                <span>{{ formatStorage(runner.storageTotalBytes) }} / {{ formatStorage(runner.storageAllowanceBytes) }}</span>
+              </div>
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Storage state</span>
+                <Tag :value="runner.storageState || 'Unknown'" :severity="runner.storageState === 'Healthy' ? 'success' : runner.storageState === 'Warning' ? 'warn' : 'danger'" />
+              </div>
+              <div class="runner-telemetry__row">
+                <span class="text-color-secondary text-sm">Measured</span>
+                <span>{{ formatRelativeTime(runner.storageMeasuredAtUtc) }} · {{ runner.storageMeasurementSource || 'Unknown source' }}</span>
+              </div>
+            </template>
           </div>
+          <Message v-if="runner.isHostedRunner" severity="info" :closable="false" class="mt-3">
+            Storage is measured approximately hourly. The allowance is monitored by Automaton and is not a hard filesystem quota.
+          </Message>
+          <Message v-if="runner.isHostedRunner && runner.storageMeasurementError" severity="warn" :closable="false" class="mt-2">
+            {{ runner.storageMeasurementError }}
+          </Message>
         </template>
       </Card>
     </div>

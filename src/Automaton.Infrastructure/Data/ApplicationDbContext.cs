@@ -40,6 +40,8 @@ namespace Automaton.Api.Data
         public virtual DbSet<HostedRunnerSpecificationRevision> HostedRunnerSpecificationRevisions { get; set; }
         public virtual DbSet<HostedRunnerPlatformSettings> HostedRunnerPlatformSettings { get; set; }
         public virtual DbSet<HostedRunnerDeployment> HostedRunnerDeployments { get; set; }
+        public virtual DbSet<HostedRunnerStorageObservation> HostedRunnerStorageObservations { get; set; }
+        public virtual DbSet<HostedRunnerStorageVerification> HostedRunnerStorageVerifications { get; set; }
         public virtual DbSet<CustomStep> CustomSteps { get; set; }
         public virtual DbSet<CustomStepUser> CustomStepUsers { get; set; }
         public virtual DbSet<Schedule> Schedules { get; set; }
@@ -333,6 +335,9 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ReservedDiskMb).IsRequired();
                 entity.Property(e => e.MetadataJson).HasColumnType("json");
                 entity.Property(e => e.HealthJson).HasColumnType("json");
+                entity.Property(e => e.StorageState).IsRequired().HasMaxLength(32).HasDefaultValue(RunnerHostStorageStates.Unknown);
+                entity.Property(e => e.StorageMeasurementStatus).IsRequired().HasMaxLength(32).HasDefaultValue(StorageMeasurementStatuses.NeverMeasured);
+                entity.Property(e => e.StorageMeasurementError).HasMaxLength(2000);
                 entity.Property(e => e.CreatedAt).IsRequired();
 
                 entity.HasIndex(e => e.Status);
@@ -470,6 +475,13 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ContainerName).IsRequired().HasMaxLength(160);
                 entity.Property(e => e.ContainerId).HasMaxLength(160);
                 entity.Property(e => e.LastError).HasMaxLength(2000);
+                entity.Property(e => e.StorageMeasurementSource).IsRequired().HasMaxLength(40).HasDefaultValue(StorageMeasurementSources.RunnerSelfReported);
+                entity.Property(e => e.StorageMeasurementStatus).IsRequired().HasMaxLength(32).HasDefaultValue(StorageMeasurementStatuses.NeverMeasured);
+                entity.Property(e => e.StorageState).IsRequired().HasMaxLength(32).HasDefaultValue(HostedRunnerStorageStates.Unknown);
+                entity.Property(e => e.StorageMeasurementError).HasMaxLength(2000);
+                entity.Property(e => e.StorageUsagePercent).HasColumnType("decimal(7,2)");
+                entity.Property(e => e.StorageSelfReportedStatus).IsRequired().HasMaxLength(32).HasDefaultValue(StorageMeasurementStatuses.NeverMeasured);
+                entity.Property(e => e.StorageSelfReportedError).HasMaxLength(2000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 ConfigureJson(entity.Property(e => e.SpecificationSnapshot));
                 ConfigureJson(entity.Property(e => e.PendingSpecificationSnapshot));
@@ -505,6 +517,28 @@ namespace Automaton.Api.Data
                     .WithMany()
                     .HasForeignKey(e => e.ApiKeyId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<HostedRunnerStorageObservation>(entity =>
+            {
+                entity.Property(e => e.Source).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.Property(e => e.RunnerVersion).HasMaxLength(80);
+                entity.HasIndex(e => new { e.HostedRunnerId, e.MeasuredAtUtc });
+                entity.HasOne(e => e.HostedRunner).WithMany(e => e.StorageObservations)
+                    .HasForeignKey(e => e.HostedRunnerId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<HostedRunnerStorageVerification>(entity =>
+            {
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.Reason).IsRequired().HasMaxLength(80);
+                entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => new { e.HostedRunnerId, e.Status });
+                entity.HasOne(e => e.HostedRunner).WithMany(e => e.StorageVerifications)
+                    .HasForeignKey(e => e.HostedRunnerId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<HostedRunnerSpecification>(entity =>

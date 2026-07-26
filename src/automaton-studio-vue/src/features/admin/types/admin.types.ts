@@ -575,6 +575,29 @@ export interface HostedRunner {
   provisionedAt?: string
   deletedAt?: string
   latestDeployment?: HostedRunnerDeployment
+  storageAllowanceBytes: number
+  storageMeasuredAtUtc?: string
+  storageMeasurementSource: string
+  storageMeasurementStatus: string
+  storageSystemBytes?: number
+  storageUserBytes?: number
+  storageTotalBytes?: number
+  storageUsagePercent?: number
+  storageState: string
+  storageMeasurementError?: string
+  storageVerificationRequestedAtUtc?: string
+  storageVerifiedAtUtc?: string
+  storageVerifiedTotalBytes?: number
+  storageSelfReportedAtUtc?: string
+  storageSelfReportedTotalBytes?: number
+  storageSelfReportedStatus: string
+  storageSelfReportedError?: string
+  hostStorageAvailableBytes?: number
+  hostStorageReserveRequiredBytes?: number
+  hostStorageState?: string
+  storageVerificationStatus?: string
+  storageVerificationReason?: string
+  storageVerificationError?: string
 }
 
 export interface HostedRunnerResources {

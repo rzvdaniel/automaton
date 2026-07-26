@@ -28,6 +28,7 @@ public class AutomatonHub : Hub
     private readonly FileUploadRegistry fileUploadRegistry;
     private readonly FileDownloadRegistry fileDownloadRegistry;
     private readonly ILogger<AutomatonHub> logger;
+    private readonly RunnerStorageTelemetryService storageTelemetryService;
 
     public AutomatonHub(
         RunnerService runnerService,
@@ -36,7 +37,8 @@ public class AutomatonHub : Hub
         TunnelRequestRegistry tunnelRegistry,
         FileUploadRegistry fileUploadRegistry,
         FileDownloadRegistry fileDownloadRegistry,
-        ILogger<AutomatonHub> logger)
+        ILogger<AutomatonHub> logger,
+        RunnerStorageTelemetryService storageTelemetryService)
     {
         this.runnerService = runnerService;
         this.appsService = appsService;
@@ -45,7 +47,14 @@ public class AutomatonHub : Hub
         this.fileUploadRegistry = fileUploadRegistry;
         this.fileDownloadRegistry = fileDownloadRegistry;
         this.logger = logger;
+        this.storageTelemetryService = storageTelemetryService;
     }
+
+    public Task ReportHostedRunnerStorage(HostedRunnerStorageTelemetry report) =>
+        storageTelemetryService.ReportHostedRunnerAsync(GetRunner(), report, Context.ConnectionAborted);
+
+    public Task ReportRunnerHostStorage(RunnerHostStorageTelemetry report) =>
+        storageTelemetryService.ReportRunnerHostAsync(GetRunner(), report, Context.ConnectionAborted);
 
     public override async Task OnConnectedAsync()
     {

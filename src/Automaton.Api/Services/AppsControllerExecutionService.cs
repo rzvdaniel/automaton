@@ -131,6 +131,10 @@ public class AppsControllerExecutionService
         if (!runners.Any())
             return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, HasRequirements = hasRequirements, Message = "No runners available for deployment. Please select a runner in the app settings." };
 
+        var storageBlock = await GetStorageDeploymentBlockAsync(runners, cancellationToken);
+        if (storageBlock != null)
+            return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, HasRequirements = hasRequirements, Message = storageBlock };
+
         var deployed = 0;
         var errors = new List<string>();
         var installLogs = new List<string>();
@@ -190,6 +194,40 @@ public class AppsControllerExecutionService
             Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
             InstallLogs = installLogs.Count > 0 ? installLogs : null
         };
+    }
+
+    private async Task<string?> GetStorageDeploymentBlockAsync(IEnumerable<Runner> runners, CancellationToken cancellationToken)
+    {
+        var runnerIds = runners.Select(x => x.Id).ToArray();
+        var hosted = await dataContext.HostedRunners
+            .Where(x => x.RunnerId != null && runnerIds.Contains(x.RunnerId.Value) && x.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var runner in hosted)
+        {
+            if (runner.StorageState is HostedRunnerStorageStates.Healthy or HostedRunnerStorageStates.Warning)
+                continue;
+            if (runner.StorageState is HostedRunnerStorageStates.Unknown or HostedRunnerStorageStates.Stale or HostedRunnerStorageStates.MeasurementFailed)
+            {
+                var window = DateTime.UtcNow.Ticks / TimeSpan.FromHours(1).Ticks;
+                var key = $"storage-verification:{runner.Id:N}:{window}";
+                if (!await dataContext.HostedRunnerStorageVerifications.AnyAsync(x => x.IdempotencyKey == key, cancellationToken))
+                {
+                    dataContext.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
+                    {
+                        Id = Guid.NewGuid(), HostedRunnerId = runner.Id, IdempotencyKey = key,
+                        Status = StorageVerificationStatuses.Pending, Reason = "DeploymentGate",
+                        RequestedAtUtc = DateTime.UtcNow
+                    });
+                    runner.StorageVerificationRequestedAtUtc = DateTime.UtcNow;
+                    await dataContext.SaveChangesAsync(cancellationToken);
+                }
+                return "Runner storage usage is unavailable or stale. Verification has been requested; retry after it completes.";
+            }
+            return runner.StorageState == HostedRunnerStorageStates.OverLimit
+                ? "Runner storage usage exceeds its monitored allowance. Remove data before deploying."
+                : "Runner storage usage is too close to its monitored allowance for a storage-increasing deployment.";
+        }
+        return null;
     }
 
     public async Task<DeployPackageResponse> DeployPackageAsync(

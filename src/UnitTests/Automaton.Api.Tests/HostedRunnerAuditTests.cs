@@ -249,6 +249,7 @@ public class HostedRunnerAuditTests
             secretGrantService: null!,
             actionDeploymentService: null!,
             hostedRunnerOptions: Options.Create(new HostedRunnerOptions()),
+            storageTelemetryOptions: Options.Create(new StorageTelemetryOptions()),
             logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
@@ -343,6 +344,7 @@ public class HostedRunnerAuditTests
         await db.SaveChangesAsync();
         var handler = new InfrastructureActionProvisioningHandler(
             db, null!, null!, null!, null!, null!, Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()),
             NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         Assert.ThrowsAsync<LifecycleClaimPersistenceException>(() =>
@@ -519,6 +521,7 @@ public class HostedRunnerAuditTests
         var handler = new InfrastructureActionProvisioningHandler(
             db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
             Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
+            Options.Create(new StorageTelemetryOptions()),
             NullLogger<InfrastructureActionProvisioningHandler>.Instance);
         using var result = JsonDocument.Parse("{}");
 

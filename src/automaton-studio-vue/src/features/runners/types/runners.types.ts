@@ -53,6 +53,14 @@ export interface Runner {
   projectName?: string | null
   hostedRunnerId?: string | null
   isHostedRunner: boolean
+  storageAllowanceBytes?: number | null
+  storageTotalBytes?: number | null
+  storageUsagePercent?: number | null
+  storageMeasuredAtUtc?: string | null
+  storageMeasurementSource?: string | null
+  storageMeasurementStatus?: string | null
+  storageState?: string | null
+  storageMeasurementError?: string | null
 }
 
 /**

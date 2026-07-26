@@ -83,7 +83,23 @@ public class RunnerService
             cancellationToken);
         var hostedRunnerLookup = await BuildHostedRunnerLookup(runnerEntities.Select(r => r.Id), cancellationToken);
 
-        return await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, hostedRunnerLookup, cancellationToken);
+        var results = (await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, hostedRunnerLookup, cancellationToken)).ToList();
+        var hostedStorage = await dbContext.HostedRunners.AsNoTracking()
+            .Where(x => x.RunnerId != null && runnerEntities.Select(r => r.Id).Contains(x.RunnerId.Value))
+            .ToDictionaryAsync(x => x.RunnerId!.Value, cancellationToken);
+        foreach (var result in results)
+        {
+            if (!hostedStorage.TryGetValue(result.Id, out var hosted)) continue;
+            result.StorageAllowanceBytes = hosted.StorageAllowanceBytes;
+            result.StorageTotalBytes = hosted.StorageTotalBytes;
+            result.StorageUsagePercent = hosted.StorageUsagePercent;
+            result.StorageMeasuredAtUtc = hosted.StorageMeasuredAtUtc;
+            result.StorageMeasurementSource = hosted.StorageMeasurementSource;
+            result.StorageMeasurementStatus = hosted.StorageMeasurementStatus;
+            result.StorageState = hosted.StorageState;
+            result.StorageMeasurementError = hosted.StorageMeasurementError;
+        }
+        return results;
     }
 
     public Runner Get(Guid id)

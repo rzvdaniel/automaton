@@ -48,6 +48,9 @@ public static class AuditEventTypes
     public const string RunnerReprovisionFailed = "RunnerReprovisionFailed";
     public const string HostedRunnerDeleted = "HostedRunnerDeleted";
     public const string HostedRunnerDeleteFailed = "HostedRunnerDeleteFailed";
+    public const string HostedRunnerStorageVerificationRequested = Models.StorageTelemetryAuditEvents.VerificationRequested;
+    public const string HostedRunnerStorageVerificationSucceeded = Models.StorageTelemetryAuditEvents.VerificationSucceeded;
+    public const string HostedRunnerStorageVerificationFailed = Models.StorageTelemetryAuditEvents.VerificationFailed;
     public const string UserRegistered = "UserRegistered";
     public const string UserDisabled = "UserDisabled";
     public const string UserEnabled = "UserEnabled";

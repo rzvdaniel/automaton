@@ -50,6 +50,7 @@ builder.Services.AddSerilog((services, config) =>
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
 builder.Services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));
+builder.Services.Configure<Automaton.Api.Models.StorageTelemetryOptions>(builder.Configuration.GetSection("StorageTelemetry"));
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -70,6 +71,7 @@ builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent
 builder.Services.AddHostedService<CliAuthorizationCleanupService>();
 builder.Services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
 builder.Services.AddHostedService<ActionSchedulePollingService>();
+builder.Services.AddHostedService<HostedRunnerStorageReconciliationService>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")

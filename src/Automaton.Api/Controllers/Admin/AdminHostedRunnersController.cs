@@ -6,6 +6,8 @@ using Automaton.Api.Models;
 using Automaton.Api.Entities;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Services.Interfaces;
 
 namespace Automaton.Api.Controllers.Admin;
 
@@ -21,6 +23,7 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
     private readonly InfrastructureRunnerHostApprovalService hostApprovalService;
+    private readonly IAuditEventService auditEventService;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
@@ -29,7 +32,8 @@ public class AdminHostedRunnersController : ControllerBase
         RunnerEnrollmentService runnerEnrollmentService,
         ApiKeyService apiKeyService,
         UserContextService userContextService,
-        InfrastructureRunnerHostApprovalService hostApprovalService)
+        InfrastructureRunnerHostApprovalService hostApprovalService,
+        IAuditEventService auditEventService)
     {
         this.db = db;
         this.provisioningService = provisioningService;
@@ -38,6 +42,40 @@ public class AdminHostedRunnersController : ControllerBase
         this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
         this.hostApprovalService = hostApprovalService;
+        this.auditEventService = auditEventService;
+    }
+
+    [HttpPost("runners/{id:guid}/verify-storage")]
+    public async Task<ActionResult> VerifyStorage(Guid id, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
+        if (runner == null) return NotFound();
+        var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
+        var key = $"storage-verification:{id:N}:admin:{window}";
+        var existing = await db.HostedRunnerStorageVerifications
+            .FirstOrDefaultAsync(x => x.IdempotencyKey == key, cancellationToken);
+        if (existing != null) return Accepted(new { existing.Id, existing.Status });
+        var verification = new HostedRunnerStorageVerification
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = id, IdempotencyKey = key,
+            Status = StorageVerificationStatuses.Pending, Reason = "AdministratorRequested",
+            RequestedAtUtc = DateTime.UtcNow
+        };
+        db.HostedRunnerStorageVerifications.Add(verification);
+        runner.StorageVerificationRequestedAtUtc = verification.RequestedAtUtc;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = runner.Id,
+            EventType = AuditEventTypes.HostedRunnerStorageVerificationRequested,
+            Outcome = AuditOutcomes.Success,
+            Message = $"Storage verification was requested for hosted Runner '{runner.Name}'.",
+            TargetUserId = runner.UserId,
+            Metadata = new { VerificationId = verification.Id, verification.Reason, runner.RunnerHostId }
+        }, cancellationToken);
+        return Accepted(new { verification.Id, verification.Status });
     }
 
     [HttpPost("infrastructure-runner/enrollment-keys")]
@@ -239,6 +277,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -266,6 +305,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .Where(x => x.Id == hostedRunner.Id)
             .FirstAsync(cancellationToken);
 
@@ -309,6 +349,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .FirstAsync(x => x.Id == hostedRunnerId, cancellationToken);
 
         return ToResponse(runner);
@@ -353,6 +394,12 @@ public class AdminHostedRunnersController : ControllerBase
             TotalDiskMb = host.TotalDiskMb,
             ReservedDiskMb = host.ReservedDiskMb,
             UsedDiskMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.DiskLimitMb),
+            StorageMeasuredAtUtc = host.StorageMeasuredAtUtc,
+            StorageAvailableBytes = host.StorageAvailableBytes,
+            StorageReserveRequiredBytes = host.StorageReserveRequiredBytes,
+            StorageState = host.StorageState,
+            StorageMeasurementStatus = host.StorageMeasurementStatus,
+            StorageMeasurementError = host.StorageMeasurementError,
             HostedRunnerCount = assigned.Count,
             CreatedAt = host.CreatedAt,
             UpdatedAt = host.UpdatedAt,
@@ -420,6 +467,7 @@ public class AdminHostedRunnersController : ControllerBase
     private static HostedRunnerResponse ToResponse(HostedRunner runner)
     {
         var deployment = runner.Deployments.OrderByDescending(x => x.StartedAt).FirstOrDefault();
+        var verification = runner.StorageVerifications.OrderByDescending(x => x.RequestedAtUtc).FirstOrDefault();
         var runnerConnectivityStatus = runner.Runner == null
             ? RunnerStatus.None.ToString()
             : RunnerPresenceEvaluator.DeriveStatus(runner.Runner.ConnectionId, runner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString();
@@ -453,6 +501,29 @@ public class AdminHostedRunnersController : ControllerBase
             UpdatedAt = runner.UpdatedAt,
             ProvisionedAt = runner.ProvisionedAt,
             DeletedAt = runner.DeletedAt,
+            StorageAllowanceBytes = runner.StorageAllowanceBytes,
+            StorageMeasuredAtUtc = runner.StorageMeasuredAtUtc,
+            StorageMeasurementSource = runner.StorageMeasurementSource,
+            StorageMeasurementStatus = runner.StorageMeasurementStatus,
+            StorageSystemBytes = runner.StorageSystemBytes,
+            StorageUserBytes = runner.StorageUserBytes,
+            StorageTotalBytes = runner.StorageTotalBytes,
+            StorageUsagePercent = runner.StorageUsagePercent,
+            StorageState = runner.StorageState,
+            StorageMeasurementError = runner.StorageMeasurementError,
+            StorageVerificationRequestedAtUtc = runner.StorageVerificationRequestedAtUtc,
+            StorageVerifiedAtUtc = runner.StorageVerifiedAtUtc,
+            StorageVerifiedTotalBytes = runner.StorageVerifiedTotalBytes,
+            StorageSelfReportedAtUtc = runner.StorageSelfReportedAtUtc,
+            StorageSelfReportedTotalBytes = runner.StorageSelfReportedTotalBytes,
+            StorageSelfReportedStatus = runner.StorageSelfReportedStatus,
+            StorageSelfReportedError = runner.StorageSelfReportedError,
+            HostStorageAvailableBytes = runner.RunnerHost?.StorageAvailableBytes,
+            HostStorageReserveRequiredBytes = runner.RunnerHost?.StorageReserveRequiredBytes,
+            HostStorageState = runner.RunnerHost?.StorageState,
+            StorageVerificationStatus = verification?.Status,
+            StorageVerificationReason = verification?.Reason,
+            StorageVerificationError = verification?.Error,
             LatestDeployment = deployment == null ? null : new HostedRunnerDeploymentResponse
             {
                 Id = deployment.Id,
@@ -503,6 +574,12 @@ public record RunnerHostResponse
     public int TotalDiskMb { get; init; }
     public int ReservedDiskMb { get; init; }
     public int UsedDiskMb { get; init; }
+    public DateTime? StorageMeasuredAtUtc { get; init; }
+    public long? StorageAvailableBytes { get; init; }
+    public long? StorageReserveRequiredBytes { get; init; }
+    public string StorageState { get; init; } = RunnerHostStorageStates.Unknown;
+    public string StorageMeasurementStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public string? StorageMeasurementError { get; init; }
     public int HostedRunnerCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
@@ -570,6 +647,29 @@ public record HostedRunnerResponse
     public DateTime? ProvisionedAt { get; init; }
     public DateTime? DeletedAt { get; init; }
     public HostedRunnerDeploymentResponse? LatestDeployment { get; init; }
+    public long StorageAllowanceBytes { get; init; }
+    public DateTime? StorageMeasuredAtUtc { get; init; }
+    public string StorageMeasurementSource { get; init; } = StorageMeasurementSources.RunnerSelfReported;
+    public string StorageMeasurementStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public long? StorageSystemBytes { get; init; }
+    public long? StorageUserBytes { get; init; }
+    public long? StorageTotalBytes { get; init; }
+    public decimal? StorageUsagePercent { get; init; }
+    public string StorageState { get; init; } = HostedRunnerStorageStates.Unknown;
+    public string? StorageMeasurementError { get; init; }
+    public DateTime? StorageVerificationRequestedAtUtc { get; init; }
+    public DateTime? StorageVerifiedAtUtc { get; init; }
+    public long? StorageVerifiedTotalBytes { get; init; }
+    public DateTime? StorageSelfReportedAtUtc { get; init; }
+    public long? StorageSelfReportedTotalBytes { get; init; }
+    public string StorageSelfReportedStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public string? StorageSelfReportedError { get; init; }
+    public long? HostStorageAvailableBytes { get; init; }
+    public long? HostStorageReserveRequiredBytes { get; init; }
+    public string? HostStorageState { get; init; }
+    public string? StorageVerificationStatus { get; init; }
+    public string? StorageVerificationReason { get; init; }
+    public string? StorageVerificationError { get; init; }
 }
 
 public record HostedRunnerDeploymentResponse
