@@ -15,6 +15,7 @@ else
     APPS_DIR="$WORKSPACE_ROOT/apps"
 fi
 mkdir -p "$APPS_DIR" "$WORKSPACE_ROOT/data" "$WORKSPACE_ROOT/cache" "$WORKSPACE_ROOT/runner"
+mkdir -p /automaton/storage/logs /automaton/storage/home
 
 # (Re)install system packages declared by apps via system-requirements.txt.
 # apt-get packages are installed to the container filesystem (ephemeral), so they must be

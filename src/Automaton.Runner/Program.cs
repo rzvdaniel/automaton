@@ -355,6 +355,7 @@ public class Program
                 services.AddSingleton<RunnerRuntimeGatewayService>();
                 services.AddHostedService(sp => sp.GetRequiredService<RunnerRuntimeGatewayService>());
                 services.AddSingleton<HubService>();
+                services.AddHostedService<StorageTelemetryBackgroundService>();
                 services.AddSingleton<FlowExecutionService>();
                 services.AddSingleton<AppFlowExecutionService>();
                 services.AddSingleton<RunnerHostService>();

@@ -51,6 +51,173 @@ namespace Automaton.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ActionSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ActionKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ConcurrencyPolicy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CronExpression")
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("ExecutionScope")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("InputJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("IntervalSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("LastExecutionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("LastTriggeredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<string>("MisfirePolicy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<DateTime?>("NextRunAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("OwnerType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("RunAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ScheduleType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("SystemIdentity")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("SystemIdentity")
+                        .IsUnique();
+
+                    b.HasIndex("Enabled", "NextRunAtUtc");
+
+                    b.HasIndex("OwnerType", "OwnerUserId", "ApplicationId");
+
+                    b.ToTable("ActionSchedules", t =>
+                        {
+                            t.HasCheckConstraint("CK_ActionSchedules_Owner", "(`OwnerType` = 'User' AND `OwnerUserId` IS NOT NULL) OR (`OwnerType` = 'System' AND `OwnerUserId` IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.ActionScheduleOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("ExecutionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("FailureSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<Guid>("ScheduleId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("ScheduledForUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime>("TriggeredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("ScheduleId", "Status", "ScheduledForUtc");
+
+                    b.ToTable("ActionScheduleOccurrences");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
                 {
                     b.Property<Guid>("Id")
@@ -647,6 +814,9 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("char(36)");
 
+                    b.Property<Guid?>("ScheduleOccurrenceId")
+                        .HasColumnType("char(36)");
+
                     b.Property<DateTime?>("StartedAtUtc")
                         .HasColumnType("datetime(6)");
 
@@ -668,6 +838,9 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("RequestedByUserId");
 
                     b.HasIndex("RunnerId");
+
+                    b.HasIndex("ScheduleOccurrenceId")
+                        .IsUnique();
 
                     b.HasIndex("AppId", "CreatedAtUtc");
 
@@ -1413,22 +1586,45 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("EnforcementState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("None");
+
+                    b.Property<DateTime?>("GracePeriodEndsAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<Guid>("HostedRunnerSpecificationId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("LastEnforcementReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("LastNotificationAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("varchar(160)");
 
+                    b.Property<DateTime?>("OverLimitSinceUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("PendingSpecificationSnapshot")
                         .HasColumnType("json");
 
                     b.Property<DateTime?>("ProvisionedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("RecoveredAtUtc")
                         .HasColumnType("datetime(6)");
 
                     b.Property<Guid?>("RunnerHostId")
@@ -1455,6 +1651,93 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)");
+
+                    b.Property<long>("StorageAllowanceBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StorageMeasuredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("StorageMeasurementError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("StorageMeasurementSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("RunnerSelfReported");
+
+                    b.Property<string>("StorageMeasurementStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("NeverMeasured");
+
+                    b.Property<DateTime?>("StorageReceivedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("StorageSelfReportedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("StorageSelfReportedError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("StorageSelfReportedStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("NeverMeasured");
+
+                    b.Property<long?>("StorageSelfReportedSystemBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageSelfReportedTotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageSelfReportedUserBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<long?>("StorageSystemBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageTotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("StorageUsagePercent")
+                        .HasColumnType("decimal(7,2)");
+
+                    b.Property<long?>("StorageUserBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StorageVerificationRequestedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("StorageVerifiedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long?>("StorageVerifiedSystemBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageVerifiedTotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageVerifiedUserBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("SuspendedAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -1662,6 +1945,103 @@ namespace Automaton.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("HostedRunnerSpecificationRevisions");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerStorageObservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<Guid>("HostedRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("MeasuredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("RunnerVersion")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<long>("SystemBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostedRunnerId", "MeasuredAtUtc");
+
+                    b.ToTable("HostedRunnerStorageObservations");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerStorageVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<Guid>("HostedRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("HostedRunnerId", "Status");
+
+                    b.ToTable("HostedRunnerStorageVerifications");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecution", b =>
@@ -2549,6 +2929,12 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<long?>("DockerFilesystemAvailableBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DockerFilesystemTotalBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("HealthJson")
                         .HasColumnType("json");
 
@@ -2635,6 +3021,12 @@ namespace Automaton.Api.Migrations
                     b.Property<int>("ReservedMemoryMb")
                         .HasColumnType("int");
 
+                    b.Property<long?>("RootFilesystemAvailableBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("RootFilesystemTotalBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("RuntimeConnectivityMode")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -2644,6 +3036,42 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)");
+
+                    b.Property<long?>("StorageAvailableBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StorageMeasuredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("StorageMeasurementError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<string>("StorageMeasurementStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("NeverMeasured");
+
+                    b.Property<DateTime?>("StorageReceivedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<long?>("StorageReserveRequiredBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<long?>("StorageTotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("StorageUsedBytes")
+                        .HasColumnType("bigint");
 
                     b.Property<decimal>("TotalCpuCores")
                         .HasColumnType("decimal(5,2)");
@@ -3464,6 +3892,25 @@ namespace Automaton.Api.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.ActionSchedule", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.ActionScheduleOccurrence", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.ActionSchedule", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AiApiKey", b =>
                 {
                     b.HasOne("Automaton.Api.Entities.AiProvider", "AiProvider")
@@ -3737,6 +4184,28 @@ namespace Automaton.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Specification");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerStorageObservation", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.HostedRunner", "HostedRunner")
+                        .WithMany("StorageObservations")
+                        .HasForeignKey("HostedRunnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HostedRunner");
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerStorageVerification", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.HostedRunner", "HostedRunner")
+                        .WithMany("StorageVerifications")
+                        .HasForeignKey("HostedRunnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HostedRunner");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecutionLog", b =>
@@ -4306,6 +4775,10 @@ namespace Automaton.Api.Migrations
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunner", b =>
                 {
                     b.Navigation("Deployments");
+
+                    b.Navigation("StorageObservations");
+
+                    b.Navigation("StorageVerifications");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.HostedRunnerDeployment", b =>

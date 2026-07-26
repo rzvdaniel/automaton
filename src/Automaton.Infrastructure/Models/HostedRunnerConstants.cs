@@ -76,6 +76,7 @@ public static class HostedRunnerStatuses
     public const string Provisioning = "provisioning";
     public const string Reprovisioning = "reprovisioning";
     public const string Running = "running";
+    public const string Suspended = "suspended";
     public const string Failed = "failed";
     public const string Disabled = "disabled";
     public const string Deleting = "deleting";
@@ -89,6 +90,16 @@ public static class HostedRunnerDeploymentActions
     public const string Deprovision = "deprovision";
     public const string Restart = "restart";
     public const string Reprovision = "reprovision";
+    public const string Suspend = "suspend";
+    public const string Resume = "resume";
+}
+
+public static class HostedRunnerDataDispositions
+{
+    public const string Preserve = "preserve";
+    public const string Delete = "delete";
+
+    public static bool IsValid(string? value) => value is Preserve or Delete;
 }
 
 public static class HostedRunnerDeploymentStatuses

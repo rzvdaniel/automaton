@@ -16,6 +16,7 @@
     <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.MySql" Version="10.0.1" />
     <PackageReference Include="DotNetCore.CAP.RabbitMQ" Version="10.0.1" />
+    <PackageReference Include="Cronos" Version="0.13.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="Fluid.Core" Version="2.31.0" />
     <PackageReference Include="Hangfire" Version="1.8.16" />

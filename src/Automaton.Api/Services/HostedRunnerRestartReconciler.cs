@@ -64,6 +64,12 @@ public sealed class HostedRunnerRestartReconciler(
                 .SingleAsync(x => x.Id == id, cancellationToken);
             operation.HostedRunner.Status = HostedRunnerStatuses.Failed;
             operation.HostedRunner.LastError = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
+            if (operation.Action == HostedRunnerDeploymentActions.Resume)
+            {
+                operation.HostedRunner.Status = HostedRunnerStatuses.Suspended;
+                operation.HostedRunner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+                operation.HostedRunner.LastEnforcementReason = HostedRunnerDeploymentErrors.RestartReconnectTimedOut;
+            }
             operation.HostedRunner.UpdatedAt = now;
             await db.SaveChangesAsync(cancellationToken);
             await auditEventService.WriteAsync(new AuditEventWriteRequest

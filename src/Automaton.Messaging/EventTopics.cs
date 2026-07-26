@@ -7,4 +7,5 @@ public static class EventTopics
     public const string InfrastructureActionExecutionRequested = "infrastructure-action.execution-requested";
     public const string ManagedRunnerProvisionCompleted = "managed-runner.provision-completed";
     public const string ManagedRunnerProvisionFailed = "managed-runner.provision-failed";
+    public const string ScheduledActionExecutionRequested = "scheduled-action.execution-requested";
 }

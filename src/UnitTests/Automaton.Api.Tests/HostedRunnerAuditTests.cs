@@ -9,6 +9,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
+using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 
 using Microsoft.AspNetCore.Http;
@@ -123,7 +124,9 @@ public class HostedRunnerAuditTests
         using var db = CreateDbContext();
         var planId = SeedHostedRunnerPlan(db);
         var host = SeedRunnerHost(db);
-        host.TotalCpuCores = 1;
+        // The Free specification requests 0.50 CPU, so this host can fit one
+        // Runner but must reject a second.
+        host.TotalCpuCores = 0.75m;
         host.TotalMemoryMb = 1024;
         host.TotalDiskMb = 4096;
         db.SaveChanges();
@@ -246,6 +249,7 @@ public class HostedRunnerAuditTests
             secretGrantService: null!,
             actionDeploymentService: null!,
             hostedRunnerOptions: Options.Create(new HostedRunnerOptions()),
+            storageTelemetryOptions: Options.Create(new StorageTelemetryOptions()),
             logger: NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         await handler.HandleAsync(new InfrastructureActionExecutionRequestedEvent
@@ -305,6 +309,7 @@ public class HostedRunnerAuditTests
             CREATE TABLE AppModuleExecutions (
                 Id TEXT NOT NULL PRIMARY KEY,
                 HostedRunnerOperationId TEXT NULL,
+                ScheduleOccurrenceId TEXT NULL,
                 AppId TEXT NOT NULL,
                 ModuleType TEXT NOT NULL,
                 ModuleKey TEXT NOT NULL,
@@ -339,6 +344,7 @@ public class HostedRunnerAuditTests
         await db.SaveChangesAsync();
         var handler = new InfrastructureActionProvisioningHandler(
             db, null!, null!, null!, null!, null!, Options.Create(new HostedRunnerOptions()),
+            Options.Create(new StorageTelemetryOptions()),
             NullLogger<InfrastructureActionProvisioningHandler>.Instance);
 
         Assert.ThrowsAsync<LifecycleClaimPersistenceException>(() =>
@@ -515,6 +521,7 @@ public class HostedRunnerAuditTests
         var handler = new InfrastructureActionProvisioningHandler(
             db, null!, new NoOpEventPublisher(), new NoOpAuditEventService(), null!, null!,
             Options.Create(new HostedRunnerOptions { RestartReconnectTimeoutSeconds = 60 }),
+            Options.Create(new StorageTelemetryOptions()),
             NullLogger<InfrastructureActionProvisioningHandler>.Instance);
         using var result = JsonDocument.Parse("{}");
 
@@ -744,6 +751,83 @@ public class HostedRunnerAuditTests
             AuditEventTypes.RunnerRestartRequested
         }));
         Assert.That(db.HostedRunnerDeployments.Single().Status, Is.EqualTo(HostedRunnerDeploymentStatuses.Queued));
+    }
+
+    [Test]
+    public async Task RestartAsAdminAsync_QueuesRestartWithoutVolumeDisposition()
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var hostedRunner = SeedManagedHostedRunner(db, userId);
+        var publisher = new RecordingEventPublisher();
+        var managementService = CreateManagementService(
+            db,
+            userId,
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            publisher);
+
+        await managementService.RestartAsAdminAsync(hostedRunner.Id, CancellationToken.None);
+
+        var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
+        Assert.That(request.ActionKey, Is.EqualTo("restart-hosted-runner"));
+        Assert.That(request.InputJson, Does.Not.Contain("preserveVolumes"));
+        Assert.That(request.InputJson, Does.Not.Contain("VolumeName"));
+    }
+
+    [TestCase(HostedRunnerDataDispositions.Preserve, true)]
+    [TestCase(HostedRunnerDataDispositions.Delete, false)]
+    public async Task DeleteAsAdminAsync_PublishesExplicitDataDisposition(
+        string disposition,
+        bool expectedPreserveVolumes)
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var hostedRunner = SeedManagedHostedRunner(db, userId);
+        var publisher = new RecordingEventPublisher();
+        var managementService = CreateManagementService(
+            db,
+            userId,
+            new FakeHostedRunnerRemoteCommandExecutor(),
+            publisher);
+
+        await managementService.DeleteAsAdminAsync(
+            hostedRunner.Id,
+            disposition,
+            CancellationToken.None);
+
+        var request = publisher.Messages.OfType<InfrastructureActionExecutionRequestedEvent>().Single();
+        using var input = JsonDocument.Parse(request.InputJson);
+        Assert.Multiple(() =>
+        {
+            Assert.That(request.ActionKey, Is.EqualTo("delete-hosted-runner"));
+            Assert.That(input.RootElement.GetProperty("preserveVolumes").GetBoolean(),
+                Is.EqualTo(expectedPreserveVolumes));
+            Assert.That(input.RootElement.GetProperty("systemVolumeName").GetString(),
+                Is.EqualTo($"automaton-hosted-runner-{hostedRunner.Id:N}-system"));
+            Assert.That(input.RootElement.GetProperty("userVolumeName").GetString(),
+                Is.EqualTo($"automaton-hosted-runner-{hostedRunner.Id:N}-user"));
+        });
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("invalid")]
+    public void DeleteAsAdminAsync_RejectsMissingOrInvalidDataDisposition(string? disposition)
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var managementService = CreateManagementService(
+            db,
+            userId,
+            new FakeHostedRunnerRemoteCommandExecutor());
+
+        var exception = Assert.ThrowsAsync<ArgumentException>(() =>
+            managementService.DeleteAsAdminAsync(
+                Guid.NewGuid(),
+                disposition!,
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("preserve").And.Contain("delete"));
     }
 
     [Test]
@@ -1012,7 +1096,8 @@ public class HostedRunnerAuditTests
     private static HostedRunnerManagementService CreateManagementService(
         ApplicationDbContext db,
         Guid actorUserId,
-        FakeHostedRunnerRemoteCommandExecutor remoteExecutor)
+        FakeHostedRunnerRemoteCommandExecutor remoteExecutor,
+        IEventPublisher? eventPublisher = null)
     {
         var httpContextAccessor = CreateHttpContextAccessor(actorUserId, "admin@automaton.test");
         var userContextService = new UserContextService(httpContextAccessor);
@@ -1029,7 +1114,7 @@ public class HostedRunnerAuditTests
         return new HostedRunnerManagementService(
             db,
             provisioningService,
-            new NoOpEventPublisher(),
+            eventPublisher ?? new NoOpEventPublisher(),
             new TestOptionsSnapshot<HostedRunnerOptions>(new HostedRunnerOptions
             {
                 Enabled = true
@@ -1076,6 +1161,19 @@ public class HostedRunnerAuditTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(ProvisionResult);
+        }
+    }
+
+    private sealed class RecordingEventPublisher : IEventPublisher
+    {
+        public List<object> Messages { get; } = [];
+
+        public Task PublishAsync<T>(
+            T message,
+            CancellationToken cancellationToken = default) where T : class
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
         }
     }
 

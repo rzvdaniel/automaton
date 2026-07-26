@@ -6,6 +6,11 @@ using Automaton.Api.Models;
 using Automaton.Api.Entities;
 using Automaton.Api.Data;
 using Automaton.Api.Services;
+using Automaton.Api.Constants;
+using Automaton.Api.Services.Interfaces;
+using Automaton.Messaging.Abstractions;
+using Automaton.Messaging.Events;
+using System.Text.Json;
 
 namespace Automaton.Api.Controllers.Admin;
 
@@ -21,6 +26,9 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly ApiKeyService apiKeyService;
     private readonly UserContextService userContextService;
     private readonly InfrastructureRunnerHostApprovalService hostApprovalService;
+    private readonly IAuditEventService auditEventService;
+    private readonly IEventPublisher eventPublisher;
+    private readonly ITransactionalEventExecutor transactionalEventExecutor;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
@@ -29,7 +37,10 @@ public class AdminHostedRunnersController : ControllerBase
         RunnerEnrollmentService runnerEnrollmentService,
         ApiKeyService apiKeyService,
         UserContextService userContextService,
-        InfrastructureRunnerHostApprovalService hostApprovalService)
+        InfrastructureRunnerHostApprovalService hostApprovalService,
+        IAuditEventService auditEventService,
+        IEventPublisher eventPublisher,
+        ITransactionalEventExecutor transactionalEventExecutor)
     {
         this.db = db;
         this.provisioningService = provisioningService;
@@ -38,7 +49,127 @@ public class AdminHostedRunnersController : ControllerBase
         this.apiKeyService = apiKeyService;
         this.userContextService = userContextService;
         this.hostApprovalService = hostApprovalService;
+        this.auditEventService = auditEventService;
+        this.eventPublisher = eventPublisher;
+        this.transactionalEventExecutor = transactionalEventExecutor;
     }
+
+    [HttpPost("runners/{id:guid}/verify-storage")]
+    public async Task<ActionResult> VerifyStorage(Guid id, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
+        if (runner == null) return NotFound();
+        var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
+        var key = $"storage-verification:{id:N}:admin:{window}";
+        var existing = await db.HostedRunnerStorageVerifications
+            .FirstOrDefaultAsync(x => x.IdempotencyKey == key, cancellationToken);
+        if (existing != null) return Accepted(new { existing.Id, existing.Status });
+        var verification = new HostedRunnerStorageVerification
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = id, IdempotencyKey = key,
+            Status = StorageVerificationStatuses.Pending, Reason = "AdministratorRequested",
+            RequestedAtUtc = DateTime.UtcNow
+        };
+        db.HostedRunnerStorageVerifications.Add(verification);
+        runner.StorageVerificationRequestedAtUtc = verification.RequestedAtUtc;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Created,
+            EntityType = AuditEntityTypes.HostedRunner,
+            EntityId = runner.Id,
+            EventType = AuditEventTypes.HostedRunnerStorageVerificationRequested,
+            Outcome = AuditOutcomes.Success,
+            Message = $"Storage verification was requested for hosted Runner '{runner.Name}'.",
+            TargetUserId = runner.UserId,
+            Metadata = new { VerificationId = verification.Id, verification.Reason, runner.RunnerHostId }
+        }, cancellationToken);
+        return Accepted(new { verification.Id, verification.Status });
+    }
+
+    [HttpPost("runners/{id:guid}/suspend")]
+    public Task<ActionResult> Suspend(Guid id, CancellationToken cancellationToken) => QueueEnforcementActionAsync(id, StorageEnforcementActions.SuspendHostedRunner, cancellationToken);
+
+    [HttpPost("runners/{id:guid}/resume")]
+    public Task<ActionResult> Resume(Guid id, CancellationToken cancellationToken) => QueueEnforcementActionAsync(id, StorageEnforcementActions.ResumeHostedRunner, cancellationToken);
+
+    [HttpPost("runners/{id:guid}/extend-grace")]
+    public async Task<ActionResult> ExtendGrace(Guid id, ExtendStorageGracePeriodRequest request, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
+        if (runner == null) return NotFound();
+        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending or HostedRunnerEnforcementStates.SuspensionPending)
+            return Conflict(new { message = "Extend grace is unavailable while a suspension or resume operation is active." });
+        runner.EnforcementState = HostedRunnerEnforcementStates.GracePeriod;
+        runner.GracePeriodEndsAtUtc = DateTime.UtcNow.AddHours(Math.Clamp(request.Hours, 1, 720));
+        runner.LastEnforcementReason = "Grace period extended by an administrator.";
+        runner.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementGraceExtended, "Grace period extended by an administrator.", cancellationToken);
+        return Ok(new { runner.Id, runner.EnforcementState, runner.GracePeriodEndsAtUtc });
+    }
+
+    [HttpPost("runners/{id:guid}/clear-enforcement")]
+    public async Task<ActionResult> ClearEnforcement(Guid id, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
+        if (runner == null) return NotFound();
+        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending or HostedRunnerEnforcementStates.SuspensionPending)
+            return Conflict(new { message = "Resume the Runner and complete its lifecycle operation before clearing enforcement state." });
+        runner.EnforcementState = HostedRunnerEnforcementStates.None;
+        runner.OverLimitSinceUtc = null;
+        runner.GracePeriodEndsAtUtc = null;
+        runner.LastEnforcementReason = "Enforcement state cleared by an administrator.";
+        runner.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await WriteEnforcementAuditAsync(runner, StorageTelemetryAuditEvents.EnforcementCleared, "Enforcement state cleared by an administrator.", cancellationToken);
+        return Ok(new { runner.Id, runner.EnforcementState });
+    }
+
+    private async Task<ActionResult> QueueEnforcementActionAsync(Guid id, string actionKey, CancellationToken cancellationToken)
+    {
+        var runner = await db.HostedRunners.Include(x => x.RunnerHost).FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
+        if (runner == null) return NotFound();
+        var action = actionKey == StorageEnforcementActions.SuspendHostedRunner ? HostedRunnerDeploymentActions.Suspend : HostedRunnerDeploymentActions.Resume;
+        var existing = await db.HostedRunnerDeployments.FirstOrDefaultAsync(x => x.HostedRunnerId == id && x.Action == action &&
+            (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
+        if (existing != null) return Accepted(new { existing.Id, existing.Status });
+        if (runner.RunnerHostId == null) return BadRequest(new { message = "The hosted Runner has no assigned Runner Host." });
+        if (action == HostedRunnerDeploymentActions.Resume && runner.EnforcementState != HostedRunnerEnforcementStates.Suspended)
+            return Conflict(new { message = "Resume is only available for a suspended Runner." });
+        if (action == HostedRunnerDeploymentActions.Suspend && (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended || runner.EnforcementState == HostedRunnerEnforcementStates.ResumePending || runner.EnforcementState == HostedRunnerEnforcementStates.SuspensionPending))
+            return Conflict(new { message = "The Runner is already suspended or has a suspension operation in progress." });
+        var operation = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = id, Action = action, Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow, Logs = "Administrator requested storage enforcement action." };
+        var message = new InfrastructureActionExecutionRequestedEvent
+        {
+            OperationId = operation.Id, HostedRunnerId = id, UserId = runner.UserId, RunnerHostId = runner.RunnerHostId.Value,
+            ActionKey = actionKey,
+            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
+            CorrelationId = $"admin-storage-enforcement:{operation.Id:N}"
+        };
+        await transactionalEventExecutor.ExecuteAsync(async token =>
+        {
+            db.HostedRunnerDeployments.Add(operation);
+            runner.EnforcementState = action == HostedRunnerDeploymentActions.Suspend
+                ? HostedRunnerEnforcementStates.SuspensionPending
+                : HostedRunnerEnforcementStates.ResumePending;
+            runner.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(token);
+            await eventPublisher.PublishAsync(message, token);
+        }, cancellationToken);
+        await WriteEnforcementAuditAsync(runner,
+            actionKey == StorageEnforcementActions.SuspendHostedRunner ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested : StorageTelemetryAuditEvents.EnforcementResumeRequested,
+            $"Administrator requested '{actionKey}'.", cancellationToken);
+        return Accepted(new { operation.Id, operation.Status });
+    }
+
+    private Task WriteEnforcementAuditAsync(HostedRunner runner, string eventType, string message, CancellationToken cancellationToken) =>
+        auditEventService.WriteAsync(new AuditEventWriteRequest
+        {
+            Action = AuditActions.Changed, EntityType = AuditEntityTypes.HostedRunner, EntityId = runner.Id,
+            EventType = eventType, Outcome = AuditOutcomes.Success, Message = message,
+            TargetUserId = runner.UserId, Metadata = new { runner.EnforcementState, runner.StorageState }
+        }, cancellationToken);
 
     [HttpPost("infrastructure-runner/enrollment-keys")]
     public async Task<ActionResult<InfrastructureRunnerEnrollmentKeyResponse>> CreateInfrastructureRunnerEnrollmentKey(
@@ -239,6 +370,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -266,6 +398,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .Where(x => x.Id == hostedRunner.Id)
             .FirstAsync(cancellationToken);
 
@@ -287,9 +420,17 @@ public class AdminHostedRunnersController : ControllerBase
     }
 
     [HttpDelete("runners/{id:guid}")]
-    public async Task<IActionResult> DeleteHostedRunner(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteHostedRunner(
+        Guid id,
+        DeleteHostedRunnerRequest? request,
+        CancellationToken cancellationToken)
     {
-        await managementService.DeleteAsAdminAsync(id, cancellationToken);
+        if (!HostedRunnerDataDispositions.IsValid(request?.DataDisposition))
+        {
+            return BadRequest(new { message = "Data disposition must be 'preserve' or 'delete'." });
+        }
+
+        await managementService.DeleteAsAdminAsync(id, request!.DataDisposition, cancellationToken);
         return NoContent();
     }
 
@@ -301,6 +442,7 @@ public class AdminHostedRunnersController : ControllerBase
             .Include(x => x.RunnerHost)
             .Include(x => x.Runner)
             .Include(x => x.Deployments.OrderByDescending(d => d.StartedAt).Take(1))
+            .Include(x => x.StorageVerifications.OrderByDescending(v => v.RequestedAtUtc).Take(1))
             .FirstAsync(x => x.Id == hostedRunnerId, cancellationToken);
 
         return ToResponse(runner);
@@ -345,6 +487,12 @@ public class AdminHostedRunnersController : ControllerBase
             TotalDiskMb = host.TotalDiskMb,
             ReservedDiskMb = host.ReservedDiskMb,
             UsedDiskMb = assigned.Sum(x => x.SpecificationSnapshot.Resources.DiskLimitMb),
+            StorageMeasuredAtUtc = host.StorageMeasuredAtUtc,
+            StorageAvailableBytes = host.StorageAvailableBytes,
+            StorageReserveRequiredBytes = host.StorageReserveRequiredBytes,
+            StorageState = host.StorageState,
+            StorageMeasurementStatus = host.StorageMeasurementStatus,
+            StorageMeasurementError = host.StorageMeasurementError,
             HostedRunnerCount = assigned.Count,
             CreatedAt = host.CreatedAt,
             UpdatedAt = host.UpdatedAt,
@@ -412,6 +560,7 @@ public class AdminHostedRunnersController : ControllerBase
     private static HostedRunnerResponse ToResponse(HostedRunner runner)
     {
         var deployment = runner.Deployments.OrderByDescending(x => x.StartedAt).FirstOrDefault();
+        var verification = runner.StorageVerifications.OrderByDescending(x => x.RequestedAtUtc).FirstOrDefault();
         var runnerConnectivityStatus = runner.Runner == null
             ? RunnerStatus.None.ToString()
             : RunnerPresenceEvaluator.DeriveStatus(runner.Runner.ConnectionId, runner.Runner.LastHeartbeatAtUtc, DateTime.UtcNow).ToString();
@@ -445,6 +594,36 @@ public class AdminHostedRunnersController : ControllerBase
             UpdatedAt = runner.UpdatedAt,
             ProvisionedAt = runner.ProvisionedAt,
             DeletedAt = runner.DeletedAt,
+            StorageAllowanceBytes = runner.StorageAllowanceBytes,
+            StorageMeasuredAtUtc = runner.StorageMeasuredAtUtc,
+            StorageMeasurementSource = runner.StorageMeasurementSource,
+            StorageMeasurementStatus = runner.StorageMeasurementStatus,
+            StorageSystemBytes = runner.StorageSystemBytes,
+            StorageUserBytes = runner.StorageUserBytes,
+            StorageTotalBytes = runner.StorageTotalBytes,
+            StorageUsagePercent = runner.StorageUsagePercent,
+            StorageState = runner.StorageState,
+            StorageMeasurementError = runner.StorageMeasurementError,
+            StorageVerificationRequestedAtUtc = runner.StorageVerificationRequestedAtUtc,
+            StorageVerifiedAtUtc = runner.StorageVerifiedAtUtc,
+            StorageVerifiedTotalBytes = runner.StorageVerifiedTotalBytes,
+            StorageSelfReportedAtUtc = runner.StorageSelfReportedAtUtc,
+            StorageSelfReportedTotalBytes = runner.StorageSelfReportedTotalBytes,
+            StorageSelfReportedStatus = runner.StorageSelfReportedStatus,
+            StorageSelfReportedError = runner.StorageSelfReportedError,
+            HostStorageAvailableBytes = runner.RunnerHost?.StorageAvailableBytes,
+            HostStorageReserveRequiredBytes = runner.RunnerHost?.StorageReserveRequiredBytes,
+            HostStorageState = runner.RunnerHost?.StorageState,
+            StorageVerificationStatus = verification?.Status,
+            StorageVerificationReason = verification?.Reason,
+            StorageVerificationError = verification?.Error,
+            EnforcementState = runner.EnforcementState,
+            OverLimitSinceUtc = runner.OverLimitSinceUtc,
+            GracePeriodEndsAtUtc = runner.GracePeriodEndsAtUtc,
+            SuspendedAtUtc = runner.SuspendedAtUtc,
+            RecoveredAtUtc = runner.RecoveredAtUtc,
+            LastEnforcementReason = runner.LastEnforcementReason,
+            LastNotificationAtUtc = runner.LastNotificationAtUtc,
             LatestDeployment = deployment == null ? null : new HostedRunnerDeploymentResponse
             {
                 Id = deployment.Id,
@@ -459,6 +638,9 @@ public class AdminHostedRunnersController : ControllerBase
         };
     }
 }
+
+public sealed record DeleteHostedRunnerRequest(string DataDisposition);
+public sealed record ExtendStorageGracePeriodRequest(int Hours);
 
 public record RunnerHostResponse
 {
@@ -493,6 +675,12 @@ public record RunnerHostResponse
     public int TotalDiskMb { get; init; }
     public int ReservedDiskMb { get; init; }
     public int UsedDiskMb { get; init; }
+    public DateTime? StorageMeasuredAtUtc { get; init; }
+    public long? StorageAvailableBytes { get; init; }
+    public long? StorageReserveRequiredBytes { get; init; }
+    public string StorageState { get; init; } = RunnerHostStorageStates.Unknown;
+    public string StorageMeasurementStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public string? StorageMeasurementError { get; init; }
     public int HostedRunnerCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
@@ -560,6 +748,36 @@ public record HostedRunnerResponse
     public DateTime? ProvisionedAt { get; init; }
     public DateTime? DeletedAt { get; init; }
     public HostedRunnerDeploymentResponse? LatestDeployment { get; init; }
+    public long StorageAllowanceBytes { get; init; }
+    public DateTime? StorageMeasuredAtUtc { get; init; }
+    public string StorageMeasurementSource { get; init; } = StorageMeasurementSources.RunnerSelfReported;
+    public string StorageMeasurementStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public long? StorageSystemBytes { get; init; }
+    public long? StorageUserBytes { get; init; }
+    public long? StorageTotalBytes { get; init; }
+    public decimal? StorageUsagePercent { get; init; }
+    public string StorageState { get; init; } = HostedRunnerStorageStates.Unknown;
+    public string? StorageMeasurementError { get; init; }
+    public DateTime? StorageVerificationRequestedAtUtc { get; init; }
+    public DateTime? StorageVerifiedAtUtc { get; init; }
+    public long? StorageVerifiedTotalBytes { get; init; }
+    public DateTime? StorageSelfReportedAtUtc { get; init; }
+    public long? StorageSelfReportedTotalBytes { get; init; }
+    public string StorageSelfReportedStatus { get; init; } = StorageMeasurementStatuses.NeverMeasured;
+    public string? StorageSelfReportedError { get; init; }
+    public long? HostStorageAvailableBytes { get; init; }
+    public long? HostStorageReserveRequiredBytes { get; init; }
+    public string? HostStorageState { get; init; }
+    public string? StorageVerificationStatus { get; init; }
+    public string? StorageVerificationReason { get; init; }
+    public string? StorageVerificationError { get; init; }
+    public string EnforcementState { get; init; } = HostedRunnerEnforcementStates.None;
+    public DateTime? OverLimitSinceUtc { get; init; }
+    public DateTime? GracePeriodEndsAtUtc { get; init; }
+    public DateTime? SuspendedAtUtc { get; init; }
+    public DateTime? RecoveredAtUtc { get; init; }
+    public string? LastEnforcementReason { get; init; }
+    public DateTime? LastNotificationAtUtc { get; init; }
 }
 
 public record HostedRunnerDeploymentResponse

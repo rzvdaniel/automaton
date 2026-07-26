@@ -4,6 +4,7 @@ public class AppModuleExecution
 {
     public Guid Id { get; set; }
     public Guid? HostedRunnerOperationId { get; set; }
+    public Guid? ScheduleOccurrenceId { get; set; }
     public HostedRunnerDeployment? HostedRunnerOperation { get; set; }
     public Guid AppId { get; set; }
     public string ModuleType { get; set; } = string.Empty;

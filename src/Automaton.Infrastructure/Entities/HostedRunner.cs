@@ -59,5 +59,38 @@ public class HostedRunner
     public DateTime? ProvisionedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
+    public long StorageAllowanceBytes { get; set; }
+    public DateTime? StorageMeasuredAtUtc { get; set; }
+    public DateTime? StorageReceivedAtUtc { get; set; }
+    [MaxLength(40)] public string StorageMeasurementSource { get; set; } = StorageMeasurementSources.RunnerSelfReported;
+    [MaxLength(32)] public string StorageMeasurementStatus { get; set; } = StorageMeasurementStatuses.NeverMeasured;
+    public long? StorageSystemBytes { get; set; }
+    public long? StorageUserBytes { get; set; }
+    public long? StorageTotalBytes { get; set; }
+    [Column(TypeName = "decimal(7,2)")] public decimal? StorageUsagePercent { get; set; }
+    [MaxLength(32)] public string StorageState { get; set; } = HostedRunnerStorageStates.Unknown;
+    [MaxLength(2000)] public string? StorageMeasurementError { get; set; }
+    public DateTime? StorageVerificationRequestedAtUtc { get; set; }
+    public DateTime? StorageVerifiedAtUtc { get; set; }
+    public long? StorageVerifiedSystemBytes { get; set; }
+    public long? StorageVerifiedUserBytes { get; set; }
+    public long? StorageVerifiedTotalBytes { get; set; }
+    public DateTime? StorageSelfReportedAtUtc { get; set; }
+    public long? StorageSelfReportedSystemBytes { get; set; }
+    public long? StorageSelfReportedUserBytes { get; set; }
+    public long? StorageSelfReportedTotalBytes { get; set; }
+    [MaxLength(32)] public string StorageSelfReportedStatus { get; set; } = StorageMeasurementStatuses.NeverMeasured;
+    [MaxLength(2000)] public string? StorageSelfReportedError { get; set; }
+
+    [MaxLength(32)] public string EnforcementState { get; set; } = HostedRunnerEnforcementStates.None;
+    public DateTime? OverLimitSinceUtc { get; set; }
+    public DateTime? GracePeriodEndsAtUtc { get; set; }
+    public DateTime? SuspendedAtUtc { get; set; }
+    public DateTime? RecoveredAtUtc { get; set; }
+    [MaxLength(2000)] public string? LastEnforcementReason { get; set; }
+    public DateTime? LastNotificationAtUtc { get; set; }
+
     public virtual ICollection<HostedRunnerDeployment> Deployments { get; set; } = new List<HostedRunnerDeployment>();
+    public virtual ICollection<HostedRunnerStorageObservation> StorageObservations { get; set; } = new List<HostedRunnerStorageObservation>();
+    public virtual ICollection<HostedRunnerStorageVerification> StorageVerifications { get; set; } = new List<HostedRunnerStorageVerification>();
 }

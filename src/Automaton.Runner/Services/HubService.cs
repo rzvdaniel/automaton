@@ -54,6 +54,8 @@ public class HubService
     private const string SynchronizeAppActionModulesMethod = "SynchronizeAppActionModules";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
     private const string HeartbeatMethod = "Heartbeat";
+    private const string ReportHostedRunnerStorageMethod = "ReportHostedRunnerStorage";
+    private const string ReportRunnerHostStorageMethod = "ReportRunnerHostStorage";
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
     private HubConnection? connection;
@@ -78,6 +80,20 @@ public class HubService
     private int reconnectInProgress = 0;
     private CancellationTokenSource? heartbeatTokenSource;
     private Task? heartbeatTask;
+
+    public Task ReportHostedRunnerStorageAsync(HostedRunnerStorageTelemetry report, CancellationToken cancellationToken) =>
+        InvokeTelemetryAsync(ReportHostedRunnerStorageMethod, report, cancellationToken);
+
+    public Task ReportRunnerHostStorageAsync(RunnerHostStorageTelemetry report, CancellationToken cancellationToken) =>
+        InvokeTelemetryAsync(ReportRunnerHostStorageMethod, report, cancellationToken);
+
+    private async Task InvokeTelemetryAsync(string method, object report, CancellationToken cancellationToken)
+    {
+        var current = connection;
+        if (current?.State != HubConnectionState.Connected)
+            throw new InvalidOperationException("Runner is not connected to the API.");
+        await current.InvokeAsync(method, report, cancellationToken);
+    }
 
     public HubService(
         ConfigurationService configService,

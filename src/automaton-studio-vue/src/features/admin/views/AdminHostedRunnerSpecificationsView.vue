@@ -24,7 +24,17 @@ const saving = ref(false)
 const visible = ref(false)
 const editing = ref<HostedRunnerSpecification | null>(null)
 
-const defaultResources = (): HostedRunnerResources => ({ cpuLimit: 0.25, memoryLimitMb: 768, memoryReservationMb: 256, diskLimitMb: 2048, pidsLimit: 128, maximumApps: 3 })
+const defaultResources = (): HostedRunnerResources => ({
+  cpuLimit: 0.5,
+  memoryLimitMb: 384,
+  memoryReservationMb: 256,
+  diskLimitMb: 512,
+  pidsLimit: 256,
+  sharedMemoryMb: 64,
+  dockerLogMaxSizeMb: 10,
+  dockerLogMaxFiles: 3,
+  maximumApps: 3,
+})
 const form = ref<HostedRunnerSpecificationRequest>({ name: '', code: '', description: '', isActive: true, resources: defaultResources() })
 
 function openHostedRunnersHandbook() {
@@ -120,8 +130,11 @@ onMounted(load)
         <div class="col-6"><label class="block text-sm mb-1">CPU limit</label><InputNumber v-model="form.resources.cpuLimit" :min="0.1" :max="8" :min-fraction-digits="2" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Memory MB</label><InputNumber v-model="form.resources.memoryLimitMb" :min="256" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Reservation MB</label><InputNumber v-model="form.resources.memoryReservationMb" :min="64" class="w-full" /></div>
-        <div class="col-6"><label class="block text-sm mb-1">Disk MB</label><InputNumber v-model="form.resources.diskLimitMb" :min="512" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Storage allowance MB</label><InputNumber v-model="form.resources.diskLimitMb" :min="512" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">PID limit</label><InputNumber v-model="form.resources.pidsLimit" :min="32" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Shared memory MB</label><InputNumber v-model="form.resources.sharedMemoryMb" :min="16" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Docker log file MB</label><InputNumber v-model="form.resources.dockerLogMaxSizeMb" :min="1" class="w-full" /></div>
+        <div class="col-6"><label class="block text-sm mb-1">Docker log files</label><InputNumber v-model="form.resources.dockerLogMaxFiles" :min="1" class="w-full" /></div>
         <div class="col-6"><label class="block text-sm mb-1">Maximum apps</label><InputNumber v-model="form.resources.maximumApps" :min="1" class="w-full" /></div>
       </div>
       <div v-if="editing" class="flex align-items-center gap-2"><Checkbox v-model="form.isActive" :binary="true" input-id="isActive" /><label for="isActive">Active</label></div>

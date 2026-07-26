@@ -2,6 +2,7 @@ using Automaton.Worker.Consumers;
 using Automaton.Worker.Handlers;
 using Automaton.Worker.Messaging;
 using Automaton.Worker.Services;
+using Automaton.Api.Services;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 using Automaton.Identity;
@@ -49,6 +50,7 @@ builder.Services.AddSerilog((services, config) =>
 builder.Services.AddAutomatonInfrastructure(builder.Configuration);
 builder.Services.AddAutomatonWorkerIdentity();
 builder.Services.Configure<Automaton.Worker.Config.HostedRunnerOptions>(builder.Configuration.GetSection("HostedRunners"));
+builder.Services.Configure<Automaton.Api.Models.StorageTelemetryOptions>(builder.Configuration.GetSection("StorageTelemetry"));
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -59,12 +61,20 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
 builder.Services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 builder.Services.AddScoped<HostedRunnerRegistrationReconciler>();
+builder.Services.AddScoped<ActionScheduleProcessor>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, EnforceHostedRunnerStorageScheduledActionHandler>();
+builder.Services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
+builder.Services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<UserRegisteredEvent>, UserRegisteredEventHandler>();
 builder.Services.AddTransient<ManagedRunnerProvisionRequestedCapSubscriber>();
 builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent>, ManagedRunnerProvisionRequestedEventHandler>();
 builder.Services.AddHostedService<CliAuthorizationCleanupService>();
 builder.Services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
+builder.Services.AddHostedService<ActionSchedulePollingService>();
+builder.Services.AddHostedService<BuiltInStorageScheduleSeeder>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")

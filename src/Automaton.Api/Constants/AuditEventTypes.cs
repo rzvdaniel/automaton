@@ -18,6 +18,11 @@ public static class AuditEventTypes
     public const string AppDeployStarted = "AppDeployStarted";
     public const string AppDeploySucceeded = "AppDeploySucceeded";
     public const string AppDeployFailed = "AppDeployFailed";
+    public const string ActionScheduleCreated = "ActionScheduleCreated";
+    public const string ActionScheduleUpdated = "ActionScheduleUpdated";
+    public const string ActionScheduleEnabled = "ActionScheduleEnabled";
+    public const string ActionScheduleDisabled = "ActionScheduleDisabled";
+    public const string ActionScheduleDeleted = "ActionScheduleDeleted";
     public const string RunnerAssignedToApp = "RunnerAssignedToApp";
     public const string RunnerUnassignedFromApp = "RunnerUnassignedFromApp";
     public const string RunnerCreated = "RunnerCreated";
@@ -43,6 +48,9 @@ public static class AuditEventTypes
     public const string RunnerReprovisionFailed = "RunnerReprovisionFailed";
     public const string HostedRunnerDeleted = "HostedRunnerDeleted";
     public const string HostedRunnerDeleteFailed = "HostedRunnerDeleteFailed";
+    public const string HostedRunnerStorageVerificationRequested = Models.StorageTelemetryAuditEvents.VerificationRequested;
+    public const string HostedRunnerStorageVerificationSucceeded = Models.StorageTelemetryAuditEvents.VerificationSucceeded;
+    public const string HostedRunnerStorageVerificationFailed = Models.StorageTelemetryAuditEvents.VerificationFailed;
     public const string UserRegistered = "UserRegistered";
     public const string UserDisabled = "UserDisabled";
     public const string UserEnabled = "UserEnabled";

@@ -42,9 +42,32 @@ const provisioningUserId = ref<string | null>(null)
 const restartingRunnerId = ref<string | null>(null)
 const reprovisioningRunnerId = ref<string | null>(null)
 const deletingRunnerId = ref<string | null>(null)
+const verifyingStorageRunnerId = ref<string | null>(null)
 const deleteConfirmationRunnerId = ref<string | null>(null)
+
+const formatStorage = (bytes?: number) => {
+  if (bytes === undefined || bytes === null) return 'Unknown'
+  const gib = bytes / (1024 ** 3)
+  return `${gib.toFixed(gib >= 10 ? 1 : 2)} GB`
+}
+
+const verifyStorage = async (runner: HostedRunner) => {
+  verifyingStorageRunnerId.value = runner.id
+  try {
+    await adminHostedRunnersService.verifyHostedRunnerStorage(runner.id)
+    toast.add({ severity: 'info', summary: 'Verification requested', detail: 'Host-side storage verification has been queued.', life: 5000 })
+    await loadHostedRunners()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Verification failed', detail: error instanceof Error ? error.message : 'Unable to request storage verification.', life: 6000 })
+  } finally {
+    verifyingStorageRunnerId.value = null
+  }
+}
+const deleteDataConfirmation = ref('')
 const hostedRestartPollMaxAttempts = 8
 const hostedRestartPollDelayMs = 1500
+const hostedDeletePollMaxAttempts = 40
+const hostedDeletePollDelayMs = 1500
 const hostDialogVisible = ref(false)
 const savingHost = ref(false)
 const editingHost = ref<RunnerHost | null>(null)
@@ -223,6 +246,22 @@ async function pollHostedRunnerUntilRunning(hostedRunnerId: string) {
   }
 
   return false
+}
+
+async function pollHostedRunnerDeletion(hostedRunnerId: string): Promise<'succeeded' | 'failed' | 'pending'> {
+  for (let attempt = 0; attempt < hostedDeletePollMaxAttempts; attempt += 1) {
+    await delay(hostedDeletePollDelayMs)
+
+    const latestHostedRunners = await adminHostedRunnersService.getHostedRunners()
+    hostedRunners.value = latestHostedRunners
+    const runner = latestHostedRunners.find((candidate) => candidate.id === hostedRunnerId)
+
+    // Successfully deleted Runners are intentionally omitted from this admin list.
+    if (!runner) return 'succeeded'
+    if (runner.status === 'deleteFailed' || runner.latestDeployment?.status === 'failed') return 'failed'
+  }
+
+  return 'pending'
 }
 
 async function loadProvisioningOptions() {
@@ -478,20 +517,66 @@ async function reprovisionHostedRunner(runner: HostedRunner) {
 
 function deleteHostedRunner(runner: HostedRunner) {
   deleteConfirmationRunnerId.value = runner.id
+  deleteDataConfirmation.value = ''
 }
 
-async function confirmDeleteHostedRunner(runner: HostedRunner) {
+async function confirmDeleteHostedRunner(runner: HostedRunner, dataDisposition: 'preserve' | 'delete') {
+  if (dataDisposition === 'delete' && deleteDataConfirmation.value !== runner.name) {
+    toast.add({ severity: 'warn', summary: 'Confirmation required', detail: `Type ${runner.name} to permanently delete its data.`, life: 4000 })
+    return
+  }
   deletingRunnerId.value = runner.id
+  let requestAccepted = false
   try {
-    await adminHostedRunnersService.deleteHostedRunner(runner.id)
-    toast.add({ severity: 'success', summary: 'Deleted', detail: `${runner.name} was deleted.`, life: 3000 })
-    await refreshAll()
+    await adminHostedRunnersService.deleteHostedRunner(runner.id, dataDisposition)
+    requestAccepted = true
+    const requestedDetail = dataDisposition === 'delete'
+      ? 'Deletion requested. The Runner and its persistent data will be removed after the infrastructure operation completes.'
+      : 'Deletion requested. The Runner container will be removed and its persistent data preserved.'
+    toast.add({ severity: 'info', summary: 'Deletion requested', detail: requestedDetail, life: 5000 })
+
+    const outcome = await pollHostedRunnerDeletion(runner.id)
+    await loadHosts()
+    if (outcome === 'succeeded') {
+      const completedDetail = dataDisposition === 'delete'
+        ? `${runner.name} and its persistent data were deleted.`
+        : `${runner.name} was deleted and its persistent data was preserved.`
+      toast.add({ severity: 'success', summary: 'Deletion completed', detail: completedDetail, life: 4000 })
+    } else if (outcome === 'failed') {
+      const failedRunner = hostedRunners.value.find((candidate) => candidate.id === runner.id)
+      toast.add({
+        severity: 'error',
+        summary: 'Deletion failed',
+        detail: failedRunner?.latestDeployment?.error || failedRunner?.lastError || 'The infrastructure operation failed.',
+        life: 6000,
+      })
+    } else {
+      toast.add({
+        severity: 'info',
+        summary: 'Deletion still in progress',
+        detail: 'The infrastructure operation has not completed yet. Check the deployment status for the final result.',
+        life: 6000,
+      })
+    }
     selectedRunner.value = hostedRunners.value.find((candidate) => candidate.id === runner.id) ?? null
   } catch {
-    toast.add({ severity: 'error', summary: 'Delete failed', detail: 'Failed to delete the hosted runner.', life: 4000 })
+    toast.add(requestAccepted
+      ? {
+          severity: 'warn',
+          summary: 'Unable to monitor deletion',
+          detail: 'Deletion was requested, but Studio could not retrieve the final infrastructure operation status.',
+          life: 6000,
+        }
+      : {
+          severity: 'error',
+          summary: 'Delete request failed',
+          detail: 'Failed to request hosted Runner deletion.',
+          life: 4000,
+        })
   } finally {
     deletingRunnerId.value = null
     deleteConfirmationRunnerId.value = null
+    deleteDataConfirmation.value = ''
   }
 }
 
@@ -1187,10 +1272,27 @@ watch(() => route.path, refreshAll)
             <i class="pi pi-exclamation-triangle" />
             <span>Delete Hosted Runner</span>
           </div>
-          <p class="mt-0 mb-3 text-color-secondary">This will remove the managed container, unassign all applications, release the hosted runner, and cannot be undone.</p>
-          <div class="flex justify-content-end gap-2">
+          <p class="mt-0 mb-3 text-color-secondary">Choose what happens to the Runner's persistent system and user volumes.</p>
+          <div class="border-1 surface-border border-round p-3 mb-3">
+            <div class="font-medium mb-1">Preserve persistent data</div>
+            <div class="text-color-secondary text-sm mb-3">Remove the container and unassign applications, but keep both named volumes for recovery.</div>
+            <Button label="Remove container and preserve data" icon="pi pi-box" outlined @click="confirmDeleteHostedRunner(selectedRunner, 'preserve')" />
+          </div>
+          <div class="border-1 border-red-300 border-round p-3 mb-3">
+            <div class="font-medium text-color-danger mb-1">Permanently delete persistent data</div>
+            <div class="text-color-secondary text-sm mb-2">This removes the container and both named volumes. This cannot be undone.</div>
+            <label for="delete-runner-data-confirmation" class="block text-sm mb-1">Type <strong>{{ selectedRunner.name }}</strong> to confirm</label>
+            <InputText id="delete-runner-data-confirmation" v-model="deleteDataConfirmation" class="w-full mb-3" autocomplete="off" />
+            <Button
+              label="Remove container and permanently delete data"
+              icon="pi pi-trash"
+              severity="danger"
+              :disabled="deleteDataConfirmation !== selectedRunner.name"
+              @click="confirmDeleteHostedRunner(selectedRunner, 'delete')"
+            />
+          </div>
+          <div class="flex justify-content-end">
             <Button label="Cancel" text @click="deleteConfirmationRunnerId = null" />
-            <Button label="Delete hosted runner" icon="pi pi-trash" severity="danger" @click="confirmDeleteHostedRunner(selectedRunner)" />
           </div>
         </div>
         <template v-else>
@@ -1233,6 +1335,34 @@ watch(() => route.path, refreshAll)
         <div v-if="selectedRunner.lastError">
           <div class="text-color-secondary text-sm mb-2">Last error</div>
           <Textarea :model-value="selectedRunner.lastError" readonly auto-resize class="w-full" />
+        </div>
+        <div class="surface-50 border-round p-3">
+          <div class="flex justify-content-between align-items-center mb-3">
+            <div class="font-semibold">Storage telemetry</div>
+            <Button
+              label="Verify storage now"
+              icon="pi pi-refresh"
+              size="small"
+              :loading="verifyingStorageRunnerId === selectedRunner.id"
+              @click="verifyStorage(selectedRunner)"
+            />
+          </div>
+          <div class="grid">
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Usage / allowance</div><div>{{ formatStorage(selectedRunner.storageTotalBytes) }} / {{ formatStorage(selectedRunner.storageAllowanceBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">State</div><Tag :value="selectedRunner.storageState" :severity="statusSeverity(selectedRunner.storageState)" /></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Measured</div><div>{{ formatDateTime(selectedRunner.storageMeasuredAtUtc) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Source</div><div>{{ selectedRunner.storageMeasurementSource }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verified usage</div><div>{{ formatStorage(selectedRunner.storageVerifiedTotalBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Latest self-report</div><div>{{ formatStorage(selectedRunner.storageSelfReportedTotalBytes) }} · {{ formatDateTime(selectedRunner.storageSelfReportedAtUtc) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Host available / reserve</div><div>{{ formatStorage(selectedRunner.hostStorageAvailableBytes) }} / {{ formatStorage(selectedRunner.hostStorageReserveRequiredBytes) }}</div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verification</div><div>{{ selectedRunner.storageVerificationStatus || 'Not requested' }}<span v-if="selectedRunner.storageVerificationReason"> · {{ selectedRunner.storageVerificationReason }}</span></div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Enforcement</div><Tag :value="selectedRunner.enforcementState" :severity="statusSeverity(selectedRunner.enforcementState)" /></div>
+            <div v-if="selectedRunner.gracePeriodEndsAtUtc" class="col-12 md:col-4"><div class="text-color-secondary text-sm">Grace-period deadline</div><div>{{ formatDateTime(selectedRunner.gracePeriodEndsAtUtc) }}</div></div>
+            <div v-if="selectedRunner.lastEnforcementReason" class="col-12"><Message severity="warn" :closable="false">{{ selectedRunner.lastEnforcementReason }}</Message></div>
+          </div>
+          <Message severity="info" :closable="false">Storage is measured approximately hourly. The allowance is monitored by Automaton; it is not a hard filesystem quota.</Message>
+          <Message v-if="selectedRunner.storageMeasurementError" severity="warn" :closable="false">{{ selectedRunner.storageMeasurementError }}</Message>
+          <Message v-if="selectedRunner.storageVerificationError" severity="warn" :closable="false">{{ selectedRunner.storageVerificationError }}</Message>
         </div>
         <div v-if="selectedRunner.latestDeployment?.logs">
           <div class="text-color-secondary text-sm mb-2">Deployment log</div>

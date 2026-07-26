@@ -14,7 +14,10 @@ public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<Aut
         "provision-hosted-runner",
         "reprovision-hosted-runner",
         "restart-hosted-runner",
-        "delete-hosted-runner"
+        "suspend-hosted-runner",
+        "resume-hosted-runner",
+        "delete-hosted-runner",
+        Automaton.Api.Models.StorageTelemetryActions.MeasureHostedRunnerStorage
     };
 
     public async Task<AppActionModuleInfo> EnsureDeployedAsync(

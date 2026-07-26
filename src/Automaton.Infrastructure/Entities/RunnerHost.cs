@@ -81,6 +81,20 @@ public class RunnerHost
     public int TotalDiskMb { get; set; } = 40960;
     public int ReservedDiskMb { get; set; }
 
+    public DateTime? StorageMeasuredAtUtc { get; set; }
+    public DateTime? StorageReceivedAtUtc { get; set; }
+    public long? StorageTotalBytes { get; set; }
+    public long? StorageAvailableBytes { get; set; }
+    public long? StorageUsedBytes { get; set; }
+    public long? StorageReserveRequiredBytes { get; set; }
+    public long? RootFilesystemTotalBytes { get; set; }
+    public long? RootFilesystemAvailableBytes { get; set; }
+    public long? DockerFilesystemTotalBytes { get; set; }
+    public long? DockerFilesystemAvailableBytes { get; set; }
+    [MaxLength(32)] public string StorageState { get; set; } = RunnerHostStorageStates.Unknown;
+    [MaxLength(32)] public string StorageMeasurementStatus { get; set; } = StorageMeasurementStatuses.NeverMeasured;
+    [MaxLength(2000)] public string? StorageMeasurementError { get; set; }
+
     public DateTime? LastHeartbeatAtUtc { get; set; }
 
     /// <summary>
@@ -110,6 +124,8 @@ public class RunnerHost
         ProvisioningStatus == RunnerHostProvisioningStatuses.Ready &&
         Status == RunnerHostStatuses.Active &&
         HostedRunnerSchedulingEnabled &&
+        StorageState != RunnerHostStorageStates.SchedulingBlocked &&
+        StorageState != RunnerHostStorageStates.Critical &&
         ValidatedAtUtc.HasValue &&
         (ProvisioningTransport == RunnerHostProvisioningTransports.LocalDocker
             ? true

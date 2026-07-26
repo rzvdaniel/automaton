@@ -27,6 +27,38 @@ public class AppActionManifestParserTests
         Assert.That(manifest.Spec.TimeoutSeconds, Is.EqualTo(60));
     }
 
+    [Test]
+    public void ParsesExplicitSchedulingPolicy()
+    {
+        var yaml = ValidManifest.Replace(
+            "timeoutSeconds: 60",
+            """
+            timeoutSeconds: 60
+              schedulable: true
+              allowedExecutionScopes:
+                - AppRunner
+              defaultConcurrencyPolicy: Queue
+              minimumIntervalSeconds: 600
+            """);
+
+        var manifest = AppActionManifestParser.Parse(yaml, "hello");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(manifest.Spec.Schedulable, Is.True);
+            Assert.That(manifest.Spec.AllowedExecutionScopes, Is.EqualTo(new[] { "AppRunner" }));
+            Assert.That(manifest.Spec.DefaultConcurrencyPolicy, Is.EqualTo("Queue"));
+            Assert.That(manifest.Spec.MinimumIntervalSeconds, Is.EqualTo(600));
+        });
+    }
+
+    [Test]
+    public void RejectsSchedulableManifestWithoutAllowedScope()
+    {
+        var yaml = ValidManifest.Replace("timeoutSeconds: 60", "timeoutSeconds: 60\n  schedulable: true");
+        Assert.That(() => AppActionManifestParser.Parse(yaml, "hello"), Throws.InvalidOperationException);
+    }
+
     [TestCase("../main.py")]
     [TestCase("/main.py")]
     [TestCase("nested//main.py")]
@@ -120,6 +152,9 @@ public class AppActionManifestParserTests
     [TestCase("reprovision-hosted-runner")]
     [TestCase("restart-hosted-runner")]
     [TestCase("delete-hosted-runner")]
+    [TestCase("measure-hosted-runner-storage")]
+    [TestCase("suspend-hosted-runner")]
+    [TestCase("resume-hosted-runner")]
     public void ParsesTrustedInfrastructureLifecycleAction(string actionKey)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -133,6 +168,21 @@ public class AppActionManifestParserTests
         Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Docker));
         Assert.That(manifest.Spec.Capabilities, Does.Contain(AppActionCapabilities.Host));
         Assert.That(File.Exists(Path.Combine(actionRoot, manifest.Spec.Entrypoint)), Is.True);
+    }
+
+    [Test]
+    public void ParsesTrustedWorkerEnforcementAction()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var actionRoot = Path.Combine(repositoryRoot, "system-apps", "automaton-infrastructure", "actions", "enforce-hosted-runner-storage");
+        var manifest = AppActionManifestParser.ParseFile(Path.Combine(actionRoot, "action.yaml"), "enforce-hosted-runner-storage", allowPrivilegedCapabilities: true);
+        Assert.Multiple(() =>
+        {
+            Assert.That(manifest.Spec.Schedulable, Is.True);
+            Assert.That(manifest.Spec.AllowedExecutionScopes, Does.Contain("Worker"));
+            Assert.That(manifest.Spec.MinimumIntervalSeconds, Is.EqualTo(60));
+            Assert.That(File.Exists(Path.Combine(actionRoot, manifest.Spec.Entrypoint)), Is.True);
+        });
     }
 
     private static string FindRepositoryRoot()

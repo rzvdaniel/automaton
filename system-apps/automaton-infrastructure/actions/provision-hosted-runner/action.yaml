@@ -24,10 +24,14 @@ spec:
       - memoryMb
       - memoryReservationMb
       - pidsLimit
+      - sharedMemoryMb
+      - dockerLogMaxSizeMb
+      - dockerLogMaxFiles
       - runnerPort
       - networkName
-      - volumeName
-      - dataRoot
+      - systemVolumeName
+      - userVolumeName
+      - specificationId
       - runnerName
     properties:
       operationId: { type: string }
@@ -40,10 +44,14 @@ spec:
       memoryMb: { type: integer }
       memoryReservationMb: { type: integer }
       pidsLimit: { type: integer }
+      sharedMemoryMb: { type: integer }
+      dockerLogMaxSizeMb: { type: integer }
+      dockerLogMaxFiles: { type: integer }
       runnerPort: { type: integer }
       networkName: { type: string }
-      volumeName: { type: string }
-      dataRoot: { type: string }
+      systemVolumeName: { type: string }
+      userVolumeName: { type: string }
+      specificationId: { type: string }
       runnerName: { type: string }
   output:
     type: object

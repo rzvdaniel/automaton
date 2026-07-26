@@ -2,6 +2,7 @@ namespace Automaton.Api.Constants;
 
 public static class AuditEntityTypes
 {
+    public const string ActionSchedule = "ActionSchedule";
     public const string ApiKey = "ApiKey";
     public const string App = "App";
     public const string Runner = "Runner";

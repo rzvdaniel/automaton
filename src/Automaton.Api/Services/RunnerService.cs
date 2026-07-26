@@ -83,7 +83,23 @@ public class RunnerService
             cancellationToken);
         var hostedRunnerLookup = await BuildHostedRunnerLookup(runnerEntities.Select(r => r.Id), cancellationToken);
 
-        return await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, hostedRunnerLookup, cancellationToken);
+        var results = (await GetRunnersWithUpdatedStatus(runnerEntities, projectLookup, hostedRunnerLookup, cancellationToken)).ToList();
+        var hostedStorage = await dbContext.HostedRunners.AsNoTracking()
+            .Where(x => x.RunnerId != null && runnerEntities.Select(r => r.Id).Contains(x.RunnerId.Value))
+            .ToDictionaryAsync(x => x.RunnerId!.Value, cancellationToken);
+        foreach (var result in results)
+        {
+            if (!hostedStorage.TryGetValue(result.Id, out var hosted)) continue;
+            result.StorageAllowanceBytes = hosted.StorageAllowanceBytes;
+            result.StorageTotalBytes = hosted.StorageTotalBytes;
+            result.StorageUsagePercent = hosted.StorageUsagePercent;
+            result.StorageMeasuredAtUtc = hosted.StorageMeasuredAtUtc;
+            result.StorageMeasurementSource = hosted.StorageMeasurementSource;
+            result.StorageMeasurementStatus = hosted.StorageMeasurementStatus;
+            result.StorageState = hosted.StorageState;
+            result.StorageMeasurementError = hosted.StorageMeasurementError;
+        }
+        return results;
     }
 
     public Runner Get(Guid id)
@@ -299,6 +315,27 @@ public class RunnerService
             deployment.FinishedAt = DateTime.UtcNow;
             deployment.Logs = "Runner connected successfully and is linked to this hosted runner.";
             deployment.Error = null;
+        }
+
+        var enforcementResume = hostedRunner.Deployments
+            .Where(x => x.Action == HostedRunnerDeploymentActions.Resume &&
+                x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect)
+            .OrderByDescending(x => x.StartedAt)
+            .FirstOrDefault();
+        if (enforcementResume != null)
+        {
+            enforcementResume.Status = HostedRunnerDeploymentStatuses.Succeeded;
+            enforcementResume.FinishedAt = DateTime.UtcNow;
+            enforcementResume.Logs = "Hosted Runner reconnected after storage enforcement recovery.";
+            hostedRunner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
+            hostedRunner.RecoveredAtUtc = DateTime.UtcNow;
+            hostedRunner.LastEnforcementReason = "Runner reconnected after authoritative storage recovery.";
+            dbContext.AuditEvents.Add(new AuditEvent
+            {
+                Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = hostedRunner.Id,
+                TargetUserId = hostedRunner.UserId, Outcome = "Success", EventType = StorageTelemetryAuditEvents.EnforcementRecovered,
+                Message = "Hosted Runner recovered after storage enforcement.", CreatedAtUtc = DateTime.UtcNow
+            });
         }
 
         logger.Warning("Hosted runner {HostedRunnerId} re-linked to runner {RunnerId} after reconnect", hostedRunner.Id, runner.Id);

@@ -560,7 +560,7 @@ export interface HostedRunner {
   runnerName?: string
   apiKeyId?: string
   name: string
-  status: 'pending' | 'provisioning' | 'reprovisioning' | 'running' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
+  status: 'pending' | 'provisioning' | 'reprovisioning' | 'running' | 'suspended' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
   containerName: string
   containerId?: string
   runtimePort?: number
@@ -575,6 +575,36 @@ export interface HostedRunner {
   provisionedAt?: string
   deletedAt?: string
   latestDeployment?: HostedRunnerDeployment
+  storageAllowanceBytes: number
+  storageMeasuredAtUtc?: string
+  storageMeasurementSource: string
+  storageMeasurementStatus: string
+  storageSystemBytes?: number
+  storageUserBytes?: number
+  storageTotalBytes?: number
+  storageUsagePercent?: number
+  storageState: string
+  storageMeasurementError?: string
+  storageVerificationRequestedAtUtc?: string
+  storageVerifiedAtUtc?: string
+  storageVerifiedTotalBytes?: number
+  storageSelfReportedAtUtc?: string
+  storageSelfReportedTotalBytes?: number
+  storageSelfReportedStatus: string
+  storageSelfReportedError?: string
+  hostStorageAvailableBytes?: number
+  hostStorageReserveRequiredBytes?: number
+  hostStorageState?: string
+  storageVerificationStatus?: string
+  storageVerificationReason?: string
+  storageVerificationError?: string
+  enforcementState: string
+  overLimitSinceUtc?: string
+  gracePeriodEndsAtUtc?: string
+  suspendedAtUtc?: string
+  recoveredAtUtc?: string
+  lastEnforcementReason?: string
+  lastNotificationAtUtc?: string
 }
 
 export interface HostedRunnerResources {
@@ -583,6 +613,9 @@ export interface HostedRunnerResources {
   memoryReservationMb: number
   diskLimitMb: number
   pidsLimit: number
+  sharedMemoryMb: number
+  dockerLogMaxSizeMb: number
+  dockerLogMaxFiles: number
   maximumApps: number
 }
 

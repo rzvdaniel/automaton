@@ -11,7 +11,7 @@ spec:
   capabilities: [docker, host]
   input:
     type: object
-    required: [operationId, hostedRunnerId, userId, containerName, image, apiUrl, cpuLimit, memoryMb, memoryReservationMb, pidsLimit, runnerPort, networkName, volumeName, dataRoot, runnerName]
+    required: [operationId, hostedRunnerId, userId, containerName, image, apiUrl, cpuLimit, memoryMb, memoryReservationMb, pidsLimit, sharedMemoryMb, dockerLogMaxSizeMb, dockerLogMaxFiles, runnerPort, networkName, systemVolumeName, userVolumeName, specificationId, runnerName]
     properties:
       operationId: { type: string }
       hostedRunnerId: { type: string }
@@ -23,10 +23,14 @@ spec:
       memoryMb: { type: integer }
       memoryReservationMb: { type: integer }
       pidsLimit: { type: integer }
+      sharedMemoryMb: { type: integer }
+      dockerLogMaxSizeMb: { type: integer }
+      dockerLogMaxFiles: { type: integer }
       runnerPort: { type: integer }
       networkName: { type: string }
-      volumeName: { type: string }
-      dataRoot: { type: string }
+      systemVolumeName: { type: string }
+      userVolumeName: { type: string }
+      specificationId: { type: string }
       runnerName: { type: string }
   output:
     type: object

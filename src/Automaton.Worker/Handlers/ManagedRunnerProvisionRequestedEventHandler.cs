@@ -71,6 +71,11 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
         }
 
         var resources = hostedRunner.PendingSpecificationSnapshot?.Resources ?? hostedRunner.SpecificationSnapshot.Resources;
+        var snapshotSpecificationId = hostedRunner.PendingSpecificationSnapshot?.SourceSpecificationId
+            ?? hostedRunner.SpecificationSnapshot.SourceSpecificationId;
+        var specificationId = snapshotSpecificationId == Guid.Empty
+            ? hostedRunner.HostedRunnerSpecificationId
+            : snapshotSpecificationId;
         var input = JsonSerializer.Serialize(new
         {
             operationId = deployment.Id,
@@ -83,12 +88,16 @@ public sealed class ManagedRunnerProvisionRequestedEventHandler(
             memoryMb = resources.MemoryLimitMb,
             memoryReservationMb = resources.MemoryReservationMb,
             pidsLimit = resources.PidsLimit,
+            sharedMemoryMb = resources.SharedMemoryMb,
+            dockerLogMaxSizeMb = resources.DockerLogMaxSizeMb,
+            dockerLogMaxFiles = resources.DockerLogMaxFiles,
             publishedPort = hostedRunner.RuntimePort,
             runnerPort = options.Value.RuntimePort,
             networkName = options.Value.DockerNetwork,
             runtimeNetworkName = options.Value.RuntimeDockerNetwork,
-            volumeName = $"automaton-runner-{hostedRunner.Id:N}-data",
-            dataRoot = options.Value.DataRoot,
+            systemVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-system",
+            userVolumeName = $"automaton-hosted-runner-{hostedRunner.Id:N}-user",
+            specificationId,
             runnerName = hostedRunner.Name
         });
 
