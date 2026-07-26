@@ -125,12 +125,12 @@ public static class AppActionManifestParser
         foreach (var directory in Directory.GetDirectories(actionsRoot).OrderBy(path => path, StringComparer.Ordinal))
         {
             var key = Path.GetFileName(directory);
-            ValidateKey(key);
             var manifestPath = Path.Combine(directory, "action.yaml");
             if (!File.Exists(manifestPath))
             {
-                throw new InvalidOperationException($"Action '{key}' is missing action.yaml.");
+                continue;
             }
+            ValidateKey(key);
 
             actions.Add(new DiscoveredAppAction(
                 key,

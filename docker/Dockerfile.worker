@@ -17,6 +17,7 @@ COPY src/Automaton.Messaging/ ./Automaton.Messaging/
 COPY src/Automaton.Infrastructure/ ./Automaton.Infrastructure/
 COPY src/Automaton.Identity/ ./Automaton.Identity/
 COPY src/Automaton.Core/ ./Automaton.Core/
+COPY system-apps/ /system-apps/
 
 RUN dotnet publish Automaton.Worker/Automaton.Worker.csproj \
     -c Release \

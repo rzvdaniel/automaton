@@ -120,6 +120,27 @@ public class AppActionManifestParserTests
     }
 
     [Test]
+    public void Discover_IgnoresDirectoriesWithoutAnActionManifest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "automaton-actions", Guid.NewGuid().ToString("N"));
+        var action = Path.Combine(root, "actions", "hello");
+        Directory.CreateDirectory(action);
+        Directory.CreateDirectory(Path.Combine(root, "actions", "__pycache__"));
+        Directory.CreateDirectory(Path.Combine(root, "actions", "supporting-script"));
+        File.WriteAllText(Path.Combine(action, "action.yaml"), ValidManifest);
+        try
+        {
+            var discovered = AppActionManifestParser.Discover(root);
+
+            Assert.That(discovered.Select(x => x.Key), Is.EqualTo(new[] { "hello" }));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public void ValidatesRequiredInputPropertiesAndTypes()
     {
         const string yaml = """

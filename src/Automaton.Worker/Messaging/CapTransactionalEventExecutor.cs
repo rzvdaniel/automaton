@@ -14,9 +14,16 @@ public sealed class CapTransactionalEventExecutor(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using (dataContext.Database.BeginTransaction(capPublisher, autoCommit: true))
+        using var transaction = dataContext.Database.BeginTransaction(capPublisher, autoCommit: false);
+        try
         {
             await operation(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 }

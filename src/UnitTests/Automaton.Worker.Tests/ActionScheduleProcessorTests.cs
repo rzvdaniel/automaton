@@ -48,26 +48,14 @@ public sealed class ActionScheduleProcessorTests
     }
 
     [Test]
-    public async Task CompetingWorkers_OnlyOneClaimsOccurrence()
+    public async Task CompetingWorkers_OnlyOneClaimsAndCreatesOccurrence()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
         await using (var setup = new ApplicationDbContext(options))
         {
-            await setup.Database.ExecuteSqlRawAsync("""
-                CREATE TABLE ActionSchedules (
-                    Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL, SystemIdentity TEXT NULL,
-                    ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Name TEXT NOT NULL,
-                    Description TEXT NULL, ExecutionScope TEXT NOT NULL, ScheduleType TEXT NOT NULL,
-                    RunAtUtc TEXT NULL, IntervalSeconds INTEGER NULL, CronExpression TEXT NULL,
-                    TimeZone TEXT NOT NULL, Enabled INTEGER NOT NULL, NextRunAtUtc TEXT NULL,
-                    LastTriggeredAtUtc TEXT NULL, LastExecutionId TEXT NULL,
-                    ConcurrencyPolicy TEXT NOT NULL, MisfirePolicy TEXT NOT NULL, InputJson TEXT NOT NULL,
-                    CreatedAtUtc TEXT NOT NULL, UpdatedAtUtc TEXT NOT NULL,
-                    LeaseOwner TEXT NULL, LeaseExpiresAtUtc TEXT NULL
-                );
-                """);
+            await CreateDispatchTablesAsync(setup);
             setup.ActionSchedules.Add(Schedule(ActionScheduleTypes.Interval));
             await setup.SaveChangesAsync();
         }
@@ -77,10 +65,160 @@ public sealed class ActionScheduleProcessorTests
         var second = Processor(secondDb);
         var id = await firstDb.ActionSchedules.Select(x => x.Id).SingleAsync();
         var now = DateTime.UtcNow;
-        var results = await Task.WhenAll(
-            first.TryClaimAsync(id, now, CancellationToken.None),
-            second.TryClaimAsync(id, now, CancellationToken.None));
-        Assert.That(results.Count(x => x), Is.EqualTo(1));
+        await Task.WhenAll(
+            first.ProcessAsync(CancellationToken.None),
+            second.ProcessAsync(CancellationToken.None));
+        var schedule = await firstDb.ActionSchedules.SingleAsync(x => x.Id == id);
+        var occurrenceCount = await firstDb.ActionScheduleOccurrences.CountAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(occurrenceCount, Is.EqualTo(1));
+            Assert.That(schedule.NextRunAtUtc, Is.GreaterThan(now));
+            Assert.That(schedule.LeaseOwner, Is.Null);
+            Assert.That(schedule.LeaseExpiresAtUtc, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task DueSystemSchedule_CreatesOccurrenceAdvancesAndReleasesLease()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        var scheduledFor = DateTime.UtcNow.AddMinutes(-1);
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        schedule.NextRunAtUtc = scheduledFor;
+        await using (var setup = new ApplicationDbContext(options))
+        {
+            await CreateDispatchTablesAsync(setup);
+            setup.ActionSchedules.Add(schedule);
+            await setup.SaveChangesAsync();
+        }
+
+        await using var db = new ApplicationDbContext(options);
+        await Processor(db).ProcessAsync(CancellationToken.None);
+        var occurrence = await db.ActionScheduleOccurrences.SingleAsync();
+        var persistedSchedule = await db.ActionSchedules.SingleAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(occurrence.ScheduledForUtc, Is.EqualTo(scheduledFor));
+            Assert.That(persistedSchedule.LastTriggeredAtUtc, Is.Not.Null);
+            Assert.That(persistedSchedule.NextRunAtUtc, Is.GreaterThan(DateTime.UtcNow));
+            Assert.That(persistedSchedule.LeaseOwner, Is.Null);
+            Assert.That(persistedSchedule.LeaseExpiresAtUtc, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task DueSystemWorkerAction_IsDispatchedAfterOccurrenceIsPersisted()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        await using (var setup = new ApplicationDbContext(options))
+        {
+            await CreateDispatchTablesAsync(setup);
+            setup.ActionSchedules.Add(schedule);
+            await setup.SaveChangesAsync();
+        }
+
+        var handler = new TestActionHandler();
+        await using var db = new ApplicationDbContext(options);
+        var processor = Processor(db, [handler]);
+        await processor.ProcessAsync(CancellationToken.None);
+        await processor.ProcessAsync(CancellationToken.None);
+        var occurrence = await db.ActionScheduleOccurrences.SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.Calls, Is.EqualTo(1));
+            Assert.That(occurrence.Status,
+                Is.EqualTo(ActionScheduleOccurrenceStatuses.Dispatched));
+        });
+    }
+
+    [Test]
+    public async Task FailedOccurrencePersistence_DoesNotAdvanceScheduleAndReleasesLease()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var interceptor = new FailNextSaveInterceptor();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).AddInterceptors(interceptor).Options;
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        var scheduledFor = schedule.NextRunAtUtc;
+        await using (var setup = new ApplicationDbContext(options))
+        {
+            await CreateDispatchTablesAsync(setup);
+            setup.ActionSchedules.Add(schedule);
+            await setup.SaveChangesAsync();
+        }
+
+        interceptor.FailNextSave();
+        await using var db = new ApplicationDbContext(options);
+        await Processor(db).ProcessAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var persistedSchedule = await db.ActionSchedules.SingleAsync();
+        var occurrenceCount = await db.ActionScheduleOccurrences.CountAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(occurrenceCount, Is.Zero);
+            Assert.That(persistedSchedule.NextRunAtUtc, Is.EqualTo(scheduledFor));
+            Assert.That(persistedSchedule.LeaseOwner, Is.Null);
+            Assert.That(persistedSchedule.LeaseExpiresAtUtc, Is.Null);
+        });
+    }
+
+    [Test]
+    public async Task PostClaimDisable_ReleasesOwnedLeaseWithoutCreatingOccurrenceOrAdvancingSchedule()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        var schedule = Schedule(ActionScheduleTypes.Interval);
+        var scheduledFor = schedule.NextRunAtUtc;
+        await using (var setup = new ApplicationDbContext(options))
+        {
+            await CreateDispatchTablesAsync(setup);
+            setup.ActionSchedules.Add(schedule);
+            await setup.SaveChangesAsync();
+        }
+
+        await using var db = new ApplicationDbContext(options);
+        var processor = Processor(db, [], new DisableScheduleBeforeOperationTransaction(db, schedule.Id));
+        await processor.ProcessAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        var persistedSchedule = await db.ActionSchedules.SingleAsync();
+        var occurrenceCount = await db.ActionScheduleOccurrences.CountAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(persistedSchedule.Enabled, Is.False);
+            Assert.That(persistedSchedule.NextRunAtUtc, Is.EqualTo(scheduledFor));
+            Assert.That(persistedSchedule.LeaseOwner, Is.Null);
+            Assert.That(persistedSchedule.LeaseExpiresAtUtc, Is.Null);
+            Assert.That(occurrenceCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task RepeatedPolling_DoesNotCreateDuplicateOccurrenceForSameScheduledRun()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using (var setup = new ApplicationDbContext(options))
+        {
+            await CreateDispatchTablesAsync(setup);
+            setup.ActionSchedules.Add(Schedule(ActionScheduleTypes.Interval));
+            await setup.SaveChangesAsync();
+        }
+
+        await using var db = new ApplicationDbContext(options);
+        var processor = Processor(db);
+        await processor.ProcessAsync(CancellationToken.None);
+        await processor.ProcessAsync(CancellationToken.None);
+        Assert.That(await db.ActionScheduleOccurrences.CountAsync(), Is.EqualTo(1));
     }
 
     [TestCase(ActionScheduleConcurrencyPolicies.Allow, true, false, ActionScheduleOccurrenceStatuses.Published)]
@@ -198,8 +336,9 @@ public sealed class ActionScheduleProcessorTests
 
     private static ActionScheduleProcessor Processor(
         ApplicationDbContext db,
-        IEnumerable<IWorkerScheduledActionHandler> handlers)
-        => new(db, new StubPublisher(), new StubTransaction(), new StubTrustedValidator(), handlers, NullLogger<ActionScheduleProcessor>.Instance);
+        IEnumerable<IWorkerScheduledActionHandler> handlers,
+        ITransactionalEventExecutor? transactions = null)
+        => new(db, new StubPublisher(), transactions ?? new StubTransaction(), new StubTrustedValidator(), handlers, NullLogger<ActionScheduleProcessor>.Instance);
 
     private static Task CreateDispatchTablesAsync(ApplicationDbContext db)
         => db.Database.ExecuteSqlRawAsync("""
@@ -262,6 +401,18 @@ public sealed class ActionScheduleProcessorTests
             => operation(cancellationToken);
     }
 
+    private sealed class DisableScheduleBeforeOperationTransaction(ApplicationDbContext db, Guid scheduleId)
+        : ITransactionalEventExecutor
+    {
+        public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+        {
+            var schedule = await db.ActionSchedules.SingleAsync(x => x.Id == scheduleId, cancellationToken);
+            schedule.Enabled = false;
+            await db.SaveChangesAsync(cancellationToken);
+            await operation(cancellationToken);
+        }
+    }
+
     private sealed class StubTrustedValidator : ITrustedSystemActionScheduleDispatchValidator
     {
         public Task<AppActionManifest> ValidateAsync(ActionSchedule schedule, CancellationToken cancellationToken)
@@ -294,6 +445,18 @@ public sealed class ActionScheduleProcessorTests
         }
     }
 
+    private sealed class TestActionHandler : IWorkerScheduledActionHandler
+    {
+        public string ActionKey => "test-action";
+        public int Calls { get; private set; }
+
+        public Task ExecuteAsync(WorkerScheduledActionContext context, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FailSecondSaveInterceptor : SaveChangesInterceptor
     {
         private int saves;
@@ -307,6 +470,26 @@ public sealed class ActionScheduleProcessorTests
         {
             saves++;
             if (saves == 2) throw new SimulatedCrashException();
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class FailNextSaveInterceptor : SaveChangesInterceptor
+    {
+        private bool shouldFail;
+
+        public void FailNextSave() => shouldFail = true;
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (shouldFail)
+            {
+                shouldFail = false;
+                throw new SimulatedCrashException();
+            }
             return base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }
