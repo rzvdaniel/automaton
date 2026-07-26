@@ -1356,6 +1356,9 @@ watch(() => route.path, refreshAll)
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Latest self-report</div><div>{{ formatStorage(selectedRunner.storageSelfReportedTotalBytes) }} · {{ formatDateTime(selectedRunner.storageSelfReportedAtUtc) }}</div></div>
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Host available / reserve</div><div>{{ formatStorage(selectedRunner.hostStorageAvailableBytes) }} / {{ formatStorage(selectedRunner.hostStorageReserveRequiredBytes) }}</div></div>
             <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Verification</div><div>{{ selectedRunner.storageVerificationStatus || 'Not requested' }}<span v-if="selectedRunner.storageVerificationReason"> · {{ selectedRunner.storageVerificationReason }}</span></div></div>
+            <div class="col-12 md:col-4"><div class="text-color-secondary text-sm">Enforcement</div><Tag :value="selectedRunner.enforcementState" :severity="statusSeverity(selectedRunner.enforcementState)" /></div>
+            <div v-if="selectedRunner.gracePeriodEndsAtUtc" class="col-12 md:col-4"><div class="text-color-secondary text-sm">Grace-period deadline</div><div>{{ formatDateTime(selectedRunner.gracePeriodEndsAtUtc) }}</div></div>
+            <div v-if="selectedRunner.lastEnforcementReason" class="col-12"><Message severity="warn" :closable="false">{{ selectedRunner.lastEnforcementReason }}</Message></div>
           </div>
           <Message severity="info" :closable="false">Storage is measured approximately hourly. The allowance is monitored by Automaton; it is not a hard filesystem quota.</Message>
           <Message v-if="selectedRunner.storageMeasurementError" severity="warn" :closable="false">{{ selectedRunner.storageMeasurementError }}</Message>

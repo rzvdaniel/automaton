@@ -99,6 +99,49 @@ public class HostedRunnerStorageReconciliationServiceTests
             Is.EqualTo(StorageVerificationStatuses.Pending));
     }
 
+    [Test]
+    public async Task AuthoritativeOverLimit_StartsGraceThenQueuesOneSuspension()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test" });
+            db.HostedRunners.Add(new HostedRunner
+            {
+                Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageAllowanceBytes = 100, StorageTotalBytes = 120, StorageState = HostedRunnerStorageStates.OverLimit,
+                StorageMeasurementSource = StorageMeasurementSources.InfrastructureRunnerVerified,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageMeasuredAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(),
+            Options.Create(new StorageTelemetryOptions { OverLimitGracePeriodHours = 1 }));
+        await service.EnforceAsync(default);
+        await using (var verifyScope = provider.CreateAsyncScope())
+        {
+            var db = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var runner = await db.HostedRunners.SingleAsync();
+            Assert.That(runner.EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.GracePeriod));
+            runner.GracePeriodEndsAtUtc = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
+        await service.EnforceAsync(default);
+        await using var finalScope = provider.CreateAsyncScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(finalDb.HostedRunners.Single().EnforcementState, Is.EqualTo(HostedRunnerEnforcementStates.Suspended));
+            Assert.That(finalDb.HostedRunnerDeployments.Count(x => x.Action == HostedRunnerDeploymentActions.Suspend), Is.EqualTo(1));
+        });
+    }
+
     private static Fixture CreateFixture(string state, DateTime measuredAt, StorageTelemetryOptions? options = null)
     {
         var services = new ServiceCollection();

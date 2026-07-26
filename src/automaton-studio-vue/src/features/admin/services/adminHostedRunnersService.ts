@@ -108,6 +108,22 @@ class AdminHostedRunnersService {
     await apiClient.post(`/api/admin/hosted-runners/runners/${id}/verify-storage`)
   }
 
+  async suspendHostedRunner(id: string): Promise<void> {
+    await apiClient.post(`/api/admin/hosted-runners/runners/${id}/suspend`)
+  }
+
+  async resumeHostedRunner(id: string): Promise<void> {
+    await apiClient.post(`/api/admin/hosted-runners/runners/${id}/resume`)
+  }
+
+  async extendStorageGracePeriod(id: string, hours: number): Promise<void> {
+    await apiClient.post(`/api/admin/hosted-runners/runners/${id}/extend-grace`, { hours })
+  }
+
+  async clearStorageEnforcement(id: string): Promise<void> {
+    await apiClient.post(`/api/admin/hosted-runners/runners/${id}/clear-enforcement`)
+  }
+
   async deleteHostedRunner(id: string, dataDisposition: 'preserve' | 'delete'): Promise<void> {
     await apiClient.delete(`/api/admin/hosted-runners/runners/${id}`, {
       data: { dataDisposition },

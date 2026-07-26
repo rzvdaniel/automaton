@@ -348,6 +348,27 @@ public sealed class InfrastructureActionProvisioningHandler(
             return;
         }
 
+        if (actionKey == StorageEnforcementActions.SuspendHostedRunner)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.Suspended;
+            deployment.Logs = "Hosted Runner container stopped; persistent volumes were preserved.";
+            deployment.Status = HostedRunnerDeploymentStatuses.Succeeded;
+            deployment.FinishedAt = DateTime.UtcNow;
+            await WriteLifecycleAuditAsync(hostedRunner, actionKey, succeeded: true, null, cancellationToken);
+            return;
+        }
+
+        if (actionKey == StorageEnforcementActions.ResumeHostedRunner)
+        {
+            hostedRunner.Status = HostedRunnerStatuses.Provisioning;
+            deployment.ExpectedRunnerId ??= hostedRunner.RunnerId;
+            deployment.Status = HostedRunnerDeploymentStatuses.WaitingForReconnect;
+            deployment.ReconnectAfterUtc ??= deployment.StartedAt;
+            deployment.ReconnectDeadlineUtc = DateTime.UtcNow.AddSeconds(Math.Clamp(hostedRunnerOptions.Value.RestartReconnectTimeoutSeconds, 30, 900));
+            deployment.Logs = "Resume command completed; waiting for the hosted Runner to reconnect.";
+            return;
+        }
+
         if (actionKey == StorageTelemetryActions.MeasureHostedRunnerStorage)
         {
             RunnerStorageTelemetryService.EnsureAllowance(hostedRunner);
@@ -423,6 +444,8 @@ public sealed class InfrastructureActionProvisioningHandler(
         var eventType = actionKey switch
         {
             "restart-hosted-runner" => succeeded ? AuditEventTypes.RunnerRestartSucceeded : AuditEventTypes.RunnerRestartFailed,
+            StorageEnforcementActions.SuspendHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested : AuditEventTypes.RunnerRestartFailed,
+            StorageEnforcementActions.ResumeHostedRunner => succeeded ? StorageTelemetryAuditEvents.EnforcementResumeRequested : AuditEventTypes.RunnerRestartFailed,
             "delete-hosted-runner" => succeeded ? AuditEventTypes.HostedRunnerDeleted : AuditEventTypes.HostedRunnerDeleteFailed,
             StorageTelemetryActions.MeasureHostedRunnerStorage => succeeded ? AuditEventTypes.HostedRunnerStorageVerificationSucceeded : AuditEventTypes.HostedRunnerStorageVerificationFailed,
             _ => succeeded ? AuditEventTypes.HostedRunnerProvisioningSucceeded : AuditEventTypes.HostedRunnerProvisioningFailed

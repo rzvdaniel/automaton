@@ -82,6 +82,14 @@ public class HostedRunner
     [MaxLength(32)] public string StorageSelfReportedStatus { get; set; } = StorageMeasurementStatuses.NeverMeasured;
     [MaxLength(2000)] public string? StorageSelfReportedError { get; set; }
 
+    [MaxLength(32)] public string EnforcementState { get; set; } = HostedRunnerEnforcementStates.None;
+    public DateTime? OverLimitSinceUtc { get; set; }
+    public DateTime? GracePeriodEndsAtUtc { get; set; }
+    public DateTime? SuspendedAtUtc { get; set; }
+    public DateTime? RecoveredAtUtc { get; set; }
+    [MaxLength(2000)] public string? LastEnforcementReason { get; set; }
+    public DateTime? LastNotificationAtUtc { get; set; }
+
     public virtual ICollection<HostedRunnerDeployment> Deployments { get; set; } = new List<HostedRunnerDeployment>();
     public virtual ICollection<HostedRunnerStorageObservation> StorageObservations { get; set; } = new List<HostedRunnerStorageObservation>();
     public virtual ICollection<HostedRunnerStorageVerification> StorageVerifications { get; set; } = new List<HostedRunnerStorageVerification>();

@@ -26,6 +26,21 @@ public static class HostedRunnerStorageStates
     public const string Stale = "Stale";
 }
 
+public static class HostedRunnerEnforcementStates
+{
+    public const string None = "None";
+    public const string GracePeriod = "GracePeriod";
+    public const string Suspended = "Suspended";
+    public const string Recovered = "Recovered";
+}
+
+public static class StorageEnforcementActions
+{
+    public const string EnforceHostedRunnerStorage = "enforce-hosted-runner-storage";
+    public const string SuspendHostedRunner = "suspend-hosted-runner";
+    public const string ResumeHostedRunner = "resume-hosted-runner";
+}
+
 public static class RunnerHostStorageStates
 {
     public const string Unknown = "Unknown";
@@ -59,4 +74,7 @@ public static class StorageTelemetryAuditEvents
     public const string VerificationFailed = "HostedRunnerStorageVerificationFailed";
     public const string HostedRunnerPolicyChanged = "HostedRunnerStoragePolicyChanged";
     public const string RunnerHostPolicyChanged = "RunnerHostStoragePolicyChanged";
+    public const string EnforcementGracePeriodStarted = "HostedRunnerStorageGracePeriodStarted";
+    public const string EnforcementSuspensionRequested = "HostedRunnerStorageSuspensionRequested";
+    public const string EnforcementResumeRequested = "HostedRunnerStorageResumeRequested";
 }

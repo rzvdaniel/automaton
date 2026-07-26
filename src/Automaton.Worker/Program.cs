@@ -64,6 +64,7 @@ builder.Services.AddScoped<HostedRunnerRegistrationReconciler>();
 builder.Services.AddScoped<ActionScheduleProcessor>();
 builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
 builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, EnforceHostedRunnerStorageScheduledActionHandler>();
 builder.Services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
 builder.Services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();

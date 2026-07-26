@@ -138,6 +138,10 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("varchar(16)");
 
+                    b.Property<string>("SystemIdentity")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -149,6 +153,9 @@ namespace Automaton.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("SystemIdentity")
+                        .IsUnique();
 
                     b.HasIndex("Enabled", "NextRunAtUtc");
 
@@ -1579,22 +1586,45 @@ namespace Automaton.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("EnforcementState")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)")
+                        .HasDefaultValue("None");
+
+                    b.Property<DateTime?>("GracePeriodEndsAtUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<Guid>("HostedRunnerSpecificationId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("LastEnforcementReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("LastNotificationAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("varchar(160)");
 
+                    b.Property<DateTime?>("OverLimitSinceUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("PendingSpecificationSnapshot")
                         .HasColumnType("json");
 
                     b.Property<DateTime?>("ProvisionedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("RecoveredAtUtc")
                         .HasColumnType("datetime(6)");
 
                     b.Property<Guid?>("RunnerHostId")
@@ -1705,6 +1735,9 @@ namespace Automaton.Api.Migrations
 
                     b.Property<long?>("StorageVerifiedUserBytes")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("SuspendedAtUtc")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");

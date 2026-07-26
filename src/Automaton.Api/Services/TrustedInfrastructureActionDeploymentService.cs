@@ -14,6 +14,8 @@ public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<Aut
         "provision-hosted-runner",
         "reprovision-hosted-runner",
         "restart-hosted-runner",
+        "suspend-hosted-runner",
+        "resume-hosted-runner",
         "delete-hosted-runner",
         Automaton.Api.Models.StorageTelemetryActions.MeasureHostedRunnerStorage
     };

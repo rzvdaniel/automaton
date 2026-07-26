@@ -30,11 +30,12 @@ public class BuiltInStorageScheduleSeederTests
         var schedules = await db.ActionSchedules.OrderBy(x => x.ActionKey).ToListAsync();
         Assert.Multiple(() =>
         {
-            Assert.That(schedules, Has.Count.EqualTo(2));
+            Assert.That(schedules, Has.Count.EqualTo(3));
             Assert.That(schedules.Select(x => x.ActionKey), Is.EquivalentTo(new[]
             {
                 BuiltInStorageScheduleActionKeys.HostedRunner,
-                BuiltInStorageScheduleActionKeys.RunnerHost
+                BuiltInStorageScheduleActionKeys.RunnerHost,
+                BuiltInStorageScheduleActionKeys.Enforcement
             }));
             Assert.That(schedules, Has.All.Property(nameof(ActionSchedule.OwnerType)).EqualTo(ActionScheduleOwnerTypes.System));
             Assert.That(schedules, Has.All.Property(nameof(ActionSchedule.ExecutionScope)).EqualTo(ActionExecutionScopes.Worker));
@@ -73,7 +74,7 @@ public class BuiltInStorageScheduleSeederTests
         var reconciled = await verifyDb.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.HostedRunner);
         Assert.Multiple(() =>
         {
-            Assert.That(verifyDb.ActionSchedules.Count(), Is.EqualTo(2));
+            Assert.That(verifyDb.ActionSchedules.Count(), Is.EqualTo(3));
             Assert.That(reconciled.Name, Is.EqualTo("Hosted Runner storage reconciliation"));
             Assert.That(reconciled.IntervalSeconds, Is.EqualTo(60));
             Assert.That(reconciled.ExecutionScope, Is.EqualTo(ActionExecutionScopes.Worker));

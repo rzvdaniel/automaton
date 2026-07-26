@@ -483,6 +483,8 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.StorageUsagePercent).HasColumnType("decimal(7,2)");
                 entity.Property(e => e.StorageSelfReportedStatus).IsRequired().HasMaxLength(32).HasDefaultValue(StorageMeasurementStatuses.NeverMeasured);
                 entity.Property(e => e.StorageSelfReportedError).HasMaxLength(2000);
+                entity.Property(e => e.EnforcementState).IsRequired().HasMaxLength(32).HasDefaultValue(HostedRunnerEnforcementStates.None);
+                entity.Property(e => e.LastEnforcementReason).HasMaxLength(2000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 ConfigureJson(entity.Property(e => e.SpecificationSnapshot));
                 ConfigureJson(entity.Property(e => e.PendingSpecificationSnapshot));

@@ -17,6 +17,101 @@ public sealed class HostedRunnerStorageReconciliationService(
     internal Task<int> ReconcileAsync(CancellationToken cancellationToken)
         => ReconcileAsync(cancellationToken, includeHostedRunners: true, includeHosts: true);
 
+    internal async Task<int> EnforceAsync(CancellationToken cancellationToken)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var now = DateTime.UtcNow;
+        var options = telemetryOptions.Value;
+        var cutoff = now.AddMinutes(-Math.Max(1, options.EnforcementMeasurementValidityMinutes));
+        var runners = await db.HostedRunners
+            .Include(x => x.RunnerHost)
+            .Where(x => x.DeletedAt == null && x.RunnerHostId != null &&
+                (x.StorageState == HostedRunnerStorageStates.OverLimit ||
+                 x.EnforcementState == HostedRunnerEnforcementStates.GracePeriod || x.EnforcementState == HostedRunnerEnforcementStates.Suspended))
+            .ToListAsync(cancellationToken);
+        var changed = 0;
+        foreach (var runner in runners)
+        {
+            var authoritative = runner.StorageMeasurementSource == StorageMeasurementSources.InfrastructureRunnerVerified &&
+                runner.StorageMeasurementStatus == StorageMeasurementStatuses.Succeeded &&
+                runner.StorageMeasuredAtUtc >= cutoff && runner.StorageTotalBytes.HasValue;
+            if (!authoritative) continue;
+
+            var usagePercent = runner.StorageAllowanceBytes > 0
+                ? runner.StorageTotalBytes!.Value * 100m / runner.StorageAllowanceBytes : 0m;
+            if (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended && usagePercent <= options.RecoveryPercent)
+            {
+                if (await QueueLifecycleActionAsync(db, runner, StorageEnforcementActions.ResumeHostedRunner, now, cancellationToken))
+                {
+                    runner.EnforcementState = HostedRunnerEnforcementStates.Recovered;
+                    runner.RecoveredAtUtc = now;
+                    runner.LastEnforcementReason = $"Authoritative usage recovered to {usagePercent:0.##}% (threshold {options.RecoveryPercent:0.##}%).";
+                    runner.UpdatedAt = now;
+                    changed++;
+                }
+                continue;
+            }
+            if (runner.StorageState != HostedRunnerStorageStates.OverLimit) continue;
+            runner.OverLimitSinceUtc ??= now;
+            if (runner.EnforcementState == HostedRunnerEnforcementStates.None || runner.EnforcementState == HostedRunnerEnforcementStates.Recovered)
+            {
+                runner.EnforcementState = HostedRunnerEnforcementStates.GracePeriod;
+                runner.GracePeriodEndsAtUtc = now.AddHours(Math.Clamp(options.OverLimitGracePeriodHours, 1, 720));
+                runner.LastEnforcementReason = $"Authoritative usage is {usagePercent:0.##}% of allowance.";
+                runner.LastNotificationAtUtc ??= now;
+                db.AuditEvents.Add(CreateEnforcementAudit(runner, StorageTelemetryAuditEvents.EnforcementGracePeriodStarted, runner.LastEnforcementReason, now));
+                changed++;
+            }
+            if (runner.EnforcementState == HostedRunnerEnforcementStates.GracePeriod && runner.GracePeriodEndsAtUtc <= now &&
+                await QueueLifecycleActionAsync(db, runner, StorageEnforcementActions.SuspendHostedRunner, now, cancellationToken))
+            {
+                runner.EnforcementState = HostedRunnerEnforcementStates.Suspended;
+                runner.SuspendedAtUtc = now;
+                runner.LastEnforcementReason = "Authoritative usage remained above the allowance after the grace period.";
+                db.AuditEvents.Add(CreateEnforcementAudit(runner, StorageTelemetryAuditEvents.EnforcementSuspensionRequested, runner.LastEnforcementReason, now));
+                changed++;
+            }
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return changed;
+    }
+
+    private async Task<bool> QueueLifecycleActionAsync(ApplicationDbContext db, HostedRunner runner, string actionKey,
+        DateTime now, CancellationToken cancellationToken)
+    {
+        var active = await db.HostedRunnerDeployments.AnyAsync(x => x.HostedRunnerId == runner.Id && x.Action ==
+            (actionKey == StorageEnforcementActions.SuspendHostedRunner ? HostedRunnerDeploymentActions.Suspend : HostedRunnerDeploymentActions.Resume) &&
+            (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
+        if (active) return false;
+        var host = runner.RunnerHost;
+        if (host == null) return false;
+        var operation = new HostedRunnerDeployment
+        {
+            Id = Guid.NewGuid(), HostedRunnerId = runner.Id,
+            Action = actionKey == StorageEnforcementActions.SuspendHostedRunner ? HostedRunnerDeploymentActions.Suspend : HostedRunnerDeploymentActions.Resume,
+            Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = now,
+            Logs = $"Trusted infrastructure Action '{actionKey}' queued for storage enforcement."
+        };
+        db.HostedRunnerDeployments.Add(operation);
+        await db.SaveChangesAsync(cancellationToken);
+        await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+        {
+            OperationId = operation.Id, HostedRunnerId = runner.Id, UserId = runner.UserId,
+            RunnerHostId = host.Id, ActionKey = actionKey,
+            InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = runner.Id, containerName = runner.ContainerName }),
+            CorrelationId = $"storage-enforcement:{operation.Id:N}"
+        }, cancellationToken);
+        return true;
+    }
+
+    private static AuditEvent CreateEnforcementAudit(HostedRunner runner, string eventType, string message, DateTime now) => new()
+    {
+        Id = Guid.NewGuid(), Category = "Audit", Action = "Changed", EntityType = "HostedRunner", EntityId = runner.Id,
+        TargetUserId = runner.UserId, Outcome = "Success", EventType = eventType, Message = message,
+        MetadataJson = JsonSerializer.Serialize(new { runner.StorageTotalBytes, runner.StorageAllowanceBytes, runner.EnforcementState }), CreatedAtUtc = now
+    };
+
     internal async Task<int> ReconcileAsync(CancellationToken cancellationToken, bool includeHostedRunners, bool includeHosts)
     {
         using var scope = scopeFactory.CreateScope();

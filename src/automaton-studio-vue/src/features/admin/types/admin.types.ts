@@ -560,7 +560,7 @@ export interface HostedRunner {
   runnerName?: string
   apiKeyId?: string
   name: string
-  status: 'pending' | 'provisioning' | 'reprovisioning' | 'running' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
+  status: 'pending' | 'provisioning' | 'reprovisioning' | 'running' | 'suspended' | 'failed' | 'disabled' | 'deleting' | 'deleteFailed' | 'deleted'
   containerName: string
   containerId?: string
   runtimePort?: number
@@ -598,6 +598,13 @@ export interface HostedRunner {
   storageVerificationStatus?: string
   storageVerificationReason?: string
   storageVerificationError?: string
+  enforcementState: string
+  overLimitSinceUtc?: string
+  gracePeriodEndsAtUtc?: string
+  suspendedAtUtc?: string
+  recoveredAtUtc?: string
+  lastEnforcementReason?: string
+  lastNotificationAtUtc?: string
 }
 
 export interface HostedRunnerResources {
