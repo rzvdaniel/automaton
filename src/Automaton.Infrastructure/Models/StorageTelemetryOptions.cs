@@ -15,6 +15,7 @@ public sealed class StorageTelemetryOptions
     public int ReconciliationIntervalMinutes { get; set; } = 20;
     public int VerificationTimeoutMinutes { get; set; } = 10;
     public int VerificationWindowMinutes { get; set; } = 60;
+    public int MaxVerificationDispatchesPerHost { get; set; } = 2;
     /// <summary>Optional sampled audit mode; normal reconciliation does not poll healthy Runners.</summary>
     public bool EnableLowFrequencyVerification { get; set; }
     public int LowFrequencyVerificationHours { get; set; } = 24;

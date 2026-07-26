@@ -30,18 +30,21 @@ public sealed class HostedRunnerStorageReconciliationService(
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    internal async Task<int> ReconcileAsync(CancellationToken cancellationToken)
+    internal Task<int> ReconcileAsync(CancellationToken cancellationToken)
+        => ReconcileAsync(cancellationToken, includeHostedRunners: true, includeHosts: true);
+
+    internal async Task<int> ReconcileAsync(CancellationToken cancellationToken, bool includeHostedRunners, bool includeHosts)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var now = DateTime.UtcNow;
         var cutoff = now.AddMinutes(-Math.Max(30, telemetryOptions.Value.FreshAfterMinutes));
         var offlineCutoff = now.AddMinutes(-2);
-        var staleRunners = await db.HostedRunners
+        var staleRunners = includeHostedRunners ? await db.HostedRunners
             .Where(x => x.DeletedAt == null && x.StorageMeasuredAtUtc != null &&
                 x.StorageMeasuredAtUtc < cutoff &&
                 x.StorageMeasurementStatus != StorageMeasurementStatuses.Failed)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken) : [];
         foreach (var runner in staleRunners)
         {
             db.AuditEvents.Add(new AuditEvent
@@ -68,12 +71,12 @@ public sealed class HostedRunnerStorageReconciliationService(
             verification.Error = "Host-side storage verification timed out.";
         }
 
-        var expiredObservations = await db.HostedRunnerStorageObservations
+        var expiredObservations = includeHostedRunners ? await db.HostedRunnerStorageObservations
             .Where(x => x.CreatedAtUtc < now.AddDays(-Math.Max(1, telemetryOptions.Value.ObservationRetentionDays)))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken) : [];
         db.HostedRunnerStorageObservations.RemoveRange(expiredObservations);
         var lowFrequencyCutoff = now.AddHours(-Math.Max(1, telemetryOptions.Value.LowFrequencyVerificationHours));
-        var candidates = await db.HostedRunners
+        var candidates = includeHostedRunners ? await db.HostedRunners
             .Where(x => x.DeletedAt == null)
             .Select(x => new
             {
@@ -98,7 +101,7 @@ public sealed class HostedRunnerStorageReconciliationService(
                     x.Runner.LastHeartbeatAtUtc == null || x.Runner.LastHeartbeatAtUtc < offlineCutoff)
             })
             .Where(x => x.OperationalVerificationDue || x.LowFrequencyAuditDue)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken) : [];
 
         var created = 0;
         var verificationWindow = TimeSpan.FromMinutes(Math.Max(5, telemetryOptions.Value.VerificationWindowMinutes));
@@ -138,9 +141,9 @@ public sealed class HostedRunnerStorageReconciliationService(
             created++;
         }
 
-        var staleHosts = await db.RunnerHosts
+        var staleHosts = includeHosts ? await db.RunnerHosts
             .Where(x => x.StorageMeasuredAtUtc != null && x.StorageMeasuredAtUtc < cutoff)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken) : [];
         foreach (var host in staleHosts)
         {
             host.StorageMeasurementStatus = StorageMeasurementStatuses.Stale;
@@ -148,12 +151,21 @@ public sealed class HostedRunnerStorageReconciliationService(
         }
         await db.SaveChangesAsync(cancellationToken);
 
-        var pending = await db.HostedRunnerStorageVerifications
+        var pending = includeHostedRunners ? await db.HostedRunnerStorageVerifications
             .Include(x => x.HostedRunner)
             .Where(x => x.Status == StorageVerificationStatuses.Pending &&
                 x.HostedRunner.RunnerHostId != null && x.HostedRunner.DeletedAt == null)
+            .OrderByDescending(x => x.HostedRunner.StorageState == HostedRunnerStorageStates.OverLimit)
+            .ThenByDescending(x => x.HostedRunner.StorageState == HostedRunnerStorageStates.Warning)
+            .ThenByDescending(x => x.HostedRunner.StorageMeasurementStatus == StorageMeasurementStatuses.Failed)
+            .ThenBy(x => x.RequestedAtUtc)
+            .Take(200)
+            .ToListAsync(cancellationToken) : [];
+        pending = pending
+            .GroupBy(x => x.HostedRunner.RunnerHostId!.Value)
+            .SelectMany(group => group.Take(Math.Clamp(telemetryOptions.Value.MaxVerificationDispatchesPerHost, 1, 20)))
             .Take(50)
-            .ToListAsync(cancellationToken);
+            .ToList();
         foreach (var verification in pending)
         {
             var runner = verification.HostedRunner;

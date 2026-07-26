@@ -62,6 +62,8 @@ builder.Services.AddSingleton<IEventPublisher, CapEventPublisher>();
 builder.Services.AddScoped<ITransactionalEventExecutor, CapTransactionalEventExecutor>();
 builder.Services.AddScoped<HostedRunnerRegistrationReconciler>();
 builder.Services.AddScoped<ActionScheduleProcessor>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileHostedRunnerStorageScheduledActionHandler>();
+builder.Services.AddScoped<IWorkerScheduledActionHandler, ReconcileRunnerHostStorageScheduledActionHandler>();
 builder.Services.AddScoped<ITrustedSystemActionScheduleDispatchValidator, TrustedSystemActionScheduleDispatchValidator>();
 builder.Services.AddSingleton<ITrustedSystemActionManifestSource, TrustedSystemActionManifestSource>();
 builder.Services.AddTransient<UserRegisteredCapSubscriber>();
@@ -71,7 +73,7 @@ builder.Services.AddTransient<IEventHandler<ManagedRunnerProvisionRequestedEvent
 builder.Services.AddHostedService<CliAuthorizationCleanupService>();
 builder.Services.AddHostedService<HostedRunnerRegistrationReconciliationService>();
 builder.Services.AddHostedService<ActionSchedulePollingService>();
-builder.Services.AddHostedService<HostedRunnerStorageReconciliationService>();
+builder.Services.AddHostedService<BuiltInStorageScheduleSeeder>();
 builder.Services.AddCap(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
