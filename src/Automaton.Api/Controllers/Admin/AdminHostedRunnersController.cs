@@ -28,6 +28,7 @@ public class AdminHostedRunnersController : ControllerBase
     private readonly InfrastructureRunnerHostApprovalService hostApprovalService;
     private readonly IAuditEventService auditEventService;
     private readonly IEventPublisher eventPublisher;
+    private readonly ITransactionalEventExecutor transactionalEventExecutor;
 
     public AdminHostedRunnersController(
         ApplicationDbContext db,
@@ -38,7 +39,8 @@ public class AdminHostedRunnersController : ControllerBase
         UserContextService userContextService,
         InfrastructureRunnerHostApprovalService hostApprovalService,
         IAuditEventService auditEventService,
-        IEventPublisher eventPublisher)
+        IEventPublisher eventPublisher,
+        ITransactionalEventExecutor transactionalEventExecutor)
     {
         this.db = db;
         this.provisioningService = provisioningService;
@@ -49,6 +51,7 @@ public class AdminHostedRunnersController : ControllerBase
         this.hostApprovalService = hostApprovalService;
         this.auditEventService = auditEventService;
         this.eventPublisher = eventPublisher;
+        this.transactionalEventExecutor = transactionalEventExecutor;
     }
 
     [HttpPost("runners/{id:guid}/verify-storage")]
@@ -56,8 +59,6 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
-        if (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended)
-            return Conflict(new { message = "Resume the suspended Runner before extending its grace period." });
         var window = DateTime.UtcNow.Ticks / TimeSpan.FromMinutes(5).Ticks;
         var key = $"storage-verification:{id:N}:admin:{window}";
         var existing = await db.HostedRunnerStorageVerifications
@@ -97,8 +98,8 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
-        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending)
-            return Conflict(new { message = "Resume the suspended Runner before clearing enforcement state." });
+        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending or HostedRunnerEnforcementStates.SuspensionPending)
+            return Conflict(new { message = "Extend grace is unavailable while a suspension or resume operation is active." });
         runner.EnforcementState = HostedRunnerEnforcementStates.GracePeriod;
         runner.GracePeriodEndsAtUtc = DateTime.UtcNow.AddHours(Math.Clamp(request.Hours, 1, 720));
         runner.LastEnforcementReason = "Grace period extended by an administrator.";
@@ -113,6 +114,8 @@ public class AdminHostedRunnersController : ControllerBase
     {
         var runner = await db.HostedRunners.FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
         if (runner == null) return NotFound();
+        if (runner.EnforcementState is HostedRunnerEnforcementStates.Suspended or HostedRunnerEnforcementStates.ResumePending or HostedRunnerEnforcementStates.SuspensionPending)
+            return Conflict(new { message = "Resume the Runner and complete its lifecycle operation before clearing enforcement state." });
         runner.EnforcementState = HostedRunnerEnforcementStates.None;
         runner.OverLimitSinceUtc = null;
         runner.GracePeriodEndsAtUtc = null;
@@ -132,15 +135,27 @@ public class AdminHostedRunnersController : ControllerBase
             (x.Status == HostedRunnerDeploymentStatuses.Pending || x.Status == HostedRunnerDeploymentStatuses.Queued || x.Status == HostedRunnerDeploymentStatuses.Dispatching || x.Status == HostedRunnerDeploymentStatuses.Executing || x.Status == HostedRunnerDeploymentStatuses.Running || x.Status == HostedRunnerDeploymentStatuses.WaitingForReconnect), cancellationToken);
         if (existing != null) return Accepted(new { existing.Id, existing.Status });
         if (runner.RunnerHostId == null) return BadRequest(new { message = "The hosted Runner has no assigned Runner Host." });
+        if (action == HostedRunnerDeploymentActions.Resume && runner.EnforcementState != HostedRunnerEnforcementStates.Suspended)
+            return Conflict(new { message = "Resume is only available for a suspended Runner." });
+        if (action == HostedRunnerDeploymentActions.Suspend && (runner.EnforcementState == HostedRunnerEnforcementStates.Suspended || runner.EnforcementState == HostedRunnerEnforcementStates.ResumePending || runner.EnforcementState == HostedRunnerEnforcementStates.SuspensionPending))
+            return Conflict(new { message = "The Runner is already suspended or has a suspension operation in progress." });
         var operation = new HostedRunnerDeployment { Id = Guid.NewGuid(), HostedRunnerId = id, Action = action, Status = HostedRunnerDeploymentStatuses.Pending, StartedAt = DateTime.UtcNow, Logs = "Administrator requested storage enforcement action." };
-        db.HostedRunnerDeployments.Add(operation);
-        await db.SaveChangesAsync(cancellationToken);
-        await eventPublisher.PublishAsync(new InfrastructureActionExecutionRequestedEvent
+        var message = new InfrastructureActionExecutionRequestedEvent
         {
             OperationId = operation.Id, HostedRunnerId = id, UserId = runner.UserId, RunnerHostId = runner.RunnerHostId.Value,
             ActionKey = actionKey,
             InputJson = JsonSerializer.Serialize(new { operationId = operation.Id, hostedRunnerId = id, expectedContainerName = runner.ContainerName }),
             CorrelationId = $"admin-storage-enforcement:{operation.Id:N}"
+        };
+        await transactionalEventExecutor.ExecuteAsync(async token =>
+        {
+            db.HostedRunnerDeployments.Add(operation);
+            runner.EnforcementState = action == HostedRunnerDeploymentActions.Suspend
+                ? HostedRunnerEnforcementStates.SuspensionPending
+                : HostedRunnerEnforcementStates.ResumePending;
+            runner.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(token);
+            await eventPublisher.PublishAsync(message, token);
         }, cancellationToken);
         await WriteEnforcementAuditAsync(runner,
             actionKey == StorageEnforcementActions.SuspendHostedRunner ? StorageTelemetryAuditEvents.EnforcementSuspensionRequested : StorageTelemetryAuditEvents.EnforcementResumeRequested,
