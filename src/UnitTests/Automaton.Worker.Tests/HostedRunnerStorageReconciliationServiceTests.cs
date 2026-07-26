@@ -62,6 +62,43 @@ public class HostedRunnerStorageReconciliationServiceTests
         Assert.That(fixture.Db.HostedRunnerStorageVerifications.Single().Reason, Is.EqualTo("Threshold"));
     }
 
+    [Test]
+    public async Task DispatchBound_ExcludesAlreadyRunningVerificationsPerHost()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var hostId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.RunnerHosts.Add(new RunnerHost { Id = hostId, Name = "host", Provider = "test" });
+            var runner = new HostedRunner
+            {
+                Id = runnerId, UserId = Guid.NewGuid(), Name = "runner", ContainerName = "runner", RunnerHostId = hostId,
+                StorageMeasuredAtUtc = DateTime.UtcNow, StorageSelfReportedStatus = StorageMeasurementStatuses.Succeeded,
+                StorageMeasurementStatus = StorageMeasurementStatuses.Succeeded, StorageState = HostedRunnerStorageStates.Healthy
+            };
+            db.HostedRunners.Add(runner);
+            db.HostedRunnerStorageVerifications.AddRange(
+                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "running-1", Status = StorageVerificationStatuses.Running, StartedAtUtc = DateTime.UtcNow },
+                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "running-2", Status = StorageVerificationStatuses.Running, StartedAtUtc = DateTime.UtcNow },
+                new HostedRunnerStorageVerification { Id = Guid.NewGuid(), HostedRunnerId = runnerId, IdempotencyKey = "pending", Status = StorageVerificationStatuses.Pending, RequestedAtUtc = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+        }
+        var service = new HostedRunnerStorageReconciliationService(
+            provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(), Options.Create(new StorageTelemetryOptions()));
+
+        await service.ReconcileAsync(default, includeHostedRunners: true, includeHosts: false);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.That((await verifyDb.HostedRunnerStorageVerifications.SingleAsync(x => x.IdempotencyKey == "pending")).Status,
+            Is.EqualTo(StorageVerificationStatuses.Pending));
+    }
+
     private static Fixture CreateFixture(string state, DateTime measuredAt, StorageTelemetryOptions? options = null)
     {
         var services = new ServiceCollection();
@@ -80,8 +117,7 @@ public class HostedRunnerStorageReconciliationServiceTests
         db.SaveChanges();
         var service = new HostedRunnerStorageReconciliationService(
             provider.GetRequiredService<IServiceScopeFactory>(), new NoOpPublisher(),
-            Options.Create(options ?? new StorageTelemetryOptions()),
-            NullLogger<HostedRunnerStorageReconciliationService>.Instance);
+            Options.Create(options ?? new StorageTelemetryOptions()));
         return new Fixture(provider, scope, db, service);
     }
 

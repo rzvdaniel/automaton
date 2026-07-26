@@ -155,6 +155,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.LeaseOwner).HasMaxLength(128);
                 entity.HasIndex(e => new { e.OwnerType, e.OwnerUserId, e.ApplicationId });
                 entity.HasIndex(e => new { e.Enabled, e.NextRunAtUtc });
+                entity.HasIndex(e => e.SystemIdentity).IsUnique();
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_ActionSchedules_Owner",

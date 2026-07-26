@@ -40,6 +40,7 @@ public static class RunnerHostStorageStates
 public static class StorageVerificationStatuses
 {
     public const string Pending = "Pending";
+    public const string Dispatching = "Dispatching";
     public const string Running = "Running";
     public const string Succeeded = "Succeeded";
     public const string Failed = "Failed";

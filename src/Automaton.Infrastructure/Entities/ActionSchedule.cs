@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Automaton.Api.Entities;
 
 public static class ActionScheduleTypes
@@ -50,6 +52,7 @@ public sealed class ActionSchedule
     public string OwnerType { get; set; } = ActionScheduleOwnerTypes.User;
     public Guid? OwnerUserId { get; set; }
     public Guid ApplicationId { get; set; }
+    [MaxLength(100)] public string? SystemIdentity { get; set; }
     public string ActionKey { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

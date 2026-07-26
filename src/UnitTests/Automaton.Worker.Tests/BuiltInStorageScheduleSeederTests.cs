@@ -41,4 +41,45 @@ public class BuiltInStorageScheduleSeederTests
             Assert.That(schedules, Has.All.Property(nameof(ActionSchedule.IntervalSeconds)).EqualTo(60));
         });
     }
+
+    [Test]
+    public async Task StartAsync_ReconcilesImmutableDefinitionWithoutDuplicatingSchedules()
+    {
+        var services = new ServiceCollection();
+        var databaseName = Guid.NewGuid().ToString("N");
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var seeder = new BuiltInStorageScheduleSeeder(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<BuiltInStorageScheduleSeeder>.Instance);
+
+        await seeder.StartAsync(default);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var schedule = await db.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.HostedRunner);
+            schedule.Name = "tampered";
+            schedule.IntervalSeconds = 3600;
+            schedule.ExecutionScope = ActionExecutionScopes.AppRunner;
+            schedule.Enabled = false;
+            schedule.NextRunAtUtc = null;
+            await db.SaveChangesAsync();
+        }
+
+        await seeder.StartAsync(default);
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var reconciled = await verifyDb.ActionSchedules.SingleAsync(x => x.ActionKey == BuiltInStorageScheduleActionKeys.HostedRunner);
+        Assert.Multiple(() =>
+        {
+            Assert.That(verifyDb.ActionSchedules.Count(), Is.EqualTo(2));
+            Assert.That(reconciled.Name, Is.EqualTo("Hosted Runner storage reconciliation"));
+            Assert.That(reconciled.IntervalSeconds, Is.EqualTo(60));
+            Assert.That(reconciled.ExecutionScope, Is.EqualTo(ActionExecutionScopes.Worker));
+            Assert.That(reconciled.Enabled, Is.True);
+            Assert.That(reconciled.NextRunAtUtc, Is.Not.Null);
+            Assert.That(reconciled.SystemIdentity, Is.EqualTo(BuiltInStorageScheduleActionKeys.HostedRunner));
+        });
+    }
 }

@@ -49,7 +49,8 @@ public sealed class BuiltInStorageScheduleSeeder(
         {
             var existing = await db.ActionSchedules.SingleOrDefaultAsync(x =>
                 x.OwnerType == ActionScheduleOwnerTypes.System &&
-                x.ApplicationId == InfrastructureAppTrust.PlatformAppId && x.ActionKey == key, cancellationToken);
+                (x.SystemIdentity == key || (x.SystemIdentity == null &&
+                    x.ApplicationId == InfrastructureAppTrust.PlatformAppId && x.ActionKey == key)), cancellationToken);
             if (existing != null)
             {
                 if (!existing.Enabled || !existing.NextRunAtUtc.HasValue)
@@ -58,12 +59,16 @@ public sealed class BuiltInStorageScheduleSeeder(
                     existing.NextRunAtUtc = now.AddMinutes(1);
                     existing.UpdatedAtUtc = now;
                 }
+                ReconcileDefinition(existing, key, name, now);
+                try { await db.SaveChangesAsync(cancellationToken); }
+                catch (DbUpdateException) { db.ChangeTracker.Clear(); }
                 continue;
             }
 
             db.ActionSchedules.Add(new ActionSchedule
             {
                 Id = Guid.NewGuid(), OwnerType = ActionScheduleOwnerTypes.System,
+                SystemIdentity = key,
                 ApplicationId = InfrastructureAppTrust.PlatformAppId, ActionKey = key,
                 Name = name, Description = "Built-in storage telemetry reconciliation.",
                 ExecutionScope = ActionExecutionScopes.Worker, ScheduleType = ActionScheduleTypes.Interval,
@@ -73,8 +78,28 @@ public sealed class BuiltInStorageScheduleSeeder(
                 CreatedAtUtc = now, UpdatedAtUtc = now
             });
             logger.LogInformation("Seeded built-in system storage schedule {ActionKey}", key);
+            try { await db.SaveChangesAsync(cancellationToken); }
+            catch (DbUpdateException) { db.ChangeTracker.Clear(); }
         }
-        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void ReconcileDefinition(ActionSchedule schedule, string key, string name, DateTime now)
+    {
+        schedule.SystemIdentity = key;
+        schedule.ApplicationId = InfrastructureAppTrust.PlatformAppId;
+        schedule.ActionKey = key;
+        schedule.Name = name;
+        schedule.Description = "Built-in storage telemetry reconciliation.";
+        schedule.ExecutionScope = ActionExecutionScopes.Worker;
+        schedule.ScheduleType = ActionScheduleTypes.Interval;
+        schedule.IntervalSeconds = 60;
+        schedule.RunAtUtc = null;
+        schedule.CronExpression = null;
+        schedule.TimeZone = "UTC";
+        schedule.ConcurrencyPolicy = ActionScheduleConcurrencyPolicies.SkipIfRunning;
+        schedule.MisfirePolicy = ActionScheduleMisfirePolicies.Skip;
+        schedule.InputJson = "{}";
+        schedule.UpdatedAtUtc = now;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

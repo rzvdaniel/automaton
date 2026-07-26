@@ -57,7 +57,7 @@ public sealed class ActionScheduleProcessorTests
         {
             await setup.Database.ExecuteSqlRawAsync("""
                 CREATE TABLE ActionSchedules (
-                    Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL,
+                    Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL, SystemIdentity TEXT NULL,
                     ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Name TEXT NOT NULL,
                     Description TEXT NULL, ExecutionScope TEXT NOT NULL, ScheduleType TEXT NOT NULL,
                     RunAtUtc TEXT NULL, IntervalSeconds INTEGER NULL, CronExpression TEXT NULL,
@@ -204,7 +204,7 @@ public sealed class ActionScheduleProcessorTests
     private static Task CreateDispatchTablesAsync(ApplicationDbContext db)
         => db.Database.ExecuteSqlRawAsync("""
             CREATE TABLE ActionSchedules (
-                Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL,
+                Id TEXT PRIMARY KEY, OwnerType TEXT NOT NULL, OwnerUserId TEXT NULL, SystemIdentity TEXT NULL,
                 ApplicationId TEXT NOT NULL, ActionKey TEXT NOT NULL, Name TEXT NOT NULL,
                 Description TEXT NULL, ExecutionScope TEXT NOT NULL, ScheduleType TEXT NOT NULL,
                 RunAtUtc TEXT NULL, IntervalSeconds INTEGER NULL, CronExpression TEXT NULL,
