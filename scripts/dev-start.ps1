@@ -7,6 +7,7 @@
     2. Starts Automaton.Api  (new terminal window)
     3. Starts the Studio Vue frontend (new terminal window)
     4. Starts the public website app  (new terminal window)
+    5. Starts Automaton.Worker       (new terminal window)
 
     Documentation servers are not started by default.
     Start them manually only when working on docs:
@@ -18,7 +19,7 @@
     By default the API, Studio, and Website are started. If you pass one or
     more selective switches, only the selected services are started. The
     switches can be combined, for example:
-      .\scripts\dev-start.ps1 -Api -Studio
+      .\scripts\dev-start.ps1 -Api -Studio -Worker
 
         Note: The script will NOT install Node.js itself; install Node from
         https://nodejs.org if not present.
@@ -45,6 +46,9 @@
 .PARAMETER Website
     Include only the public Website frontend in a selective startup.
 
+.PARAMETER Worker
+    Include Automaton.Worker in a selective startup.
+
 .EXAMPLE
     .\scripts\dev-start.ps1
     .\scripts\dev-start.ps1 -MainRepo "C:\Work\automaton"
@@ -55,7 +59,8 @@ param(
     [switch]$AutoInstall,
     [switch]$Api,
     [switch]$Studio,
-    [switch]$Website
+    [switch]$Website,
+    [switch]$Worker
 )
 
 Set-StrictMode -Version Latest
@@ -65,13 +70,15 @@ $ErrorActionPreference = "Stop"
 
 $WorktreeRoot  = Split-Path $PSScriptRoot -Parent
 $ServerProject = Join-Path $WorktreeRoot "src\Automaton.Api"
+$WorkerProject  = Join-Path $WorktreeRoot "src\Automaton.Worker"
 $VueProject    = Join-Path $WorktreeRoot "src\automaton-studio-vue"
 $WebsiteProject = Join-Path $WorktreeRoot "src\automaton-vue"
 
-$selectiveStartup = $Api -or $Studio -or $Website
+$selectiveStartup = $Api -or $Studio -or $Website -or $Worker
 $startApi = -not $selectiveStartup -or $Api
 $startStudio = -not $selectiveStartup -or $Studio
 $startWebsite = -not $selectiveStartup -or $Website
+$startWorker = -not $selectiveStartup -or $Worker
 $startedServices = [System.Collections.Generic.List[string]]::new()
 
 # Auto-detect main repo from git worktree list if not supplied
@@ -100,6 +107,15 @@ if ($startApi) {
     Start-DevWindow "Automaton Server" $ServerProject "dotnet watch"
     $startedServices.Add("API")
     Write-Ok "Server window launched"
+}
+
+# ---------- Automaton.Worker -----------------------------------------------
+
+if ($startWorker) {
+    Write-Step "Starting Automaton.Worker..."
+    Start-DevWindow "Automaton Worker" $WorkerProject "dotnet watch"
+    $startedServices.Add("Worker")
+    Write-Ok "Worker window launched"
 }
 
 # ---------- Node / Vite checks for frontend --------------------------------
@@ -169,6 +185,9 @@ if ($startWebsite) {
     Start-DevWindow "Automaton Website" $WebsiteProject "npm run dev"
     $startedServices.Add("Website")
     Write-Ok "Website window launched"
+}
+if ($startWorker) {
+    Write-Host "  Worker   : background scheduler and reconciliation" -ForegroundColor White
 }
 
 # ---------- Summary ---------------------------------------------------------
