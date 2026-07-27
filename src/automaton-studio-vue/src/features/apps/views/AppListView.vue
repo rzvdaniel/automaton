@@ -119,7 +119,6 @@ const statusOptions = ref([
 ])
 
 // Quick-start how-to tab
-const quickStartPath = ref<'editor' | 'cli'>('editor')
 
 // Create dialog state
 const showCreateDialog = ref(false)
@@ -433,7 +432,7 @@ const handleRetry = async () => {
             <i class="pi pi-globe text-6xl text-color-secondary mb-4"></i>
             <h3 class="text-xl font-semibold mb-2">No apps yet</h3>
             <p class="text-color-secondary mb-4">
-              Describe your app above and let AI generate it, or create one manually
+              Create an app from scratch, import an existing project, or start from a template.
             </p>
             <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
           </div>
@@ -452,39 +451,7 @@ const handleRetry = async () => {
             <span class="font-semibold ml-2">How to build an app</span>
           </div>
 
-          <!-- Path tabs -->
-          <div class="qs-tabs mb-4">
-            <button
-              :class="['qs-tab', quickStartPath === 'editor' && 'qs-tab--active']"
-              @click="quickStartPath = 'editor'"
-            >
-              <i class="pi pi-desktop" />
-              <span>AI Editor</span>
-            </button>
-            <button
-              :class="['qs-tab', quickStartPath === 'cli' && 'qs-tab--active']"
-              @click="quickStartPath = 'cli'"
-            >
-              <i class="pi pi-terminal" />
-              <span>CLI + Your IDE</span>
-            </button>
-          </div>
-
-          <!-- Editor path -->
-          <div v-if="quickStartPath === 'editor'" class="qs-content">
-            <p class="text-color-secondary text-sm mt-0 mb-3">
-              The fastest way to get started. Type a description above and the AI writes the app for you.
-            </p>
-            <ol class="qs-steps">
-              <li>Type what you want to build in the text area above</li>
-              <li>Click <strong>Generate</strong> — the app is created and you're taken to the editor</li>
-              <li>The AI writes the files and asks you to <strong>Deploy Backend</strong></li>
-              <li>Preview opens automatically. Click <strong>Publish</strong> to share.</li>
-            </ol>
-          </div>
-
-          <!-- CLI path -->
-          <div v-else-if="quickStartPath === 'cli'" class="qs-content">
+          <div class="qs-content">
             <p class="text-color-secondary text-sm mt-0 mb-3">
               Build locally with any editor (Cursor, VS Code…), keep the project in Git,
               and deploy with the CLI. Let the CLI create or link the project that it will deploy.
