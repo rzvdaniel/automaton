@@ -45,7 +45,8 @@ public class ZipServiceTests
 
         var content = File.ReadAllText(ignoreFile);
         Assert.That(content, Does.Contain("node_modules/"));
-        Assert.That(content, Does.Contain("!.env.example"));
+        Assert.That(content, Does.Contain(".gitignore"));
+        Assert.That(content, Does.Not.Contain("!.env.example"));
         Assert.That(content, Does.Not.Contain("automaton.json"));
         Assert.That(content, Does.Not.Contain(".automatonignore"));
     }

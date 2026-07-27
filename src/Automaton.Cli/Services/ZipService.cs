@@ -27,6 +27,7 @@ public static class ZipService
     {
         "# Version-control and editor files",
         ".github/",
+        ".gitignore",
         ".vs/",
         ".idea/",
         "",
@@ -55,7 +56,6 @@ public static class ZipService
         "# Local environment, logs, and databases",
         ".env",
         ".env.*",
-        "!.env.example",
         "*.log",
         "*.db",
         "*.sqlite",
