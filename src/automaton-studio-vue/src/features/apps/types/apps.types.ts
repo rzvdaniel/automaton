@@ -91,6 +91,19 @@ export interface App {
   backend: AppComponentOwnership
 }
 
+export interface AppListItem {
+  id: string
+  name: string
+  description: string
+  thumbnailUrl?: string | null
+  tags: string[]
+  isPublished: boolean
+  publicUrl?: string | null
+  updatedAtUtc: string
+  runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' | number } | null
+  runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
+}
+
 export interface AppComponentOwnership {
   sourceAvailable: boolean
   sourceModifiedAtUtc?: string | null

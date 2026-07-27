@@ -54,25 +54,56 @@ public class AppsService
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
+    public async Task<IReadOnlyList<AppListItemDto>> ListAsync(Guid? projectId = null, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var rows = await authorizationService.GetAppsQueryByContext(projectId)
+            .AsNoTracking()
+            .Select(app => new
+            {
+                app.Id, app.Name, app.Description, app.ThumbnailUrl, app.Tags,
+                app.IsPublished, app.PublicUrl, app.Updated,
+                OwnerId = app.WebAppUsers.Select(u => (Guid?)u.UserId).FirstOrDefault(),
+                Runner = dataContext.Runners.Where(r => r.Id == app.ExecutionRunnerId)
+                    .Select(r => new AppListRunnerDto
+                    {
+                        Id = r.Id, Name = r.Name, Purpose = r.Purpose,
+                        ConnectivityStatus = RunnerPresenceEvaluator.DeriveStatus(r.ConnectionId, r.LastHeartbeatAtUtc, now)
+                    }).FirstOrDefault()
+            }).ToListAsync(cancellationToken);
+
+        var items = await Task.WhenAll(rows.Select(async row =>
+        {
+            var ownerId = row.OwnerId ?? UserId;
+            var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, row.Id);
+            return new AppListItemDto
+            {
+                Id = row.Id, Name = row.Name, Description = row.Description ?? string.Empty,
+                ThumbnailUrl = row.ThumbnailUrl, Tags = ParseTags(row.Tags), IsPublished = row.IsPublished,
+                PublicUrl = row.PublicUrl, UpdatedAtUtc = row.Updated,
+                Runner = row.Runner,
+                Runtime = new AppListRuntimeDto
+                {
+                    FrontendAvailable = metadata.Frontend.RuntimeAvailable,
+                    BackendAvailable = metadata.Backend.RuntimeAvailable,
+                    FrontendDeployedAtUtc = metadata.Frontend.RuntimeDeployedAtUtc,
+                    BackendDeployedAtUtc = metadata.Backend.RuntimeDeployedAtUtc
+                }
+            };
+        }));
+        return items;
+    }
+
+    // Legacy projection retained for MCP callers until their contract is migrated.
     public IEnumerable<AppModel> List(Guid? projectId = null)
     {
-        // Use authorization service to get apps filtered by project context
-        var entities = authorizationService.GetAppsQueryByContext(projectId)
-            .Include(x => x.WebAppUsers)
-            .Include(x => x.WebAppScreenshots)
-            .AsSplitQuery()
-            .ToList();
-        var apps = entities
-            .Select(e =>
-            {
-                var ownerId = ResolveAppOwnerId(e) ?? UserId;
-                var app = MapToModel(e, null, ownerId);
-                ApplyStorageMetadata(app, fileStorageService.GetAppStorageMetadataAsync(ownerId, e.Id).Result);
-                return app;
-            });
-
-        return apps;
+        return authorizationService.GetAppsQueryByContext(projectId)
+            .Include(x => x.WebAppUsers).Include(x => x.WebAppScreenshots).AsSplitQuery().ToList()
+            .Select(e => MapToModel(e, null, ResolveAppOwnerId(e) ?? UserId));
     }
+
+    private static IReadOnlyList<string> ParseTags(string? tags) =>
+        string.IsNullOrWhiteSpace(tags) ? Array.Empty<string>() : tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public AppModel Get(Guid id)
     {

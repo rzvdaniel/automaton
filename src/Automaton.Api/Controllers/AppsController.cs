@@ -63,9 +63,9 @@ public class AppsController : BaseController
     }
 
     [HttpGet]
-    public IEnumerable<AppModel> Get([FromQuery] Guid? projectId = null)
+    public async Task<ActionResult<IReadOnlyList<AppListItemDto>>> Get([FromQuery] Guid? projectId = null, CancellationToken cancellationToken = default)
     {
-        return appsService.List(projectId);
+        return Ok(await appsService.ListAsync(projectId, cancellationToken));
     }
 
     [HttpGet("{id}")]
