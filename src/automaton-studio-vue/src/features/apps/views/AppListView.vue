@@ -36,7 +36,8 @@ const projectsStore = useProjectsStore()
 function openExternal(url: string) {
   window.open(url, '_blank', 'noopener')
 }
-\r?\n// View mode state
+
+// View mode state
 const viewMode = ref('grid')
 const viewOptions = ref([
   { icon: 'pi pi-th-large', value: 'grid' },
@@ -173,7 +174,9 @@ watch(
 onUnmounted(() => {
   appsStore.clearFilters()
 })
-\r?\n// Handlers\r?\nconst openCreateDialog = () => {
+
+// Handlers
+const openCreateDialog = () => {
   newAppName.value = ''
   selectedRunnerId.value = null
   showCreateDialog.value = true
@@ -301,7 +304,8 @@ const handleRetry = async () => {
         />
       </div>
     </div>
-\r?\n    <!-- Tabs: My Apps / Templates -->
+
+    <!-- Tabs: My Apps / Templates -->
     <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
@@ -796,5 +800,6 @@ const handleRetry = async () => {
   overflow: hidden;
 }
 </style>
+
 
 
