@@ -63,7 +63,9 @@ public class AppsService
             {
                 app.Id, app.Name, app.Description, app.ThumbnailUrl, app.Tags,
                 app.IsPublished, app.PublicUrl, app.Updated,
-                OwnerId = app.WebAppUsers.Select(u => (Guid?)u.UserId).FirstOrDefault(),
+                OwnerId = app.ProjectId.HasValue
+                    ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
+                    : app.WebAppUsers.OrderBy(u => u.UserId).Select(u => (Guid?)u.UserId).FirstOrDefault(),
                 Runner = dataContext.Runners.Where(r => r.Id == app.ExecutionRunnerId)
                     .Select(r => new AppListRunnerDto
                     {
@@ -72,10 +74,25 @@ public class AppsService
                     }).FirstOrDefault()
             }).ToListAsync(cancellationToken);
 
+        using var metadataGate = new SemaphoreSlim(8);
         var items = await Task.WhenAll(rows.Select(async row =>
         {
             var ownerId = row.OwnerId ?? UserId;
-            var metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, row.Id);
+            await metadataGate.WaitAsync(cancellationToken);
+            AppStorageMetadata metadata;
+            try
+            {
+                metadata = await fileStorageService.GetAppStorageMetadataAsync(ownerId, row.Id);
+            }
+            catch (Exception exception) when (exception is IOException or JsonException)
+            {
+                logger.Warning(exception, "Unable to load app storage metadata for {AppId}; treating runtime as unavailable", row.Id);
+                metadata = new AppStorageMetadata { Frontend = new(), Backend = new() };
+            }
+            finally
+            {
+                metadataGate.Release();
+            }
             return new AppListItemDto
             {
                 Id = row.Id, Name = row.Name, Description = row.Description ?? string.Empty,
@@ -95,7 +112,7 @@ public class AppsService
     }
 
     // Legacy projection retained for MCP callers until their contract is migrated.
-    public IEnumerable<AppModel> List(Guid? projectId = null)
+    public IEnumerable<AppModel> ListForMcp(Guid? projectId = null)
     {
         return authorizationService.GetAppsQueryByContext(projectId)
             .Include(x => x.WebAppUsers).Include(x => x.WebAppScreenshots).AsSplitQuery().ToList()

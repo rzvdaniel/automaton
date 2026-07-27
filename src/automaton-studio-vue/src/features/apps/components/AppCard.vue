@@ -7,16 +7,14 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Menu from 'primevue/menu'
-import type { App } from '../types/apps.types'
-import { AccessScope } from '../types/apps.types'
+import type { App, AppListItem } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
-import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import { getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 
 interface Props {
-  app: App
+  app: AppListItem
 }
 
 const props = defineProps<Props>()
@@ -34,15 +32,12 @@ const fullThumbnailUrl = computed(() => {
   return `${baseUrl}${props.app.thumbnailUrl}`
 })
 
-const emit = defineEmits<{
-  publish: [app: App]
-}>()
+const emit = defineEmits<{ publish: [app: AppListItem] }>()
 
 const router = useRouter()
 const confirm = useConfirm()
 const toast = useToast()
 const appsStore = useAppsStore()
-const projectsStore = useProjectsStore()
 
 const menu = ref()
 const isExporting = ref(false)
@@ -54,18 +49,11 @@ const statusBadge = computed(() => ({
 }))
 
 // Project linkage info
-const isLinkedToProject = computed(() => props.app.scope === AccessScope.Project)
-const projectName = computed(() => {
-  if (!props.app.projectId) return 'Project'
-  const p = projectsStore.projects.find((x) => x.id === props.app.projectId)
-  return p?.displayName || 'Project'
-})
-
 const updatedAgo = computed(() => {
-  if (!props.app.updated) return 'Never updated'
+  if (!props.app.updatedAtUtc) return 'Never updated'
 
   const now = new Date()
-  const updated = new Date(props.app.updated)
+  const updated = new Date(props.app.updatedAtUtc)
   const diffMs = now.getTime() - updated.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
@@ -79,7 +67,7 @@ const updatedAgo = computed(() => {
   return `Updated: ${diffWeeks}w ago`
 })
 
-const canOpenPrivateApp = computed(() => props.app.hasDeployedFrontend)
+const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
 const canOpenPublicApp = computed(() => props.app.isPublished && !!props.app.publicUrl)
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
 const openAppUrl = computed(() => {
@@ -280,14 +268,7 @@ const menuItems = computed(() => {
     })
   }
 
-  // Disable delete when linked to a project
-  if (!isLinkedToProject.value) {
-    items.push({
-      label: 'Delete',
-      icon: 'pi pi-trash',
-      command: handleDelete,
-    })
-  }
+  items.push({ label: 'Delete', icon: 'pi pi-trash', command: handleDelete })
 
   return items
 })
@@ -335,22 +316,16 @@ const menuItems = computed(() => {
 
         <!-- Description -->
         <p class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-          {{ app.description || app.summary || 'No description' }}
+          {{ app.description || 'No description' }}
         </p>
-
-        <!-- Project badge -->
-        <div v-if="isLinkedToProject" class="mb-3">
-          <Tag v-tooltip.top="'Linked to ' + projectName" severity="info">
-            <span class="flex align-items-center gap-1">
-              <i class="pi pi-users" style="font-size: 0.75rem"></i>
-              Project: {{ projectName }}
-            </span>
-          </Tag>
-        </div>
 
         <!-- Metadata -->
         <div class="text-color-secondary text-sm mb-4">
           {{ canOpenApp ? updatedAgo.replace('Updated:', 'Last deploy:') : updatedAgo }}
+        </div>
+        <div class="text-color-secondary text-xs mb-3">
+          <div><i class="pi pi-server mr-1"></i>{{ app.runner?.name || 'No Runner' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
+          <div>Frontend {{ app.runtime.frontendAvailable ? 'available' : 'unavailable' }} · Backend {{ app.runtime.backendAvailable ? 'available' : 'unavailable' }}</div>
         </div>
 
         <!-- Actions -->

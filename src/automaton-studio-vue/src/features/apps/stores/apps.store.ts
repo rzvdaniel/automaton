@@ -61,7 +61,7 @@ export const useAppsStore = defineStore('apps', () => {
     error.value = null
 
     try {
-      apps.value = await appsService.list(projectId)
+      apps.value = (await appsService.getApps(projectId)) as unknown as App[]
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       error.value = errorMessage

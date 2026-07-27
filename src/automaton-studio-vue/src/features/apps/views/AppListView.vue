@@ -25,7 +25,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
-import type { App, PublishAppRequest } from '../types/apps.types'
+import type { App, AppListItem, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
@@ -163,6 +163,13 @@ watch(activeTabIndex, (index) => {
 // Local state
 const searchQuery = ref('')
 const selectedStatus = ref<'all' | 'published' | 'draft'>('all')
+const selectedRunner = ref<string | null>(null)
+const runnerOptions = computed(() => [
+  { label: 'All Runners', value: null },
+  ...Array.from(new Map((appsStore.apps as unknown as AppListItem[]).map((app) => [app.runner?.id, app.runner?.name || 'No Runner'])))
+    .filter(([id]) => id)
+    .map(([value, label]) => ({ label, value })),
+])
 
 const statusOptions = ref([
   { label: 'All', value: 'all' },
@@ -202,6 +209,10 @@ watch(searchQuery, (value) => {
 watch(selectedStatus, (value) => {
   appsStore.setStatusFilter(value)
 })
+
+const visibleApps = computed(() => selectedRunner.value
+  ? (appsStore.filteredApps as unknown as AppListItem[]).filter((app) => app.runner?.id === selectedRunner.value)
+  : (appsStore.filteredApps as unknown as AppListItem[]))
 
 // React to active project changes (including initial load)
 watch(
@@ -525,6 +536,14 @@ const handleRetry = async () => {
           placeholder="Status"
           class="w-10rem"
         />
+        <Dropdown
+          v-model="selectedRunner"
+          :options="runnerOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Runner"
+          class="w-12rem"
+        />
         <SelectButton v-model="viewMode" :options="viewOptions" option-value="value">
           <template #option="{ option }">
             <i :class="option.icon"></i>
@@ -569,9 +588,9 @@ const handleRetry = async () => {
     <!-- Content -->
     <template v-else>
       <!-- Apps Grid -->
-      <div v-if="appsStore.filteredApps.length > 0" class="grid">
+      <div v-if="visibleApps.length > 0" :class="viewMode === 'list' ? 'app-list' : 'grid'">
         <div
-          v-for="app in appsStore.filteredApps"
+          v-for="app in visibleApps"
           :key="app.id"
           class="col-12 md:col-6 lg:col-4"
         >

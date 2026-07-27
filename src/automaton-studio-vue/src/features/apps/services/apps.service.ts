@@ -5,6 +5,7 @@
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
   App,
+  AppListItem,
   AppScreenshot,
   AppDeployCapabilities,
   CreateAppRequest,
@@ -142,6 +143,12 @@ class AppsService {
   async list(projectId?: string): Promise<App[]> {
     const params = projectId ? { projectId } : {}
     const { data } = await apiClient.get<App[]>('/api/apps', { params })
+    return data
+  }
+
+  async getApps(projectId?: string): Promise<AppListItem[]> {
+    const params = projectId ? { projectId } : {}
+    const { data } = await apiClient.get<AppListItem[]>('/api/apps', { params })
     return data
   }
 

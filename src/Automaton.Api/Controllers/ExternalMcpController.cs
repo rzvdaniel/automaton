@@ -341,7 +341,7 @@ public class ExternalMcpController : ControllerBase
 
     private Task<string> ExecListUserApps()
     {
-        var apps = _appsService.List()
+        var apps = _appsService.ListForMcp()
             .OrderByDescending(app => app.Updated)
             .Select(app => new
             {
