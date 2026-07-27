@@ -95,7 +95,7 @@ public class AppAuthorizationRegressionTests
         var apps = await CreateAppsService(dbContext, collaboratorId).ListAsync(allowedProjectId, CancellationToken.None);
 
         Assert.That(apps, Has.Count.EqualTo(1));
-        Assert.That(apps.Single().Name, Is.EqualTo("project-app"));
+        Assert.That(apps.Single().Name, Is.EqualTo("Project App"));
     }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
