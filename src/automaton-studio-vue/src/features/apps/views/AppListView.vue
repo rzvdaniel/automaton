@@ -5,11 +5,9 @@ import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
 import Dropdown from 'primevue/dropdown'
 import Skeleton from 'primevue/skeleton'
-import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import IconField from 'primevue/iconfield'
@@ -20,11 +18,7 @@ import PublishDialog from '../components/PublishDialog.vue'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
-import { getAvailableProviders } from '@/shared/services/ai/ai-providers-service'
-import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import { ConversationMode } from '@/shared/types/ai.types'
-import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
 import type { App, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 import { getPublishedAppUrl } from '../utils/public-app-url'
@@ -38,67 +32,11 @@ const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
-const { defaultAiModel } = useUserSettings()
 
 function openExternal(url: string) {
   window.open(url, '_blank', 'noopener')
 }
-
-// AI generation state
-const aiDescription = ref('')
-const aiMode = ref<string>(ConversationMode.Autonomous)
-const aiModel = ref<string>('')
-const aiAvailableModels = ref<string[]>([])
-const aiModelDisplayNames = ref<Record<string, string>>({})
-const isLoadingModels = ref(false)
-const aiIsUsingSharedKey = ref(false)
-
-onMounted(async () => {
-  isLoadingModels.value = true
-  try {
-    const providers = await getAvailableProviders()
-    const models: string[] = []
-    const displayNames: Record<string, string> = {}
-    for (const p of providers) {
-      const providerDisplayNames = p.modelDisplayNames || {}
-      for (const m of p.supportedModels) {
-        if (!models.includes(m)) models.push(m)
-        if (!displayNames[m]) {
-          displayNames[m] = providerDisplayNames[m] || m
-        }
-      }
-    }
-    aiAvailableModels.value = models.sort((a, b) => a.localeCompare(b))
-    aiModelDisplayNames.value = displayNames
-
-    // Priority: 1. user's saved preference, 2. admin default model, 3. first alphabetically
-    if (defaultAiModel.value && models.includes(defaultAiModel.value)) {
-      aiModel.value = defaultAiModel.value
-    } else {
-      let foundDefault = false
-      for (const p of providers) {
-        if (p.defaultModel && models.includes(p.defaultModel)) {
-          aiModel.value = p.defaultModel
-          foundDefault = true
-          break
-        }
-      }
-      if (!foundDefault && models.length > 0) {
-        aiModel.value = models[0]!
-      }
-    }
-
-    // Detect if the selected model's provider is using a shared/demo key
-    const selectedProvider = providers.find((p) => p.supportedModels.includes(aiModel.value))
-    aiIsUsingSharedKey.value = !!selectedProvider && !selectedProvider.hasStoredKeys && !selectedProvider.hasEnvironmentKey && (selectedProvider.hasSystemKey ?? false)
-  } catch {
-    // Models unavailable — user can still type the prompt
-  } finally {
-    isLoadingModels.value = false
-  }
-})
-
-// View mode state
+\r?\n// View mode state
 const viewMode = ref('grid')
 const viewOptions = ref([
   { icon: 'pi pi-th-large', value: 'grid' },
@@ -1012,3 +950,4 @@ const handleRetry = async () => {
   overflow: hidden;
 }
 </style>
+
