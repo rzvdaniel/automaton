@@ -101,7 +101,7 @@ export interface AppListItem {
   publicUrl?: string | null
   updatedAtUtc: string
   canDelete: boolean
-  runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' | number } | null
+  runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' } | null
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
 }
 

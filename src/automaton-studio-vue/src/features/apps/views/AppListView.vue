@@ -222,6 +222,7 @@ const visibleApps = computed(() => selectedRunner.value
 watch(
   () => projectsStore.activeProjectId,
   async (projectId) => {
+    selectedRunner.value = null
     try {
       await appsStore.fetchApps(projectId ?? undefined)
     } catch {
