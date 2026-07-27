@@ -131,6 +131,10 @@ public class UserAppsControllerTests
         });
 
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+            dbContext,
+            authorizationService,
+            new HostedRunnerAppCapacityService(dbContext));
 
         return new AppsService(
             dbContext,
@@ -142,7 +146,7 @@ public class UserAppsControllerTests
             new NoOpAuditEventService(),
             new NoOpApplicationEventService(),
             null!,
-            new HostedRunnerAppCapacityService(dbContext));
+            runnerAssignmentPolicy);
     }
 
     private static PrivateAppLaunchService CreatePrivateAppLaunchService()

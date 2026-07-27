@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
@@ -6,11 +7,13 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
+using Automaton.Core.Enums;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Tests;
@@ -51,6 +54,221 @@ public class AppAuthorizationRegressionTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Id, Is.EqualTo(appId));
         Assert.That(result.OwnerId, Is.EqualTo(ownerId));
+    }
+
+    [Test]
+    public async Task Update_CannotBypassRunnerAssignmentPolicy()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+        var model = service.Get(appId)!;
+        model.ExecutionRunnerId = Guid.NewGuid();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.Update(appId, model));
+
+        Assert.That(exception!.Message, Does.Contain("not found"));
+        Assert.That(
+            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            Is.Null);
+    }
+
+    [Test]
+    public async Task UpdateRunner_AssignsEligibleOwnedRunner()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "hosted-runner",
+            Purpose = RunnerPurposes.Managed,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                RunnerPurposes.Managed),
+            Status = "offline"
+        });
+        dbContext.RunnerUsers.Add(new RunnerUser { RunnerId = runnerId, UserId = ownerId });
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        await service.UpdateRunner(appId, runnerId);
+
+        Assert.That(
+            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            Is.EqualTo(runnerId));
+    }
+
+    [Test]
+    public async Task UpdateRunner_RejectsInfrastructureRunner()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "infrastructure-runner",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            Status = "online"
+        });
+        dbContext.RunnerUsers.Add(new RunnerUser { RunnerId = runnerId, UserId = ownerId });
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateRunner(appId, runnerId));
+
+        Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
+        Assert.That(
+            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            Is.Null);
+    }
+
+    [Test]
+    public async Task Create_RejectsRunnerOutsideCallerScope()
+    {
+        var ownerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "other-runner",
+            Purpose = RunnerPurposes.Managed,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                RunnerPurposes.Managed),
+            Status = "offline"
+        });
+        dbContext.RunnerUsers.Add(new RunnerUser { RunnerId = runnerId, UserId = otherUserId });
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.Create(new NewApp
+            {
+                Name = "Rejected App",
+                ExecutionRunnerId = runnerId
+            }));
+
+        Assert.That(exception!.Message, Does.Contain("access"));
+        Assert.That(await dbContext.WebApps.CountAsync(), Is.Zero);
+    }
+
+    [Test]
+    public async Task AppActionExecution_RejectsInvalidPersistedRunnerAssignment()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        var app = await dbContext.WebApps.SingleAsync(item => item.Id == appId);
+        app.ExecutionRunnerId = Guid.NewGuid();
+        await dbContext.SaveChangesAsync();
+
+        var userContextService = CreateUserContextService(ownerId);
+        var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+            dbContext,
+            authorizationService,
+            new HostedRunnerAppCapacityService(dbContext));
+        var appsService = CreateAppsService(dbContext, ownerId);
+        var executionService = new AppActionExecutionService(
+            dbContext,
+            appsService,
+            authorizationService,
+            runnerAssignmentPolicy,
+            null!,
+            null!);
+        using var input = JsonDocument.Parse("{}");
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await executionService.ExecuteAsync(
+                appId,
+                "health-check",
+                ownerId,
+                input.RootElement,
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("invalid"));
+    }
+
+    [Test]
+    public async Task RunnerVisibility_DoesNotLeakAcrossProjectContexts()
+    {
+        var userId = Guid.NewGuid();
+        var projectAId = Guid.NewGuid();
+        var projectBId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        await using var dbContext = CreateDbContext();
+        dbContext.Projects.AddRange(
+            CreateProject(projectAId, userId, "project-a"),
+            CreateProject(projectBId, userId, "project-b"));
+        dbContext.ProjectMembers.AddRange(
+            new ProjectMember
+            {
+                ProjectId = projectAId,
+                UserId = userId,
+                Role = ProjectRole.ProjectAdmin,
+                JoinedAt = DateTime.UtcNow,
+                IsActive = true
+            },
+            new ProjectMember
+            {
+                ProjectId = projectBId,
+                UserId = userId,
+                Role = ProjectRole.ProjectAdmin,
+                JoinedAt = DateTime.UtcNow,
+                IsActive = true
+            });
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "project-b-runner",
+            Purpose = RunnerPurposes.Managed,
+            Status = "offline"
+        });
+        dbContext.ProjectRunners.Add(new ProjectRunner
+        {
+            ProjectId = projectBId,
+            RunnerId = runnerId,
+            AddedAt = DateTime.UtcNow,
+            AddedBy = userId
+        });
+        await dbContext.SaveChangesAsync();
+        var authorizationService = new ResourceAuthorizationService(
+            dbContext,
+            CreateUserContextService(userId));
+
+        var visibleRunnerIds = await authorizationService
+            .GetRunnersQueryByContext(projectAId, userId)
+            .Select(item => item.Id)
+            .ToListAsync();
+
+        Assert.That(visibleRunnerIds, Is.Empty);
     }
 
     [Test]
@@ -206,16 +424,7 @@ public class AppAuthorizationRegressionTests
 
     private static AppsService CreateAppsService(ApplicationDbContext dbContext, Guid userId, string? contentRootPath = null)
     {
-        var userContextService = new UserContextService(new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(
-                [
-                    new Claim(ClaimTypes.NameIdentifier, userId.ToString())
-                ], "Test"))
-            }
-        });
+        var userContextService = CreateUserContextService(userId);
 
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
         var environment = new StubWebHostEnvironment(contentRootPath ?? Path.GetTempPath());
@@ -228,6 +437,15 @@ public class AppAuthorizationRegressionTests
                 RemixFrontendExclude = []
             }));
         var fileStorageService = new AppFileStorageService(environment, settingsService);
+        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+            dbContext,
+            authorizationService,
+            new HostedRunnerAppCapacityService(dbContext));
+        var backendRouteConfigService = new BackendRouteConfigService(
+            dbContext,
+            Options.Create(new PublishedAppsConfig()),
+            environment,
+            NullLogger<BackendRouteConfigService>.Instance);
 
         return new AppsService(
             dbContext,
@@ -238,8 +456,22 @@ public class AppAuthorizationRegressionTests
             environment,
             new NoOpAuditEventService(),
             new NoOpApplicationEventService(),
-            null!,
-            new HostedRunnerAppCapacityService(dbContext));
+            backendRouteConfigService,
+            runnerAssignmentPolicy);
+    }
+
+    private static UserContextService CreateUserContextService(Guid userId)
+    {
+        return new UserContextService(new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+                ], "Test"))
+            }
+        });
     }
 
     private static void SeedProjectScopedApp(
@@ -317,6 +549,21 @@ public class AppAuthorizationRegressionTests
             UserId = ownerId
         });
         dbContext.SaveChanges();
+    }
+
+    private static Project CreateProject(Guid projectId, Guid ownerId, string name)
+    {
+        return new Project
+        {
+            Id = projectId,
+            Name = name,
+            DisplayName = name,
+            Description = string.Empty,
+            OwnerId = ownerId,
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            IsActive = true
+        };
     }
 
     private static Api.Entities.CustomStep CreateStep(Guid id, string name)

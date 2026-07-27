@@ -767,7 +767,9 @@ public class ResourceAuthorizationService
         {
             // Project mode - return only runners in that project (if user has access)
             var projectRunnerIds = dbContext.ProjectRunners
-                .Where(pcs => pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
+                .Where(pcs =>
+                    pcs.ProjectId == projectId.Value &&
+                    pcs.Project.Members.Any(pm => pm.UserId == userId && pm.IsActive))
                 .Select(pcs => pcs.RunnerId);
 
             var projectRunners = dbContext.Runners

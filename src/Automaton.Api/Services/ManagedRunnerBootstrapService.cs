@@ -15,17 +15,20 @@ public sealed class ManagedRunnerBootstrapService
     private readonly HostedRunnerProvisioningService hostedRunnerProvisioningService;
     private readonly IEventPublisher eventPublisher;
     private readonly IApplicationEventService applicationEventService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
 
     public ManagedRunnerBootstrapService(
         ApplicationDbContext dbContext,
         HostedRunnerProvisioningService hostedRunnerProvisioningService,
         IEventPublisher eventPublisher,
-        IApplicationEventService applicationEventService)
+        IApplicationEventService applicationEventService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy)
     {
         this.dbContext = dbContext;
         this.hostedRunnerProvisioningService = hostedRunnerProvisioningService;
         this.eventPublisher = eventPublisher;
         this.applicationEventService = applicationEventService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
     }
 
     public async Task<ManagedRunnerBootstrapResult> EnsureRunnerAssignmentAsync(
@@ -39,35 +42,32 @@ public sealed class ManagedRunnerBootstrapService
 
         if (app.ExecutionRunnerId.HasValue)
         {
-            var assignedHostedRunner = await dbContext.HostedRunners
-                .Include(x => x.Runner)
-                .FirstOrDefaultAsync(x =>
-                    x.RunnerId == app.ExecutionRunnerId.Value &&
+            var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+                appId,
+                requireOnline: false,
+                cancellationToken);
+
+            var assignedHostedRunnerIsActive = await dbContext.HostedRunners
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.RunnerId == assignedRunner.Id &&
                     x.UserId == ownerId &&
                     x.DeletedAt == null &&
                     x.Status != HostedRunnerStatuses.Disabled,
                     cancellationToken);
-            var assignedRunner = assignedHostedRunner?.Runner;
-
-            // Resolve assignments through the user's active HostedRunner record.
-            // The underlying Runner row can remain online after its HostedRunner
-            // has been soft-deleted, disabled, or reassigned.
-            if (assignedRunner == null || !RunnerCapabilities.CanExecuteApplications(assignedRunner.CapabilitiesJson, assignedRunner.Purpose))
+            if (!assignedHostedRunnerIsActive)
             {
-                app.ExecutionRunnerId = null;
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-            else
-            {
-                if (RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
-                {
-                    return ManagedRunnerBootstrapResult.Ready(assignedRunner.Id);
-                }
-
-                return ManagedRunnerBootstrapResult.Unavailable(
-                    "No connected runner is assigned to this app.");
+                throw new InvalidOperationException(
+                    "The assigned Hosted Runner is no longer eligible for App execution.");
             }
 
+            if (RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
+            {
+                return ManagedRunnerBootstrapResult.Ready(assignedRunner.Id);
+            }
+
+            return ManagedRunnerBootstrapResult.Unavailable(
+                "No connected runner is assigned to this app.");
         }
 
         var user = await dbContext.Users
@@ -88,7 +88,7 @@ public sealed class ManagedRunnerBootstrapService
             RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose) &&
             RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
-            app.ExecutionRunnerId = runnerId;
+            await runnerAssignmentPolicy.AssignAsync(app, runnerId, ownerId, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             return ManagedRunnerBootstrapResult.Ready(runnerId);
         }

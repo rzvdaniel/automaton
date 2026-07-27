@@ -8,6 +8,7 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -87,7 +88,7 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_ClearsSoftDeletedHostedRunnerAssignmentAndQueuesHostedRunner()
+    public async Task EnsureRunnerAssignmentAsync_RejectsSoftDeletedHostedRunnerAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -102,14 +103,13 @@ public class ManagedRunnerBootstrapServiceTests
         app.ExecutionRunnerId = runner.Id;
         db.SaveChanges();
 
-        var publisher = new RecordingEventPublisher();
-        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
-        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+        Assert.That(exception!.Message, Does.Contain("no longer eligible"));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.EqualTo(runner.Id));
     }
 
     [Test]
@@ -160,7 +160,7 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_ClearsLegacyInfrastructureAssignmentAndQueuesHostedRunner()
+    public async Task EnsureRunnerAssignmentAsync_RejectsLegacyInfrastructureAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -182,21 +182,21 @@ public class ManagedRunnerBootstrapServiceTests
             Status = "online"
         };
         db.Runners.Add(infrastructureRunner);
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = infrastructureRunner.Id, UserId = ownerId });
         app.ExecutionRunnerId = infrastructureRunner.Id;
         db.SaveChanges();
 
-        var publisher = new RecordingEventPublisher();
-        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
-        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+        Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.EqualTo(infrastructureRunner.Id));
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_ClearsMissingAssignmentAndQueuesHostedRunner()
+    public async Task EnsureRunnerAssignmentAsync_RejectsMissingPersistedAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -207,14 +207,13 @@ public class ManagedRunnerBootstrapServiceTests
         app.ExecutionRunnerId = Guid.NewGuid();
         db.SaveChanges();
 
-        var publisher = new RecordingEventPublisher();
-        var service = CreateService(db, publisher, new RecordingApplicationEventService());
+        var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
-        Assert.That(result.State, Is.EqualTo(AppDeployStates.PreparingManagedRuntime));
-        Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>().Count(), Is.EqualTo(1));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+        Assert.That(exception!.Message, Does.Contain("invalid"));
+        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Not.Null);
     }
 
     [Test]
@@ -254,12 +253,19 @@ public class ManagedRunnerBootstrapServiceTests
             new HostedRunnerSpecificationResolver(db),
             new NoOpAuditEventService(),
             NullLogger<HostedRunnerProvisioningService>.Instance);
+        var userContextService = new UserContextService(new HttpContextAccessor());
+        var authorizationService = new ResourceAuthorizationService(db, userContextService);
+        var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
+            db,
+            authorizationService,
+            new HostedRunnerAppCapacityService(db));
 
         return new ManagedRunnerBootstrapService(
             db,
             provisioningService,
             publisher,
-            applicationEvents);
+            applicationEvents,
+            runnerAssignmentPolicy);
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -401,6 +407,7 @@ public class ManagedRunnerBootstrapServiceTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = ownerId });
         db.SaveChanges();
     }
 

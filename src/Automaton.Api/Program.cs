@@ -366,6 +366,7 @@ services.AddHangfireServer();
 
 services.AddScoped<CustomStepsService>();
 services.AddScoped<AppsService>();
+services.AddScoped<AppRunnerAssignmentPolicy>();
 services.AddScoped<AdminAppsService>();
 services.AddScoped<PublicAppsService>();
 services.AddScoped<WebAppStarService>();

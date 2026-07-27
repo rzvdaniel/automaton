@@ -38,6 +38,7 @@ public class AppsControllerExecutionService
     private readonly UserImpersonationServiceFactory<FlowsService> flowsServiceFactory;
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -51,7 +52,8 @@ public class AppsControllerExecutionService
         IAppDeployCapabilityService appDeployCapabilityService,
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         BackendRouteConfigService backendRouteConfigService,
-        ManagedRunnerBootstrapService managedRunnerBootstrapService)
+        ManagedRunnerBootstrapService managedRunnerBootstrapService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -64,6 +66,7 @@ public class AppsControllerExecutionService
         this.flowsServiceFactory = flowsServiceFactory;
         this.backendRouteConfigService = backendRouteConfigService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -735,41 +738,34 @@ public class AppsControllerExecutionService
 
     private async Task<IEnumerable<Runner>> ResolveRunnersAsync(PublishedAppInfo app, List<string>? runnerNames)
     {
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-        var query = dataContext.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == app.OwnerId))
-            .Where(r => r.ConnectionId != null
-                && r.LastHeartbeatAtUtc.HasValue
-                && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
+        var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+            app.Id,
+            requireOnline: true);
 
-        if (runnerNames != null && runnerNames.Any())
-            query = query.Where(r => runnerNames.Contains(r.Name));
-        else if (app.ExecutionRunnerId.HasValue)
-            query = query.Where(r => r.Id == app.ExecutionRunnerId.Value);
+        if (runnerNames is { Count: > 0 } &&
+            !runnerNames.Contains(assignedRunner.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "App backend execution must use the assigned Runner.");
+        }
 
-        var runners = await query.ToListAsync();
-        return runners.Where(r => !RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
+        return [assignedRunner];
     }
 
     private async Task<IEnumerable<Runner>> ResolveRunnersByOwnerAsync(Guid ownerId, List<string>? runnerNames, Guid appId)
     {
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-        var query = dataContext.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.ConnectionId != null
-                && r.LastHeartbeatAtUtc.HasValue
-                && r.LastHeartbeatAtUtc.Value >= thresholdUtc);
+        var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+            appId,
+            requireOnline: true);
 
-        if (runnerNames != null && runnerNames.Any())
-            query = query.Where(r => runnerNames.Contains(r.Name));
-        else
-            query = query.Where(r => r.Id == dataContext.WebApps
-                .Where(a => a.Id == appId)
-                .Select(a => a.ExecutionRunnerId)
-                .FirstOrDefault());
+        if (runnerNames is { Count: > 0 } &&
+            !runnerNames.Contains(assignedRunner.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "App backend deployment must use the assigned Runner.");
+        }
 
-        var runners = await query.ToListAsync();
-        return runners.Where(r => !RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose));
+        return [assignedRunner];
     }
 
     private static string GetActionLabel(bool updated, int fileCount) =>

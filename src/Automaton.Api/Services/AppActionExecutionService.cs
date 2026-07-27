@@ -21,14 +21,22 @@ public sealed class AppActionExecutionService
     private readonly ApplicationDbContext db;
     private readonly AppsService appsService;
     private readonly ResourceAuthorizationService authorizationService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IHubContext<AutomatonHub> hub;
     private readonly IServiceScopeFactory scopeFactory;
 
-    public AppActionExecutionService(ApplicationDbContext db, AppsService appsService, ResourceAuthorizationService authorizationService, IHubContext<AutomatonHub> hub, IServiceScopeFactory scopeFactory)
+    public AppActionExecutionService(
+        ApplicationDbContext db,
+        AppsService appsService,
+        ResourceAuthorizationService authorizationService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        IHubContext<AutomatonHub> hub,
+        IServiceScopeFactory scopeFactory)
     {
         this.db = db;
         this.appsService = appsService;
         this.authorizationService = authorizationService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.hub = hub;
         this.scopeFactory = scopeFactory;
     }
@@ -53,12 +61,10 @@ public sealed class AppActionExecutionService
             ?? throw new KeyNotFoundException("App not found.");
         if (!await authorizationService.CanExecuteAppAsync(appId, userId, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
-        if (!app.ExecutionRunnerId.HasValue)
-            throw new InvalidOperationException("No Runner is assigned to this App.");
-
-        var runner = await db.Runners.AsNoTracking().SingleOrDefaultAsync(r => r.Id == app.ExecutionRunnerId.Value, cancellationToken);
-        if (runner == null || string.IsNullOrWhiteSpace(runner.ConnectionId))
-            throw new InvalidOperationException("The assigned Runner is unavailable.");
+        var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+            appId,
+            requireOnline: true,
+            cancellationToken);
 
         var deployed = await hub.Clients.Client(runner.ConnectionId).InvokeAsync<AppActionModulesResponse>(
             AutomatonHubMethods.ListAppActionModules, appId, cancellationToken);
@@ -252,12 +258,11 @@ public sealed class AppActionExecutionService
 
     private async Task<string> GetAuthorizedRunnerConnectionAsync(Guid appId, Guid userId, CancellationToken cancellationToken)
     {
-        var app = await appsService.GetAccessibleAppInfoByIdAsync(appId, userId, cancellationToken)
-            ?? throw new KeyNotFoundException("App not found.");
-        if (!app.ExecutionRunnerId.HasValue) throw new InvalidOperationException("No Runner is assigned to this App.");
-        var connectionId = await db.Runners.AsNoTracking().Where(runner => runner.Id == app.ExecutionRunnerId.Value)
-            .Select(runner => runner.ConnectionId).SingleOrDefaultAsync(cancellationToken);
-        return !string.IsNullOrWhiteSpace(connectionId) ? connectionId : throw new InvalidOperationException("The assigned Runner is unavailable.");
+        var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+            appId,
+            requireOnline: true,
+            cancellationToken);
+        return runner.ConnectionId!;
     }
 
     private async Task EnsureCanUpdateAsync(Guid appId, Guid userId, CancellationToken cancellationToken)

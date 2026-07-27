@@ -7,18 +7,18 @@ public sealed class ManagedRunnerAppAssignmentService
 {
     private readonly ApplicationDbContext dbContext;
     private readonly AppFileStorageService fileStorageService;
-    private readonly HostedRunnerAppCapacityService capacityService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly ILogger<ManagedRunnerAppAssignmentService> logger;
 
     public ManagedRunnerAppAssignmentService(
         ApplicationDbContext dbContext,
         AppFileStorageService fileStorageService,
-        HostedRunnerAppCapacityService capacityService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         ILogger<ManagedRunnerAppAssignmentService> logger)
     {
         this.dbContext = dbContext;
         this.fileStorageService = fileStorageService;
-        this.capacityService = capacityService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.logger = logger;
     }
 
@@ -44,11 +44,11 @@ public sealed class ManagedRunnerAppAssignmentService
 
             try
             {
-                await capacityService.AssignAsync(app, runnerId, cancellationToken);
+                await runnerAssignmentPolicy.AssignAsync(app, runnerId, userId, cancellationToken);
             }
             catch (InvalidOperationException ex)
             {
-                logger.LogInformation(ex, "Hosted runner {RunnerId} reached its app capacity", runnerId);
+                logger.LogInformation(ex, "Managed runner {RunnerId} could not be assigned", runnerId);
                 break;
             }
 

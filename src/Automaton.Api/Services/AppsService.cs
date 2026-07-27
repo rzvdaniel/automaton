@@ -22,7 +22,7 @@ public class AppsService
     private readonly IAuditEventService auditEventService;
     private readonly IApplicationEventService applicationEventService;
     private readonly BackendRouteConfigService backendRouteConfigService;
-    private readonly HostedRunnerAppCapacityService hostedRunnerAppCapacityService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -38,7 +38,7 @@ public class AppsService
         IAuditEventService auditEventService,
         IApplicationEventService applicationEventService,
         BackendRouteConfigService backendRouteConfigService,
-        HostedRunnerAppCapacityService hostedRunnerAppCapacityService
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy
     )
     {
         this.dataContext = dataContext;
@@ -50,7 +50,7 @@ public class AppsService
         this.auditEventService = auditEventService;
         this.applicationEventService = applicationEventService;
         this.backendRouteConfigService = backendRouteConfigService;
-        this.hostedRunnerAppCapacityService = hostedRunnerAppCapacityService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -241,18 +241,6 @@ public class AppsService
 
     public async Task<Guid> Create(NewApp app)
     {
-        // If an execution runner id was provided, ensure it belongs to the owner (current user)
-        if (app.ExecutionRunnerId.HasValue)
-        {
-            var runnerExists = dataContext.Runners
-                .Any(r => r.Id == app.ExecutionRunnerId.Value && r.RunnerUsers.Any(u => u.UserId == UserId));
-
-            if (!runnerExists)
-            {
-                throw new InvalidOperationException("Execution runner not found or you do not have access to it.");
-            }
-        }
-
         var entity = new Entities.WebApp
         {
             Id = Guid.NewGuid(),
@@ -266,7 +254,7 @@ public class AppsService
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             Definition = "{}", // Empty - content is now in file system
-            ExecutionRunnerId = app.ExecutionRunnerId
+            ExecutionRunnerId = null
         };
 
         dataContext.WebApps.Add(entity);
@@ -278,7 +266,8 @@ public class AppsService
         };
 
         dataContext.WebAppUsers.Add(appUser);
-        dataContext.SaveChanges();
+        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
+        await dataContext.SaveChangesAsync();
 
         // Create default app metadata in file system (no index.html — AI will write it)
         var defaultDefinition = new Models.AppDefinition
@@ -363,6 +352,7 @@ public class AppsService
         var previousIsProfileFeatured = entity.IsProfileFeatured;
         var previousExecutionRunnerId = entity.ExecutionRunnerId;
 
+        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
         entity.Name = app.Name;
         entity.Summary = app.Summary;
         entity.Description = app.Description;
@@ -370,7 +360,6 @@ public class AppsService
         entity.IsForkable = app.IsForkable;
         entity.PublicUrl = app.PublicUrl;
         entity.RequiresAuthentication = app.RequiresAuthentication;
-        entity.ExecutionRunnerId = app.ExecutionRunnerId;
         entity.IsProfileFeatured = app.IsProfileFeatured;
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
@@ -381,7 +370,7 @@ public class AppsService
         entity.Category = app.Category;
         entity.Tags = app.Tags;
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         // Save app content to file system
         await fileStorageService.SaveAppAsync(ownerId, id, app.Definition);
@@ -577,16 +566,9 @@ public class AppsService
             throw new InvalidOperationException("This URL is already taken");
         }
 
-        // If an execution runner id was provided, ensure it belongs to the owner
         if (executionRunnerId.HasValue)
         {
-            var runnerExists = dataContext.Runners
-                .Any(r => r.Id == executionRunnerId.Value && r.RunnerUsers.Any(u => u.UserId == UserId));
-
-            if (!runnerExists)
-            {
-                throw new InvalidOperationException("Execution runner not found or you do not have access to it.");
-            }
+            await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
         }
 
         var ownerId = ResolveAppOwnerId(entity) ?? UserId;
@@ -599,12 +581,10 @@ public class AppsService
         entity.RequiresAuthentication = requiresAuthentication;
         entity.Category = category?.Trim();
         entity.Tags = tags?.Trim();
-        if (executionRunnerId.HasValue)
-            entity.ExecutionRunnerId = executionRunnerId.Value;
         entity.Version = nextVersion;
         entity.Updated = DateTime.UtcNow;
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
         {
@@ -727,26 +707,12 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
-        if (executionRunnerId.HasValue && dataContext.Runners
-            .Where(r => r.Id == executionRunnerId.Value)
-            .Select(r => new { r.CapabilitiesJson, r.Purpose })
-            .AsEnumerable()
-            .Any(r => RunnerCapabilities.RequiresAdministrator(r.CapabilitiesJson, r.Purpose)))
-        {
-            throw new InvalidOperationException("Infrastructure runners cannot be assigned to app execution.");
-        }
-
         var previousRunnerId = entity.ExecutionRunnerId;
 
-        if (executionRunnerId.HasValue)
-        {
-            await hostedRunnerAppCapacityService.AssignAsync(entity, executionRunnerId.Value);
-        }
-
-        entity.ExecutionRunnerId = executionRunnerId;
+        await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
         entity.Updated = DateTime.UtcNow;
 
-        dataContext.SaveChanges();
+        await dataContext.SaveChangesAsync();
 
         await auditEventService.WriteAsync(new Models.AuditEventWriteRequest
         {
@@ -919,7 +885,7 @@ public class AppsService
             PublicUrl = null,
             PublishedAt = null,
             Version = 1,
-            ExecutionRunnerId = source.ExecutionRunnerId,
+            ExecutionRunnerId = null,
             RequiresAuthentication = source.RequiresAuthentication,
             Scope = AccessScope.Personal,
             ProjectId = null,
@@ -935,6 +901,7 @@ public class AppsService
 
         dataContext.WebApps.Add(entity);
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
+        await runnerAssignmentPolicy.AssignAsync(entity, source.ExecutionRunnerId, UserId);
         await dataContext.SaveChangesAsync();
 
         await fileStorageService.CopySourceFilesAsync(UserId, appId, UserId, newId);
