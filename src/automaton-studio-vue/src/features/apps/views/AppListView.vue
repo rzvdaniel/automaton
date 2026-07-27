@@ -300,6 +300,7 @@ const handleRetry = async () => {
         <p class="text-color-secondary mt-1 mb-0">Build and publish web applications</p>
       </div>
       <div class="flex gap-2">
+        <Button label="Create App" icon="pi pi-plus" @click="openCreateDialog" />
         <Button
           label="Import App"
           icon="pi pi-upload"
@@ -399,7 +400,16 @@ const handleRetry = async () => {
           :key="app.id"
           class="col-12 md:col-6 lg:col-4"
         >
-          <AppCard :app="app" @publish="openPublishDialog" />
+          <AppCard v-if="viewMode === 'grid'" :app="app" @publish="openPublishDialog" />
+          <div v-else class="app-list-row flex align-items-center gap-3 p-3 border-1 surface-border border-round">
+            <i class="pi pi-globe text-primary text-xl" />
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
+              <div class="text-color-secondary text-sm">{{ app.runner?.name || 'Unassigned' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
+            </div>
+            <div class="text-sm text-color-secondary">{{ app.runtime.frontendAvailable ? 'Frontend' : 'No frontend' }} · {{ app.runtime.backendAvailable ? 'Backend' : 'No backend' }}</div>
+            <Button label="Edit" icon="pi pi-pencil" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
+          </div>
         </div>
       </div>
 
