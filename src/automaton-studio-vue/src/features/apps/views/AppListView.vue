@@ -173,85 +173,7 @@ watch(
 onUnmounted(() => {
   appsStore.clearFilters()
 })
-
-// Handlers
-const handleGenerateApp = async () => {
-  if (!aiDescription.value.trim()) return
-
-  isCreating.value = true
-  try {
-    // Extract a name from the description immediately (no AI call) so we navigate fast.
-    // The editor page receives the full prompt and performs the expensive AI generation there.
-    const words = aiDescription.value.trim().split(/\s+/).slice(0, 4).join(' ')
-    const appName = words.length > 30 ? words.substring(0, 30) + '...' : words
-
-    const app = await appsStore.createApp({
-      name: appName,
-    })
-
-    // Navigate to editor with prompt, mode, and model as query params
-    // Vue Router encodes query params automatically — don't call encodeURIComponent
-    const query: Record<string, string> = { prompt: aiDescription.value.trim() }
-    if (aiMode.value)  query.mode  = aiMode.value
-    if (aiModel.value) query.model = aiModel.value
-    router.push({ path: `/apps/${app.id}`, query })
-
-    // Clear the description
-    aiDescription.value = ''
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to create app'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    })
-  } finally {
-    isCreating.value = false
-  }
-}
-
-const handleCreateApp = async () => {
-  if (!newAppName.value.trim()) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Validation Error',
-      detail: 'App name is required',
-      life: 3000,
-    })
-    return
-  }
-
-  isCreating.value = true
-  try {
-    const app = await appsStore.createApp({
-      name: newAppName.value.trim(),
-      executionRunnerId: selectedRunnerId.value || undefined,
-    })
-    toast.add({
-      severity: 'success',
-      summary: 'Created',
-      detail: `App "${app.name}" created successfully`,
-      life: 3000,
-    })
-    showCreateDialog.value = false
-    newAppName.value = ''
-    selectedRunnerId.value = null
-    router.push(`/apps/${app.id}`)
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to create app'
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: message,
-      life: 5000,
-    })
-  } finally {
-    isCreating.value = false
-  }
-}
-
-const openCreateDialog = () => {
+\r?\n// Handlers\r?\nconst openCreateDialog = () => {
   newAppName.value = ''
   selectedRunnerId.value = null
   showCreateDialog.value = true
@@ -379,82 +301,7 @@ const handleRetry = async () => {
         />
       </div>
     </div>
-
-    <!-- AI Generation Input -->
-    <Card class="mb-5">
-      <template #content>
-        <div class="flex align-items-start gap-3">
-          <div
-            class="flex align-items-center justify-content-center border-round flex-shrink-0"
-            style="
-              width: 48px;
-              height: 48px;
-              background-color: var(--p-primary-100);
-              color: var(--p-primary-600);
-            "
-          >
-            <i class="pi pi-sparkles text-xl"></i>
-          </div>
-          <div class="flex-1">
-            <div class="font-semibold mb-2">What would you like to build?</div>
-            <!-- No AI key notice -->
-            <Message
-              v-if="!isLoadingModels && aiAvailableModels.length === 0"
-              severity="warn"
-              :closable="false"
-              class="mb-2"
-            >
-              No AI key configured.
-              <Button
-                label="Add AI Key"
-                link
-                size="small"
-                class="p-0 ml-1"
-                style="vertical-align: baseline"
-                @click="router.push('/ai-keys')"
-              />
-              to enable AI generation.
-            </Message>
-            <Textarea
-              v-model="aiDescription"
-              rows="3"
-              placeholder="Describe your app in plain English. For example: 'A customer feedback form that saves responses to a database and sends email notifications...'"
-              class="w-full"
-              @keydown="(e: KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerateApp() } }"
-            />
-            <div class="flex align-items-center justify-content-between mt-3">
-              <AiModeModelSelector
-                v-model:mode="aiMode"
-                v-model:model="aiModel"
-                :available-models="aiAvailableModels"
-                :model-display-names="aiModelDisplayNames"
-                :loading="isLoadingModels"
-                :shared-key="aiIsUsingSharedKey"
-              />
-              <div class="flex align-items-center gap-2">
-                <Button
-                  label="Start from scratch"
-                  icon="pi pi-plus"
-                  severity="secondary"
-                  outlined
-                  :disabled="isCreating"
-                  @click="openCreateDialog"
-                />
-                <Button
-                  label="Create with AI"
-                  icon="pi pi-sparkles"
-                  :disabled="!aiDescription || isCreating || aiAvailableModels.length === 0"
-                  :loading="isCreating"
-                  @click="handleGenerateApp"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </Card>
-
-    <!-- Tabs: My Apps / Templates -->
+\r?\n    <!-- Tabs: My Apps / Templates -->
     <TabMenu v-model:activeIndex="activeTabIndex" :model="tabItems" class="mb-4" />
 
     <!-- ─── MY APPS TAB ────────────────────────────────────────────── -->
@@ -618,7 +465,6 @@ const handleRetry = async () => {
               <li>The AI writes the files and asks you to <strong>Deploy Backend</strong></li>
               <li>Preview opens automatically. Click <strong>Publish</strong> to share.</li>
             </ol>
-            <Button label="Generate with AI" icon="pi pi-sparkles" size="small" class="mt-2" @click="handleGenerateApp" />
           </div>
 
           <!-- CLI path -->
@@ -950,4 +796,5 @@ const handleRetry = async () => {
   overflow: hidden;
 }
 </style>
+
 
