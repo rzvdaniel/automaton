@@ -22,6 +22,49 @@ namespace Automaton.Api.Tests;
 public class AppAuthorizationRegressionTests
 {
     [Test]
+    public async Task ListAsync_ProjectsAuthorizedPersonalAppAndUnassignedRunner()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "personal-app");
+
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+        var result = await service.ListAsync(cancellationToken: CancellationToken.None);
+
+        var app = result.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.Id, Is.EqualTo(appId));
+            Assert.That(app.Runner, Is.Null);
+            Assert.That(app.CanDelete, Is.True);
+            Assert.That(app.Runtime.FrontendAvailable, Is.False);
+            Assert.That(app.Runtime.BackendAvailable, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task ListAsync_ProjectsAssignedRunnerAndCanonicalPresence()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "runner-app");
+        dbContext.WebApps.Single().ExecutionRunnerId = runnerId;
+        dbContext.Runners.Add(new Runner { Id = runnerId, Name = "runner", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", LastHeartbeatAtUtc = DateTime.UtcNow, Status = "offline" });
+        await dbContext.SaveChangesAsync();
+
+        var app = (await CreateAppsService(dbContext, ownerId).ListAsync(cancellationToken: CancellationToken.None)).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.Runner!.Name, Is.EqualTo("runner"));
+            Assert.That(app.Runner.Purpose, Is.EqualTo(RunnerPurposes.Managed));
+            Assert.That(app.Runner.ConnectivityStatus, Is.EqualTo(RunnerStatus.Online));
+        });
+    }
+    [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
     {
         var ownerId = Guid.NewGuid();
