@@ -13,15 +13,21 @@ multi-Runner assignment, or deployment-instance concepts. The existing
 `WebApp.ExecutionRunnerId` remains the single execution target. Tags must remain
 organization metadata and must not participate in Runner authorization.
 
-The smallest useful direction is:
+The approved architecture direction is:
 
-1. enrich the app-list response with a compact, read-only Runner and deployment
-   projection;
-2. normalize the existing tag string at API boundaries and expose parsed tags
+1. centralize Runner assignment policy and route every assignment, deployment,
+   and execution path through it before adding new infrastructure-app UX;
+2. introduce a purpose-built app-list projection with compact, read-only Runner
+   and runtime metadata rather than continually expanding `AppModel`;
+3. normalize the existing tag string at API boundaries and expose parsed tags
    to Studio without introducing a tag authorization model;
-3. add a separate `AppStatusSummary` resource for app-published display status;
-4. add a separate, secret-free CLI targets file whose aliases resolve to
+4. add a separate `AppStatusSummary` resource for app-published display status;
+5. add a separate, secret-free CLI targets file whose aliases resolve to
    independent app IDs while reusing the existing deploy pipeline.
+
+The following concepts are explicitly excluded: `ApplicationKind`, multi-Runner
+assignment, deployment instances, tag entities/join tables, and
+infrastructure-specific fields on `WebApp`.
 
 ## Current model
 
@@ -103,10 +109,10 @@ presented as deployment time.
 - Tags are not consulted by the current Runner rules, which is the correct
   security boundary.
 
-Stage 6 should centralize every assignment path behind one service/policy:
-ordinary callers may select only eligible visible Runners; authorized
-administrators may additionally select eligible Infrastructure Runners in
-their admin scope. Direct DTO updates must not bypass that policy.
+Stage 2A must centralize every assignment path behind one service/policy while
+preserving the currently supported assignment rules. Direct DTO updates must
+not bypass that policy. Authorized administrator assignment to Infrastructure
+Runners is added only in Stage 6 after its scope and UX are implemented.
 
 ### Deployment and execution history
 
@@ -156,27 +162,92 @@ across compatible targets.
 
 ## Proposed minimal schema and API changes
 
-### Stage 2: Apps-page list projection
+### Stage 2A: centralized Runner assignment policy
+
+The first implementation priority is to close the broad app-update bypass
+before exposing additional Runner information or infrastructure-app UX.
+
+Introduce one centralized assignment service/policy and apply it to:
+
+- app creation and general app update;
+- the dedicated Runner assignment endpoint;
+- deployment validation;
+- app backend execution;
+- app Action execution;
+- project/organization assignment paths where applicable.
+
+Preserve current assignment behavior unless a reviewed requirement explicitly
+changes it. In particular, do not add Infrastructure Runner admin assignment UX
+in this stage unless required to preserve currently supported behavior.
+
+Deployment and execution must reject an invalid persisted assignment rather
+than trusting `ExecutionRunnerId`. Regression tests must prove:
+
+- general app update cannot bypass assignment validation;
+- dedicated assignment still works;
+- invalid Runner assignment is rejected consistently;
+- normal Hosted Runner assignment remains valid;
+- deployment and execution reject invalid persisted assignments.
+
+### Stage 2B: app-list projection and Apps-page redesign
 
 No database migration is required for the initial page redesign.
 
-Extend the app-list DTO (or add a purpose-built `AppListItemDto`) with:
+Add a purpose-built DTO rather than expanding the general `AppModel`:
 
-- `runner`: nullable `{ id, name, purpose, connectivityStatus }`;
-- `deployment`: frontend/backend runtime availability and latest deployed time,
-  with an explicit `result` only if backed by a real generic deployment source;
-- `latestActionExecution`: optional `{ status, completedAtUtc }` only where it
-  adds useful list-level signal.
+```text
+AppListItemDto
+{
+    Id
+    Name
+    Description
+    ThumbnailUrl
+    Tags[]
+    IsPublished
+    PublicUrl
+    UpdatedAtUtc
+
+    Runner
+    {
+        Id
+        Name
+        Purpose
+        ConnectivityStatus
+    }
+
+    Runtime
+    {
+        FrontendAvailable
+        BackendAvailable
+        FrontendDeployedAtUtc
+        BackendDeployedAtUtc
+    }
+}
+```
 
 Prefer an async, set-based list query. The current synchronous list method
 performs per-app filesystem metadata reads and should not gain more per-app
-database queries.
+database queries. Runner connectivity must reuse the canonical presence/status
+model rather than introducing a second connectivity model.
+
+Keep frontend and backend deployment timestamps separate. Do not label
+`WebApp.Updated`/`UpdatedAtUtc` as deployment time.
+
+The initial DTO deliberately excludes:
+
+- `StatusSummary`, until its backing entity and API exist in Stage 4;
+- `LatestActionExecution`, until the redesigned page proves it useful;
+- a generic deployment result, until a real generic deployment record exists.
+
+Studio work in this stage removes the unsupported AI creation panel while
+preserving functional Create, Import, Templates, and Public Apps flows. It adds
+genuine card/list layouts plus search, publication, and Runner filters.
 
 ### Stage 3: tag normalization and UX
 
 Keep the existing `WebApp.Tags` column initially to avoid an unnecessary schema
-migration. Add one server-side normalizer used by update, publish, import,
-duplicate, and fork boundaries:
+migration. Add one server-side normalizer used by create/update, publish,
+import, duplicate, and fork boundaries:
 
 - split on commas;
 - trim each value;
@@ -185,12 +256,13 @@ duplicate, and fork boundaries:
 - enforce conservative per-tag and tag-count limits;
 - persist a stable canonical representation.
 
-Expose `tags: string[]` on the purpose-built list/settings DTO while retaining
+Expose `Tags` as `string[]` on the purpose-built list/settings DTO while retaining
 the legacy string during a compatibility window if other clients depend on it.
 Build autocomplete options by taking distinct normalized tags from apps already
 visible in the caller's authorization context. Filtering/grouping can remain
-client-side for the expected personal/project app counts; no tag query or index
-is required initially.
+client-side for the expected personal/project app counts, initially using
+match-any semantics; no tag query or index is required initially. Tests must
+prove that tags do not affect Runner authorization or eligibility.
 
 ### Stage 4: generic status summary
 
@@ -213,6 +285,19 @@ trusting an app ID in the payload. Include a derived read projection in app-list
 DTOs; expired data is returned/rendered as stale and `unknown`. This metadata
 must not affect authorization, publication, or Runner eligibility.
 
+Only in this stage extend `AppListItemDto` with:
+
+```text
+StatusSummary
+{
+    Status
+    Summary
+    Metrics
+    UpdatedAtUtc
+    IsStale
+}
+```
+
 ### Stage 5: CLI target manifest
 
 Add `automaton.deployments.json` with a typed, validated alias-to-target model.
@@ -227,27 +312,48 @@ Refactor deployment into:
 3. aggregate result rendering and exit-code calculation.
 
 Reject unknown aliases and duplicate app IDs before deploying. Keep the existing
-no-target `automaton deploy` path behavior unchanged.
+no-target `automaton deploy` path behavior unchanged. Extract a reusable
+prepared deployment artifact before adding multi-target orchestration; do not
+turn the existing `DeployService` into an internal multi-target loop.
 
 ## Reviewed implementation sequence
 
-1. **Apps page redesign:** introduce the list projection, remove the unsupported
-   AI creation panel, preserve functional Create/Import/Templates flows, and
-   implement real card/list views plus search/status/Runner/publication controls.
-2. **Tags UX:** add centralized normalization, array DTOs, multi-select filtering
+1. **Stage 2A — centralized Runner assignment policy:** close the broad-update
+   bypass, route assignment/deployment/execution validation through one policy,
+   preserve current behavior, and add regression coverage before new UX.
+2. **Stage 2B — app-list projection and Apps page redesign:** introduce the
+   approved `AppListItemDto`, remove the unsupported AI creation panel, preserve
+   functional Create/Import/Templates/Public Apps flows, and implement real
+   card/list views plus search/publication/Runner controls.
+3. **Stage 3 — Tags UX:** add centralized normalization, array DTOs, multi-select filtering
    with match-any semantics, tag grouping, editing, and visible-scope
    autocomplete. Verify tags have no security effect.
-3. **Generic status summary:** add the separate entity, scoped write/clear API,
+4. **Stage 4 — Generic status summary:** add the separate entity, scoped write/clear API,
    stale derivation, list projection, card/list rendering, and documentation.
-4. **CLI multi-app deployment:** add the secret-free target manifest, reuse one
+5. **Stage 5 — CLI multi-app deployment:** add the secret-free target manifest, reuse one
    compatible build/package, deploy sequentially, and aggregate failures.
-5. **Infrastructure assignment UX:** centralize Runner assignment policy, close
-   the general-update bypass, allow only authorized admin-scoped Infrastructure
-   assignment, add warnings/badges derived from Runner purpose, and audit it.
-6. **Monitoring app template:** build a private, read-only example that publishes
-   the generic summary and is deployable as one app ID per target alias.
-7. **Operational polish:** add generic offline/failed/stale/unassigned indicators
+6. **Stage 6 — Infrastructure assignment UX:** allow Infrastructure Runner
+   assignment only when the caller is an authorized administrator, the Runner
+   is visible in that administrator's scope, the app is in a scope the caller
+   administers, and the Runner is otherwise eligible. Normal users must not
+   discover these Runners. Add warnings/confirmation and a Privileged Runner
+   badge derived from Runner purpose, never tags. Enforce the same rules for
+   direct API requests and audit assignment, deployment, and privileged Action
+   execution. Preserve trusted System Action targeting and admin host-management
+   views.
+7. **Stage 7 — Monitoring app template:** build a private, read-only example
+   using one app ID and one assigned Infrastructure Runner per target, one
+   shared source repository, CLI target aliases, and generic status publication.
+   Include a frontend dashboard, snapshot API, configurable thresholds, and
+   read-only host/Docker monitoring Actions. Exclude arbitrary command consoles,
+   destructive maintenance, and committed credentials.
+8. **Stage 8 — Operational polish:** add generic offline/failed/stale/unassigned indicators
    and optional sorting/preferences without automatic remediation.
+
+The following remain explicitly deferred: multi-Runner apps, deployment
+instances, automatic remediation, destructive cleanup, backup automation, hard
+quotas, paid storage upgrades, shared storage, and latest Action execution on
+app cards unless later proven useful.
 
 Each stage remains a separate branch and review boundary. Nothing should deploy
 automatically.
