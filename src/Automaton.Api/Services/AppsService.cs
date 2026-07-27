@@ -62,7 +62,7 @@ public class AppsService
             .Select(app => new
             {
                 app.Id, app.Name, app.Description, app.ThumbnailUrl, app.Tags,
-                app.IsPublished, app.PublicUrl, app.Updated,
+                app.IsPublished, app.PublicUrl, app.Updated, app.ProjectId,
                 OwnerId = app.ProjectId.HasValue
                     ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
                     : app.WebAppUsers.OrderBy(u => u.UserId).Select(u => (Guid?)u.UserId).FirstOrDefault(),
@@ -98,6 +98,7 @@ public class AppsService
                 Id = row.Id, Name = row.Name, Description = row.Description ?? string.Empty,
                 ThumbnailUrl = row.ThumbnailUrl, Tags = ParseTags(row.Tags), IsPublished = row.IsPublished,
                 PublicUrl = row.PublicUrl, UpdatedAtUtc = row.Updated,
+                CanDelete = !row.ProjectId.HasValue,
                 Runner = row.Runner,
                 Runtime = new AppListRuntimeDto
                 {

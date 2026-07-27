@@ -25,7 +25,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
 import { ConversationMode } from '@/shared/types/ai.types'
 import AiModeModelSelector from '@/shared/components/ui/AiModeModelSelector.vue'
-import type { App, AppListItem, PublishAppRequest } from '../types/apps.types'
+import type { App, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
@@ -164,9 +164,11 @@ watch(activeTabIndex, (index) => {
 const searchQuery = ref('')
 const selectedStatus = ref<'all' | 'published' | 'draft'>('all')
 const selectedRunner = ref<string | null>(null)
+const unassignedRunnerFilter = '__unassigned__'
 const runnerOptions = computed(() => [
   { label: 'All Runners', value: null },
-  ...Array.from(new Map((appsStore.apps as unknown as AppListItem[]).map((app) => [app.runner?.id, app.runner?.name || 'No Runner'])))
+  { label: 'Unassigned', value: unassignedRunnerFilter },
+  ...Array.from(new Map(appsStore.listApps.map((app) => [app.runner?.id, app.runner?.name || 'No Runner'])))
     .filter(([id]) => id)
     .map(([value, label]) => ({ label, value })),
 ])
@@ -211,8 +213,10 @@ watch(selectedStatus, (value) => {
 })
 
 const visibleApps = computed(() => selectedRunner.value
-  ? (appsStore.filteredApps as unknown as AppListItem[]).filter((app) => app.runner?.id === selectedRunner.value)
-  : (appsStore.filteredApps as unknown as AppListItem[]))
+  ? selectedRunner.value === unassignedRunnerFilter
+    ? appsStore.filteredApps.filter((app) => !app.runner)
+    : appsStore.filteredApps.filter((app) => app.runner?.id === selectedRunner.value)
+  : appsStore.filteredApps)
 
 // React to active project changes (including initial load)
 watch(
@@ -365,8 +369,8 @@ const viewPublicApps = () => {
   }
 }
 
-const openPublishDialog = (app: App) => {
-  publishingApp.value = app
+const openPublishDialog = async (appId: string) => {
+  publishingApp.value = await appsStore.fetchApp(appId)
   showPublishDialog.value = true
 }
 

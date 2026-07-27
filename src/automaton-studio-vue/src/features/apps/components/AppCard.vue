@@ -7,7 +7,7 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Menu from 'primevue/menu'
-import type { App, AppListItem } from '../types/apps.types'
+import type { AppListItem } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
@@ -32,7 +32,7 @@ const fullThumbnailUrl = computed(() => {
   return `${baseUrl}${props.app.thumbnailUrl}`
 })
 
-const emit = defineEmits<{ publish: [app: AppListItem] }>()
+const emit = defineEmits<{ publish: [appId: string] }>()
 
 const router = useRouter()
 const confirm = useConfirm()
@@ -65,6 +65,14 @@ const updatedAgo = computed(() => {
   if (diffHours < 24) return `Updated: ${diffHours}h ago`
   if (diffDays < 7) return `Updated: ${diffDays}d ago`
   return `Updated: ${diffWeeks}w ago`
+})
+const deployedAgo = computed(() => {
+  const values = [props.app.runtime.frontendDeployedAtUtc, props.app.runtime.backendDeployedAtUtc]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+  if (!values.length) return 'Not deployed'
+  const diffHours = Math.floor((Date.now() - Math.max(...values)) / (1000 * 60 * 60))
+  return diffHours < 1 ? 'Deployed: just now' : `Deployed: ${diffHours}h ago`
 })
 
 const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
@@ -268,7 +276,7 @@ const menuItems = computed(() => {
     })
   }
 
-  items.push({ label: 'Delete', icon: 'pi pi-trash', command: handleDelete })
+  if (props.app.canDelete) items.push({ label: 'Delete', icon: 'pi pi-trash', command: handleDelete })
 
   return items
 })
@@ -321,7 +329,7 @@ const menuItems = computed(() => {
 
         <!-- Metadata -->
         <div class="text-color-secondary text-sm mb-4">
-          {{ canOpenApp ? updatedAgo.replace('Updated:', 'Last deploy:') : updatedAgo }}
+          {{ updatedAgo }} · {{ deployedAgo }}
         </div>
         <div class="text-color-secondary text-xs mb-3">
           <div><i class="pi pi-server mr-1"></i>{{ app.runner?.name || 'No Runner' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>

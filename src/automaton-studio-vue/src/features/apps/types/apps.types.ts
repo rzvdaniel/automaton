@@ -100,6 +100,7 @@ export interface AppListItem {
   isPublished: boolean
   publicUrl?: string | null
   updatedAtUtc: string
+  canDelete: boolean
   runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' | number } | null
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
 }

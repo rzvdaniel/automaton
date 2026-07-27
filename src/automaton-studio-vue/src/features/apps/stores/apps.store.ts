@@ -5,11 +5,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
-import type { App, AppListFilters, CreateAppRequest, PublishAppRequest } from '../types/apps.types'
+import type { App, AppListItem, AppListFilters, CreateAppRequest, PublishAppRequest } from '../types/apps.types'
 
 export const useAppsStore = defineStore('apps', () => {
   // State
   const apps = ref<App[]>([])
+  const listApps = ref<AppListItem[]>([])
   const selectedApp = ref<App | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -21,7 +22,7 @@ export const useAppsStore = defineStore('apps', () => {
 
   // Computed
   const filteredApps = computed(() => {
-    let result = apps.value
+    let result = listApps.value
 
     // Filter by status
     if (filters.value.status === 'published') {
@@ -43,17 +44,17 @@ export const useAppsStore = defineStore('apps', () => {
     return result
   })
 
-  const publishedApps = computed(() => apps.value.filter((app) => app.isPublished))
+  const publishedApps = computed(() => listApps.value.filter((app) => app.isPublished))
 
-  const draftApps = computed(() => apps.value.filter((app) => !app.isPublished))
+  const draftApps = computed(() => listApps.value.filter((app) => !app.isPublished))
 
-  const appCount = computed(() => apps.value.length)
+  const appCount = computed(() => listApps.value.length)
 
   const publishedCount = computed(() => publishedApps.value.length)
 
   const draftCount = computed(() => draftApps.value.length)
 
-  const hasApps = computed(() => apps.value.length > 0)
+  const hasApps = computed(() => listApps.value.length > 0)
 
   // Actions
   async function fetchApps(projectId?: string): Promise<void> {
@@ -61,7 +62,7 @@ export const useAppsStore = defineStore('apps', () => {
     error.value = null
 
     try {
-      apps.value = (await appsService.getApps(projectId)) as unknown as App[]
+      listApps.value = await appsService.getApps(projectId)
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
       error.value = errorMessage
@@ -218,6 +219,7 @@ export const useAppsStore = defineStore('apps', () => {
 
   function reset(): void {
     apps.value = []
+    listApps.value = []
     selectedApp.value = null
     isLoading.value = false
     error.value = null
@@ -292,6 +294,7 @@ export const useAppsStore = defineStore('apps', () => {
   return {
     // State
     apps,
+    listApps,
     selectedApp,
     isLoading,
     error,

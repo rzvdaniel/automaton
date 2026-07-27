@@ -12,6 +12,7 @@ public sealed class AppListItemDto
     public bool IsPublished { get; init; }
     public string? PublicUrl { get; init; }
     public DateTime UpdatedAtUtc { get; init; }
+    public bool CanDelete { get; init; }
     public AppListRunnerDto? Runner { get; init; }
     public AppListRuntimeDto Runtime { get; init; } = new();
 }
