@@ -80,6 +80,23 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(apps.Single().CanDelete, Is.False);
     }
+
+    [Test]
+    public async Task ListAsync_DoesNotLeakAppsFromAnotherProject()
+    {
+        var ownerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var allowedProjectId = Guid.NewGuid();
+        var otherProjectId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedProjectScopedApp(dbContext, Guid.NewGuid(), allowedProjectId, ownerId, collaboratorId);
+        SeedProjectScopedApp(dbContext, Guid.NewGuid(), otherProjectId, ownerId, Guid.NewGuid());
+
+        var apps = await CreateAppsService(dbContext, collaboratorId).ListAsync(allowedProjectId, CancellationToken.None);
+
+        Assert.That(apps, Has.Count.EqualTo(1));
+        Assert.That(apps.Single().Name, Is.EqualTo("project-app"));
+    }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
     {
