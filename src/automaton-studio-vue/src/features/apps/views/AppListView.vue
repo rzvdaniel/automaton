@@ -398,10 +398,10 @@ const handleRetry = async () => {
         <div
           v-for="app in visibleApps"
           :key="app.id"
-          class="col-12 md:col-6 lg:col-4"
+          :class="viewMode === 'grid' ? 'col-12 md:col-6 lg:col-4' : 'col-12'"
         >
           <AppCard v-if="viewMode === 'grid'" :app="app" @publish="openPublishDialog" />
-          <div v-else class="app-list-row flex align-items-center gap-3 p-3 border-1 surface-border border-round">
+          <div v-else class="app-list-row flex flex-column md:flex-row md:align-items-center gap-3 p-3 border-1 surface-border border-round">
             <i class="pi pi-globe text-primary text-xl" />
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
