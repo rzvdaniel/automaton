@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -180,6 +180,18 @@ const openCreateDialog = () => {
   newAppName.value = ''
   selectedRunnerId.value = null
   showCreateDialog.value = true
+}
+
+const handleCreateApp = async () => {
+  if (!newAppName.value.trim()) return
+  isCreating.value = true
+  try {
+    const app = await appsStore.createApp({ name: newAppName.value.trim(), executionRunnerId: selectedRunnerId.value ?? undefined })
+    showCreateDialog.value = false
+    router.push(`/apps/${app.id}`)
+  } finally {
+    isCreating.value = false
+  }
 }
 
 const openImportDialog = () => {
