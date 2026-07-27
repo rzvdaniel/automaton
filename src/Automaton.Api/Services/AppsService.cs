@@ -120,7 +120,7 @@ public class AppsService
             .Select(e => MapToModel(e, null, ResolveAppOwnerId(e) ?? UserId));
     }
 
-    private static IReadOnlyList<string> ParseTags(string? tags) =>
+    internal static IReadOnlyList<string> ParseTags(string? tags) =>
         string.IsNullOrWhiteSpace(tags) ? Array.Empty<string>() : tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public AppModel Get(Guid id)

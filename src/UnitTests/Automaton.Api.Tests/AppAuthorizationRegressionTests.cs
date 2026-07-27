@@ -355,7 +355,7 @@ public class AppAuthorizationRegressionTests
 
         var service = CreateAppsService(dbContext, collaboratorId, tempRoot.Path);
 
-        var result = service.List(projectId).Single();
+        var result = service.ListForMcp(projectId).Single();
 
         Assert.That(result.UserId, Is.EqualTo(projectOwnerId));
     }
