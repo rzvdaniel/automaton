@@ -53,7 +53,8 @@ public class AppAuthorizationRegressionTests
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "runner-app");
         dbContext.WebApps.Single().ExecutionRunnerId = runnerId;
-        dbContext.Runners.Add(new Runner { Id = runnerId, Name = "runner", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", LastHeartbeatAtUtc = DateTime.UtcNow, Status = "offline" });
+        var now = DateTime.UtcNow;
+        dbContext.Runners.Add(new Runner { Id = runnerId, Name = "runner", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", LastHeartbeatAtUtc = now, Status = "offline" });
         await dbContext.SaveChangesAsync();
 
         var app = (await CreateAppsService(dbContext, ownerId).ListAsync(cancellationToken: CancellationToken.None)).Single();
@@ -63,6 +64,21 @@ public class AppAuthorizationRegressionTests
             Assert.That(app.Runner.Purpose, Is.EqualTo(RunnerPurposes.Managed));
             Assert.That(app.Runner.ConnectivityStatus, Is.EqualTo(RunnerStatus.Online));
         });
+    }
+
+    [Test]
+    public async Task ListAsync_ProjectsProjectAppWithoutDeleteCapability()
+    {
+        var ownerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedProjectScopedApp(dbContext, appId, projectId, ownerId, collaboratorId);
+
+        var apps = await CreateAppsService(dbContext, collaboratorId).ListAsync(projectId, CancellationToken.None);
+
+        Assert.That(apps.Single().CanDelete, Is.False);
     }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
