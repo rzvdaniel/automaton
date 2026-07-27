@@ -63,6 +63,7 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
         self,
         action_key: str,
         existing_volumes: dict[str, dict[str, str]] | None = None,
+        missing_volume_error: str = "No such volume: {name}",
     ):
         module = load_action(action_key)
         calls = []
@@ -73,7 +74,12 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             if arguments[:3] == ("docker", "volume", "inspect"):
                 name = arguments[3]
                 if name not in volumes:
-                    return subprocess.CompletedProcess(arguments, 1, "", f"No such volume: {name}")
+                    return subprocess.CompletedProcess(
+                        arguments,
+                        1,
+                        "",
+                        missing_volume_error.format(name=name),
+                    )
                 return subprocess.CompletedProcess(
                     arguments,
                     0,
@@ -140,6 +146,33 @@ class HostedRunnerResourceContractTests(unittest.TestCase):
             4,
         )
         self.assert_resource_contract(calls)
+
+    def test_missing_volume_responses_are_recognized_case_insensitively_by_both_actions(self):
+        missing_volume_errors = [
+            "No such volume: {name}",
+            "Error response from daemon: get {name}: no such volume",
+            "ERROR RESPONSE FROM DAEMON: GET {name}: NO SUCH VOLUME",
+        ]
+        for action_key in ("provision-hosted-runner", "reprovision-hosted-runner"):
+            for missing_volume_error in missing_volume_errors:
+                with self.subTest(action_key=action_key, missing_volume_error=missing_volume_error):
+                    calls, volumes = self.run_provision_action(
+                        action_key,
+                        missing_volume_error=missing_volume_error,
+                    )
+                    self.assertEqual(volumes[SYSTEM_VOLUME], volume_labels("system"))
+                    self.assertEqual(volumes[USER_VOLUME], volume_labels("user"))
+                    self.assertEqual(
+                        sum(call[:3] == ("docker", "volume", "create") for call in calls),
+                        2,
+                    )
+
+    def test_unrelated_volume_inspection_error_remains_fatal(self):
+        with self.assertRaisesRegex(RuntimeError, "permission denied"):
+            self.run_provision_action(
+                "provision-hosted-runner",
+                missing_volume_error="Error response from daemon: permission denied",
+            )
 
     def test_valid_existing_volumes_are_reused_without_recreation(self):
         existing = {

@@ -48,7 +48,7 @@ def host(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str
 def inspect_volume(volume_name: str) -> dict[str, str] | None:
     result = host("docker", "volume", "inspect", volume_name, check=False)
     if result.returncode != 0:
-        if "No such volume" in result.stderr:
+        if "no such volume" in result.stderr.lower():
             return None
         raise RuntimeError(result.stderr.strip() or f"Could not inspect Docker volume {volume_name}")
     try:
