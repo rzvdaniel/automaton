@@ -6,6 +6,7 @@ import apiClient from '@/shared/services/api/axios-instance'
 import type {
   App,
   AppListItem,
+  AppTagSettings,
   AppScreenshot,
   AppDeployCapabilities,
   CreateAppRequest,
@@ -134,6 +135,24 @@ class AppsService {
 
   private encodePath(path: string): string {
     return path.split('/').map(encodeURIComponent).join('/')
+  }
+
+  /**
+   * Get tag suggestions for the active personal or project context.
+   */
+  async getTagSuggestions(projectId?: string): Promise<string[]> {
+    const params = projectId ? { projectId } : {}
+    const { data } = await apiClient.get<string[]>('/api/apps/tags', { params })
+    return data
+  }
+
+  async getTagSettings(id: string): Promise<AppTagSettings> {
+    const { data } = await apiClient.get<AppTagSettings>(`/api/apps/${id}/tag-settings`)
+    return data
+  }
+
+  async updateTagSettings(id: string, tags: string[]): Promise<void> {
+    await apiClient.put(`/api/apps/${id}/tag-settings`, { tags })
   }
 
   /**

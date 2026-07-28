@@ -332,6 +332,10 @@ const menuItems = computed(() => {
           {{ app.description || 'No description' }}
         </p>
 
+        <div v-if="app.tags.length" class="flex flex-wrap gap-1 mb-3">
+          <Tag v-for="tag in app.tags.slice(0, 3)" :key="tag" :value="tag" severity="secondary" class="text-xs" />
+        </div>
+
         <!-- Metadata -->
         <div class="text-color-secondary text-sm mb-4">
           {{ updatedAgo }}

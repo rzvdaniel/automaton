@@ -105,6 +105,10 @@ export interface AppListItem {
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
 }
 
+export interface AppTagSettings {
+  tags: string[]
+}
+
 export interface AppComponentOwnership {
   sourceAvailable: boolean
   sourceModifiedAtUtc?: string | null

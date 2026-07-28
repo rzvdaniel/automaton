@@ -80,6 +80,10 @@ const isForkable = ref(false)
 const isProfileFeatured = ref(false)
 const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
+const tags = ref<string[]>([])
+const tagInput = ref('')
+const tagSuggestions = ref<string[]>([])
+const isLoadingTags = ref(false)
 const maxScreenshots = 8
 
 // Loading states
@@ -160,7 +164,8 @@ const hasChanges = computed(() => {
     isForkable.value !== (app.value.isForkable ?? false) ||
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
-    thumbnailUrl.value !== (app.value.thumbnailUrl || undefined)
+    thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
+    !sameTags(tags.value, parseLegacyTags(app.value.tags))
   )
 })
 
@@ -175,6 +180,49 @@ const studioApplicationUrl = computed(() => {
 })
 
 // Initialize form from app data
+function parseLegacyTags(value?: string | null): string[] {
+  return (value ?? '').split(',').map((tag) => tag.trim()).filter(Boolean)
+}
+
+function sameTags(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((tag, index) => tag === right[index])
+}
+
+function addTags(value: string) {
+  for (const rawTag of value.split(',')) {
+    const tag = rawTag.trim()
+    if (tag && !tags.value.some((existing) => existing.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0)) {
+      tags.value.push(tag)
+    }
+  }
+  tagInput.value = ''
+}
+
+function removeTag(tag: string) {
+  tags.value = tags.value.filter((existing) => existing !== tag)
+}
+
+async function loadTagSettings(appId: string, projectId?: string) {
+  isLoadingTags.value = true
+  try {
+    const [settings, suggestions] = await Promise.all([
+      appsService.getTagSettings(appId),
+      appsService.getTagSuggestions(projectId),
+    ])
+    if (app.value?.id === appId) {
+      tags.value = settings.tags
+      tagSuggestions.value = suggestions
+    }
+  } catch {
+    if (app.value?.id === appId) {
+      tags.value = parseLegacyTags(app.value.tags)
+      tagSuggestions.value = []
+    }
+  } finally {
+    isLoadingTags.value = false
+  }
+}
+
 watch(
   app,
   (newApp) => {
@@ -190,6 +238,7 @@ watch(
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
       isFeatured.value = newApp.isFeatured ?? false
+      void loadTagSettings(newApp.id, newApp.projectId)
     }
   },
   { immediate: true },
@@ -291,6 +340,7 @@ async function saveSettings() {
       isProfileFeatured: isProfileFeatured.value,
       executionRunnerId: executionRunnerId.value || undefined,
     })
+    await appsService.updateTagSettings(app.value.id, tags.value)
 
     // Update store's app data directly without full reload
     if (editorStore.currentApp) {
@@ -302,6 +352,7 @@ async function saveSettings() {
       editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
       editorStore.currentApp.executionRunnerId = executionRunnerId.value || undefined
+      editorStore.currentApp.tags = tags.value.join(',') || null
     }
 
     toast.add({
@@ -640,6 +691,36 @@ async function handleSaveTemplateStatus() {
                   :maxlength="500"
                 />
                 <small class="text-color-secondary">Full description shown in app details • {{ description.length }}/500 characters</small>
+              </div>
+
+              <div class="flex flex-column gap-2">
+                <label for="app-tags" class="font-medium">Tags</label>
+                <div v-if="tags.length" class="flex flex-wrap gap-2">
+                  <span v-for="tag in tags" :key="tag" class="tag-editor-chip">
+                    {{ tag }}
+                    <Button
+                      :aria-label="`Remove ${tag} tag`"
+                      icon="pi pi-times"
+                      text
+                      rounded
+                      size="small"
+                      @click="removeTag(tag)"
+                    />
+                  </span>
+                </div>
+                <InputText
+                  id="app-tags"
+                  v-model="tagInput"
+                  list="app-tag-suggestions"
+                  placeholder="Add a tag and press Enter"
+                  class="w-full"
+                  :disabled="isLoadingTags"
+                  @keydown.enter.prevent="addTags(tagInput)"
+                />
+                <datalist id="app-tag-suggestions">
+                  <option v-for="suggestion in tagSuggestions" :key="suggestion" :value="suggestion" />
+                </datalist>
+                <small class="text-color-secondary">Choose a suggested tag or add your own. Press Enter to add it.</small>
               </div>
 
               <div class="flex justify-content-end pt-3 border-top-1 surface-border">
@@ -1191,6 +1272,19 @@ automaton deploy</pre>
     </div>
   </div>
 </template>
+
+<style scoped>
+.tag-editor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.125rem 0.25rem 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--p-primary-100);
+  color: var(--p-primary-800);
+  font-size: 0.875rem;
+}
+</style>
 
 <style scoped>
 .app-settings {

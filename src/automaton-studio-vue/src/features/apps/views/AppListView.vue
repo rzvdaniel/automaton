@@ -7,6 +7,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import Dropdown from 'primevue/dropdown'
+import MultiSelect from 'primevue/multiselect'
 import Skeleton from 'primevue/skeleton'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
@@ -110,6 +111,9 @@ watch(activeTabIndex, (index) => {
 const searchQuery = ref('')
 const selectedStatus = ref<'all' | 'published' | 'draft'>('all')
 const selectedRunner = ref<string | null>(null)
+const selectedTags = ref<string[]>([])
+const selectedTagGroup = ref<string | null>(null)
+const tagSuggestions = ref<string[]>([])
 const unassignedRunnerFilter = '__unassigned__'
 const runnerOptions = computed(() => [
   { label: 'All Runners', value: null },
@@ -124,6 +128,18 @@ const statusOptions = ref([
   { label: 'Published', value: 'published' },
   { label: 'Draft', value: 'draft' },
 ])
+
+const tagOptions = computed(() => {
+  const tags = new Map<string, string>()
+  for (const tag of [...tagSuggestions.value, ...appsStore.listApps.flatMap((app) => app.tags)]) {
+    const key = tag.toLocaleLowerCase()
+    if (!tags.has(key)) tags.set(key, tag)
+  }
+
+  return Array.from(tags.values())
+    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'accent' }))
+    .map((tag) => ({ label: tag, value: tag }))
+})
 
 // Quick-start how-to tab
 
@@ -144,7 +160,7 @@ const showEmptySearch = computed(() => {
   return (
     appsStore.filteredApps.length === 0 &&
     appsStore.hasApps &&
-    (searchQuery.value || selectedStatus.value !== 'all')
+    (searchQuery.value || selectedStatus.value !== 'all' || selectedTags.value.length > 0 || selectedTagGroup.value)
   )
 })
 
@@ -157,21 +173,40 @@ watch(selectedStatus, (value) => {
   appsStore.setStatusFilter(value)
 })
 
-const visibleApps = computed(() => selectedRunner.value
-  ? selectedRunner.value === unassignedRunnerFilter
-    ? appsStore.filteredApps.filter((app) => !app.runner)
-    : appsStore.filteredApps.filter((app) => app.runner?.id === selectedRunner.value)
-  : appsStore.filteredApps)
+const hasTag = (app: AppListItem, tag: string) =>
+  app.tags.some((appTag) => appTag.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0)
+
+const visibleApps = computed(() => {
+  let apps = selectedRunner.value
+    ? selectedRunner.value === unassignedRunnerFilter
+      ? appsStore.filteredApps.filter((app) => !app.runner)
+      : appsStore.filteredApps.filter((app) => app.runner?.id === selectedRunner.value)
+    : appsStore.filteredApps
+
+  if (selectedTags.value.length) {
+    apps = apps.filter((app) => selectedTags.value.some((tag) => hasTag(app, tag)))
+  }
+
+  return selectedTagGroup.value
+    ? apps.filter((app) => hasTag(app, selectedTagGroup.value!))
+    : apps
+})
 
 // React to active project changes (including initial load)
 watch(
   () => projectsStore.activeProjectId,
   async (projectId) => {
     selectedRunner.value = null
+    selectedTags.value = []
+    selectedTagGroup.value = null
     try {
-      await appsStore.fetchApps(projectId ?? undefined)
+      const [_, suggestions] = await Promise.all([
+        appsStore.fetchApps(projectId ?? undefined),
+        appsService.getTagSuggestions(projectId ?? undefined),
+      ])
+      tagSuggestions.value = suggestions
     } catch {
-      // Error handled in store
+      tagSuggestions.value = []
     }
   },
   { immediate: true },
@@ -357,6 +392,24 @@ const handleRetry = async () => {
           placeholder="Runner"
           class="w-12rem"
         />
+        <MultiSelect
+          v-model="selectedTags"
+          :options="tagOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Tags"
+          display="chip"
+          class="w-12rem"
+        />
+        <Dropdown
+          v-model="selectedTagGroup"
+          :options="tagOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Group by tag"
+          show-clear
+          class="w-12rem"
+        />
         <SelectButton v-model="viewMode" :options="viewOptions" option-value="value">
           <template #option="{ option }">
             <i :class="option.icon"></i>
@@ -400,6 +453,9 @@ const handleRetry = async () => {
 
     <!-- Content -->
     <template v-else>
+      <div v-if="selectedTagGroup" class="text-color-secondary text-sm mb-3">
+        Showing tag group: <span class="font-semibold">{{ selectedTagGroup }}</span>
+      </div>
       <!-- Apps Grid -->
       <div v-if="visibleApps.length > 0" :class="viewMode === 'list' ? 'app-list' : 'grid'">
         <div
@@ -416,6 +472,9 @@ const handleRetry = async () => {
                 <Tag :value="app.isPublished ? 'Published' : 'Draft'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
               </div>
               <div class="text-color-secondary text-sm">{{ app.runner?.name || 'Unassigned' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
+              <div v-if="app.tags.length" class="flex flex-wrap gap-1 mt-1">
+                <Tag v-for="tag in app.tags.slice(0, 2)" :key="tag" :value="tag" severity="secondary" class="text-xs" />
+              </div>
             </div>
             <div class="text-sm text-color-secondary">{{ getDeploymentSummary(app) }}</div>
             <Button label="Edit" icon="pi pi-pencil" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
@@ -438,6 +497,8 @@ const handleRetry = async () => {
                 () => {
                   searchQuery = ''
                   selectedStatus = 'all'
+                  selectedTags = []
+                  selectedTagGroup = null
                 }
               "
             />
@@ -814,7 +875,8 @@ const handleRetry = async () => {
 
   .apps-list-filters :deep(.p-iconfield),
   .apps-list-filters :deep(.p-inputtext),
-  .apps-list-filters :deep(.p-select) {
+  .apps-list-filters :deep(.p-select),
+  .apps-list-filters :deep(.p-multiselect) {
     width: 100%;
   }
 
@@ -828,6 +890,3 @@ const handleRetry = async () => {
   }
 }
 </style>
-
-
-
