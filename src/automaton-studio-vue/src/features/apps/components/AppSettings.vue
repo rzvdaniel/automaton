@@ -166,7 +166,8 @@ const hasChanges = computed(() => {
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
-    !sameTags(tags.value, originalTags.value)
+    !sameTags(tags.value, originalTags.value) ||
+    pendingTags.value.length > 0
   )
 })
 
@@ -189,13 +190,27 @@ function sameTags(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((tag, index) => tag === right[index])
 }
 
-function addTags(value: string) {
+function getNewTags(value: string): string[] {
+  const newTags: string[] = []
+
   for (const rawTag of value.split(',')) {
     const tag = rawTag.trim()
-    if (tag && !tags.value.some((existing) => existing.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0)) {
-      tags.value.push(tag)
+    if (
+      tag &&
+      !tags.value.some((existing) => existing.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0) &&
+      !newTags.some((existing) => existing.localeCompare(tag, undefined, { sensitivity: 'accent' }) === 0)
+    ) {
+      newTags.push(tag)
     }
   }
+
+  return newTags
+}
+
+const pendingTags = computed(() => getNewTags(tagInput.value))
+
+function addTags(value: string) {
+  tags.value.push(...getNewTags(value))
   tagInput.value = ''
 }
 
@@ -337,6 +352,7 @@ async function openPrivateUrl() {
 async function saveSettings() {
   if (!app.value) return
 
+  addTags(tagInput.value)
   isSaving.value = true
   try {
     await appsService.updateSettings(app.value.id, {
@@ -726,6 +742,7 @@ async function handleSaveTemplateStatus() {
                   class="w-full"
                   :disabled="isLoadingTags"
                   @keydown.enter.prevent="addTags(tagInput)"
+                  @blur="addTags(tagInput)"
                 />
                 <datalist id="app-tag-suggestions">
                   <option v-for="suggestion in tagSuggestions" :key="suggestion" :value="suggestion" />
