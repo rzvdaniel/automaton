@@ -81,6 +81,7 @@ const isProfileFeatured = ref(false)
 const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
 const tags = ref<string[]>([])
+const originalTags = ref<string[]>([])
 const tagInput = ref('')
 const tagSuggestions = ref<string[]>([])
 const isLoadingTags = ref(false)
@@ -165,7 +166,7 @@ const hasChanges = computed(() => {
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
     executionRunnerId.value !== (app.value.executionRunnerId || null) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
-    !sameTags(tags.value, parseLegacyTags(app.value.tags))
+    !sameTags(tags.value, originalTags.value)
   )
 })
 
@@ -205,21 +206,26 @@ function removeTag(tag: string) {
 async function loadTagSettings(appId: string, projectId?: string) {
   isLoadingTags.value = true
   try {
-    const [settings, suggestions] = await Promise.all([
-      appsService.getTagSettings(appId),
-      appsService.getTagSuggestions(projectId),
-    ])
+    const settings = await appsService.getTagSettings(appId)
     if (app.value?.id === appId) {
-      tags.value = settings.tags
-      tagSuggestions.value = suggestions
+      tags.value = [...settings.tags]
+      originalTags.value = [...settings.tags]
     }
   } catch {
     if (app.value?.id === appId) {
-      tags.value = parseLegacyTags(app.value.tags)
-      tagSuggestions.value = []
+      const fallbackTags = parseLegacyTags(app.value.tags)
+      tags.value = fallbackTags
+      originalTags.value = [...fallbackTags]
     }
   } finally {
     isLoadingTags.value = false
+  }
+
+  try {
+    const suggestions = await appsService.getTagSuggestions(projectId)
+    if (app.value?.id === appId) tagSuggestions.value = suggestions
+  } catch {
+    if (app.value?.id === appId) tagSuggestions.value = []
   }
 }
 
@@ -238,6 +244,9 @@ watch(
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
       isFeatured.value = newApp.isFeatured ?? false
+      const fallbackTags = parseLegacyTags(newApp.tags)
+      tags.value = fallbackTags
+      originalTags.value = [...fallbackTags]
       void loadTagSettings(newApp.id, newApp.projectId)
     }
   },
@@ -341,6 +350,7 @@ async function saveSettings() {
       executionRunnerId: executionRunnerId.value || undefined,
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
+    originalTags.value = [...tags.value]
 
     // Update store's app data directly without full reload
     if (editorStore.currentApp) {

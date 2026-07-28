@@ -155,15 +155,6 @@ const isImporting = ref(false)
 const showPublishDialog = ref(false)
 const publishingApp = ref<App | null>(null)
 
-// Computed
-const showEmptySearch = computed(() => {
-  return (
-    appsStore.filteredApps.length === 0 &&
-    appsStore.hasApps &&
-    (searchQuery.value || selectedStatus.value !== 'all' || selectedTags.value.length > 0 || selectedTagGroup.value)
-  )
-})
-
 // Watch for filter changes
 watch(searchQuery, (value) => {
   appsStore.setSearchFilter(value)
@@ -190,6 +181,17 @@ const visibleApps = computed(() => {
   return selectedTagGroup.value
     ? apps.filter((app) => hasTag(app, selectedTagGroup.value!))
     : apps
+})
+
+const showEmptySearch = computed(() => {
+  const hasActiveFilter =
+    Boolean(searchQuery.value) ||
+    selectedStatus.value !== 'all' ||
+    selectedRunner.value !== null ||
+    selectedTags.value.length > 0 ||
+    selectedTagGroup.value !== null
+
+  return visibleApps.value.length === 0 && appsStore.hasApps && hasActiveFilter
 })
 
 // React to active project changes (including initial load)
@@ -369,7 +371,7 @@ const handleRetry = async () => {
     <div class="apps-list-header flex align-items-center justify-content-between mb-4">
       <div class="apps-list-title flex align-items-center gap-3">
         <span class="font-semibold">Your Apps</span>
-        <Tag :value="`${appsStore.filteredApps.length} apps`" severity="secondary" />
+        <Tag :value="`${visibleApps.length} apps`" severity="secondary" />
       </div>
       <div class="apps-list-filters flex align-items-center gap-3">
         <IconField>
