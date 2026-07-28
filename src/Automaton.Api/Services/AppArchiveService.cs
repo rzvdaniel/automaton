@@ -77,8 +77,9 @@ public class AppArchiveService
 
             var manifest = await ReadArchiveManifestAsync(archive, cancellationToken);
             var appName = GetImportedAppName(manifest, fileName);
+            var tags = AppTagNormalizer.Serialize(manifest?.Tags);
 
-            createdAppId = await appsService.Create(new NewApp { Name = appName });
+            createdAppId = await appsService.Create(new NewApp { Name = appName, Tags = tags });
 
             var userId = userContextService.GetUserId();
             var sourcePath = fileStorageService.GetAppSourceDirectoryPath(userId, createdAppId.Value);
@@ -92,7 +93,7 @@ public class AppArchiveService
             importedApp.Description = manifest?.Description ?? string.Empty;
             importedApp.RequiresAuthentication = manifest?.RequiresAuthentication ?? importedApp.RequiresAuthentication;
             importedApp.Category = manifest?.Category;
-            importedApp.Tags = manifest?.Tags;
+            importedApp.Tags = tags;
             importedApp.IsPublished = false;
             importedApp.PublicUrl = null;
             importedApp.PublishedAt = null;

@@ -265,6 +265,10 @@ public class AppsController : BaseController
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (AppTagValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         catch (OperationCanceledException)
         {
             return StatusCode(StatusCodes.Status499ClientClosedRequest);

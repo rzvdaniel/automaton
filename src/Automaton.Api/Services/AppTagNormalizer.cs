@@ -20,10 +20,10 @@ public static class AppTagNormalizer
                 var tag = value.Trim();
                 if (tag.Length == 0 || !seen.Add(tag)) continue;
                 if (tag.Length > MaximumTagLength)
-                    throw new InvalidOperationException($"Tags cannot exceed {MaximumTagLength} characters.");
+                    throw new AppTagValidationException($"Tags cannot exceed {MaximumTagLength} characters.");
                 normalized.Add(tag);
                 if (normalized.Count > MaximumTagsPerApp)
-                    throw new InvalidOperationException($"Apps cannot have more than {MaximumTagsPerApp} tags.");
+                    throw new AppTagValidationException($"Apps cannot have more than {MaximumTagsPerApp} tags.");
             }
         }
 

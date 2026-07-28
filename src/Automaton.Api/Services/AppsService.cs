@@ -302,6 +302,7 @@ public class AppsService
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             Definition = "{}", // Empty - content is now in file system
+            Tags = AppTagNormalizer.Serialize(app.Tags),
             ExecutionRunnerId = null
         };
 
