@@ -66,13 +66,18 @@ const updatedAgo = computed(() => {
   if (diffDays < 7) return `Updated: ${diffDays}d ago`
   return `Updated: ${diffWeeks}w ago`
 })
-const deployedAgo = computed(() => {
+const deploymentSummary = computed(() => {
+  const frontend = props.app.runtime.frontendAvailable
+  const backend = props.app.runtime.backendAvailable
+  if (!frontend && !backend) return 'Not deployed yet'
+
   const values = [props.app.runtime.frontendDeployedAtUtc, props.app.runtime.backendDeployedAtUtc]
     .filter((value): value is string => Boolean(value))
     .map((value) => new Date(value).getTime())
-  if (!values.length) return 'Not deployed'
+  const state = frontend && backend ? 'Full stack deployed' : frontend ? 'Frontend deployed' : 'Backend deployed'
+  if (!values.length) return state
   const diffHours = Math.floor((Date.now() - Math.max(...values)) / (1000 * 60 * 60))
-  return diffHours < 1 ? 'Deployed: just now' : `Deployed: ${diffHours}h ago`
+  return diffHours < 1 ? `${state} · just now` : `${state} · ${diffHours}h ago`
 })
 
 const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
@@ -329,11 +334,11 @@ const menuItems = computed(() => {
 
         <!-- Metadata -->
         <div class="text-color-secondary text-sm mb-4">
-          {{ updatedAgo }} · {{ deployedAgo }}
+          {{ updatedAgo }}
         </div>
         <div class="text-color-secondary text-xs mb-3">
           <div><i class="pi pi-server mr-1"></i>{{ app.runner?.name || 'No Runner' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
-          <div>Frontend {{ app.runtime.frontendAvailable ? 'available' : 'unavailable' }} · Backend {{ app.runtime.backendAvailable ? 'available' : 'unavailable' }}</div>
+          <div>{{ deploymentSummary }}</div>
         </div>
 
         <!-- Actions -->

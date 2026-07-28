@@ -19,7 +19,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useProjectsStore } from '@/features/projects/stores/projectsStore'
 import { getPublicStoreUrl } from '@/shared/utils/public-store-url'
-import type { App, PublishAppRequest } from '../types/apps.types'
+import type { App, AppListItem, PublishAppRequest } from '../types/apps.types'
 import { appsService } from '../services/apps.service'
 import { getPublishedAppUrl } from '../utils/public-app-url'
 
@@ -32,6 +32,13 @@ const toast = useToast()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
 const projectsStore = useProjectsStore()
+
+const getDeploymentSummary = (app: AppListItem) => {
+  if (app.runtime.frontendAvailable && app.runtime.backendAvailable) return 'Full stack deployed'
+  if (app.runtime.frontendAvailable) return 'Frontend deployed'
+  if (app.runtime.backendAvailable) return 'Backend deployed'
+  return 'Not deployed yet'
+}
 
 function openExternal(url: string) {
   window.open(url, '_blank', 'noopener')
@@ -404,10 +411,13 @@ const handleRetry = async () => {
           <div v-else class="app-list-row flex flex-column md:flex-row md:align-items-center gap-3 p-3 border-1 surface-border border-round">
             <i class="pi pi-globe text-primary text-xl" />
             <div class="flex-1 min-w-0">
-              <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
+              <div class="flex align-items-center gap-2">
+                <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
+                <Tag :value="app.isPublished ? 'Published' : 'Draft'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
+              </div>
               <div class="text-color-secondary text-sm">{{ app.runner?.name || 'Unassigned' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
             </div>
-            <div class="text-sm text-color-secondary">{{ app.runtime.frontendAvailable ? 'Frontend' : 'No frontend' }} · {{ app.runtime.backendAvailable ? 'Backend' : 'No backend' }}</div>
+            <div class="text-sm text-color-secondary">{{ getDeploymentSummary(app) }}</div>
             <Button label="Edit" icon="pi pi-pencil" size="small" outlined @click="router.push(`/apps/${app.id}`)" />
           </div>
         </div>
