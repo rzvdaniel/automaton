@@ -97,6 +97,40 @@ public class AppAuthorizationRegressionTests
         Assert.That(apps, Has.Count.EqualTo(1));
         Assert.That(apps.Single().Name, Is.EqualTo("Project App"));
     }
+
+    [Test]
+    public async Task ListAsync_MapsFrontendAndBackendDeploymentMetadataSeparately()
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var updatedAtUtc = DateTime.UtcNow.AddDays(-2);
+        var frontendAtUtc = DateTime.UtcNow.AddHours(-3);
+        var backendAtUtc = DateTime.UtcNow.AddHours(-1);
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "metadata-app");
+        dbContext.WebApps.Single().Updated = updatedAtUtc;
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out var storage);
+        await storage.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        {
+            metadata.Frontend.RuntimeAvailable = true;
+            metadata.Frontend.RuntimeDeployedAtUtc = frontendAtUtc;
+            metadata.Backend.RuntimeAvailable = true;
+            metadata.Backend.RuntimeDeployedAtUtc = backendAtUtc;
+        });
+
+        var app = (await service.ListAsync(cancellationToken: CancellationToken.None)).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(app.UpdatedAtUtc, Is.EqualTo(updatedAtUtc));
+            Assert.That(app.Runtime.FrontendDeployedAtUtc, Is.EqualTo(frontendAtUtc));
+            Assert.That(app.Runtime.BackendDeployedAtUtc, Is.EqualTo(backendAtUtc));
+            Assert.That(app.Runtime.FrontendAvailable, Is.True);
+            Assert.That(app.Runtime.BackendAvailable, Is.True);
+        });
+    }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
     {
@@ -499,6 +533,9 @@ public class AppAuthorizationRegressionTests
     }
 
     private static AppsService CreateAppsService(ApplicationDbContext dbContext, Guid userId, string? contentRootPath = null)
+        => CreateAppsService(dbContext, userId, contentRootPath, out _);
+
+    private static AppsService CreateAppsService(ApplicationDbContext dbContext, Guid userId, string? contentRootPath, out AppFileStorageService storage)
     {
         var userContextService = CreateUserContextService(userId);
 
@@ -513,6 +550,7 @@ public class AppAuthorizationRegressionTests
                 RemixFrontendExclude = []
             }));
         var fileStorageService = new AppFileStorageService(environment, settingsService);
+        storage = fileStorageService;
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
             authorizationService,
