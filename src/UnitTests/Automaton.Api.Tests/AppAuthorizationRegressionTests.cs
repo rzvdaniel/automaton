@@ -131,6 +131,29 @@ public class AppAuthorizationRegressionTests
             Assert.That(app.Runtime.BackendAvailable, Is.True);
         });
     }
+
+    [Test]
+    public async Task ListAsync_IsolatesCorruptStorageMetadata()
+    {
+        var ownerId = Guid.NewGuid();
+        var healthyAppId = Guid.NewGuid();
+        var corruptAppId = Guid.NewGuid();
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, healthyAppId, ownerId, "healthy");
+        SeedApp(dbContext, corruptAppId, ownerId, "corrupt");
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path, out _);
+        var metadataPath = Path.Combine(tempRoot.Path, "AppData", "apps", ownerId.ToString(), corruptAppId.ToString(), "_metadata.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(metadataPath)!);
+        await File.WriteAllTextAsync(metadataPath, "{invalid");
+
+        var apps = await service.ListAsync(cancellationToken: CancellationToken.None);
+
+        Assert.That(apps, Has.Count.EqualTo(2));
+        var corrupt = apps.Single(app => app.Id == corruptAppId);
+        Assert.That(corrupt.Runtime.FrontendAvailable, Is.False);
+        Assert.That(corrupt.Runtime.BackendAvailable, Is.False);
+    }
     [Test]
     public async Task GetAccessibleAppInfoByIdAsync_ReturnsNullForUnauthorizedApp()
     {
