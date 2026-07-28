@@ -401,6 +401,7 @@ const handleRetry = async () => {
           option-value="value"
           placeholder="Tags"
           display="chip"
+          :show-toggle-all="false"
           class="w-12rem"
         />
         <Dropdown
