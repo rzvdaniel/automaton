@@ -870,7 +870,7 @@ const handleRetry = async () => {
   }
 
   .apps-list-filters {
-    display: grid;
+    display: grid !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
   }
