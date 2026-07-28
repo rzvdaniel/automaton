@@ -1,10 +1,12 @@
 using Automaton.Api.Services;
+using Automaton.Api.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 
 namespace Automaton.Api.Tests;
 
@@ -66,5 +68,17 @@ public sealed class AppListProjectionTests
             Assert.That(context.ExceptionHandled, Is.True);
             Assert.That((context.Result as ObjectResult)?.StatusCode, Is.EqualTo(StatusCodes.Status400BadRequest));
         });
+    }
+
+    [Test]
+    public void TagSettingsRequestAcceptsLegacyStringAndArrayInput()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var legacy = JsonSerializer.Deserialize<UpdateAppTagSettingsRequest>("""{"tags":"Games, strategy"}""", options);
+        var modern = JsonSerializer.Deserialize<UpdateAppTagSettingsRequest>("""{"tags":["Games","strategy"]}""", options);
+
+        Assert.That(legacy!.Tags, Is.EqualTo(new[] { "Games, strategy" }));
+        Assert.That(modern!.Tags, Is.EqualTo(new[] { "Games", "strategy" }));
     }
 }

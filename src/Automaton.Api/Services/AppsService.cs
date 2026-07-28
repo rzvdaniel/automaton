@@ -140,6 +140,41 @@ public class AppsService
             .ToArray();
     }
 
+    public async Task<AppTagSettingsDto?> GetTagSettingsAsync(Guid appId, CancellationToken cancellationToken = default)
+    {
+        var app = await authorizationService.GetAccessibleAppsQuery()
+            .AsNoTracking()
+            .Where(app => app.Id == appId)
+            .Select(item => new { item.Tags })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return app is null
+            ? null
+            : new AppTagSettingsDto { Tags = AppTagNormalizer.Normalize(app.Tags) };
+    }
+
+    public async Task<bool> UpdateTagSettingsAsync(
+        Guid appId,
+        IEnumerable<string>? tags,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await authorizationService.CanUpdateAppAsync(appId))
+        {
+            return false;
+        }
+
+        var app = await dataContext.WebApps.SingleOrDefaultAsync(item => item.Id == appId, cancellationToken);
+        if (app is null)
+        {
+            return false;
+        }
+
+        app.Tags = AppTagNormalizer.Serialize(tags);
+        app.Updated = DateTime.UtcNow;
+        await dataContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public AppModel Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)

@@ -76,6 +76,24 @@ public class AppsController : BaseController
         return Ok(await appsService.ListTagSuggestionsAsync(projectId, cancellationToken));
     }
 
+    [HttpGet("{id}/tag-settings")]
+    public async Task<ActionResult<AppTagSettingsDto>> GetTagSettings(Guid id, CancellationToken cancellationToken)
+    {
+        var settings = await appsService.GetTagSettingsAsync(id, cancellationToken);
+        return settings is null ? NotFound() : Ok(settings);
+    }
+
+    [HttpPut("{id}/tag-settings")]
+    public async Task<IActionResult> UpdateTagSettings(
+        Guid id,
+        UpdateAppTagSettingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await appsService.UpdateTagSettingsAsync(id, request.Tags, cancellationToken)
+            ? NoContent()
+            : NotFound();
+    }
+
     [HttpGet("{id}")]
     [Authorize(Policy = "AllowApiKey")]
     public ActionResult<AppModel> Get(Guid id)
