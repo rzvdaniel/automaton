@@ -336,6 +336,75 @@ public class AppAuthorizationRegressionTests
             Is.Null);
     }
 
+    [TestCase("infrastructure")]
+    public async Task UpdateRunner_TagDoesNotGrantInfrastructureRunnerAssignment(string tag)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        dbContext.WebApps.Single().Tags = tag;
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "infrastructure-runner",
+            Purpose = RunnerPurposes.Infrastructure,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Infrastructure),
+                RunnerPurposes.Infrastructure),
+            Status = "online"
+        });
+        dbContext.RunnerUsers.Add(new RunnerUser { RunnerId = runnerId, UserId = ownerId });
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateRunner(appId, runnerId));
+
+        Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
+        Assert.That(
+            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            Is.Null);
+    }
+
+    [TestCase("system")]
+    [TestCase("admin")]
+    public async Task UpdateRunner_PrivilegedLookingTagsDoNotExpandRunnerEligibility(string tag)
+    {
+        var ownerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+
+        using var tempRoot = new TemporaryDirectory();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, appId, ownerId, "owner-app");
+        dbContext.WebApps.Single().Tags = tag;
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "workflow-only-runner",
+            Purpose = RunnerPurposes.Managed,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                [RunnerCapabilities.WorkflowExecution],
+                RunnerPurposes.Managed),
+            Status = "online"
+        });
+        dbContext.RunnerUsers.Add(new RunnerUser { RunnerId = runnerId, UserId = ownerId });
+        await dbContext.SaveChangesAsync();
+        var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.UpdateRunner(appId, runnerId));
+
+        Assert.That(exception!.Message, Does.Contain("not eligible"));
+        Assert.That(
+            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            Is.Null);
+    }
+
     [Test]
     public async Task Create_RejectsRunnerOutsideCallerScope()
     {
