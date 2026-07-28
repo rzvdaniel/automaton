@@ -324,12 +324,12 @@ const handleRetry = async () => {
     <template v-if="activeTabIndex === 0">
 
     <!-- Apps List Header -->
-    <div class="flex align-items-center justify-content-between mb-4">
-      <div class="flex align-items-center gap-3">
+    <div class="apps-list-header flex align-items-center justify-content-between mb-4">
+      <div class="apps-list-title flex align-items-center gap-3">
         <span class="font-semibold">Your Apps</span>
         <Tag :value="`${appsStore.filteredApps.length} apps`" severity="secondary" />
       </div>
-      <div class="flex align-items-center gap-3">
+      <div class="apps-list-filters flex align-items-center gap-3">
         <IconField>
           <InputIcon class="pi pi-search" />
           <InputText v-model="searchQuery" placeholder="Search apps..." />
@@ -787,6 +787,35 @@ const handleRetry = async () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .apps-list-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .apps-list-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .apps-list-filters :deep(.p-iconfield),
+  .apps-list-filters :deep(.p-inputtext),
+  .apps-list-filters :deep(.p-select) {
+    width: 100%;
+  }
+
+  .apps-list-filters :deep(.p-iconfield) {
+    grid-column: 1 / -1;
+  }
+
+  .apps-list-filters :deep(.p-selectbutton) {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 </style>
 
