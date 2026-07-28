@@ -291,11 +291,7 @@ services.AddControllers(options =>
     options.Filters.Add(new AuthorizeFilter(policy));
     options.Filters.Add<GlobalExceptionFilter>();
 })
-.AddJsonOptions(options =>
-{
-    // Serialize enums as strings instead of integers
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-});
+.AddJsonOptions(AutomatonJsonOptions.Configure);
 
 services.AddTransient<UserNameEnricher>();
 services.AddHttpContextAccessor();

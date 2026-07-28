@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using Automaton.Api.Models;
+using Automaton.Api.Extensions;
 using Automaton.Core.Enums;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -23,7 +23,7 @@ public sealed class AppListMvcSerializationTests
             webBuilder.UseTestServer();
             webBuilder.ConfigureServices(services => services.AddControllers()
                 .AddApplicationPart(typeof(AppListSerializationController).Assembly)
-                .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter())));
+                .AddJsonOptions(AutomatonJsonOptions.Configure));
             webBuilder.Configure(app =>
             {
                 app.UseRouting();
