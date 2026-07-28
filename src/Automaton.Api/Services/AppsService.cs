@@ -120,8 +120,7 @@ public class AppsService
             .Select(e => MapToModel(e, null, ResolveAppOwnerId(e) ?? UserId));
     }
 
-    internal static IReadOnlyList<string> ParseTags(string? tags) =>
-        string.IsNullOrWhiteSpace(tags) ? Array.Empty<string>() : tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    internal static IReadOnlyList<string> ParseTags(string? tags) => AppTagNormalizer.Normalize(tags);
 
     public AppModel Get(Guid id)
     {
@@ -417,7 +416,7 @@ public class AppsService
         // Public profile display fields
         entity.ThumbnailUrl = app.ThumbnailUrl;
         entity.Category = app.Category;
-        entity.Tags = app.Tags;
+        entity.Tags = AppTagNormalizer.Serialize(app.Tags);
 
         await dataContext.SaveChangesAsync();
 
@@ -629,7 +628,7 @@ public class AppsService
         entity.IsForkable = isForkable;
         entity.RequiresAuthentication = requiresAuthentication;
         entity.Category = category?.Trim();
-        entity.Tags = tags?.Trim();
+        entity.Tags = AppTagNormalizer.Serialize(tags);
         entity.Version = nextVersion;
         entity.Updated = DateTime.UtcNow;
 
@@ -943,7 +942,7 @@ public class AppsService
             IsProfileFeatured = false,
             ThumbnailUrl = source.ThumbnailUrl,
             Category = source.Category,
-            Tags = source.Tags,
+            Tags = AppTagNormalizer.Serialize(source.Tags),
             Created = now,
             Updated = now,
         };
@@ -1087,7 +1086,7 @@ public class AppsService
             IsProfileFeatured = false,
             ThumbnailUrl = source.ThumbnailUrl,
             Category = source.Category,
-            Tags = source.Tags,
+            Tags = AppTagNormalizer.Serialize(source.Tags),
             ForkedFromAppId = source.Id,
             ForkedFromAuthorUserId = sourceOwner,
             ForkedFromAppName = source.Name,
