@@ -122,6 +122,24 @@ public class AppsService
 
     internal static IReadOnlyList<string> ParseTags(string? tags) => AppTagNormalizer.Normalize(tags);
 
+    public async Task<IReadOnlyList<string>> ListTagSuggestionsAsync(
+        Guid? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var tagValues = await authorizationService.GetAppsQueryByContext(projectId)
+            .AsNoTracking()
+            .Select(app => app.Tags)
+            .ToListAsync(cancellationToken);
+
+        return tagValues
+            .SelectMany(ParseTags)
+            .GroupBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(tag => tag, StringComparer.Ordinal).First())
+            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(tag => tag, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public AppModel Get(Guid id)
     {
         // Use authorization service query to check access (personal + project-based)

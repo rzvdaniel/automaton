@@ -673,7 +673,7 @@ public class ResourceAuthorizationService
         {
             // Personal mode - return only personal apps
             return dbContext.WebApps
-                .Where(a => a.WebAppUsers.Any(u => u.UserId == userId));
+                .Where(a => !a.ProjectId.HasValue && a.WebAppUsers.Any(u => u.UserId == userId));
         }
         else
         {

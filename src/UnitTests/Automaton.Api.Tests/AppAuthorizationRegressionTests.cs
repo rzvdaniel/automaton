@@ -99,6 +99,67 @@ public class AppAuthorizationRegressionTests
     }
 
     [Test]
+    public async Task ListTagSuggestionsAsync_ReturnsNormalizedPersonalTagsInPredictableOrder()
+    {
+        var ownerId = Guid.NewGuid();
+        var firstAppId = Guid.NewGuid();
+        var secondAppId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, firstAppId, ownerId, "first-app");
+        SeedApp(dbContext, secondAppId, ownerId, "second-app");
+        dbContext.WebApps.Single(app => app.Id == firstAppId).Tags = " Games, strategy, games ";
+        dbContext.WebApps.Single(app => app.Id == secondAppId).Tags = "Automation,Strategy";
+        await dbContext.SaveChangesAsync();
+
+        var tags = await CreateAppsService(dbContext, ownerId).ListTagSuggestionsAsync(cancellationToken: CancellationToken.None);
+
+        Assert.That(tags, Is.EqualTo(new[] { "Automation", "Games", "Strategy" }));
+    }
+
+    [Test]
+    public async Task ListTagSuggestionsAsync_DoesNotLeakTagsFromAnotherProject()
+    {
+        var ownerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var allowedProjectId = Guid.NewGuid();
+        var otherProjectId = Guid.NewGuid();
+        var allowedAppId = Guid.NewGuid();
+        var otherAppId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedProjectScopedApp(dbContext, allowedAppId, allowedProjectId, ownerId, collaboratorId);
+        SeedProjectScopedApp(dbContext, otherAppId, otherProjectId, ownerId, Guid.NewGuid());
+        dbContext.WebApps.Single(app => app.Id == allowedAppId).Tags = "Shared, Team";
+        dbContext.WebApps.Single(app => app.Id == otherAppId).Tags = "Confidential";
+        await dbContext.SaveChangesAsync();
+
+        var tags = await CreateAppsService(dbContext, collaboratorId)
+            .ListTagSuggestionsAsync(allowedProjectId, CancellationToken.None);
+
+        Assert.That(tags, Is.EqualTo(new[] { "Shared", "Team" }));
+    }
+
+    [Test]
+    public async Task ListTagSuggestionsAsync_DoesNotIncludeProjectTagsInPersonalContext()
+    {
+        var ownerId = Guid.NewGuid();
+        var collaboratorId = Guid.NewGuid();
+        var personalAppId = Guid.NewGuid();
+        var projectAppId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        await using var dbContext = CreateDbContext();
+        SeedApp(dbContext, personalAppId, collaboratorId, "personal-app");
+        SeedProjectScopedApp(dbContext, projectAppId, projectId, ownerId, collaboratorId);
+        dbContext.WebApps.Single(app => app.Id == personalAppId).Tags = "Personal";
+        dbContext.WebApps.Single(app => app.Id == projectAppId).Tags = "Project-only";
+        await dbContext.SaveChangesAsync();
+
+        var tags = await CreateAppsService(dbContext, collaboratorId)
+            .ListTagSuggestionsAsync(cancellationToken: CancellationToken.None);
+
+        Assert.That(tags, Is.EqualTo(new[] { "Personal" }));
+    }
+
+    [Test]
     public async Task ListAsync_MapsFrontendAndBackendDeploymentMetadataSeparately()
     {
         var ownerId = Guid.NewGuid();

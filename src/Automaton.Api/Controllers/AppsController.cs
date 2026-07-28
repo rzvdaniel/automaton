@@ -68,6 +68,14 @@ public class AppsController : BaseController
         return Ok(await appsService.ListAsync(projectId, cancellationToken));
     }
 
+    [HttpGet("tags")]
+    public async Task<ActionResult<IReadOnlyList<string>>> GetTagSuggestions(
+        [FromQuery] Guid? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await appsService.ListTagSuggestionsAsync(projectId, cancellationToken));
+    }
+
     [HttpGet("{id}")]
     [Authorize(Policy = "AllowApiKey")]
     public ActionResult<AppModel> Get(Guid id)
