@@ -460,7 +460,7 @@ const handleRetry = async () => {
         Showing tag group: <span class="font-semibold">{{ selectedTagGroup }}</span>
       </div>
       <!-- Apps Grid -->
-      <div v-if="visibleApps.length > 0" :class="viewMode === 'list' ? 'app-list' : 'grid'">
+      <div v-if="visibleApps.length > 0" :class="viewMode === 'list' ? 'app-list' : 'grid apps-grid'">
         <div
           v-for="app in visibleApps"
           :key="app.id"
@@ -714,6 +714,18 @@ const handleRetry = async () => {
 .apps-view {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 360px));
+  justify-content: start;
+  gap: 1.25rem;
+}
+
+.apps-grid > div {
+  width: auto;
+  padding: 0;
 }
 
 .quick-start-card {

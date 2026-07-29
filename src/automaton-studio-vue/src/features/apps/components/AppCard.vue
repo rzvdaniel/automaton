@@ -44,6 +44,13 @@ const statusBadge = computed(() => ({
   icon: props.app.isPublished ? 'pi pi-check-circle' : 'pi pi-file-edit',
 }))
 
+const initials = computed(() => props.app.name
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((word) => word[0] ?? '')
+  .join('')
+  .toUpperCase())
+
 // Project linkage info
 const updatedAgo = computed(() => {
   if (!props.app.updatedAtUtc) return 'Never updated'
@@ -324,29 +331,26 @@ const menuItems = computed(() => {
     </template>
 
     <template #content>
-      <div class="flex flex-column h-full">
-        <!-- App name -->
-        <div class="flex align-items-center gap-2 min-w-0 mb-1">
-          <i :class="app.isPublished ? 'pi pi-globe' : 'pi pi-box'" class="app-identity-icon flex-shrink-0"></i>
-          <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
-            {{ app.name }}
-          </span>
+      <div class="app-card-content flex flex-column h-full">
+        <div class="app-card-identity">
+          <div class="app-icon" aria-hidden="true">{{ initials }}</div>
+          <div class="min-w-0">
+            <div class="app-title text-overflow-ellipsis white-space-nowrap overflow-hidden">{{ app.name }}</div>
+            <div class="app-description line-clamp-2">{{ app.description || 'No description' }}</div>
+          </div>
         </div>
 
-        <!-- Description -->
-        <p class="text-color-secondary text-sm mt-0 mb-3 line-clamp-2">
-          {{ app.description || 'No description' }}
-        </p>
-
-        <div v-if="app.tags.length" class="flex flex-wrap gap-1 mb-3">
-          <Tag v-for="tag in app.tags.slice(0, 3)" :key="tag" :value="tag" severity="secondary" class="text-xs" />
+        <div class="app-card-tags" v-if="app.tags.length">
+          <Tag v-for="tag in app.tags.slice(0, 3)" :key="tag" :value="tag" severity="secondary" />
+          <Tag v-if="app.tags.length > 3" :value="`+${app.tags.length - 3}`" severity="secondary" />
         </div>
 
-        <!-- Metadata -->
-        <div class="app-status-rows text-sm mb-3">
+        <div class="app-card-divider" aria-hidden="true"></div>
+
+        <div class="app-status-rows">
           <div class="app-status-row">
             <span>Runner</span>
-            <span class="app-status-value"><i :class="['runner-status-dot', runnerStatusClass]" aria-hidden="true"></i>{{ app.runner?.name || 'Unassigned' }} · {{ runnerStatusLabel }}</span>
+            <span class="app-status-value" :aria-label="`${app.runner?.name || 'Unassigned'} · ${runnerStatusLabel}`"><i :class="['runner-status-dot', runnerStatusClass]" aria-hidden="true"></i>{{ app.runner?.name || 'Unassigned' }}<span class="visually-hidden"> · {{ runnerStatusLabel }}</span></span>
           </div>
           <div class="app-status-row">
             <span>Deployment</span>
@@ -358,13 +362,12 @@ const menuItems = computed(() => {
           </div>
         </div>
 
-        <!-- Actions -->
-        <div class="flex gap-2 mt-auto">
+        <div class="app-card-actions mt-auto">
           <Button
             :label="primaryAction.label"
             :icon="primaryAction.icon"
             size="small"
-            class="flex-1"
+            class="primary-action"
             @click="handlePrimaryAction"
           />
           <Button
@@ -372,7 +375,7 @@ const menuItems = computed(() => {
             icon="pi pi-pencil"
             size="small"
             outlined
-            class="flex-1"
+            class="secondary-action"
             @click="handleEdit"
           />
         </div>
@@ -383,20 +386,26 @@ const menuItems = computed(() => {
 
 <style scoped>
 .app-card {
+  border: 1px solid var(--p-surface-border);
+  border-radius: 0.85rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .app-card:hover {
   transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--p-primary-500) 35%, var(--p-surface-border));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 /* Thumbnail — always shown */
 .app-thumbnail {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 7;
+  aspect-ratio: 16 / 6;
   overflow: hidden;
   border-radius: var(--p-card-border-radius) var(--p-card-border-radius) 0 0;
 }
@@ -418,7 +427,8 @@ const menuItems = computed(() => {
   top: 8px;
   left: 8px;
   z-index: 10;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.45rem;
 }
 
 .thumbnail-overlay {
@@ -435,6 +445,8 @@ const menuItems = computed(() => {
 }
 
 .thumbnail-overlay .menu-button {
+  width: 2rem;
+  height: 2rem;
   background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(4px);
 }
@@ -445,7 +457,58 @@ const menuItems = computed(() => {
 
 /* Reduce body top padding since thumbnail is always present */
 :deep(.p-card-body) {
-  padding-top: 0.75rem;
+  padding: 0;
+}
+
+.app-card-content {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.app-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.app-icon {
+  display: grid;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--p-primary-500) 12%, var(--p-surface-100));
+  color: var(--p-primary-600);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.app-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.app-description {
+  margin-top: 0.2rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.84rem;
+}
+
+.app-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.app-card-tags :deep(.p-tag) {
+  font-size: 0.75rem;
+}
+
+.app-card-divider {
+  margin: 0.9rem 0 0.75rem;
+  border-top: 1px solid var(--p-surface-border);
 }
 
 .line-clamp-2 {
@@ -463,20 +526,52 @@ const menuItems = computed(() => {
 
 .app-status-rows {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.45rem;
   color: var(--p-text-muted-color);
+  font-size: 0.82rem;
 }
 
 .app-status-row {
   display: grid;
-  grid-template-columns: 4.75rem minmax(0, 1fr);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: 0.5rem;
+  align-items: start;
 }
+
+.app-status-row > span:first-child { color: var(--p-text-muted-color); }
 
 .app-status-value {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--p-text-color);
+  font-weight: 500;
+}
+
+.app-card-actions {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.app-card-actions :deep(.p-button) {
+  min-height: 2.15rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.primary-action { flex: 1.15; }
+.secondary-action { flex: 0.85; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .runner-status-dot {
