@@ -362,7 +362,7 @@ const menuItems = computed(() => {
           </div>
         </div>
 
-        <div class="app-card-actions mt-auto">
+        <div class="app-card-actions">
           <Button
             :label="primaryAction.label"
             :icon="primaryAction.icon"
@@ -552,7 +552,8 @@ const menuItems = computed(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 0.85rem;
   width: min(100%, 18rem);
   margin-inline: auto;
 }
