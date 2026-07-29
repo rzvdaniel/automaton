@@ -334,7 +334,7 @@ const menuItems = computed(() => {
       <div class="app-card-content flex flex-column h-full">
         <div class="app-card-identity">
           <div class="app-icon" aria-hidden="true">{{ initials }}</div>
-          <div class="min-w-0">
+          <div class="app-title-group min-w-0">
             <div class="app-title text-overflow-ellipsis white-space-nowrap overflow-hidden">{{ app.name }}</div>
             <div class="app-description line-clamp-2">{{ app.description || 'No description' }}</div>
           </div>
@@ -424,24 +424,24 @@ const menuItems = computed(() => {
 /* Status badge pinned top-left on thumbnail */
 .status-overlay-badge {
   position: absolute;
-  top: 0.65rem;
-  left: 0.65rem;
+  top: 0.7rem;
+  left: 0.7rem;
   z-index: 10;
-  min-height: 1.65rem;
-  padding: 0.28rem 0.6rem;
+  min-height: 1.5rem;
+  padding: 0.24rem 0.58rem;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 0.45rem;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
   color: var(--p-surface-700);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   line-height: 1;
 }
 
 .status-overlay-badge :deep(.p-tag-icon) {
   margin-right: 0.3rem;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .status-overlay-badge :deep(.p-tag-label) {
@@ -483,7 +483,7 @@ const menuItems = computed(() => {
 
 .app-card-identity {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr);
+  grid-template-columns: 2.625rem minmax(0, 1fr);
   align-items: start;
   gap: 0.75rem;
   min-width: 0;
@@ -491,29 +491,33 @@ const menuItems = computed(() => {
 
 .app-icon {
   display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.625rem;
+  height: 2.625rem;
   place-items: center;
   border-radius: 0.65rem;
-  margin-top: 0.1rem;
   background: color-mix(in srgb, var(--p-primary-500) 12%, var(--p-surface-100));
   color: var(--p-primary-600);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
+.app-title-group {
+  padding-top: 0.05rem;
+}
+
 .app-title {
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.95rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.15;
   letter-spacing: -0.01em;
 }
 
 .app-description {
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
   color: var(--p-text-muted-color);
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-size: 0.8rem;
+  line-height: 1.25;
 }
 
 .app-card-tags {
