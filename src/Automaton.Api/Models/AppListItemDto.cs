@@ -6,6 +6,7 @@ public sealed class AppListItemDto
 {
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public string? ThumbnailUrl { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();

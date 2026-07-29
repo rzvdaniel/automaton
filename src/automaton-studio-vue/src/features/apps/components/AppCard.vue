@@ -336,7 +336,7 @@ const menuItems = computed(() => {
           <div class="app-icon" aria-hidden="true">{{ initials }}</div>
           <div class="app-title-group min-w-0">
             <div class="app-title text-overflow-ellipsis white-space-nowrap overflow-hidden">{{ app.name }}</div>
-            <div class="app-description line-clamp-2">{{ app.description || 'No description' }}</div>
+            <div class="app-summary">{{ app.summary || 'No summary' }}</div>
           </div>
         </div>
 
@@ -513,18 +513,22 @@ const menuItems = computed(() => {
   letter-spacing: -0.01em;
 }
 
-.app-description {
+.app-summary {
+  display: -webkit-box;
   margin-top: 0.25rem;
+  overflow: hidden;
   color: var(--p-text-muted-color);
   font-size: 0.8rem;
   line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .app-card-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.65rem;
+  margin-top: 0.45rem;
 }
 
 .app-card-tags :deep(.p-tag) {
@@ -535,14 +539,6 @@ const menuItems = computed(() => {
 .app-card-divider {
   margin: 0.85rem 0 0.75rem;
   border-top: 1px solid var(--p-surface-200);
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: 2.5rem;
 }
 
 .app-identity-icon {

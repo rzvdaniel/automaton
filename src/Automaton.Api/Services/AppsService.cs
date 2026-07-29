@@ -61,7 +61,7 @@ public class AppsService
             .AsNoTracking()
             .Select(app => new
             {
-                app.Id, app.Name, app.Description, app.ThumbnailUrl, app.Tags,
+                app.Id, app.Name, app.Summary, app.Description, app.ThumbnailUrl, app.Tags,
                 app.IsPublished, app.PublicUrl, app.Updated, app.ProjectId,
                 OwnerId = app.ProjectId.HasValue
                     ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
@@ -95,7 +95,8 @@ public class AppsService
             }
             return new AppListItemDto
             {
-                Id = row.Id, Name = row.Name, Description = row.Description ?? string.Empty,
+                Id = row.Id, Name = row.Name, Summary = row.Summary ?? string.Empty,
+                Description = row.Description ?? string.Empty,
                 ThumbnailUrl = row.ThumbnailUrl, Tags = ParseTags(row.Tags), IsPublished = row.IsPublished,
                 PublicUrl = row.PublicUrl, UpdatedAtUtc = row.Updated,
                 CanDelete = !row.ProjectId.HasValue,

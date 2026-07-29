@@ -29,6 +29,8 @@ public class AppAuthorizationRegressionTests
         using var tempRoot = new TemporaryDirectory();
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "personal-app");
+        dbContext.WebApps.Single().Summary = "Card summary";
+        await dbContext.SaveChangesAsync();
 
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
         var result = await service.ListAsync(cancellationToken: CancellationToken.None);
@@ -37,6 +39,7 @@ public class AppAuthorizationRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(app.Id, Is.EqualTo(appId));
+            Assert.That(app.Summary, Is.EqualTo("Card summary"));
             Assert.That(app.Runner, Is.Null);
             Assert.That(app.CanDelete, Is.True);
             Assert.That(app.Runtime.FrontendAvailable, Is.False);

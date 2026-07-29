@@ -94,6 +94,7 @@ export interface App {
 export interface AppListItem {
   id: string
   name: string
+  summary: string
   description: string
   thumbnailUrl?: string | null
   tags: string[]
