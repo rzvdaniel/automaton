@@ -465,19 +465,20 @@ const menuItems = computed(() => {
 }
 
 .app-card-identity {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
   min-width: 0;
 }
 
 .app-icon {
   display: grid;
-  flex: 0 0 2.75rem;
   width: 2.75rem;
   height: 2.75rem;
   place-items: center;
   border-radius: 0.65rem;
+  margin-top: 0.1rem;
   background: color-mix(in srgb, var(--p-primary-500) 12%, var(--p-surface-100));
   color: var(--p-primary-600);
   font-size: 0.9rem;
@@ -486,14 +487,16 @@ const menuItems = computed(() => {
 
 .app-title {
   font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.2;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .app-description {
   margin-top: 0.2rem;
   color: var(--p-text-muted-color);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .app-card-tags {
@@ -554,8 +557,7 @@ const menuItems = computed(() => {
   gap: 0.65rem;
   margin-top: auto;
   padding-top: 0.85rem;
-  width: min(100%, 18rem);
-  margin-inline: auto;
+  width: 100%;
 }
 
 .app-card-actions :deep(.p-button) {
