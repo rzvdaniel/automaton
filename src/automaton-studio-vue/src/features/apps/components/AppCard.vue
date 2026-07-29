@@ -308,12 +308,12 @@ const menuItems = computed(() => {
         <img v-if="hasThumbnail" :src="fullThumbnailUrl" :alt="app.name" loading="lazy" />
         <AppCoverPlaceholder v-else :app-id="app.id" :name="app.name" />
         <!-- Status badge on image -->
-        <Tag :severity="statusBadge.severity" class="status-overlay-badge">
-          <span class="flex align-items-center gap-1">
-            <i :class="statusBadge.icon" style="font-size: 0.7rem"></i>
-            {{ statusBadge.label }}
-          </span>
-        </Tag>
+        <Tag
+          :value="statusBadge.label"
+          :icon="statusBadge.icon"
+          :severity="statusBadge.severity"
+          class="status-overlay-badge"
+        />
         <!-- Menu button overlay -->
         <div class="thumbnail-overlay">
           <Button
@@ -424,11 +424,28 @@ const menuItems = computed(() => {
 /* Status badge pinned top-left on thumbnail */
 .status-overlay-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 0.65rem;
+  left: 0.65rem;
   z-index: 10;
-  font-size: 0.7rem;
-  padding: 0.2rem 0.45rem;
+  min-height: 1.65rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  color: var(--p-surface-700);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.status-overlay-badge :deep(.p-tag-icon) {
+  margin-right: 0.3rem;
+  font-size: 0.72rem;
+}
+
+.status-overlay-badge :deep(.p-tag-label) {
+  line-height: 1;
 }
 
 .thumbnail-overlay {
