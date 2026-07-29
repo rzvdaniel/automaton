@@ -524,11 +524,12 @@ const menuItems = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.75rem;
+  margin-top: 0.65rem;
 }
 
 .app-card-tags :deep(.p-tag) {
-  font-size: 0.75rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.72rem;
 }
 
 .app-card-divider {
