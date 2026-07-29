@@ -467,15 +467,15 @@ const menuItems = computed(() => {
 .app-card-identity {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.9rem;
   min-width: 0;
 }
 
 .app-icon {
   display: grid;
-  flex: 0 0 2.5rem;
-  width: 2.5rem;
-  height: 2.5rem;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
   border-radius: 0.65rem;
   background: color-mix(in srgb, var(--p-primary-500) 12%, var(--p-surface-100));
@@ -509,7 +509,7 @@ const menuItems = computed(() => {
 
 .app-card-divider {
   margin: 0.85rem 0 0.75rem;
-  border-top: 1px solid var(--p-surface-300);
+  border-top: 1px solid var(--p-surface-200);
 }
 
 .line-clamp-2 {
@@ -549,9 +549,12 @@ const menuItems = computed(() => {
 }
 
 .app-card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
   margin-top: 1rem;
+  width: min(100%, 18rem);
+  margin-inline: auto;
 }
 
 .app-card-actions :deep(.p-button) {
@@ -560,13 +563,10 @@ const menuItems = computed(() => {
   font-size: 0.875rem;
 }
 
-.app-card-actions {
-  justify-content: flex-end;
-}
-
 .app-card-actions .primary-action,
 .app-card-actions .secondary-action {
-  flex: 0 1 7.75rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .visually-hidden {
