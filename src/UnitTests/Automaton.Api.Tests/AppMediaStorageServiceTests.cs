@@ -30,7 +30,7 @@ public class AppMediaStorageServiceTests
             Summary = string.Empty,
             Description = string.Empty,
             Definition = "{}",
-            ExecutionRunnerId = runnerId,
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) },
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow
         });
@@ -105,7 +105,7 @@ public class AppMediaStorageServiceTests
             Summary = string.Empty,
             Description = string.Empty,
             Definition = "{}",
-            ExecutionRunnerId = runnerId,
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) },
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow
         });

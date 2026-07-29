@@ -42,7 +42,7 @@ public class BackendRouteConfigServiceTests
             Definition = "{}",
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            ExecutionRunnerId = runnerId
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) }
         });
 
         await dbContext.SaveChangesAsync();
@@ -69,16 +69,17 @@ public class BackendRouteConfigServiceTests
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
 
+        var appId = Guid.NewGuid();
         dbContext.WebApps.Add(new WebApp
         {
-            Id = Guid.NewGuid(),
+            Id = appId,
             Name = "Unrouted App",
             Summary = string.Empty,
             Description = string.Empty,
             Definition = "{}",
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            ExecutionRunnerId = Guid.NewGuid()
+            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, Guid.NewGuid()) }
         });
 
         await dbContext.SaveChangesAsync();

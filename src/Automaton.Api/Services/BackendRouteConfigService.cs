@@ -32,23 +32,23 @@ public class BackendRouteConfigService
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var routes = await dbContext.WebApps
+        var routes = await dbContext.AppDeploymentTargets
             .AsNoTracking()
-            .Where(app => app.ExecutionRunnerId != null)
+            .Where(target => target.IsDefault && target.ExecutionRunnerId != null)
             .Join(
                 dbContext.HostedRunners.AsNoTracking().Where(r =>
                     r.DeletedAt == null &&
                     r.RunnerId != null &&
                     r.RuntimeEndpoint != null &&
                     r.RuntimeEndpoint != string.Empty),
-                app => app.ExecutionRunnerId,
+                target => target.ExecutionRunnerId,
                 runner => runner.RunnerId,
-                (app, runner) => new
+                (target, runner) => new
                 {
-                    AppId = app.Id,
+                    AppId = target.WebAppId,
                     RuntimeEndpoint = runner.RuntimeEndpoint!,
-                    Slug = app.IsPublished && app.AccessStatus == AppAccessStatuses.Active
-                        ? app.PublicUrl
+                    Slug = target.WebApp.IsPublished && target.WebApp.AccessStatus == AppAccessStatuses.Active
+                        ? target.WebApp.PublicUrl
                         : null
                 })
             .OrderBy(x => x.AppId)

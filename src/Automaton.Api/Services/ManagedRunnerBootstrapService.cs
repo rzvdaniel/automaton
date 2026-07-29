@@ -37,10 +37,11 @@ public sealed class ManagedRunnerBootstrapService
         CancellationToken cancellationToken = default)
     {
         var app = await dbContext.WebApps
+            .Include(x => x.DeploymentTargets)
             .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken)
             ?? throw new InvalidOperationException("App not found.");
 
-        if (app.ExecutionRunnerId.HasValue)
+        if (app.DeploymentTargets.SingleOrDefault(x => x.IsDefault)?.ExecutionRunnerId.HasValue == true)
         {
             var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
                 appId,

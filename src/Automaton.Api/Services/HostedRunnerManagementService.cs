@@ -2,6 +2,7 @@ using Automaton.Api.Config;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Messaging.Abstractions;
@@ -67,12 +68,14 @@ public class HostedRunnerManagementService
         var hostedRunner = await LoadHostedRunnerAsync(hostedRunnerId, cancellationToken);
         hostedRunner.Status = HostedRunnerStatuses.Deleting;
         hostedRunner.UpdatedAt = DateTime.UtcNow;
-        var appAssignments = await db.WebApps
+        var appAssignments = await db.AppDeploymentTargets
             .Where(x => x.ExecutionRunnerId == hostedRunner.RunnerId)
             .ToListAsync(cancellationToken);
-        foreach (var app in appAssignments)
+        foreach (var target in appAssignments)
         {
-            app.ExecutionRunnerId = null;
+            target.ExecutionRunnerId = null;
+            target.Status = DeploymentTargetStatus.Unassigned;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         var deployment = AddDeployment(

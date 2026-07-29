@@ -232,9 +232,9 @@ public class AppMediaStorageService
 
     private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId, CancellationToken ct)
     {
-        var executionRunnerId = await dataContext.WebApps
-            .Where(a => a.Id == appId)
-            .Select(a => a.ExecutionRunnerId)
+        var executionRunnerId = await dataContext.AppDeploymentTargets
+            .Where(target => target.WebAppId == appId && target.IsDefault)
+            .Select(target => target.ExecutionRunnerId)
             .FirstOrDefaultAsync(ct);
 
         if (executionRunnerId == null)
@@ -264,9 +264,9 @@ public class AppMediaStorageService
             .Where(r => r.ConnectionId != null
                 && r.LastHeartbeatAtUtc.HasValue
                 && r.LastHeartbeatAtUtc.Value >= thresholdUtc)
-            .Where(r => r.Id == dataContext.WebApps
-                .Where(a => a.Id == appId)
-                .Select(a => a.ExecutionRunnerId)
+            .Where(r => r.Id == dataContext.AppDeploymentTargets
+                .Where(target => target.WebAppId == appId && target.IsDefault)
+                .Select(target => target.ExecutionRunnerId)
                 .FirstOrDefault())
             .FirstOrDefaultAsync(ct);
     }

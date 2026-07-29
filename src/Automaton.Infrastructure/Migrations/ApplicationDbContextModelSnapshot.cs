@@ -752,6 +752,70 @@ namespace Automaton.Api.Migrations
                     b.ToTable("ApiKeyUsers");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.AppDeploymentTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("BackendDeployed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte?>("DefaultConstraintKey")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<Guid?>("ExecutionRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("FrontendDeployed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTimeOffset?>("LastDeploymentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTimeOffset?>("LastSuccessfulDeploymentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("WebAppId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutionRunnerId");
+
+                    b.HasIndex("WebAppId", "DefaultConstraintKey")
+                        .IsUnique();
+
+                    b.HasIndex("WebAppId", "Slug")
+                        .IsUnique();
+
+                    b.ToTable("AppDeploymentTargets");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.AppModuleExecution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3568,9 +3632,6 @@ namespace Automaton.Api.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<Guid?>("ExecutionRunnerId")
-                        .HasColumnType("char(36)");
-
                     b.Property<Guid?>("ForkedFromAppId")
                         .HasColumnType("char(36)");
 
@@ -3969,6 +4030,24 @@ namespace Automaton.Api.Migrations
                         .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Automaton.Api.Entities.AppDeploymentTarget", b =>
+                {
+                    b.HasOne("Automaton.Api.Entities.Runner", "ExecutionRunner")
+                        .WithMany("AppDeploymentTargets")
+                        .HasForeignKey("ExecutionRunnerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Automaton.Api.Entities.WebApp", "WebApp")
+                        .WithMany("DeploymentTargets")
+                        .HasForeignKey("WebAppId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ExecutionRunner");
+
+                    b.Navigation("WebApp");
                 });
 
             modelBuilder.Entity("Automaton.Api.Entities.AppModuleExecution", b =>
@@ -4826,6 +4905,8 @@ namespace Automaton.Api.Migrations
 
             modelBuilder.Entity("Automaton.Api.Entities.Runner", b =>
                 {
+                    b.Navigation("AppDeploymentTargets");
+
                     b.Navigation("ProjectRunners");
 
                     b.Navigation("RunnerUsers");
@@ -4860,6 +4941,8 @@ namespace Automaton.Api.Migrations
 
             modelBuilder.Entity("Automaton.Api.Entities.WebApp", b =>
                 {
+                    b.Navigation("DeploymentTargets");
+
                     b.Navigation("ProjectApps");
 
                     b.Navigation("WebAppScreenshots");

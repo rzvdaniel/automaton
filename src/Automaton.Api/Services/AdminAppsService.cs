@@ -203,15 +203,11 @@ public class AdminAppsService
             return null;
         }
 
-        string? executionRunnerName = null;
-        if (app.ExecutionRunnerId.HasValue)
-        {
-            executionRunnerName = await dataContext.Runners
-                .AsNoTracking()
-                .Where(runner => runner.Id == app.ExecutionRunnerId.Value)
-                .Select(runner => runner.Name)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
+        var executionRunnerName = await dataContext.AppDeploymentTargets
+            .AsNoTracking()
+            .Where(target => target.WebAppId == app.Id && target.IsDefault)
+            .Select(target => target.ExecutionRunner == null ? null : target.ExecutionRunner.Name)
+            .FirstOrDefaultAsync(cancellationToken);
 
         string? projectName = null;
         if (app.ProjectId.HasValue)

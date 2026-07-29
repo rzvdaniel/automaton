@@ -29,7 +29,10 @@ public sealed class ManagedRunnerAppAssignmentService
     {
         var apps = await dbContext.WebApps
             .Include(x => x.WebAppUsers)
-            .Where(x => x.ExecutionRunnerId == null && x.WebAppUsers.Any(u => u.UserId == userId))
+            .Include(x => x.DeploymentTargets)
+            .Where(x =>
+                x.DeploymentTargets.Any(target => target.IsDefault && target.ExecutionRunnerId == null) &&
+                x.WebAppUsers.Any(u => u.UserId == userId))
             .ToListAsync(cancellationToken);
 
         var assignedCount = 0;

@@ -66,7 +66,10 @@ public class AppsService
                 OwnerId = app.ProjectId.HasValue
                     ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
                     : app.WebAppUsers.OrderBy(u => u.UserId).Select(u => (Guid?)u.UserId).FirstOrDefault(),
-                Runner = dataContext.Runners.Where(r => r.Id == app.ExecutionRunnerId)
+                Runner = dataContext.Runners
+                    .Where(runner => app.DeploymentTargets.Any(target =>
+                        target.IsDefault &&
+                        target.ExecutionRunnerId == runner.Id))
                     .Select(r => new AppListRunnerDto
                     {
                         Id = r.Id, Name = r.Name, Purpose = r.Purpose,
@@ -117,7 +120,10 @@ public class AppsService
     public IEnumerable<AppModel> ListForMcp(Guid? projectId = null)
     {
         return authorizationService.GetAppsQueryByContext(projectId)
-            .Include(x => x.WebAppUsers).Include(x => x.WebAppScreenshots).AsSplitQuery().ToList()
+            .Include(x => x.WebAppUsers)
+            .Include(x => x.WebAppScreenshots)
+            .Include(x => x.DeploymentTargets)
+            .AsSplitQuery().ToList()
             .Select(e => MapToModel(e, null, ResolveAppOwnerId(e) ?? UserId));
     }
 
@@ -182,6 +188,7 @@ public class AppsService
         var appEntity = authorizationService.GetAccessibleAppsQuery()
             .Include(x => x.WebAppUsers)
             .Include(x => x.WebAppScreenshots)
+            .Include(x => x.DeploymentTargets)
             .SingleOrDefault(x => x.Id == id);
 
         if (appEntity == null)
@@ -218,6 +225,7 @@ public class AppsService
     {
         var appEntity = await dataContext.WebApps
             .Include(x => x.WebAppUsers)
+            .Include(x => x.DeploymentTargets)
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
@@ -239,7 +247,7 @@ public class AppsService
             PublicUrl = appEntity.PublicUrl,
             RequiresAuthentication = appEntity.RequiresAuthentication,
             OwnerId = ownerId,
-            ExecutionRunnerId = appEntity.ExecutionRunnerId
+            ExecutionRunnerId = GetDefaultRunnerId(appEntity)
         };
     }
 
@@ -257,6 +265,7 @@ public class AppsService
     {
         var appEntity = await authorizationService.GetAccessibleAppsQuery(userId)
             .Include(x => x.WebAppUsers)
+            .Include(x => x.DeploymentTargets)
             .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken);
 
         if (appEntity == null)
@@ -273,7 +282,7 @@ public class AppsService
             PublicUrl = appEntity.PublicUrl,
             RequiresAuthentication = appEntity.RequiresAuthentication,
             OwnerId = ownerId,
-            ExecutionRunnerId = appEntity.ExecutionRunnerId
+            ExecutionRunnerId = GetDefaultRunnerId(appEntity)
         };
     }
 
@@ -356,8 +365,7 @@ public class AppsService
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
             Definition = "{}", // Empty - content is now in file system
-            Tags = AppTagNormalizer.Serialize(app.Tags),
-            ExecutionRunnerId = null
+            Tags = AppTagNormalizer.Serialize(app.Tags)
         };
 
         dataContext.WebApps.Add(entity);
@@ -415,7 +423,7 @@ public class AppsService
             Metadata = new
             {
                 entity.Name,
-                entity.ExecutionRunnerId
+                ExecutionRunnerId = GetDefaultRunnerId(entity)
             }
         });
 
@@ -434,6 +442,7 @@ public class AppsService
         var entity = dataContext.WebApps
             .Include(x => x.WebAppUsers)
             .Include(x => x.WebAppScreenshots)
+            .Include(x => x.DeploymentTargets)
             .SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
@@ -453,7 +462,7 @@ public class AppsService
         var previousCategory = entity.Category;
         var previousTags = entity.Tags;
         var previousIsProfileFeatured = entity.IsProfileFeatured;
-        var previousExecutionRunnerId = entity.ExecutionRunnerId;
+        var previousExecutionRunnerId = GetDefaultRunnerId(entity);
 
         await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
         entity.Name = app.Name;
@@ -530,7 +539,7 @@ public class AppsService
             !string.Equals(previousCategory, entity.Category, StringComparison.Ordinal) ||
             !string.Equals(previousTags, entity.Tags, StringComparison.Ordinal) ||
             previousIsProfileFeatured != entity.IsProfileFeatured ||
-            previousExecutionRunnerId != entity.ExecutionRunnerId;
+            previousExecutionRunnerId != GetDefaultRunnerId(entity);
 
         if (metadataChanged)
         {
@@ -553,13 +562,13 @@ public class AppsService
                     entity.Category,
                     entity.Tags,
                     entity.IsProfileFeatured,
-                    entity.ExecutionRunnerId,
+                    ExecutionRunnerId = GetDefaultRunnerId(entity),
                     OwnerUserId = ownerId
                 }
             });
         }
 
-        if (previousExecutionRunnerId != entity.ExecutionRunnerId)
+        if (previousExecutionRunnerId != GetDefaultRunnerId(entity))
         {
             await backendRouteConfigService.RefreshAsync();
         }
@@ -619,7 +628,7 @@ public class AppsService
                 AppId = id,
                 Name = appName,
                 app.PublicUrl,
-                app.ExecutionRunnerId,
+                ExecutionRunnerId = GetDefaultRunnerId(app),
                 OwnerUserId = ownerId
             }
         });
@@ -703,7 +712,7 @@ public class AppsService
                 Slug = publicUrl,
                 entity.Version,
                 RequiresAuthentication = requiresAuthentication,
-                RunnerId = entity.ExecutionRunnerId,
+                RunnerId = GetDefaultRunnerId(entity),
                 IsForkable = isForkable,
                 OwnerUserId = ownerId
             }
@@ -722,7 +731,7 @@ public class AppsService
                 Slug = publicUrl,
                 entity.Version,
                 RequiresAuthentication = requiresAuthentication,
-                RunnerId = entity.ExecutionRunnerId,
+                RunnerId = GetDefaultRunnerId(entity),
                 IsForkable = isForkable
             }
         });
@@ -741,7 +750,9 @@ public class AppsService
             throw new UnauthorizedAccessException($"You do not have permission to unpublish app {id}");
         }
 
-        var entity = dataContext.WebApps.SingleOrDefault(x => x.Id == id);
+        var entity = dataContext.WebApps
+            .Include(x => x.DeploymentTargets)
+            .SingleOrDefault(x => x.Id == id);
 
         if (entity == null)
         {
@@ -810,7 +821,7 @@ public class AppsService
             throw new InvalidOperationException($"App {id} not found");
         }
 
-        var previousRunnerId = entity.ExecutionRunnerId;
+        var previousRunnerId = GetDefaultRunnerId(entity);
 
         await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
         entity.Updated = DateTime.UtcNow;
@@ -902,7 +913,7 @@ public class AppsService
             RequiresAuthentication = entity.RequiresAuthentication,
             Created = entity.Created,
             Updated = entity.Updated,
-            ExecutionRunnerId = entity.ExecutionRunnerId,
+            ExecutionRunnerId = GetDefaultRunnerId(entity),
             // Project context
             Scope = entity.Scope,
             ProjectId = entity.ProjectId,
@@ -988,7 +999,6 @@ public class AppsService
             PublicUrl = null,
             PublishedAt = null,
             Version = 1,
-            ExecutionRunnerId = null,
             RequiresAuthentication = source.RequiresAuthentication,
             Scope = AccessScope.Personal,
             ProjectId = null,
@@ -1004,7 +1014,7 @@ public class AppsService
 
         dataContext.WebApps.Add(entity);
         dataContext.WebAppUsers.Add(new Entities.WebAppUser { WebAppId = newId, UserId = UserId });
-        await runnerAssignmentPolicy.AssignAsync(entity, source.ExecutionRunnerId, UserId);
+        await runnerAssignmentPolicy.AssignAsync(entity, null, UserId);
         await dataContext.SaveChangesAsync();
 
         await fileStorageService.CopySourceFilesAsync(UserId, appId, UserId, newId);
@@ -1132,7 +1142,6 @@ public class AppsService
             PublicUrl = publicUrl,
             PublishedAt = request.PublishImmediately ? now : null,
             Version = 1,
-            ExecutionRunnerId = null,
             RequiresAuthentication = false,
             Scope = AccessScope.Personal,
             ProjectId = null,
@@ -1448,5 +1457,12 @@ public class AppsService
             "default-frontend-index.html");
 
         return await File.ReadAllTextAsync(templatePath);
+    }
+
+    private static Guid? GetDefaultRunnerId(WebApp app)
+    {
+        return app.DeploymentTargets?
+            .SingleOrDefault(target => target.IsDefault)?
+            .ExecutionRunnerId;
     }
 }

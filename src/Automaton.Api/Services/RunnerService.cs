@@ -1346,10 +1346,11 @@ public class RunnerService
         Guid? actorUserId,
         CancellationToken cancellationToken)
     {
-        var appIds = await dbContext.WebApps
+        var appIds = await dbContext.AppDeploymentTargets
             .AsNoTracking()
             .Where(x => x.ExecutionRunnerId == runnerId)
-            .Select(x => x.Id)
+            .Select(x => x.WebAppId)
+            .Distinct()
             .ToListAsync(cancellationToken);
 
         foreach (var appId in appIds)

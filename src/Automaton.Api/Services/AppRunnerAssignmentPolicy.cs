@@ -1,12 +1,13 @@
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
 /// <summary>
-/// Canonical policy for assigning and consuming an App's single execution Runner.
+/// Canonical policy for assigning and consuming an App deployment target's Runner.
 /// Infrastructure Runner assignment remains unsupported until the reviewed admin
 /// authorization flow is implemented.
 /// </summary>
@@ -21,14 +22,18 @@ public sealed class AppRunnerAssignmentPolicy(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
+        var target = await GetOrCreateDefaultTargetAsync(app, cancellationToken);
+
         if (!runnerId.HasValue)
         {
-            app.ExecutionRunnerId = null;
+            target.ExecutionRunnerId = null;
+            target.Status = DeploymentTargetStatus.Unassigned;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
             return;
         }
 
         await ResolveEligibleRunnerAsync(app, runnerId.Value, userId, cancellationToken);
-        await hostedRunnerAppCapacityService.AssignAsync(app, runnerId.Value, cancellationToken);
+        await hostedRunnerAppCapacityService.AssignAsync(target, runnerId.Value, cancellationToken);
     }
 
     public async Task<Runner> GetAssignedRunnerAsync(
@@ -38,17 +43,21 @@ public sealed class AppRunnerAssignmentPolicy(
     {
         var app = await dbContext.WebApps
             .AsNoTracking()
+            .Include(item => item.DeploymentTargets)
             .SingleOrDefaultAsync(item => item.Id == appId, cancellationToken)
             ?? throw new KeyNotFoundException("App not found.");
 
-        if (!app.ExecutionRunnerId.HasValue)
+        var target = app.DeploymentTargets.SingleOrDefault(item => item.IsDefault)
+            ?? throw new InvalidOperationException("The App has no default deployment target.");
+
+        if (!target.ExecutionRunnerId.HasValue)
         {
-            throw new InvalidOperationException("No Runner is assigned to this App.");
+            throw new InvalidOperationException("No Runner is assigned to the default deployment target.");
         }
 
         var runner = await ResolvePersistedRunnerAsync(
             app,
-            app.ExecutionRunnerId.Value,
+            target.ExecutionRunnerId.Value,
             cancellationToken);
 
         if (requireOnline &&
@@ -61,6 +70,33 @@ public sealed class AppRunnerAssignmentPolicy(
         }
 
         return runner;
+    }
+
+    private async Task<AppDeploymentTarget> GetOrCreateDefaultTargetAsync(
+        WebApp app,
+        CancellationToken cancellationToken)
+    {
+        var trackedTarget = app.DeploymentTargets.SingleOrDefault(item => item.IsDefault);
+        if (trackedTarget != null)
+        {
+            return trackedTarget;
+        }
+
+        if (dbContext.Entry(app).State != EntityState.Added)
+        {
+            var persistedTarget = await dbContext.AppDeploymentTargets
+                .SingleOrDefaultAsync(
+                    item => item.WebAppId == app.Id && item.IsDefault,
+                    cancellationToken);
+            if (persistedTarget != null)
+            {
+                return persistedTarget;
+            }
+        }
+
+        var target = AppDeploymentTarget.CreateDefault(app.Id);
+        app.DeploymentTargets.Add(target);
+        return target;
     }
 
     private async Task<Runner> ResolveEligibleRunnerAsync(

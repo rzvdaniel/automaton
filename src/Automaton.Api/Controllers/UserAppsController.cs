@@ -158,7 +158,10 @@ public class UserAppsController : ControllerBase
                     .Select(u => (Guid?)u.UserId)
                     .FirstOrDefault(),
                 RequiresAuthentication = a.RequiresAuthentication,
-                ExecutionRunnerId = a.ExecutionRunnerId
+                ExecutionRunnerId = a.DeploymentTargets
+                    .Where(target => target.IsDefault)
+                    .Select(target => target.ExecutionRunnerId)
+                    .FirstOrDefault()
             })
             .FirstOrDefaultAsync();
 

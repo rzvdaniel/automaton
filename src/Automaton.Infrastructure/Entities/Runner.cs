@@ -54,4 +54,5 @@ public class Runner
 
     // Project linking
     public virtual ICollection<ProjectRunner> ProjectRunners { get; set; } = new List<ProjectRunner>();
+    public virtual ICollection<AppDeploymentTarget> AppDeploymentTargets { get; set; } = new List<AppDeploymentTarget>();
 }

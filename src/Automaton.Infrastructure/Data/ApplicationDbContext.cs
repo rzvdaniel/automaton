@@ -55,6 +55,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<AiModel> AiModels { get; set; }
         public virtual DbSet<AiGuidanceDocument> AiGuidanceDocuments { get; set; }
         public virtual DbSet<WebApp> WebApps { get; set; }
+        public virtual DbSet<AppDeploymentTarget> AppDeploymentTargets { get; set; }
         public virtual DbSet<MarketplaceCategory> MarketplaceCategories { get; set; }
         public virtual DbSet<WebAppStar> WebAppStars { get; set; }
         public virtual DbSet<WebAppScreenshot> WebAppScreenshots { get; set; }
@@ -671,6 +672,33 @@ namespace Automaton.Api.Data
                     .WithOne(e => e.WebApp)
                     .HasForeignKey(e => e.WebAppId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(e => e.DeploymentTargets)
+                    .WithOne(e => e.WebApp)
+                    .HasForeignKey(e => e.WebAppId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AppDeploymentTarget>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.Slug).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.Status)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasConversion<string>();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+
+                entity.HasIndex(e => new { e.WebAppId, e.Slug }).IsUnique();
+                entity.HasIndex(e => new { e.WebAppId, e.DefaultConstraintKey }).IsUnique();
+                entity.HasIndex(e => e.ExecutionRunnerId);
+
+                entity.HasOne(e => e.ExecutionRunner)
+                    .WithMany(e => e.AppDeploymentTargets)
+                    .HasForeignKey(e => e.ExecutionRunnerId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<MarketplaceCategory>(entity =>
@@ -1493,6 +1521,144 @@ namespace Automaton.Api.Data
                 (left, right) => JsonSerializer.Serialize(left, options) == JsonSerializer.Serialize(right, options),
                 value => JsonSerializer.Serialize(value, options).GetHashCode(),
                 value => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, options), options)!));
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            PrepareDeploymentTargets();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override async Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            await PrepareDeploymentTargetsAsync(cancellationToken);
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void PrepareDeploymentTargets()
+        {
+            foreach (var appEntry in ChangeTracker.Entries<WebApp>()
+                         .Where(entry => entry.State == EntityState.Added))
+            {
+                var app = appEntry.Entity;
+                if (!app.DeploymentTargets.Any(target => target.IsDefault))
+                {
+                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateDefault(app.Id));
+                }
+            }
+
+            foreach (var targetEntry in ChangeTracker.Entries<AppDeploymentTarget>()
+                         .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+            {
+                targetEntry.Entity.SynchronizeDefaultConstraint();
+            }
+
+            ValidateDefaultTargetCounts();
+        }
+
+        private async Task PrepareDeploymentTargetsAsync(CancellationToken cancellationToken)
+        {
+            foreach (var appEntry in ChangeTracker.Entries<WebApp>()
+                         .Where(entry => entry.State == EntityState.Added))
+            {
+                var app = appEntry.Entity;
+                if (!app.DeploymentTargets.Any(target => target.IsDefault))
+                {
+                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateDefault(app.Id));
+                }
+            }
+
+            foreach (var targetEntry in ChangeTracker.Entries<AppDeploymentTarget>()
+                         .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+            {
+                targetEntry.Entity.SynchronizeDefaultConstraint();
+            }
+
+            await ValidateDefaultTargetCountsAsync(cancellationToken);
+        }
+
+        private void ValidateDefaultTargetCounts()
+        {
+            var targetEntries = ChangeTracker.Entries<AppDeploymentTarget>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .ToArray();
+
+            foreach (var appId in targetEntries.Select(entry => entry.Entity.WebAppId).Distinct())
+            {
+                var appIsBeingDeleted = ChangeTracker.Entries<WebApp>().Any(entry =>
+                    entry.Entity.Id == appId &&
+                    entry.State == EntityState.Deleted);
+                if (appIsBeingDeleted)
+                {
+                    continue;
+                }
+
+                var defaultCount = AppDeploymentTargets
+                    .AsNoTracking()
+                    .Count(target => target.WebAppId == appId && target.IsDefault);
+
+                foreach (var entry in targetEntries.Where(entry => entry.Entity.WebAppId == appId))
+                {
+                    var wasDefault = entry.State == EntityState.Added
+                        ? false
+                        : entry.OriginalValues.GetValue<bool>(nameof(AppDeploymentTarget.IsDefault));
+                    var isDefault = entry.State == EntityState.Deleted
+                        ? false
+                        : entry.Entity.IsDefault;
+
+                    defaultCount += (isDefault ? 1 : 0) - (wasDefault ? 1 : 0);
+                }
+
+                if (defaultCount != 1)
+                {
+                    throw new InvalidOperationException(
+                        "Every App must have exactly one default deployment target.");
+                }
+            }
+        }
+
+        private async Task ValidateDefaultTargetCountsAsync(CancellationToken cancellationToken)
+        {
+            var targetEntries = ChangeTracker.Entries<AppDeploymentTarget>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .ToArray();
+
+            foreach (var appId in targetEntries.Select(entry => entry.Entity.WebAppId).Distinct())
+            {
+                var appIsBeingDeleted = ChangeTracker.Entries<WebApp>().Any(entry =>
+                    entry.Entity.Id == appId &&
+                    entry.State == EntityState.Deleted);
+                if (appIsBeingDeleted)
+                {
+                    continue;
+                }
+
+                var defaultCount = await AppDeploymentTargets
+                    .AsNoTracking()
+                    .CountAsync(
+                        target => target.WebAppId == appId && target.IsDefault,
+                        cancellationToken);
+
+                foreach (var entry in targetEntries.Where(entry => entry.Entity.WebAppId == appId))
+                {
+                    var wasDefault = entry.State == EntityState.Added
+                        ? false
+                        : entry.OriginalValues.GetValue<bool>(nameof(AppDeploymentTarget.IsDefault));
+                    var isDefault = entry.State == EntityState.Deleted
+                        ? false
+                        : entry.Entity.IsDefault;
+
+                    defaultCount += (isDefault ? 1 : 0) - (wasDefault ? 1 : 0);
+                }
+
+                if (defaultCount != 1)
+                {
+                    throw new InvalidOperationException(
+                        "Every App must have exactly one default deployment target.");
+                }
+            }
         }
 
         public void BeginTransaction()

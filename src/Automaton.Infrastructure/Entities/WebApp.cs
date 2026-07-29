@@ -17,8 +17,6 @@ public class WebApp
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; } = 1;
 
-    public Guid? ExecutionRunnerId { get; set; }
-    
     // Access control (future use)
     public bool RequiresAuthentication { get; set; } = false;
     public string? AllowedRoles { get; set; }
@@ -116,4 +114,5 @@ public class WebApp
     public virtual ICollection<WebAppUser> WebAppUsers { get; set; }
     public virtual ICollection<WebAppScreenshot> WebAppScreenshots { get; set; } = new List<WebAppScreenshot>();
     public virtual ICollection<ProjectApp> ProjectApps { get; set; }
+    public virtual ICollection<AppDeploymentTarget> DeploymentTargets { get; set; } = new List<AppDeploymentTarget>();
 }

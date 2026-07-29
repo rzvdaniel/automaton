@@ -284,14 +284,11 @@ public class AppRunnerBackendFilesController : ControllerBase
         }
 
         var userId = userContextService.GetUserId();
-        var runner = await dataContext.WebApps
-            .Where(app => app.Id == appId)
-            .Select(app => app.ExecutionRunnerId == null
-                ? null
-                : dataContext.Runners
-                    .Where(r => r.Id == app.ExecutionRunnerId)
-                    .Where(r => r.RunnerUsers.Any(ru => ru.UserId == userId))
-                    .FirstOrDefault())
+        var runner = await dataContext.AppDeploymentTargets
+            .Where(target => target.WebAppId == appId && target.IsDefault)
+            .Where(target => target.ExecutionRunner != null)
+            .Select(target => target.ExecutionRunner)
+            .Where(r => r!.RunnerUsers.Any(ru => ru.UserId == userId))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (runner == null)

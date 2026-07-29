@@ -83,8 +83,8 @@ public class ManagedRunnerBootstrapServiceTests
         Assert.That(result.IsReady, Is.True);
         Assert.That(result.RunnerId, Is.EqualTo(runner.Id));
 
-        var refreshedApp = await db.WebApps.SingleAsync(x => x.Id == app.Id);
-        Assert.That(refreshedApp.ExecutionRunnerId, Is.EqualTo(runner.Id));
+        var refreshedTarget = await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault);
+        Assert.That(refreshedTarget.ExecutionRunnerId, Is.EqualTo(runner.Id));
     }
 
     [Test]
@@ -100,7 +100,7 @@ public class ManagedRunnerBootstrapServiceTests
         SeedRunningHostedRunner(db, ownerId, planId, runner);
         var hostedRunner = db.HostedRunners.Single();
         hostedRunner.DeletedAt = DateTime.UtcNow;
-        app.ExecutionRunnerId = runner.Id;
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
         db.SaveChanges();
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
@@ -109,7 +109,7 @@ public class ManagedRunnerBootstrapServiceTests
             async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
         Assert.That(exception!.Message, Does.Contain("no longer eligible"));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.EqualTo(runner.Id));
+        Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.EqualTo(runner.Id));
     }
 
     [Test]
@@ -156,7 +156,7 @@ public class ManagedRunnerBootstrapServiceTests
 
         Assert.That(result.IsReady, Is.False);
         Assert.That(publisher.Messages.OfType<ManagedRunnerProvisionRequestedEvent>(), Is.Empty);
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Null);
+        Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.Null);
     }
 
     [Test]
@@ -183,7 +183,7 @@ public class ManagedRunnerBootstrapServiceTests
         };
         db.Runners.Add(infrastructureRunner);
         db.RunnerUsers.Add(new RunnerUser { RunnerId = infrastructureRunner.Id, UserId = ownerId });
-        app.ExecutionRunnerId = infrastructureRunner.Id;
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = infrastructureRunner.Id;
         db.SaveChanges();
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
@@ -192,7 +192,7 @@ public class ManagedRunnerBootstrapServiceTests
             async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.EqualTo(infrastructureRunner.Id));
+        Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.EqualTo(infrastructureRunner.Id));
     }
 
     [Test]
@@ -204,7 +204,7 @@ public class ManagedRunnerBootstrapServiceTests
         var app = SeedBackendApp(db, ownerId);
         SeedUser(db, ownerId, planId);
         SeedRunnerHost(db);
-        app.ExecutionRunnerId = Guid.NewGuid();
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = Guid.NewGuid();
         db.SaveChanges();
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
@@ -213,7 +213,7 @@ public class ManagedRunnerBootstrapServiceTests
             async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
         Assert.That(exception!.Message, Does.Contain("invalid"));
-        Assert.That((await db.WebApps.SingleAsync(x => x.Id == app.Id)).ExecutionRunnerId, Is.Not.Null);
+        Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.Not.Null);
     }
 
     [Test]

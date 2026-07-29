@@ -55,7 +55,7 @@ public class AppAuthorizationRegressionTests
         var runnerId = Guid.NewGuid();
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "runner-app");
-        dbContext.WebApps.Single().ExecutionRunnerId = runnerId;
+        dbContext.AppDeploymentTargets.Single().ExecutionRunnerId = runnerId;
         var now = DateTime.UtcNow;
         dbContext.Runners.Add(new Runner { Id = runnerId, Name = "runner", Purpose = RunnerPurposes.Managed, ConnectionId = "connection", LastHeartbeatAtUtc = now, Status = "offline" });
         await dbContext.SaveChangesAsync();
@@ -271,7 +271,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(exception!.Message, Does.Contain("not found"));
         Assert.That(
-            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.Null);
     }
 
@@ -302,7 +302,7 @@ public class AppAuthorizationRegressionTests
         await service.UpdateRunner(appId, runnerId);
 
         Assert.That(
-            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.EqualTo(runnerId));
     }
 
@@ -335,7 +335,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
         Assert.That(
-            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.Null);
     }
 
@@ -369,7 +369,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
         Assert.That(
-            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.Null);
     }
 
@@ -404,7 +404,7 @@ public class AppAuthorizationRegressionTests
 
         Assert.That(exception!.Message, Does.Contain("not eligible"));
         Assert.That(
-            (await dbContext.WebApps.SingleAsync(item => item.Id == appId)).ExecutionRunnerId,
+            (await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault)).ExecutionRunnerId,
             Is.Null);
     }
 
@@ -450,8 +450,8 @@ public class AppAuthorizationRegressionTests
 
         await using var dbContext = CreateDbContext();
         SeedApp(dbContext, appId, ownerId, "owner-app");
-        var app = await dbContext.WebApps.SingleAsync(item => item.Id == appId);
-        app.ExecutionRunnerId = Guid.NewGuid();
+        var target = await dbContext.AppDeploymentTargets.SingleAsync(item => item.WebAppId == appId && item.IsDefault);
+        target.ExecutionRunnerId = Guid.NewGuid();
         await dbContext.SaveChangesAsync();
 
         var userContextService = CreateUserContextService(ownerId);
