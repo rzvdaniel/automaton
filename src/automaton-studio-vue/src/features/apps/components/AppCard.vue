@@ -12,6 +12,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
 import { getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
+import { resolveMediaUrl } from '../utils/media-url'
 
 interface Props {
   app: AppListItem
@@ -24,12 +25,7 @@ const hasThumbnail = computed(() => !!props.app.thumbnailUrl)
 
 // Full thumbnail URL with API base URL (only used when thumbnailUrl is set)
 const fullThumbnailUrl = computed(() => {
-  if (!props.app.thumbnailUrl) return ''
-  if (props.app.thumbnailUrl.startsWith('http')) {
-    return props.app.thumbnailUrl
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  return `${baseUrl}${props.app.thumbnailUrl}`
+  return resolveMediaUrl(props.app.thumbnailUrl)
 })
 
 const emit = defineEmits<{ publish: [appId: string] }>()
@@ -71,18 +67,19 @@ const deploymentSummary = computed(() => {
   const backend = props.app.runtime.backendAvailable
   if (!frontend && !backend) return 'Not deployed yet'
 
-  const values = [props.app.runtime.frontendDeployedAtUtc, props.app.runtime.backendDeployedAtUtc]
-    .filter((value): value is string => Boolean(value))
-    .map((value) => new Date(value).getTime())
-  const state = frontend && backend ? 'Full stack deployed' : frontend ? 'Frontend deployed' : 'Backend deployed'
-  if (!values.length) return state
-  const diffHours = Math.floor((Date.now() - Math.max(...values)) / (1000 * 60 * 60))
-  return diffHours < 1 ? `${state} · just now` : `${state} · ${diffHours}h ago`
+  return frontend && backend ? 'Full stack deployed' : frontend ? 'Frontend deployed' : 'Backend deployed'
 })
+
+const runnerStatus = computed(() => props.app.runner?.connectivityStatus ?? 'None')
+const runnerStatusLabel = computed(() => runnerStatus.value === 'None' ? 'Unassigned' : runnerStatus.value)
+const runnerStatusClass = computed(() => `runner-status--${runnerStatus.value.toLowerCase()}`)
 
 const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
 const canOpenPublicApp = computed(() => props.app.isPublished && !!props.app.publicUrl)
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
+const primaryAction = computed(() => canOpenApp.value
+  ? { label: 'Open', icon: 'pi pi-external-link' }
+  : { label: 'Deploy', icon: 'pi pi-cloud-upload' })
 const openAppUrl = computed(() => {
   if (canOpenPublicApp.value) {
     return getPublishedAppUrl(props.app.publicUrl)
@@ -95,6 +92,15 @@ const studioApplicationUrl = computed(() => getStudioApplicationUrl(props.app.id
 
 const handleEdit = () => {
   router.push(`/apps/${props.app.id}`)
+}
+
+const handlePrimaryAction = async () => {
+  if (!canOpenApp.value) {
+    handleEdit()
+    return
+  }
+
+  await handleOpenApp()
 }
 
 const handleOpenApp = async () => {
@@ -321,7 +327,7 @@ const menuItems = computed(() => {
       <div class="flex flex-column h-full">
         <!-- App name -->
         <div class="flex align-items-center gap-2 min-w-0 mb-1">
-          <i class="pi pi-globe flex-shrink-0" style="color: var(--p-primary-500); font-size: 0.85rem"></i>
+          <i :class="app.isPublished ? 'pi pi-globe' : 'pi pi-box'" class="app-identity-icon flex-shrink-0"></i>
           <span class="font-semibold text-overflow-ellipsis white-space-nowrap overflow-hidden">
             {{ app.name }}
           </span>
@@ -337,23 +343,29 @@ const menuItems = computed(() => {
         </div>
 
         <!-- Metadata -->
-        <div class="text-color-secondary text-sm mb-4">
-          {{ updatedAgo }}
-        </div>
-        <div class="text-color-secondary text-xs mb-3">
-          <div><i class="pi pi-server mr-1"></i>{{ app.runner?.name || 'No Runner' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
-          <div>{{ deploymentSummary }}</div>
+        <div class="app-status-rows text-sm mb-3">
+          <div class="app-status-row">
+            <span>Runner</span>
+            <span class="app-status-value"><i :class="['runner-status-dot', runnerStatusClass]" aria-hidden="true"></i>{{ app.runner?.name || 'Unassigned' }} · {{ runnerStatusLabel }}</span>
+          </div>
+          <div class="app-status-row">
+            <span>Deployment</span>
+            <span class="app-status-value">{{ deploymentSummary }}</span>
+          </div>
+          <div class="app-status-row">
+            <span>Updated</span>
+            <span class="app-status-value">{{ updatedAgo.replace('Updated: ', '') }}</span>
+          </div>
         </div>
 
         <!-- Actions -->
         <div class="flex gap-2 mt-auto">
           <Button
-            label="Open"
-            icon="pi pi-external-link"
+            :label="primaryAction.label"
+            :icon="primaryAction.icon"
             size="small"
             class="flex-1"
-            :disabled="!canOpenApp"
-            @click="handleOpenApp"
+            @click="handlePrimaryAction"
           />
           <Button
             label="Edit"
@@ -384,7 +396,7 @@ const menuItems = computed(() => {
 .app-thumbnail {
   position: relative;
   width: 100%;
-  height: 160px;
+  aspect-ratio: 16 / 7;
   overflow: hidden;
   border-radius: var(--p-card-border-radius) var(--p-card-border-radius) 0 0;
 }
@@ -414,7 +426,7 @@ const menuItems = computed(() => {
   top: 0;
   right: 0;
   padding: 0.5rem;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.2s ease;
 }
 
@@ -443,6 +455,41 @@ const menuItems = computed(() => {
   overflow: hidden;
   min-height: 2.5rem;
 }
+
+.app-identity-icon {
+  color: var(--p-primary-500);
+  font-size: 0.85rem;
+}
+
+.app-status-rows {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--p-text-muted-color);
+}
+
+.app-status-row {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.app-status-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--p-text-color);
+}
+
+.runner-status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: var(--p-surface-400);
+}
+
+.runner-status--online { background: var(--p-green-500); }
+.runner-status--offline { background: var(--p-surface-500); }
 
 /* Dark mode */
 :global(.app-dark) .thumbnail-overlay .menu-button {

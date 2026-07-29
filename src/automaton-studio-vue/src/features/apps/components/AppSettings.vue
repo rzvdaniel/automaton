@@ -21,6 +21,7 @@ import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
 import { AccessScope, type AppScreenshot } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
+import { resolveMediaUrl } from '../utils/media-url'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -140,18 +141,9 @@ const isLinkedToProject = computed(() => app.value?.scope === AccessScope.Projec
 const screenshots = computed(() => app.value?.screenshots ?? [])
 const canAddMoreScreenshots = computed(() => screenshots.value.length < maxScreenshots)
 
-function resolveAssetUrl(url?: string | null): string {
-  if (!url) return ''
-  if (url.startsWith('http')) {
-    return url
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  return `${baseUrl}${url}`
-}
-
 // Full thumbnail URL with API base URL
 const fullThumbnailUrl = computed(() => {
-  return resolveAssetUrl(thumbnailUrl.value)
+  return resolveMediaUrl(thumbnailUrl.value)
 })
 
 const hasChanges = computed(() => {
@@ -448,7 +440,7 @@ async function handleImageUpload(event: { files: File[] }) {
 }
 
 function screenshotUrl(screenshot: AppScreenshot): string {
-  return resolveAssetUrl(screenshot.imageUrl)
+  return resolveMediaUrl(screenshot.imageUrl)
 }
 
 async function handleScreenshotUpload(file: File) {

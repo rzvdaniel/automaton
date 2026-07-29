@@ -6,34 +6,6 @@ const props = defineProps<{
   name: string
 }>()
 
-// Curated gradient palette — each pair chosen to look great as an app cover
-const gradients = [
-  ['#667eea', '#764ba2'], // violet
-  ['#4facfe', '#00f2fe'], // ocean blue
-  ['#43e97b', '#38f9d7'], // mint
-  ['#fa709a', '#fee140'], // sunset
-  ['#a18cd1', '#fbc2eb'], // lavender
-  ['#fccb90', '#d57eeb'], // peach purple
-  ['#a1c4fd', '#c2e9fb'], // sky
-  ['#f093fb', '#f5576c'], // pink red
-  ['#0ba360', '#3cba92'], // teal
-  ['#f7971e', '#ffd200'], // golden
-  ['#30cfd0', '#330867'], // cyan deep
-  ['#f953c6', '#b91d73'], // magenta
-]
-
-// Deterministic index from app id — consistent across renders
-const gradient = computed(() => {
-  let hash = 0
-  for (let i = 0; i < props.appId.length; i++) {
-    hash = (hash * 31 + props.appId.charCodeAt(i)) >>> 0
-  }
-  const gradientPair = gradients[hash % gradients.length] ?? gradients[0]
-  const from = gradientPair?.[0] ?? '#667eea'
-  const to = gradientPair?.[1] ?? '#764ba2'
-  return `linear-gradient(135deg, ${from} 0%, ${to} 100%)`
-})
-
 // 1–2 uppercase initials
 const initials = computed(() => {
   return props.name
@@ -46,7 +18,7 @@ const initials = computed(() => {
 </script>
 
 <template>
-  <div class="cover-placeholder" :style="{ background: gradient }">
+  <div class="cover-placeholder">
     <span class="cover-initials">{{ initials }}</span>
   </div>
 </template>
@@ -58,14 +30,14 @@ const initials = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--p-surface-100);
 }
 
 .cover-initials {
   font-size: 2.5rem;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--p-primary-600);
   letter-spacing: 0.05em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   user-select: none;
 }
 </style>
