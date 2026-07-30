@@ -81,7 +81,7 @@ const navItems: AdminNavItem[] = [
     routePrefix: '/admin/subscription-plans',
   },
   {
-    label: 'Hosted Runners',
+    label: 'Runners',
     icon: 'pi pi-server',
     to: '/admin/hosted-runners',
     routePrefix: '/admin/hosted-runners',

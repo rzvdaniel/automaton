@@ -8,13 +8,15 @@ const router = useRouter()
 
 const tabs = [
   { label: 'Runner Hosts', icon: 'pi pi-server', to: '/admin/hosted-runners' },
-  { label: 'Runner Containers', icon: 'pi pi-box', to: '/admin/hosted-runners/containers' },
+  { label: 'Infrastructure Runners', icon: 'pi pi-shield', to: '/admin/hosted-runners/infrastructure' },
+  { label: 'Hosted Runners', icon: 'pi pi-box', to: '/admin/hosted-runners/containers' },
   { label: 'Specifications', icon: 'pi pi-sliders-h', to: '/admin/hosted-runners/specifications' },
 ]
 
 const activeIndex = computed(() => {
-  if (route.path.endsWith('/specifications')) return 2
-  if (route.path.endsWith('/containers')) return 1
+  if (route.path.endsWith('/specifications')) return 3
+  if (route.path.endsWith('/containers')) return 2
+  if (route.path.endsWith('/infrastructure')) return 1
   return 0
 })
 

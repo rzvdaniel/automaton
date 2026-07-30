@@ -508,6 +508,12 @@ public class AdminHostedRunnersController : ControllerBase
             InfrastructureRunnerLastHeartbeatAtUtc = host.InfrastructureRunner?.LastHeartbeatAtUtc
             ,InfrastructureRunnerOnboardingStatus = GetInfrastructureRunnerOnboardingStatus(host)
             ,InfrastructureRunnerVersion = host.InfrastructureRunner?.Version
+            ,InfrastructureRunnerImageDigest = host.InfrastructureRunner?.ImageDigest
+            ,InfrastructureRunnerSpecificationVersion = host.InfrastructureRunner?.ContainerSpecificationVersion
+            ,InfrastructureRunnerApiCompatibilityVersion = host.InfrastructureRunner?.ApiCompatibilityVersion
+            ,InfrastructureRunnerOperatingSystem = host.InfrastructureRunner?.OperatingSystem
+            ,InfrastructureRunnerArchitecture = host.InfrastructureRunner?.Architecture
+            ,InfrastructureRunnerContainerHealth = host.InfrastructureRunner?.ContainerHealth
             ,InfrastructureRunnerInstallationId = host.InfrastructureRunner?.InstallationId
             ,InfrastructureRunnerCapabilities = host.InfrastructureRunner == null
                 ? Array.Empty<string>()
@@ -691,6 +697,12 @@ public record RunnerHostResponse
     public DateTime? InfrastructureRunnerLastHeartbeatAtUtc { get; init; }
     public string InfrastructureRunnerOnboardingStatus { get; init; } = "NotInstalled";
     public string? InfrastructureRunnerVersion { get; init; }
+    public string? InfrastructureRunnerImageDigest { get; init; }
+    public int? InfrastructureRunnerSpecificationVersion { get; init; }
+    public string? InfrastructureRunnerApiCompatibilityVersion { get; init; }
+    public string? InfrastructureRunnerOperatingSystem { get; init; }
+    public string? InfrastructureRunnerArchitecture { get; init; }
+    public string? InfrastructureRunnerContainerHealth { get; init; }
     public string? InfrastructureRunnerInstallationId { get; init; }
     public IReadOnlyList<string> InfrastructureRunnerCapabilities { get; init; } = Array.Empty<string>();
     public DateTime? InfrastructureEnrollmentExpiresAtUtc { get; init; }

@@ -2123,6 +2123,78 @@ namespace Automaton.Api.Migrations
                     b.ToTable("HostedRunnerStorageVerifications");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.InfrastructureRunnerUpdateOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Diagnostics")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<Guid>("InfrastructureRunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("PreviousImageDigest")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<int?>("PreviousSpecificationVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReconnectDeadlineUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("RequestedImage")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<Guid>("RunnerHostId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("TargetImageDigest")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
+
+                    b.Property<int?>("TargetSpecificationVersion")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("RunnerHostId", "Status");
+
+                    b.ToTable("InfrastructureRunnerUpdateOperations");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.InfrastructureWorkflowExecution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2798,12 +2870,20 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("varchar(32)");
 
+                    b.Property<string>("ApiCompatibilityVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
                     b.Property<string>("ApiInstanceId")
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
 
                     b.Property<Guid?>("ApiKeyId")
                         .HasColumnType("char(36)");
+
+                    b.Property<string>("Architecture")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
 
                     b.Property<string>("CapabilitiesJson")
                         .IsRequired()
@@ -2812,6 +2892,17 @@ namespace Automaton.Api.Migrations
 
                     b.Property<string>("ConnectionId")
                         .HasColumnType("longtext");
+
+                    b.Property<string>("ContainerHealth")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<int?>("ContainerSpecificationVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImageDigest")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
 
                     b.Property<string>("InstallationId")
                         .HasMaxLength(128)
@@ -2837,6 +2928,10 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("longtext");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(256)
+                        .HasColumnType("varchar(256)");
 
                     b.Property<string>("Purpose")
                         .IsRequired()

@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bootstrap a Docker-capable server. This uses the normal Automaton Runner
-# image with Infrastructure capabilities. New installations use a short-lived,
-# single-use Infrastructure Runner enrollment API key; the Runner exchanges it
-# for its permanent credential and stores that credential in the config volume.
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Run this script as root (for example: sudo -E bash install-infrastructure-runner.sh)." >&2
-  exit 1
-fi
-
+# The single source of truth for an Infrastructure Runner container.  Install,
+# repair, update and rollback all invoke the same builder so recovery never
+# requires an administrator to reconstruct privileged docker arguments.
+SPECIFICATION_VERSION=1
+OPERATION=install
 AUTOMATON_SERVER_URL="${AUTOMATON_SERVER_URL:-}"
 AUTOMATON_API_KEY="${AUTOMATON_API_KEY:-}"
 AUTOMATON_ENROLLMENT_TOKEN="${AUTOMATON_ENROLLMENT_TOKEN:-}"
@@ -21,156 +16,104 @@ AUTOMATON_PRIVATE_IP="${AUTOMATON_PRIVATE_IP:-}"
 AUTOMATON_CONTAINER_NAME="${AUTOMATON_CONTAINER_NAME:-automaton-infrastructure-runner}"
 AUTOMATON_ROOT="${AUTOMATON_ROOT:-/var/lib/automaton}"
 AUTOMATON_DATA_ROOT="${AUTOMATON_DATA_ROOT:-$AUTOMATON_ROOT/infrastructure-runner}"
-AUTOMATON_REPLACE=false
+ROLLBACK_IMAGE=""
 
+usage() {
+  echo "Usage: $0 [install|update|repair|replace] [--version IMAGE] [installer options]" >&2
+}
+
+if [[ $# -gt 0 && "$1" != --* ]]; then OPERATION="$1"; shift; fi
+case "$OPERATION" in install|update|repair|replace) ;; *) usage; exit 1 ;; esac
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --server-url)
-      AUTOMATON_SERVER_URL="${2:-}"
-      shift 2
-      ;;
-    --enrollment-token)
-      AUTOMATON_ENROLLMENT_TOKEN="${2:-}"
-      shift 2
-      ;;
-    --api-key)
-      AUTOMATON_API_KEY="${2:-}"
-      shift 2
-      ;;
-    --runner-image)
-      AUTOMATON_RUNNER_IMAGE="${2:-}"
-      shift 2
-      ;;
-    --runner-name)
-      AUTOMATON_RUNNER_NAME="${2:-}"
-      shift 2
-      ;;
-    --public-ip)
-      AUTOMATON_PUBLIC_IP="${2:-}"
-      shift 2
-      ;;
-    --private-ip)
-      AUTOMATON_PRIVATE_IP="${2:-}"
-      shift 2
-      ;;
-    --container-name)
-      AUTOMATON_CONTAINER_NAME="${2:-}"
-      shift 2
-      ;;
-    --data-root)
-      AUTOMATON_DATA_ROOT="${2:-}"
-      shift 2
-      ;;
-    --replace)
-      AUTOMATON_REPLACE=true
-      shift
-      ;;
-    *)
-      echo "Unknown installer argument: $1" >&2
-      exit 1
-      ;;
+    --server-url) AUTOMATON_SERVER_URL="${2:-}"; shift 2 ;;
+    --enrollment-token) AUTOMATON_ENROLLMENT_TOKEN="${2:-}"; shift 2 ;;
+    --api-key|--enrollment-key) AUTOMATON_API_KEY="${2:-}"; shift 2 ;;
+    --runner-image|--version) AUTOMATON_RUNNER_IMAGE="${2:-}"; shift 2 ;;
+    --runner-name) AUTOMATON_RUNNER_NAME="${2:-}"; shift 2 ;;
+    --public-ip) AUTOMATON_PUBLIC_IP="${2:-}"; shift 2 ;;
+    --private-ip) AUTOMATON_PRIVATE_IP="${2:-}"; shift 2 ;;
+    --container-name) AUTOMATON_CONTAINER_NAME="${2:-}"; shift 2 ;;
+    --data-root) AUTOMATON_DATA_ROOT="${2:-}"; shift 2 ;;
+    *) echo "Unknown installer argument: $1" >&2; exit 1 ;;
   esac
 done
 
-: "${AUTOMATON_SERVER_URL:?Set --server-url or AUTOMATON_SERVER_URL to the Automaton API URL}"
-: "${AUTOMATON_RUNNER_IMAGE:?Set --runner-image or AUTOMATON_RUNNER_IMAGE to the published Runner image}"
-
-if [[ -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROLLMENT_TOKEN" ]]; then
-  echo "Set --api-key to a one-time Infrastructure Runner enrollment key." >&2
-  exit 1
-fi
-
-if [[ "$AUTOMATON_REPLACE" == true && -z "$AUTOMATON_API_KEY" ]]; then
-  echo "--replace requires a fresh one-time Infrastructure Runner enrollment key via --api-key." >&2
-  exit 1
-fi
-
+[[ "$(id -u)" -eq 0 ]] || { echo "Run this script as root." >&2; exit 1; }
 if ! command -v docker >/dev/null 2>&1; then
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y docker.io
+  export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y docker.io
 fi
-
 systemctl enable --now docker
-mkdir -p \
-  "$AUTOMATON_DATA_ROOT/config" \
-  "$AUTOMATON_DATA_ROOT/logs" \
-  "$AUTOMATON_DATA_ROOT/workflows" \
-  "$AUTOMATON_DATA_ROOT/artifacts" \
-  "$AUTOMATON_ROOT/hosted-runners" \
-  "$AUTOMATON_ROOT/gateway" \
-  "$AUTOMATON_ROOT/certificates"
+mkdir -p "$AUTOMATON_DATA_ROOT"/{config,logs,workflows,artifacts} "$AUTOMATON_ROOT"/{hosted-runners,gateway,certificates}
 
-docker pull "$AUTOMATON_RUNNER_IMAGE"
+existing_env() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null | sed -n "s/^$1=//p" | head -n 1; }
+if [[ -z "$AUTOMATON_SERVER_URL" ]]; then AUTOMATON_SERVER_URL="$(existing_env AUTOMATON_SERVER_URL || true)"; fi
+[[ -n "$AUTOMATON_SERVER_URL" ]] || { echo "Set --server-url for the initial installation." >&2; exit 1; }
+if [[ "$OPERATION" == install && -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROLLMENT_TOKEN" ]]; then
+  echo "Set --api-key or --enrollment-token for installation." >&2; exit 1
+fi
+if [[ "$OPERATION" == replace && -z "$AUTOMATON_API_KEY" && -z "$AUTOMATON_ENROLLMENT_TOKEN" ]]; then
+  echo "replace requires a fresh enrollment key or token." >&2; exit 1
+fi
+
+resolve_image() {
+  docker pull "$AUTOMATON_RUNNER_IMAGE" >&2
+  local digest
+  digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$AUTOMATON_RUNNER_IMAGE" 2>/dev/null || true)"
+  [[ "$digest" == *@sha256:* ]] || { echo "Unable to resolve an immutable digest for $AUTOMATON_RUNNER_IMAGE." >&2; exit 1; }
+  AUTOMATON_RUNNER_IMAGE="$digest"
+}
+
+installation_id() {
+  local profile="$AUTOMATON_DATA_ROOT/config/installation-profile.json"
+  [[ -f "$profile" ]] && sed -n 's/.*"InstallationId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$profile" | head -n 1 || true
+}
+
+run_canonical_container() {
+  local image="$1" digest="$2" id
+  id="$(installation_id)"
+  local args=(run -d --name "$AUTOMATON_CONTAINER_NAME" --restart unless-stopped --privileged --user 0:0 --pid host --network host
+    --label "automaton.installation-id=$id" --label "automaton.runner-version=${image#*:}" --label "automaton.image-digest=$digest" --label "automaton.specification-version=$SPECIFICATION_VERSION"
+    -v /var/run/docker.sock:/var/run/docker.sock -v /:/host
+    -v "$AUTOMATON_DATA_ROOT/config:/app/config" -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace"
+    -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts" -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
+    -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL" -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure" -e "AUTOMATON_RUNNER_IMAGE=$image"
+    -e "AUTOMATON_RUNNER_IMAGE_DIGEST=$digest" -e "AUTOMATON_CONTAINER_SPECIFICATION_VERSION=$SPECIFICATION_VERSION")
+  [[ -n "$AUTOMATON_RUNNER_NAME" ]] && args+=(-e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME")
+  [[ -n "$AUTOMATON_PUBLIC_IP" ]] && args+=(-e "AUTOMATON_PUBLIC_IP=$AUTOMATON_PUBLIC_IP")
+  [[ -n "$AUTOMATON_PRIVATE_IP" ]] && args+=(-e "AUTOMATON_PRIVATE_IP=$AUTOMATON_PRIVATE_IP")
+  [[ -n "$AUTOMATON_API_KEY" ]] && args+=(-e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY")
+  [[ -n "$AUTOMATON_ENROLLMENT_TOKEN" ]] && args+=(-e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN")
+  args+=("$image"); docker "${args[@]}"
+}
+
+wait_for_healthy() {
+  for _ in $(seq 1 30); do
+    [[ "$(docker inspect --format '{{.State.Running}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null || true)" == true ]] || return 1
+    docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -Eq 'self-registration completed|Runner enrolled successfully|self-registered|Runner connection' && return 0
+    sleep 2
+  done
+  return 1
+}
+
+if [[ "$OPERATION" == replace ]]; then
+  # Replacement intentionally discards both the durable credential and the
+  # installation identity. The enrollment flow must authorize the new agent.
+  rm -f "$AUTOMATON_DATA_ROOT/config/api-key" "$AUTOMATON_DATA_ROOT/config/runner.json" "$AUTOMATON_DATA_ROOT/config/installation-profile.json" "$AUTOMATON_DATA_ROOT/config/installation-id"
+fi
+ROLLBACK_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null || true)"
+resolve_image
+TARGET_DIGEST="$AUTOMATON_RUNNER_IMAGE"
 docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
-
-if [[ "$AUTOMATON_REPLACE" == true ]]; then
-  # Keep installation-id so the API reconnects the replacement to the same
-  # Runner/RunnerHost, while forcing a fresh permanent credential exchange.
-  rm -f \
-    "$AUTOMATON_DATA_ROOT/config/api-key" \
-    "$AUTOMATON_DATA_ROOT/config/runner.json" \
-    "$AUTOMATON_DATA_ROOT/config/installation-profile.json"
-  echo "Replacing the existing Infrastructure Runner while preserving its installation identity."
-fi
-
-docker_args=(
-  run -d
-  --name "$AUTOMATON_CONTAINER_NAME"
-  --restart unless-stopped
-  --privileged
-  --user 0
-  --pid host
-  --network host
-  -v /var/run/docker.sock:/var/run/docker.sock
-  -v /:/host
-  -v "$AUTOMATON_DATA_ROOT/config:/app/config"
-  -v "$AUTOMATON_DATA_ROOT/workflows:/automaton/workspace"
-  -v "$AUTOMATON_DATA_ROOT/artifacts:/automaton/artifacts"
-  -v "$AUTOMATON_DATA_ROOT/logs:/app/logs"
-  -e "AUTOMATON_SERVER_URL=$AUTOMATON_SERVER_URL"
-)
-
-if [[ -n "$AUTOMATON_API_KEY" ]]; then
-  docker_args+=(
-    -e "AUTOMATON_API_KEY=$AUTOMATON_API_KEY"
-    -e "AUTOMATON_RUNNER_PURPOSE=Infrastructure"
-  )
-else
-  docker_args+=( -e "AUTOMATON_ENROLLMENT_TOKEN=$AUTOMATON_ENROLLMENT_TOKEN" )
-fi
-
-if [[ -n "$AUTOMATON_RUNNER_NAME" ]]; then
-  docker_args+=( -e "AUTOMATON_RUNNER_NAME=$AUTOMATON_RUNNER_NAME" )
-fi
-
-if [[ -n "$AUTOMATON_PUBLIC_IP" ]]; then
-  docker_args+=( -e "AUTOMATON_PUBLIC_IP=$AUTOMATON_PUBLIC_IP" )
-fi
-
-if [[ -n "$AUTOMATON_PRIVATE_IP" ]]; then
-  docker_args+=( -e "AUTOMATON_PRIVATE_IP=$AUTOMATON_PRIVATE_IP" )
-fi
-
-docker_args+=( "$AUTOMATON_RUNNER_IMAGE" )
-docker "${docker_args[@]}"
-
-echo "Infrastructure Runner registration started: $AUTOMATON_CONTAINER_NAME"
-echo "The Runner will exchange the one-time credential and persist its durable credential in: $AUTOMATON_DATA_ROOT/config"
-
-for attempt in $(seq 1 30); do
-  if [[ "$(docker inspect --format '{{.State.Running}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null || true)" != "true" ]]; then
-    echo "Infrastructure Runner stopped before enrollment completed." >&2
-    docker logs --tail 80 "$AUTOMATON_CONTAINER_NAME" >&2 || true
-    exit 1
+run_canonical_container "$AUTOMATON_RUNNER_IMAGE" "$TARGET_DIGEST"
+if ! wait_for_healthy; then
+  docker logs --tail 120 "$AUTOMATON_CONTAINER_NAME" >&2 || true
+  docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
+  if [[ -n "$ROLLBACK_IMAGE" && "$OPERATION" == update ]]; then
+    echo "Update failed; restoring the previous image." >&2
+    PREVIOUS_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$ROLLBACK_IMAGE" 2>/dev/null || echo "$ROLLBACK_IMAGE")"
+    run_canonical_container "$ROLLBACK_IMAGE" "$PREVIOUS_DIGEST"
   fi
-
-  if docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -Eq "self-registration completed|Runner enrolled successfully|self-registered"; then
-    echo "Infrastructure Runner registered successfully and is starting its Runner connection."
-    exit 0
-  fi
-
-  sleep 2
-done
-
-echo "Infrastructure Runner is still starting. Check logs with: docker logs -f $AUTOMATON_CONTAINER_NAME"
+  exit 1
+fi
+echo "Infrastructure Runner $OPERATION succeeded using immutable image $TARGET_DIGEST (specification v$SPECIFICATION_VERSION)."

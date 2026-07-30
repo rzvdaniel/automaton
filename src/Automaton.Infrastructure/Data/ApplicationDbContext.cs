@@ -32,6 +32,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<RunnerUser> RunnerUsers { get; set; }
         public virtual DbSet<RunnerHost> RunnerHosts { get; set; }
         public virtual DbSet<RunnerHostProvisioningOperation> RunnerHostProvisioningOperations { get; set; }
+        public virtual DbSet<InfrastructureRunnerUpdateOperation> InfrastructureRunnerUpdateOperations { get; set; }
         public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
@@ -276,6 +277,11 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.IpAddress).HasMaxLength(64);
                 entity.Property(e => e.ApiInstanceId).HasMaxLength(80);
                 entity.Property(e => e.ApiColor).HasMaxLength(32);
+                entity.Property(e => e.ImageDigest).HasMaxLength(256);
+                entity.Property(e => e.ApiCompatibilityVersion).HasMaxLength(40);
+                entity.Property(e => e.OperatingSystem).HasMaxLength(256);
+                entity.Property(e => e.Architecture).HasMaxLength(40);
+                entity.Property(e => e.ContainerHealth).HasMaxLength(40);
                 entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
                 entity.Property(e => e.CapabilitiesJson).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.InstallationId).HasMaxLength(128);
@@ -372,6 +378,20 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => e.IdempotencyKey).IsUnique();
                 entity.HasIndex(e => new { e.RunnerHostId, e.Status });
                 entity.HasOne(e => e.RunnerHost).WithMany().HasForeignKey(e => e.RunnerHostId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<InfrastructureRunnerUpdateOperation>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(160);
+                entity.Property(e => e.RequestedImage).HasMaxLength(256);
+                entity.Property(e => e.TargetImageDigest).HasMaxLength(256);
+                entity.Property(e => e.PreviousImageDigest).HasMaxLength(256);
+                entity.Property(e => e.Error).HasMaxLength(2000);
+                entity.Property(e => e.Diagnostics).HasColumnType("longtext");
+                entity.HasIndex(e => e.IdempotencyKey).IsUnique();
+                entity.HasIndex(e => new { e.RunnerHostId, e.Status });
             });
 
             modelBuilder.Entity<RunnerEnrollment>(entity =>
