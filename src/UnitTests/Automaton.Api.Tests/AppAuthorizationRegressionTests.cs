@@ -330,7 +330,7 @@ public class AppAuthorizationRegressionTests
         await dbContext.SaveChangesAsync();
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
             async () => await service.UpdateRunner(appId, runnerId));
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
@@ -364,7 +364,7 @@ public class AppAuthorizationRegressionTests
         await dbContext.SaveChangesAsync();
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
             async () => await service.UpdateRunner(appId, runnerId));
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
@@ -431,7 +431,7 @@ public class AppAuthorizationRegressionTests
         await dbContext.SaveChangesAsync();
         var service = CreateAppsService(dbContext, ownerId, tempRoot.Path);
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
             async () => await service.Create(new NewApp
             {
                 Name = "Rejected App",
@@ -456,10 +456,12 @@ public class AppAuthorizationRegressionTests
 
         var userContextService = CreateUserContextService(ownerId);
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
-            authorizationService,
-            new HostedRunnerAppCapacityService(dbContext));
+            new HostedRunnerAppCapacityService(dbContext),
+            runnerAuthorizationPolicy,
+            new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
         var appsService = CreateAppsService(dbContext, ownerId);
         var executionService = new AppActionExecutionService(
             dbContext,
@@ -478,7 +480,7 @@ public class AppAuthorizationRegressionTests
                 input.RootElement,
                 CancellationToken.None));
 
-        Assert.That(exception!.Message, Does.Contain("invalid"));
+        Assert.That(exception!.Message, Does.Contain("not found"));
     }
 
     [Test]
@@ -707,10 +709,12 @@ public class AppAuthorizationRegressionTests
             }));
         var fileStorageService = new AppFileStorageService(environment, settingsService);
         storage = fileStorageService;
+        var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
-            authorizationService,
-            new HostedRunnerAppCapacityService(dbContext));
+            new HostedRunnerAppCapacityService(dbContext),
+            runnerAuthorizationPolicy,
+            new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
         var backendRouteConfigService = new BackendRouteConfigService(
             dbContext,
             Options.Create(new PublishedAppsConfig()),

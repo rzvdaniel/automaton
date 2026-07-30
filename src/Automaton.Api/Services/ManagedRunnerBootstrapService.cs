@@ -36,17 +36,13 @@ public sealed class ManagedRunnerBootstrapService
         Guid ownerId,
         CancellationToken cancellationToken = default)
     {
-        var app = await dbContext.WebApps
-            .Include(x => x.DeploymentTargets)
-            .FirstOrDefaultAsync(x => x.Id == appId, cancellationToken)
-            ?? throw new InvalidOperationException("App not found.");
-
-        if (app.DeploymentTargets.SingleOrDefault(x => x.IsDefault)?.ExecutionRunnerId.HasValue == true)
+        try
         {
             var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
                 appId,
+                ownerId,
                 requireOnline: false,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             var assignedHostedRunnerIsActive = await dbContext.HostedRunners
                 .AsNoTracking()
@@ -70,6 +66,10 @@ public sealed class ManagedRunnerBootstrapService
             return ManagedRunnerBootstrapResult.Unavailable(
                 "No connected runner is assigned to this app.");
         }
+        catch (AppDeploymentTargetUnassignedException)
+        {
+            // Provisioning below creates and assigns the user's managed Runner.
+        }
 
         var user = await dbContext.Users
             .AsNoTracking()
@@ -89,6 +89,9 @@ public sealed class ManagedRunnerBootstrapService
             RunnerCapabilities.CanExecuteApplications(runner.CapabilitiesJson, runner.Purpose) &&
             RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
         {
+            var app = await dbContext.WebApps
+                .Include(item => item.DeploymentTargets)
+                .SingleAsync(item => item.Id == appId, cancellationToken);
             await runnerAssignmentPolicy.AssignAsync(app, runnerId, ownerId, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             return ManagedRunnerBootstrapResult.Ready(runnerId);

@@ -63,8 +63,9 @@ public sealed class AppActionExecutionService
             throw new UnauthorizedAccessException("You do not have permission to execute Actions in this App.");
         var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
+            userId,
             requireOnline: true,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         var deployed = await hub.Clients.Client(runner.ConnectionId).InvokeAsync<AppActionModulesResponse>(
             AutomatonHubMethods.ListAppActionModules, appId, cancellationToken);
@@ -260,8 +261,9 @@ public sealed class AppActionExecutionService
     {
         var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
+            userId,
             requireOnline: true,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return runner.ConnectionId!;
     }
 

@@ -46,6 +46,7 @@ public class AppFilesController : ControllerBase
     private readonly FileDownloadRegistry downloadRegistry;
     private readonly ILogger<AppFilesController> logger;
     private readonly PrivateAppLaunchService privateAppLaunchService;
+    private readonly IAppDeploymentTargetResolver targetResolver;
 
     public AppFilesController(
         ApplicationDbContext dataContext,
@@ -53,7 +54,8 @@ public class AppFilesController : ControllerBase
         FileUploadRegistry uploadRegistry,
         FileDownloadRegistry downloadRegistry,
         ILogger<AppFilesController> logger,
-        PrivateAppLaunchService privateAppLaunchService)
+        PrivateAppLaunchService privateAppLaunchService,
+        IAppDeploymentTargetResolver targetResolver)
     {
         this.dataContext = dataContext;
         this.automatonHub = automatonHub;
@@ -61,6 +63,7 @@ public class AppFilesController : ControllerBase
         this.downloadRegistry = downloadRegistry;
         this.logger = logger;
         this.privateAppLaunchService = privateAppLaunchService;
+        this.targetResolver = targetResolver;
     }
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -367,43 +370,51 @@ public class AppFilesController : ControllerBase
     /// </summary>
     private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId)
     {
-        var executionRunnerId = await dataContext.AppDeploymentTargets
-            .Where(target => target.WebAppId == appId && target.IsDefault)
-            .Select(target => target.ExecutionRunnerId)
-            .FirstOrDefaultAsync();
-
-        if (executionRunnerId == null)
-            return "No runner is configured for this app. Go to App Settings and select a runner.";
-
-        var runner = await dataContext.Runners
-            .Where(r => r.Id == executionRunnerId)
-            .FirstOrDefaultAsync();
-
-        if (runner is null)
-            return "The runner configured for this app no longer exists.";
-
-        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-            return $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
-
-        if (!await dataContext.Runners.AnyAsync(r => r.Id == executionRunnerId && r.RunnerUsers.Any(ru => ru.UserId == ownerId)))
-            return $"Runner '{runner.Name}' is not accessible by this app's owner.";
-
-        return null;
+        try
+        {
+            var target = await targetResolver.ResolveAsync(appId, null, ownerId);
+            var runner = target.ExecutionRunner!;
+            return RunnerPresenceEvaluator.IsOnline(
+                runner.ConnectionId,
+                runner.LastHeartbeatAtUtc,
+                DateTime.UtcNow)
+                ? null
+                : $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
+        }
+        catch (KeyNotFoundException)
+        {
+            return "The configured app or deployment target no longer exists.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "The runner configured for this app is not accessible by this app's owner.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
     }
 
     private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId)
     {
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-        return await dataContext.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.ConnectionId != null
-                && r.LastHeartbeatAtUtc.HasValue
-                && r.LastHeartbeatAtUtc.Value >= thresholdUtc)
-            .Where(r => r.Id == dataContext.AppDeploymentTargets
-                .Where(target => target.WebAppId == appId && target.IsDefault)
-                .Select(target => target.ExecutionRunnerId)
-                .FirstOrDefault())
-            .FirstOrDefaultAsync();
+        try
+        {
+            var target = await targetResolver.ResolveAsync(appId, null, ownerId);
+            var runner = target.ExecutionRunner!;
+            return RunnerPresenceEvaluator.IsOnline(
+                runner.ConnectionId,
+                runner.LastHeartbeatAtUtc,
+                DateTime.UtcNow)
+                ? runner
+                : null;
+        }
+        catch (Exception ex) when (
+            ex is KeyNotFoundException or
+                UnauthorizedAccessException or
+                InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private Guid GetUserId()

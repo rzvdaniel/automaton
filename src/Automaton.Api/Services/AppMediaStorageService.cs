@@ -1,12 +1,10 @@
 using Automaton.Api.Config;
-using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Enums;
 using Automaton.Api.Hubs;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Services;
@@ -17,27 +15,27 @@ public class AppMediaStorageService
     private const int UploadTimeoutMinutes = 10;
     private const int DownloadChunkTimeoutSeconds = 30;
 
-    private readonly ApplicationDbContext dataContext;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly FileUploadRegistry uploadRegistry;
     private readonly FileDownloadRegistry downloadRegistry;
     private readonly MediaStorageOptions options;
     private readonly ILogger<AppMediaStorageService> logger;
+    private readonly IAppDeploymentTargetResolver targetResolver;
 
     public AppMediaStorageService(
-        ApplicationDbContext dataContext,
         IHubContext<AutomatonHub> automatonHub,
         FileUploadRegistry uploadRegistry,
         FileDownloadRegistry downloadRegistry,
         IOptions<MediaStorageOptions> options,
-        ILogger<AppMediaStorageService> logger)
+        ILogger<AppMediaStorageService> logger,
+        IAppDeploymentTargetResolver targetResolver)
     {
-        this.dataContext = dataContext;
         this.automatonHub = automatonHub;
         this.uploadRegistry = uploadRegistry;
         this.downloadRegistry = downloadRegistry;
         this.options = options.Value;
         this.logger = logger;
+        this.targetResolver = targetResolver;
     }
 
     public async Task<(bool Success, int StatusCode, object Payload)> UploadAsync(Guid appId, Guid ownerId, IFormFile? file, CancellationToken ct)
@@ -232,43 +230,51 @@ public class AppMediaStorageService
 
     private async Task<string?> GetRunnerErrorAsync(Guid ownerId, Guid appId, CancellationToken ct)
     {
-        var executionRunnerId = await dataContext.AppDeploymentTargets
-            .Where(target => target.WebAppId == appId && target.IsDefault)
-            .Select(target => target.ExecutionRunnerId)
-            .FirstOrDefaultAsync(ct);
-
-        if (executionRunnerId == null)
-            return "No runner is configured for this app. Go to App Settings and select a runner.";
-
-        var runner = await dataContext.Runners
-            .Where(r => r.Id == executionRunnerId)
-            .FirstOrDefaultAsync(ct);
-
-        if (runner is null)
-            return "The runner configured for this app no longer exists.";
-
-        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-            return $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
-
-        if (!await dataContext.Runners.AnyAsync(r => r.Id == executionRunnerId && r.RunnerUsers.Any(ru => ru.UserId == ownerId), ct))
-            return $"Runner '{runner.Name}' is not accessible by this app's owner.";
-
-        return null;
+        try
+        {
+            var target = await targetResolver.ResolveAsync(appId, null, ownerId, ct);
+            var runner = target.ExecutionRunner!;
+            return RunnerPresenceEvaluator.IsOnline(
+                runner.ConnectionId,
+                runner.LastHeartbeatAtUtc,
+                DateTime.UtcNow)
+                ? null
+                : $"Runner '{runner.Name}' is not connected. Please start the runner and try again.";
+        }
+        catch (KeyNotFoundException)
+        {
+            return "The configured app or deployment target no longer exists.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "The runner configured for this app is not accessible by this app's owner.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
     }
 
     private async Task<Runner?> ResolveRunnerAsync(Guid ownerId, Guid appId, CancellationToken ct)
     {
-        var thresholdUtc = DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold;
-        return await dataContext.Runners
-            .Where(r => r.RunnerUsers.Any(ru => ru.UserId == ownerId))
-            .Where(r => r.ConnectionId != null
-                && r.LastHeartbeatAtUtc.HasValue
-                && r.LastHeartbeatAtUtc.Value >= thresholdUtc)
-            .Where(r => r.Id == dataContext.AppDeploymentTargets
-                .Where(target => target.WebAppId == appId && target.IsDefault)
-                .Select(target => target.ExecutionRunnerId)
-                .FirstOrDefault())
-            .FirstOrDefaultAsync(ct);
+        try
+        {
+            var target = await targetResolver.ResolveAsync(appId, null, ownerId, ct);
+            var runner = target.ExecutionRunner!;
+            return RunnerPresenceEvaluator.IsOnline(
+                runner.ConnectionId,
+                runner.LastHeartbeatAtUtc,
+                DateTime.UtcNow)
+                ? runner
+                : null;
+        }
+        catch (Exception ex) when (
+            ex is KeyNotFoundException or
+                UnauthorizedAccessException or
+                InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private static string BuildInlineContentDispositionHeader(string fileName)

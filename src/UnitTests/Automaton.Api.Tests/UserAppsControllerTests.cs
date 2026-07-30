@@ -131,10 +131,12 @@ public class UserAppsControllerTests
         });
 
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
+        var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
-            authorizationService,
-            new HostedRunnerAppCapacityService(dbContext));
+            new HostedRunnerAppCapacityService(dbContext),
+            runnerAuthorizationPolicy,
+            new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
 
         return new AppsService(
             dbContext,

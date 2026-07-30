@@ -188,7 +188,7 @@ public class ManagedRunnerBootstrapServiceTests
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
             async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
         Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
@@ -212,7 +212,7 @@ public class ManagedRunnerBootstrapServiceTests
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
             async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
 
-        Assert.That(exception!.Message, Does.Contain("invalid"));
+        Assert.That(exception!.Message, Does.Contain("not found"));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.Not.Null);
     }
 
@@ -255,10 +255,12 @@ public class ManagedRunnerBootstrapServiceTests
             NullLogger<HostedRunnerProvisioningService>.Instance);
         var userContextService = new UserContextService(new HttpContextAccessor());
         var authorizationService = new ResourceAuthorizationService(db, userContextService);
+        var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(db, authorizationService);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             db,
-            authorizationService,
-            new HostedRunnerAppCapacityService(db));
+            new HostedRunnerAppCapacityService(db),
+            runnerAuthorizationPolicy,
+            new AppDeploymentTargetResolver(db, authorizationService, runnerAuthorizationPolicy));
 
         return new ManagedRunnerBootstrapService(
             db,

@@ -740,6 +740,7 @@ public class AppsControllerExecutionService
     {
         var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             app.Id,
+            app.OwnerId ?? throw new InvalidOperationException("The App has no owner."),
             requireOnline: true);
 
         if (runnerNames is { Count: > 0 } &&
@@ -756,6 +757,7 @@ public class AppsControllerExecutionService
     {
         var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
+            ownerId,
             requireOnline: true);
 
         if (runnerNames is { Count: > 0 } &&

@@ -20,6 +20,7 @@ public class AppRunnerBackendFilesController : ControllerBase
     private readonly ResourceAuthorizationService authorizationService;
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
+    private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<AppRunnerBackendFilesController> logger;
@@ -29,6 +30,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         ResourceAuthorizationService authorizationService,
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
         IHubContext<AutomatonHub> automatonHub,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<AppRunnerBackendFilesController> logger)
@@ -37,6 +39,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         this.authorizationService = authorizationService;
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
+        this.runnerAssignmentPolicy = runnerAssignmentPolicy;
         this.automatonHub = automatonHub;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = logger;
@@ -283,15 +286,25 @@ public class AppRunnerBackendFilesController : ControllerBase
             return (null, NotFound());
         }
 
-        var userId = userContextService.GetUserId();
-        var runner = await dataContext.AppDeploymentTargets
-            .Where(target => target.WebAppId == appId && target.IsDefault)
-            .Where(target => target.ExecutionRunner != null)
-            .Select(target => target.ExecutionRunner)
-            .Where(r => r!.RunnerUsers.Any(ru => ru.UserId == userId))
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (runner == null)
+        try
+        {
+            var runner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
+                appId,
+                userContextService.GetUserId(),
+                requireOnline: true,
+                cancellationToken: cancellationToken);
+            return (runner, null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return (null, BadRequest(new AppBackendFilesResponse
+            {
+                Success = false,
+                Area = AppRunnerFileAreas.Backend,
+                Error = ex.Message
+            }));
+        }
+        catch (UnauthorizedAccessException)
         {
             return (null, BadRequest(new AppBackendFilesResponse
             {
@@ -300,18 +313,6 @@ public class AppRunnerBackendFilesController : ControllerBase
                 Error = "No accessible runner is configured for this app."
             }));
         }
-
-        if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
-        {
-            return (null, BadRequest(new AppBackendFilesResponse
-            {
-                Success = false,
-                Area = AppRunnerFileAreas.Backend,
-                Error = $"Runner '{runner.Name}' is not connected."
-            }));
-        }
-
-        return (runner, null);
     }
 
     private static string NormalizeArea(string? area)

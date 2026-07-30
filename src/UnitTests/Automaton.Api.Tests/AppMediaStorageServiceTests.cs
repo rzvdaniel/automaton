@@ -71,12 +71,12 @@ public class AppMediaStorageServiceTests
             });
 
         var service = new AppMediaStorageService(
-            dbContext,
             hubContext,
             new FileUploadRegistry(),
             downloadRegistry,
             Options.Create(new MediaStorageOptions()),
-            NullLogger<AppMediaStorageService>.Instance);
+            NullLogger<AppMediaStorageService>.Instance,
+            new StubTargetResolver(dbContext));
 
         var httpContext = new DefaultHttpContext();
         httpContext.Response.Body = new MemoryStream();
@@ -123,7 +123,6 @@ public class AppMediaStorageServiceTests
         await dbContext.SaveChangesAsync();
 
         var service = new AppMediaStorageService(
-            dbContext,
             new FakeHubContext(
                 (_, _) => new AppMediaFileMetadataResponse
                 {
@@ -135,7 +134,8 @@ public class AppMediaStorageServiceTests
             new FileUploadRegistry(),
             new FileDownloadRegistry(),
             Options.Create(new MediaStorageOptions()),
-            NullLogger<AppMediaStorageService>.Instance);
+            NullLogger<AppMediaStorageService>.Instance,
+            new StubTargetResolver(dbContext));
 
         var httpContext = new DefaultHttpContext();
         httpContext.Response.Body = new MemoryStream();
@@ -153,6 +153,23 @@ public class AppMediaStorageServiceTests
             .Options;
 
         return new ApplicationDbContext(options);
+    }
+
+    private sealed class StubTargetResolver(ApplicationDbContext dbContext)
+        : IAppDeploymentTargetResolver
+    {
+        public async Task<AppDeploymentTarget> ResolveAsync(
+            Guid appId,
+            string? targetSlug,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            return await dbContext.AppDeploymentTargets
+                .Include(target => target.ExecutionRunner)
+                .SingleAsync(
+                    target => target.WebAppId == appId && target.IsDefault,
+                    cancellationToken);
+        }
     }
 
     private sealed class FakeHubContext(
