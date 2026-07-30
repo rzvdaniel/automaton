@@ -149,15 +149,21 @@ if [[ "$OPERATION" == replace ]]; then
   rm -f "$AUTOMATON_DATA_ROOT/config/api-key" "$AUTOMATON_DATA_ROOT/config/runner.json" "$AUTOMATON_DATA_ROOT/config/installation-profile.json" "$AUTOMATON_DATA_ROOT/config/installation-id"
 fi
 docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
-run_canonical_container "$AUTOMATON_RUNNER_IMAGE" "$TARGET_DIGEST"
-if ! wait_for_healthy; then
+target_started=false
+if run_canonical_container "$AUTOMATON_RUNNER_IMAGE" "$TARGET_DIGEST"; then
+  target_started=true
+fi
+if [[ "$target_started" != true ]] || ! wait_for_healthy; then
   docker logs --tail 120 "$AUTOMATON_CONTAINER_NAME" >&2 || true
   docker rm -f "$AUTOMATON_CONTAINER_NAME" >/dev/null 2>&1 || true
   if [[ -n "$ROLLBACK_IMAGE" && "$OPERATION" == update ]]; then
     echo "Update failed; restoring the previous image." >&2
     PREVIOUS_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$ROLLBACK_IMAGE" 2>/dev/null || echo "$ROLLBACK_IMAGE")"
-    run_canonical_container "$ROLLBACK_IMAGE" "$PREVIOUS_DIGEST"
-    if wait_for_healthy; then
+    rollback_started=false
+    if run_canonical_container "$ROLLBACK_IMAGE" "$PREVIOUS_DIGEST"; then
+      rollback_started=true
+    fi
+    if [[ "$rollback_started" == true ]] && wait_for_healthy; then
       echo "Update failed; rollback succeeded." >&2
     else
       echo "Update failed; rollback also failed. Manual recovery is required." >&2
