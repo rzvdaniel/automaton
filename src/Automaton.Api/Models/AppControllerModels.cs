@@ -41,6 +41,8 @@ public class AppDeployCapabilitiesResponse
 
 public class DeployBackendResponse
 {
+    public Guid DeploymentTargetId { get; set; }
+    public string TargetSlug { get; set; } = string.Empty;
     public bool Success { get; set; }
     public string State { get; set; } = AppDeployStates.Ready;
     public bool RequiresRetry { get; set; }
@@ -55,17 +57,21 @@ public class DeployBackendResponse
 
 public class AppControllerUploadResult
 {
+    public Guid DeploymentTargetId { get; set; }
     public bool Success { get; set; }
     public List<string>? Logs { get; set; }
 }
 
 public class DeployBackendRequest
 {
+    public string? TargetSlug { get; set; }
     public List<string>? RunnerNames { get; set; }
 }
 
 public class DeployPackageResponse
 {
+    public Guid DeploymentTargetId { get; set; }
+    public string TargetSlug { get; set; } = string.Empty;
     public bool Success { get; set; }
     public string State { get; set; } = AppDeployStates.Ready;
     public bool RequiresRetry { get; set; }
@@ -80,6 +86,8 @@ public class DeployPackageResponse
 
 public class DeployAppResponse
 {
+    public Guid DeploymentTargetId { get; set; }
+    public string TargetSlug { get; set; } = string.Empty;
     public bool Success { get; set; }
     public string State { get; set; } = AppDeployStates.Ready;
     public bool RequiresRetry { get; set; }

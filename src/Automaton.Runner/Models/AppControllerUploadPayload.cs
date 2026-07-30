@@ -7,6 +7,7 @@ namespace Automaton.Runner.Console.Models;
 public class AppControllerUploadPayload
 {
     public Guid AppId { get; set; }
+    public Guid DeploymentTargetId { get; set; }
     public string RelativePath { get; set; } = string.Empty;
     public string ControllerName { get; set; } = string.Empty;
     public byte[] Content { get; set; } = [];

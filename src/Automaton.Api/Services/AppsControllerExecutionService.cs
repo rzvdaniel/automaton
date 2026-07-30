@@ -39,6 +39,8 @@ public class AppsControllerExecutionService
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly ManagedRunnerBootstrapService managedRunnerBootstrapService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
+    private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
+    private readonly AppDeploymentTargetStateService deploymentTargetStateService;
     private readonly Serilog.ILogger logger;
 
     public AppsControllerExecutionService(
@@ -53,7 +55,9 @@ public class AppsControllerExecutionService
         UserImpersonationServiceFactory<FlowsService> flowsServiceFactory,
         BackendRouteConfigService backendRouteConfigService,
         ManagedRunnerBootstrapService managedRunnerBootstrapService,
-        AppRunnerAssignmentPolicy runnerAssignmentPolicy)
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        IAppDeploymentTargetResolver deploymentTargetResolver,
+        AppDeploymentTargetStateService deploymentTargetStateService)
     {
         this.dataContext = dataContext;
         this.fileStorageService = fileStorageService;
@@ -67,6 +71,8 @@ public class AppsControllerExecutionService
         this.backendRouteConfigService = backendRouteConfigService;
         this.managedRunnerBootstrapService = managedRunnerBootstrapService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
+        this.deploymentTargetResolver = deploymentTargetResolver;
+        this.deploymentTargetStateService = deploymentTargetStateService;
         this.logger = Serilog.Log.ForContext<AppsControllerExecutionService>();
     }
 
@@ -95,10 +101,11 @@ public class AppsControllerExecutionService
     public async Task<DeployBackendResponse> DeployBackendToRunnersAsync(
         Guid appId,
         Guid ownerId,
+        string? targetSlug,
         List<string>? runnerNames,
         CancellationToken cancellationToken)
     {
-        if (runnerNames == null || runnerNames.Count == 0)
+        if (string.IsNullOrWhiteSpace(targetSlug) && (runnerNames == null || runnerNames.Count == 0))
         {
             var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
             if (!bootstrap.IsReady)
@@ -113,90 +120,150 @@ public class AppsControllerExecutionService
             }
         }
 
-        _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
-        var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
-        var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
+        var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
 
-        if (scripts.Count == 0)
+        try
         {
-            var runnersWithoutScripts = (await ResolveRunnersByOwnerAsync(ownerId, runnerNames, appId)).ToList();
-            if (runnersWithoutScripts.Count == 0)
+            _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+            var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
+            var hasRequirements = scripts.Any(s => s.ControllerName == "requirements" && s.Language == "Text");
+
+            if (scripts.Count == 0)
             {
-                return new DeployBackendResponse { Success = true, DeployedCount = 0, Message = "No backend scripts found" };
+                var runnersWithoutScripts = (await ResolveRunnersByOwnerAsync(
+                    ownerId, runnerNames, appId, target.Slug, cancellationToken)).ToList();
+                if (runnersWithoutScripts.Count == 0)
+                {
+                    await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, deployFrontend: false, deployBackend: true, cancellationToken);
+                    return new DeployBackendResponse
+                    {
+                        DeploymentTargetId = target.Id,
+                        TargetSlug = target.Slug,
+                        Success = true,
+                        DeployedCount = 0,
+                        Message = "No backend scripts found"
+                    };
+                }
+
+                await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, runnersWithoutScripts, cancellationToken);
+                await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: true, deployFrontend: false, deployBackend: true, cancellationToken);
+                return new DeployBackendResponse
+                {
+                    DeploymentTargetId = target.Id,
+                    TargetSlug = target.Slug,
+                    Success = true,
+                    DeployedCount = 0,
+                    RunnerCount = runnersWithoutScripts.Count,
+                    Message = "No backend scripts found"
+                };
             }
 
-            await DeployManagedFlowArtifactsAsync(appId, ownerId, runnersWithoutScripts, cancellationToken);
-            return new DeployBackendResponse { Success = true, DeployedCount = 0, RunnerCount = runnersWithoutScripts.Count, Message = "No backend scripts found" };
-        }
+            var runners = await ResolveRunnersByOwnerAsync(
+                ownerId, runnerNames, appId, target.Slug, cancellationToken);
 
-        var runners = await ResolveRunnersByOwnerAsync(ownerId, runnerNames, appId);
-
-        if (!runners.Any())
-            return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, HasRequirements = hasRequirements, Message = "No runners available for deployment. Please select a runner in the app settings." };
-
-        var storageBlock = await GetStorageDeploymentBlockAsync(runners, cancellationToken);
-        if (storageBlock != null)
-            return new DeployBackendResponse { Success = false, TotalScripts = scripts.Count, HasRequirements = hasRequirements, Message = storageBlock };
-
-        var deployed = 0;
-        var errors = new List<string>();
-        var installLogs = new List<string>();
-
-        foreach (var runner in runners)
-        {
-            foreach (var script in scripts)
+            if (!runners.Any())
             {
-                try
+                await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, deployFrontend: false, deployBackend: true, cancellationToken);
+                return new DeployBackendResponse
                 {
-                    var payload = new
+                    DeploymentTargetId = target.Id,
+                    TargetSlug = target.Slug,
+                    Success = false,
+                    TotalScripts = scripts.Count,
+                    HasRequirements = hasRequirements,
+                    Message = "No runners available for deployment. Please select a runner in the app settings."
+                };
+            }
+
+            var storageBlock = await GetStorageDeploymentBlockAsync(runners, cancellationToken);
+            if (storageBlock != null)
+            {
+                await deploymentTargetStateService.MarkCompletedAsync(appId, target.Id, success: false, deployFrontend: false, deployBackend: true, cancellationToken);
+                return new DeployBackendResponse
+                {
+                    DeploymentTargetId = target.Id,
+                    TargetSlug = target.Slug,
+                    Success = false,
+                    TotalScripts = scripts.Count,
+                    HasRequirements = hasRequirements,
+                    Message = storageBlock
+                };
+            }
+
+            var deployed = 0;
+            var errors = new List<string>();
+            var installLogs = new List<string>();
+
+            foreach (var runner in runners)
+            {
+                foreach (var script in scripts)
+                {
+                    try
                     {
-                        AppId = appId,
-                        RelativePath = script.RelativePath,
-                        ControllerName = script.ControllerName,
-                        Content = script.Content,
-                        Language = script.Language
-                    };
+                        var payload = new
+                        {
+                            AppId = appId,
+                            DeploymentTargetId = target.Id,
+                            RelativePath = script.RelativePath,
+                            ControllerName = script.ControllerName,
+                            Content = script.Content,
+                            Language = script.Language
+                        };
 
                     var result = await automatonHub.Clients.Client(runner.ConnectionId)
                         .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
 
+                    ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
                     if (result.Success)
-                    {
-                        deployed++;
-                        if (result.Logs?.Count > 0)
-                            installLogs.AddRange(result.Logs.Select(l => $"[{runner.Name}] {l}"));
+                        {
+                            deployed++;
+                            if (result.Logs?.Count > 0)
+                                installLogs.AddRange(result.Logs.Select(l => $"[{runner.Name}] {l}"));
+                        }
+                        else
+                            errors.Add($"Runner '{runner.Name}' rejected {script.ControllerName}");
                     }
-                    else
-                        errors.Add($"Runner '{runner.Name}' rejected {script.ControllerName}");
+                    catch (Exception ex)
+                    {
+                        errors.Add($"Runner '{runner.Name}', script '{script.ControllerName}': {ex.Message}");
+                        logger.Warning(ex, "Failed to deploy {ControllerName} to runner {RunnerName}", script.ControllerName, runner.Name);
+                    }
+                }
+
+                try
+                {
+                    await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, [runner], cancellationToken);
                 }
                 catch (Exception ex)
                 {
-                    errors.Add($"Runner '{runner.Name}', script '{script.ControllerName}': {ex.Message}");
-                    logger.Warning(ex, "Failed to deploy {ControllerName} to runner {RunnerName}", script.ControllerName, runner.Name);
+                    errors.Add($"Runner '{runner.Name}', flow artifacts: {ex.Message}");
+                    logger.Warning(ex, "Failed to deploy flow artifacts for app {AppId} to runner {RunnerName}", appId, runner.Name);
                 }
             }
 
-            try
+            var response = new DeployBackendResponse
             {
-                await DeployManagedFlowArtifactsAsync(appId, ownerId, [runner], cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Runner '{runner.Name}', flow artifacts: {ex.Message}");
-                logger.Warning(ex, "Failed to deploy flow artifacts for app {AppId} to runner {RunnerName}", appId, runner.Name);
-            }
+                DeploymentTargetId = target.Id,
+                TargetSlug = target.Slug,
+                Success = !errors.Any(),
+                DeployedCount = deployed,
+                TotalScripts = scripts.Count,
+                RunnerCount = runners.Count(),
+                HasRequirements = hasRequirements,
+                Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
+                InstallLogs = installLogs.Count > 0 ? installLogs : null
+            };
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, response.Success, deployFrontend: false, deployBackend: true, cancellationToken);
+            return response;
         }
-
-        return new DeployBackendResponse
+        catch
         {
-            Success = !errors.Any(),
-            DeployedCount = deployed,
-            TotalScripts = scripts.Count,
-            RunnerCount = runners.Count(),
-            HasRequirements = hasRequirements,
-            Message = errors.Any() ? string.Join("; ", errors) : $"Deployed {deployed} script(s) to {runners.Count()} runner(s)",
-            InstallLogs = installLogs.Count > 0 ? installLogs : null
-        };
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: false, deployFrontend: false, deployBackend: true, CancellationToken.None);
+            throw;
+        }
     }
 
     private async Task<string?> GetStorageDeploymentBlockAsync(IEnumerable<Runner> runners, CancellationToken cancellationToken)
@@ -217,8 +284,11 @@ public class AppsControllerExecutionService
                 {
                     dataContext.HostedRunnerStorageVerifications.Add(new HostedRunnerStorageVerification
                     {
-                        Id = Guid.NewGuid(), HostedRunnerId = runner.Id, IdempotencyKey = key,
-                        Status = StorageVerificationStatuses.Pending, Reason = "DeploymentGate",
+                        Id = Guid.NewGuid(),
+                        HostedRunnerId = runner.Id,
+                        IdempotencyKey = key,
+                        Status = StorageVerificationStatuses.Pending,
+                        Reason = "DeploymentGate",
                         RequestedAtUtc = DateTime.UtcNow
                     });
                     runner.StorageVerificationRequestedAtUtc = DateTime.UtcNow;
@@ -236,6 +306,7 @@ public class AppsControllerExecutionService
     public async Task<DeployPackageResponse> DeployPackageAsync(
         Guid appId,
         Guid ownerId,
+        string? targetSlug,
         IFormFile? file,
         bool clean,
         CancellationToken cancellationToken)
@@ -245,139 +316,178 @@ public class AppsControllerExecutionService
             throw new InvalidOperationException("A deployment package file is required.");
         }
 
-        var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
-        if (!bootstrap.IsReady)
+        if (string.IsNullOrWhiteSpace(targetSlug))
         {
+            var bootstrap = await managedRunnerBootstrapService.EnsureRunnerAssignmentAsync(appId, ownerId, cancellationToken);
+            if (!bootstrap.IsReady)
+            {
+                return new DeployPackageResponse
+                {
+                    Success = false,
+                    State = bootstrap.State,
+                    RequiresRetry = bootstrap.RequiresRetry,
+                    Message = bootstrap.Message
+                };
+            }
+        }
+
+        var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        try
+        {
+            var runners = (await ResolveRunnersByOwnerAsync(
+                ownerId, null, appId, target.Slug, cancellationToken)).ToList();
+            if (runners.Count == 0)
+            {
+                throw new InvalidOperationException("No connected runner is assigned to this app.");
+            }
+
+            var runner = runners[0];
+            var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
+
+            var result = await automatonHub.Clients.Client(runner.ConnectionId!)
+                .InvokeAsync<DeployAppPackageResult>(
+                    AutomatonHubMethods.DeployAppPackage,
+                    new DeployAppPackageRequest
+                    {
+                        AppId = appId,
+                        DeploymentTargetId = target.Id,
+                        PackagePath = completion.LocalPath,
+                        Clean = clean,
+                        SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
+                            && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
+                    },
+                    cancellationToken);
+
+            ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
+
+            if (result.Success)
+            {
+                // Keep API source as the compatibility copy used by Studio, pull,
+                // remix, and fork flows. Runner-deployed Action content remains the
+                // runtime authority and is never reconstructed from this copy.
+                await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
+                var deployedAtUtc = DateTime.UtcNow;
+                await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+                {
+                    metadata.DevelopmentMode = AppDevelopmentModes.Local;
+                    metadata.Frontend.RuntimeSource = AppRuntimeSources.CliBuild;
+                    metadata.Frontend.RuntimeAvailable = metadata.Frontend.SourceAvailable || metadata.Frontend.RuntimeAvailable;
+                    if (metadata.Frontend.RuntimeAvailable)
+                    {
+                        metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                    }
+                    metadata.Backend.RuntimeSource = AppRuntimeSources.CliDeploy;
+                    metadata.Backend.RuntimeAvailable = metadata.Backend.SourceAvailable || metadata.Backend.RuntimeAvailable;
+                    if (metadata.Backend.RuntimeAvailable)
+                    {
+                        metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                    }
+                });
+
+                await DeployManagedFlowArtifactsAsync(appId, target.Id, ownerId, [runner], cancellationToken);
+                await backendRouteConfigService.RefreshAsync(cancellationToken);
+            }
+
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, result.Success, deployFrontend: true, deployBackend: true, cancellationToken);
             return new DeployPackageResponse
             {
-                Success = false,
-                State = bootstrap.State,
-                RequiresRetry = bootstrap.RequiresRetry,
-                Message = bootstrap.Message
+                DeploymentTargetId = target.Id,
+                TargetSlug = target.Slug,
+                Success = result.Success,
+                RunnerCount = result.Success ? 1 : 0,
+                SourceFilesDeployed = result.SourceFilesDeployed,
+                RuntimeFilesDeployed = result.RuntimeFilesDeployed,
+                SnapshotPath = result.SnapshotPath,
+                Message = result.Message,
+                Logs = result.Logs,
+                Actions = result.Actions
             };
         }
-
-        var runners = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).ToList();
-        if (runners.Count == 0)
+        catch
         {
-            throw new InvalidOperationException("No connected runner is assigned to this app.");
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: false, deployFrontend: true, deployBackend: true, CancellationToken.None);
+            throw;
         }
-
-        var runner = runners[0];
-        var completion = await UploadPackageToRunnerAsync(appId, runner, file, cancellationToken);
-
-        var result = await automatonHub.Clients.Client(runner.ConnectionId!)
-            .InvokeAsync<DeployAppPackageResult>(
-                AutomatonHubMethods.DeployAppPackage,
-                new DeployAppPackageRequest
-                {
-                    AppId = appId,
-                    PackagePath = completion.LocalPath,
-                    Clean = clean,
-                    SystemInfrastructure = InfrastructureAppTrust.IsTrustedApp(appId)
-                        && string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.Ordinal)
-                },
-                cancellationToken);
-
-        if (result.Success)
-        {
-            // Keep API source as the compatibility copy used by Studio, pull,
-            // remix, and fork flows. Runner-deployed Action content remains the
-            // runtime authority and is never reconstructed from this copy.
-            await PersistDeployPackageSourceAsync(appId, ownerId, file, cancellationToken);
-            var deployedAtUtc = DateTime.UtcNow;
-            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
-            {
-                metadata.DevelopmentMode = AppDevelopmentModes.Local;
-                metadata.Frontend.RuntimeSource = AppRuntimeSources.CliBuild;
-                metadata.Frontend.RuntimeAvailable = metadata.Frontend.SourceAvailable || metadata.Frontend.RuntimeAvailable;
-                if (metadata.Frontend.RuntimeAvailable)
-                {
-                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
-                metadata.Backend.RuntimeSource = AppRuntimeSources.CliDeploy;
-                metadata.Backend.RuntimeAvailable = metadata.Backend.SourceAvailable || metadata.Backend.RuntimeAvailable;
-                if (metadata.Backend.RuntimeAvailable)
-                {
-                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
-                }
-            });
-
-            await DeployManagedFlowArtifactsAsync(appId, ownerId, [runner], cancellationToken);
-            await backendRouteConfigService.RefreshAsync(cancellationToken);
-        }
-
-        return new DeployPackageResponse
-        {
-            Success = result.Success,
-            RunnerCount = result.Success ? 1 : 0,
-            SourceFilesDeployed = result.SourceFilesDeployed,
-            RuntimeFilesDeployed = result.RuntimeFilesDeployed,
-            SnapshotPath = result.SnapshotPath,
-            Message = result.Message,
-            Logs = result.Logs,
-            Actions = result.Actions
-        };
     }
 
     public async Task<DeployAppResponse> DeployStudioAppAsync(
         Guid appId,
         Guid ownerId,
+        string? targetSlug,
         CancellationToken cancellationToken)
     {
-        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
-        if (!capabilities.CanDeployAppFromStudio)
+        var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        try
         {
-            // Keep execution aligned with the capability contract. Even if a caller
-            // bypasses the toolbar state, the backend must reject deploy-all when the
-            // current Studio deploy implementation cannot fulfill it.
-            // Keep server enforcement aligned with the Studio toolbar state. Even if a
-            // caller bypasses the UI, the backend remains the source of truth for what
-            // the current Studio deploy strategy can safely execute.
-            throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this app.");
+            var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
+            if (!capabilities.CanDeployAppFromStudio)
+            {
+                // Keep execution aligned with the capability contract. Even if a caller
+                // bypasses the toolbar state, the backend must reject deploy-all when the
+                // current Studio deploy implementation cannot fulfill it.
+                // Keep server enforcement aligned with the Studio toolbar state. Even if a
+                // caller bypasses the UI, the backend remains the source of truth for what
+                // the current Studio deploy strategy can safely execute.
+                throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this app.");
+            }
+
+            var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+            var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+            var deployedAtUtc = DateTime.UtcNow;
+            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+            {
+                metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+                if (metadata.Frontend.SourceAvailable)
+                {
+                    metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+                    metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
+                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
+                if (metadata.Backend.SourceAvailable)
+                {
+                    metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+                    metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
+                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
+            });
+
+            var backendDeploy = await DeployBackendToRunnersAsync(
+                appId, ownerId, target.Slug, null, cancellationToken);
+            // Studio operates deployed runtime state; Action source is deployed through
+            // the CLI package path and is not copied from API-side source storage here.
+            var actionDeployments = new List<AppActionDeploymentResult>();
+            await backendRouteConfigService.RefreshAsync(cancellationToken);
+
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, backendDeploy.Success, deployFrontend: true, deployBackend: true, cancellationToken);
+            return new DeployAppResponse
+            {
+                DeploymentTargetId = target.Id,
+                TargetSlug = target.Slug,
+                Success = backendDeploy.Success,
+                State = backendDeploy.State,
+                RequiresRetry = backendDeploy.RequiresRetry,
+                FrontendFilesSynced = frontendSync.CopiedFiles,
+                BackendFilesSynced = backendSync.CopiedFiles,
+                FrontendAction = frontendSync.Updated ? "updated" : "preserved",
+                BackendAction = backendSync.Updated ? "updated" : "preserved",
+                BackendDeploy = backendDeploy,
+                Actions = actionDeployments,
+                Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
+                FrontendRuntimeDeployedAtUtc = deployedAtUtc,
+                BackendRuntimeDeployedAtUtc = deployedAtUtc
+            };
         }
-
-        var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
-        var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
-        var deployedAtUtc = DateTime.UtcNow;
-        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+        catch
         {
-            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            if (metadata.Frontend.SourceAvailable)
-            {
-                metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
-                metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
-                metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
-            }
-            if (metadata.Backend.SourceAvailable)
-            {
-                metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
-                metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
-                metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
-            }
-        });
-
-        var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
-        // Studio operates deployed runtime state; Action source is deployed through
-        // the CLI package path and is not copied from API-side source storage here.
-        var actionDeployments = new List<AppActionDeploymentResult>();
-        await backendRouteConfigService.RefreshAsync(cancellationToken);
-
-        return new DeployAppResponse
-        {
-            Success = backendDeploy.Success,
-            State = backendDeploy.State,
-            RequiresRetry = backendDeploy.RequiresRetry,
-            FrontendFilesSynced = frontendSync.CopiedFiles,
-            BackendFilesSynced = backendSync.CopiedFiles,
-            FrontendAction = frontendSync.Updated ? "updated" : "preserved",
-            BackendAction = backendSync.Updated ? "updated" : "preserved",
-            BackendDeploy = backendDeploy,
-            Actions = actionDeployments,
-            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
-            FrontendRuntimeDeployedAtUtc = deployedAtUtc,
-            BackendRuntimeDeployedAtUtc = deployedAtUtc
-        };
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: false, deployFrontend: true, deployBackend: true, CancellationToken.None);
+            throw;
+        }
     }
 
     private async Task<List<AppActionDeploymentResult>> DeployStudioActionsAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
@@ -433,77 +543,116 @@ public class AppsControllerExecutionService
         return $"sha256:{Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant()}";
     }
 
-    public async Task<DeployAppResponse> DeployFrontendAsync(Guid appId, Guid ownerId)
+    public async Task<DeployAppResponse> DeployFrontendAsync(
+        Guid appId,
+        Guid ownerId,
+        string? targetSlug,
+        CancellationToken cancellationToken)
     {
-        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId);
-        if (!capabilities.CanDeployFrontendFromStudio)
+        var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        try
         {
-            throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this frontend.");
-        }
-
-        var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
-        var deployedAtUtc = DateTime.UtcNow;
-        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
-        {
-            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            if (metadata.Frontend.SourceAvailable)
+            var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId);
+            if (!capabilities.CanDeployFrontendFromStudio)
             {
-                metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
-                metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
-                metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                throw new InvalidOperationException(capabilities.FrontendDeployBlockReason ?? "Studio cannot deploy this frontend.");
             }
-        });
 
-        return new DeployAppResponse
+            var frontendSync = await fileStorageService.SyncSourceFrontendToRuntimeFrontendAsync(ownerId, appId);
+            var deployedAtUtc = DateTime.UtcNow;
+            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+            {
+                metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+                if (metadata.Frontend.SourceAvailable)
+                {
+                    metadata.Frontend.RuntimeSource = AppRuntimeSources.Studio;
+                    metadata.Frontend.RuntimeAvailable = frontendSync.Updated || metadata.Frontend.RuntimeAvailable;
+                    metadata.Frontend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
+            });
+
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: true, deployFrontend: true, deployBackend: false, cancellationToken);
+            return new DeployAppResponse
+            {
+                DeploymentTargetId = target.Id,
+                TargetSlug = target.Slug,
+                Success = true,
+                FrontendFilesSynced = frontendSync.CopiedFiles,
+                BackendFilesSynced = 0,
+                FrontendAction = frontendSync.Updated ? "updated" : "preserved",
+                BackendAction = "preserved",
+                Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files",
+                FrontendRuntimeDeployedAtUtc = deployedAtUtc
+            };
+        }
+        catch
         {
-            Success = true,
-            FrontendFilesSynced = frontendSync.CopiedFiles,
-            BackendFilesSynced = 0,
-            FrontendAction = frontendSync.Updated ? "updated" : "preserved",
-            BackendAction = "preserved",
-            Message = $"Frontend {GetActionLabel(frontendSync.Updated, frontendSync.CopiedFiles)}; backend preserved existing live files",
-            FrontendRuntimeDeployedAtUtc = deployedAtUtc
-        };
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: false, deployFrontend: true, deployBackend: false, CancellationToken.None);
+            throw;
+        }
     }
 
-    public async Task<DeployAppResponse> DeployBackendComponentAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
+    public async Task<DeployAppResponse> DeployBackendComponentAsync(
+        Guid appId,
+        Guid ownerId,
+        string? targetSlug,
+        CancellationToken cancellationToken)
     {
-        var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
-        if (!capabilities.CanDeployBackendFromStudio)
+        var target = await deploymentTargetResolver.ResolveAsync(appId, targetSlug, ownerId, cancellationToken);
+        await deploymentTargetStateService.MarkStartedAsync(appId, target.Id, cancellationToken);
+        try
         {
-            throw new InvalidOperationException("Backend source is not available in Studio.");
-        }
-
-        var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
-        var deployedAtUtc = DateTime.UtcNow;
-
-        await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
-        {
-            metadata.DevelopmentMode = AppDevelopmentModes.Studio;
-            if (metadata.Backend.SourceAvailable)
+            var capabilities = await appDeployCapabilityService.GetCapabilitiesAsync(ownerId, appId, cancellationToken);
+            if (!capabilities.CanDeployBackendFromStudio)
             {
-                metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
-                metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
-                metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                throw new InvalidOperationException("Backend source is not available in Studio.");
             }
-        });
 
-        var backendDeploy = await DeployBackendToRunnersAsync(appId, ownerId, null, cancellationToken);
-        await backendRouteConfigService.RefreshAsync(cancellationToken);
+            var backendSync = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
+            var deployedAtUtc = DateTime.UtcNow;
 
-        return new DeployAppResponse
+            await fileStorageService.UpdateAppStorageMetadataAsync(ownerId, appId, metadata =>
+            {
+                metadata.DevelopmentMode = AppDevelopmentModes.Studio;
+                if (metadata.Backend.SourceAvailable)
+                {
+                    metadata.Backend.RuntimeSource = AppRuntimeSources.Studio;
+                    metadata.Backend.RuntimeAvailable = backendSync.Updated || metadata.Backend.RuntimeAvailable;
+                    metadata.Backend.RuntimeDeployedAtUtc = deployedAtUtc;
+                }
+            });
+
+            var backendDeploy = await DeployBackendToRunnersAsync(
+                appId, ownerId, target.Slug, null, cancellationToken);
+            await backendRouteConfigService.RefreshAsync(cancellationToken);
+
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, backendDeploy.Success, deployFrontend: false, deployBackend: true, cancellationToken);
+            return new DeployAppResponse
+            {
+                DeploymentTargetId = target.Id,
+                TargetSlug = target.Slug,
+                Success = backendDeploy.Success,
+                State = backendDeploy.State,
+                RequiresRetry = backendDeploy.RequiresRetry,
+                FrontendFilesSynced = 0,
+                BackendFilesSynced = backendSync.CopiedFiles,
+                FrontendAction = "preserved",
+                BackendAction = backendSync.Updated ? "updated" : "preserved",
+                BackendDeploy = backendDeploy,
+                Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
+                BackendRuntimeDeployedAtUtc = deployedAtUtc
+            };
+        }
+        catch
         {
-            Success = backendDeploy.Success,
-            State = backendDeploy.State,
-            RequiresRetry = backendDeploy.RequiresRetry,
-            FrontendFilesSynced = 0,
-            BackendFilesSynced = backendSync.CopiedFiles,
-            FrontendAction = "preserved",
-            BackendAction = backendSync.Updated ? "updated" : "preserved",
-            BackendDeploy = backendDeploy,
-            Message = $"Frontend preserved existing live files; backend {GetActionLabel(backendSync.Updated, backendSync.CopiedFiles)}",
-            BackendRuntimeDeployedAtUtc = deployedAtUtc
-        };
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId, target.Id, success: false, deployFrontend: false, deployBackend: true, CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task<(byte[] Content, string ContentType)?> ReadRuntimeFrontendFileFromRunnerAsync(
@@ -753,12 +902,19 @@ public class AppsControllerExecutionService
         return [assignedRunner];
     }
 
-    private async Task<IEnumerable<Runner>> ResolveRunnersByOwnerAsync(Guid ownerId, List<string>? runnerNames, Guid appId)
+    private async Task<IEnumerable<Runner>> ResolveRunnersByOwnerAsync(
+        Guid ownerId,
+        List<string>? runnerNames,
+        Guid appId,
+        string? targetSlug = null,
+        CancellationToken cancellationToken = default)
     {
         var assignedRunner = await runnerAssignmentPolicy.GetAssignedRunnerAsync(
             appId,
             ownerId,
-            requireOnline: true);
+            requireOnline: true,
+            targetSlug: targetSlug,
+            cancellationToken: cancellationToken);
 
         if (runnerNames is { Count: > 0 } &&
             !runnerNames.Contains(assignedRunner.Name, StringComparer.OrdinalIgnoreCase))
@@ -860,6 +1016,7 @@ public class AppsControllerExecutionService
 
     private async Task DeployManagedFlowArtifactsAsync(
         Guid appId,
+        Guid deploymentTargetId,
         Guid ownerId,
         IEnumerable<Runner> runners,
         CancellationToken cancellationToken)
@@ -912,6 +1069,7 @@ public class AppsControllerExecutionService
                 var payload = new
                 {
                     AppId = appId,
+                    DeploymentTargetId = deploymentTargetId,
                     RelativePath = artifact.RelativePath,
                     ControllerName = "managed-flow-artifact",
                     Content = artifact.Content,
@@ -921,11 +1079,23 @@ public class AppsControllerExecutionService
                 var result = await automatonHub.Clients.Client(runner.ConnectionId!)
                     .InvokeAsync<AppControllerUploadResult>(AutomatonHubMethods.UploadControllerScript, payload, cancellationToken);
 
+                ValidateDeploymentTargetResponse(deploymentTargetId, result.DeploymentTargetId);
                 if (!result.Success)
                 {
                     throw new InvalidOperationException($"Runner '{runner.Name}' rejected backend file '{artifact.RelativePath}'.");
                 }
             }
+        }
+    }
+
+    private static void ValidateDeploymentTargetResponse(
+        Guid expectedDeploymentTargetId,
+        Guid actualDeploymentTargetId)
+    {
+        if (actualDeploymentTargetId != expectedDeploymentTargetId)
+        {
+            throw new InvalidOperationException(
+                "Runner deployment response did not match the selected deployment target.");
         }
     }
 

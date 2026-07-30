@@ -99,6 +99,7 @@ public class RunnerDeploymentService
 
             return new DeployAppPackageResult
             {
+                DeploymentTargetId = request.DeploymentTargetId,
                 Success = true,
                 Message = $"Deployment package applied for app {appId}.",
                 SourceFilesDeployed = sourceCount,
@@ -127,6 +128,7 @@ public class RunnerDeploymentService
             logs.Add(ex.Message);
             return new DeployAppPackageResult
             {
+                DeploymentTargetId = request.DeploymentTargetId,
                 Success = false,
                 Message = ex.Message,
                 Logs = logs

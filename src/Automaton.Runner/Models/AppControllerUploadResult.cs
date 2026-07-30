@@ -6,6 +6,7 @@ namespace Automaton.Runner.Console.Models;
 /// </summary>
 public class AppControllerUploadResult
 {
+    public Guid DeploymentTargetId { get; set; }
     public bool Success { get; set; }
     public List<string>? Logs { get; set; }
 }

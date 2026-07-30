@@ -352,7 +352,9 @@ public class HubService
             // Register script upload handler — runner saves scripts to local disk for FastAPI to read
             connection.On<AppControllerUploadPayload, AppControllerUploadResult>(UploadControllerScriptMethod, (payload) =>
             {
-                return UploadControllerScriptHandler(payload);
+                var result = UploadControllerScriptHandler(payload);
+                result.DeploymentTargetId = payload.DeploymentTargetId;
+                return result;
             });
 
             // Register tunnel forwarding handler

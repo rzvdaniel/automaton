@@ -15,6 +15,7 @@ public sealed class AppDeploymentPackageManifest
 public sealed class DeployAppPackageRequest
 {
     public Guid AppId { get; set; }
+    public Guid DeploymentTargetId { get; set; }
     public string PackagePath { get; set; } = string.Empty;
     public bool Clean { get; set; }
     public bool SystemInfrastructure { get; set; }
@@ -22,6 +23,7 @@ public sealed class DeployAppPackageRequest
 
 public sealed class DeployAppPackageResult
 {
+    public Guid DeploymentTargetId { get; set; }
     public bool Success { get; set; }
     public string? Message { get; set; }
     public int SourceFilesDeployed { get; set; }

@@ -122,7 +122,7 @@ public class AppsControllerExecutionController : ControllerBase
                 cancellationToken);
 
             var result = await controllerExecutionService.DeployBackendToRunnersAsync(
-                appId, userId, request?.RunnerNames, cancellationToken);
+                appId, userId, request?.TargetSlug, request?.RunnerNames, cancellationToken);
 
             await WriteApplicationEventAsync(
                 appId,
@@ -165,6 +165,7 @@ public class AppsControllerExecutionController : ControllerBase
         Guid appId,
         [FromForm] IFormFile? file,
         [FromQuery] bool clean = false,
+        [FromQuery] string? targetSlug = null,
         CancellationToken cancellationToken = default)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
@@ -175,7 +176,8 @@ public class AppsControllerExecutionController : ControllerBase
         try
         {
             var userId = userContextService.GetUserId();
-            var result = await controllerExecutionService.DeployPackageAsync(appId, userId, file, clean, cancellationToken);
+            var result = await controllerExecutionService.DeployPackageAsync(
+                appId, userId, targetSlug, file, clean, cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
@@ -189,6 +191,7 @@ public class AppsControllerExecutionController : ControllerBase
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployAppResponse>> DeployApp(
         Guid appId,
+        [FromQuery] string? targetSlug,
         CancellationToken cancellationToken)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
@@ -210,7 +213,8 @@ public class AppsControllerExecutionController : ControllerBase
                 userId,
                 cancellationToken);
 
-            var result = await controllerExecutionService.DeployStudioAppAsync(appId, userId, cancellationToken);
+            var result = await controllerExecutionService.DeployStudioAppAsync(
+                appId, userId, targetSlug, cancellationToken);
             await WriteApplicationEventAsync(
                 appId,
                 result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
@@ -255,7 +259,10 @@ public class AppsControllerExecutionController : ControllerBase
 
     [HttpPost("api/apps/{appId:guid}/frontend/deploy")]
     [Authorize(Policy = "AllowApiKey")]
-    public async Task<ActionResult<DeployAppResponse>> DeployFrontend(Guid appId)
+    public async Task<ActionResult<DeployAppResponse>> DeployFrontend(
+        Guid appId,
+        [FromQuery] string? targetSlug,
+        CancellationToken cancellationToken)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
         {
@@ -276,7 +283,8 @@ public class AppsControllerExecutionController : ControllerBase
                 userId,
                 CancellationToken.None);
 
-            var result = await controllerExecutionService.DeployFrontendAsync(appId, userId);
+            var result = await controllerExecutionService.DeployFrontendAsync(
+                appId, userId, targetSlug, cancellationToken);
             await WriteApplicationEventAsync(
                 appId,
                 result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
@@ -313,6 +321,7 @@ public class AppsControllerExecutionController : ControllerBase
     [Authorize(Policy = "AllowApiKey")]
     public async Task<ActionResult<DeployAppResponse>> DeployBackendComponent(
         Guid appId,
+        [FromQuery] string? targetSlug,
         CancellationToken cancellationToken)
     {
         if (!await confirmedEmailGuardService.IsConfirmedAsync(userContextService.GetUserId()))
@@ -334,7 +343,8 @@ public class AppsControllerExecutionController : ControllerBase
                 userId,
                 cancellationToken);
 
-            var result = await controllerExecutionService.DeployBackendComponentAsync(appId, userId, cancellationToken);
+            var result = await controllerExecutionService.DeployBackendComponentAsync(
+                appId, userId, targetSlug, cancellationToken);
             await WriteApplicationEventAsync(
                 appId,
                 result.Success ? ApplicationEventLevels.Info : ApplicationEventLevels.Warning,
