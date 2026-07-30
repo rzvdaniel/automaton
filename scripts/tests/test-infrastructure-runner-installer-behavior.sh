@@ -24,7 +24,10 @@ cat >"$TMP/bin/docker" <<'EOF'
 set -e
 printf '%s\n' "$*" >>"$LOG"
 if [[ "$1" == pull ]]; then [[ "${MOCK_PULL_FAIL:-}" != 1 ]] || exit 1; exit 0; fi
-if [[ "$1" == image && "$2" == inspect ]]; then echo 'example/runner@sha256:new'; exit 0; fi
+if [[ "$1" == image && "$2" == inspect ]]; then
+  [[ "${@: -1}" == *'@sha256:old' ]] && echo 'example/runner@sha256:old' || echo 'example/runner@sha256:new'
+  exit 0
+fi
 if [[ "$1" == inspect ]]; then
   case "$*" in
     *'.Config.Image'*) echo 'example/runner@sha256:old' ;;
@@ -44,12 +47,19 @@ PATH="$TMP/bin:$PATH"
 AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" repair --data-root "$TMP/data" --server-url https://api.example.test
 grep -Fq 'pull example/runner@sha256:old' "$LOG"
 ! grep -Fq 'pull automaton-runner:latest' "$LOG"
+grep -Eq '^run -d --name automaton-infrastructure-runner .* example/runner@sha256:old$' "$LOG"
 
 # A failed replacement resolves before it removes the durable identity.
+printf 'existing-api-key' >"$TMP/data/config/api-key"
+printf 'existing-runner-config' >"$TMP/data/config/runner.json"
+printf 'existing-profile' >"$TMP/data/config/installation-profile.json"
 printf 'existing-identity' >"$TMP/data/config/installation-id"
 if MOCK_PULL_FAIL=1 AUTOMATON_ROOT="$TMP/root" bash "$INSTALLER" replace --data-root "$TMP/data" --server-url https://api.example.test --enrollment-key key --version example/runner:bad; then
   echo 'expected replacement pull failure' >&2; exit 1
 fi
+[[ "$(cat "$TMP/data/config/api-key")" == existing-api-key ]]
+[[ "$(cat "$TMP/data/config/runner.json")" == existing-runner-config ]]
+[[ "$(cat "$TMP/data/config/installation-profile.json")" == existing-profile ]]
 [[ "$(cat "$TMP/data/config/installation-id")" == existing-identity ]]
 
 # A held host lock rejects a competing lifecycle operation.
