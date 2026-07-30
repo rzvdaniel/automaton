@@ -43,6 +43,14 @@ export function getDeployedAppUrl(appId?: string | null): string {
   return baseUrl.toString()
 }
 
+export function getDeploymentTargetUrl(appId?: string | null, routePath?: string | null): string {
+  const deployedAppUrl = getDeployedAppUrl(appId)
+  const normalizedRoutePath = routePath?.trim()
+  if (!deployedAppUrl || !normalizedRoutePath) return ''
+
+  return new URL(normalizedRoutePath, deployedAppUrl).toString()
+}
+
 export function getStudioAppUrl(appId?: string | null): string {
   const normalizedAppId = appId?.trim()
   if (!normalizedAppId) return ''

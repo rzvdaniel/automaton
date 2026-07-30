@@ -111,6 +111,8 @@ export const DeploymentTargetStatus = {
   Deploying: 'Deploying',
   Running: 'Running',
   Failed: 'Failed',
+  RunnerOffline: 'RunnerOffline',
+  Unassigned: 'Unassigned',
 } as const
 
 export type DeploymentTargetStatus = (typeof DeploymentTargetStatus)[keyof typeof DeploymentTargetStatus]

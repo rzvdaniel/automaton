@@ -12,7 +12,7 @@ import { runnersService } from '@/features/runners/services/runners.service'
 import { RunnerStatus, type Runner } from '@/features/runners/types/runners.types'
 import { appsService } from '../services/apps.service'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
-import { getPublicAppsBaseUrl } from '../utils/public-app-url'
+import { getDeploymentTargetUrl } from '../utils/public-app-url'
 
 const props = defineProps<{ appId: string; refreshRevision?: number }>()
 const emit = defineEmits<{
@@ -183,8 +183,7 @@ function statusSeverity(status: AppDeploymentTarget['status']) {
 
 function targetRoute(target: AppDeploymentTarget) {
   if (target.isDefault) return null
-  const base = getPublicAppsBaseUrl()
-  return `${base}${target.routePath}`
+  return getDeploymentTargetUrl(props.appId, target.routePath)
 }
 
 function openRoute(target: AppDeploymentTarget) {
