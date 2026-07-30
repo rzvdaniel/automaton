@@ -6,8 +6,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { appsService } from '../services/apps.service'
 import type { DeployAppResult, DeployBackendResult } from '../services/apps.service'
-import { runnersService } from '@/features/runners/services/runners.service'
-import { RunnerStatus } from '@/features/runners/types/runners.types'
 import type {
   App,
   AppDeployCapabilities,
@@ -166,7 +164,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     deployCapabilities.value?.canDeployAppFromStudio ?? false,
   )
   const deployBlockedReason = computed(() => deployCapabilities.value?.frontendDeployBlockReason ?? null)
-  const runnerOffline = computed(() => !!currentApp.value?.executionRunnerId && assignedRunnerOnline.value === false)
+  const runnerOffline = computed(() => assignedRunnerOnline.value === false)
   const applicationState = computed(() => {
     if (lastDeployError.value) return 'Build failed'
     if (runnerOffline.value) return 'Runner offline'
@@ -394,15 +392,15 @@ export const useAppEditorStore = defineStore('appEditor', () => {
   }
 
   async function refreshAssignedRunnerStatus(): Promise<void> {
-    if (!currentApp.value?.executionRunnerId) {
+    if (!currentApp.value) {
       assignedRunnerOnline.value = null
       return
     }
 
     try {
-      const runners = await runnersService.list()
-      const assignedRunner = runners.find((runner) => runner.id === currentApp.value?.executionRunnerId)
-      assignedRunnerOnline.value = assignedRunner ? assignedRunner.status === RunnerStatus.Online : null
+      const targets = await appsService.listDeploymentTargets(currentApp.value.id)
+      const defaultRunner = targets.find((target) => target.isDefault)?.runner
+      assignedRunnerOnline.value = defaultRunner ? defaultRunner.isOnline : null
     } catch {
       assignedRunnerOnline.value = null
     }
@@ -873,7 +871,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
    * Checks for requirements.txt up-front and surfaces a status label beneath the button
    * for the duration of the operation — no blocking toast needed.
    */
-  async function deployBackend(): Promise<DeployBackendResult> {
+  async function deployBackend(targetSlug?: string): Promise<DeployBackendResult> {
     if (!currentApp.value) throw new Error('No app loaded')
     isDeployingBackend.value = true
     deployStatusMessage.value = 'Deploying...'
@@ -882,7 +880,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       if (info.hasRequirements) {
         deployStatusMessage.value = 'Installing packages…'
       }
-      const result = await appsService.deployBackend(currentApp.value.id)
+      const result = await appsService.deployBackend(currentApp.value.id, targetSlug)
       lastDeployError.value = result.success ? null : result.message
       return result
     } catch (err: unknown) {
@@ -894,7 +892,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     }
   }
 
-  async function deployApp(): Promise<DeployAppResult> {
+  async function deployApp(targetSlug?: string): Promise<DeployAppResult> {
     if (!currentApp.value) throw new Error('No app loaded')
     if (!canDeployFromStudio.value) {
       throw new Error(deployBlockedReason.value || 'This app cannot be fully deployed from Studio.')
@@ -909,7 +907,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
         deployAppStatusMessage.value = 'Syncing source to live...'
       }
 
-      const result = await appsService.deployApp(currentApp.value.id)
+      const result = await appsService.deployApp(currentApp.value.id, targetSlug)
       await loadUnifiedFileTree(currentApp.value.id)
       currentApp.value = await appsService.get(currentApp.value.id)
       await refreshAssignedRunnerStatus()
@@ -1008,30 +1006,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     try {
       await appsService.updateSettings(currentApp.value.id, { name })
       currentApp.value = { ...currentApp.value, name }
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err)
-      throw err
-    }
-  }
-
-  /**
-   * Update the execution runner for the current app
-   */
-  async function updateAppRunner(runnerId: string | null): Promise<void> {
-    if (!currentApp.value) return
-
-    try {
-      await appsService.updateRunner(currentApp.value.id, runnerId)
-
-      // Update local state - executionRunnerId can be undefined according to the type
-      if (currentApp.value) {
-        currentApp.value = {
-          ...currentApp.value,
-          executionRunnerId: runnerId || undefined
-        }
-      }
-
-      await refreshAssignedRunnerStatus()
     } catch (err: unknown) {
       error.value = getErrorMessage(err)
       throw err
@@ -1341,7 +1315,6 @@ export const useAppEditorStore = defineStore('appEditor', () => {
     deployAppStatusMessage,
     deployStatusMessage,
     updateAppName,
-    updateAppRunner,
     refreshFileTree,
     reloadFile,
     reloadActiveFile,

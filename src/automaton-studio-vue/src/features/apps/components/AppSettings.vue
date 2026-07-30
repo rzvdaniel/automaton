@@ -14,12 +14,12 @@ import Textarea from 'primevue/textarea'
 import InputSwitch from 'primevue/inputswitch'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
+import AppDeploymentTargets from './AppDeploymentTargets.vue'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import { useAppsStore } from '../stores/apps.store'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { appsService } from '../services/apps.service'
-import { AccessScope, type AppScreenshot } from '../types/apps.types'
+import { AccessScope, type AppDeploymentTarget, type AppScreenshot } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix, getStudioApplicationUrl } from '../utils/public-app-url'
 import { resolveMediaUrl } from '../utils/media-url'
 
@@ -30,6 +30,12 @@ const router = useRouter()
 const editorStore = useAppEditorStore()
 const appsStore = useAppsStore()
 const authStore = useAuthStore()
+const props = defineProps<{ targetsRevision?: number }>()
+const emit = defineEmits<{
+  deployTarget: [target: AppDeploymentTarget]
+  viewTargetLogs: [target: AppDeploymentTarget]
+  targetsChanged: [targets: AppDeploymentTarget[]]
+}>()
 
 const isAdmin = computed(() => {
   const roles = authStore.user?.roles
@@ -38,14 +44,13 @@ const isAdmin = computed(() => {
 })
 
 // Active settings section
-const activeSection = ref<'basic' | 'publishing' | 'execution' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
+const activeSection = ref<'basic' | 'publishing' | 'targets' | 'appearance' | 'templates' | 'connect' | 'danger'>('basic')
 
 watch(
   () => route.query.settings,
   (section) => {
-    if (section === 'publishing') {
-      activeSection.value = 'publishing'
-    }
+    if (section === 'publishing') activeSection.value = 'publishing'
+    if (section === 'targets') activeSection.value = 'targets'
   },
   { immediate: true },
 )
@@ -79,7 +84,6 @@ const publicUrl = ref('')
 const requiresAuthentication = ref(false)
 const isForkable = ref(false)
 const isProfileFeatured = ref(false)
-const executionRunnerId = ref<string | null>(null)
 const thumbnailUrl = ref<string | undefined>(undefined)
 const tags = ref<string[]>([])
 const originalTags = ref<string[]>([])
@@ -156,7 +160,6 @@ const hasChanges = computed(() => {
     requiresAuthentication.value !== app.value.requiresAuthentication ||
     isForkable.value !== (app.value.isForkable ?? false) ||
     isProfileFeatured.value !== (app.value.isProfileFeatured ?? false) ||
-    executionRunnerId.value !== (app.value.executionRunnerId || null) ||
     thumbnailUrl.value !== (app.value.thumbnailUrl || undefined) ||
     !sameTags(tags.value, originalTags.value) ||
     pendingTags.value.length > 0
@@ -247,7 +250,6 @@ watch(
       requiresAuthentication.value = newApp.requiresAuthentication || false
       isForkable.value = newApp.isForkable ?? false
       isProfileFeatured.value = newApp.isProfileFeatured ?? false
-      executionRunnerId.value = newApp.executionRunnerId || null
       thumbnailUrl.value = newApp.thumbnailUrl ?? undefined
       isSample.value = newApp.isSample ?? false
       isFeatured.value = newApp.isFeatured ?? false
@@ -355,7 +357,6 @@ async function saveSettings() {
       requiresAuthentication: requiresAuthentication.value,
       isForkable: isForkable.value,
       isProfileFeatured: isProfileFeatured.value,
-      executionRunnerId: executionRunnerId.value || undefined,
     })
     await appsService.updateTagSettings(app.value.id, tags.value)
     originalTags.value = [...tags.value]
@@ -369,7 +370,6 @@ async function saveSettings() {
       editorStore.currentApp.requiresAuthentication = requiresAuthentication.value
       editorStore.currentApp.isForkable = isForkable.value
       editorStore.currentApp.isProfileFeatured = isProfileFeatured.value
-      editorStore.currentApp.executionRunnerId = executionRunnerId.value || undefined
       editorStore.currentApp.tags = tags.value.join(',') || null
     }
 
@@ -618,12 +618,12 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'publishing'"
               />
               <Button
-                label="Execution"
+                label="Deployment Targets"
                 icon="pi pi-server"
                 text
-                :class="{ 'surface-hover': activeSection === 'execution' }"
+                :class="{ 'surface-hover': activeSection === 'targets' }"
                 class="w-full justify-content-start"
-                @click="activeSection = 'execution'"
+                @click="activeSection = 'targets'"
               />
               <Button
                 label="Appearance"
@@ -952,33 +952,16 @@ async function handleSaveTemplateStatus() {
           </template>
         </Card>
 
-        <!-- Execution Settings -->
-        <Card v-if="activeSection === 'execution'">
-          <template #title>Execution</template>
+        <Card v-if="activeSection === 'targets'">
           <template #content>
-            <div class="flex flex-column gap-4">
-              <div class="flex flex-column gap-2">
-                <label for="execution-runner" class="font-medium">Default Runner</label>
-                <RunnerSelector
-                  id="execution-runner"
-                  v-model="executionRunnerId"
-                  class="w-full"
-                />
-                <small class="text-color-secondary">
-                  Runner used for the running application and step execution
-                </small>
-              </div>
-
-              <div class="flex justify-content-end pt-3 border-top-1 surface-border">
-                <Button
-                  label="Save Changes"
-                  icon="pi pi-save"
-                  :loading="isSaving"
-                  :disabled="!hasChanges"
-                  @click="saveSettings"
-                />
-              </div>
-            </div>
+            <AppDeploymentTargets
+              v-if="app"
+              :app-id="app.id"
+              :refresh-revision="props.targetsRevision"
+              @deploy="emit('deployTarget', $event)"
+              @view-logs="emit('viewTargetLogs', $event)"
+              @targets-changed="emit('targetsChanged', $event)"
+            />
           </template>
         </Card>
 

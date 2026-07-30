@@ -5,7 +5,6 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
-import RunnerSelector from '@/shared/components/ui/RunnerSelector.vue'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 
 const { isDark } = useUserSettings()
@@ -16,8 +15,6 @@ const props = defineProps<{
   isEditingName: boolean
   editingName: string
   isPublished: boolean
-  hasRunners: boolean | null
-  selectedRunnerId: string | null
   isSaving: boolean
   hasUnsavedChanges: boolean
   canDeployFromStudio: boolean
@@ -39,8 +36,6 @@ const emit = defineEmits<{
   startEditing: []
   saveName: []
   cancelEditing: []
-  'update:selectedRunnerId': [value: string | null]
-  runnersLoaded: [count: number]
   saveAll: []
   deployApp: []
   deployFrontend: []
@@ -433,15 +428,6 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="workspace-actions">
-      <div v-if="showsEditorActions && hasRunners !== false" class="runtime-control">
-        <RunnerSelector
-          :model-value="selectedRunnerId"
-          :disabled="isSaving"
-          @update:model-value="emit('update:selectedRunnerId', $event)"
-          @runners-loaded="emit('runnersLoaded', $event)"
-        />
-      </div>
-
       <div v-if="showsEditorActions && activeTab !== 'services'" class="deploy-actions">
         <Button
           label="Deploy"

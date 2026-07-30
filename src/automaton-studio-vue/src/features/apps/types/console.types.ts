@@ -48,6 +48,7 @@ export interface StepResultMessage {
 
 export interface BackendRuntimeLogEvent {
   appId: string
+  deploymentTargetId: string
   timestamp: string
   level: 'info' | 'warn' | 'error'
   message: string

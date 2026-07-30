@@ -9,6 +9,7 @@ class BackendRuntimeLogClient {
   private connection: signalR.HubConnection | null = null
   private startPromise: Promise<void> | null = null
   private activeAppId: string | null = null
+  private activeTargetSlug: string | null = null
   private readonly handlers = new Set<RuntimeLogHandler>()
 
   onLog(handler: RuntimeLogHandler): () => void {
@@ -18,19 +19,21 @@ class BackendRuntimeLogClient {
     }
   }
 
-  async subscribe(appId: string): Promise<void> {
+  async subscribe(appId: string, targetSlug?: string): Promise<void> {
     await this.ensureConnection()
     if (!this.connection) {
       return
     }
 
-    if (this.activeAppId && this.activeAppId !== appId) {
-      await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, this.activeAppId)
+    if (this.activeAppId && (this.activeAppId !== appId || this.activeTargetSlug !== (targetSlug ?? null))) {
+      await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, this.activeAppId, this.activeTargetSlug)
+      this.activeAppId = null
     }
 
-    if (this.activeAppId !== appId) {
-      await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, appId)
+    if (!this.activeAppId) {
+      await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, appId, targetSlug ?? null)
       this.activeAppId = appId
+      this.activeTargetSlug = targetSlug ?? null
     }
   }
 
@@ -38,6 +41,7 @@ class BackendRuntimeLogClient {
     if (!this.connection || this.connection.state !== signalR.HubConnectionState.Connected) {
       if (!appId || this.activeAppId === appId) {
         this.activeAppId = null
+        this.activeTargetSlug = null
       }
       return
     }
@@ -47,9 +51,10 @@ class BackendRuntimeLogClient {
       return
     }
 
-    await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, targetAppId)
+    await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, targetAppId, this.activeTargetSlug)
     if (this.activeAppId === targetAppId) {
       this.activeAppId = null
+      this.activeTargetSlug = null
     }
   }
 
@@ -75,7 +80,7 @@ class BackendRuntimeLogClient {
 
       this.connection.onreconnected(async () => {
         if (this.activeAppId && this.connection) {
-          await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, this.activeAppId)
+          await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, this.activeAppId, this.activeTargetSlug)
         }
       })
     }

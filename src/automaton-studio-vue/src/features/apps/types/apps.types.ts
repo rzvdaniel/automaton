@@ -106,6 +106,35 @@ export interface AppListItem {
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
 }
 
+export const DeploymentTargetStatus = {
+  NotDeployed: 'NotDeployed',
+  Deploying: 'Deploying',
+  Running: 'Running',
+  Failed: 'Failed',
+} as const
+
+export type DeploymentTargetStatus = (typeof DeploymentTargetStatus)[keyof typeof DeploymentTargetStatus]
+
+export interface AppDeploymentTarget {
+  id: string
+  appId: string
+  name: string
+  slug: string
+  isDefault: boolean
+  status: DeploymentTargetStatus
+  frontendDeployed: boolean
+  backendDeployed: boolean
+  lastDeploymentAt?: string | null
+  lastSuccessfulDeploymentAt?: string | null
+  runner?: {
+    id: string
+    name: string
+    purpose: string
+    isOnline: boolean
+  } | null
+  routePath: string
+}
+
 export interface AppTagSettings {
   tags: string[]
 }

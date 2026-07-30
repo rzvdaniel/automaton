@@ -35,7 +35,8 @@ import { useAppEditorStore } from '../stores/app-editor.store'
 import { tokenStorage } from '@/shared/services/api/axios-instance'
 import { aiConversationClient } from '@/shared/services/ai/ai-conversation-client'
 import { backendRuntimeLogClient } from '../services/backend-runtime-log-client'
-import type { PublishAppRequest } from '../types/apps.types'
+import { appsService } from '../services/apps.service'
+import type { AppDeploymentTarget, PublishAppRequest } from '../types/apps.types'
 import { AppFileSystemScope } from '../types/apps.types'
 import type { StepResultMessage } from '../types/console.types'
 import { useSidebarState } from '@/shared/composables/useSidebarState'
@@ -82,7 +83,8 @@ const appNameAutoUpdated = ref(false)
 
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
-const hasRunners = ref<boolean | null>(null) // null = not yet loaded
+const selectedLogTargetId = ref<string | null>(null)
+const targetsRevision = ref(0)
 
 // Active view tab
 const activeTab = ref<'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'>('build')
@@ -379,7 +381,7 @@ const existingFilePaths = computed(() => {
 // Load app on mount
 onMounted(async () => {
   unsubscribeBackendRuntimeLogs = backendRuntimeLogClient.onLog((event) => {
-    if (event.appId !== resolvedAppId.value) {
+    if (event.appId !== resolvedAppId.value || (selectedLogTargetId.value && event.deploymentTargetId !== selectedLogTargetId.value)) {
       return
     }
 
@@ -399,10 +401,7 @@ onMounted(async () => {
     try {
       await editorStore.loadApp(appId.value)
       await backendRuntimeLogClient.subscribe(appId.value)
-      // Load the execution runner ID from the app
-      if (editorStore.currentApp?.executionRunnerId) {
-        selectedRunnerId.value = editorStore.currentApp.executionRunnerId
-      }
+      await refreshDefaultTarget()
     } catch (err: unknown) {
       toast.add({
         severity: 'error',
@@ -415,25 +414,28 @@ onMounted(async () => {
   }
 })
 
-// Watch for runner selection changes and save to backend
-watch(selectedRunnerId, async (newRunnerId) => {
-  if (editorStore.currentApp && newRunnerId !== editorStore.currentApp.executionRunnerId) {
-    try {
-      await editorStore.updateAppRunner(newRunnerId)
-    } catch (err: unknown) {
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: err instanceof Error ? err.message : 'Failed to update runner',
-        life: 5000,
-      })
-      // Revert on error
-      if (editorStore.currentApp?.executionRunnerId) {
-        selectedRunnerId.value = editorStore.currentApp.executionRunnerId
-      }
-    }
-  }
-})
+async function refreshDefaultTarget() {
+  const targets = await appsService.listDeploymentTargets(appId.value)
+  handleTargetsChanged(targets)
+}
+
+function handleTargetsChanged(targets: AppDeploymentTarget[]) {
+  const defaultTarget = targets.find((target) => target.isDefault)
+  selectedRunnerId.value = defaultTarget?.runner?.id ?? null
+  if (!selectedLogTargetId.value) selectedLogTargetId.value = defaultTarget?.id ?? null
+}
+
+async function handleViewTargetLogs(target: AppDeploymentTarget) {
+  selectedLogTargetId.value = target.id
+  await backendRuntimeLogClient.subscribe(target.appId, target.slug)
+  activeTab.value = 'logs'
+  toast.add({ severity: 'info', summary: `${target.name} activity`, detail: `Live runtime output is now scoped to ${target.slug}.`, life: 2500 })
+}
+
+async function handleDeployTarget(target: AppDeploymentTarget) {
+  await handleDeployApp(target.slug, target.name)
+  targetsRevision.value += 1
+}
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -712,9 +714,9 @@ async function handleDeployFrontend() {
   }
 }
 
-async function handleDeployApp() {
+async function handleDeployApp(targetSlug?: string, targetName?: string) {
   try {
-    const result = await editorStore.deployApp()
+    const result = await editorStore.deployApp(targetSlug)
     if (!result.success) {
       toast.add({
         severity: result.requiresRetry ? 'info' : 'warn',
@@ -731,8 +733,8 @@ async function handleDeployApp() {
 
       toast.add({
         severity: 'success',
-        summary: 'App Deployed',
-        detail: `${getOpenAppLabel()}: ${openAppUrl} Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
+        summary: targetName ? `${targetName} deployed` : 'App Deployed',
+        detail: `${targetName ? `Target ${targetSlug}.` : `${getOpenAppLabel()}: ${openAppUrl}`} Frontend ${result.frontendAction === 'updated' ? `updated from source (${result.frontendFilesSynced} file(s))` : 'preserved'}; backend ${result.backendAction === 'updated' ? `updated from source (${result.backendFilesSynced} file(s))` : 'preserved'}.${backendMessage}`,
         life: 7000,
       })
   } catch (err: unknown) {
@@ -1136,8 +1138,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         :is-editing-name="isEditingName"
         :editing-name="editingName"
         :is-published="editorStore.isPublished"
-        :has-runners="hasRunners"
-        :selected-runner-id="selectedRunnerId"
         :is-saving="editorStore.isSaving"
         :has-unsaved-changes="editorStore.hasUnsavedChanges"
         :can-deploy-from-studio="editorStore.canDeployFromStudio"
@@ -1156,8 +1156,6 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @start-editing="startEditingName"
         @save-name="saveAppName"
         @cancel-editing="cancelEditingName"
-        @update:selected-runner-id="selectedRunnerId = $event"
-        @runners-loaded="(count) => hasRunners = count > 0"
         @save-all="handleSaveAll"
         @deploy-app="handleDeployApp"
         @deploy-frontend="handleDeployFrontend"
@@ -1201,7 +1199,12 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
 
           <!-- Settings View -->
           <div v-show="activeTab === 'settings'" class="settings-view">
-            <AppSettings />
+            <AppSettings
+              :targets-revision="targetsRevision"
+              @deploy-target="handleDeployTarget"
+              @view-target-logs="handleViewTargetLogs"
+              @targets-changed="handleTargetsChanged"
+            />
           </div>
 
           <div v-if="activeTab === 'services'" class="backend-server-view">

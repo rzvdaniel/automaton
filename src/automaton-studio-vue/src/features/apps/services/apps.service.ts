@@ -4,6 +4,7 @@
  */
 import apiClient from '@/shared/services/api/axios-instance'
 import type {
+  AppDeploymentTarget,
   App,
   AppListItem,
   AppTagSettings,
@@ -272,14 +273,65 @@ class AppsService {
    * Deploy backend scripts to the app's configured runner(s).
    * POST /api/apps/{id}/backend/deploy
    */
-  async deployBackend(id: string): Promise<DeployBackendResult> {
-    const { data } = await apiClient.post<DeployBackendResult>(`/api/apps/${id}/backend/deploy`, {})
+  async deployBackend(id: string, targetSlug?: string): Promise<DeployBackendResult> {
+    const { data } = await apiClient.post<DeployBackendResult>(`/api/apps/${id}/backend/deploy`, {}, {
+      params: targetSlug ? { targetSlug } : undefined,
+    })
     return data
   }
 
-  async deployApp(id: string): Promise<DeployAppResult> {
-    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {})
+  async deployApp(id: string, targetSlug?: string): Promise<DeployAppResult> {
+    const { data } = await apiClient.post<DeployAppResult>(`/api/apps/${id}/deploy`, {}, {
+      params: targetSlug ? { targetSlug } : undefined,
+    })
     return data
+  }
+
+  async listDeploymentTargets(id: string): Promise<AppDeploymentTarget[]> {
+    const { data } = await apiClient.get<AppDeploymentTarget[]>(`/api/apps/${id}/targets`)
+    return data
+  }
+
+  async createDeploymentTarget(
+    id: string,
+    request: { name: string; slug: string; runnerId?: string | null },
+  ): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.post<AppDeploymentTarget>(`/api/apps/${id}/targets`, request)
+    return data
+  }
+
+  async updateDeploymentTarget(
+    id: string,
+    targetId: string,
+    request: { name: string; slug: string },
+  ): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.patch<AppDeploymentTarget>(`/api/apps/${id}/targets/${targetId}`, request)
+    return data
+  }
+
+  async assignDeploymentTargetRunner(
+    id: string,
+    targetId: string,
+    runnerId: string | null,
+    cleanupDeployedRuntime: boolean,
+  ): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.post<AppDeploymentTarget>(
+      `/api/apps/${id}/targets/${targetId}/assign-runner`,
+      { runnerId, cleanupDeployedRuntime },
+    )
+    return data
+  }
+
+  async makeDefaultDeploymentTarget(id: string, targetId: string): Promise<AppDeploymentTarget> {
+    const { data } = await apiClient.post<AppDeploymentTarget>(
+      `/api/apps/${id}/targets/${targetId}/make-default`,
+      {},
+    )
+    return data
+  }
+
+  async deleteDeploymentTarget(id: string, targetId: string): Promise<void> {
+    await apiClient.delete(`/api/apps/${id}/targets/${targetId}`)
   }
 
   async runAction(id: string, actionKey: string, input: unknown): Promise<AppActionExecution> {
