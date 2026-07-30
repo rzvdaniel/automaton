@@ -4,6 +4,7 @@ using Automaton.Api.Enums;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Core.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Tests;
@@ -72,6 +73,76 @@ public class AppDeploymentTargetStateServiceTests
         Assert.That(
             app.DeploymentTargets.All(target => target.Status == DeploymentTargetStatus.Deploying),
             Is.True);
+    }
+
+    [Test]
+    public async Task ConcurrentRelationalClaimsForSameTarget_ProduceExactlyOneWinner()
+    {
+        var databasePath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            $"deployment-target-claims-{Guid.NewGuid():N}.db");
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            DefaultTimeout = 30,
+            Pooling = false
+        }.ToString();
+        var appId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        try
+        {
+            await using (var setupConnection = new SqliteConnection(connectionString))
+            {
+                await setupConnection.OpenAsync();
+                await using var createCommand = setupConnection.CreateCommand();
+                createCommand.CommandText =
+                    """
+                    CREATE TABLE AppDeploymentTargets (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        WebAppId TEXT NOT NULL,
+                        Status INTEGER NOT NULL,
+                        LastDeploymentAt TEXT NULL,
+                        UpdatedAt TEXT NOT NULL
+                    );
+                    INSERT INTO AppDeploymentTargets (Id, WebAppId, Status, UpdatedAt)
+                    VALUES ($targetId, $appId, $status, $updatedAt);
+                    """;
+                createCommand.Parameters.AddWithValue("$targetId", targetId.ToString().ToUpperInvariant());
+                createCommand.Parameters.AddWithValue("$appId", appId.ToString().ToUpperInvariant());
+                createCommand.Parameters.AddWithValue("$status", (int)DeploymentTargetStatus.NotDeployed);
+                createCommand.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow);
+                await createCommand.ExecuteNonQueryAsync();
+            }
+
+            {
+                await using var firstDb = CreateSqliteDbContext(connectionString);
+                await using var secondDb = CreateSqliteDbContext(connectionString);
+                var claims = await Task.WhenAll(
+                    TryStartAsync(new AppDeploymentTargetStateService(firstDb), appId, targetId),
+                    TryStartAsync(new AppDeploymentTargetStateService(secondDb), appId, targetId));
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(claims.Count(result => result), Is.EqualTo(1));
+                    Assert.That(claims.Count(result => !result), Is.EqualTo(1));
+                });
+
+                await using var verificationDb = CreateSqliteDbContext(connectionString);
+                Assert.That(
+                    await verificationDb.AppDeploymentTargets
+                        .Where(target => target.Id == targetId && target.WebAppId == appId)
+                        .Select(target => target.Status)
+                        .SingleAsync(),
+                    Is.EqualTo(DeploymentTargetStatus.Deploying));
+            }
+        }
+        finally
+        {
+            File.Delete(databasePath);
+        }
     }
 
     [TestCase(true, false)]
@@ -202,6 +273,30 @@ public class AppDeploymentTargetStateServiceTests
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase($"deployment-target-state-{Guid.NewGuid():N}")
                 .Options);
+    }
+
+    private static ApplicationDbContext CreateSqliteDbContext(string connectionString)
+    {
+        return new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseSqlite(connectionString)
+                .Options);
+    }
+
+    private static async Task<bool> TryStartAsync(
+        AppDeploymentTargetStateService service,
+        Guid appId,
+        Guid targetId)
+    {
+        try
+        {
+            await service.MarkStartedAsync(appId, targetId);
+            return true;
+        }
+        catch (AppDeploymentTargetConflictException)
+        {
+            return false;
+        }
     }
 
 }

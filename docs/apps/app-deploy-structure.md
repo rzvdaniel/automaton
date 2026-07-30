@@ -23,21 +23,24 @@ Rules:
 - Studio/API `live/backend/` is deploy output used to send backend files to a runner. It is not editable source and is never publicly served.
 - Fork copies `source/` only, never `live/`.
 
-Runner runtime keeps its own private per-app layout:
+Runner runtime keeps a private layout for every deployment target:
 
 ```text
-RUNNER_SCRIPTS_DIR/{appId}/
-├─ backend/
+RUNNER_SCRIPTS_DIR/apps/{appId}/targets/{deploymentTargetId}/
+├─ source/
+├─ runtime/
 ├─ venv/
-└─ data/
+└─ versions/
 ```
 
 Rules:
-- `backend/` contains the deployed controller files from `backend.deployDir`.
-- `venv/` contains the app-specific Python virtual environment.
-- `data/` is private persistent app storage and is not publicly served by default.
+- `runtime/backend/` contains deployed controller files from `backend.deployDir`.
+- `venv/` contains the target-specific Python virtual environment.
+- Runtime content, processes, ports, logs, and restoration metadata are isolated
+  by `WebAppId + DeploymentTargetId`.
+- App data is private persistent storage and remains app-scoped by design.
 - Persistent app files, including SQLite databases and uploads, must be stored under the `AUTOMATON_APP_DATA_DIR` environment variable.
-- Do not store persistent files next to controller files in `backend/`; backend deploys can replace controller files.
+- Do not store persistent files beside files in `runtime/backend/`; backend deploys can replace controller files.
 
 Recommended runtime data layout:
 
@@ -86,7 +89,12 @@ Deploy behavior:
 2. Upload `frontend.deployDir` into `live/frontend/`.
 3. Upload `backend.deployDir` into `live/backend/` when configured.
 4. Trigger backend runner deployment from `live/backend/`.
-5. Keep runner-side `RUNNER_SCRIPTS_DIR/{appId}/data/` intact across backend deploys.
+5. Keep `AUTOMATON_APP_DATA_DIR` intact across target backend deploys.
+
+The default target is selected when no target is supplied. A named target is
+selected with `automaton deploy <target-slug>`. See
+[Deployment Targets](deployment-targets.md) for target management, routing,
+authorization, and lifecycle behavior.
 
 Packaging rules:
 - CLI deploy uploads archives, not one HTTP request per file.
@@ -163,6 +171,7 @@ Avoid these assumptions:
 
 - Public runtime comes only from `frontend.deployDir`.
 - Runner backend runtime comes only from `backend.deployDir`.
+- Each deployed Runner runtime is isolated by app ID and deployment target ID.
 - Persistent runner app data lives under `AUTOMATON_APP_DATA_DIR` and survives backend redeploys.
 - Default AI-generated local apps should use `frontend/` + Vite and deploy only `frontend/dist/`.
 - Root static apps remain supported, but only as an explicit no-build exception.

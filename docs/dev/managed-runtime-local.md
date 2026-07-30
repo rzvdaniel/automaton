@@ -17,9 +17,8 @@ and only add the missing runtime edge.
 
 Use this setup when you want to validate:
 
-- `/a/{appId}/...` static frontend serving
-- `/a/{appId}/api/controllers/...` runner backend execution
-- `/a/{appId}/api/flows/{flowIdentifier}/execute` runner flow execution
+- default and named deployment-target frontend serving
+- target-specific Runner backend and flow execution
 - upload and download helpers
 - API participation through the normal API hostname
 - Traefik dynamic route generation
@@ -118,7 +117,8 @@ That keeps manual host-side development safe by default while making the contain
 
 Traefik routes are generated from the hosted runner runtime endpoint, not from the live runner connection directly.
 
-For local validation, the hosted runner record associated with your app's `ExecutionRunnerId` must have:
+For local validation, the hosted Runner associated with the deployment
+target's `ExecutionRunnerId` must have:
 
 ```txt
 RuntimeEndpoint = http://automaton-local-runner:8001
@@ -128,12 +128,12 @@ If that endpoint is missing or points somewhere else, the route file may exist b
 
 ## Validation checklist
 
-After deploying an app with a private frontend and assigned runner:
+After deploying an app with a private frontend and assigned Runner:
 
 1. Confirm static frontend export exists:
 
 ```powershell
-Get-ChildItem .local-dev\managed-runtime\static-runtime\apps\<appId>
+Get-ChildItem .local-dev\managed-runtime\static-runtime\apps\<appId>\targets\<deploymentTargetId>
 ```
 
 2. Confirm Traefik route file exists:
@@ -145,10 +145,16 @@ Get-Content .local-dev\managed-runtime\traefik-dynamic\managed-runtime-routes.ym
 3. Launch runtime from Studio and confirm the browser lands on:
 
 ```txt
-https://apps.automaton.test:8443/a/{appId}/
+https://app-{appIdWithoutDashes}.apps.automaton.test:8443/
 ```
 
-4. Verify:
+For a named target, use:
+
+```txt
+https://app-{appIdWithoutDashes}.apps.automaton.test:8443/a/{appId}/t/{deploymentTargetId}/
+```
+
+4. Verify each target independently:
 
 - frontend loads
 - controller execution works through `/a/{appId}/api/controllers/...`
@@ -157,7 +163,7 @@ https://apps.automaton.test:8443/a/{appId}/
 
 5. Verify failure paths:
 
-- wrong app id denied
+- wrong app or target id denied
 - missing runtime cookie denied
 - unknown flow denied
 - missing artifacts fail safely
@@ -186,8 +192,8 @@ docker logs --tail 200 automaton-local-runner
 
 The key runtime check is that browser traffic goes:
 
-- browser -> nginx for `/a/{appId}/...`
+- browser -> Traefik on the app-specific host and target-aware path
 - nginx -> API only for `/internal/runtime/auth`
-- nginx -> Traefik -> runner for `/a/{appId}/api/...`
+- nginx -> Traefik -> Runner at `/apps/{appId}/targets/{deploymentTargetId}/...`
 
 `Automaton.Api` should not be in the runtime backend data path.

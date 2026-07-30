@@ -2,6 +2,10 @@
 
 Date: 2026-07-27
 
+> Historical document. Its single-Runner conclusions were superseded by the
+> multi-target deployment architecture. See
+> [Deployment Targets](../apps/deployment-targets.md) for the current model.
+
 ## Scope and conclusions
 
 This audit covers the generic app model, tags, the Studio Apps page, Runner

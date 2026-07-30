@@ -92,7 +92,15 @@ From the app folder:
 automaton-dev config --show
 automaton-dev validate
 automaton-dev deploy
+automaton-dev target list
+automaton-dev deploy server-eu
 ```
+
+`automaton deploy` resolves the server-owned default deployment target.
+`automaton deploy <target-slug>` resolves a named target. Target definitions
+and Runner assignments are not stored in `automaton.json`; manage them with
+`automaton target list|add|remove|default`. See
+[Deployment Targets](../apps/deployment-targets.md).
 
 ## Named project environments
 

@@ -11,30 +11,12 @@ namespace Automaton.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_AppModuleExecutions_AppId_CreatedAtUtc",
-                table: "AppModuleExecutions");
-
-            migrationBuilder.DropIndex(
-                name: "IX_AppModuleExecutions_AppId_ModuleType_ModuleKey_CreatedAtUtc",
-                table: "AppModuleExecutions");
-
             migrationBuilder.AddColumn<Guid>(
                 name: "DeploymentTargetId",
                 table: "AppModuleExecutions",
                 type: "char(36)",
                 nullable: true,
                 collation: "ascii_general_ci");
-
-            migrationBuilder.Sql(
-                """
-                UPDATE AppModuleExecutions executions
-                INNER JOIN AppDeploymentTargets targets
-                    ON targets.WebAppId = executions.AppId
-                    AND targets.IsDefault = 1
-                SET executions.DeploymentTargetId = targets.Id
-                WHERE executions.RunnerId IS NOT NULL;
-                """);
 
             migrationBuilder.CreateIndex(
                 name: "IX_AppModuleExecutions_AppId_DeploymentTargetId_CreatedAtUtc",
@@ -50,6 +32,27 @@ namespace Automaton.Infrastructure.Migrations
                 name: "IX_AppModuleExecutions_DeploymentTargetId",
                 table: "AppModuleExecutions",
                 column: "DeploymentTargetId");
+
+            // MySQL requires an index whose leading column is AppId while the
+            // existing WebApp foreign key is present. Create the replacement
+            // indexes before removing the old AppId indexes.
+            migrationBuilder.DropIndex(
+                name: "IX_AppModuleExecutions_AppId_CreatedAtUtc",
+                table: "AppModuleExecutions");
+
+            migrationBuilder.DropIndex(
+                name: "IX_AppModuleExecutions_AppId_ModuleType_ModuleKey_CreatedAtUtc",
+                table: "AppModuleExecutions");
+
+            migrationBuilder.Sql(
+                """
+                UPDATE AppModuleExecutions executions
+                INNER JOIN AppDeploymentTargets targets
+                    ON targets.WebAppId = executions.AppId
+                    AND targets.IsDefault = 1
+                SET executions.DeploymentTargetId = targets.Id
+                WHERE executions.RunnerId IS NOT NULL;
+                """);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_AppModuleExecutions_AppDeploymentTargets_DeploymentTargetId",
@@ -67,6 +70,16 @@ namespace Automaton.Infrastructure.Migrations
                 name: "FK_AppModuleExecutions_AppDeploymentTargets_DeploymentTargetId",
                 table: "AppModuleExecutions");
 
+            migrationBuilder.CreateIndex(
+                name: "IX_AppModuleExecutions_AppId_CreatedAtUtc",
+                table: "AppModuleExecutions",
+                columns: new[] { "AppId", "CreatedAtUtc" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AppModuleExecutions_AppId_ModuleType_ModuleKey_CreatedAtUtc",
+                table: "AppModuleExecutions",
+                columns: new[] { "AppId", "ModuleType", "ModuleKey", "CreatedAtUtc" });
+
             migrationBuilder.DropIndex(
                 name: "IX_AppModuleExecutions_AppId_DeploymentTargetId_CreatedAtUtc",
                 table: "AppModuleExecutions");
@@ -82,16 +95,6 @@ namespace Automaton.Infrastructure.Migrations
             migrationBuilder.DropColumn(
                 name: "DeploymentTargetId",
                 table: "AppModuleExecutions");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AppModuleExecutions_AppId_CreatedAtUtc",
-                table: "AppModuleExecutions",
-                columns: new[] { "AppId", "CreatedAtUtc" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AppModuleExecutions_AppId_ModuleType_ModuleKey_CreatedAtUtc",
-                table: "AppModuleExecutions",
-                columns: new[] { "AppId", "ModuleType", "ModuleKey", "CreatedAtUtc" });
         }
     }
 }
