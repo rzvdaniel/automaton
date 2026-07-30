@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fast regression coverage for safety properties that must remain true even
-# when Docker is unavailable in CI. End-to-end host tests cover Docker itself.
+# Fast structural guards plus mocked-Docker behavior checks. End-to-end host
+# tests cover Docker itself; these tests exercise installer decision paths.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 INSTALLER="$ROOT/scripts/install-infrastructure-runner.sh"
 
@@ -28,7 +28,7 @@ identity_line="$(grep -n 'installation-id' "$INSTALLER" | tail -n 1 | cut -d: -f
 # Update success requires both local health and the actual connected log; do
 # not accept broad, ambiguous text such as "Runner connection".
 require 'curl -fsS http://127.0.0.1:8001/health'
-require 'Successfully connected to server'
+require "grep -Fq 'Successfully connected to server'"
 ! grep -Fq 'Runner connection' "$INSTALLER" || fail 'ambiguous connection log match remains'
 
 # Rollback has an independently verified outcome.

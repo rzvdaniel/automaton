@@ -134,7 +134,7 @@ wait_for_healthy() {
   for _ in $(seq 1 30); do
     [[ "$(docker inspect --format '{{.State.Running}}' "$AUTOMATON_CONTAINER_NAME" 2>/dev/null || true)" == true ]] || return 1
     docker exec "$AUTOMATON_CONTAINER_NAME" curl -fsS http://127.0.0.1:8001/health >/dev/null 2>&1 \
-      && docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -Eq 'Successfully connected to server|self-registration completed|Runner enrolled successfully' \
+      && docker logs "$AUTOMATON_CONTAINER_NAME" 2>&1 | grep -Fq 'Successfully connected to server' \
       && return 0
     sleep 2
   done
