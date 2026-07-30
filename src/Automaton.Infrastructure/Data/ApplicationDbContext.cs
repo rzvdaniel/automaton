@@ -254,7 +254,7 @@ namespace Automaton.Api.Data
                 entity.HasOne<AppDeploymentTarget>()
                     .WithMany()
                     .HasForeignKey(e => e.DeploymentTargetId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.SetNull);
                 entity.HasOne<Runner>().WithMany().HasForeignKey(e => e.RunnerId).OnDelete(DeleteBehavior.SetNull);
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.RequestedByUserId).OnDelete(DeleteBehavior.SetNull);
             });

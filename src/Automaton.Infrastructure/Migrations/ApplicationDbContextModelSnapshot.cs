@@ -4066,7 +4066,7 @@ namespace Automaton.Api.Migrations
                     b.HasOne("Automaton.Api.Entities.AppDeploymentTarget", null)
                         .WithMany()
                         .HasForeignKey("DeploymentTargetId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Automaton.Api.Entities.HostedRunnerDeployment", "HostedRunnerOperation")
                         .WithOne("AppModuleExecution")

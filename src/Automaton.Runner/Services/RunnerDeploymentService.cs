@@ -164,6 +164,20 @@ public class RunnerDeploymentService
         }
     }
 
+    public async Task CleanupTargetAsync(
+        Guid appId,
+        Guid deploymentTargetId)
+    {
+        await backendProcessManager.StopAsync(appId, deploymentTargetId);
+        var targetRoot = runnerWorkspaceService.GetDeploymentTargetRoot(
+            appId,
+            deploymentTargetId);
+        if (Directory.Exists(targetRoot))
+        {
+            Directory.Delete(targetRoot, recursive: true);
+        }
+    }
+
     private async Task PersistDeploymentMetadataAsync(
         Guid appId,
         Guid deploymentTargetId,

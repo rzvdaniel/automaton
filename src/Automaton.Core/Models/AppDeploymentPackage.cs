@@ -41,3 +41,13 @@ public sealed class AppActionDeploymentResult
     public string? ContentHash { get; set; }
     public string? Message { get; set; }
 }
+
+public sealed record CleanupAppDeploymentTargetRequest(
+    Guid AppId,
+    Guid DeploymentTargetId);
+
+public sealed record CleanupAppDeploymentTargetResult(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    bool Success,
+    string? Error = null);

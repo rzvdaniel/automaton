@@ -90,6 +90,39 @@ public class RunnerDeploymentTargetIsolationTests
         });
     }
 
+    [Test]
+    public async Task CleanupTargetAsync_IsTargetScopedAndIdempotent()
+    {
+        var workspace = new RunnerWorkspaceService();
+        var processManager = new StubBackendProcessManager();
+        var service = new RunnerDeploymentService(
+            workspace,
+            new RunnerBackendEnvironmentService(workspace),
+            processManager,
+            new AppActionDeploymentService(workspace));
+        var appId = Guid.NewGuid();
+        var deletedTargetId = Guid.NewGuid();
+        var preservedTargetId = Guid.NewGuid();
+        Directory.CreateDirectory(workspace.GetDeploymentTargetRoot(appId, deletedTargetId));
+        Directory.CreateDirectory(workspace.GetDeploymentTargetRoot(appId, preservedTargetId));
+
+        await service.CleanupTargetAsync(appId, deletedTargetId);
+        await service.CleanupTargetAsync(appId, deletedTargetId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                Directory.Exists(workspace.GetDeploymentTargetRoot(appId, deletedTargetId)),
+                Is.False);
+            Assert.That(
+                Directory.Exists(workspace.GetDeploymentTargetRoot(appId, preservedTargetId)),
+                Is.True);
+            Assert.That(
+                processManager.StoppedTargets.Count(target => target == deletedTargetId),
+                Is.EqualTo(2));
+        });
+    }
+
     private string CreatePackage(Guid appId, string frontendContent)
     {
         var packagePath = Path.Combine(root, $"{Guid.NewGuid():N}.zip");

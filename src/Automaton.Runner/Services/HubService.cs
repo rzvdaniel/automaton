@@ -52,6 +52,7 @@ public class HubService
     private const string DeleteAppActionVersionMethod = "DeleteAppActionVersion";
     private const string PrepareAppActionModuleMethod = "PrepareAppActionModule";
     private const string SynchronizeAppActionModulesMethod = "SynchronizeAppActionModules";
+    private const string CleanupAppDeploymentTargetMethod = "CleanupAppDeploymentTarget";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
     private const string HeartbeatMethod = "Heartbeat";
     private const string ReportHostedRunnerStorageMethod = "ReportHostedRunnerStorage";
@@ -483,6 +484,9 @@ public class HubService
                 actionDeploymentService.PrepareModuleAsync(request, CancellationToken.None));
             connection.On<SynchronizeAppActionModulesRequest, int>(SynchronizeAppActionModulesMethod, request =>
                 Task.FromResult(actionDeploymentService.SynchronizeModules(request)));
+            connection.On<CleanupAppDeploymentTargetRequest, CleanupAppDeploymentTargetResult>(
+                CleanupAppDeploymentTargetMethod,
+                CleanupDeploymentTargetAsync);
 
             // Handle connection events
             connection.Closed += async (error) =>
@@ -899,6 +903,35 @@ public class HubService
                 Area = NormalizeRunnerFileArea(request.Area),
                 Error = ex.Message
             };
+        }
+    }
+
+    private async Task<CleanupAppDeploymentTargetResult> CleanupDeploymentTargetAsync(
+        CleanupAppDeploymentTargetRequest request)
+    {
+        try
+        {
+            await runnerDeploymentService.CleanupTargetAsync(
+                request.AppId,
+                request.DeploymentTargetId);
+
+            return new CleanupAppDeploymentTargetResult(
+                request.AppId,
+                request.DeploymentTargetId,
+                Success: true);
+        }
+        catch (Exception ex)
+        {
+            logger.Error(
+                ex,
+                "Failed to clean up app {AppId} target {DeploymentTargetId}",
+                request.AppId,
+                request.DeploymentTargetId);
+            return new CleanupAppDeploymentTargetResult(
+                request.AppId,
+                request.DeploymentTargetId,
+                Success: false,
+                Error: "Runner runtime cleanup failed.");
         }
     }
 
