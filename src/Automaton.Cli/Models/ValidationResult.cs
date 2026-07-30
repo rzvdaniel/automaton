@@ -22,4 +22,4 @@ public sealed class ValidationResult
     public IReadOnlyList<string> NextSteps { get; init; } = [];
 }
 
-public sealed record RemoteAppValidationInfo(string? ExecutionRunnerId);
+public sealed record RemoteAppValidationInfo(string? DefaultTargetRunnerId);

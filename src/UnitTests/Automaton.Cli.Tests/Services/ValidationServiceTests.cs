@@ -143,7 +143,7 @@ public class ValidationServiceTests
         Assert.That(result.Success, Is.False);
         AssertCheck(result, ValidationCheckNames.RemoteAppAccess, true, "remote app found");
         AssertCheck(result, ValidationCheckNames.BackendRunner, false, "no runner is assigned");
-        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton deploy and choose a connected runner when prompted"));
+        Assert.That(result.NextSteps, Has.Some.EqualTo("Run automaton deploy to prepare the default managed Runner"));
     }
 
     [Test]

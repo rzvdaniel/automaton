@@ -19,14 +19,14 @@ public sealed class DeployService
     private readonly Action<string>? progress;
     private readonly Action<DeployCheckResult>? checkReported;
     private readonly Func<string, string, CancellationToken, Task<int>> runBuildAsync;
-    private readonly Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync;
+    private readonly Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>> deployPackageAsync;
     private readonly Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>> createSnapshotAsync;
     private readonly Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync;
 
     public DeployService(
         ConfigService config,
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
-        Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
+        Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
         : this(config, null, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
     {
@@ -36,7 +36,7 @@ public sealed class DeployService
         ConfigService config,
         Action<string>? progress,
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
-        Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
+        Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null)
         : this(config, progress, null, runBuildAsync, deployPackageAsync, createSnapshotAsync)
     {
@@ -47,7 +47,7 @@ public sealed class DeployService
         Action<string>? progress = null,
         Action<DeployCheckResult>? checkReported = null,
         Func<string, string, CancellationToken, Task<int>>? runBuildAsync = null,
-        Func<string, string, string, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
+        Func<string, string, string, string?, Stream, bool, CancellationToken, Task<(DeployUploadResult Upload, DeployBackendResult Deploy)>>? deployPackageAsync = null,
         Func<string, string, string, CancellationToken, Task<(bool Created, string Message)>>? createSnapshotAsync = null,
         Func<string, string, string, CancellationToken, Task<JsonElement>>? ensureManagedRuntimeReadyAsync = null)
 
@@ -68,6 +68,7 @@ public sealed class DeployService
         bool skipBackend,
         string? directoryOverride,
         string? environmentName = null,
+        DeploymentTargetInfo? target = null,
         CancellationToken cancellationToken = default)
     {
         var checks = new List<DeployCheckResult>();
@@ -91,35 +92,35 @@ public sealed class DeployService
 
         if (!appLinkCheck.Success || !credentialsCheck.Success || projectConfig == null || string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(apiKey))
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
         var buildCheck = await RunBuildIfNeededAsync(projectConfig.Frontend?.Build, directory, nextSteps, cancellationToken);
         AddCheck(checks, buildCheck);
         if (!buildCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
         var actionsCheck = ValidateActions(directory, nextSteps, out var actionCount);
         AddCheck(checks, actionsCheck);
         if (!actionsCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
         var frontendCheck = ValidateFrontendPackage(directory, directoryOverride ?? projectConfig.Frontend?.DeployDir, actionCount > 0, nextSteps, out var deployDirectory);
         AddCheck(checks, frontendCheck);
         if (!frontendCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, directoryOverride, uploadResult, backendResult, target);
         }
 
         var backendCheck = ValidateBackendPackage(directory, projectConfig.Backend?.DeployDir, nextSteps, out var backendDirectory, out var backendControllers);
         AddCheck(checks, backendCheck);
         if (!skipBackend && !backendCheck.Success)
         {
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         try
@@ -147,12 +148,13 @@ public sealed class DeployService
                 projectConfig.Frontend,
                 null);
             ReportProgress("Uploading deploy package to the assigned runner...");
-            var result = await deployPackageAsync(server, apiKey, appId!, zip, clean, cancellationToken);
+            var result = await deployPackageAsync(
+                server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
             backendResult = new DeployBackendResult(true, result.Deploy.RunnerCount, "backend deploy skipped by flag");
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, "backend deploy skipped by flag"));
-            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         if (backendControllers == 0 || backendDirectory == null)
@@ -164,7 +166,7 @@ public sealed class DeployService
         // Every deployed app uses a managed hosted runner. Do not infer runtime
         // eligibility from the presence of backend controllers: frontend-only apps
         // need the same hosted runtime and may be the user's first deployment.
-        if (ensureManagedRuntimeReadyAsync != null)
+        if (ensureManagedRuntimeReadyAsync != null && target?.IsDefault != false)
         {
             var readiness = await WaitForManagedRuntimeAsync(server!, apiKey!, appId!, cancellationToken);
             if (!readiness.Ready)
@@ -182,7 +184,7 @@ public sealed class DeployService
                 }
 
                 backendResult = new DeployBackendResult(false, 0, readiness.Message, readiness.State, RequiresRetry: true);
-                return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+                return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
             }
         }
 
@@ -198,7 +200,8 @@ public sealed class DeployService
                 projectConfig.Frontend,
                 projectConfig.Backend);
             ReportProgress("Uploading deploy package to the assigned runner...");
-            var result = await deployPackageAsync(server, apiKey, appId!, zip, clean, cancellationToken);
+            var result = await deployPackageAsync(
+                server, apiKey, appId!, target?.IsDefault == true ? null : target?.Slug, zip, clean, cancellationToken);
             uploadResult = result.Upload;
             backendResult = result.Deploy;
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, true, FormatUploadMessage("uploaded", "deploy package", uploadResult)));
@@ -207,26 +210,28 @@ public sealed class DeployService
         {
             nextSteps.Add("Inspect runner deployment logs in Automaton Studio.");
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageUpload, false, ex.Message));
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         if (backendResult == null)
         {
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, "runner did not return a deployment result"));
-            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            return CreateResult(false, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         if (!backendResult.Success || backendResult.RunnerCount <= 0)
         {
             AddManagedRuntimeNextSteps(nextSteps, backendResult);
             AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, false, backendResult.Message ?? "deploy package did not reach any runner", IsWarning: true));
-            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+            return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult, target);
         }
 
         AddCheck(checks, new DeployCheckResult(DeployCheckNames.PackageDeploy, true, backendResult.Message ?? $"deploy package applied to {backendResult.RunnerCount} runner(s)"));
         ReportProgress(backendResult.Message ?? $"Deploy package applied to {backendResult.RunnerCount} runner(s).");
 
-        return CreateResult(true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend, deployDirectory, uploadResult, backendResult);
+        return CreateResult(
+            true, checks, nextSteps, projectConfig, appId, server, clean, skipBackend,
+            deployDirectory, uploadResult, backendResult, target);
     }
 
     private async Task<(bool Ready, string Message, string NextStep, string State)> WaitForManagedRuntimeAsync(
@@ -436,7 +441,8 @@ public sealed class DeployService
         bool skipBackend,
         string? deployDirectory,
         DeployUploadResult? uploadResult,
-        DeployBackendResult? backendResult)
+        DeployBackendResult? backendResult,
+        DeploymentTargetInfo? target = null)
     {
         return new DeployResult
         {
@@ -446,6 +452,10 @@ public sealed class DeployService
                 : "Deploy failed",
             AppId = appId,
             AppName = projectConfig?.Name,
+            TargetSlug = target?.Slug,
+            TargetName = target?.Name,
+            RunnerName = target?.Runner?.Name,
+            DeploymentMode = target == null || target.IsDefault ? "default" : "named",
             OpenAppUrl = !string.IsNullOrWhiteSpace(appId) ? CliAppUrlBuilder.BuildStudioApplicationUrl(server, appId) : null,
             StudioAppUrl = !string.IsNullOrWhiteSpace(appId) ? CliAppUrlBuilder.BuildStudioAppUrl(server, appId) : null,
             DeployDirectory = deployDirectory,
@@ -481,13 +491,15 @@ public sealed class DeployService
         string server,
         string apiKey,
         string appId,
+        string? targetSlug,
         Stream zip,
         bool clean,
         CancellationToken cancellationToken)
     {
         var sizeMb = zip.Length / 1_048_576.0;
         using var client = new AutomatonApiClient(server, apiKey);
-        var deployResult = await client.DeployPackageAsync(appId, zip, clean, cancellationToken);
+        var deployResult = await client.DeployPackageAsync(
+            appId, zip, clean, targetSlug, cancellationToken);
         var sourceFiles = deployResult.TryGetProperty("sourceFilesDeployed", out var sourceProperty) ? sourceProperty.GetInt32() : 0;
         var runtimeFiles = deployResult.TryGetProperty("runtimeFilesDeployed", out var runtimeProperty) ? runtimeProperty.GetInt32() : 0;
         var success = deployResult.TryGetProperty("success", out var successProperty) && successProperty.GetBoolean();

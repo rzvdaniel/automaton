@@ -267,9 +267,9 @@ public sealed class ValidationService
                 "cannot verify runner assignment because remote app access failed");
         }
 
-        if (string.IsNullOrWhiteSpace(remoteAppCheck.RemoteApp?.ExecutionRunnerId))
+        if (string.IsNullOrWhiteSpace(remoteAppCheck.RemoteApp?.DefaultTargetRunnerId))
         {
-            nextSteps.Add("Run automaton deploy and choose a connected runner when prompted");
+            nextSteps.Add("Run automaton deploy to prepare the default managed Runner");
             nextSteps.Add("If no connected runner exists, create or deploy one in Automaton Studio, then rerun automaton deploy");
             return new ValidationCheckResult(
                 ValidationCheckNames.BackendRunner,
@@ -280,7 +280,7 @@ public sealed class ValidationService
         return new ValidationCheckResult(
             ValidationCheckNames.BackendRunner,
             true,
-            $"runner assigned: {remoteAppCheck.RemoteApp.ExecutionRunnerId}");
+            $"default target runner assigned: {remoteAppCheck.RemoteApp.DefaultTargetRunnerId}");
     }
 
     private async Task<RemoteAppCheckResult> ValidateRemoteAppAccessAsync(
@@ -340,13 +340,9 @@ public sealed class ValidationService
         CancellationToken cancellationToken)
     {
         using var client = new AutomatonApiClient(server, apiKey);
-        var app = await client.GetAppAsync(appId, cancellationToken);
-        var executionRunnerId = app.TryGetProperty("executionRunnerId", out var runnerProperty)
-            && runnerProperty.ValueKind == System.Text.Json.JsonValueKind.String
-                ? runnerProperty.GetString()
-                : null;
-
-        return new RemoteAppValidationInfo(executionRunnerId);
+        var targets = await client.ListDeploymentTargetsAsync(appId, cancellationToken);
+        return new RemoteAppValidationInfo(
+            targets.SingleOrDefault(target => target.IsDefault)?.Runner?.Id);
     }
 
     private sealed record RemoteAppCheckResult(ValidationCheckResult Check, RemoteAppValidationInfo? RemoteApp);

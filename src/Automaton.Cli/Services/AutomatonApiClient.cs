@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Automaton.AiGuidance;
+using Automaton.Cli.Models;
 
 namespace Automaton.Cli.Services;
 
@@ -34,6 +35,15 @@ public class AutomatonApiClient : IDisposable
         }
     }
 
+    public AutomatonApiClient(HttpClient httpClient, string? apiKey = null)
+    {
+        _http = httpClient;
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            _http.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+        }
+    }
+
     // ── Apps ──────────────────────────────────────────────────────────────────
 
     public async Task<(string appId, string name)> CreateAppAsync(string name, CancellationToken ct = default)
@@ -53,6 +63,67 @@ public class AutomatonApiClient : IDisposable
         using var resp = await _http.GetAsync($"api/apps/{appId}", ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
+    }
+
+    public async Task<IReadOnlyList<DeploymentTargetInfo>> ListDeploymentTargetsAsync(
+        string appId,
+        CancellationToken ct = default)
+    {
+        using var resp = await _http.GetAsync($"api/apps/{appId}/targets", ct);
+        await EnsureSuccessAsync(resp);
+        return JsonSerializer.Deserialize<List<DeploymentTargetInfo>>(
+            await resp.Content.ReadAsStringAsync(ct),
+            JsonOptions) ?? [];
+    }
+
+    public async Task<DeploymentTargetInfo> CreateDeploymentTargetAsync(
+        string appId,
+        string name,
+        string slug,
+        string? runnerId,
+        CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { name, slug, runnerId }, JsonOptions);
+        using var resp = await PostJsonAsync($"api/apps/{appId}/targets", payload, ct);
+        await EnsureSuccessAsync(resp);
+        return JsonSerializer.Deserialize<DeploymentTargetInfo>(
+            await resp.Content.ReadAsStringAsync(ct),
+            JsonOptions) ?? throw new InvalidOperationException("Target response was empty.");
+    }
+
+    public async Task MakeDeploymentTargetDefaultAsync(
+        string appId,
+        string targetId,
+        CancellationToken ct = default)
+    {
+        using var resp = await PostJsonAsync(
+            $"api/apps/{appId}/targets/{targetId}/make-default", "{}", ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task AssignDeploymentTargetRunnerAsync(
+        string appId,
+        string targetId,
+        string? runnerId,
+        bool cleanupDeployedRuntime = false,
+        CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(
+            new { runnerId, cleanupDeployedRuntime },
+            JsonOptions);
+        using var resp = await PostJsonAsync(
+            $"api/apps/{appId}/targets/{targetId}/assign-runner", payload, ct);
+        await EnsureSuccessAsync(resp);
+    }
+
+    public async Task DeleteDeploymentTargetAsync(
+        string appId,
+        string targetId,
+        CancellationToken ct = default)
+    {
+        using var resp = await _http.DeleteAsync(
+            $"api/apps/{appId}/targets/{targetId}", ct);
+        await EnsureSuccessAsync(resp);
     }
 
     public async Task<JsonElement> GetUserProfileAsync(CancellationToken ct = default)
@@ -120,13 +191,6 @@ public class AutomatonApiClient : IDisposable
         return await ReadJsonAsync(resp, ct);
     }
 
-    public async Task UpdateAppRunnerAsync(string appId, string? runnerId, CancellationToken ct = default)
-    {
-        var payload = JsonSerializer.Serialize(new { executionRunnerId = runnerId }, JsonOptions);
-        using var resp = await PutJsonAsync($"api/apps/{appId}/runner", payload, ct);
-        await EnsureSuccessAsync(resp);
-    }
-
     public async Task<string> CreateRuntimeLaunchAsync(string appId, CancellationToken ct = default)
     {
         using var resp = await PostJsonAsync($"api/apps/{appId}/runtime-launch", "{}", ct);
@@ -179,14 +243,28 @@ public class AutomatonApiClient : IDisposable
     /// <summary>
     /// Upload a zip archive to the app. clean=true wipes existing files first.
     /// </summary>
-    public async Task<JsonElement> DeployPackageAsync(string appId, Stream zipStream, bool clean = false, CancellationToken ct = default)
+    public async Task<JsonElement> DeployPackageAsync(
+        string appId,
+        Stream zipStream,
+        bool clean = false,
+        string? targetSlug = null,
+        CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
         var streamContent = new StreamContent(zipStream);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         content.Add(streamContent, "file", "deploy-package.zip");
 
-        var url = $"api/apps/{appId}/deploy-package{(clean ? "?clean=true" : "")}";
+        var query = new List<string>();
+        if (clean)
+        {
+            query.Add("clean=true");
+        }
+        if (!string.IsNullOrWhiteSpace(targetSlug))
+        {
+            query.Add($"targetSlug={Uri.EscapeDataString(targetSlug)}");
+        }
+        var url = $"api/apps/{appId}/deploy-package{(query.Count > 0 ? $"?{string.Join("&", query)}" : "")}";
         using var resp = await _http.PostAsync(url, content, ct);
         await EnsureSuccessAsync(resp);
         return await ReadJsonAsync(resp, ct);
@@ -205,7 +283,6 @@ public class AutomatonApiClient : IDisposable
         string appId,
         string publicUrl,
         bool requiresAuthentication = false,
-        string? executionRunnerId = null,
         string? category = null,
         string? tags = null,
         bool isForkable = false,
@@ -215,7 +292,6 @@ public class AutomatonApiClient : IDisposable
         {
             publicUrl,
             requiresAuthentication,
-            executionRunnerId,
             category,
             tags,
             isForkable
@@ -349,12 +425,6 @@ public class AutomatonApiClient : IDisposable
     {
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         return await _http.PostAsync(url, content, ct);
-    }
-
-    private async Task<HttpResponseMessage> PutJsonAsync(string url, string json, CancellationToken ct)
-    {
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        return await _http.PutAsync(url, content, ct);
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage resp, CancellationToken ct)

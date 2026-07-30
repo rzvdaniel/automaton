@@ -41,6 +41,14 @@ public sealed class DeployResult
 
     public string? AppName { get; init; }
 
+    public string? TargetSlug { get; init; }
+
+    public string? TargetName { get; init; }
+
+    public string? RunnerName { get; init; }
+
+    public string? DeploymentMode { get; init; }
+
     public string? OpenAppUrl { get; init; }
 
     public string? StudioAppUrl { get; init; }

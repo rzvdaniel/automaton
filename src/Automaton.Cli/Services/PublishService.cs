@@ -134,7 +134,6 @@ public sealed class PublishService
                 appId!,
                 resolvedSlug,
                 resolvedRequiresAuthentication,
-                executionRunnerId: null,
                 category: null,
                 tags: null,
                 resolvedIsForkable,

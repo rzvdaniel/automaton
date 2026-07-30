@@ -54,16 +54,14 @@ public static class StatusCommand
 
                 using var client = new AutomatonApiClient(server!, apiKey!);
                 var app = await client.GetAppAsync(appId!);
+                var targets = await client.ListDeploymentTargetsAsync(appId!);
+                var defaultTarget = targets.SingleOrDefault(target => target.IsDefault);
 
                 var deployDirectory = !string.IsNullOrWhiteSpace(appConfig.Frontend?.DeployDir)
                     ? ZipService.ResolveDeployDirectory(cwd, appConfig.Frontend.DeployDir)
                     : null;
                 var backendScripts = ResolveBackendScriptCount(cwd, appConfig.Backend?.DeployDir);
 
-                var executionRunnerId = app.TryGetProperty("executionRunnerId", out var runnerProperty)
-                    && runnerProperty.ValueKind == JsonValueKind.String
-                        ? runnerProperty.GetString()
-                        : null;
                 var publicUrl = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var liveUrl = isPublished && !string.IsNullOrWhiteSpace(publicUrl) ? CliAppUrlBuilder.BuildPublishedUrl(server!, publicUrl) : null;
@@ -99,7 +97,8 @@ public static class StatusCommand
                             publicUrl,
                             openAppUrl,
                             liveUrl,
-                            executionRunnerId,
+                            defaultTarget,
+                            targets,
                             version = app.TryGetProperty("version", out var versionProperty) ? versionProperty.GetInt32() : 0
                         }
                     });
@@ -116,7 +115,12 @@ public static class StatusCommand
                 table.AddRow("frontend deploy dir", deployDirectory == null ? "-" : Path.GetRelativePath(cwd, deployDirectory));
                 table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
                 table.AddRow("backend scripts", backendScripts.ToString());
-                table.AddRow("runner", string.IsNullOrWhiteSpace(executionRunnerId) ? "-" : executionRunnerId);
+                table.AddRow(
+                    "default target",
+                    defaultTarget == null
+                        ? "-"
+                        : $"{defaultTarget.Slug} → {defaultTarget.Runner?.Name ?? "unassigned"}");
+                table.AddRow("targets", targets.Count.ToString());
                 table.AddRow("open app", string.IsNullOrWhiteSpace(openAppUrl) ? "-" : openAppUrl);
                 table.AddRow("published", isPublished ? "yes" : "no");
                 table.AddRow("public url", liveUrl ?? "-");

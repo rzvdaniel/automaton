@@ -1,18 +1,12 @@
 namespace Automaton.Cli.Models;
 
-public sealed record RunnerSelectionItem(string Id, string Name, bool Connected, bool CanExecuteApplications = false);
-
 public sealed class DeployPreparationResult
 {
     public bool Success { get; init; }
 
-    public bool RequiresRunnerSelection { get; init; }
-
     public IReadOnlyList<DeployCheckResult> Checks { get; init; } = [];
 
     public IReadOnlyList<string> NextSteps { get; init; } = [];
-
-    public IReadOnlyList<RunnerSelectionItem> AvailableRunners { get; init; } = [];
 
     public string? RunnerId { get; init; }
 

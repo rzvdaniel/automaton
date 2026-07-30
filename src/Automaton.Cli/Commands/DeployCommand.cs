@@ -24,6 +24,13 @@ public static class DeployCommand
     private static DateTime managedRunnerLastNonInteractiveUpdateUtc;
     public static Command Build(ConfigService config)
     {
+        var targetArgument = new Argument<string?>(
+            "target",
+            () => null,
+            "Named deployment target slug; omit to deploy the default target")
+        {
+            Arity = ArgumentArity.ZeroOrOne
+        };
         var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before backend deploy when needed");
         var cleanOption = new Option<bool>(
             "--clean",
@@ -46,6 +53,7 @@ public static class DeployCommand
 
         var cmd = new Command("deploy", "Build, upload, and deploy the app to Automaton")
         {
+            targetArgument,
             runnerOption,
             cleanOption,
             skipBackendOption,
@@ -60,6 +68,7 @@ public static class DeployCommand
 
         cmd.SetHandler(async (InvocationContext context) =>
         {
+            var targetSlug = context.ParseResult.GetValueForArgument(targetArgument);
             var runner = context.ParseResult.GetValueForOption(runnerOption);
             var clean = context.ParseResult.GetValueForOption(cleanOption);
             var skipBackend = context.ParseResult.GetValueForOption(skipBackendOption);
@@ -71,7 +80,6 @@ public static class DeployCommand
             var nonInteractiveFlag = context.ParseResult.GetValueForOption(nonInteractiveOption);
             var environmentName = context.ParseResult.GetValueForOption(environmentOption);
 
-            var preparationService = new DeployPreparationService(config);
             var publishService = new PublishService(config);
             var nonInteractive = CliInteraction.IsNonInteractive(nonInteractiveFlag, asJson);
             var headingWritten = false;
@@ -84,21 +92,42 @@ public static class DeployCommand
                 var cwd = Directory.GetCurrentDirectory();
                 var projectConfig = config.TryLoadProjectConfig(cwd);
                 var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
-                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
-                var preparation = skipBackend
-                    ? new DeployPreparationResult { Success = true }
-                    : await preparationService.PrepareAsync(cwd, runner, environmentName);
-
-                if (preparation.RequiresRunnerSelection && !nonInteractive && string.IsNullOrWhiteSpace(runner) && preparation.AvailableRunners.Count > 1)
+                var targetService = new DeploymentTargetService(config);
+                var target = await targetService.ResolveAsync(
+                    cwd, targetSlug, environmentName, context.GetCancellationToken());
+                if (!string.IsNullOrWhiteSpace(runner))
                 {
-                    var prompt = new SelectionPrompt<RunnerSelectionItem>()
-                        .Title("Select a connected runner for backend deploy")
-                        .UseConverter(item => $"{item.Name} ({item.Id})");
-
-                    prompt.AddChoices(preparation.AvailableRunners);
-                    var selected = AnsiConsole.Prompt(prompt);
-                    preparation = await preparationService.PrepareAsync(cwd, selected.Id, environmentName);
+                    target = await targetService.AssignRunnerAsync(
+                        cwd,
+                        target,
+                        runner,
+                        environmentName,
+                        context.GetCancellationToken());
                 }
+                if (!target.IsDefault && target.Runner == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Deployment target '{target.Slug}' has no assigned Runner. " +
+                        $"Assign one with 'automaton deploy {target.Slug} --runner <runner-id-or-name>'.");
+                }
+                if (!target.IsDefault && (publish || open))
+                {
+                    throw new InvalidOperationException(
+                        "--publish and --open apply only to the default target.");
+                }
+                WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
+                var preparation = new DeployPreparationResult
+                {
+                    Success = true,
+                    RunnerId = target.Runner?.Id,
+                    RunnerName = target.Runner?.Name,
+                    Checks = target.Runner == null
+                        ? []
+                        : [new DeployCheckResult(
+                            DeployCheckNames.RunnerAssignment,
+                            true,
+                            $"target '{target.Slug}' assigned to Runner {target.Runner.Name}")]
+                };
 
                 if (!preparation.Success)
                 {
@@ -115,7 +144,23 @@ public static class DeployCommand
                     return;
                 }
 
-                var result = await deployService.DeployAsync(cwd, clean, skipBackend, dir, environmentName);
+                var result = await deployService.DeployAsync(
+                    cwd,
+                    clean,
+                    skipBackend,
+                    dir,
+                    environmentName,
+                    target,
+                    context.GetCancellationToken());
+                if (result.Success)
+                {
+                    target = await targetService.ResolveAsync(
+                        cwd,
+                        target.Slug,
+                        environmentName,
+                        context.GetCancellationToken());
+                    result = ApplyTargetIdentity(result, target);
+                }
                 result = MergePreparation(result, preparation);
 
                 if (result.Success)
@@ -168,7 +213,25 @@ public static class DeployCommand
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
+                if (asJson)
+                {
+                    CliJson.Write(new
+                    {
+                        success = false,
+                        summary = "Deploy failed",
+                        error = ex.Message,
+                        target = targetSlug
+                    });
+                }
+                else if (nonInteractive)
+                {
+                    Console.Error.WriteLine($"Error: {ex.Message}");
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine(
+                        $"[red]Error:[/] {Markup.Escape(ex.Message)}");
+                }
                 Environment.ExitCode = 1;
             }
         });
@@ -198,6 +261,10 @@ public static class DeployCommand
             HasWarnings = result.HasWarnings || preparationChecks.Any(check => !check.Success && check.IsWarning),
             AppId = result.AppId,
             AppName = result.AppName,
+            TargetSlug = result.TargetSlug,
+            TargetName = result.TargetName,
+            RunnerName = result.RunnerName,
+            DeploymentMode = result.DeploymentMode,
             OpenAppUrl = result.OpenAppUrl,
             StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
@@ -213,9 +280,38 @@ public static class DeployCommand
         };
     }
 
+    private static DeployResult ApplyTargetIdentity(
+        DeployResult result,
+        DeploymentTargetInfo target) =>
+        new()
+        {
+            Success = result.Success,
+            Summary = result.Summary,
+            HasWarnings = result.HasWarnings,
+            AppId = result.AppId,
+            AppName = result.AppName,
+            TargetSlug = target.Slug,
+            TargetName = target.Name,
+            RunnerName = target.Runner?.Name,
+            DeploymentMode = target.IsDefault ? "default" : "named",
+            OpenAppUrl = result.OpenAppUrl,
+            StudioAppUrl = result.StudioAppUrl,
+            DeployDirectory = result.DeployDirectory,
+            Clean = result.Clean,
+            SkipBackend = result.SkipBackend,
+            Checks = result.Checks,
+            NextSteps = result.NextSteps,
+            SourceUploaded = result.SourceUploaded,
+            Uploaded = result.Uploaded,
+            BackendUploaded = result.BackendUploaded,
+            Backend = result.Backend,
+            BackendRunning = result.BackendRunning
+        };
+
     private static DeployResult AppendDefaultSuccessNextSteps(DeployResult result)
     {
-        if (!result.Success)
+        if (!result.Success ||
+            string.Equals(result.DeploymentMode, "named", StringComparison.Ordinal))
         {
             return result;
         }
@@ -230,6 +326,10 @@ public static class DeployCommand
             Summary = result.Summary,
             AppId = result.AppId,
             AppName = result.AppName,
+            TargetSlug = result.TargetSlug,
+            TargetName = result.TargetName,
+            RunnerName = result.RunnerName,
+            DeploymentMode = result.DeploymentMode,
             OpenAppUrl = result.OpenAppUrl,
             StudioAppUrl = result.StudioAppUrl,
             DeployDirectory = result.DeployDirectory,
@@ -267,6 +367,10 @@ public static class DeployCommand
                 hasWarnings = result.HasWarnings,
                 appId = result.AppId,
                 appName = result.AppName,
+                target = result.TargetSlug,
+                targetName = result.TargetName,
+                runner = result.RunnerName,
+                deploymentMode = result.DeploymentMode,
                 openAppUrl = result.OpenAppUrl,
                 studioAppUrl = result.StudioAppUrl,
                 deployDirectory = result.DeployDirectory,
@@ -303,6 +407,11 @@ public static class DeployCommand
 
         if (result.Success)
         {
+            AnsiConsole.MarkupLine(
+                $"[bold]Target:[/] {Markup.Escape(result.TargetSlug ?? "default")} " +
+                $"([grey]{Markup.Escape(result.DeploymentMode ?? "default")}[/])");
+            AnsiConsole.MarkupLine(
+                $"[bold]Runner:[/] {Markup.Escape(result.RunnerName ?? "managed/default assignment")}");
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
             {
                 AnsiConsole.WriteLine();
@@ -471,6 +580,10 @@ public static class DeployCommand
 
         if (result.Success)
         {
+            Console.WriteLine(
+                $"Target: {result.TargetSlug ?? "default"} ({result.DeploymentMode ?? "default"})");
+            Console.WriteLine(
+                $"Runner: {result.RunnerName ?? "managed/default assignment"}");
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))
             {
                 Console.WriteLine(result.HasWarnings ? "Deploy complete with warnings." : "Deploy complete.");
@@ -528,6 +641,10 @@ public static class DeployCommand
             hasWarnings = deployResult.HasWarnings,
             appId = deployResult.AppId,
             appName = deployResult.AppName,
+            target = deployResult.TargetSlug,
+            targetName = deployResult.TargetName,
+            runner = deployResult.RunnerName,
+            deploymentMode = deployResult.DeploymentMode,
             openAppUrl = deployResult.OpenAppUrl,
             studioAppUrl = deployResult.StudioAppUrl,
             deployDirectory = deployResult.DeployDirectory,

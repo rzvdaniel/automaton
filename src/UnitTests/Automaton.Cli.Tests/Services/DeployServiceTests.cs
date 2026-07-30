@@ -111,7 +111,7 @@ public class DeployServiceTests
             configService,
             progress.Add,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, zip, _, _) =>
+            (_, _, _, _, zip, _, _) =>
             {
                 Assert.That(zip.Length, Is.GreaterThan(0));
                 return Task.FromResult((
@@ -148,7 +148,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, _, _, _) => Task.FromResult((
+            (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(4, 0, 0.1),
                 new DeployBackendResult(true, 1, "ignored"))));
 
@@ -177,7 +177,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, _, _, _) => Task.FromResult((
+            (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
                     false,
@@ -212,7 +212,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             runBuildAsync: (_, _, _) => Task.FromResult(0),
-            deployPackageAsync: (_, _, _, _, _, _) => throw new InvalidOperationException("upload must wait for runtime readiness"),
+            deployPackageAsync: (_, _, _, _, _, _, _) => throw new InvalidOperationException("upload must wait for runtime readiness"),
             createSnapshotAsync: (_, _, _, _) => Task.FromResult((true, "snapshot created")),
             ensureManagedRuntimeReadyAsync: (_, _, _, _) =>
             {
@@ -247,7 +247,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, _, _, _) => Task.FromResult((
+            (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
                     false,
@@ -283,7 +283,7 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, _, _, _) => Task.FromResult((
+            (_, _, _, _, _, _, _) => Task.FromResult((
                 new DeployUploadResult(1, 0, 0.1),
                 new DeployBackendResult(
                     false,
@@ -317,12 +317,69 @@ public class DeployServiceTests
         var service = new DeployService(
             configService,
             (_, _, _) => Task.FromResult(0),
-            (_, _, _, _, _, _) => throw new InvalidOperationException("package upload failed"));
+            (_, _, _, _, _, _, _) => throw new InvalidOperationException("package upload failed"));
 
         var result = await service.DeployAsync(projectRoot, clean: false, skipBackend: false, directoryOverride: null);
 
         Assert.That(result.Success, Is.False);
         AssertCheck(result, DeployCheckNames.PackageUpload, false, "package upload failed");
+    }
+
+    [Test]
+    public async Task DeployAsync_NamedTargetPassesSlugAndReportsDeploymentIdentity()
+    {
+        var projectRoot = CreateProjectRoot();
+        var configService = new ConfigService();
+        configService.SaveProjectConfig(projectRoot, new AutomatonConfig
+        {
+            Name = "App",
+            Frontend = new FrontendConfig { DeployDir = "frontend/dist" }
+        });
+        SaveEnvironment(
+            configService,
+            projectRoot,
+            "https://api.example.com",
+            "ak_test",
+            Guid.NewGuid().ToString());
+        WriteFrontendIndexHtml(projectRoot);
+        string? requestedTarget = null;
+        var target = new DeploymentTargetInfo(
+            "target-eu",
+            "Server EU",
+            "server-eu",
+            false,
+            "Running",
+            true,
+            false,
+            null,
+            new DeploymentTargetRunnerInfo("runner-eu", "Runner EU", true));
+        var service = new DeployService(
+            configService,
+            runBuildAsync: (_, _, _) => Task.FromResult(0),
+            deployPackageAsync: (_, _, _, targetSlug, _, _, _) =>
+            {
+                requestedTarget = targetSlug;
+                return Task.FromResult((
+                    new DeployUploadResult(1, 0, 0.1),
+                    new DeployBackendResult(true, 1, "deployed")));
+            },
+            createSnapshotAsync: (_, _, _, _) =>
+                Task.FromResult((true, "snapshot created")));
+
+        var result = await service.DeployAsync(
+            projectRoot,
+            clean: false,
+            skipBackend: true,
+            directoryOverride: null,
+            target: target);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requestedTarget, Is.EqualTo("server-eu"));
+            Assert.That(result.TargetSlug, Is.EqualTo("server-eu"));
+            Assert.That(result.RunnerName, Is.EqualTo("Runner EU"));
+            Assert.That(result.DeploymentMode, Is.EqualTo("named"));
+        });
     }
 
     private static void AssertCheck(DeployResult result, string name, bool expectedSuccess, string expectedMessageFragment)
