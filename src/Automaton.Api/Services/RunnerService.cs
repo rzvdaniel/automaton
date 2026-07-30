@@ -903,6 +903,17 @@ public class RunnerService
                 throw new InvalidOperationException("Hosted runners cannot be deleted from the generic runners page. Restart the hosted runner instead.");
             }
 
+            var assignedTargets = await dbContext.AppDeploymentTargets
+                .Where(target => target.ExecutionRunnerId == id)
+                .ToListAsync(cancellationToken);
+            foreach (var target in assignedTargets)
+            {
+                target.ExecutionRunnerId = null;
+                target.ExecutionRunner = null;
+                target.Status = DeploymentTargetStatus.Unassigned;
+                target.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
             dbContext.Runners.Remove(entity);
             await dbContext.SaveChangesAsync(cancellationToken);
 

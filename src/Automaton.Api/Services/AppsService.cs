@@ -23,6 +23,7 @@ public class AppsService
     private readonly IApplicationEventService applicationEventService;
     private readonly BackendRouteConfigService backendRouteConfigService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
+    private readonly AppDeploymentTargetManagementService? deploymentTargetManagementService;
     private readonly Serilog.ILogger logger;
 
     // ✅ Helper property to get current userId (respects impersonation)
@@ -38,7 +39,8 @@ public class AppsService
         IAuditEventService auditEventService,
         IApplicationEventService applicationEventService,
         BackendRouteConfigService backendRouteConfigService,
-        AppRunnerAssignmentPolicy runnerAssignmentPolicy
+        AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        AppDeploymentTargetManagementService? deploymentTargetManagementService = null
     )
     {
         this.dataContext = dataContext;
@@ -51,6 +53,7 @@ public class AppsService
         this.applicationEventService = applicationEventService;
         this.backendRouteConfigService = backendRouteConfigService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
+        this.deploymentTargetManagementService = deploymentTargetManagementService;
         this.logger = Serilog.Log.ForContext<AppsService>();
     }
 
@@ -604,12 +607,32 @@ public class AppsService
         var appName = app.Name;
         var ownerId = ResolveAppOwnerId(app) ?? UserId;
 
-        // Delete from file system
-        await fileStorageService.DeleteAppAsync(ownerId, id);
+        IReadOnlyDictionary<Guid, DeploymentTargetStatus>? deletionClaims = null;
+        try
+        {
+            if (deploymentTargetManagementService != null)
+            {
+                deletionClaims = await deploymentTargetManagementService
+                    .ClaimAndCleanupAppRuntimesAsync(id);
+            }
 
-        // Delete from database
-        dataContext.WebApps.Remove(app);
-        dataContext.SaveChanges();
+            // Delete from file system
+            await fileStorageService.DeleteAppAsync(ownerId, id);
+
+            // Delete from database
+            dataContext.WebApps.Remove(app);
+            dataContext.SaveChanges();
+        }
+        catch
+        {
+            if (deploymentTargetManagementService != null && deletionClaims != null)
+            {
+                dataContext.ChangeTracker.Clear();
+                await deploymentTargetManagementService.ReleaseAppDeletionClaimsAsync(
+                    id, deletionClaims, CancellationToken.None);
+            }
+            throw;
+        }
 
         // Log activity
         await recentActivityService.LogAppActivityAsync(ActivityType.AppDeleted, appName, id);

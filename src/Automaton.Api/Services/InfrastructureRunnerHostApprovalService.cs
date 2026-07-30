@@ -2,6 +2,7 @@ using System.Data;
 using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Hubs;
 using Automaton.Api.Models;
 using Automaton.Api.Services.Interfaces;
@@ -107,6 +108,16 @@ public sealed class InfrastructureRunnerHostApprovalService(
             runner.ConnectionId = null;
             runner.LastDisconnectedAtUtc = DateTime.UtcNow;
             runner.Status = RunnerConnectivityStatuses.Offline;
+            var assignedTargets = await db.AppDeploymentTargets
+                .Where(target => target.ExecutionRunnerId == runner.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var target in assignedTargets)
+            {
+                target.ExecutionRunnerId = null;
+                target.ExecutionRunner = null;
+                target.Status = DeploymentTargetStatus.Unassigned;
+                target.UpdatedAt = DateTimeOffset.UtcNow;
+            }
             host.HostedRunnerSchedulingEnabled = false;
             host.Status = RunnerHostStatuses.Disabled;
             host.UpdatedAt = DateTime.UtcNow;

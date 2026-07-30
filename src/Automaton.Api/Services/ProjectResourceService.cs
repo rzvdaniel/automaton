@@ -405,6 +405,18 @@ public class ProjectResourceService
         }
 
         dbContext.ProjectRunners.Remove(projectRunner);
+        var affectedTargets = await dbContext.AppDeploymentTargets
+            .Where(target =>
+                target.ExecutionRunnerId == runnerId &&
+                target.WebApp.ProjectId == projectId)
+            .ToListAsync(cancellationToken);
+        foreach (var target in affectedTargets)
+        {
+            target.ExecutionRunnerId = null;
+            target.ExecutionRunner = null;
+            target.Status = DeploymentTargetStatus.Unassigned;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // Audit

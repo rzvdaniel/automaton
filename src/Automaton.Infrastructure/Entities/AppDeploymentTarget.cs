@@ -31,6 +31,9 @@ public sealed class AppDeploymentTarget
     public DateTimeOffset? LastSuccessfulDeploymentAt { get; set; }
 
     public DeploymentTargetStatus Status { get; set; } = DeploymentTargetStatus.NotDeployed;
+    public bool CleanupPending { get; set; }
+    public string? LastCleanupError { get; set; }
+    public DateTimeOffset? LastCleanupAttemptAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

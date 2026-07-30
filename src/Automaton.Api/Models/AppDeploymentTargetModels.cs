@@ -19,6 +19,9 @@ public sealed record AppDeploymentTargetSummary(
     bool BackendDeployed,
     DateTimeOffset? LastDeploymentAt,
     DateTimeOffset? LastSuccessfulDeploymentAt,
+    bool CleanupPending,
+    string? LastCleanupError,
+    DateTimeOffset? LastCleanupAttemptAt,
     AppDeploymentTargetRunnerSummary? Runner,
     string RoutePath);
 

@@ -692,6 +692,7 @@ namespace Automaton.Api.Data
                     .IsRequired()
                     .HasMaxLength(40)
                     .HasConversion<string>();
+                entity.Property(e => e.LastCleanupError).HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
 

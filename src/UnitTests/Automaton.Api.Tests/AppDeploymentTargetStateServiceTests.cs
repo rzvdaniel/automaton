@@ -40,6 +40,40 @@ public class AppDeploymentTargetStateServiceTests
         });
     }
 
+    [Test]
+    public async Task StartingSecondDeploymentForSameTarget_IsRejected()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var target = app.DeploymentTargets.Single(candidate => candidate.IsDefault);
+        var service = new AppDeploymentTargetStateService(db);
+
+        await service.MarkStartedAsync(app.Id, target.Id);
+
+        var exception = Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await service.MarkStartedAsync(app.Id, target.Id));
+        Assert.That(exception!.Message, Does.Contain("already active"));
+    }
+
+    [Test]
+    public async Task DifferentTargets_CanBothHaveActiveDeployments()
+    {
+        await using var db = CreateDbContext();
+        var app = AddAppWithTwoTargets(db);
+        await db.SaveChangesAsync();
+        var service = new AppDeploymentTargetStateService(db);
+
+        foreach (var target in app.DeploymentTargets)
+        {
+            await service.MarkStartedAsync(app.Id, target.Id);
+        }
+
+        Assert.That(
+            app.DeploymentTargets.All(target => target.Status == DeploymentTargetStatus.Deploying),
+            Is.True);
+    }
+
     [TestCase(true, false)]
     [TestCase(false, true)]
     [TestCase(true, true)]
@@ -169,4 +203,5 @@ public class AppDeploymentTargetStateServiceTests
                 .UseInMemoryDatabase($"deployment-target-state-{Guid.NewGuid():N}")
                 .Options);
     }
+
 }

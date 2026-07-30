@@ -177,6 +177,7 @@ function remove(target: AppDeploymentTarget) {
 function statusSeverity(status: AppDeploymentTarget['status']) {
   if (status === DeploymentTargetStatus.Running) return 'success'
   if (status === DeploymentTargetStatus.Failed) return 'danger'
+  if (status === DeploymentTargetStatus.RunnerOffline) return 'warn'
   if (status === DeploymentTargetStatus.Deploying) return 'info'
   return 'secondary'
 }
@@ -235,6 +236,9 @@ watch(() => props.refreshRevision, load)
             </span>
             <span><i class="pi pi-box"></i> {{ target.frontendDeployed || target.backendDeployed ? 'Runtime deployed' : 'Not deployed' }}</span>
           </div>
+          <Message v-if="target.cleanupPending" severity="warn" :closable="false">
+            Runtime cleanup needs retry. {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
+          </Message>
           <button v-if="targetRoute(target)" class="route-link" type="button" @click="openRoute(target)">
             {{ target.routePath }} <i class="pi pi-external-link"></i>
           </button>

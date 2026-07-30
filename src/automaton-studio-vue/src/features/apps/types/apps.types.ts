@@ -128,6 +128,9 @@ export interface AppDeploymentTarget {
   backendDeployed: boolean
   lastDeploymentAt?: string | null
   lastSuccessfulDeploymentAt?: string | null
+  cleanupPending: boolean
+  lastCleanupError?: string | null
+  lastCleanupAttemptAt?: string | null
   runner?: {
     id: string
     name: string

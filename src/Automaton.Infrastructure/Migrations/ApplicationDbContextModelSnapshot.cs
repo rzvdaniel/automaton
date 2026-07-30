@@ -761,6 +761,9 @@ namespace Automaton.Api.Migrations
                     b.Property<bool>("BackendDeployed")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<bool>("CleanupPending")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -775,6 +778,13 @@ namespace Automaton.Api.Migrations
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTimeOffset?>("LastCleanupAttemptAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LastCleanupError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
                     b.Property<DateTimeOffset?>("LastDeploymentAt")
                         .HasColumnType("datetime(6)");

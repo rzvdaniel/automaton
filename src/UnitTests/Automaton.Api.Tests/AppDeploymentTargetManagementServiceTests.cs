@@ -128,6 +128,89 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
+    public async Task CleanupFailure_IsRecordedAndCanBeRetried()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var runner = fixture.AddRunner(online: false);
+        await fixture.Db.SaveChangesAsync();
+        var created = await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = "Offline target",
+                Slug = "offline-target",
+                RunnerId = runner.Id
+            },
+            fixture.UserId);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
+        target.FrontendDeployed = true;
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+
+        Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await fixture.Service.DeleteAsync(
+                fixture.App.Id, target.Id, fixture.UserId));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(target.CleanupPending, Is.True);
+            Assert.That(target.LastCleanupAttemptAt, Is.Not.Null);
+            Assert.That(target.LastCleanupError, Does.Contain("must be online"));
+            Assert.That(fixture.Db.AppDeploymentTargets.Any(candidate => candidate.Id == target.Id), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task OfflineRunner_IsRepresentedWithoutClearingDeploymentMetadata()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var runner = fixture.AddRunner(online: false);
+        await fixture.Db.SaveChangesAsync();
+        var created = await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = "Offline target",
+                Slug = "offline-target",
+                RunnerId = runner.Id
+            },
+            fixture.UserId);
+        var target = await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == created.Id);
+        target.FrontendDeployed = true;
+        target.LastSuccessfulDeploymentAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        target.Status = DeploymentTargetStatus.Running;
+        await fixture.Db.SaveChangesAsync();
+
+        var summary = await fixture.Service.GetAsync(fixture.App.Id, target.Id, fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Status, Is.EqualTo(DeploymentTargetStatus.RunnerOffline));
+            Assert.That(summary.FrontendDeployed, Is.True);
+            Assert.That(summary.LastSuccessfulDeploymentAt, Is.EqualTo(target.LastSuccessfulDeploymentAt));
+        });
+    }
+
+    [Test]
+    public async Task AppDeletionClaim_BlocksDeploymentUntilReleased()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var target = await fixture.Db.AppDeploymentTargets
+            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+
+        var claims = await fixture.Service.ClaimAndCleanupAppRuntimesAsync(fixture.App.Id);
+
+        Assert.ThrowsAsync<AppDeploymentTargetConflictException>(
+            async () => await new AppDeploymentTargetStateService(fixture.Db)
+                .MarkStartedAsync(fixture.App.Id, target.Id));
+
+        await fixture.Service.ReleaseAppDeletionClaimsAsync(fixture.App.Id, claims);
+        Assert.That(
+            (await fixture.Db.AppDeploymentTargets.SingleAsync(candidate => candidate.Id == target.Id)).Status,
+            Is.EqualTo(DeploymentTargetStatus.Unassigned));
+    }
+
+    [Test]
     public async Task Create_InfrastructureRunnerForOrdinaryAppIsRejected()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
@@ -228,7 +311,8 @@ public class AppDeploymentTargetManagementServiceTests
                 authorization,
                 new AppRunnerAuthorizationPolicy(db, authorization),
                 new RejectingHubContext(),
-                routeService);
+                routeService,
+                new AppDeploymentTargetStateService(db));
             return new TestFixtureContext(db, app, service, routeRoot, userId);
         }
 
