@@ -455,6 +455,12 @@ export interface RunnerHost {
   infrastructureRunnerLastHeartbeatAtUtc?: string
   infrastructureRunnerOnboardingStatus: 'NotInstalled' | 'EnrollmentPending' | 'Online' | 'Offline' | 'Replacing' | 'Revoked' | string
   infrastructureRunnerVersion?: string
+  infrastructureRunnerImageDigest?: string
+  infrastructureRunnerSpecificationVersion?: number
+  infrastructureRunnerApiCompatibilityVersion?: string
+  infrastructureRunnerOperatingSystem?: string
+  infrastructureRunnerArchitecture?: string
+  infrastructureRunnerContainerHealth?: string
   infrastructureRunnerInstallationId?: string
   infrastructureRunnerCapabilities: string[]
   infrastructureEnrollmentExpiresAtUtc?: string

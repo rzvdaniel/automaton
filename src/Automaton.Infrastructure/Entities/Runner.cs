@@ -22,6 +22,12 @@ public class Runner
     public string? IpAddress { get; set; }
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
+    [MaxLength(256)] public string? ImageDigest { get; set; }
+    public int? ContainerSpecificationVersion { get; set; }
+    [MaxLength(40)] public string? ApiCompatibilityVersion { get; set; }
+    [MaxLength(256)] public string? OperatingSystem { get; set; }
+    [MaxLength(40)] public string? Architecture { get; set; }
+    [MaxLength(40)] public string? ContainerHealth { get; set; }
 
     /// <summary>
     /// Installation purpose. This does not grant privileges; the installation

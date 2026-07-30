@@ -11,6 +11,7 @@ using Automaton.Core.Enums;
 using System.Threading;
 
 using System.Text;
+using System.Reflection;
 
 namespace Automaton.Runner.Console.Services;
 
@@ -24,6 +25,12 @@ public class HubService
     private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
     private const string HostedRunnerIdHeader = "HostedRunnerId";
+    private const string RunnerImageDigestHeader = "RunnerImageDigest";
+    private const string RunnerSpecificationVersionHeader = "RunnerSpecificationVersion";
+    private const string RunnerApiCompatibilityVersionHeader = "RunnerApiCompatibilityVersion";
+    private const string RunnerOperatingSystemHeader = "RunnerOperatingSystem";
+    private const string RunnerArchitectureHeader = "RunnerArchitecture";
+    private const string RunnerContainerHealthHeader = "RunnerContainerHealth";
     private const string RunWorkflowMethod = "RunWorkflow";
     private const string RunCustomStepMethod = "RunCustomStep";
     private const string RunInfrastructureCommandMethod = "RunInfrastructureCommand";
@@ -287,8 +294,13 @@ public class HubService
                     options.Headers.Add("X-API-Key", apiKey);
                     options.Headers.Add(RunnerIdHeader, configService.RunnerId);
                     options.Headers.Add(RunnerNameHeader, configService.ApplicationName);
-                    options.Headers.Add(RunnerVersionHeader, Environment.Version.ToString());
+                    options.Headers.Add(RunnerVersionHeader, GetRunnerReleaseVersion());
                     options.Headers.Add(RunnerMachineNameHeader, Environment.MachineName);
+                    options.Headers.Add(RunnerImageDigestHeader, Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_IMAGE_DIGEST") ?? string.Empty);
+                    options.Headers.Add(RunnerSpecificationVersionHeader, Environment.GetEnvironmentVariable("AUTOMATON_CONTAINER_SPECIFICATION_VERSION") ?? string.Empty);
+                    options.Headers.Add(RunnerApiCompatibilityVersionHeader, "1");
+                    options.Headers.Add(RunnerOperatingSystemHeader, System.Runtime.InteropServices.RuntimeInformation.OSDescription);
+                    options.Headers.Add(RunnerArchitectureHeader, System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString());
                     var purpose = RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE"));
                     options.Headers.Add(RunnerPurposeHeader, purpose);
                     options.Headers.Add(
@@ -1620,6 +1632,11 @@ public class HubService
     }
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
+
+    private static string GetRunnerReleaseVersion()
+        => typeof(HubService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? typeof(HubService).Assembly.GetName().Version?.ToString()
+            ?? "unknown";
 
     private static string GetContentType(string fileName)
     {

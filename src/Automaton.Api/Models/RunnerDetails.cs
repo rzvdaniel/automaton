@@ -22,6 +22,12 @@ public class RunnerDetails
     public string? IpAddress { get; set; }
     public string? ApiInstanceId { get; set; }
     public string? ApiColor { get; set; }
+    public string? ImageDigest { get; set; }
+    public int? ContainerSpecificationVersion { get; set; }
+    public string? ApiCompatibilityVersion { get; set; }
+    public string? OperatingSystem { get; set; }
+    public string? Architecture { get; set; }
+    public string? ContainerHealth { get; set; }
     public string Purpose { get; set; } = RunnerPurposes.Managed;
     public IReadOnlyList<string> Capabilities { get; set; } = Array.Empty<string>();
     public Guid? RunnerHostId { get; set; }

@@ -426,6 +426,7 @@ public class RunnerService
         runner.IpAddress = runnerConnection.IpAddress;
         runner.ApiInstanceId = runnerConnection.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
         runner.ApiColor = runnerConnection.ApiColor ?? apiInstanceIdentityService.ApiColor;
+        ApplyInstallationReport(runner, runnerConnection);
 
         // Mark entity as modified
         dbContext.Entry(runner).State = EntityState.Modified;
@@ -505,6 +506,7 @@ public class RunnerService
         runner.IpAddress = runnerHeartbeat.IpAddress;
         runner.ApiInstanceId = runnerHeartbeat.ApiInstanceId ?? apiInstanceIdentityService.ApiInstanceId;
         runner.ApiColor = runnerHeartbeat.ApiColor ?? apiInstanceIdentityService.ApiColor;
+        ApplyInstallationReport(runner, runnerHeartbeat);
 
         if (string.Equals(runner.Purpose, RunnerPurposes.Infrastructure, StringComparison.OrdinalIgnoreCase))
         {
@@ -519,6 +521,22 @@ public class RunnerService
         dbContext.Entry(runner).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
         await CompleteHostedRunnerRestartAsync(runner, cancellationToken);
+    }
+
+    private static void ApplyInstallationReport(Runner runner, RunnerDetails report)
+    {
+        runner.ImageDigest = TrimOrNull(report.ImageDigest, 256);
+        runner.ContainerSpecificationVersion = report.ContainerSpecificationVersion is > 0 and <= 1000 ? report.ContainerSpecificationVersion : null;
+        runner.ApiCompatibilityVersion = TrimOrNull(report.ApiCompatibilityVersion, 40);
+        runner.OperatingSystem = TrimOrNull(report.OperatingSystem, 256);
+        runner.Architecture = TrimOrNull(report.Architecture, 40);
+        runner.ContainerHealth = TrimOrNull(report.ContainerHealth, 40);
+    }
+
+    private static string? TrimOrNull(string? value, int maximumLength)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed[..Math.Min(trimmed.Length, maximumLength)];
     }
 
     internal async Task CompleteHostedRunnerRestartAsync(Runner runner, CancellationToken cancellationToken)

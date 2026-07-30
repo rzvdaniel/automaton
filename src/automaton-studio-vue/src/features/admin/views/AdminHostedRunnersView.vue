@@ -688,7 +688,7 @@ watch(() => route.path, refreshAll)
   <div class="hosted-runners-view">
     <div class="flex justify-content-between align-items-start gap-3 mb-4">
       <div>
-        <h1 class="m-0">Hosted Runners</h1>
+        <h1 class="m-0">Runners</h1>
         <p class="text-color-secondary mt-2 mb-0">
           {{ isContainersView
             ? 'Manage tenant runner containers, their specifications, lifecycle, and runtime state.'

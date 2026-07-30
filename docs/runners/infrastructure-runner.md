@@ -10,7 +10,7 @@ its workflows.
 
 ## Installation profile
 
-Create the `RunnerHost` record in Admin -> Hosted Runners first. In the host
+Create the `RunnerHost` record in Admin -> Runners first. In the host
 row, choose **Install Runner**. Studio creates a short-lived, one-time
 enrollment token bound to that host and the administrator-approved
 Infrastructure capability profile. Copy the generated command and run
@@ -53,27 +53,22 @@ The `workflows` directory is mounted as the Runner's existing workspace path;
 this keeps the same Runner project and runtime behavior while giving the host
 the clearer infrastructure-oriented layout.
 
-The equivalent container command contains only the server URL and one-time
-enrollment token:
+Do not reconstruct a `docker run` command manually. The installer owns the
+canonical privileged-container specification (currently version 1), including
+the host mounts, labels, restart policy, network/pid modes, and root user.
+It resolves the requested image to an immutable digest and is the only
+supported path for installation and recovery:
 
 ```bash
-docker run -d \
-  --name automaton-infrastructure-runner \
-  --restart unless-stopped \
-  --user 0 \
-  --privileged \
-  --pid=host \
-  --network host \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /:/host \
-  -v /var/lib/automaton/infrastructure-runner/config:/app/config \
-  -v /var/lib/automaton/infrastructure-runner/workflows:/automaton/workspace \
-  -v /var/lib/automaton/infrastructure-runner/artifacts:/automaton/artifacts \
-  -v /var/lib/automaton/infrastructure-runner/logs:/app/logs \
-  -e AUTOMATON_SERVER_URL='https://your-configured-api-url' \
-  -e AUTOMATON_ENROLLMENT_TOKEN='re_one-time-token' \
-  <runner-image>
+sudo bash install-infrastructure-runner.sh update --version 'your-registry/automaton-runner:release-tag'
+sudo bash install-infrastructure-runner.sh repair
+sudo bash install-infrastructure-runner.sh replace --enrollment-key 're_one-time-token'
 ```
+
+`update` retains the installation identity and automatically restores the
+previous image if the replacement fails to start. `repair` recreates the same
+container contract and identity. `replace` deliberately discards the durable
+credential and installation identity, then requires re-enrollment.
 
 The Runner exchanges the token at `POST /api/runner-enrollments/exchange`. The
 API determines the purpose and capabilities from the enrollment record; the

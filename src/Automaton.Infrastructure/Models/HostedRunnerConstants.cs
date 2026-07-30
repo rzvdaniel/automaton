@@ -116,6 +116,22 @@ public static class HostedRunnerDeploymentStatuses
     public const string Skipped = "skipped";
 }
 
+public static class InfrastructureRunnerUpdateOperationStatuses
+{
+    public const string Pending = "pending";
+    public const string Preparing = "preparing";
+    public const string PullingImage = "pullingImage";
+    public const string StartingUpdater = "startingUpdater";
+    public const string ReplacingRunner = "replacingRunner";
+    public const string WaitingForReconnect = "waitingForReconnect";
+    public const string Validating = "validating";
+    public const string Succeeded = "succeeded";
+    public const string RollingBack = "rollingBack";
+    public const string RolledBack = "rolledBack";
+    public const string Failed = "failed";
+    public const string TimedOut = "timedOut";
+}
+
 public static class HostedRunnerDeploymentErrors
 {
     public const string RegistrationTimedOut = "The hosted Runner did not register before its enrollment deadline.";

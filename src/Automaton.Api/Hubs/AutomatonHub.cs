@@ -20,6 +20,12 @@ public class AutomatonHub : Hub
     private const string RunnerCapabilitiesHeader = "RunnerCapabilities";
     private const string RunnerHostIdHeader = "RunnerHostId";
     private const string HostedRunnerIdHeader = "HostedRunnerId";
+    private const string RunnerImageDigestHeader = "RunnerImageDigest";
+    private const string RunnerSpecificationVersionHeader = "RunnerSpecificationVersion";
+    private const string RunnerApiCompatibilityVersionHeader = "RunnerApiCompatibilityVersion";
+    private const string RunnerOperatingSystemHeader = "RunnerOperatingSystem";
+    private const string RunnerArchitectureHeader = "RunnerArchitecture";
+    private const string RunnerContainerHealthHeader = "RunnerContainerHealth";
 
     private readonly RunnerService runnerService;
     private readonly AppsService appsService;
@@ -273,6 +279,12 @@ public class AutomatonHub : Hub
             IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
             ApiInstanceId = apiInstanceIdentityService.ApiInstanceId,
             ApiColor = apiInstanceIdentityService.ApiColor,
+            ImageDigest = httpContext.Request.Headers[RunnerImageDigestHeader].ToString(),
+            ContainerSpecificationVersion = int.TryParse(httpContext.Request.Headers[RunnerSpecificationVersionHeader].ToString(), out var specificationVersion) ? specificationVersion : null,
+            ApiCompatibilityVersion = httpContext.Request.Headers[RunnerApiCompatibilityVersionHeader].ToString(),
+            OperatingSystem = httpContext.Request.Headers[RunnerOperatingSystemHeader].ToString(),
+            Architecture = httpContext.Request.Headers[RunnerArchitectureHeader].ToString(),
+            ContainerHealth = httpContext.Request.Headers[RunnerContainerHealthHeader].ToString(),
         };
     }
 
