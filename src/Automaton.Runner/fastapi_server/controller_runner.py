@@ -6,8 +6,20 @@ import sys
 from contextlib import redirect_stderr, redirect_stdout
 
 
-def _load_controller_module(scripts_dir: str, app_id: str, controller_name: str):
-    backend_dir = os.path.join(scripts_dir, app_id, "runtime", "backend")
+def _load_controller_module(
+    scripts_dir: str,
+    app_id: str,
+    deployment_target_id: str,
+    controller_name: str,
+):
+    backend_dir = os.path.join(
+        scripts_dir,
+        app_id,
+        "targets",
+        deployment_target_id,
+        "runtime",
+        "backend",
+    )
     script_path = os.path.join(backend_dir, controller_name + ".py")
 
     if not os.path.exists(script_path):
@@ -30,27 +42,29 @@ def _load_controller_module(scripts_dir: str, app_id: str, controller_name: str)
 
 
 def main() -> int:
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print(
             json.dumps(
                 {
                     "success": False,
                     "data": None,
-                    "error": "Usage: controller_runner.py <scripts_dir> <app_id> <controller_name>",
+                    "error": "Usage: controller_runner.py <scripts_dir> <app_id> <deployment_target_id> <controller_name>",
                     "output": None,
                 }
             )
         )
         return 1
 
-    scripts_dir, app_id, controller_name = sys.argv[1:4]
+    scripts_dir, app_id, deployment_target_id, controller_name = sys.argv[1:5]
 
     try:
         payload = json.loads(sys.stdin.read() or "{}")
         action_name = payload.get("action", "")
         inputs = payload.get("inputs", {})
 
-        module = _load_controller_module(scripts_dir, app_id, controller_name)
+        module = _load_controller_module(
+            scripts_dir, app_id, deployment_target_id, controller_name
+        )
         if not hasattr(module, "handle"):
             raise RuntimeError(f"Controller '{controller_name}' has no handle() function")
 

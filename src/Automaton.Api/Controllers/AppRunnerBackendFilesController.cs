@@ -21,6 +21,7 @@ public class AppRunnerBackendFilesController : ControllerBase
     private readonly UserContextService userContextService;
     private readonly AppFileStorageService fileStorageService;
     private readonly AppRunnerAssignmentPolicy runnerAssignmentPolicy;
+    private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
     private readonly IHubContext<AutomatonHub> automatonHub;
     private readonly ConfirmedEmailGuardService confirmedEmailGuardService;
     private readonly ILogger<AppRunnerBackendFilesController> logger;
@@ -31,6 +32,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         UserContextService userContextService,
         AppFileStorageService fileStorageService,
         AppRunnerAssignmentPolicy runnerAssignmentPolicy,
+        IAppDeploymentTargetResolver deploymentTargetResolver,
         IHubContext<AutomatonHub> automatonHub,
         ConfirmedEmailGuardService confirmedEmailGuardService,
         ILogger<AppRunnerBackendFilesController> logger)
@@ -40,6 +42,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         this.userContextService = userContextService;
         this.fileStorageService = fileStorageService;
         this.runnerAssignmentPolicy = runnerAssignmentPolicy;
+        this.deploymentTargetResolver = deploymentTargetResolver;
         this.automatonHub = automatonHub;
         this.confirmedEmailGuardService = confirmedEmailGuardService;
         this.logger = logger;
@@ -77,7 +80,7 @@ public class AppRunnerBackendFilesController : ControllerBase
             });
         }
 
-        var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
+        var (runner, deploymentTargetId, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {
             return error;
@@ -89,8 +92,10 @@ public class AppRunnerBackendFilesController : ControllerBase
             response = await automatonHub.Clients.Client(runner!.ConnectionId!)
                 .InvokeAsync<AppBackendFilesResponse>(
                     AutomatonHubMethods.ListAppBackendFiles,
-                    appId.ToString(),
-                    runnerFileArea,
+                    new ListAppBackendFilesRequest(
+                        appId,
+                        deploymentTargetId,
+                        runnerFileArea),
                     cancellationToken);
         }
         catch (HubException ex)
@@ -146,7 +151,7 @@ public class AppRunnerBackendFilesController : ControllerBase
             });
         }
 
-        var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
+        var (runner, deploymentTargetId, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {
             return error;
@@ -158,9 +163,11 @@ public class AppRunnerBackendFilesController : ControllerBase
             response = await automatonHub.Clients.Client(runner!.ConnectionId!)
                 .InvokeAsync<AppBackendFileContentResponse>(
                     AutomatonHubMethods.ReadAppBackendFile,
-                    appId.ToString(),
-                    path,
-                    runnerFileArea,
+                    new AppBackendFileRequest(
+                        appId,
+                        deploymentTargetId,
+                        path,
+                        runnerFileArea),
                     cancellationToken);
         }
         catch (HubException ex)
@@ -218,7 +225,7 @@ public class AppRunnerBackendFilesController : ControllerBase
             });
         }
 
-        var (runner, error) = await ResolveRunnerAsync(appId, cancellationToken);
+        var (runner, deploymentTargetId, error) = await ResolveRunnerAsync(appId, cancellationToken);
         if (error != null)
         {
             return error;
@@ -230,9 +237,11 @@ public class AppRunnerBackendFilesController : ControllerBase
             response = await automatonHub.Clients.Client(runner!.ConnectionId!)
                 .InvokeAsync<AppBackendFileDeleteResponse>(
                     AutomatonHubMethods.DeleteAppBackendFile,
-                    appId.ToString(),
-                    path,
-                    runnerFileArea,
+                    new AppBackendFileRequest(
+                        appId,
+                        deploymentTargetId,
+                        path,
+                        runnerFileArea),
                     cancellationToken);
         }
         catch (HubException ex)
@@ -279,11 +288,13 @@ public class AppRunnerBackendFilesController : ControllerBase
         return ownerId ?? userContextService.GetUserId();
     }
 
-    private async Task<(Runner? Runner, ActionResult? Error)> ResolveRunnerAsync(Guid appId, CancellationToken cancellationToken)
+    private async Task<(Runner? Runner, Guid DeploymentTargetId, ActionResult? Error)> ResolveRunnerAsync(
+        Guid appId,
+        CancellationToken cancellationToken)
     {
         if (!await authorizationService.CanAccessAppAsync(appId, cancellationToken))
         {
-            return (null, NotFound());
+            return (null, Guid.Empty, NotFound());
         }
 
         try
@@ -293,11 +304,16 @@ public class AppRunnerBackendFilesController : ControllerBase
                 userContextService.GetUserId(),
                 requireOnline: true,
                 cancellationToken: cancellationToken);
-            return (runner, null);
+            var target = await deploymentTargetResolver.ResolveAsync(
+                appId,
+                targetSlug: null,
+                userContextService.GetUserId(),
+                cancellationToken);
+            return (runner, target.Id, null);
         }
         catch (InvalidOperationException ex)
         {
-            return (null, BadRequest(new AppBackendFilesResponse
+            return (null, Guid.Empty, BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
                 Area = AppRunnerFileAreas.Backend,
@@ -306,7 +322,7 @@ public class AppRunnerBackendFilesController : ControllerBase
         }
         catch (UnauthorizedAccessException)
         {
-            return (null, BadRequest(new AppBackendFilesResponse
+            return (null, Guid.Empty, BadRequest(new AppBackendFilesResponse
             {
                 Success = false,
                 Area = AppRunnerFileAreas.Backend,

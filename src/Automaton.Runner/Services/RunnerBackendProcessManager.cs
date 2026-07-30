@@ -8,8 +8,11 @@ namespace Automaton.Runner.Console.Services;
 
 public interface IAppBackendProcessManager
 {
-    Task EnsureRunningAsync(Guid appId, CancellationToken cancellationToken = default);
-    Task StopAsync(Guid appId);
+    Task EnsureRunningAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        CancellationToken cancellationToken = default);
+    Task StopAsync(Guid appId, Guid deploymentTargetId);
 }
 
 /// <summary>Owns one loopback backend process per deployed app.</summary>
@@ -19,7 +22,7 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
     private readonly RunnerBackendRegistry registry;
     private readonly ILogger<RunnerBackendProcessManager> logger;
     private readonly object gate = new();
-    private readonly Dictionary<Guid, Process> processes = [];
+    private readonly Dictionary<DeploymentRuntimeKey, Process> processes = [];
     private readonly int portStart = ReadPort("AUTOMATON_BACKEND_PORT_START", 18000);
     private readonly int portEnd = ReadPort("AUTOMATON_BACKEND_PORT_END", 18999);
 
@@ -39,8 +42,16 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
             try
             {
                 var deployment = JsonSerializer.Deserialize<BackendDeploymentMetadata>(await File.ReadAllTextAsync(metadata, cancellationToken));
-                if (deployment is { HasBackend: true } && Guid.TryParse(deployment.AppId, out var appId))
-                    await EnsureRunningAsync(appId, deployment.BackendModule, cancellationToken);
+                if (deployment is { HasBackend: true } &&
+                    Guid.TryParse(deployment.AppId, out var appId) &&
+                    Guid.TryParse(deployment.DeploymentTargetId, out var deploymentTargetId))
+                {
+                    await EnsureRunningAsync(
+                        appId,
+                        deploymentTargetId,
+                        deployment.BackendModule,
+                        cancellationToken);
+                }
             }
             catch (Exception ex)
             {
@@ -49,15 +60,23 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
         }
     }
 
-    public Task EnsureRunningAsync(Guid appId, CancellationToken cancellationToken = default)
-        => EnsureRunningAsync(appId, "main:app", cancellationToken);
+    public Task EnsureRunningAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        CancellationToken cancellationToken = default)
+        => EnsureRunningAsync(appId, deploymentTargetId, "main:app", cancellationToken);
 
-    private async Task EnsureRunningAsync(Guid appId, string? backendModule, CancellationToken cancellationToken)
+    private async Task EnsureRunningAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        string? backendModule,
+        CancellationToken cancellationToken)
     {
+        var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
         Process? old;
-        lock (gate) processes.TryGetValue(appId, out old);
+        lock (gate) processes.TryGetValue(key, out old);
         var port = AllocatePort();
-        var backendRoot = workspace.GetAppBackendDirectory(appId);
+        var backendRoot = workspace.GetAppBackendDirectory(appId, deploymentTargetId);
         var entrypoint = Path.Combine(backendRoot, "main.py");
         if (!File.Exists(entrypoint))
         {
@@ -65,12 +84,17 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
             return;
         }
 
-        var logDir = Path.Combine(workspace.GetAppRoot(appId), "logs");
+        var logDir = Path.Combine(
+            workspace.GetDeploymentTargetRoot(appId, deploymentTargetId),
+            "logs");
         Directory.CreateDirectory(logDir);
         var log = new StreamWriter(Path.Combine(logDir, "backend.log"), append: true) { AutoFlush = true };
+        var targetPython = RunnerBackendEnvironmentService.GetVenvPythonPath(
+            workspace.GetAppVenvDirectory(appId, deploymentTargetId));
         var start = new ProcessStartInfo
         {
-            FileName = Environment.GetEnvironmentVariable("AUTOMATON_BACKEND_PYTHON") ?? "python",
+            FileName = Environment.GetEnvironmentVariable("AUTOMATON_BACKEND_PYTHON")
+                ?? (File.Exists(targetPython) ? targetPython : "python"),
             Arguments = $"-m uvicorn {SanitizeModule(backendModule)} --host 127.0.0.1 --port {port}",
             WorkingDirectory = backendRoot,
             UseShellExecute = false,
@@ -79,6 +103,8 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
             CreateNoWindow = true
         };
         start.Environment["PORT"] = port.ToString();
+        start.Environment["AUTOMATON_APP_ID"] = appId.ToString();
+        start.Environment["AUTOMATON_DEPLOYMENT_TARGET_ID"] = deploymentTargetId.ToString();
         var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start backend for app {appId}.");
         process.OutputDataReceived += (_, e) => { if (e.Data is not null) log.WriteLine(e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data is not null) log.WriteLine(e.Data); };
@@ -87,13 +113,16 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
             var isCurrent = false;
             lock (gate)
             {
-                isCurrent = processes.TryGetValue(appId, out var current) && ReferenceEquals(current, process);
-                if (isCurrent) processes.Remove(appId);
+                isCurrent = processes.TryGetValue(key, out var current) && ReferenceEquals(current, process);
+                if (isCurrent) processes.Remove(key);
             }
             if (isCurrent)
             {
-                registry.Remove(appId);
-                logger.LogWarning("Backend process exited unexpectedly for app {AppId}", appId);
+                registry.Remove(appId, deploymentTargetId);
+                logger.LogWarning(
+                    "Backend process exited unexpectedly for app {AppId}, target {DeploymentTargetId}",
+                    appId,
+                    deploymentTargetId);
             }
             log.Dispose();
         };
@@ -104,8 +133,8 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
         try
         {
             await WaitForPortAsync(port, cancellationToken);
-            registry.Register(appId, port);
-            lock (gate) { processes[appId] = process; }
+            registry.Register(appId, deploymentTargetId, port);
+            lock (gate) { processes[key] = process; }
             if (old is not null && !old.HasExited) old.Kill(entireProcessTree: true);
         }
         catch
@@ -120,7 +149,8 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
     {
         Process[] active;
         lock (gate) active = processes.Values.ToArray();
-        foreach (var pair in processes.Keys.ToArray()) registry.Remove(pair);
+        foreach (var pair in processes.Keys.ToArray())
+            registry.Remove(pair.AppId, pair.DeploymentTargetId);
         foreach (var process in active)
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
@@ -130,12 +160,13 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(Guid appId)
+    public Task StopAsync(Guid appId, Guid deploymentTargetId)
     {
-        registry.Remove(appId);
+        var key = new DeploymentRuntimeKey(appId, deploymentTargetId);
+        registry.Remove(appId, deploymentTargetId);
         lock (gate)
         {
-            if (processes.Remove(appId, out var process))
+            if (processes.Remove(key, out var process))
             {
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
                 process.Dispose();
@@ -173,7 +204,11 @@ public sealed class RunnerBackendProcessManager : IAppBackendProcessManager, IHo
 
     private static int ReadPort(string name, int fallback) => int.TryParse(Environment.GetEnvironmentVariable(name), out var port) && port is > 0 and <= 65535 ? port : fallback;
     public void Dispose() => StopAsync(CancellationToken.None).GetAwaiter().GetResult();
-    private sealed record BackendDeploymentMetadata(string AppId, bool HasBackend, string? BackendModule);
+    private sealed record BackendDeploymentMetadata(
+        string AppId,
+        string DeploymentTargetId,
+        bool HasBackend,
+        string? BackendModule);
 
     private static string SanitizeModule(string? module)
     {

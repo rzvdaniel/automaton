@@ -2,12 +2,16 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using Automaton.Api.Hubs;
+using Automaton.Api.Data;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automaton.Api.Services;
 
-public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<AutomatonHub> hub)
+public sealed class TrustedInfrastructureActionDeploymentService(
+    IHubContext<AutomatonHub> hub,
+    ApplicationDbContext db)
 {
     private static readonly IReadOnlySet<string> AllowedActions = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -40,8 +44,20 @@ public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<Aut
         _ = AppActionManifestParser.ParseFile(manifestPath, actionKey, allowPrivilegedCapabilities: true);
 
         var expectedHash = ComputeContentHash(actionRoot);
+        var deploymentTargetId = await db.AppDeploymentTargets
+            .Where(target =>
+                target.WebAppId == InfrastructureAppTrust.PlatformAppId &&
+                target.IsDefault)
+            .Select(target => target.Id)
+            .SingleAsync(cancellationToken);
         var modules = await hub.Clients.Client(connectionId)
-            .InvokeAsync<AppActionModulesResponse>(AutomatonHubMethods.ListAppActionModules, InfrastructureAppTrust.PlatformAppId, cancellationToken);
+            .InvokeAsync<AppActionModulesResponse>(
+                AutomatonHubMethods.ListAppActionModules,
+                new AppActionModuleRequest(
+                    InfrastructureAppTrust.PlatformAppId,
+                    deploymentTargetId,
+                    actionKey),
+                cancellationToken);
         var current = modules.Actions.SingleOrDefault(x => string.Equals(x.Key, actionKey, StringComparison.Ordinal));
         if (current != null && string.Equals(current.ContentHash, expectedHash, StringComparison.Ordinal)) return current;
 
@@ -50,6 +66,7 @@ public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<Aut
                 AutomatonHubMethods.PrepareAppActionModule,
                 new PrepareAppActionModuleRequest(
                     InfrastructureAppTrust.PlatformAppId,
+                    deploymentTargetId,
                     actionKey,
                     CreateSourceZip(actionRoot),
                     expectedHash,
@@ -59,7 +76,13 @@ public sealed class TrustedInfrastructureActionDeploymentService(IHubContext<Aut
             throw new InvalidOperationException(response.Message ?? $"Trusted infrastructure Action '{actionKey}' could not be deployed.");
 
         modules = await hub.Clients.Client(connectionId)
-            .InvokeAsync<AppActionModulesResponse>(AutomatonHubMethods.ListAppActionModules, InfrastructureAppTrust.PlatformAppId, cancellationToken);
+            .InvokeAsync<AppActionModulesResponse>(
+                AutomatonHubMethods.ListAppActionModules,
+                new AppActionModuleRequest(
+                    InfrastructureAppTrust.PlatformAppId,
+                    deploymentTargetId,
+                    actionKey),
+                cancellationToken);
         return modules.Actions.SingleOrDefault(x => string.Equals(x.Key, actionKey, StringComparison.Ordinal))
             ?? throw new InvalidOperationException($"Trusted infrastructure Action '{actionKey}' was not visible after deployment.");
     }

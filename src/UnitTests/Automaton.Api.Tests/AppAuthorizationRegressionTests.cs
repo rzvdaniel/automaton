@@ -457,17 +457,22 @@ public class AppAuthorizationRegressionTests
         var userContextService = CreateUserContextService(ownerId);
         var authorizationService = new ResourceAuthorizationService(dbContext, userContextService);
         var runnerAuthorizationPolicy = new AppRunnerAuthorizationPolicy(dbContext, authorizationService);
+        var targetResolver = new AppDeploymentTargetResolver(
+            dbContext,
+            authorizationService,
+            runnerAuthorizationPolicy);
         var runnerAssignmentPolicy = new AppRunnerAssignmentPolicy(
             dbContext,
             new HostedRunnerAppCapacityService(dbContext),
             runnerAuthorizationPolicy,
-            new AppDeploymentTargetResolver(dbContext, authorizationService, runnerAuthorizationPolicy));
+            targetResolver);
         var appsService = CreateAppsService(dbContext, ownerId);
         var executionService = new AppActionExecutionService(
             dbContext,
             appsService,
             authorizationService,
             runnerAssignmentPolicy,
+            targetResolver,
             null!,
             null!);
         using var input = JsonDocument.Parse("{}");

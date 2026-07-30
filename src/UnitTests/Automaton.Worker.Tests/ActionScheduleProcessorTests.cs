@@ -361,7 +361,8 @@ public sealed class ActionScheduleProcessorTests
             );
             CREATE TABLE AppModuleExecutions (
                 Id TEXT PRIMARY KEY, HostedRunnerOperationId TEXT NULL, ScheduleOccurrenceId TEXT NULL,
-                AppId TEXT NOT NULL, ModuleType TEXT NOT NULL, ModuleKey TEXT NOT NULL,
+                AppId TEXT NOT NULL, DeploymentTargetId TEXT NULL,
+                ModuleType TEXT NOT NULL, ModuleKey TEXT NOT NULL,
                 RunnerId TEXT NULL, TriggerType TEXT NOT NULL, RequestedByUserId TEXT NULL,
                 Status TEXT NOT NULL, DeploymentHash TEXT NULL, ExitCode INTEGER NULL,
                 ErrorCode TEXT NULL, FailureSummary TEXT NULL, CreatedAtUtc TEXT NOT NULL,

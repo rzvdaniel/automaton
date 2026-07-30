@@ -7,9 +7,15 @@ public sealed class AppActionExecutionCoordinator
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new(StringComparer.Ordinal);
 
-    public async Task<IDisposable> EnterAsync(Guid appId, string actionKey, CancellationToken cancellationToken)
+    public async Task<IDisposable> EnterAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey,
+        CancellationToken cancellationToken)
     {
-        var gate = locks.GetOrAdd($"{appId:N}/{actionKey}", _ => new SemaphoreSlim(1, 1));
+        var gate = locks.GetOrAdd(
+            $"{appId:N}/{deploymentTargetId:N}/{actionKey}",
+            _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         return new Releaser(gate);
     }

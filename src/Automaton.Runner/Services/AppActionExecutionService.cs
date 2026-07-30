@@ -32,11 +32,20 @@ public sealed class AppActionExecutionService
         await concurrencyGate.WaitAsync(cancellationToken);
         try
         {
-        using var actionLock = await coordinator.EnterAsync(request.AppId, request.ActionKey, cancellationToken);
+        using var actionLock = await coordinator.EnterAsync(
+            request.AppId,
+            request.DeploymentTargetId,
+            request.ActionKey,
+            cancellationToken);
         if (active.TryGetValue(request.ExecutionId, out existingExecution))
             return await existingExecution.Completion.Task.WaitAsync(cancellationToken);
         AppActionManifestParser.ValidateKey(request.ActionKey);
-        var executionDirectory = Path.Combine(workspace.GetAppActionExecutionsDirectory(request.AppId, request.ActionKey), request.ExecutionId.ToString("N"));
+        var executionDirectory = Path.Combine(
+            workspace.GetAppActionExecutionsDirectory(
+                request.AppId,
+                request.DeploymentTargetId,
+                request.ActionKey),
+            request.ExecutionId.ToString("N"));
         var statePath = Path.Combine(executionDirectory, ".automaton-execution.json");
         var persistedState = ReadExecutionState(statePath);
         if (persistedState != null)
@@ -53,7 +62,10 @@ public sealed class AppActionExecutionService
                 logs: false,
                 result: false);
         }
-        var currentDirectory = workspace.GetAppActionCurrentDirectory(request.AppId, request.ActionKey);
+        var currentDirectory = workspace.GetAppActionCurrentDirectory(
+            request.AppId,
+            request.DeploymentTargetId,
+            request.ActionKey);
         var manifestPath = Path.Combine(currentDirectory, "action.yaml");
         if (!File.Exists(manifestPath))
             throw new InvalidOperationException($"Action '{request.ActionKey}' is not deployed.");
@@ -253,7 +265,13 @@ public sealed class AppActionExecutionService
     private AppModuleExecutionArtifactResponse ReadArtifact(ReadAppModuleExecutionArtifactRequest request, string fileName)
     {
         AppActionManifestParser.ValidateKey(request.ActionKey);
-        var path = Path.Combine(workspace.GetAppActionExecutionsDirectory(request.AppId, request.ActionKey), request.ExecutionId.ToString("N"), fileName);
+        var path = Path.Combine(
+            workspace.GetAppActionExecutionsDirectory(
+                request.AppId,
+                request.DeploymentTargetId,
+                request.ActionKey),
+            request.ExecutionId.ToString("N"),
+            fileName);
         if (!File.Exists(path)) return new(false, null, null, "Artifact is not available.");
         var expires = File.GetLastWriteTimeUtc(path) + ArtifactRetention;
         if (expires <= DateTime.UtcNow) return new(false, null, expires, "Artifact has expired.");

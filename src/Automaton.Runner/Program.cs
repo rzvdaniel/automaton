@@ -261,6 +261,13 @@ public class Program
             IsRequired = true
         };
 
+        var deploymentTargetIdOption = new Option<Guid>(
+            name: "--deployment-target-id",
+            description: "Deployment target ID to execute flow for")
+        {
+            IsRequired = true
+        };
+
         var inputsJsonOption = new Option<string>(
             name: "--inputs-json",
             description: "JSON object of string inputs")
@@ -271,11 +278,17 @@ public class Program
         var command = new Command("execute-app-flow", "Execute a deployed app flow from local runner workspace")
         {
             appIdOption,
+            deploymentTargetIdOption,
             flowIdentifierOption,
             inputsJsonOption
         };
 
-        command.SetHandler(async (Guid appId, string flowIdentifier, string? inputsJson, bool verbose) =>
+        command.SetHandler(async (
+            Guid appId,
+            Guid deploymentTargetId,
+            string flowIdentifier,
+            string? inputsJson,
+            bool verbose) =>
         {
             VerboseOptions.Verbose = verbose;
             using var host = CreateHostBuilder(Array.Empty<string>()).Build();
@@ -289,7 +302,11 @@ public class Program
                     : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(inputsJson)
                         ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                var result = await appFlowExecutionService.ExecuteAsync(appId, flowIdentifier, inputs);
+                var result = await appFlowExecutionService.ExecuteAsync(
+                    appId,
+                    deploymentTargetId,
+                    flowIdentifier,
+                    inputs);
                 WriteLine(System.Text.Json.JsonSerializer.Serialize(result, jsonSerializerOptions));
                 Environment.ExitCode = 0;
             }
@@ -306,7 +323,7 @@ public class Program
                 WriteLine(System.Text.Json.JsonSerializer.Serialize(error, jsonSerializerOptions));
                 Environment.ExitCode = 1;
             }
-        }, appIdOption, flowIdentifierOption, inputsJsonOption, verboseOption);
+        }, appIdOption, deploymentTargetIdOption, flowIdentifierOption, inputsJsonOption, verboseOption);
 
         return command;
     }

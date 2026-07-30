@@ -839,6 +839,9 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
 
+                    b.Property<Guid?>("DeploymentTargetId")
+                        .HasColumnType("char(36)");
+
                     b.Property<string>("ErrorCode")
                         .HasMaxLength(80)
                         .HasColumnType("varchar(80)");
@@ -896,6 +899,8 @@ namespace Automaton.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DeploymentTargetId");
+
                     b.HasIndex("HostedRunnerOperationId")
                         .IsUnique();
 
@@ -906,11 +911,11 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("ScheduleOccurrenceId")
                         .IsUnique();
 
-                    b.HasIndex("AppId", "CreatedAtUtc");
-
                     b.HasIndex("Status", "CreatedAtUtc");
 
-                    b.HasIndex("AppId", "ModuleType", "ModuleKey", "CreatedAtUtc");
+                    b.HasIndex("AppId", "DeploymentTargetId", "CreatedAtUtc");
+
+                    b.HasIndex("AppId", "DeploymentTargetId", "ModuleType", "ModuleKey", "CreatedAtUtc");
 
                     b.ToTable("AppModuleExecutions");
                 });
@@ -4057,6 +4062,11 @@ namespace Automaton.Api.Migrations
                         .HasForeignKey("AppId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Automaton.Api.Entities.AppDeploymentTarget", null)
+                        .WithMany()
+                        .HasForeignKey("DeploymentTargetId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Automaton.Api.Entities.HostedRunnerDeployment", "HostedRunnerOperation")
                         .WithOne("AppModuleExecution")

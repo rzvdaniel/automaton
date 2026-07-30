@@ -45,48 +45,68 @@ public class RunnerWorkspaceService
         return GetFullPath(AppsRoot, appId.ToString());
     }
 
-    public string GetAppSourceRoot(Guid appId) => GetFullPath(GetAppRoot(appId), "source");
+    public string GetDeploymentTargetRoot(Guid appId, Guid deploymentTargetId)
+    {
+        if (appId == Guid.Empty)
+            throw new ArgumentException("App ID is required.", nameof(appId));
+        if (deploymentTargetId == Guid.Empty)
+            throw new ArgumentException(
+                "Deployment target ID is required.",
+                nameof(deploymentTargetId));
+        return GetFullPath(
+            GetFullPath(GetAppRoot(appId), "targets"),
+            deploymentTargetId.ToString());
+    }
 
-    public string GetAppRuntimeRoot(Guid appId) => GetFullPath(GetAppRoot(appId), "runtime");
+    public string GetAppSourceRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "source");
 
-    public string GetAppSourceFrontendDirectory(Guid appId) => GetFullPath(GetAppSourceRoot(appId), "frontend");
+    public string GetAppRuntimeRoot(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "runtime");
 
-    public string GetAppSourceBackendDirectory(Guid appId) => GetFullPath(GetAppSourceRoot(appId), "backend");
+    public string GetAppSourceFrontendDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "frontend");
 
-    public string GetAppRuntimeFrontendDirectory(Guid appId) => GetFullPath(GetAppRuntimeRoot(appId), "frontend");
+    public string GetAppSourceBackendDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "backend");
 
-    public string GetAppSourceActionsDirectory(Guid appId) => GetFullPath(GetAppSourceRoot(appId), "actions");
+    public string GetAppRuntimeFrontendDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "frontend");
 
-    public string GetAppRuntimeActionsDirectory(Guid appId) => GetFullPath(GetAppRuntimeRoot(appId), "actions");
+    public string GetAppSourceActionsDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppSourceRoot(appId, deploymentTargetId), "actions");
 
-    public string GetAppActionRuntimeRoot(Guid appId, string actionKey)
+    public string GetAppRuntimeActionsDirectory(Guid appId, Guid deploymentTargetId)
+        => GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "actions");
+
+    public string GetAppActionRuntimeRoot(Guid appId, Guid deploymentTargetId, string actionKey)
     {
         AppActionManifestParser.ValidateKey(actionKey);
-        return GetFullPath(GetAppRuntimeActionsDirectory(appId), actionKey);
+        return GetFullPath(GetAppRuntimeActionsDirectory(appId, deploymentTargetId), actionKey);
     }
 
-    public string GetAppActionCurrentDirectory(Guid appId, string actionKey)
-        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "current");
+    public string GetAppActionCurrentDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "current");
 
-    public string GetAppActionVersionsDirectory(Guid appId, string actionKey)
-        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "versions");
+    public string GetAppActionVersionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "versions");
 
-    public string GetAppActionExecutionsDirectory(Guid appId, string actionKey)
-        => GetFullPath(GetAppActionRuntimeRoot(appId, actionKey), "executions");
+    public string GetAppActionExecutionsDirectory(Guid appId, Guid deploymentTargetId, string actionKey)
+        => GetFullPath(GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey), "executions");
 
-    public string GetAppBackendDirectory(Guid appId)
+    public string GetAppBackendDirectory(Guid appId, Guid deploymentTargetId)
     {
-        return GetFullPath(GetAppRuntimeRoot(appId), "backend");
+        return GetFullPath(GetAppRuntimeRoot(appId, deploymentTargetId), "backend");
     }
 
-    public string GetAppVenvDirectory(Guid appId)
+    public string GetAppVenvDirectory(Guid appId, Guid deploymentTargetId)
     {
-        return GetFullPath(GetAppRoot(appId), "venv");
+        return GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "venv");
     }
 
-    public string GetAppVersionsDirectory(Guid appId)
+    public string GetAppVersionsDirectory(Guid appId, Guid deploymentTargetId)
     {
-        return GetFullPath(GetAppRoot(appId), "versions");
+        return GetFullPath(GetDeploymentTargetRoot(appId, deploymentTargetId), "versions");
     }
 
     public string GetAppDataDirectory(Guid appId)
@@ -96,16 +116,19 @@ public class RunnerWorkspaceService
             : GetFullPath(DataRoot, appId.ToString());
     }
 
-    public string ResolveBackendUploadPath(Guid appId, string relativePath)
+    public string ResolveBackendUploadPath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
-        return ResolveRelativePath(GetAppBackendDirectory(appId), relativePath, "app backend");
+        return ResolveRelativePath(
+            GetAppBackendDirectory(appId, deploymentTargetId),
+            relativePath,
+            "deployment target backend");
     }
 
-    public string ResolveRunnerFilePath(Guid appId, string relativePath, string area)
+    public string ResolveRunnerFilePath(Guid appId, Guid deploymentTargetId, string relativePath, string area)
     {
         var rootDirectory = area == AppRunnerFileAreas.Data
             ? GetAppDataDirectory(appId)
-            : GetAppBackendDirectory(appId);
+            : GetAppBackendDirectory(appId, deploymentTargetId);
 
         return ResolveRelativePath(rootDirectory, relativePath, "requested app directory");
     }
@@ -115,9 +138,12 @@ public class RunnerWorkspaceService
         return ResolveRelativePath(GetFullPath(GetAppDataDirectory(appId), "media"), relativePath, "app media directory");
     }
 
-    public string ResolveAppBackendFilePath(Guid appId, string relativePath)
+    public string ResolveAppBackendFilePath(Guid appId, Guid deploymentTargetId, string relativePath)
     {
-        return ResolveRelativePath(GetAppBackendDirectory(appId), relativePath, "app backend directory");
+        return ResolveRelativePath(
+            GetAppBackendDirectory(appId, deploymentTargetId),
+            relativePath,
+            "deployment target backend directory");
     }
 
     public string NormalizeRelativePath(string relativePath)

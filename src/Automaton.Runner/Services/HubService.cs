@@ -430,19 +430,19 @@ public class HubService
                 return GetAppMediaFileMetadata(appId, relativePath);
             });
 
-            connection.On<string, string, AppBackendFilesResponse>(ListAppBackendFilesMethod, (appId, area) =>
+            connection.On<ListAppBackendFilesRequest, AppBackendFilesResponse>(ListAppBackendFilesMethod, request =>
             {
-                return ListAppBackendFiles(appId, area);
+                return ListAppBackendFiles(request);
             });
 
-            connection.On<string, string, string, AppBackendFileContentResponse>(ReadAppBackendFileMethod, (appId, path, area) =>
+            connection.On<AppBackendFileRequest, AppBackendFileContentResponse>(ReadAppBackendFileMethod, request =>
             {
-                return ReadAppBackendFile(appId, path, area);
+                return ReadAppBackendFile(request);
             });
 
-            connection.On<string, string, string, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, (appId, path, area) =>
+            connection.On<AppBackendFileRequest, AppBackendFileDeleteResponse>(DeleteAppBackendFileMethod, request =>
             {
-                return DeleteAppBackendFile(appId, path, area);
+                return DeleteAppBackendFile(request);
             });
 
             connection.On<DeployAppPackageRequest, DeployAppPackageResult>(DeployAppPackageMethod, async (request) =>
@@ -458,14 +458,27 @@ public class HubService
                 Task.FromResult(appActionExecutionService.ReadLogs(request)));
             connection.On<ReadAppModuleExecutionArtifactRequest, AppModuleExecutionArtifactResponse>(ReadAppModuleExecutionResultMethod, request =>
                 Task.FromResult(appActionExecutionService.ReadResult(request)));
-            connection.On<Guid, AppActionModulesResponse>(ListAppActionModulesMethod, appId =>
-                Task.FromResult(actionDeploymentService.ListModules(appId)));
+            connection.On<AppActionModuleRequest, AppActionModulesResponse>(ListAppActionModulesMethod, request =>
+                Task.FromResult(actionDeploymentService.ListModules(
+                    request.AppId,
+                    request.DeploymentTargetId)));
             connection.On<AppActionModuleRequest, AppActionVersionsResponse>(ListAppActionVersionsMethod, request =>
-                Task.FromResult(actionDeploymentService.ListVersions(request.AppId, request.ActionKey)));
+                Task.FromResult(actionDeploymentService.ListVersions(
+                    request.AppId,
+                    request.DeploymentTargetId,
+                    request.ActionKey)));
             connection.On<AppActionVersionRequest, AppActionVersionOperationResponse>(RestoreAppActionVersionMethod, request =>
-                Task.FromResult(actionDeploymentService.RestoreVersion(request.AppId, request.ActionKey, request.Version)));
+                Task.FromResult(actionDeploymentService.RestoreVersion(
+                    request.AppId,
+                    request.DeploymentTargetId,
+                    request.ActionKey,
+                    request.Version)));
             connection.On<AppActionVersionRequest, AppActionVersionOperationResponse>(DeleteAppActionVersionMethod, request =>
-                Task.FromResult(actionDeploymentService.DeleteVersion(request.AppId, request.ActionKey, request.Version)));
+                Task.FromResult(actionDeploymentService.DeleteVersion(
+                    request.AppId,
+                    request.DeploymentTargetId,
+                    request.ActionKey,
+                    request.Version)));
             connection.On<PrepareAppActionModuleRequest, AppActionDeploymentResult>(PrepareAppActionModuleMethod, request =>
                 actionDeploymentService.PrepareModuleAsync(request, CancellationToken.None));
             connection.On<SynchronizeAppActionModulesRequest, int>(SynchronizeAppActionModulesMethod, request =>
@@ -644,7 +657,9 @@ public class HubService
     {
         try
         {
-            var backendDir = runnerWorkspaceService.GetAppBackendDirectory(payload.AppId);
+            var backendDir = runnerWorkspaceService.GetAppBackendDirectory(
+                payload.AppId,
+                payload.DeploymentTargetId);
             var dataDir = runnerWorkspaceService.GetAppDataDirectory(payload.AppId);
 
             Directory.CreateDirectory(backendDir);
@@ -660,7 +675,7 @@ public class HubService
                 var reqPath = Path.Combine(backendDir, "requirements.txt");
                 File.WriteAllBytes(reqPath, payload.Content);
 
-                return InstallRequirements(payload.AppId, reqPath);
+                return InstallRequirements(payload.AppId, payload.DeploymentTargetId, reqPath);
             }
 
             // system-requirements.txt — write as plain text, then apt-get install (Docker runners only)
@@ -669,13 +684,22 @@ public class HubService
                 var sysReqPath = Path.Combine(backendDir, "system-requirements.txt");
                 File.WriteAllBytes(sysReqPath, payload.Content);
 
-                var aptLogs = InstallSystemPackages(payload.AppId, Encoding.UTF8.GetString(payload.Content));
+                var aptLogs = InstallSystemPackages(
+                    payload.AppId,
+                    payload.DeploymentTargetId,
+                    Encoding.UTF8.GetString(payload.Content));
                 return new AppControllerUploadResult { Success = true, Logs = aptLogs };
             }
 
-            EnsureAppVirtualEnvironment(payload.AppId, recreate: false);
+            EnsureAppVirtualEnvironment(
+                payload.AppId,
+                payload.DeploymentTargetId,
+                recreate: false);
 
-            var filePath = runnerWorkspaceService.ResolveBackendUploadPath(payload.AppId, relativePath);
+            var filePath = runnerWorkspaceService.ResolveBackendUploadPath(
+                payload.AppId,
+                payload.DeploymentTargetId,
+                relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
             File.WriteAllBytes(filePath, payload.Content);
 
@@ -711,12 +735,15 @@ public class HubService
         return relativePath.Replace('\\', '/').TrimStart('/');
     }
 
-    private AppBackendFilesResponse ListAppBackendFiles(string appId, string? area)
+    private AppBackendFilesResponse ListAppBackendFiles(ListAppBackendFilesRequest request)
     {
         try
         {
-            var runnerFileArea = NormalizeRunnerFileArea(area);
-            var rootDirectory = GetRunnerFileRootDirectory(ParseAppId(appId), runnerFileArea);
+            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
+            var rootDirectory = GetRunnerFileRootDirectory(
+                request.AppId,
+                request.DeploymentTargetId,
+                runnerFileArea);
             if (!Directory.Exists(rootDirectory))
             {
                 return new AppBackendFilesResponse
@@ -756,18 +783,23 @@ public class HubService
             return new AppBackendFilesResponse
             {
                 Success = false,
-                Area = NormalizeRunnerFileArea(area),
+                Area = NormalizeRunnerFileArea(request.Area),
                 Error = ex.Message
             };
         }
     }
 
-    private AppBackendFileContentResponse ReadAppBackendFile(string appId, string relativePath, string? area)
+    private AppBackendFileContentResponse ReadAppBackendFile(AppBackendFileRequest request)
     {
+        var relativePath = request.Path;
         try
         {
-            var runnerFileArea = NormalizeRunnerFileArea(area);
-            var path = runnerWorkspaceService.ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
+            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
+            var path = runnerWorkspaceService.ResolveRunnerFilePath(
+                request.AppId,
+                request.DeploymentTargetId,
+                relativePath,
+                runnerFileArea);
             var normalizedRelativePath = runnerWorkspaceService.NormalizeRelativePath(relativePath);
             if (!File.Exists(path))
             {
@@ -824,19 +856,24 @@ public class HubService
             return new AppBackendFileContentResponse
             {
                 Success = false,
-                Area = NormalizeRunnerFileArea(area),
+                Area = NormalizeRunnerFileArea(request.Area),
                 Path = runnerWorkspaceService.NormalizeRelativePath(relativePath),
                 Error = ex.Message
             };
         }
     }
 
-    private AppBackendFileDeleteResponse DeleteAppBackendFile(string appId, string relativePath, string? area)
+    private AppBackendFileDeleteResponse DeleteAppBackendFile(AppBackendFileRequest request)
     {
+        var relativePath = request.Path;
         try
         {
-            var runnerFileArea = NormalizeRunnerFileArea(area);
-            var path = runnerWorkspaceService.ResolveRunnerFilePath(ParseAppId(appId), relativePath, runnerFileArea);
+            var runnerFileArea = NormalizeRunnerFileArea(request.Area);
+            var path = runnerWorkspaceService.ResolveRunnerFilePath(
+                request.AppId,
+                request.DeploymentTargetId,
+                relativePath,
+                runnerFileArea);
             if (!File.Exists(path))
             {
                 return new AppBackendFileDeleteResponse
@@ -859,7 +896,7 @@ public class HubService
             return new AppBackendFileDeleteResponse
             {
                 Success = false,
-                Area = NormalizeRunnerFileArea(area),
+                Area = NormalizeRunnerFileArea(request.Area),
                 Error = ex.Message
             };
         }
@@ -872,11 +909,14 @@ public class HubService
             : AppRunnerFileAreas.Backend;
     }
 
-    private string GetRunnerFileRootDirectory(Guid appId, string area)
+    private string GetRunnerFileRootDirectory(
+        Guid appId,
+        Guid deploymentTargetId,
+        string area)
     {
         return area == AppRunnerFileAreas.Data
             ? runnerWorkspaceService.GetAppDataDirectory(appId)
-            : runnerWorkspaceService.GetAppBackendDirectory(appId);
+            : runnerWorkspaceService.GetAppBackendDirectory(appId, deploymentTargetId);
     }
 
     private static Guid ParseAppId(string appId)
@@ -906,11 +946,17 @@ public class HubService
         // Fallback: Linux containers always have this sentinel file
         || File.Exists("/.dockerenv");
 
-    private AppControllerUploadResult InstallRequirements(Guid appId, string requirementsPath)
+    private AppControllerUploadResult InstallRequirements(
+        Guid appId,
+        Guid deploymentTargetId,
+        string requirementsPath)
     {
         try
         {
-            var logs = backendEnvironmentService.InstallRequirements(appId, requirementsPath);
+            var logs = backendEnvironmentService.InstallRequirements(
+                appId,
+                deploymentTargetId,
+                requirementsPath);
             return new AppControllerUploadResult { Success = true, Logs = logs };
         }
         catch (Exception ex)
@@ -921,9 +967,15 @@ public class HubService
         }
     }
 
-    private List<string> EnsureAppVirtualEnvironment(Guid appId, bool recreate)
+    private List<string> EnsureAppVirtualEnvironment(
+        Guid appId,
+        Guid deploymentTargetId,
+        bool recreate)
     {
-        return backendEnvironmentService.EnsureAppVirtualEnvironment(appId, recreate);
+        return backendEnvironmentService.EnsureAppVirtualEnvironment(
+            appId,
+            deploymentTargetId,
+            recreate);
     }
 
     private static string GetVenvPythonPath(string venvDir)
@@ -998,9 +1050,15 @@ public class HubService
     /// Only works on Docker runners; silently skips with a warning on non-container deployments.
     /// Packages install to the container filesystem and are reinstalled by docker-entrypoint.sh on container restart.
     /// </summary>
-    private List<string> InstallSystemPackages(Guid appId, string packageListContent)
+    private List<string> InstallSystemPackages(
+        Guid appId,
+        Guid deploymentTargetId,
+        string packageListContent)
     {
-        return backendEnvironmentService.InstallSystemPackages(appId, packageListContent);
+        return backendEnvironmentService.InstallSystemPackages(
+            appId,
+            deploymentTargetId,
+            packageListContent);
     }
 
     private async Task HandleConnectionError(Exception ex)

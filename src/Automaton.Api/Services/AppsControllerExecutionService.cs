@@ -360,6 +360,13 @@ public class AppsControllerExecutionService
                     cancellationToken);
 
             ValidateDeploymentTargetResponse(target.Id, result.DeploymentTargetId);
+            await deploymentTargetStateService.MarkCompletedAsync(
+                appId,
+                target.Id,
+                result.Success,
+                deployFrontend: true,
+                deployBackend: true,
+                cancellationToken);
 
             if (result.Success)
             {
@@ -389,8 +396,6 @@ public class AppsControllerExecutionService
                 await backendRouteConfigService.RefreshAsync(cancellationToken);
             }
 
-            await deploymentTargetStateService.MarkCompletedAsync(
-                appId, target.Id, result.Success, deployFrontend: true, deployBackend: true, cancellationToken);
             return new DeployPackageResponse
             {
                 DeploymentTargetId = target.Id,
@@ -492,6 +497,11 @@ public class AppsControllerExecutionService
 
     private async Task<List<AppActionDeploymentResult>> DeployStudioActionsAsync(Guid appId, Guid ownerId, CancellationToken cancellationToken)
     {
+        var target = await deploymentTargetResolver.ResolveAsync(
+            appId,
+            targetSlug: null,
+            ownerId,
+            cancellationToken);
         var sourceRoot = fileStorageService.GetAppSourceDirectoryPath(ownerId, appId);
         var actions = AppActionManifestParser.Discover(sourceRoot);
         var runner = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).FirstOrDefault();
@@ -506,12 +516,22 @@ public class AppsControllerExecutionService
             var contentHash = ComputeActionContentHash(action.DirectoryPath);
             results.Add(await automatonHub.Clients.Client(runner.ConnectionId).InvokeAsync<AppActionDeploymentResult>(
                 AutomatonHubMethods.PrepareAppActionModule,
-                new PrepareAppActionModuleRequest(appId, action.Key, sourceZip, contentHash, SystemInfrastructure: false),
+                    new PrepareAppActionModuleRequest(
+                        appId,
+                        target.Id,
+                        action.Key,
+                        sourceZip,
+                        contentHash,
+                        SystemInfrastructure: false),
                 cancellationToken));
         }
         await automatonHub.Clients.Client(runner.ConnectionId).InvokeAsync<int>(
             AutomatonHubMethods.SynchronizeAppActionModules,
-            new SynchronizeAppActionModulesRequest(appId, actions.Select(action => action.Key).ToList()), cancellationToken);
+                new SynchronizeAppActionModulesRequest(
+                    appId,
+                    target.Id,
+                    actions.Select(action => action.Key).ToList()),
+                cancellationToken);
         return results;
     }
 
@@ -574,6 +594,7 @@ public class AppsControllerExecutionService
 
             await deploymentTargetStateService.MarkCompletedAsync(
                 appId, target.Id, success: true, deployFrontend: true, deployBackend: false, cancellationToken);
+            await backendRouteConfigService.RefreshAsync(cancellationToken);
             return new DeployAppResponse
             {
                 DeploymentTargetId = target.Id,
@@ -661,6 +682,11 @@ public class AppsControllerExecutionService
         string relativePath,
         CancellationToken cancellationToken)
     {
+        var target = await deploymentTargetResolver.ResolveAsync(
+            appId,
+            targetSlug: null,
+            ownerId,
+            cancellationToken);
         var runners = (await ResolveRunnersByOwnerAsync(ownerId, null, appId)).ToList();
         if (runners.Count == 0)
         {
@@ -670,6 +696,7 @@ public class AppsControllerExecutionService
         var body = JsonSerializer.Serialize(new
         {
             app_id = appId,
+            deployment_target_id = target.Id,
             path = relativePath
         });
 
@@ -708,7 +735,12 @@ public class AppsControllerExecutionService
     /// Deploys only Python controller scripts (skips requirements.txt / system-requirements.txt)
     /// to a specific runner. Fast — no pip/apt involved. Used for auto-deploy on first execution.
     /// </summary>
-    private async Task DeployScriptsToRunnerAsync(Guid appId, Guid ownerId, Runner runner, CancellationToken cancellationToken)
+    private async Task DeployScriptsToRunnerAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid ownerId,
+        Runner runner,
+        CancellationToken cancellationToken)
     {
         _ = await fileStorageService.SyncSourceBackendToRuntimeBackendAsync(ownerId, appId);
         var scripts = await fileStorageService.ListRuntimeBackendFilesAsync(ownerId, appId);
@@ -721,6 +753,7 @@ public class AppsControllerExecutionService
                 var payload = new
                 {
                     AppId = appId,
+                    DeploymentTargetId = deploymentTargetId,
                     RelativePath = script.RelativePath,
                     ControllerName = script.ControllerName,
                     Content = script.Content,
@@ -1110,6 +1143,11 @@ public class AppsControllerExecutionService
         List<string> logs)
     {
         var results = new List<RunnerAppControllerResult>();
+        var target = await deploymentTargetResolver.ResolveAsync(
+            appId,
+            targetSlug: null,
+            ownerId,
+            cancellationToken);
 
         foreach (var runner in runners)
         {
@@ -1122,6 +1160,7 @@ public class AppsControllerExecutionService
                 var body = JsonSerializer.Serialize(new
                 {
                     app_id = appId,
+                    deployment_target_id = target.Id,
                     action = actionName,
                     inputs = inputs
                 });
@@ -1134,7 +1173,12 @@ public class AppsControllerExecutionService
                     logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] Controller not found on runner — auto-deploying scripts...");
                     logger.Warning("Auto-deploying scripts for AppId={AppId} to runner {RunnerName} (scripts not found on runner)", appId, runner.Name);
 
-                    await DeployScriptsToRunnerAsync(appId, ownerId, runner, cancellationToken);
+                    await DeployScriptsToRunnerAsync(
+                        appId,
+                        target.Id,
+                        ownerId,
+                        runner,
+                        cancellationToken);
 
                     tunnelResponse = await SendTunnelRequestAsync(runner, controllerName, body, cancellationToken);
                 }
@@ -1153,6 +1197,7 @@ public class AppsControllerExecutionService
 
                         await PublishBackendRuntimeOutputAsync(
                             appId,
+                            target.Id,
                             controllerName,
                             actionName,
                             runner.Name,
@@ -1186,6 +1231,7 @@ public class AppsControllerExecutionService
                     logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {errorDetail}");
                     await PublishBackendRuntimeOutputAsync(
                         appId,
+                        target.Id,
                         controllerName,
                         actionName,
                         runner.Name,
@@ -1206,6 +1252,7 @@ public class AppsControllerExecutionService
                 logs.Add($"[{DateTime.UtcNow:HH:mm:ss}] ERROR on {runner.Name}: {ex.Message}");
                 await PublishBackendRuntimeOutputAsync(
                     appId,
+                    target.Id,
                     controllerName,
                     actionName,
                     runner.Name,
@@ -1282,6 +1329,7 @@ public class AppsControllerExecutionService
 
     private async Task PublishBackendRuntimeOutputAsync(
         Guid appId,
+        Guid deploymentTargetId,
         string controllerName,
         string actionName,
         string runnerName,
@@ -1307,11 +1355,14 @@ public class AppsControllerExecutionService
         foreach (var line in lines)
         {
             var normalizedLevel = ClassifyBackendRuntimeLine(line);
-            await automatonHub.Clients.Group(GetAppRuntimeLogsGroupName(appId)).SendAsync(
+            await automatonHub.Clients
+                .Group(GetAppRuntimeLogsGroupName(appId, deploymentTargetId))
+                .SendAsync(
                 AutomatonHubMethods.BackendRuntimeLogEvent,
                 new BackendRuntimeLogEvent
                 {
                     AppId = appId,
+                    DeploymentTargetId = deploymentTargetId,
                     Timestamp = DateTime.UtcNow,
                     Level = normalizedLevel,
                     Message = line,
@@ -1324,6 +1375,11 @@ public class AppsControllerExecutionService
                 cancellationToken);
         }
     }
+
+    private static string GetAppRuntimeLogsGroupName(
+        Guid appId,
+        Guid deploymentTargetId)
+        => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
 
     private static string ClassifyBackendRuntimeLine(string line)
     {

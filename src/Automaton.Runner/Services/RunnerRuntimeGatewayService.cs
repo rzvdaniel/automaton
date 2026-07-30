@@ -38,18 +38,32 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         var app = builder.Build();
         app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
         app.MapGet("/ready", () => Results.Ok(new { status = "ready", workspace = workspace.WorkspaceRoot }));
-        app.MapMethods("/apps/{appId:guid}/api/{**path}", new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }, ProxyApiAsync);
-        app.MapMethods("/apps/{appId:guid}/{**path}", new[] { "GET", "HEAD" }, ServeFrontendAsync);
-        app.MapMethods("/apps/{appId:guid}", new[] { "GET", "HEAD" }, (Guid appId) => ServeFrontendAsync(appId, null));
+        app.MapMethods(
+            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/api/{**path}",
+            new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" },
+            ProxyApiAsync);
+        app.MapMethods(
+            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path}",
+            new[] { "GET", "HEAD" },
+            ServeFrontendAsync);
+        app.MapMethods(
+            "/apps/{appId:guid}/targets/{deploymentTargetId:guid}",
+            new[] { "GET", "HEAD" },
+            (Guid appId, Guid deploymentTargetId) =>
+                ServeFrontendAsync(appId, deploymentTargetId, null));
 
         application = app;
         await app.StartAsync(cancellationToken);
         logger.LogInformation("Runner runtime gateway listening on {RuntimeUrl}", GetListenUrl());
     }
 
-    private async Task ProxyApiAsync(HttpContext context, Guid appId, string? path)
+    private async Task ProxyApiAsync(
+        HttpContext context,
+        Guid appId,
+        Guid deploymentTargetId,
+        string? path)
     {
-        if (!backendRegistry.TryGet(appId, out var backend))
+        if (!backendRegistry.TryGet(appId, deploymentTargetId, out var backend))
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             await context.Response.WriteAsJsonAsync(new { error = "Backend runtime is unavailable." });
@@ -103,9 +117,12 @@ public sealed class RunnerRuntimeGatewayService : IHostedService
         }
     }
 
-    private async Task<IResult> ServeFrontendAsync(Guid appId, string? path)
+    private async Task<IResult> ServeFrontendAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        string? path)
     {
-        var root = workspace.GetAppRuntimeFrontendDirectory(appId);
+        var root = workspace.GetAppRuntimeFrontendDirectory(appId, deploymentTargetId);
         if (!Directory.Exists(root))
         {
             return Results.NotFound(new { error = "Frontend runtime is not deployed." });

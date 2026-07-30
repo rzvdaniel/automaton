@@ -90,6 +90,17 @@ public class AppBackendFileEntry
     public bool IsText { get; set; }
 }
 
+public sealed record ListAppBackendFilesRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    string Area);
+
+public sealed record AppBackendFileRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    string Path,
+    string Area);
+
 public class AppBackendFilesResponse
 {
     public bool Success { get; set; }

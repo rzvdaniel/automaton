@@ -94,10 +94,13 @@ async def debug_scripts_dir():
     }
 
 
-def _venv_python_path(app_id: str) -> str:
+def _venv_python_path(app_id: str, deployment_target_id: str) -> str:
+    target_home = os.path.join(
+        SCRIPTS_DIR, app_id, "targets", deployment_target_id
+    )
     if sys.platform == "win32":
-        return os.path.join(SCRIPTS_DIR, app_id, "venv", "Scripts", "python.exe")
-    return os.path.join(SCRIPTS_DIR, app_id, "venv", "bin", "python")
+        return os.path.join(target_home, "venv", "Scripts", "python.exe")
+    return os.path.join(target_home, "venv", "bin", "python")
 
 
 def _app_data_dir(app_home: str, app_id: str) -> str:
@@ -107,9 +110,17 @@ def _app_data_dir(app_home: str, app_id: str) -> str:
     return os.path.join(WORKSPACE_ROOT, "data", app_id)
 
 
-def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inputs: dict):
-    app_home, backend_dir, data_dir = _resolve_app_paths(app_id)
-    python_path = _venv_python_path(app_id)
+def _execute_in_app_env(
+    app_id: str,
+    deployment_target_id: str,
+    controller_name: str,
+    action_name: str,
+    inputs: dict,
+):
+    target_home, backend_dir, data_dir = _resolve_app_paths(
+        app_id, deployment_target_id
+    )
+    python_path = _venv_python_path(app_id, deployment_target_id)
     if not os.path.exists(python_path):
         raise HTTPException(
             500,
@@ -129,14 +140,22 @@ def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inp
     env.update(
         {
             "AUTOMATON_APP_ID": app_id,
-            "AUTOMATON_APP_HOME": app_home,
+            "AUTOMATON_DEPLOYMENT_TARGET_ID": deployment_target_id,
+            "AUTOMATON_APP_HOME": target_home,
             "AUTOMATON_APP_BACKEND_DIR": backend_dir,
             "AUTOMATON_APP_DATA_DIR": data_dir,
         }
     )
 
     process = subprocess.run(
-        [python_path, RUNNER_SCRIPT, SCRIPTS_DIR, app_id, controller_name],
+        [
+            python_path,
+            RUNNER_SCRIPT,
+            SCRIPTS_DIR,
+            app_id,
+            deployment_target_id,
+            controller_name,
+        ],
         input=payload,
         text=True,
         capture_output=True,
@@ -177,22 +196,44 @@ def _execute_in_app_env(app_id: str, controller_name: str, action_name: str, inp
         }
 
 
-def _resolve_app_paths(app_id: str) -> tuple[str, str, str]:
+def _resolve_app_paths(
+    app_id: str, deployment_target_id: str
+) -> tuple[str, str, str]:
     if not app_id:
         raise HTTPException(status_code=400, detail="app_id is required")
+    if not deployment_target_id:
+        raise HTTPException(
+            status_code=400, detail="deployment_target_id is required"
+        )
+    try:
+        uuid.UUID(app_id)
+        uuid.UUID(deployment_target_id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400, detail="app and deployment target ids must be UUIDs"
+        ) from error
 
     app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
     scripts_root = os.path.abspath(SCRIPTS_DIR)
     if not app_home.startswith(scripts_root + os.sep):
         raise HTTPException(status_code=400, detail="invalid app id")
 
-    backend_dir = os.path.join(app_home, "runtime", "backend")
+    target_home = os.path.abspath(
+        os.path.join(app_home, "targets", deployment_target_id)
+    )
+    if not target_home.startswith(app_home + os.sep):
+        raise HTTPException(status_code=400, detail="invalid deployment target id")
+
+    backend_dir = os.path.join(target_home, "runtime", "backend")
     data_dir = _app_data_dir(app_home, app_id)
 
-    if not os.path.isdir(app_home):
-        raise HTTPException(status_code=404, detail=f"unknown app '{app_id}'")
+    if not os.path.isdir(target_home):
+        raise HTTPException(
+            status_code=404,
+            detail=f"unknown deployment target '{deployment_target_id}' for app '{app_id}'",
+        )
 
-    return app_home, backend_dir, data_dir
+    return target_home, backend_dir, data_dir
 
 
 def _temp_upload_dir(session_id: str) -> str:
@@ -220,10 +261,17 @@ async def execute_controller(controller_name: str, request: Request) -> JSONResp
     try:
         body = await request.json()
         app_id = str(body.get("app_id", ""))
+        deployment_target_id = str(body.get("deployment_target_id", ""))
         action_name = body.get("action", "")
         inputs = body.get("inputs", {})
 
-        result = _execute_in_app_env(app_id, controller_name, action_name, inputs)
+        result = _execute_in_app_env(
+            app_id,
+            deployment_target_id,
+            controller_name,
+            action_name,
+            inputs,
+        )
 
         return JSONResponse(status_code=200, content=result)
     except HTTPException:
@@ -240,13 +288,14 @@ async def read_runtime_file(request: Request) -> JSONResponse:
     try:
         body = await request.json()
         app_id = str(body.get("app_id", ""))
+        deployment_target_id = str(body.get("deployment_target_id", ""))
         relative_path = str(body.get("path", "index.html")).strip().lstrip("/\\")
 
         if not app_id:
             return JSONResponse(status_code=400, content={"error": "app_id is required"})
 
-        app_home = os.path.abspath(os.path.join(SCRIPTS_DIR, app_id))
-        frontend_dir = os.path.join(app_home, "runtime", "frontend")
+        target_home, _, _ = _resolve_app_paths(app_id, deployment_target_id)
+        frontend_dir = os.path.join(target_home, "runtime", "frontend")
         full_path = os.path.abspath(os.path.join(frontend_dir, relative_path))
 
         if not full_path.startswith(os.path.abspath(frontend_dir) + os.sep) and full_path != os.path.abspath(frontend_dir):
@@ -273,18 +322,25 @@ async def read_runtime_file(request: Request) -> JSONResponse:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-@app.post("/internal/apps/{app_id}/api/controllers/{controller_name}/actions/{action_name}/execute")
+@app.post("/internal/apps/{app_id}/targets/{deployment_target_id}/api/controllers/{controller_name}/actions/{action_name}/execute")
 async def execute_internal_controller(
     app_id: str,
+    deployment_target_id: str,
     controller_name: str,
     action_name: str,
     request: Request,
 ) -> JSONResponse:
     try:
-        _resolve_app_paths(app_id)
+        _resolve_app_paths(app_id, deployment_target_id)
         body = await request.json()
         inputs = body.get("inputs", {}) if isinstance(body, dict) else {}
-        result = _execute_in_app_env(app_id, controller_name, action_name, inputs)
+        result = _execute_in_app_env(
+            app_id,
+            deployment_target_id,
+            controller_name,
+            action_name,
+            inputs,
+        )
         return JSONResponse(status_code=200, content=result)
     except HTTPException as ex:
         return JSONResponse(status_code=ex.status_code, content={"success": False, "data": None, "error": ex.detail})
@@ -292,10 +348,15 @@ async def execute_internal_controller(
         return JSONResponse(status_code=500, content={"success": False, "data": None, "error": str(ex)})
 
 
-@app.post("/internal/apps/{app_id}/api/flows/{flow_identifier}/execute")
-async def execute_internal_flow(app_id: str, flow_identifier: str, request: Request) -> JSONResponse:
+@app.post("/internal/apps/{app_id}/targets/{deployment_target_id}/api/flows/{flow_identifier}/execute")
+async def execute_internal_flow(
+    app_id: str,
+    deployment_target_id: str,
+    flow_identifier: str,
+    request: Request,
+) -> JSONResponse:
     try:
-        _resolve_app_paths(app_id)
+        _resolve_app_paths(app_id, deployment_target_id)
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         inputs = body.get("inputs", {}) if isinstance(body, dict) else {}
         inputs_json = json.dumps(inputs)
@@ -307,6 +368,8 @@ async def execute_internal_flow(app_id: str, flow_identifier: str, request: Requ
                 "execute-app-flow",
                 "--app-id",
                 app_id,
+                "--deployment-target-id",
+                deployment_target_id,
                 "--flow-identifier",
                 flow_identifier,
                 "--inputs-json",
@@ -349,16 +412,17 @@ async def execute_internal_flow(app_id: str, flow_identifier: str, request: Requ
         return JSONResponse(status_code=ex.status_code, content={"message": ex.detail})
 
 
-@app.post("/internal/apps/{app_id}/api/files/upload")
+@app.post("/internal/apps/{app_id}/targets/{deployment_target_id}/api/files/upload")
 async def upload_internal_file(
     app_id: str,
+    deployment_target_id: str,
     file: UploadFile = File(...),
     runnerNames: str | None = Form(default=None),
 ) -> JSONResponse:
     del runnerNames
 
     try:
-        _resolve_app_paths(app_id)
+        _resolve_app_paths(app_id, deployment_target_id)
         session_id = uuid.uuid4().hex
         target_dir = _temp_upload_dir(session_id)
         os.makedirs(target_dir, exist_ok=True)
@@ -381,10 +445,12 @@ async def upload_internal_file(
         return JSONResponse(status_code=500, content={"error": str(ex)})
 
 
-@app.get("/internal/apps/{app_id}/api/files/{session_id}")
-async def download_internal_file(app_id: str, session_id: str):
+@app.get("/internal/apps/{app_id}/targets/{deployment_target_id}/api/files/{session_id}")
+async def download_internal_file(
+    app_id: str, deployment_target_id: str, session_id: str
+):
     try:
-        _resolve_app_paths(app_id)
+        _resolve_app_paths(app_id, deployment_target_id)
         file_path = _safe_download_file(session_id)
         if not file_path:
             return JSONResponse(status_code=404, content={"error": "file not found"})
@@ -400,10 +466,12 @@ async def download_internal_file(app_id: str, session_id: str):
         return JSONResponse(status_code=ex.status_code, content={"error": ex.detail})
 
 
-@app.api_route("/internal/apps/{app_id}/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
-async def unknown_internal_api(app_id: str, path: str) -> JSONResponse:
+@app.api_route("/internal/apps/{app_id}/targets/{deployment_target_id}/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
+async def unknown_internal_api(
+    app_id: str, deployment_target_id: str, path: str
+) -> JSONResponse:
     try:
-        _resolve_app_paths(app_id)
+        _resolve_app_paths(app_id, deployment_target_id)
     except HTTPException as ex:
         return JSONResponse(status_code=ex.status_code, content={"error": ex.detail})
 

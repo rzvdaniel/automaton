@@ -130,6 +130,7 @@ public class AppControllerActionResponse
 public class BackendRuntimeLogEvent
 {
     public Guid AppId { get; set; }
+    public Guid DeploymentTargetId { get; set; }
     public DateTime Timestamp { get; set; }
     public string Level { get; set; } = "info";
     public string Message { get; set; } = string.Empty;

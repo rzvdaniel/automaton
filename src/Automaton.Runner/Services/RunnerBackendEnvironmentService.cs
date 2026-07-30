@@ -15,11 +15,14 @@ public class RunnerBackendEnvironmentService
         logger = Log.ForContext<RunnerBackendEnvironmentService>();
     }
 
-    public List<string> EnsureAppVirtualEnvironment(Guid appId, bool recreate)
+    public List<string> EnsureAppVirtualEnvironment(
+        Guid appId,
+        Guid deploymentTargetId,
+        bool recreate)
     {
         var logs = new List<string>();
-        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
-        var appRootDir = runnerWorkspaceService.GetAppRoot(appId);
+        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId);
+        var appRootDir = runnerWorkspaceService.GetDeploymentTargetRoot(appId, deploymentTargetId);
 
         Directory.CreateDirectory(appRootDir);
 
@@ -55,12 +58,15 @@ public class RunnerBackendEnvironmentService
         return logs;
     }
 
-    public List<string> InstallRequirements(Guid appId, string requirementsPath)
+    public List<string> InstallRequirements(
+        Guid appId,
+        Guid deploymentTargetId,
+        string requirementsPath)
     {
         var logs = new List<string>();
-        logs.AddRange(EnsureAppVirtualEnvironment(appId, recreate: true));
+        logs.AddRange(EnsureAppVirtualEnvironment(appId, deploymentTargetId, recreate: true));
 
-        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId);
+        var venvDir = runnerWorkspaceService.GetAppVenvDirectory(appId, deploymentTargetId);
         var pipPath = GetVenvPipPath(venvDir);
         var pythonPath = GetVenvPythonPath(venvDir);
 
@@ -78,7 +84,10 @@ public class RunnerBackendEnvironmentService
         return logs;
     }
 
-    public List<string> InstallSystemPackages(Guid appId, string packageListContent)
+    public List<string> InstallSystemPackages(
+        Guid appId,
+        Guid deploymentTargetId,
+        string packageListContent)
     {
         var logs = new List<string>();
         if (!IsRunningInContainer())

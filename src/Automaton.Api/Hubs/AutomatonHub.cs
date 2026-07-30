@@ -29,6 +29,7 @@ public class AutomatonHub : Hub
     private readonly FileDownloadRegistry fileDownloadRegistry;
     private readonly ILogger<AutomatonHub> logger;
     private readonly RunnerStorageTelemetryService storageTelemetryService;
+    private readonly IAppDeploymentTargetResolver deploymentTargetResolver;
 
     public AutomatonHub(
         RunnerService runnerService,
@@ -38,7 +39,8 @@ public class AutomatonHub : Hub
         FileUploadRegistry fileUploadRegistry,
         FileDownloadRegistry fileDownloadRegistry,
         ILogger<AutomatonHub> logger,
-        RunnerStorageTelemetryService storageTelemetryService)
+        RunnerStorageTelemetryService storageTelemetryService,
+        IAppDeploymentTargetResolver deploymentTargetResolver)
     {
         this.runnerService = runnerService;
         this.appsService = appsService;
@@ -48,6 +50,7 @@ public class AutomatonHub : Hub
         this.fileDownloadRegistry = fileDownloadRegistry;
         this.logger = logger;
         this.storageTelemetryService = storageTelemetryService;
+        this.deploymentTargetResolver = deploymentTargetResolver;
     }
 
     public Task ReportHostedRunnerStorage(HostedRunnerStorageTelemetry report) =>
@@ -165,7 +168,7 @@ public class AutomatonHub : Hub
         return !string.IsNullOrEmpty(runnerName);
     }
 
-    public async Task JoinAppRuntimeLogs(Guid appId)
+    public async Task JoinAppRuntimeLogs(Guid appId, string? targetSlug = null)
     {
         if (GetRunnerOrNull() != null)
         {
@@ -179,15 +182,32 @@ public class AutomatonHub : Hub
             throw new HubException("App not found or access denied.");
         }
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, GetAppRuntimeLogsGroupName(appId));
+        var target = await deploymentTargetResolver.ResolveAsync(
+            appId,
+            targetSlug,
+            userId,
+            Context.ConnectionAborted);
+        await Groups.AddToGroupAsync(
+            Context.ConnectionId,
+            GetAppRuntimeLogsGroupName(appId, target.Id));
     }
 
-    public Task LeaveAppRuntimeLogs(Guid appId)
+    public async Task LeaveAppRuntimeLogs(Guid appId, string? targetSlug = null)
     {
-        return Groups.RemoveFromGroupAsync(Context.ConnectionId, GetAppRuntimeLogsGroupName(appId));
+        var target = await deploymentTargetResolver.ResolveAsync(
+            appId,
+            targetSlug,
+            GetUserId(),
+            Context.ConnectionAborted);
+        await Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            GetAppRuntimeLogsGroupName(appId, target.Id));
     }
 
-    public static string GetAppRuntimeLogsGroupName(Guid appId) => $"app-runtime-logs:{appId:D}";
+    public static string GetAppRuntimeLogsGroupName(
+        Guid appId,
+        Guid deploymentTargetId)
+        => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
 
     public async Task Heartbeat()
     {

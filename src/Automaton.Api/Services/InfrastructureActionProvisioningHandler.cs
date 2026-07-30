@@ -93,6 +93,12 @@ public sealed class InfrastructureActionProvisioningHandler(
 
             var module = await actionDeploymentService.EnsureDeployedAsync(
                 infrastructureRunner.ConnectionId!, message.ActionKey, cancellationToken);
+            var deploymentTargetId = await db.AppDeploymentTargets
+                .Where(target =>
+                    target.WebAppId == InfrastructureAppTrust.PlatformAppId &&
+                    target.IsDefault)
+                .Select(target => target.Id)
+                .SingleAsync(cancellationToken);
 
             if (message.ActionKey is "provision-hosted-runner" or "reprovision-hosted-runner"
                 && message.SecretGrantIds.Count == 0)
@@ -107,6 +113,7 @@ public sealed class InfrastructureActionProvisioningHandler(
                     Id = Guid.NewGuid(),
                     HostedRunnerOperationId = message.OperationId,
                     AppId = InfrastructureAppTrust.PlatformAppId,
+                    DeploymentTargetId = deploymentTargetId,
                     ModuleType = AppModuleTypes.Action,
                     ModuleKey = message.ActionKey,
                     RunnerId = infrastructureRunner.Id,
@@ -165,6 +172,7 @@ public sealed class InfrastructureActionProvisioningHandler(
                         {
                             ExecutionId = execution.Id,
                             AppId = InfrastructureAppTrust.PlatformAppId,
+                            DeploymentTargetId = deploymentTargetId,
                             ActionKey = message.ActionKey,
                             ExpectedDeploymentHash = module.ContentHash,
                             TimeoutSeconds = module.TimeoutSeconds,
@@ -207,7 +215,11 @@ public sealed class InfrastructureActionProvisioningHandler(
             var artifact = await hub.Clients.Client(infrastructureRunner.ConnectionId!)
                 .InvokeAsync<AppModuleExecutionArtifactResponse>(
                     AutomatonHubMethods.ReadAppModuleExecutionResult,
-                    new ReadAppModuleExecutionArtifactRequest(InfrastructureAppTrust.PlatformAppId, message.ActionKey, execution.Id),
+                    new ReadAppModuleExecutionArtifactRequest(
+                        InfrastructureAppTrust.PlatformAppId,
+                        deploymentTargetId,
+                        message.ActionKey,
+                        execution.Id),
                     cancellationToken);
             if (!artifact.Available || string.IsNullOrWhiteSpace(artifact.Content))
                 throw new InvalidOperationException("Infrastructure Action completed without a result artifact.");

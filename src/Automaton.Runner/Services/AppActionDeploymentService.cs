@@ -24,23 +24,29 @@ public sealed class AppActionDeploymentService
         this.coordinator = coordinator ?? new AppActionExecutionCoordinator();
     }
 
-    public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(Guid appId, bool allowPrivilegedCapabilities = false, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AppActionDeploymentResult>> PrepareAllAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        bool allowPrivilegedCapabilities = false,
+        CancellationToken cancellationToken = default)
     {
         if (allowPrivilegedCapabilities && Automaton.Core.Enums.RunnerPurposes.Normalize(Environment.GetEnvironmentVariable("AUTOMATON_RUNNER_PURPOSE")) != Automaton.Core.Enums.RunnerPurposes.Infrastructure)
             throw new UnauthorizedAccessException("Privileged Actions may only be prepared on Infrastructure Runners.");
-        var actions = AppActionManifestParser.Discover(workspace.GetAppSourceRoot(appId), allowPrivilegedCapabilities);
+        var actions = AppActionManifestParser.Discover(
+            workspace.GetAppSourceRoot(appId, deploymentTargetId),
+            allowPrivilegedCapabilities);
         var results = new List<AppActionDeploymentResult>(actions.Count);
         foreach (var action in actions)
         {
-            results.Add(await PrepareAsync(appId, action, cancellationToken));
+            results.Add(await PrepareAsync(appId, deploymentTargetId, action, cancellationToken));
         }
 
         return results;
     }
 
-    public AppActionModulesResponse ListModules(Guid appId)
+    public AppActionModulesResponse ListModules(Guid appId, Guid deploymentTargetId)
     {
-        var actionsRoot = workspace.GetAppRuntimeActionsDirectory(appId);
+        var actionsRoot = workspace.GetAppRuntimeActionsDirectory(appId, deploymentTargetId);
         if (!Directory.Exists(actionsRoot)) return new([]);
         var actions = new List<AppActionModuleInfo>();
         foreach (var directory in Directory.GetDirectories(actionsRoot).OrderBy(path => path, StringComparer.Ordinal))
@@ -49,7 +55,7 @@ public sealed class AppActionDeploymentService
             try
             {
                 AppActionManifestParser.ValidateKey(key);
-                var current = workspace.GetAppActionCurrentDirectory(appId, key);
+                var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, key);
                 var manifestPath = Path.Combine(current, "action.yaml");
                 if (!File.Exists(manifestPath)) continue;
                 var manifest = AppActionManifestParser.ParseFile(manifestPath, key, allowPrivilegedCapabilities: true);
@@ -104,7 +110,11 @@ public sealed class AppActionDeploymentService
             var hash = ComputeContentHash(temp);
             if (!string.Equals(hash, request.ExpectedContentHash, StringComparison.Ordinal))
                 throw new InvalidOperationException("Action source package hash did not match the expected hash.");
-            return await PrepareAsync(request.AppId, action, cancellationToken);
+            return await PrepareAsync(
+                request.AppId,
+                request.DeploymentTargetId,
+                action,
+                cancellationToken);
         }
         finally
         {
@@ -116,7 +126,9 @@ public sealed class AppActionDeploymentService
     {
         var expected = request.ActionKeys.ToHashSet(StringComparer.Ordinal);
         foreach (var key in expected) AppActionManifestParser.ValidateKey(key);
-        var runtimeRoot = workspace.GetAppRuntimeActionsDirectory(request.AppId);
+        var runtimeRoot = workspace.GetAppRuntimeActionsDirectory(
+            request.AppId,
+            request.DeploymentTargetId);
         if (!Directory.Exists(runtimeRoot)) return 0;
         var removed = 0;
         foreach (var directory in Directory.GetDirectories(runtimeRoot))
@@ -129,14 +141,17 @@ public sealed class AppActionDeploymentService
         return removed;
     }
 
-    public AppActionVersionsResponse ListVersions(Guid appId, string actionKey)
+    public AppActionVersionsResponse ListVersions(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey)
     {
         AppActionManifestParser.ValidateKey(actionKey);
         var versions = new List<AppActionVersionInfo>();
-        var current = workspace.GetAppActionCurrentDirectory(appId, actionKey);
+        var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
         if (Directory.Exists(current))
             versions.Add(ToVersionInfo(current, "current", isCurrent: true));
-        var versionsRoot = workspace.GetAppActionVersionsDirectory(appId, actionKey);
+        var versionsRoot = workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey);
         if (Directory.Exists(versionsRoot))
         {
             versions.AddRange(Directory.GetDirectories(versionsRoot)
@@ -146,14 +161,20 @@ public sealed class AppActionDeploymentService
         return new(versions);
     }
 
-    public AppActionVersionOperationResponse RestoreVersion(Guid appId, string actionKey, string version)
+    public AppActionVersionOperationResponse RestoreVersion(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey,
+        string version)
     {
         ValidateVersionName(version);
-        var versionsRoot = workspace.GetAppActionVersionsDirectory(appId, actionKey);
+        var versionsRoot = workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey);
         var selected = EnsureChildPath(versionsRoot, version);
         if (!Directory.Exists(selected)) return new(false, "Action version was not found.");
-        var current = workspace.GetAppActionCurrentDirectory(appId, actionKey);
-        var staging = Path.Combine(workspace.GetAppActionRuntimeRoot(appId, actionKey), $".restore-{Guid.NewGuid():N}");
+        var current = workspace.GetAppActionCurrentDirectory(appId, deploymentTargetId, actionKey);
+        var staging = Path.Combine(
+            workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, actionKey),
+            $".restore-{Guid.NewGuid():N}");
         CopyDirectory(selected, staging);
         ValidatePreparedDeployment(staging, actionKey);
         if (Directory.Exists(current))
@@ -166,20 +187,37 @@ public sealed class AppActionDeploymentService
         return new(true, $"Restored Action '{actionKey}' to version '{version}'.", ReadCurrentHash(current));
     }
 
-    public AppActionVersionOperationResponse DeleteVersion(Guid appId, string actionKey, string version)
+    public AppActionVersionOperationResponse DeleteVersion(
+        Guid appId,
+        Guid deploymentTargetId,
+        string actionKey,
+        string version)
     {
         ValidateVersionName(version);
-        var path = EnsureChildPath(workspace.GetAppActionVersionsDirectory(appId, actionKey), version);
+        var path = EnsureChildPath(
+            workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey),
+            version);
         if (!Directory.Exists(path)) return new(false, "Action version was not found.");
         Directory.Delete(path, recursive: true);
         return new(true, $"Deleted Action version '{version}'.");
     }
 
-    private async Task<AppActionDeploymentResult> PrepareAsync(Guid appId, DiscoveredAppAction action, CancellationToken cancellationToken)
+    private async Task<AppActionDeploymentResult> PrepareAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        DiscoveredAppAction action,
+        CancellationToken cancellationToken)
     {
-        using var actionLock = await coordinator.EnterAsync(appId, action.Key, cancellationToken);
+        using var actionLock = await coordinator.EnterAsync(
+            appId,
+            deploymentTargetId,
+            action.Key,
+            cancellationToken);
         var contentHash = ComputeContentHash(action.DirectoryPath);
-        var currentDirectory = workspace.GetAppActionCurrentDirectory(appId, action.Key);
+        var currentDirectory = workspace.GetAppActionCurrentDirectory(
+            appId,
+            deploymentTargetId,
+            action.Key);
         if (string.Equals(ReadCurrentHash(currentDirectory), contentHash, StringComparison.Ordinal))
         {
             return new AppActionDeploymentResult
@@ -191,7 +229,7 @@ public sealed class AppActionDeploymentService
             };
         }
 
-        var actionRoot = workspace.GetAppActionRuntimeRoot(appId, action.Key);
+        var actionRoot = workspace.GetAppActionRuntimeRoot(appId, deploymentTargetId, action.Key);
         var stagingDirectory = Path.Combine(actionRoot, $".staging-{Guid.NewGuid():N}");
         Directory.CreateDirectory(actionRoot);
         try
@@ -213,14 +251,14 @@ public sealed class AppActionDeploymentService
             if (Directory.Exists(currentDirectory))
             {
                 var versionDirectory = Path.Combine(
-                    workspace.GetAppActionVersionsDirectory(appId, action.Key),
+                    workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, action.Key),
                     $"{DateTime.UtcNow:yyyyMMddHHmmssfff}-{HashSuffix(ReadCurrentHash(currentDirectory))}");
                 Directory.CreateDirectory(Path.GetDirectoryName(versionDirectory)!);
                 Directory.Move(currentDirectory, versionDirectory);
             }
 
             Directory.Move(stagingDirectory, currentDirectory);
-            PruneVersions(appId, action.Key);
+            PruneVersions(appId, deploymentTargetId, action.Key);
             return new AppActionDeploymentResult
             {
                 ActionKey = action.Key,
@@ -381,9 +419,9 @@ public sealed class AppActionDeploymentService
             throw new InvalidOperationException("Invalid Action version identifier.");
     }
 
-    private void PruneVersions(Guid appId, string actionKey)
+    private void PruneVersions(Guid appId, Guid deploymentTargetId, string actionKey)
     {
-        var root = workspace.GetAppActionVersionsDirectory(appId, actionKey);
+        var root = workspace.GetAppActionVersionsDirectory(appId, deploymentTargetId, actionKey);
         if (!Directory.Exists(root)) return;
         var versions = Directory.GetDirectories(root)
             .Select(path => new { Path = path, Created = Directory.GetCreationTimeUtc(path), Size = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length) })

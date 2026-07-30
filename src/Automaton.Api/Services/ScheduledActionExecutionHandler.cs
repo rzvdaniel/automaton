@@ -125,8 +125,15 @@ public sealed class ScheduledActionExecutionHandler(
             throw new InvalidOperationException("Infrastructure Runner is not active, approved, ready, and online.");
         var module = await infrastructureActions.EnsureDeployedAsync(
             runner.ConnectionId!, schedule.ActionKey, cancellationToken);
+        var deploymentTargetId = await db.AppDeploymentTargets
+            .Where(target =>
+                target.WebAppId == schedule.ApplicationId &&
+                target.IsDefault)
+            .Select(target => target.Id)
+            .SingleAsync(cancellationToken);
         return await executions.ExecuteScheduledOnRunnerAsync(
             schedule.ApplicationId,
+            deploymentTargetId,
             schedule.ActionKey,
             input.Clone(),
             occurrenceId,

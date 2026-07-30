@@ -17,10 +17,11 @@ public class AppActionExecutionServiceTests
             var workspace = new RunnerWorkspaceService();
             var service = new AppActionExecutionService(workspace);
             var appId = Guid.NewGuid();
+            var targetId = Guid.NewGuid();
             const string actionKey = "idempotent";
             var terminalExecutionId = Guid.NewGuid();
             var terminalDirectory = Path.Combine(
-                workspace.GetAppActionExecutionsDirectory(appId, actionKey),
+                workspace.GetAppActionExecutionsDirectory(appId, targetId, actionKey),
                 terminalExecutionId.ToString("N"));
             Directory.CreateDirectory(terminalDirectory);
             await File.WriteAllTextAsync(
@@ -41,6 +42,7 @@ public class AppActionExecutionServiceTests
             {
                 ExecutionId = terminalExecutionId,
                 AppId = appId,
+                DeploymentTargetId = targetId,
                 ActionKey = actionKey
             });
 
@@ -48,7 +50,7 @@ public class AppActionExecutionServiceTests
 
             var interruptedExecutionId = Guid.NewGuid();
             var interruptedDirectory = Path.Combine(
-                workspace.GetAppActionExecutionsDirectory(appId, actionKey),
+                workspace.GetAppActionExecutionsDirectory(appId, targetId, actionKey),
                 interruptedExecutionId.ToString("N"));
             Directory.CreateDirectory(interruptedDirectory);
             await File.WriteAllTextAsync(
@@ -68,6 +70,7 @@ public class AppActionExecutionServiceTests
             {
                 ExecutionId = interruptedExecutionId,
                 AppId = appId,
+                DeploymentTargetId = targetId,
                 ActionKey = actionKey
             });
 
@@ -94,7 +97,8 @@ public class AppActionExecutionServiceTests
         {
             var workspace = new RunnerWorkspaceService();
             var appId = Guid.NewGuid();
-            var actionDirectory = workspace.GetAppActionCurrentDirectory(appId, "noisy");
+            var targetId = Guid.NewGuid();
+            var actionDirectory = workspace.GetAppActionCurrentDirectory(appId, targetId, "noisy");
             Directory.CreateDirectory(actionDirectory);
             await File.WriteAllTextAsync(Path.Combine(actionDirectory, "action.yaml"), """
                 apiVersion: automaton.dev/v1
@@ -117,7 +121,7 @@ public class AppActionExecutionServiceTests
             var service = new AppActionExecutionService(workspace);
             var result = await service.ExecuteAsync(new Automaton.Core.Models.ExecuteAppActionModuleRequest
             {
-                ExecutionId = Guid.NewGuid(), AppId = appId, ActionKey = "noisy", Input = input.RootElement.Clone()
+                ExecutionId = Guid.NewGuid(), AppId = appId, DeploymentTargetId = targetId, ActionKey = "noisy", Input = input.RootElement.Clone()
             });
 
             Assert.That(result.Status, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionStatuses.Failed));
@@ -141,8 +145,9 @@ public class AppActionExecutionServiceTests
             var workspace = new RunnerWorkspaceService();
             var service = new AppActionExecutionService(workspace);
             var appId = Guid.NewGuid();
-            var expired = Path.Combine(workspace.GetAppActionExecutionsDirectory(appId, "hello"), Guid.NewGuid().ToString("N"));
-            var current = Path.Combine(workspace.GetAppActionExecutionsDirectory(appId, "hello"), Guid.NewGuid().ToString("N"));
+            var targetId = Guid.NewGuid();
+            var expired = Path.Combine(workspace.GetAppActionExecutionsDirectory(appId, targetId, "hello"), Guid.NewGuid().ToString("N"));
+            var current = Path.Combine(workspace.GetAppActionExecutionsDirectory(appId, targetId, "hello"), Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(expired);
             Directory.CreateDirectory(current);
             Directory.SetLastWriteTimeUtc(expired, DateTime.UtcNow.AddDays(-2));
@@ -174,9 +179,10 @@ public class AppActionExecutionServiceTests
             const string secret = "re_sensitive-value-with-specials";
             var workspace = new RunnerWorkspaceService();
             var appId = Guid.NewGuid();
+            var targetId = Guid.NewGuid();
             var actionKey = "echo-secret";
             var executionId = Guid.NewGuid();
-            var actionDirectory = workspace.GetAppActionCurrentDirectory(appId, actionKey);
+            var actionDirectory = workspace.GetAppActionCurrentDirectory(appId, targetId, actionKey);
             Directory.CreateDirectory(actionDirectory);
             await File.WriteAllTextAsync(Path.Combine(actionDirectory, "action.yaml"), """
                 apiVersion: automaton.dev/v1
@@ -201,6 +207,7 @@ public class AppActionExecutionServiceTests
             {
                 ExecutionId = executionId,
                 AppId = appId,
+                DeploymentTargetId = targetId,
                 ActionKey = actionKey,
                 Input = input.RootElement.Clone(),
                 Secrets = new Dictionary<string, string> { ["DELIVERED_SECRET"] = secret }
@@ -211,8 +218,8 @@ public class AppActionExecutionServiceTests
             Assert.That(result.Status, Is.EqualTo(Automaton.Core.Models.AppModuleExecutionStatuses.Succeeded));
             Assert.That(duplicateResult.Status, Is.EqualTo(result.Status));
             Assert.That(duplicateResult.StartedAtUtc, Is.EqualTo(result.StartedAtUtc));
-            var logs = service.ReadLogs(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, actionKey, executionId));
-            var output = service.ReadResult(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, actionKey, executionId));
+            var logs = service.ReadLogs(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, targetId, actionKey, executionId));
+            var output = service.ReadResult(new Automaton.Core.Models.ReadAppModuleExecutionArtifactRequest(appId, targetId, actionKey, executionId));
             Assert.That(logs.Content, Does.Not.Contain(secret));
             Assert.That(logs.Content, Does.Contain("[REDACTED]"));
             Assert.That(output.Content, Does.Not.Contain(secret));

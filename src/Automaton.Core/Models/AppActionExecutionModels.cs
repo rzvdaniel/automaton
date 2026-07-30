@@ -45,6 +45,7 @@ public sealed class ExecuteAppActionModuleRequest
 {
     public Guid ExecutionId { get; set; }
     public Guid AppId { get; set; }
+    public Guid DeploymentTargetId { get; set; }
     public string ActionKey { get; set; } = string.Empty;
     public string? ExpectedDeploymentHash { get; set; }
     public int? TimeoutSeconds { get; set; }
@@ -70,11 +71,15 @@ public sealed class AppActionExecutionResult
 }
 
 public sealed record CancelAppModuleExecutionRequest(Guid ExecutionId);
-public sealed record ReadAppModuleExecutionArtifactRequest(Guid AppId, string ActionKey, Guid ExecutionId);
+public sealed record ReadAppModuleExecutionArtifactRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    string ActionKey,
+    Guid ExecutionId);
 public sealed record AppModuleExecutionArtifactResponse(bool Available, string? Content, DateTime? ExpiresAtUtc, string? Message = null);
 
-public sealed record AppActionModuleRequest(Guid AppId, string ActionKey);
-public sealed record AppActionVersionRequest(Guid AppId, string ActionKey, string Version);
+public sealed record AppActionModuleRequest(Guid AppId, Guid DeploymentTargetId, string ActionKey);
+public sealed record AppActionVersionRequest(Guid AppId, Guid DeploymentTargetId, string ActionKey, string Version);
 public sealed record AppActionVersionInfo(string Version, string? ContentHash, DateTime CreatedAtUtc, long SizeBytes, bool IsCurrent = false);
 public sealed record AppActionVersionsResponse(IReadOnlyList<AppActionVersionInfo> Versions);
 public sealed record AppActionVersionOperationResponse(bool Success, string Message, string? ContentHash = null);
@@ -91,5 +96,14 @@ public sealed record AppActionModuleInfo(
     int MinimumIntervalSeconds,
     Dictionary<string, object?>? InputSchema);
 public sealed record AppActionModulesResponse(IReadOnlyList<AppActionModuleInfo> Actions);
-public sealed record PrepareAppActionModuleRequest(Guid AppId, string ActionKey, byte[] SourceZip, string ExpectedContentHash, bool SystemInfrastructure);
-public sealed record SynchronizeAppActionModulesRequest(Guid AppId, IReadOnlyList<string> ActionKeys);
+public sealed record PrepareAppActionModuleRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    string ActionKey,
+    byte[] SourceZip,
+    string ExpectedContentHash,
+    bool SystemInfrastructure);
+public sealed record SynchronizeAppActionModulesRequest(
+    Guid AppId,
+    Guid DeploymentTargetId,
+    IReadOnlyList<string> ActionKeys);

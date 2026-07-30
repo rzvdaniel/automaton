@@ -33,6 +33,8 @@ public class BackendRouteConfigServiceTests
             RuntimeEndpoint = "http://runner-a:8080"
         });
 
+        var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        defaultTarget.FrontendDeployed = true;
         dbContext.WebApps.Add(new WebApp
         {
             Id = appId,
@@ -42,7 +44,7 @@ public class BackendRouteConfigServiceTests
             Definition = "{}",
             Created = DateTime.UtcNow,
             Updated = DateTime.UtcNow,
-            DeploymentTargets = { AppDeploymentTarget.CreateDefault(appId, runnerId) }
+            DeploymentTargets = { defaultTarget }
         });
 
         await dbContext.SaveChangesAsync();
@@ -58,7 +60,8 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/api`)"));
             Assert.That(content, Does.Contain("tls: {}"));
             Assert.That(content, Does.Not.Contain("certResolver"));
-            Assert.That(content, Does.Contain($"/apps/{appId}/api/$1"));
+            Assert.That(content, Does.Contain(
+                $"/apps/{appId}/targets/{defaultTarget.Id}/api/$1"));
             Assert.That(content, Does.Contain("http://runner-a:8080"));
         });
     }
@@ -95,6 +98,78 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain("routers: {}"));
             Assert.That(content, Does.Contain("middlewares: {}"));
             Assert.That(content, Does.Contain("services: {}"));
+        });
+    }
+
+    [Test]
+    public async Task RefreshAsync_WritesIndependentRoute_ForNamedTarget()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var defaultTarget = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        defaultTarget.FrontendDeployed = true;
+        var namedTarget = new AppDeploymentTarget
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = appId,
+            Name = "Server EU",
+            Slug = "server-eu",
+            ExecutionRunnerId = runnerId,
+            FrontendDeployed = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        namedTarget.SynchronizeDefaultConstraint();
+        dbContext.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            Name = "Hosted Runner",
+            Status = "Running",
+            ContainerName = "runner-a",
+            RunnerId = runnerId,
+            RuntimeEndpoint = "http://runner-a:8080"
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Multi-target App",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            DeploymentTargets = { defaultTarget, namedTarget }
+        });
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+        var content = await File.ReadAllTextAsync(
+            Path.Combine(rootPath, "managed-runtime-routes.yml"));
+        var targetPrefix = $"/a/{appId}/t/{namedTarget.Id}";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain($"PathPrefix(`{targetPrefix}`)"));
+            Assert.That(content, Does.Contain(
+                $"/apps/{appId}/targets/{namedTarget.Id}/$1"));
+            Assert.That(content, Does.Contain(
+                $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
+        });
+
+        dbContext.AppDeploymentTargets.Remove(namedTarget);
+        await dbContext.SaveChangesAsync();
+        await CreateService(dbContext, rootPath).RefreshAsync();
+        content = await File.ReadAllTextAsync(
+            Path.Combine(rootPath, "managed-runtime-routes.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Not.Contain(targetPrefix));
+            Assert.That(content, Does.Contain(
+                $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
         });
     }
 

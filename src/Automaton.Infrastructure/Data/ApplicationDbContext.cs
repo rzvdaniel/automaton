@@ -241,8 +241,8 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.ErrorCode).HasMaxLength(80);
                 entity.Property(e => e.FailureSummary).HasMaxLength(1000);
                 entity.Property(e => e.CorrelationId).HasMaxLength(128);
-                entity.HasIndex(e => new { e.AppId, e.CreatedAtUtc });
-                entity.HasIndex(e => new { e.AppId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.AppId, e.DeploymentTargetId, e.CreatedAtUtc });
+                entity.HasIndex(e => new { e.AppId, e.DeploymentTargetId, e.ModuleType, e.ModuleKey, e.CreatedAtUtc });
                 entity.HasIndex(e => e.HostedRunnerOperationId).IsUnique();
                 entity.HasIndex(e => e.ScheduleOccurrenceId).IsUnique();
                 entity.HasOne(e => e.HostedRunnerOperation)
@@ -251,6 +251,10 @@ namespace Automaton.Api.Data
                     .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
                 entity.HasOne<WebApp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<AppDeploymentTarget>()
+                    .WithMany()
+                    .HasForeignKey(e => e.DeploymentTargetId)
+                    .OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne<Runner>().WithMany().HasForeignKey(e => e.RunnerId).OnDelete(DeleteBehavior.SetNull);
                 entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(e => e.RequestedByUserId).OnDelete(DeleteBehavior.SetNull);
             });

@@ -27,13 +27,14 @@ public class AppFlowExecutionService
 
     public async Task<AppFlowExecutionResult> ExecuteAsync(
         Guid appId,
+        Guid deploymentTargetId,
         string flowIdentifier,
         IDictionary<string, string> inputs,
         CancellationToken cancellationToken = default)
     {
-        EnsureAppExists(appId);
+        EnsureAppExists(appId, deploymentTargetId);
 
-        var index = await LoadFlowIndexAsync(appId, cancellationToken);
+        var index = await LoadFlowIndexAsync(appId, deploymentTargetId, cancellationToken);
         var entry = ResolveFlow(index, flowIdentifier);
         if (entry == null)
         {
@@ -47,7 +48,7 @@ public class AppFlowExecutionService
             };
         }
 
-        var flow = await LoadFlowAsync(appId, entry.FlowId, cancellationToken);
+        var flow = await LoadFlowAsync(appId, deploymentTargetId, entry.FlowId, cancellationToken);
         ApplyInputVariables(flow, inputs);
 
         var execution = await flowExecuteService.Execute(flow, cancellationToken);
@@ -66,18 +67,21 @@ public class AppFlowExecutionService
         };
     }
 
-    private void EnsureAppExists(Guid appId)
+    private void EnsureAppExists(Guid appId, Guid deploymentTargetId)
     {
-        var appRoot = runnerWorkspaceService.GetAppRoot(appId);
-        if (!Directory.Exists(appRoot))
+        var targetRoot = runnerWorkspaceService.GetDeploymentTargetRoot(appId, deploymentTargetId);
+        if (!Directory.Exists(targetRoot))
         {
             throw new DirectoryNotFoundException($"unknown app '{appId}'");
         }
     }
 
-    private async Task<List<FlowIndexEntry>> LoadFlowIndexAsync(Guid appId, CancellationToken cancellationToken)
+    private async Task<List<FlowIndexEntry>> LoadFlowIndexAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        CancellationToken cancellationToken)
     {
-        var indexPath = GetFlowIndexPath(appId);
+        var indexPath = GetFlowIndexPath(appId, deploymentTargetId);
         if (!File.Exists(indexPath))
         {
             return [];
@@ -87,9 +91,13 @@ public class AppFlowExecutionService
         return JsonSerializer.Deserialize<List<FlowIndexEntry>>(json, JsonOptions()) ?? [];
     }
 
-    private async Task<Flow> LoadFlowAsync(Guid appId, Guid flowId, CancellationToken cancellationToken)
+    private async Task<Flow> LoadFlowAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid flowId,
+        CancellationToken cancellationToken)
     {
-        var flowPath = GetFlowArtifactPath(appId, flowId);
+        var flowPath = GetFlowArtifactPath(appId, deploymentTargetId, flowId);
         if (!File.Exists(flowPath))
         {
             throw new FileNotFoundException($"Flow artifact '{flowId}' not found.", flowPath);
@@ -130,15 +138,15 @@ public class AppFlowExecutionService
         }
     }
 
-    private string GetFlowIndexPath(Guid appId)
-        => Path.Combine(GetFlowArtifactsDirectory(appId), FlowIndexFileName);
+    private string GetFlowIndexPath(Guid appId, Guid deploymentTargetId)
+        => Path.Combine(GetFlowArtifactsDirectory(appId, deploymentTargetId), FlowIndexFileName);
 
-    private string GetFlowArtifactPath(Guid appId, Guid flowId)
-        => Path.Combine(GetFlowArtifactsDirectory(appId), $"{flowId:N}.json");
+    private string GetFlowArtifactPath(Guid appId, Guid deploymentTargetId, Guid flowId)
+        => Path.Combine(GetFlowArtifactsDirectory(appId, deploymentTargetId), $"{flowId:N}.json");
 
-    private string GetFlowArtifactsDirectory(Guid appId)
+    private string GetFlowArtifactsDirectory(Guid appId, Guid deploymentTargetId)
         => Path.Combine(
-            runnerWorkspaceService.GetAppBackendDirectory(appId),
+            runnerWorkspaceService.GetAppBackendDirectory(appId, deploymentTargetId),
             FlowArtifactsDirectoryName,
             FlowArtifactsFolderName);
 

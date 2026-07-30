@@ -7,6 +7,7 @@ public class AppModuleExecution
     public Guid? ScheduleOccurrenceId { get; set; }
     public HostedRunnerDeployment? HostedRunnerOperation { get; set; }
     public Guid AppId { get; set; }
+    public Guid? DeploymentTargetId { get; set; }
     public string ModuleType { get; set; } = string.Empty;
     public string ModuleKey { get; set; } = string.Empty;
     public Guid? RunnerId { get; set; }

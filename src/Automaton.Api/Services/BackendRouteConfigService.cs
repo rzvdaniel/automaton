@@ -16,7 +16,12 @@ public class BackendRouteConfigService
     private readonly IWebHostEnvironment environment;
     private readonly ILogger<BackendRouteConfigService> logger;
 
-    private sealed record RouteTarget(Guid AppId, string RuntimeEndpoint, string? Slug);
+    private sealed record RouteTarget(
+        Guid AppId,
+        Guid DeploymentTargetId,
+        bool IsDefault,
+        string RuntimeEndpoint,
+        string? Slug);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -34,7 +39,9 @@ public class BackendRouteConfigService
     {
         var routes = await dbContext.AppDeploymentTargets
             .AsNoTracking()
-            .Where(target => target.IsDefault && target.ExecutionRunnerId != null)
+            .Where(target =>
+                target.ExecutionRunnerId != null &&
+                (target.FrontendDeployed || target.BackendDeployed))
             .Join(
                 dbContext.HostedRunners.AsNoTracking().Where(r =>
                     r.DeletedAt == null &&
@@ -46,14 +53,21 @@ public class BackendRouteConfigService
                 (target, runner) => new
                 {
                     AppId = target.WebAppId,
+                    DeploymentTargetId = target.Id,
+                    target.IsDefault,
                     RuntimeEndpoint = runner.RuntimeEndpoint!,
-                    Slug = target.WebApp.IsPublished && target.WebApp.AccessStatus == AppAccessStatuses.Active
+                    Slug = target.IsDefault &&
+                        target.WebApp.IsPublished &&
+                        target.WebApp.AccessStatus == AppAccessStatuses.Active
                         ? target.WebApp.PublicUrl
                         : null
                 })
             .OrderBy(x => x.AppId)
+            .ThenBy(x => x.DeploymentTargetId)
             .Select(x => new RouteTarget(
                 x.AppId,
+                x.DeploymentTargetId,
+                x.IsDefault,
                 x.RuntimeEndpoint.Trim(),
                 x.Slug))
             .ToListAsync(cancellationToken);
@@ -103,7 +117,7 @@ public class BackendRouteConfigService
         }
 
         builder.AppendLine("  routers:");
-        foreach (var route in routes)
+        foreach (var route in routes.Where(route => route.IsDefault))
         {
             var key = $"private-{route.AppId:N}";
             var host = BuildPrivateAppHost(route.AppId);
@@ -125,6 +139,21 @@ public class BackendRouteConfigService
             builder.AppendLine("      priority: 1");
             builder.AppendLine($"      service: \"{key}\"");
             builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
+        }
+
+        foreach (var route in routes.Where(route => !route.IsDefault))
+        {
+            var key = $"target-{route.DeploymentTargetId:N}";
+            var prefix = BuildTargetRoutePrefix(route.AppId, route.DeploymentTargetId);
+            var host = BuildPrivateAppHost(route.AppId);
+            builder.AppendLine($"    {key}:");
+            builder.AppendLine("      entryPoints:");
+            builder.AppendLine("        - websecure");
+            builder.AppendLine("      tls: {}");
+            builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{prefix}`)\"");
+            builder.AppendLine("      priority: 110");
+            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      middlewares: [\"{key}-rewrite\"]");
         }
 
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
@@ -152,17 +181,27 @@ public class BackendRouteConfigService
         }
 
         builder.AppendLine("  middlewares:");
-        foreach (var route in routes)
+        foreach (var route in routes.Where(route => route.IsDefault))
         {
             var key = $"private-{route.AppId:N}";
             builder.AppendLine($"    {key}-api-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/api/$1\"");
             builder.AppendLine($"    {key}-frontend-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/(.*)$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
+        }
+
+        foreach (var route in routes.Where(route => !route.IsDefault))
+        {
+            var key = $"target-{route.DeploymentTargetId:N}";
+            var prefix = BuildTargetRoutePrefix(route.AppId, route.DeploymentTargetId);
+            builder.AppendLine($"    {key}-rewrite:");
+            builder.AppendLine("      replacePathRegex:");
+            builder.AppendLine($"        regex: \"^{prefix}(?:/(.*))?$\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
         }
 
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
@@ -171,11 +210,11 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/api/$1\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/api/$1\"");
             builder.AppendLine($"    {key}-frontend-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/(.*)$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/$1\"");
+            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
         }
 
         builder.AppendLine("  services:");
@@ -190,7 +229,9 @@ public class BackendRouteConfigService
 
         foreach (var route in routes)
         {
-            var key = $"private-{route.AppId:N}";
+            var key = route.IsDefault
+                ? $"private-{route.AppId:N}"
+                : $"target-{route.DeploymentTargetId:N}";
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      loadBalancer:");
             builder.AppendLine("        servers:");
@@ -199,6 +240,9 @@ public class BackendRouteConfigService
 
         return builder.ToString();
     }
+
+    private static string BuildTargetRoutePrefix(Guid appId, Guid deploymentTargetId)
+        => $"/a/{appId}/t/{deploymentTargetId}";
 
     private string BuildPublishedAppHost(string slug)
     {

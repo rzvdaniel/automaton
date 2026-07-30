@@ -32,13 +32,14 @@ public class AppActionDeploymentServiceTests
     public async Task PrepareAll_SkipsUnchangedAndPreservesRestorableVersions()
     {
         var appId = Guid.NewGuid();
-        var source = CreateBashAction(appId, "printf '{\"version\":1}'");
+        var targetId = Guid.NewGuid();
+        var source = CreateBashAction(appId, targetId, "printf '{\"version\":1}'");
 
-        var first = await service.PrepareAllAsync(appId);
-        var unchanged = await service.PrepareAllAsync(appId);
+        var first = await service.PrepareAllAsync(appId, targetId);
+        var unchanged = await service.PrepareAllAsync(appId, targetId);
         File.WriteAllText(Path.Combine(source, "main.sh"), "printf '{\"version\":2}'");
-        var second = await service.PrepareAllAsync(appId);
-        var versions = service.ListVersions(appId, "hello");
+        var second = await service.PrepareAllAsync(appId, targetId);
+        var versions = service.ListVersions(appId, targetId, "hello");
 
         Assert.That(first.Single().Status, Is.EqualTo("deployed"));
         Assert.That(unchanged.Single().Status, Is.EqualTo("unchanged"));
@@ -46,30 +47,31 @@ public class AppActionDeploymentServiceTests
         Assert.That(versions.Versions, Has.Count.EqualTo(2));
         var oldVersion = versions.Versions.Single(version => !version.IsCurrent);
 
-        var restored = service.RestoreVersion(appId, "hello", oldVersion.Version);
+        var restored = service.RestoreVersion(appId, targetId, "hello", oldVersion.Version);
 
         Assert.That(restored.Success, Is.True);
-        Assert.That(File.ReadAllText(Path.Combine(workspace.GetAppActionCurrentDirectory(appId, "hello"), "main.sh")), Does.Contain("version\":1"));
+        Assert.That(File.ReadAllText(Path.Combine(workspace.GetAppActionCurrentDirectory(appId, targetId, "hello"), "main.sh")), Does.Contain("version\":1"));
     }
 
     [Test]
     public async Task DeleteVersion_RejectsCurrentAndDeletesNamedOldVersion()
     {
         var appId = Guid.NewGuid();
-        var source = CreateBashAction(appId, "printf '{}'");
-        await service.PrepareAllAsync(appId);
+        var targetId = Guid.NewGuid();
+        var source = CreateBashAction(appId, targetId, "printf '{}'");
+        await service.PrepareAllAsync(appId, targetId);
         File.AppendAllText(Path.Combine(source, "main.sh"), "\nprintf ' '");
-        await service.PrepareAllAsync(appId);
-        var oldVersion = service.ListVersions(appId, "hello").Versions.Single(version => !version.IsCurrent);
+        await service.PrepareAllAsync(appId, targetId);
+        var oldVersion = service.ListVersions(appId, targetId, "hello").Versions.Single(version => !version.IsCurrent);
 
-        Assert.That(() => service.DeleteVersion(appId, "hello", "current"), Throws.TypeOf<InvalidOperationException>());
-        Assert.That(service.DeleteVersion(appId, "hello", oldVersion.Version).Success, Is.True);
-        Assert.That(service.ListVersions(appId, "hello").Versions, Has.Count.EqualTo(1));
+        Assert.That(() => service.DeleteVersion(appId, targetId, "hello", "current"), Throws.TypeOf<InvalidOperationException>());
+        Assert.That(service.DeleteVersion(appId, targetId, "hello", oldVersion.Version).Success, Is.True);
+        Assert.That(service.ListVersions(appId, targetId, "hello").Versions, Has.Count.EqualTo(1));
     }
 
-    private string CreateBashAction(Guid appId, string script)
+    private string CreateBashAction(Guid appId, Guid targetId, string script)
     {
-        var directory = Path.Combine(workspace.GetAppSourceRoot(appId), "actions", "hello");
+        var directory = Path.Combine(workspace.GetAppSourceRoot(appId, targetId), "actions", "hello");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, "action.yaml"), """
             apiVersion: automaton.dev/v1
