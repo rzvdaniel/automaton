@@ -83,6 +83,8 @@ const installationReplaceHost = ref<RunnerHost | null>(null)
 const installationPublicIp = ref('')
 const installationPrivateIp = ref('')
 const generatingInstallationKey = ref(false)
+const repairDialogVisible = ref(false)
+const repairHost = ref<RunnerHost | null>(null)
 const validatingHostId = ref<string | null>(null)
 const approvingHostId = ref<string | null>(null)
 const disablingSchedulingHostId = ref<string | null>(null)
@@ -318,6 +320,16 @@ function infrastructureRunnerInstallCommand(): string {
   const publicIpArgument = installationPublicIp.value.trim() ? ` --public-ip ${quote(installationPublicIp.value.trim())}` : ''
   const privateIpArgument = installationPrivateIp.value.trim() ? ` --private-ip ${quote(installationPrivateIp.value.trim())}` : ''
   return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${publicIpArgument}${privateIpArgument}${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
+}
+
+function infrastructureRunnerRepairCommand(): string {
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+  return `curl -fsSL '${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh' | sudo bash -s -- --repair`
+}
+
+function showInfrastructureRunnerRepair(host: RunnerHost) {
+  repairHost.value = host
+  repairDialogVisible.value = true
 }
 
 async function revokeInstallationKey(key: InfrastructureRunnerEnrollmentKey) {
@@ -863,6 +875,14 @@ watch(() => route.path, refreshAll)
                 />
                 <Button
                   v-if="data.infrastructureRunnerId"
+                  label="Repair"
+                  icon="pi pi-wrench"
+                  size="small"
+                  outlined
+                  @click="showInfrastructureRunnerRepair(data)"
+                />
+                <Button
+                  v-if="data.infrastructureRunnerId"
                   label="Replace"
                   icon="pi pi-refresh"
                   size="small"
@@ -1044,6 +1064,17 @@ watch(() => route.path, refreshAll)
       <template #footer>
         <Button label="Close" text @click="enrollmentDialogVisible = false" />
       </template>
+    </Dialog>
+
+    <Dialog v-model:visible="repairDialogVisible" header="Repair Infrastructure Runner" modal :style="{ width: '52rem' }">
+      <div v-if="repairHost" class="flex flex-column gap-3">
+        <Message severity="info" :closable="false">
+          Run this command directly on <strong>{{ repairHost.name }}</strong>. Automaton observes the reconnect and refreshed version; it does not replace the Runner remotely.
+        </Message>
+        <div class="text-color-secondary text-sm">Current digest: {{ repairHost.infrastructureRunnerImageDigest || 'Unknown' }}</div>
+        <Textarea :model-value="infrastructureRunnerRepairCommand()" readonly auto-resize class="w-full" />
+      </div>
+      <template #footer><Button label="Close" text @click="repairDialogVisible = false" /></template>
     </Dialog>
 
     <Dialog v-model:visible="installationDialogVisible" header="Install Infrastructure Runner" modal :style="{ width: '52rem' }">
