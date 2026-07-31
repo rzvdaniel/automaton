@@ -22,6 +22,16 @@ Use this file as the operational contract. For detailed patterns, read the relev
 - If the task reveals a missing rule, repeated mistake, or unclear workflow, update the relevant skill or harness document.
 - When a session creates a reusable rule, new skill, architecture decision, safety guardrail, or durable coding convention, automatically consider the retro skill before finishing.
 
+### Admin documentation
+
+Whenever a change affects administrator-visible Studio or API behavior, use
+`.agent/skills/automaton-admin-docs/SKILL.md` and update the Admin documentation and
+its navigation in the same change.
+
+Documentation must use the implemented navigation paths, labels, permissions,
+commands, statuses, warnings, and consequences. If no documentation update is
+required, explain why in the handoff.
+
 ---
 
 ## 2. Agent knowledge layout
@@ -80,6 +90,7 @@ Recommended skills:
 - Production deployment: `.agent/skills/deployment-prod/SKILL.md`
 - Scaffolded/generated apps: `.agent/skills/scaffolded-apps/SKILL.md`
 - Studio frontend: `.agent/skills/studio-frontend/SKILL.md`
+- Admin documentation: `.agent/skills/automaton-admin-docs/SKILL.md`
 - Studio backend: `.agent/skills/studio-backend/SKILL.md`
 - Event messaging: `.agent/skills/event-messaging/SKILL.md`
 - Audit and logging: `.agent/skills/audit-logging/SKILL.md`
