@@ -5,6 +5,8 @@ order: 25
 
 Use this page when adding a new Runner Host or maintaining an existing Infrastructure Runner. Studio provides verified commands and observes the result; maintenance runs locally on the server.
 
+![Infrastructure Runner operations](./assets/infrastructure-runner-operations.png)
+
 ## Install on a new server
 
 1. Prepare a Linux server with administrator access and install Docker.
@@ -15,6 +17,8 @@ Use this page when adding a new Runner Host or maintaining an existing Infrastru
 6. Correct any reported problems and validate again. When validation succeeds, select **Approve**.
 
 Approval enables Hosted Runner scheduling. Confirm that the host is **Online**, **Ready**, successfully validated, and shows the expected image digest. The server is then ready to host managed Runners. For the canonical host onboarding details, see **Add a Runner Host**.
+
+![Install an Infrastructure Runner on a new server](./assets/infrastructure-runner-installation.png)
 
 ## Repair an existing Infrastructure Runner
 
@@ -29,6 +33,8 @@ It preserves the installation ID, API credential, `runner.json`, `installation-p
 5. Confirm that the runner reconnected, is **Online** and **Ready**, passed health validation, retained its identity, and still shows the installed digest.
 
 Existing Hosted Runner containers normally continue running. New provisioning and host workflows are temporarily unavailable while the Infrastructure Runner is disconnected. If repair fails, inspect the host and container logs before retrying.
+
+![Maintain an existing Infrastructure Runner](./assets/infrastructure-runner-maintenance.png)
 
 ## Replace and re-enroll
 
