@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Repo-local skill for agents that can read .agent/skills.
 metadata:
   author: Automaton
-  version: 1.0.0
+  version: 1.0.1
 ---
 
 # Automaton Admin Docs
