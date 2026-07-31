@@ -310,24 +310,31 @@ async function generateInfrastructureRunnerInstallationKey(host?: RunnerHost) {
   }
 }
 
-function infrastructureRunnerInstallCommand(): string {
-  if (!installationKey.value) return ''
+function verifiedInstallerCommand(installerArguments: string): string {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
   const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
   const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  const replaceArgument = installationReplaceHost.value ? ' replace' : ''
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" ${installerArguments}; status=$?; rm -f "$tmp"; exit $status`
+}
+
+function infrastructureRunnerInstallCommand(): string {
+  if (!installationKey.value) return ''
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+  const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
   const publicIpArgument = installationPublicIp.value.trim() ? ` --public-ip ${quote(installationPublicIp.value.trim())}` : ''
   const privateIpArgument = installationPrivateIp.value.trim() ? ` --private-ip ${quote(installationPrivateIp.value.trim())}` : ''
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${publicIpArgument}${privateIpArgument}${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
+  const operation = installationReplaceHost.value ? 'replace' : ''
+  const credentials = installationReplaceHost.value
+    ? `--api-key ${quote(installationKey.value.apiKey || '')}`
+    : `--api-key ${quote(installationKey.value.apiKey || '')}`
+  return verifiedInstallerCommand(`${operation} --server-url ${quote(apiBaseUrl)} ${credentials} --runner-image 'rzvdaniel/automaton-runner:latest'${publicIpArgument}${privateIpArgument}`.trim())
 }
 
 function infrastructureRunnerRepairCommand(): string {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
-  const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
-  const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" repair; status=$?; rm -f "$tmp"; exit $status`
+  return verifiedInstallerCommand(`repair --server-url ${quote(apiBaseUrl)}`)
 }
 
 function showInfrastructureRunnerRepair(host: RunnerHost) {
@@ -409,9 +416,7 @@ function enrollmentCommand(): string {
   if (!enrollment.value) return ''
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
-  const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
-  const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --enrollment-token ${quote(enrollment.value.enrollmentToken)} --runner-image ${quote(enrollment.value.dockerImage)}; status=$?; rm -f "$tmp"; exit $status`
+  return verifiedInstallerCommand(`--server-url ${quote(apiBaseUrl)} --enrollment-token ${quote(enrollment.value.enrollmentToken)} --runner-image ${quote(enrollment.value.dockerImage)}`)
 }
 
 async function validateHost(host: RunnerHost) {
