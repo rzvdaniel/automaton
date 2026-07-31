@@ -52,11 +52,11 @@ Use the established page structure. Otherwise use only the useful sections: purp
 | Operation | Administrator intent | Identity and configuration |
 | --- | --- | --- |
 | Install and enroll | Add an Infrastructure Runner to a new server | Created |
-| Update / Repair | Update, reinstall, or recover its container | Preserved |
+| Repair | Reinstall or recover its container using the current immutable image | Preserved |
 | Replace / Re-enroll | Replace invalid, lost, or compromised identity or credentials | Recreated |
 | Revoke | Retire or block the installation | Disabled |
 
-For **Update / Repair**, document the current Studio-generated checksum-verified command rather than a copied static command. Explain that the host performs replacement locally while Automaton observes disconnect, reconnect, health, readiness, and installed digest. Existing Hosted Runner containers normally continue operating, while new placement and host workflows are unavailable when the Infrastructure Runner is offline or not ready.
+For **Repair**, document the current Studio-generated checksum-verified command rather than a copied static command. Repair recreates the container using its current immutable image while preserving identity and configuration; it is not an image upgrade and does not provide update rollback. Explain that the host performs the replacement locally while Automaton observes disconnect, reconnect, health, readiness, and installed digest. Existing Hosted Runner containers normally continue operating, while new placement and host workflows are unavailable when the Infrastructure Runner is offline or not ready. Do not document or generate an Update operation until the installer supports a target immutable image and rollback.
 
 ## Completion checklist
 
