@@ -7,10 +7,12 @@ import Tag from 'primevue/tag'
 import HostedRunnersTabs from '../components/HostedRunnersTabs.vue'
 import { adminHostedRunnersService } from '../services/adminHostedRunnersService'
 import type { RunnerHost } from '../types/admin.types'
+import { useDocumentationDrawer } from '@/shared/documentation/services/documentationDrawer'
 
 const hosts = ref<RunnerHost[]>([])
 const loading = ref(false)
 const runners = computed(() => hosts.value.filter((host) => host.infrastructureRunnerId))
+const { openDocumentation } = useDocumentationDrawer()
 
 async function load() {
   loading.value = true
@@ -32,7 +34,10 @@ onMounted(load)
         <h1 class="m-0">Runners</h1>
         <p class="mt-2 mb-0 text-color-secondary">Manage server control agents separately from tenant execution containers.</p>
       </div>
-      <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="load" />
+      <div class="flex gap-2">
+        <Button label="Documentation" icon="pi pi-book" text @click="openDocumentation('admin.hosted-runners.infrastructure-runners', 'Hosted Runners Administration Guide')" />
+        <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="load" />
+      </div>
     </div>
     <HostedRunnersTabs />
     <DataTable :value="runners" :loading="loading" data-key="infrastructureRunnerId" responsive-layout="scroll">
