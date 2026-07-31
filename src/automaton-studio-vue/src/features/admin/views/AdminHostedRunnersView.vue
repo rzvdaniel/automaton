@@ -316,7 +316,7 @@ function infrastructureRunnerInstallCommand(): string {
   const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
   const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
   const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
-  const replaceArgument = installationReplaceHost.value ? ' --replace' : ''
+  const replaceArgument = installationReplaceHost.value ? ' replace' : ''
   const publicIpArgument = installationPublicIp.value.trim() ? ` --public-ip ${quote(installationPublicIp.value.trim())}` : ''
   const privateIpArgument = installationPrivateIp.value.trim() ? ` --private-ip ${quote(installationPrivateIp.value.trim())}` : ''
   return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" --server-url ${quote(apiBaseUrl)} --api-key ${quote(installationKey.value.apiKey || '')} --runner-image 'rzvdaniel/automaton-runner:latest'${publicIpArgument}${privateIpArgument}${replaceArgument}; status=$?; rm -f "$tmp"; exit $status`
@@ -1090,7 +1090,7 @@ watch(() => route.path, refreshAll)
       <div v-if="installationKey" class="flex flex-column gap-3">
         <Message severity="warn" :closable="false">
           <span v-if="installationReplaceHost">
-            This replacement key expires {{ formatDateTime(installationKey.expiresAtUtc) }}. It stops the old Runner and preserves the existing installation identity.
+            This replacement key expires {{ formatDateTime(installationKey.expiresAtUtc) }}. It replaces the old Runner identity and credentials.
           </span>
           <span v-else>
             This enrollment key is shown once, expires {{ formatDateTime(installationKey.expiresAtUtc) }}, and can register exactly one Infrastructure Runner host.
