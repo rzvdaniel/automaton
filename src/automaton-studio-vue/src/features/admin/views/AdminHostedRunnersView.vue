@@ -324,12 +324,20 @@ function infrastructureRunnerInstallCommand(): string {
 
 function infrastructureRunnerRepairCommand(): string {
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
-  return `curl -fsSL '${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh' | sudo bash -s -- --repair`
+  const quote = (value: string) => `'${value.replace(/'/g, "'\\\"'\\\"'")}'`
+  const installerUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sh`
+  const checksumUrl = `${apiBaseUrl}/api/infrastructure-runner/installer/latest.sha256`
+  return `tmp=$(mktemp) && checksum=$(curl -fsSL ${quote(checksumUrl)} | awk '{print $1}') && curl -fsSL ${quote(installerUrl)} -o "$tmp" && echo "$checksum  $tmp" | sha256sum -c - && sudo bash "$tmp" repair; status=$?; rm -f "$tmp"; exit $status`
 }
 
 function showInfrastructureRunnerRepair(host: RunnerHost) {
   repairHost.value = host
   repairDialogVisible.value = true
+}
+
+async function copyInfrastructureRunnerRepairCommand() {
+  await navigator.clipboard.writeText(infrastructureRunnerRepairCommand())
+  toast.add({ severity: 'success', summary: 'Copied', detail: 'Repair command copied to the clipboard.', life: 2500 })
 }
 
 async function revokeInstallationKey(key: InfrastructureRunnerEnrollmentKey) {
@@ -1073,6 +1081,7 @@ watch(() => route.path, refreshAll)
         </Message>
         <div class="text-color-secondary text-sm">Current digest: {{ repairHost.infrastructureRunnerImageDigest || 'Unknown' }}</div>
         <Textarea :model-value="infrastructureRunnerRepairCommand()" readonly auto-resize class="w-full" />
+        <Button label="Copy command" icon="pi pi-copy" outlined @click="copyInfrastructureRunnerRepairCommand" />
       </div>
       <template #footer><Button label="Close" text @click="repairDialogVisible = false" /></template>
     </Dialog>
