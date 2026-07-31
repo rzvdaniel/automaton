@@ -36,6 +36,7 @@ onMounted(load)
       </div>
       <div class="flex gap-2">
         <Button label="Documentation" icon="pi pi-book" text @click="openDocumentation('admin.hosted-runners.infrastructure-runners', 'Hosted Runners Administration Guide')" />
+        <Button label="Deployment targets" icon="pi pi-sitemap" text @click="openDocumentation('admin.hosted-runners.deployment-targets', 'Deployment targets and Runner relationships')" />
         <Button label="Refresh" icon="pi pi-refresh" outlined :loading="loading" @click="load" />
       </div>
     </div>

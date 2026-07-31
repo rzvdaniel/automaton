@@ -722,6 +722,7 @@ watch(() => route.path, refreshAll)
       </div>
       <div class="flex gap-2">
         <Button label="Help" icon="pi pi-book" severity="secondary" outlined @click="openHostedRunnersHandbook" />
+        <Button label="Deployment targets" icon="pi pi-sitemap" severity="secondary" outlined @click="openDocumentation('admin.hosted-runners.deployment-targets', 'Deployment targets and Runner relationships')" />
         <Button
           label="Install Infrastructure Runner"
           icon="pi pi-download"
