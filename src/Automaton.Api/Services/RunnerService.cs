@@ -451,7 +451,10 @@ public class RunnerService
         var completedHostedRunnerAction = LinkHostedRunnerAfterReconnect(runner, userId, runnerConnection.HostedRunnerId);
         await dbContext.SaveChangesAsync(cancellationToken);
         await WriteHostedRunnerRegistrationCompletionAuditAsync(completedHostedRunnerAction, runner, cancellationToken);
-        await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
+        if (RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(runner.Purpose, runner.ApplicationProfile))
+        {
+            await managedRunnerAppAssignmentService.AssignEligibleAppsAsync(userId, runner.Id, cancellationToken);
+        }
 
         await WriteRunnerApplicationEventsAsync(
             runner.Id,

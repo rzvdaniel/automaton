@@ -3514,6 +3514,65 @@ namespace Automaton.Api.Migrations
                     b.ToTable("SecretVersions");
                 });
 
+            modelBuilder.Entity("Automaton.Api.Entities.SelfHostedRunnerEnrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ApplicationProfile")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EnrollmentTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<Guid?>("RunnerId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("RunnerName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentTokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.ToTable("SelfHostedRunnerEnrollments");
+                });
+
             modelBuilder.Entity("Automaton.Api.Entities.SensitiveVariable", b =>
                 {
                     b.Property<Guid>("Id")

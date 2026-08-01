@@ -1,5 +1,6 @@
 using Automaton.Api.Models;
 using Automaton.Api.Services;
+using Automaton.Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,7 +8,7 @@ namespace Automaton.Api.Controllers;
 
 [ApiController]
 [Route("api/self-hosted-runners")]
-[Authorize(Policy = "AllowApiKey")]
+[Authorize(Policy = SelfHostedRunnerInstallationAuthorization.PolicyName)]
 public sealed class SelfHostedRunnersController(
     SelfHostedRunnerInstallationService installationService) : ControllerBase
 {
