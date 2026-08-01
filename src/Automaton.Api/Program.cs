@@ -172,6 +172,11 @@ services.AddAuthorization(options =>
               || scope != Automaton.Core.Enums.ApiKeyScope.InfrastructureRunnerEnroll;
       }));
 
+    options.AddPolicy(SelfHostedRunnerInstallationAuthorization.PolicyName, policy =>
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationSchemeOptions.DefaultScheme, JwtBearerDefaults.AuthenticationScheme, "Identity.Application")
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => SelfHostedRunnerInstallationAuthorization.IsAllowed(context.User)));
+
     // Policy for anonymous endpoints (validation, etc.)
     options.AddPolicy("AllowAnonymous", policy =>
         policy.RequireAssertion(_ => true));
@@ -393,6 +398,7 @@ services.AddScoped<RunnerService>();
 services.AddScoped<RunnerStorageTelemetryService>();
 services.Configure<StorageTelemetryOptions>(applicationBuilder.Configuration.GetSection("StorageTelemetry"));
 services.AddScoped<RunnerEnrollmentService>();
+services.AddScoped<SelfHostedRunnerInstallationService>();
 services.AddScoped<InfrastructureRunnerRegistrationService>();
 services.AddScoped<InfrastructureRunnerHostApprovalService>();
 services.AddScoped<AdminRunnersService>();

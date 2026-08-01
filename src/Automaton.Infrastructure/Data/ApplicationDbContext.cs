@@ -34,6 +34,7 @@ namespace Automaton.Api.Data
         public virtual DbSet<RunnerHostProvisioningOperation> RunnerHostProvisioningOperations { get; set; }
         public virtual DbSet<InfrastructureRunnerUpdateOperation> InfrastructureRunnerUpdateOperations { get; set; }
         public virtual DbSet<RunnerEnrollment> RunnerEnrollments { get; set; }
+        public virtual DbSet<SelfHostedRunnerEnrollment> SelfHostedRunnerEnrollments { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecution> InfrastructureWorkflowExecutions { get; set; }
         public virtual DbSet<InfrastructureWorkflowExecutionLog> InfrastructureWorkflowExecutionLogs { get; set; }
         public virtual DbSet<HostedRunner> HostedRunners { get; set; }
@@ -292,6 +293,19 @@ namespace Automaton.Api.Data
                     .HasForeignKey(e => e.ApiKeyId)
                     .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(e => e.InstallationId).IsUnique();
+            });
+
+            modelBuilder.Entity<SelfHostedRunnerEnrollment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.RunnerName).IsRequired().HasMaxLength(120);
+                entity.Property(e => e.ApplicationProfile).IsRequired().HasMaxLength(40);
+                entity.Property(e => e.EnrollmentTokenHash).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.InstallationId).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(32);
+                entity.HasIndex(e => e.EnrollmentTokenHash).IsUnique();
+                entity.HasIndex(e => e.InstallationId).IsUnique();
+                entity.HasIndex(e => new { e.UserId, e.CreatedAtUtc });
             });
 
             modelBuilder.Entity<RunnerConnectionSession>(entity =>

@@ -188,6 +188,32 @@ public class AppDeploymentTargetResolverTests
         Assert.That(exception!.Message, Does.Contain("unavailable"));
     }
 
+    [Test]
+    public async Task AssignAsync_AllowsExplicitPrivilegedHostAssignment()
+    {
+        await using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var runner = AddRunner(
+            db,
+            userId,
+            online: true,
+            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
+        var app = AddApp(db, userId, runnerId: null);
+        await db.SaveChangesAsync();
+
+        var assignmentPolicy = new AppRunnerAssignmentPolicy(
+            db,
+            new HostedRunnerAppCapacityService(db),
+            CreateRunnerAuthorizationPolicy(db, userId),
+            CreateResolver(db, userId));
+
+        await assignmentPolicy.AssignAsync(app, runner.Id, userId);
+
+        Assert.That(
+            (await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId,
+            Is.EqualTo(runner.Id));
+    }
+
     private static AppDeploymentTargetResolver CreateResolver(
         ApplicationDbContext db,
         Guid userId,
@@ -279,13 +305,15 @@ public class AppDeploymentTargetResolverTests
         ApplicationDbContext db,
         Guid userId,
         bool online,
-        string purpose = RunnerPurposes.Managed)
+        string purpose = RunnerPurposes.Managed,
+        string? applicationProfile = null)
     {
         var runner = new Runner
         {
             Id = Guid.NewGuid(),
             Name = $"Runner {Guid.NewGuid():N}",
             Purpose = purpose,
+            ApplicationProfile = applicationProfile,
             CapabilitiesJson = RunnerCapabilities.Serialize(
                 RunnerCapabilities.DefaultsForPurpose(purpose),
                 purpose),

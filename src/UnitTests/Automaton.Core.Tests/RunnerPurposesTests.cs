@@ -68,4 +68,19 @@ public class RunnerPurposesTests
             RunnerProfileRules.CanExecuteApplications(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, capabilities),
             Is.True);
     }
+
+    [Test]
+    public void PrivilegedHostIsExcludedOnlyFromAutomaticApplicationAssignment()
+    {
+        Assert.That(
+            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
+                RunnerPurposes.Managed,
+                RunnerApplicationProfiles.Standard),
+            Is.True);
+        Assert.That(
+            RunnerProfileRules.CanReceiveAutomaticApplicationAssignment(
+                RunnerPurposes.Managed,
+                RunnerApplicationProfiles.PrivilegedHost),
+            Is.False);
+    }
 }

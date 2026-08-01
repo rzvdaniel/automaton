@@ -23,6 +23,8 @@ public class RunnerHostCloudInitTests
         Assert.That(cloudInit, Does.Contain("-v '/opt/automaton/infrastructure-runner/logs':/app/logs"));
         Assert.That(cloudInit, Does.Contain("shred -u /etc/automaton/infrastructure-runner.env"));
         Assert.That(cloudInit, Does.Not.Contain("AUTOMATON_API_KEY"));
+        Assert.That(CountOccurrences(cloudInit, "-v /var/run/docker.sock:/var/run/docker.sock"), Is.EqualTo(1));
+        Assert.That(CountOccurrences(cloudInit, "-v /:/host"), Is.EqualTo(1));
     }
 
     [Test]
@@ -36,4 +38,7 @@ public class RunnerHostCloudInitTests
                 "automaton-runner:latest")),
             Throws.ArgumentException);
     }
+
+    private static int CountOccurrences(string value, string fragment)
+        => value.Split(fragment, StringSplitOptions.None).Length - 1;
 }
