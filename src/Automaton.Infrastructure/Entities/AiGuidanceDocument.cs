@@ -47,6 +47,19 @@ public class AiGuidanceDocument
     public int Version { get; set; } = 1;
 
     [Required]
+    [MaxLength(20)]
+    public string Source { get; set; } = "Admin";
+
+    public int? SeedVersion { get; set; }
+
+    [MaxLength(64)]
+    public string? SeedContentHash { get; set; }
+
+    public DateTime? LastSeedSynchronizedAt { get; set; }
+
+    public bool IsSeedRetired { get; set; }
+
+    [Required]
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }

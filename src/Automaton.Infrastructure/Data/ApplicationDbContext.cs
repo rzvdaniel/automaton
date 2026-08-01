@@ -1383,6 +1383,9 @@ namespace Automaton.Api.Data
                   entity.Property(e => e.IsModelLoadable).IsRequired().HasDefaultValue(true);
                   entity.Property(e => e.SortOrder).IsRequired().HasDefaultValue(100);
                   entity.Property(e => e.Version).IsRequired().HasDefaultValue(1);
+                  entity.Property(e => e.Source).IsRequired().HasMaxLength(20).HasDefaultValue("Admin");
+                  entity.Property(e => e.SeedContentHash).HasMaxLength(64);
+                  entity.Property(e => e.IsSeedRetired).IsRequired().HasDefaultValue(false);
                   entity.Property(e => e.CreatedAt).IsRequired();
   
                   entity.HasIndex(e => e.Key).IsUnique();

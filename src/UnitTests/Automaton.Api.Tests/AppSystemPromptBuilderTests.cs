@@ -94,6 +94,14 @@ public class AppSystemPromptBuilderTests
     }
 
     [Test]
+    public void ContextSelector_AddsActionsGuidance_ForBackgroundJobs()
+    {
+        var selector = new KeywordAppPromptContextSelector();
+
+        Assert.That(selector.SelectAdditionalReferences("Create a scheduled background export job"), Does.Contain("automaton-actions"));
+    }
+
+    [Test]
     public async Task AutomatonGuidanceTool_ListsFocusedGuidanceReferences()
     {
         await using var dbContext = CreateDbContext();

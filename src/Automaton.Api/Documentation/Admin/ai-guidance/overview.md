@@ -5,6 +5,12 @@ order: 0
 
 # AI Guidance Overview
 
+## Seed-managed documents
+
+Guidance whose source is the embedded seed catalog is synchronized into the runtime database every time the API starts after a deployment. The seed version controls its content and seed-owned metadata; administrators can still enable or disable it, but should use **Clone** to create an editable custom document rather than editing the seed-managed document directly.
+
+If a seed is removed from the catalog, its matching database document is disabled and marked retired. It is not deleted automatically.
+
 Automaton uses AI Guidance Documents to control how AI behaves across the platform.
 
 The architecture is intentionally simple:

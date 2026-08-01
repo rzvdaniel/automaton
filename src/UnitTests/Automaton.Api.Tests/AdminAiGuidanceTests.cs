@@ -247,6 +247,64 @@ public class AdminAiGuidanceTests
         Assert.That(document, Is.Null);
     }
 
+    [Test]
+    public async Task SeedMissingDefaultsAsync_ReconcilesExistingSeedDocument_AndPreservesEnabledStatus()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.AiGuidanceDocuments.Add(new AiGuidanceDocument
+        {
+            Id = Guid.NewGuid(), Key = "automaton-actions", Title = "Old", Surface = "shared",
+            DocumentKind = AiGuidanceDocumentKinds.Guidance, ContentMarkdown = "old", IsEnabled = false,
+            IsModelLoadable = true, Version = 1, CreatedAt = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateRuntimeService(dbContext);
+        await service.SeedMissingDefaultsAsync();
+
+        var document = await dbContext.AiGuidanceDocuments.SingleAsync(item => item.Key == "automaton-actions");
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.Source, Is.EqualTo("Seed"));
+            Assert.That(document.ContentMarkdown, Does.Contain("Actions are executable modules"));
+            Assert.That(document.IsEnabled, Is.False);
+            Assert.That(document.SeedContentHash, Is.Not.Null.And.Not.Empty);
+            Assert.That(document.LastSeedSynchronizedAt, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task SeedMissingDefaultsAsync_IsIdempotentAfterFirstSynchronization()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateRuntimeService(dbContext);
+
+        Assert.That(await service.SeedMissingDefaultsAsync(), Is.GreaterThan(0));
+        var before = await dbContext.AiGuidanceDocuments.SingleAsync(item => item.Key == "automaton-actions");
+        var version = before.Version;
+        var synchronizedAt = before.LastSeedSynchronizedAt;
+
+        Assert.That(await service.SeedMissingDefaultsAsync(), Is.EqualTo(0));
+        var after = await dbContext.AiGuidanceDocuments.SingleAsync(item => item.Key == "automaton-actions");
+        Assert.Multiple(() =>
+        {
+            Assert.That(after.Version, Is.EqualTo(version));
+            Assert.That(after.LastSeedSynchronizedAt, Is.EqualTo(synchronizedAt));
+        });
+    }
+
+    [Test]
+    public async Task DeleteAsync_RejectsSeedManagedDocument()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateAdminService(dbContext);
+        await CreateRuntimeService(dbContext).SeedMissingDefaultsAsync();
+        var entity = await dbContext.AiGuidanceDocuments.SingleAsync(item => item.Key == "automaton-actions");
+
+        var error = Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteAsync(entity.Id));
+        Assert.That(error!.Message, Does.Contain("cannot be deleted"));
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

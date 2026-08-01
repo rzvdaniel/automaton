@@ -147,6 +147,11 @@ public sealed class AdminAiGuidanceController : ControllerBase
         IsModelLoadable = document.IsModelLoadable,
         SortOrder = document.SortOrder,
         Version = document.Version,
+        Source = document.Source,
+        SeedVersion = document.SeedVersion,
+        SeedContentHash = document.SeedContentHash,
+        LastSeedSynchronizedAt = document.LastSeedSynchronizedAt,
+        IsSeedRetired = document.IsSeedRetired,
         CreatedAt = document.CreatedAt,
         UpdatedAt = document.UpdatedAt,
         HasEmbeddedDefault = _service.HasEmbeddedDefault(document.Key)
@@ -169,6 +174,11 @@ public sealed class AiGuidanceAdminResponse
     public bool IsModelLoadable { get; set; }
     public int SortOrder { get; set; }
     public int Version { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public int? SeedVersion { get; set; }
+    public string? SeedContentHash { get; set; }
+    public DateTime? LastSeedSynchronizedAt { get; set; }
+    public bool IsSeedRetired { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool HasEmbeddedDefault { get; set; }

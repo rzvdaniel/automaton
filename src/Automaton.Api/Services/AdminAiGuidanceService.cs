@@ -68,6 +68,7 @@ public sealed class AdminAiGuidanceService
             IsModelLoadable = isModelLoadable,
             SortOrder = sortOrder,
             Version = 1,
+            Source = AiGuidanceSources.Admin,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -105,6 +106,11 @@ public sealed class AdminAiGuidanceService
         if (entity is null)
         {
             return null;
+        }
+
+        if (string.Equals(entity.Source, "Seed", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Seed-managed guidance is read-only. Clone it to create an administrator-managed custom document.");
         }
 
         await EnsureUniqueAsync(key, id, cancellationToken);
@@ -172,6 +178,11 @@ public sealed class AdminAiGuidanceService
         if (entity is null)
         {
             return false;
+        }
+
+        if (string.Equals(entity.Source, AiGuidanceSources.Seed, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Seed-managed guidance cannot be deleted. Disable it to preserve the administrator preference.");
         }
 
         if (entity.IsEnabled)
