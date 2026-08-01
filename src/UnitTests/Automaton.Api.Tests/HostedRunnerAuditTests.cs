@@ -56,6 +56,28 @@ public class HostedRunnerAuditTests
     }
 
     [Test]
+    public void ReconnectAndHeartbeatInstallationReportsCannotChangePersistedProfile()
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "profile-authoritative",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost,
+            ImageDigest = "old"
+        };
+
+        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
+        {
+            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ImageDigest = "new"
+        });
+
+        Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(runner.ImageDigest, Is.EqualTo("new"));
+    }
+
+    [Test]
     public void SanitizeMetadataJson_RedactsExpandedSensitiveKeys()
     {
         var json = AuditEventService.SanitizeMetadataJson(new

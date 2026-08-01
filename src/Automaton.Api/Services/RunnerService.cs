@@ -523,7 +523,7 @@ public class RunnerService
         await CompleteHostedRunnerRestartAsync(runner, cancellationToken);
     }
 
-    private static void ApplyInstallationReport(Runner runner, RunnerDetails report)
+    internal static void ApplyInstallationReport(Runner runner, RunnerDetails report)
     {
         // ApplicationProfile is intentionally absent here. Registration,
         // reconnect, and heartbeat payloads are runner self-reports; the
