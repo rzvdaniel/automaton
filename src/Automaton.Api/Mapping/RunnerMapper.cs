@@ -44,6 +44,7 @@ public static class RunnerMapper
          Architecture = runner.Architecture,
          ContainerHealth = runner.ContainerHealth,
          Purpose = RunnerPurposes.Normalize(runner.Purpose),
+         ApplicationProfile = RunnerProfileRules.NormalizeApplicationProfile(runner.Purpose, runner.ApplicationProfile),
          Capabilities = RunnerCapabilities.Deserialize(runner.CapabilitiesJson, runner.Purpose),
 		 Scope = scope,
 		 ProjectId = projectId,
@@ -102,6 +103,7 @@ public static class RunnerMapper
  Architecture = details.Architecture,
  ContainerHealth = details.ContainerHealth,
  Purpose = RunnerPurposes.Normalize(details.Purpose),
+ ApplicationProfile = RunnerProfileRules.NormalizeApplicationProfile(details.Purpose, details.ApplicationProfile),
  CapabilitiesJson = RunnerCapabilities.Serialize(details.Capabilities, details.Purpose)
  // ScriptEngineSettings and RunnerUsers are not present in RunnerDetails
  };

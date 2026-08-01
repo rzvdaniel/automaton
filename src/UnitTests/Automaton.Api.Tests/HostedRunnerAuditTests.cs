@@ -9,6 +9,7 @@ using Automaton.Api.Models;
 using Automaton.Api.Services;
 using Automaton.Api.Services.Interfaces;
 using Automaton.Core.Models;
+using Automaton.Core.Enums;
 using Automaton.Messaging.Abstractions;
 using Automaton.Messaging.Events;
 
@@ -24,6 +25,58 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class HostedRunnerAuditTests
 {
+    [Test]
+    public async Task RegistrationDoesNotPersistSelfReportedApplicationProfile()
+    {
+        using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var runnerId = Guid.NewGuid();
+        var accessor = CreateHttpContextAccessor(userId, "runner-owner@automaton.test");
+        var userContext = new UserContextService(accessor);
+        var runnerService = new RunnerService(
+            db,
+            userContext,
+            automatonHub: null!,
+            authorizationService: null!,
+            new ApiInstanceIdentityService(),
+            new NoOpAuditEventService(),
+            applicationEventService: null!,
+            managedRunnerAppAssignmentService: null!);
+
+        await runnerService.Add(new RunnerDetails
+        {
+            Id = runnerId,
+            Name = "profile-self-report",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
+        });
+
+        var persisted = await db.Runners.SingleAsync(x => x.Id == runnerId);
+        Assert.That(persisted.ApplicationProfile, Is.Null);
+    }
+
+    [Test]
+    public void ReconnectAndHeartbeatInstallationReportsCannotChangePersistedProfile()
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = "profile-authoritative",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost,
+            ImageDigest = "old"
+        };
+
+        RunnerService.ApplyInstallationReport(runner, new RunnerDetails
+        {
+            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            ImageDigest = "new"
+        });
+
+        Assert.That(runner.ApplicationProfile, Is.EqualTo(RunnerApplicationProfiles.PrivilegedHost));
+        Assert.That(runner.ImageDigest, Is.EqualTo("new"));
+    }
+
     [Test]
     public void SanitizeMetadataJson_RedactsExpandedSensitiveKeys()
     {

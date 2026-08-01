@@ -2903,6 +2903,10 @@ namespace Automaton.Api.Migrations
                     b.Property<Guid?>("ApiKeyId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("ApplicationProfile")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
                     b.Property<string>("Architecture")
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)");
