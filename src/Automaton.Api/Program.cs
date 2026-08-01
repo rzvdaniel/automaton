@@ -393,6 +393,7 @@ services.AddScoped<RunnerService>();
 services.AddScoped<RunnerStorageTelemetryService>();
 services.Configure<StorageTelemetryOptions>(applicationBuilder.Configuration.GetSection("StorageTelemetry"));
 services.AddScoped<RunnerEnrollmentService>();
+services.AddScoped<SelfHostedRunnerInstallationService>();
 services.AddScoped<InfrastructureRunnerRegistrationService>();
 services.AddScoped<InfrastructureRunnerHostApprovalService>();
 services.AddScoped<AdminRunnersService>();
