@@ -525,6 +525,10 @@ public class RunnerService
 
     private static void ApplyInstallationReport(Runner runner, RunnerDetails report)
     {
+        // ApplicationProfile is intentionally absent here. Registration,
+        // reconnect, and heartbeat payloads are runner self-reports; the
+        // authoritative profile will be assigned from the server-controlled
+        // one-time enrollment record in Stage 2.
         runner.ImageDigest = TrimOrNull(report.ImageDigest, 256);
         runner.ContainerSpecificationVersion = report.ContainerSpecificationVersion is > 0 and <= 1000 ? report.ContainerSpecificationVersion : null;
         runner.ApiCompatibilityVersion = TrimOrNull(report.ApiCompatibilityVersion, 40);

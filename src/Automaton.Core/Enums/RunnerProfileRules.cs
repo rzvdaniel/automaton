@@ -11,8 +11,7 @@ public static class RunnerProfileRules
 
     public static bool CanExecuteApplications(string? purpose, string? profile, IEnumerable<string>? capabilities)
         => !IsInfrastructure(purpose)
-            && RunnerCapabilities.CanExecuteApplications(capabilities, purpose)
-            && !IsPrivilegedHost(purpose, profile);
+            && RunnerCapabilities.CanExecuteApplications(capabilities, purpose);
 
     public static bool IsPrivilegedHost(string? purpose, string? profile)
         => !IsInfrastructure(purpose)

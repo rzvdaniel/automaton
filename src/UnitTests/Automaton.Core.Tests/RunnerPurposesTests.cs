@@ -30,6 +30,18 @@ public class RunnerPurposesTests
     }
 
     [Test]
+    public void ApplicationProfile_RejectsUnknownValuesInsteadOfDefaulting()
+    {
+        Assert.That(RunnerApplicationProfiles.IsValidForPurpose("mystery", RunnerPurposes.Managed), Is.False);
+        Assert.That(
+            () => RunnerApplicationProfiles.Normalize("mystery"),
+            Throws.ArgumentException);
+        Assert.That(
+            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Managed, "standard"),
+            Is.EqualTo(RunnerApplicationProfiles.Standard));
+    }
+
+    [Test]
     public void InfrastructureRunnersCannotHaveAnApplicationProfile()
     {
         Assert.That(
@@ -52,5 +64,8 @@ public class RunnerPurposesTests
         Assert.That(
             RunnerCapabilities.RequiresAdministrator(capabilities, RunnerPurposes.Managed),
             Is.False);
+        Assert.That(
+            RunnerProfileRules.CanExecuteApplications(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost, capabilities),
+            Is.True);
     }
 }

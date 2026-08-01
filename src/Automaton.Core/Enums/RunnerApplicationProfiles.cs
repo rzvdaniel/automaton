@@ -9,15 +9,37 @@ public static class RunnerApplicationProfiles
     public const string Standard = "Standard";
     public const string PrivilegedHost = "PrivilegedHost";
 
+    public static bool TryNormalize(string? profile, out string normalized)
+    {
+        if (string.IsNullOrWhiteSpace(profile))
+        {
+            normalized = Standard;
+            return true;
+        }
+
+        if (string.Equals(profile, Standard, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = Standard;
+            return true;
+        }
+
+        if (string.Equals(profile, PrivilegedHost, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = PrivilegedHost;
+            return true;
+        }
+
+        normalized = string.Empty;
+        return false;
+    }
+
     public static string Normalize(string? profile)
-        => string.Equals(profile, PrivilegedHost, StringComparison.OrdinalIgnoreCase)
-            ? PrivilegedHost
-            : Standard;
+        => TryNormalize(profile, out var normalized)
+            ? normalized
+            : throw new ArgumentException($"Unknown application Runner profile '{profile}'.", nameof(profile));
 
     public static bool IsValidForPurpose(string? profile, string? purpose)
         => string.Equals(RunnerPurposes.Normalize(purpose), RunnerPurposes.Infrastructure, StringComparison.Ordinal)
             ? string.IsNullOrWhiteSpace(profile)
-            : string.IsNullOrWhiteSpace(profile) ||
-              string.Equals(profile, Standard, StringComparison.OrdinalIgnoreCase) ||
-              string.Equals(profile, PrivilegedHost, StringComparison.OrdinalIgnoreCase);
+            : TryNormalize(profile, out _);
 }
