@@ -37,6 +37,13 @@ public class Runner
     public string Purpose { get; set; } = RunnerPurposes.Managed;
 
     /// <summary>
+    /// Approved application installation profile. Infrastructure Runners must
+    /// leave this unset; null application profiles are legacy Standard Runners.
+    /// </summary>
+    [MaxLength(40)]
+    public string? ApplicationProfile { get; set; }
+
+    /// <summary>
     /// JSON-serialized Runner capabilities reported by the installation.
     /// </summary>
     public string CapabilitiesJson { get; set; } = "[]";

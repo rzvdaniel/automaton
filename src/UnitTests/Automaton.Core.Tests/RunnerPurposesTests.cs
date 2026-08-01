@@ -17,4 +17,40 @@ public class RunnerPurposesTests
     {
         Assert.That(RunnerPurposes.Normalize("infrastructure"), Is.EqualTo(RunnerPurposes.Infrastructure));
     }
+
+    [Test]
+    public void ApplicationProfile_DefaultsLegacyManagedRunnersToStandard()
+    {
+        Assert.That(
+            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Managed, null),
+            Is.EqualTo(RunnerApplicationProfiles.Standard));
+        Assert.That(
+            RunnerProfileRules.IsPrivilegedHost(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost),
+            Is.True);
+    }
+
+    [Test]
+    public void InfrastructureRunnersCannotHaveAnApplicationProfile()
+    {
+        Assert.That(
+            RunnerProfileRules.IsValid(RunnerPurposes.Infrastructure, RunnerApplicationProfiles.PrivilegedHost),
+            Is.False);
+        Assert.That(
+            RunnerProfileRules.NormalizeApplicationProfile(RunnerPurposes.Infrastructure, null),
+            Is.Null);
+    }
+
+    [Test]
+    public void PrivilegedHostProfileDoesNotGrantInfrastructureCapabilities()
+    {
+        var capabilities = RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed);
+
+        Assert.That(capabilities, Does.Not.Contain(RunnerCapabilities.HostedRunnerProvisioning));
+        Assert.That(
+            RunnerProfileRules.IsPrivilegedHost(RunnerPurposes.Managed, RunnerApplicationProfiles.PrivilegedHost),
+            Is.True);
+        Assert.That(
+            RunnerCapabilities.RequiresAdministrator(capabilities, RunnerPurposes.Managed),
+            Is.False);
+    }
 }

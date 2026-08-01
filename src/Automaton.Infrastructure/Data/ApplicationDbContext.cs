@@ -283,6 +283,7 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.Architecture).HasMaxLength(40);
                 entity.Property(e => e.ContainerHealth).HasMaxLength(40);
                 entity.Property(e => e.Purpose).IsRequired().HasMaxLength(40).HasDefaultValue(RunnerPurposes.Managed);
+                entity.Property(e => e.ApplicationProfile).HasMaxLength(40);
                 entity.Property(e => e.CapabilitiesJson).IsRequired().HasMaxLength(2000);
                 entity.Property(e => e.InstallationId).HasMaxLength(128);
                 entity.HasIndex(e => e.ApiKeyId);
