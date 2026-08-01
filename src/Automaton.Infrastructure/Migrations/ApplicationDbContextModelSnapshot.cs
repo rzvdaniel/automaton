@@ -450,10 +450,18 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("IsSeedRetired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("varchar(120)");
+
+                    b.Property<DateTime?>("LastSeedSynchronizedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("OutputPath")
                         .HasMaxLength(500)
@@ -464,10 +472,24 @@ namespace Automaton.Api.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("SeedContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int?>("SeedVersion")
+                        .HasColumnType("int");
+
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(100);
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("Admin");
 
                     b.Property<string>("Surface")
                         .IsRequired()

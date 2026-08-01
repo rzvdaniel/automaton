@@ -91,11 +91,13 @@ const selectedDocument = computed(() =>
 )
 
 const isNewDocument = computed(() => selectedId.value === null)
+const isSeedManaged = computed(() => selectedDocument.value?.source === 'Seed')
 const isCreateFormValid = computed(() => createTitle.value.trim().length > 0)
 const activeDocumentCount = computed(() => documents.value.filter(item => item.isEnabled).length)
 const disabledDocumentCount = computed(() => documents.value.filter(item => !item.isEnabled).length)
 const canDeleteSelectedDocument = computed(() =>
   !!selectedDocument.value &&
+  selectedDocument.value.source !== 'Seed' &&
   !selectedDocument.value.isEnabled &&
   deleteConfirmKey.value.trim() === selectedDocument.value.key
 )
@@ -210,20 +212,43 @@ function openAiGuidanceHandbook() {
   openDocumentation('admin.ai-guidance.overview', 'AI Guidance Handbook')
 }
 
-function cloneDocument() {
+async function cloneDocument() {
   if (!selectedDocument.value) {
     return
   }
 
   const source = selectedDocument.value
-  selectedId.value = null
-  createTitle.value = `${source.title} Copy`
-  deleteConfirmKey.value = ''
-  form.value = createEmptyForm()
-  activeTab.value = 'markdown'
-  propertiesOpen.value = false
-  inspectorTab.value = 'properties'
-  editingTitle.value = false
+  saving.value = true
+  try {
+    const suffix = Date.now().toString(36)
+    const cloned = await adminAiGuidanceService.create({
+      key: `${source.key}-custom-${suffix}`.slice(0, 120),
+      title: `${source.title} Copy`,
+      surface: source.surface,
+      documentKind: source.documentKind,
+      description: source.description,
+      tagsJson: source.tagsJson,
+      outputPath: source.outputPath,
+      contentMarkdown: source.contentMarkdown,
+      isEnabled: false,
+      requiredByDefault: source.requiredByDefault,
+      isModelLoadable: source.isModelLoadable,
+      sortOrder: source.sortOrder,
+    })
+    selectedId.value = cloned.id
+    applyDocumentToForm(cloned)
+    upsertDocument(cloned)
+    toast.add({
+      severity: 'success',
+      summary: 'Cloned Disabled Copy',
+      detail: 'The custom copy was created disabled. Disable the seed-managed document before enabling its replacement.',
+      life: 5000,
+    })
+  } catch (error: unknown) {
+    toast.add({ severity: 'error', summary: 'Clone Failed', detail: extractErrorMessage(error, 'Failed to clone document'), life: 4000 })
+  } finally {
+    saving.value = false
+  }
 }
 
 function openInspector(tab: 'properties' | 'history') {
@@ -492,6 +517,10 @@ function buildDocumentBadges(document: AiGuidanceAdmin): DocumentBadge[] {
     badges.push({ label: 'Discoverable', className: 'doc-badge-loadable' })
   }
 
+  if (document.source === 'Seed') {
+    badges.push({ label: 'Seed managed', className: 'doc-badge-seed' })
+  }
+
   return badges
 }
 
@@ -707,6 +736,7 @@ async function deleteSelectedDocument() {
                     v-else
                     id="guidance-title"
                     v-model="form.title"
+                    :disabled="isSeedManaged"
                     class="editor-title-input"
                     placeholder="Untitled guidance document"
                     @blur="editingTitle = false"
@@ -732,7 +762,7 @@ async function deleteSelectedDocument() {
                       @click="confirmToggleEnabled(selectedDocument)"
                     />
                     <div class="editor-primary-action">
-                      <Button label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
+                      <Button v-if="!isSeedManaged" label="Save" icon="pi pi-save" :loading="saving" @click="saveDocument" />
                     </div>
                   </div>
                 </div>
@@ -779,7 +809,7 @@ async function deleteSelectedDocument() {
 
                 <div class="editor-pane">
                   <CodeEditor
-                    v-if="activeTab === 'markdown'"
+                    v-if="activeTab === 'markdown' && !isSeedManaged"
                     :file-path="editorFilePath"
                     :content="form.contentMarkdown"
                     language="markdown"
@@ -787,6 +817,10 @@ async function deleteSelectedDocument() {
                     @save="saveDocument"
                     class="guidance-content"
                   />
+
+                  <div v-else-if="activeTab === 'markdown'" class="preview-pane">
+                    <div class="markdown-preview" v-html="renderedPreview" />
+                  </div>
 
                   <div v-else class="preview-pane">
                     <div v-if="form.contentMarkdown.trim()" class="markdown-preview" v-html="renderedPreview" />
@@ -834,6 +868,7 @@ async function deleteSelectedDocument() {
                 option-label="label"
                 option-value="value"
                 class="w-full"
+                :disabled="isSeedManaged"
               />
               <small class="field-help">Surface decides the primary audience.</small>
             </div>
@@ -847,6 +882,7 @@ async function deleteSelectedDocument() {
                 option-label="label"
                 option-value="value"
                 class="w-full"
+                :disabled="isSeedManaged"
               />
               <small class="field-help">Base Prompt defines the contract; Guidance provides focused instructions.</small>
             </div>
@@ -859,6 +895,7 @@ async function deleteSelectedDocument() {
                   input-id="guidance-required-by-default"
                   v-model="form.requiredByDefault"
                   binary
+                  :disabled="isSeedManaged"
                 />
                 <span>Always loaded</span>
               </label>
@@ -871,6 +908,7 @@ async function deleteSelectedDocument() {
                   input-id="guidance-model-loadable"
                   v-model="form.isModelLoadable"
                   binary
+                  :disabled="isSeedManaged"
                 />
                 <span>Discoverable</span>
               </label>
@@ -886,13 +924,14 @@ async function deleteSelectedDocument() {
               class="w-full"
               auto-resize
               rows="2"
+              :disabled="isSeedManaged"
               placeholder="Short summary used for discovery and tooling."
             />
           </div>
 
           <div class="field">
             <label for="guidance-tags">Tags</label>
-            <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" placeholder='["studio","editor"]' />
+            <InputText id="guidance-tags" v-model="form.tagsJson" class="w-full" :disabled="isSeedManaged" placeholder='["studio","editor"]' />
           </div>
 
           <div class="field">
@@ -901,6 +940,7 @@ async function deleteSelectedDocument() {
               id="guidance-output-path"
               v-model="form.outputPath"
               class="w-full"
+              :disabled="isSeedManaged"
               placeholder=".automaton/agents/references/llms/example.md"
             />
             <small class="field-help">Output path means exported by CLI.</small>
@@ -927,6 +967,7 @@ async function deleteSelectedDocument() {
             <div class="property-section danger-section">Danger Zone</div>
             <div class="inspector-empty-state danger-zone">
               <strong>Delete permanently</strong>
+              <span v-if="selectedDocument.source === 'Seed'">Seed-managed documents cannot be deleted. Disable them to preserve this preference.</span>
               <span v-if="selectedDocument.isEnabled">
                 Disable this document before deleting it permanently.
               </span>

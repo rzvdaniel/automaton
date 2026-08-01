@@ -106,6 +106,12 @@ public sealed class KeywordAppPromptContextSelector : IAppPromptContextSelector
             AddReference(references, "automaton-cli-deploy");
         }
 
+        if (ContainsAnyWord(normalized,
+                "action", "actions", "job", "jobs", "scheduled", "schedule", "import", "export", "background"))
+        {
+            AddReference(references, "automaton-actions");
+        }
+
         return references;
     }
 

@@ -198,6 +198,11 @@ export interface AiGuidanceAdmin {
   isModelLoadable: boolean
   sortOrder: number
   version: number
+  source: string
+  seedVersion?: number
+  seedContentHash?: string
+  lastSeedSynchronizedAt?: string
+  isSeedRetired: boolean
   createdAt: string
   updatedAt?: string
   hasEmbeddedDefault: boolean

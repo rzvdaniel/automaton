@@ -2,6 +2,7 @@ namespace Automaton.AiGuidance;
 
 public static class AutomatonGuidanceSeedCatalog
 {
+    public const int CurrentSeedVersion = 1;
     private static readonly IReadOnlyDictionary<string, AutomatonGuidanceSeedOverride> OverridesByRelativePath =
         new Dictionary<string, AutomatonGuidanceSeedOverride>(StringComparer.Ordinal)
         {
