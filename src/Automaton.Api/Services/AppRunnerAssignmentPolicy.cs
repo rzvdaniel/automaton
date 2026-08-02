@@ -18,10 +18,11 @@ public sealed class AppRunnerAssignmentPolicy(
         WebApp app,
         Guid? runnerId,
         Guid userId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool privilegedHostAccessAcknowledged = false)
     {
         var target = await GetOrCreateDefaultTargetAsync(app, cancellationToken);
-        await AssignAsync(app, target, runnerId, userId, cancellationToken);
+        await AssignAsync(app, target, runnerId, userId, cancellationToken, privilegedHostAccessAcknowledged);
     }
 
     public async Task AssignAsync(
@@ -29,7 +30,8 @@ public sealed class AppRunnerAssignmentPolicy(
         AppDeploymentTarget target,
         Guid? runnerId,
         Guid userId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool privilegedHostAccessAcknowledged = false)
     {
         if (target.WebAppId != app.Id)
         {
@@ -45,11 +47,15 @@ public sealed class AppRunnerAssignmentPolicy(
             return;
         }
 
-        await runnerAuthorizationPolicy.AuthorizeAsync(
+        var runner = await runnerAuthorizationPolicy.AuthorizeAsync(
             app,
             runnerId.Value,
             userId,
             cancellationToken);
+        if (target.ExecutionRunnerId != runner.Id)
+        {
+            PrivilegedHostAssignmentGuard.EnsureAcknowledged(runner, privilegedHostAccessAcknowledged);
+        }
         await hostedRunnerAppCapacityService.AssignAsync(target, runnerId.Value, cancellationToken);
     }
 

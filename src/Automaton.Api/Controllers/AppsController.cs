@@ -310,7 +310,9 @@ public class AppsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Post(NewApp app)
     {
-        var appId = await appsService.Create(app);
+        Guid appId;
+        try { appId = await appsService.Create(app); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         var newApp = appsService.Get(appId);
 
@@ -320,7 +322,8 @@ public class AppsController : BaseController
     [HttpPut("{id}")]
     public async Task<IActionResult> Put(Guid id, AppModel app)
     {
-        await appsService.Update(id, app);
+        try { await appsService.Update(id, app); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
     }
@@ -349,6 +352,7 @@ public class AppsController : BaseController
                 request.PublicUrl,
                 request.RequiresAuthentication,
                 request.ExecutionRunnerId,
+                request.PrivilegedHostAccessAcknowledged,
                 request.Category,
                 request.Tags,
                 request.IsForkable);
@@ -452,7 +456,8 @@ public class AppsController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        await appsService.UpdateRunner(id, request.ExecutionRunnerId);
+        try { await appsService.UpdateRunner(id, request.ExecutionRunnerId, request.PrivilegedHostAccessAcknowledged); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
     }
@@ -2124,6 +2129,7 @@ public class PublishAppRequest
     public required string PublicUrl { get; set; }
     public bool RequiresAuthentication { get; set; } = false;
     public Guid? ExecutionRunnerId { get; set; }
+    public bool PrivilegedHostAccessAcknowledged { get; set; }
     public string? Category { get; set; }
     public string? Tags { get; set; }
     public bool IsForkable { get; set; } = false;
@@ -2142,6 +2148,7 @@ public class CreateAppStepRequest
 public class UpdateRunnerRequest
 {
     public Guid? ExecutionRunnerId { get; set; }
+    public bool PrivilegedHostAccessAcknowledged { get; set; }
 }
 
 public class SetSampleStatusRequest

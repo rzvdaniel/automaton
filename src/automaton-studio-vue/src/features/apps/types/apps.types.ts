@@ -135,6 +135,8 @@ export interface AppDeploymentTarget {
     id: string
     name: string
     purpose: string
+    applicationProfile?: string | null
+    isHostedRunner: boolean
     isOnline: boolean
   } | null
   routePath: string

@@ -380,7 +380,7 @@ public class AppsService
         };
 
         dataContext.WebAppUsers.Add(appUser);
-        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
+        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId, privilegedHostAccessAcknowledged: app.PrivilegedHostAccessAcknowledged);
         await dataContext.SaveChangesAsync();
 
         // Create default app metadata in file system (no index.html — AI will write it)
@@ -467,7 +467,7 @@ public class AppsService
         var previousIsProfileFeatured = entity.IsProfileFeatured;
         var previousExecutionRunnerId = GetDefaultRunnerId(entity);
 
-        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId);
+        await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId, privilegedHostAccessAcknowledged: app.PrivilegedHostAccessAcknowledged);
         entity.Name = app.Name;
         entity.Summary = app.Summary;
         entity.Description = app.Description;
@@ -665,6 +665,7 @@ public class AppsService
         string publicUrl,
         bool requiresAuthentication = true,
         Guid? executionRunnerId = null,
+        bool privilegedHostAccessAcknowledged = false,
         string? category = null,
         string? tags = null,
         bool isForkable = false)
@@ -703,7 +704,7 @@ public class AppsService
 
         if (executionRunnerId.HasValue)
         {
-            await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
+            await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId, privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged);
         }
 
         var ownerId = ResolveAppOwnerId(entity) ?? UserId;
@@ -829,7 +830,7 @@ public class AppsService
     /// <summary>
     /// Update the execution runner for an app
     /// </summary>
-    public async Task UpdateRunner(Guid id, Guid? executionRunnerId)
+    public async Task UpdateRunner(Guid id, Guid? executionRunnerId, bool privilegedHostAccessAcknowledged = false)
     {
         // Check if user can update this app
         if (!await authorizationService.CanUpdateAppAsync(id))
@@ -846,7 +847,7 @@ public class AppsService
 
         var previousRunnerId = GetDefaultRunnerId(entity);
 
-        await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId);
+        await runnerAssignmentPolicy.AssignAsync(entity, executionRunnerId, UserId, privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged);
         entity.Updated = DateTime.UtcNow;
 
         await dataContext.SaveChangesAsync();

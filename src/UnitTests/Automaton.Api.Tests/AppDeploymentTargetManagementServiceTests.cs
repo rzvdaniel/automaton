@@ -230,6 +230,122 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
+    public async Task Create_PrivilegedHostRequiresAcknowledgementAndAcceptsConfirmedAssignment()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var runner = fixture.AddRunner(
+            online: true,
+            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
+        await fixture.Db.SaveChangesAsync();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.Service.CreateAsync(
+                fixture.App.Id,
+                new CreateAppDeploymentTargetRequest
+                {
+                    Name = "Privileged",
+                    Slug = "privileged",
+                    RunnerId = runner.Id
+                },
+                fixture.UserId));
+        var created = await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = "Confirmed privileged",
+                Slug = "confirmed-privileged",
+                RunnerId = runner.Id,
+                PrivilegedHostAccessAcknowledged = true
+            },
+            fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("explicit host-access acknowledgement"));
+            Assert.That(created.Runner?.Id, Is.EqualTo(runner.Id));
+        });
+    }
+
+    [Test]
+    public async Task AssignRunner_PrivilegedHostRequiresAcknowledgementOnlyWhenRunnerChanges()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var privilegedRunner = fixture.AddRunner(
+            online: true,
+            applicationProfile: RunnerApplicationProfiles.PrivilegedHost);
+        var target = await fixture.Db.AppDeploymentTargets
+            .SingleAsync(candidate => candidate.WebAppId == fixture.App.Id && candidate.IsDefault);
+        await fixture.Db.SaveChangesAsync();
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.Service.AssignRunnerAsync(
+                fixture.App.Id,
+                target.Id,
+                new AssignAppDeploymentTargetRunnerRequest { RunnerId = privilegedRunner.Id },
+                fixture.UserId));
+
+        var assigned = await fixture.Service.AssignRunnerAsync(
+            fixture.App.Id,
+            target.Id,
+            new AssignAppDeploymentTargetRunnerRequest
+            {
+                RunnerId = privilegedRunner.Id,
+                PrivilegedHostAccessAcknowledged = true
+            },
+            fixture.UserId);
+        var unchanged = await fixture.Service.AssignRunnerAsync(
+            fixture.App.Id,
+            target.Id,
+            new AssignAppDeploymentTargetRunnerRequest { RunnerId = privilegedRunner.Id },
+            fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assigned.Runner?.Id, Is.EqualTo(privilegedRunner.Id));
+            Assert.That(unchanged.Runner?.Id, Is.EqualTo(privilegedRunner.Id));
+        });
+    }
+
+    [Test]
+    public async Task List_IdentifiesOnlyActiveHostedRunnerRelationshipsAsAutomatonHosted()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var activeRunner = fixture.AddRunner(online: true);
+        var deletedRunner = fixture.AddRunner(online: true);
+        fixture.Db.HostedRunners.AddRange(
+            fixture.AddHostedRunner(activeRunner.Id),
+            fixture.AddHostedRunner(deletedRunner.Id, DateTime.UtcNow));
+        await fixture.Db.SaveChangesAsync();
+
+        await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = "Active hosted",
+                Slug = "active-hosted",
+                RunnerId = activeRunner.Id
+            },
+            fixture.UserId);
+        await fixture.Service.CreateAsync(
+            fixture.App.Id,
+            new CreateAppDeploymentTargetRequest
+            {
+                Name = "Deleted hosted",
+                Slug = "deleted-hosted",
+                RunnerId = deletedRunner.Id
+            },
+            fixture.UserId);
+
+        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(targets.Single(target => target.Runner?.Id == activeRunner.Id).Runner!.IsHostedRunner, Is.True);
+            Assert.That(targets.Single(target => target.Runner?.Id == deletedRunner.Id).Runner!.IsHostedRunner, Is.False);
+        });
+    }
+
+    [Test]
     public async Task TargetDeletion_PreservesExecutionHistoryByClearingTargetReference()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
@@ -316,13 +432,17 @@ public class AppDeploymentTargetManagementServiceTests
             return new TestFixtureContext(db, app, service, routeRoot, userId);
         }
 
-        public Runner AddRunner(bool online, string purpose = RunnerPurposes.Managed)
+        public Runner AddRunner(
+            bool online,
+            string purpose = RunnerPurposes.Managed,
+            string? applicationProfile = null)
         {
             var runner = new Runner
             {
                 Id = Guid.NewGuid(),
                 Name = $"Runner {Guid.NewGuid():N}",
                 Purpose = purpose,
+                ApplicationProfile = applicationProfile,
                 CapabilitiesJson = RunnerCapabilities.Serialize(
                     RunnerCapabilities.DefaultsForPurpose(purpose), purpose),
                 ConnectionId = online ? $"connection-{Guid.NewGuid():N}" : null,
@@ -332,6 +452,17 @@ public class AppDeploymentTargetManagementServiceTests
             Db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = UserId });
             return runner;
         }
+
+        public HostedRunner AddHostedRunner(Guid runnerId, DateTime? deletedAt = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = UserId,
+            RunnerId = runnerId,
+            Name = $"Hosted {Guid.NewGuid():N}",
+            ContainerName = $"hosted-{Guid.NewGuid():N}",
+            Status = HostedRunnerStatuses.Running,
+            DeletedAt = deletedAt
+        };
 
         public async ValueTask DisposeAsync()
         {

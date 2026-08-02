@@ -6,6 +6,8 @@ public sealed record AppDeploymentTargetRunnerSummary(
     Guid Id,
     string Name,
     string Purpose,
+    string? ApplicationProfile,
+    bool IsHostedRunner,
     bool IsOnline);
 
 public sealed record AppDeploymentTargetSummary(
@@ -30,6 +32,7 @@ public sealed class CreateAppDeploymentTargetRequest
     public string Name { get; init; } = string.Empty;
     public string Slug { get; init; } = string.Empty;
     public Guid? RunnerId { get; init; }
+    public bool PrivilegedHostAccessAcknowledged { get; init; }
     public bool IsDefault { get; init; }
 }
 
@@ -43,4 +46,5 @@ public sealed class AssignAppDeploymentTargetRunnerRequest
 {
     public Guid? RunnerId { get; init; }
     public bool CleanupDeployedRuntime { get; init; }
+    public bool PrivilegedHostAccessAcknowledged { get; init; }
 }
