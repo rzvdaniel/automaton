@@ -54,6 +54,8 @@ public sealed partial class AppDeploymentTargetManagementService(
         {
             runner = await runnerAuthorizationPolicy.AuthorizeAsync(
                 app, request.RunnerId.Value, userId, cancellationToken);
+            PrivilegedHostAssignmentGuard.EnsureAcknowledged(
+                runner, request.PrivilegedHostAccessAcknowledged);
         }
 
         await using var transaction = dbContext.Database.IsRelational()
@@ -165,6 +167,11 @@ public sealed partial class AppDeploymentTargetManagementService(
             {
                 runner = await runnerAuthorizationPolicy.AuthorizeAsync(
                     app, request.RunnerId.Value, userId, cancellationToken);
+                if (target.ExecutionRunnerId != runner.Id)
+                {
+                    PrivilegedHostAssignmentGuard.EnsureAcknowledged(
+                        runner, request.PrivilegedHostAccessAcknowledged);
+                }
             }
             if (target.ExecutionRunnerId == runner?.Id)
             {
@@ -495,6 +502,8 @@ public sealed partial class AppDeploymentTargetManagementService(
                     target.ExecutionRunner.Id,
                     target.ExecutionRunner.Name,
                     target.ExecutionRunner.Purpose,
+                    target.ExecutionRunner.ApplicationProfile,
+                    string.Equals(target.ExecutionRunner.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase),
                     string.Equals(
                         target.ExecutionRunner.Status,
                         RunnerStatus.Online.ToString(),

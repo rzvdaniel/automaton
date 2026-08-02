@@ -18,6 +18,7 @@ public class AppModel
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }
+    public bool PrivilegedHostAccessAcknowledged { get; set; }
 
     // Project context
     public AccessScope Scope { get; set; }

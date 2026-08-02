@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -9,12 +10,13 @@ import Tag from 'primevue/tag'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '@/features/runners/services/runners.service'
-import { RunnerStatus, type Runner } from '@/features/runners/types/runners.types'
+import { RunnerApplicationProfiles, RunnerStatus, type Runner } from '@/features/runners/types/runners.types'
+import { classifyRunner, isVisibleApplicationRunner } from '@/features/runners/utils/runner-classification'
 import { appsService } from '../services/apps.service'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 
-const props = defineProps<{ appId: string; refreshRevision?: number }>()
+const props = defineProps<{ appId: string; projectId?: string | null; refreshRevision?: number }>()
 const emit = defineEmits<{
   deploy: [target: AppDeploymentTarget]
   viewLogs: [target: AppDeploymentTarget]
@@ -32,9 +34,12 @@ const editingTarget = ref<AppDeploymentTarget | null>(null)
 const name = ref('')
 const slug = ref('')
 const runnerId = ref<string | null>(null)
+const privilegedHostAccessAcknowledged = ref(false)
 
-const runnerOptions = computed(() => runners.value.map((runner) => ({
-  label: `${runner.name} · ${runner.status}`,
+const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
+const selectedRunnerIsPrivileged = computed(() => selectedRunner.value?.applicationProfile === RunnerApplicationProfiles.PrivilegedHost && !selectedRunner.value.isHostedRunner)
+const runnerOptions = computed(() => runners.value.filter(isVisibleApplicationRunner).map((runner) => ({
+  label: `${runner.name} · ${runnerSourceLabel(runner)} · ${runner.status}`,
   value: runner.id,
   disabled: runner.status !== RunnerStatus.Online,
 })))
@@ -50,7 +55,7 @@ async function load() {
   try {
     const [targetData, runnerData] = await Promise.all([
       appsService.listDeploymentTargets(props.appId),
-      runnersService.list(),
+      runnersService.list(props.projectId ?? undefined),
     ])
     targets.value = targetData
     runners.value = runnerData
@@ -67,6 +72,7 @@ function openCreate() {
   name.value = ''
   slug.value = ''
   runnerId.value = null
+  privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
 }
 
@@ -75,6 +81,7 @@ function openEdit(target: AppDeploymentTarget) {
   name.value = target.name
   slug.value = target.slug
   runnerId.value = target.runner?.id ?? null
+  privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
 }
 
@@ -103,6 +110,7 @@ async function saveTarget() {
         name: name.value.trim(),
         slug: normalizedSlug.value,
         runnerId: runnerId.value,
+        privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged.value,
       })
       showEditor.value = false
       toast.add({ severity: 'success', summary: 'Target created', detail: `${name.value.trim()} is ready to configure.`, life: 2500 })
@@ -128,6 +136,7 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
         target.id,
         runnerId.value,
         cleanupDeployedRuntime,
+        privilegedHostAccessAcknowledged.value,
       )
     }
     showEditor.value = false
@@ -139,6 +148,16 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
     busyTargetId.value = null
   }
 }
+
+function runnerSourceLabel(runner: Runner) {
+  switch (classifyRunner(runner)) {
+    case 'automaton-hosted': return 'Automaton-hosted'
+    case 'self-hosted-privileged': return 'Self-hosted · Privileged Host'
+    default: return 'Self-hosted · Standard'
+  }
+}
+
+watch(runnerId, () => { privilegedHostAccessAcknowledged.value = false })
 
 async function makeDefault(target: AppDeploymentTarget) {
   busyTargetId.value = target.id
@@ -274,9 +293,17 @@ watch(() => props.refreshRevision, load)
         <Select id="target-runner" v-model="runnerId" :options="runnerOptions" option-label="label"
           option-value="value" option-disabled="disabled" show-clear placeholder="Assign later" />
       </div>
+      <Message v-if="selectedRunnerIsPrivileged" severity="warn" :closable="false">
+        <strong>Privileged Host access</strong><br>
+        This App may read and modify host files, inspect host processes and Docker containers, affect services and system state, and access host secrets.
+        <div class="flex align-items-start gap-2 mt-3">
+          <Checkbox v-model="privilegedHostAccessAcknowledged" input-id="privileged-host-acknowledgement" binary />
+          <label for="privileged-host-acknowledgement">I understand that this App will have administrator-level access to the selected machine.</label>
+        </div>
+      </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
-        <Button label="Save target" :disabled="!name.trim() || !normalizedSlug"
+        <Button label="Save target" :disabled="!name.trim() || !normalizedSlug || (selectedRunnerIsPrivileged && !privilegedHostAccessAcknowledged)"
           :loading="busyTargetId !== null" @click="saveTarget" />
       </template>
     </Dialog>
