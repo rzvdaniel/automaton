@@ -145,6 +145,21 @@ function getRunnerSourceSeverity(runner: Runner): 'contrast' | 'warn' | 'info' {
   }
 }
 
+async function handleSelfHostedInstallationCreated() {
+  if (projectsStore.activeProjectId) {
+    projectsStore.setActiveProject(null)
+    toast.add({
+      severity: 'info',
+      summary: 'Switched to Personal Runners',
+      detail: 'Your new self-hosted Runner is personal and will appear here after it connects.',
+      life: 5000,
+    })
+    return
+  }
+
+  await refreshRunners()
+}
+
 // Load runners with optional project filter
 async function loadRunners(projectId?: string | null) {
   loading.value = true
@@ -352,12 +367,12 @@ onUnmounted(() => {
 <template>
   <div class="runners-view">
     <!-- Page Header -->
-    <div class="flex align-items-center justify-content-between mb-5">
+    <div class="runners-page-header mb-5">
       <div>
         <h1 class="text-3xl font-bold m-0">Runners</h1>
         <p class="text-color-secondary mt-1 mb-0">Remote execution agents for your workflows</p>
       </div>
-      <div class="flex gap-2">
+      <div class="runners-page-header__actions">
         <Button label="Other runner options" text @click="showDeployDialog = true" />
         <Button
           label="Install Self-Hosted Runner"
@@ -454,20 +469,10 @@ onUnmounted(() => {
             Without one, <strong>Deploy Backend</strong> will fail in the App Editor.
           </p>
 
-          <!-- CLI quick-start -->
-          <div class="runner-quickstart mt-4">
-            <div class="runner-quickstart-label">Recommended setup — Automaton CLI:</div>
-            <div class="runner-quickstart-code">
-              <span class="code-line">dotnet tool install --global Automaton.Cli</span>
-              <span class="code-line">automaton login</span>
-              <span class="code-line">automaton runner install</span>
-            </div>
-            <p class="text-color-secondary text-sm mt-2 mb-0">
-              Requires Docker to be installed and running. Get a runner API key from
-              <router-link to="/apikeys" class="runner-link">API Keys</router-link>.
-              Create a one-time Docker command for a self-hosted Runner on a machine you own.
-            </p>
-          </div>
+          <p class="text-color-secondary text-sm mt-3 mb-0">
+            <strong>Recommended:</strong> create a one-time Docker command for a self-hosted Runner
+            on a machine you own. API-key and CLI installation options remain available separately.
+          </p>
 
           <div class="flex gap-2 mt-4 justify-content-center">
             <Button
@@ -476,13 +481,6 @@ onUnmounted(() => {
               @click="showSelfHostedInstallDialog = true"
             />
             <Button label="Other runner options" text @click="showDeployDialog = true" />
-            <Button
-              label="API Keys"
-              icon="pi pi-key"
-              severity="secondary"
-              outlined
-              @click="$router.push('/apikeys')"
-            />
           </div>
         </div>
       </template>
@@ -777,7 +775,7 @@ onUnmounted(() => {
 
     <SelfHostedRunnerInstallDialog
       v-model:visible="showSelfHostedInstallDialog"
-      @created="refreshRunners(projectsStore.activeProjectId)"
+      @created="handleSelfHostedInstallationCreated"
     />
 
     <!-- Legacy Runner installation options -->
@@ -938,6 +936,20 @@ onUnmounted(() => {
 .runners-view {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.runners-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.runners-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .stat-card {
@@ -1157,52 +1169,18 @@ onUnmounted(() => {
   margin-bottom: 1rem;
 }
 
-.runner-quickstart {
-  text-align: left;
-  max-width: 540px;
-  margin: 0 auto;
-}
+@media (max-width: 640px) {
+  .runners-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
 
-.runner-quickstart-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.5rem;
-}
+  .runners-page-header__actions {
+    justify-content: stretch;
+  }
 
-.runner-quickstart-code {
-  display: flex;
-  flex-direction: column;
-  background: var(--p-surface-900);
-  color: var(--p-surface-100);
-  border-radius: 8px;
-  padding: 0.875rem 1rem;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.82rem;
-  line-height: 1.7;
-}
-
-:global(.app-dark) .runner-quickstart-code {
-  background: var(--p-surface-800);
-}
-
-.runner-quickstart-code em {
-  color: var(--p-primary-300);
-  font-style: normal;
-}
-
-.code-line {
-  white-space: nowrap;
-}
-
-.runner-link {
-  color: var(--p-primary-500);
-  text-decoration: none;
-}
-
-.runner-link:hover {
-  text-decoration: underline;
+  .runners-page-header__actions :deep(.p-button) {
+    flex: 1 1 auto;
+  }
 }
 </style>
