@@ -10,6 +10,7 @@ import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
 import type { PublishAppRequest } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix } from '../utils/public-app-url'
+import { getPublishVisibilityState } from '../utils/publish-visibility'
 
 const props = defineProps<{
   visible: boolean
@@ -81,8 +82,12 @@ watch(isVisible, async (visible) => {
 
   requiresAuthentication.value = false
   allowRemixing.value = props.isForkable ?? false
-  publishRuntime.value = props.currentRuntimeVisibility !== 'private'
-  listInMarketplace.value = props.currentCatalogVisibility !== 'unlisted'
+  const visibilityState = getPublishVisibilityState(
+    props.currentRuntimeVisibility,
+    props.currentCatalogVisibility,
+  )
+  publishRuntime.value = visibilityState.publishRuntime
+  listInMarketplace.value = visibilityState.listInMarketplace
   selectedCategory.value = props.currentCategory ?? null
   tags.value = props.currentTags ?? ''
   validationError.value = null

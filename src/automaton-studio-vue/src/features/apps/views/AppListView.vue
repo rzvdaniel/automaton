@@ -303,7 +303,9 @@ const handlePublishApp = async (request: PublishAppRequest) => {
       summary: 'Published',
       detail: request.runtimeVisibility === 'public'
         ? `App is now available at ${getPublishedAppUrl(request.publicUrl)}`
-        : 'Private runtime listed with a media-only marketplace preview.',
+        : request.catalogVisibility === 'listed'
+          ? 'Private runtime listed with a media-only marketplace preview.'
+          : 'Private runtime published as an unlisted media preview.',
       life: 5000,
     })
     showPublishDialog.value = false

@@ -757,7 +757,9 @@ async function handlePublish(request: PublishAppRequest) {
       summary: 'Published',
       detail: request.runtimeVisibility === 'public'
         ? `App published at ${getPublishedAppUrl(request.publicUrl)}`
-        : 'Private runtime listed with a media-only marketplace preview.',
+        : request.catalogVisibility === 'listed'
+          ? 'Private runtime listed with a media-only marketplace preview.'
+          : 'Private runtime published as an unlisted media preview.',
       life: 5000,
     })
   } catch (err: unknown) {
