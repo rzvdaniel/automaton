@@ -232,7 +232,7 @@ public class AppsService
             .FirstOrDefaultAsync(x =>
                 x.PublicUrl != null &&
                 x.PublicUrl.ToLower() == slug.ToLower() &&
-                x.IsPublished &&
+                x.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                 x.AccessStatus == AppAccessStatuses.Active,
                 cancellationToken);
 
@@ -468,6 +468,10 @@ public class AppsService
         var previousExecutionRunnerId = GetDefaultRunnerId(entity);
 
         await runnerAssignmentPolicy.AssignAsync(entity, app.ExecutionRunnerId, UserId, privilegedHostAccessAcknowledged: app.PrivilegedHostAccessAcknowledged);
+        AppVisibilityPolicy.EnsureValidConfiguration(
+            app.RuntimeVisibility,
+            app.CatalogVisibility,
+            app.MarketplacePreviewMode);
         entity.Name = app.Name;
         entity.Summary = app.Summary;
         entity.Description = app.Description;
@@ -475,6 +479,9 @@ public class AppsService
         entity.IsForkable = app.IsForkable;
         entity.PublicUrl = app.PublicUrl;
         entity.RequiresAuthentication = app.RequiresAuthentication;
+        entity.RuntimeVisibility = app.RuntimeVisibility;
+        entity.CatalogVisibility = app.CatalogVisibility;
+        entity.MarketplacePreviewMode = app.MarketplacePreviewMode;
         entity.IsProfileFeatured = app.IsProfileFeatured;
         entity.Updated = DateTime.UtcNow;
         // Definition is now empty - content in file system
@@ -668,7 +675,10 @@ public class AppsService
         bool privilegedHostAccessAcknowledged = false,
         string? category = null,
         string? tags = null,
-        bool isForkable = false)
+        bool isForkable = false,
+        string runtimeVisibility = AppRuntimeVisibilities.Public,
+        string catalogVisibility = AppCatalogVisibilities.Listed,
+        string marketplacePreviewMode = MarketplacePreviewModes.Launchable)
     {
         // Check if user can update this app (needed for publishing)
         if (!await authorizationService.CanUpdateAppAsync(id))
@@ -691,7 +701,10 @@ public class AppsService
             throw new InvalidOperationException("Invalid URL slug format. Use lowercase letters, numbers, and hyphens only.");
         }
 
-        if (requiresAuthentication)
+        AppVisibilityPolicy.EnsureValidConfiguration(
+            runtimeVisibility, catalogVisibility, marketplacePreviewMode);
+
+        if (runtimeVisibility == AppRuntimeVisibilities.Public && requiresAuthentication)
         {
             throw new InvalidOperationException("Restricted published apps are not supported by the public static app host yet. Use Studio preview for private and organization apps.");
         }
@@ -711,6 +724,9 @@ public class AppsService
         var nextVersion = entity.Version + 1;
 
         entity.IsPublished = true;
+        entity.RuntimeVisibility = runtimeVisibility;
+        entity.CatalogVisibility = catalogVisibility;
+        entity.MarketplacePreviewMode = marketplacePreviewMode;
         entity.PublicUrl = publicUrl;
         entity.PublishedAt = DateTime.UtcNow;
         entity.IsForkable = isForkable;
@@ -784,6 +800,8 @@ public class AppsService
         }
 
         entity.IsPublished = false;
+        entity.RuntimeVisibility = AppRuntimeVisibilities.Private;
+        entity.CatalogVisibility = AppCatalogVisibilities.Unlisted;
         entity.PublishedAt = null;
         entity.Updated = DateTime.UtcNow;
         // Keep PublicUrl for re-publishing with same slug
@@ -935,6 +953,9 @@ public class AppsService
             PublishedAt = entity.PublishedAt,
             Version = entity.Version,
             RequiresAuthentication = entity.RequiresAuthentication,
+            RuntimeVisibility = entity.RuntimeVisibility,
+            CatalogVisibility = entity.CatalogVisibility,
+            MarketplacePreviewMode = entity.MarketplacePreviewMode,
             Created = entity.Created,
             Updated = entity.Updated,
             ExecutionRunnerId = GetDefaultRunnerId(entity),

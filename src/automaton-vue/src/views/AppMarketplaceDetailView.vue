@@ -72,7 +72,7 @@ const tagList = computed(() =>
 )
 
 const launchUrl = computed(() =>
-  app.value?.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
+  app.value?.canLaunch && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
 )
 
 const forkUrl = computed(() =>
@@ -154,7 +154,7 @@ async function shareApp() {
   shareMessage.value = ''
 
   const title = app.value?.name || 'Automaton app'
-  const url = launchUrl.value || window.location.href
+  const url = window.location.href
 
   try {
     if (navigator.share) {
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
           <section class="detail-hero">
             <aside class="summary-panel">
               <div class="badge-row">
-                <span class="badge">Live app</span>
+                <span class="badge">{{ app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                 <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
                 <span v-if="app.canRemix" class="badge badge-forkable">Forkable</span>
                 <span class="badge badge-static">{{ app.hasBackendExecution ? 'Backend' : 'Static' }}</span>
@@ -407,6 +407,7 @@ onBeforeUnmount(() => {
                       Open app
                       <i class="pi pi-external-link" />
                   </button>
+                  <p v-else class="private-runtime-note">Private runtime — preview available through media.</p>
                   <a v-if="app.canRemix" :href="forkUrl" class="detail-button fork-action" target="_blank" rel="noopener">
                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                       <path d="M5 3.25a2.25 2.25 0 1 0-1.5 2.122v5.256a2.251 2.251 0 1 0 1.5 0V9.372a2.251 2.251 0 0 0 1.746-1.554h2.628a2.251 2.251 0 1 0 0-1.5H6.746A2.251 2.251 0 0 0 5 4.628V3.25Z" fill="currentColor" />

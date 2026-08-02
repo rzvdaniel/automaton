@@ -355,7 +355,10 @@ public class AppsController : BaseController
                 request.PrivilegedHostAccessAcknowledged,
                 request.Category,
                 request.Tags,
-                request.IsForkable);
+                request.IsForkable,
+                request.RuntimeVisibility,
+                request.CatalogVisibility,
+                request.MarketplacePreviewMode);
         }
         catch (InvalidOperationException ex)
         {
@@ -2133,6 +2136,9 @@ public class PublishAppRequest
     public string? Category { get; set; }
     public string? Tags { get; set; }
     public bool IsForkable { get; set; } = false;
+    public string RuntimeVisibility { get; set; } = AppRuntimeVisibilities.Public;
+    public string CatalogVisibility { get; set; } = AppCatalogVisibilities.Listed;
+    public string MarketplacePreviewMode { get; set; } = MarketplacePreviewModes.Launchable;
 }
 
 public class LinkMultipleStepsRequest
