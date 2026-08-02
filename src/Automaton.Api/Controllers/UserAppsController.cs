@@ -209,7 +209,7 @@ public class UserAppsController : ControllerBase
             var app = await dbContext.WebApps
                 .Include(a => a.WebAppUsers)
                 .FirstOrDefaultAsync(a =>
-                    a.IsPublished &&
+                    a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.AccessStatus == AppAccessStatuses.Active &&
                     a.PublicUrl != null &&
                     a.PublicUrl.ToLower() == slug.ToLower());

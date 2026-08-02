@@ -57,7 +57,7 @@ public class BackendRouteConfigService
                     target.IsDefault,
                     RuntimeEndpoint = runner.RuntimeEndpoint!,
                     Slug = target.IsDefault &&
-                        target.WebApp.IsPublished &&
+                        target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                         target.WebApp.AccessStatus == AppAccessStatuses.Active
                         ? target.WebApp.PublicUrl
                         : null

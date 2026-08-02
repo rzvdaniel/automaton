@@ -1,6 +1,7 @@
 using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
+using Automaton.Api.Enums;
 using Automaton.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -171,6 +172,39 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain(
                 $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
         });
+    }
+
+    [Test]
+    public async Task RefreshAsync_DoesNotWritePublicSlugRoute_ForPrivateMediaPreview()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.FrontendDeployed = true;
+        dbContext.HostedRunners.Add(new HostedRunner
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(), Name = "Hosted Runner",
+            Status = "Running", ContainerName = "runner-a", RunnerId = runnerId,
+            RuntimeEndpoint = "http://runner-a:8080"
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId, Name = "Private preview", Summary = string.Empty, Description = string.Empty,
+            Definition = "{}", Created = DateTime.UtcNow, Updated = DateTime.UtcNow,
+            IsPublished = true, PublicUrl = "private-preview",
+            RuntimeVisibility = AppRuntimeVisibilities.Private,
+            CatalogVisibility = AppCatalogVisibilities.Listed,
+            MarketplacePreviewMode = MarketplacePreviewModes.MediaOnly,
+            DeploymentTargets = { target }
+        });
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+        var content = await File.ReadAllTextAsync(Path.Combine(rootPath, "managed-runtime-routes.yml"));
+
+        Assert.That(content, Does.Not.Contain("private-preview"));
     }
 
     private static BackendRouteConfigService CreateService(ApplicationDbContext dbContext, string rootPath)

@@ -15,6 +15,9 @@ public class AppModel
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; }
     public bool RequiresAuthentication { get; set; } = true;
+    public string RuntimeVisibility { get; set; } = AppRuntimeVisibilities.Private;
+    public string CatalogVisibility { get; set; } = AppCatalogVisibilities.Unlisted;
+    public string MarketplacePreviewMode { get; set; } = MarketplacePreviewModes.Launchable;
     public DateTime Created { get; set; }
     public DateTime Updated { get; set; }
     public Guid? ExecutionRunnerId { get; set; }

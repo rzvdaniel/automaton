@@ -17,6 +17,15 @@ public class WebApp
     public DateTime? PublishedAt { get; set; }
     public int Version { get; set; } = 1;
 
+    /// <summary>Controls whether the app runtime is reachable outside Studio.</summary>
+    public string RuntimeVisibility { get; set; } = AppRuntimeVisibilities.Private;
+
+    /// <summary>Controls whether the app appears in the public marketplace.</summary>
+    public string CatalogVisibility { get; set; } = AppCatalogVisibilities.Unlisted;
+
+    /// <summary>Controls whether the marketplace can offer a live runtime launch.</summary>
+    public string MarketplacePreviewMode { get; set; } = MarketplacePreviewModes.Launchable;
+
     // Access control (future use)
     public bool RequiresAuthentication { get; set; } = false;
     public string? AllowedRoles { get; set; }
