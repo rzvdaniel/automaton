@@ -310,7 +310,9 @@ public class AppsController : BaseController
     [Authorize(Policy = "AllowApiKey")]
     public async Task<IActionResult> Post(NewApp app)
     {
-        var appId = await appsService.Create(app);
+        Guid appId;
+        try { appId = await appsService.Create(app); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         var newApp = appsService.Get(appId);
 
@@ -320,7 +322,8 @@ public class AppsController : BaseController
     [HttpPut("{id}")]
     public async Task<IActionResult> Put(Guid id, AppModel app)
     {
-        await appsService.Update(id, app);
+        try { await appsService.Update(id, app); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
     }
@@ -453,7 +456,8 @@ public class AppsController : BaseController
             return StatusCode(StatusCodes.Status403Forbidden, new { message = ConfirmedEmailGuardService.SensitiveActionMessage });
         }
 
-        await appsService.UpdateRunner(id, request.ExecutionRunnerId, request.PrivilegedHostAccessAcknowledged);
+        try { await appsService.UpdateRunner(id, request.ExecutionRunnerId, request.PrivilegedHostAccessAcknowledged); }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
         return NoContent();
     }

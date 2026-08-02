@@ -481,7 +481,7 @@ public sealed partial class AppDeploymentTargetManagementService(
         return normalized;
     }
 
-    private static AppDeploymentTargetSummary ToSummary(AppDeploymentTarget target) =>
+    private AppDeploymentTargetSummary ToSummary(AppDeploymentTarget target) =>
         new(
             target.Id,
             target.WebAppId,
@@ -503,7 +503,7 @@ public sealed partial class AppDeploymentTargetManagementService(
                     target.ExecutionRunner.Name,
                     target.ExecutionRunner.Purpose,
                     target.ExecutionRunner.ApplicationProfile,
-                    string.Equals(target.ExecutionRunner.Purpose, RunnerPurposes.Managed, StringComparison.OrdinalIgnoreCase),
+                    dbContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunner.Id),
                     string.Equals(
                         target.ExecutionRunner.Status,
                         RunnerStatus.Online.ToString(),

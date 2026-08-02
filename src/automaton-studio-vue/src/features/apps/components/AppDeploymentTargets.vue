@@ -38,6 +38,7 @@ const privilegedHostAccessAcknowledged = ref(false)
 
 const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
 const selectedRunnerIsPrivileged = computed(() => selectedRunner.value?.applicationProfile === RunnerApplicationProfiles.PrivilegedHost && !selectedRunner.value.isHostedRunner)
+const requiresPrivilegedAcknowledgement = computed(() => selectedRunnerIsPrivileged.value && runnerId.value !== (editingTarget.value?.runner?.id ?? null))
 const runnerOptions = computed(() => runners.value.filter(isVisibleApplicationRunner).map((runner) => ({
   label: `${runner.name} · ${runnerSourceLabel(runner)} · ${runner.status}`,
   value: runner.id,
@@ -303,7 +304,7 @@ watch(() => props.refreshRevision, load)
       </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
-        <Button label="Save target" :disabled="!name.trim() || !normalizedSlug || (selectedRunnerIsPrivileged && !privilegedHostAccessAcknowledged)"
+        <Button label="Save target" :disabled="!name.trim() || !normalizedSlug || (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)"
           :loading="busyTargetId !== null" @click="saveTarget" />
       </template>
     </Dialog>
