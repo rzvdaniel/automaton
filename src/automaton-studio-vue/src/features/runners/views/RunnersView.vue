@@ -11,6 +11,7 @@ import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
+import SelfHostedRunnerInstallDialog from '../components/SelfHostedRunnerInstallDialog.vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useAuthStore } from '@/features/auth/stores/auth.store'
@@ -23,6 +24,7 @@ import {
   type Runner,
   isRunnerLinkedToProject,
 } from '../types/runners.types'
+import { classifyRunner, isVisibleApplicationRunner } from '../utils/runner-classification'
 
 const toast = useToast()
 const confirm = useConfirm()
@@ -33,6 +35,7 @@ const authStore = useAuthStore()
 const loading = ref(true)
 const runners = ref<Runner[]>([])
 const showDeployDialog = ref(false)
+const showSelfHostedInstallDialog = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const showDebugDetails = ref(false)
 const restartingRunnerId = ref<string | null>(null)
@@ -48,9 +51,14 @@ const viewOptions = [
 ]
 
 // Computed stats
-const onlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Online).length)
-const offlineCount = computed(() => runners.value.filter((r) => r.status === RunnerStatus.Offline).length)
-const totalCount = computed(() => runners.value.length)
+const visibleRunners = computed(() => runners.value.filter(isVisibleApplicationRunner))
+const onlineCount = computed(
+  () => visibleRunners.value.filter((r) => r.status === RunnerStatus.Online).length
+)
+const offlineCount = computed(
+  () => visibleRunners.value.filter((r) => r.status === RunnerStatus.Offline).length
+)
+const totalCount = computed(() => visibleRunners.value.length)
 const isAdminViewer = computed(() => {
   const roles = authStore.user?.roles ?? []
   return roles.includes('Admin') || roles.includes('SysAdmin')
@@ -113,6 +121,43 @@ function formatStorage(bytes?: number | null) {
 // Get status color for grid view indicator
 function getStatusColor(status: RunnerStatus): string {
   return status === RunnerStatus.Online ? 'var(--p-green-500)' : 'var(--p-red-500)'
+}
+
+function getRunnerSourceLabel(runner: Runner): string {
+  switch (classifyRunner(runner)) {
+    case 'automaton-hosted':
+      return 'Automaton-hosted'
+    case 'self-hosted-privileged':
+      return 'Self-hosted · Privileged Host'
+    default:
+      return 'Self-hosted · Standard'
+  }
+}
+
+function getRunnerSourceSeverity(runner: Runner): 'contrast' | 'warn' | 'info' {
+  switch (classifyRunner(runner)) {
+    case 'automaton-hosted':
+      return 'contrast'
+    case 'self-hosted-privileged':
+      return 'warn'
+    default:
+      return 'info'
+  }
+}
+
+async function handleSelfHostedInstallationCreated() {
+  if (projectsStore.activeProjectId) {
+    projectsStore.setActiveProject(null)
+    toast.add({
+      severity: 'info',
+      summary: 'Switched to Personal Runners',
+      detail: 'Your new self-hosted Runner is personal and will appear here after it connects.',
+      life: 5000,
+    })
+    return
+  }
+
+  await refreshRunners()
 }
 
 // Load runners with optional project filter
@@ -322,12 +367,19 @@ onUnmounted(() => {
 <template>
   <div class="runners-view">
     <!-- Page Header -->
-    <div class="flex align-items-center justify-content-between mb-5">
+    <div class="runners-page-header mb-5">
       <div>
         <h1 class="text-3xl font-bold m-0">Runners</h1>
         <p class="text-color-secondary mt-1 mb-0">Remote execution agents for your workflows</p>
       </div>
-      <Button label="Install Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
+      <div class="runners-page-header__actions">
+        <Button label="Other runner options" text @click="showDeployDialog = true" />
+        <Button
+          label="Install Self-Hosted Runner"
+          icon="pi pi-plus"
+          @click="showSelfHostedInstallDialog = true"
+        />
+      </div>
     </div>
 
     <Message severity="warn" :closable="false" class="mb-4">
@@ -407,7 +459,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Empty State -->
-    <Card v-if="!loading && runners.length === 0">
+    <Card v-if="!loading && visibleRunners.length === 0">
       <template #content>
         <div class="runners-empty-state">
           <i class="pi pi-server runners-empty-icon"></i>
@@ -417,30 +469,18 @@ onUnmounted(() => {
             Without one, <strong>Deploy Backend</strong> will fail in the App Editor.
           </p>
 
-          <!-- CLI quick-start -->
-          <div class="runner-quickstart mt-4">
-            <div class="runner-quickstart-label">Recommended setup — Automaton CLI:</div>
-            <div class="runner-quickstart-code">
-              <span class="code-line">dotnet tool install --global Automaton.Cli</span>
-              <span class="code-line">automaton login</span>
-              <span class="code-line">automaton runner install</span>
-            </div>
-            <p class="text-color-secondary text-sm mt-2 mb-0">
-              Requires Docker to be installed and running. Get a runner API key from
-              <router-link to="/apikeys" class="runner-link">API Keys</router-link>.
-              Docker and Docker Compose options are also available from <strong>Install Runner</strong>.
-            </p>
-          </div>
+          <p class="text-color-secondary text-sm mt-3 mb-0">
+            <strong>Recommended:</strong> create a one-time Docker command for a self-hosted Runner
+            on a machine you own. API-key and CLI installation options remain available separately.
+          </p>
 
           <div class="flex gap-2 mt-4 justify-content-center">
-            <Button label="Install Runner" icon="pi pi-plus" @click="showDeployDialog = true" />
             <Button
-              label="API Keys"
-              icon="pi pi-key"
-              severity="secondary"
-              outlined
-              @click="$router.push('/apikeys')"
+              label="Install Self-Hosted Runner"
+              icon="pi pi-plus"
+              @click="showSelfHostedInstallDialog = true"
             />
+            <Button label="Other runner options" text @click="showDeployDialog = true" />
           </div>
         </div>
       </template>
@@ -454,7 +494,7 @@ onUnmounted(() => {
 
     <!-- Grid View -->
     <div v-else-if="viewMode === 'grid'" class="runners-grid">
-      <Card v-for="runner in runners" :key="runner.id" class="runner-card">
+      <Card v-for="runner in visibleRunners" :key="runner.id" class="runner-card">
         <template #content>
           <div class="flex align-items-start justify-content-between">
             <div class="flex align-items-center gap-3">
@@ -468,7 +508,10 @@ onUnmounted(() => {
               <div>
                 <div class="flex align-items-center gap-2 mb-1">
                   <span class="font-semibold text-lg">{{ runner.name }}</span>
-                  <Tag v-if="runner.isHostedRunner" value="Hosted" severity="contrast" />
+                  <Tag
+                    :value="getRunnerSourceLabel(runner)"
+                    :severity="getRunnerSourceSeverity(runner)"
+                  />
                   <Tag
                     v-if="isRunnerLinkedToProject(runner)"
                     v-tooltip.top="'Linked to a project. Manage under Project settings.'"
@@ -596,10 +639,10 @@ onUnmounted(() => {
     <Card v-else>
       <template #content>
         <DataTable
-          :value="runners"
+          :value="visibleRunners"
           :loading="loading"
           class="p-datatable-sm"
-          :paginator="runners.length > 10"
+          :paginator="visibleRunners.length > 10"
           :rows="10"
           striped-rows
         >
@@ -608,7 +651,10 @@ onUnmounted(() => {
               <div class="flex align-items-center gap-2">
                 <i class="pi pi-server text-color-secondary"></i>
                 <span class="font-medium">{{ data.name }}</span>
-                <Tag v-if="data.isHostedRunner" value="Hosted" severity="contrast" />
+                <Tag
+                  :value="getRunnerSourceLabel(data)"
+                  :severity="getRunnerSourceSeverity(data)"
+                />
                 <Tag
                   v-if="isRunnerLinkedToProject(data)"
                   v-tooltip.top="'Linked to a project. Manage under Project settings.'"
@@ -727,7 +773,12 @@ onUnmounted(() => {
       </template>
     </Card>
 
-    <!-- Deploy Runner Dialog -->
+    <SelfHostedRunnerInstallDialog
+      v-model:visible="showSelfHostedInstallDialog"
+      @created="handleSelfHostedInstallationCreated"
+    />
+
+    <!-- Legacy Runner installation options -->
     <Dialog
       v-model:visible="showDeployDialog"
       header="Deploy a runner"
@@ -885,6 +936,20 @@ onUnmounted(() => {
 .runners-view {
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.runners-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.runners-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .stat-card {
@@ -1104,52 +1169,18 @@ onUnmounted(() => {
   margin-bottom: 1rem;
 }
 
-.runner-quickstart {
-  text-align: left;
-  max-width: 540px;
-  margin: 0 auto;
-}
+@media (max-width: 640px) {
+  .runners-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
 
-.runner-quickstart-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.5rem;
-}
+  .runners-page-header__actions {
+    justify-content: stretch;
+  }
 
-.runner-quickstart-code {
-  display: flex;
-  flex-direction: column;
-  background: var(--p-surface-900);
-  color: var(--p-surface-100);
-  border-radius: 8px;
-  padding: 0.875rem 1rem;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.82rem;
-  line-height: 1.7;
-}
-
-:global(.app-dark) .runner-quickstart-code {
-  background: var(--p-surface-800);
-}
-
-.runner-quickstart-code em {
-  color: var(--p-primary-300);
-  font-style: normal;
-}
-
-.code-line {
-  white-space: nowrap;
-}
-
-.runner-link {
-  color: var(--p-primary-500);
-  text-decoration: none;
-}
-
-.runner-link:hover {
-  text-decoration: underline;
+  .runners-page-header__actions :deep(.p-button) {
+    flex: 1 1 auto;
+  }
 }
 </style>

@@ -46,6 +46,7 @@ export interface Runner {
   apiInstanceId?: string | null
   apiColor?: string | null
   purpose?: string
+  applicationProfile?: string | null
   capabilities?: string[]
   runnerHostId?: string | null
   scope: AccessScope
@@ -61,6 +62,30 @@ export interface Runner {
   storageMeasurementStatus?: string | null
   storageState?: string | null
   storageMeasurementError?: string | null
+}
+
+export const RunnerApplicationProfiles = {
+  Standard: 'Standard',
+  PrivilegedHost: 'PrivilegedHost',
+} as const
+
+export type RunnerApplicationProfile =
+  (typeof RunnerApplicationProfiles)[keyof typeof RunnerApplicationProfiles]
+
+export interface CreateSelfHostedRunnerInstallationRequest {
+  runnerName: string
+  applicationProfile: RunnerApplicationProfile
+}
+
+export interface SelfHostedRunnerInstallation {
+  installationId: string
+  enrollmentId: string
+  runnerName: string
+  applicationProfile: RunnerApplicationProfile
+  expiresAtUtc: string
+  installationCommand: string
+  requiresHostAccessAcknowledgement: boolean
+  hostAccessWarning?: string | null
 }
 
 /**
@@ -91,9 +116,7 @@ export function getStatusDisplayName(status: RunnerStatus): string {
 /**
  * Get status color for PrimeVue Tag severity
  */
-export function getStatusSeverity(
-  status: RunnerStatus,
-): 'success' | 'danger' | 'secondary' {
+export function getStatusSeverity(status: RunnerStatus): 'success' | 'danger' | 'secondary' {
   switch (status) {
     case RunnerStatus.Online:
       return 'success'

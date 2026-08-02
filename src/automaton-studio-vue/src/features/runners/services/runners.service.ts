@@ -3,7 +3,12 @@
  * Connects to ASP.NET backend runners endpoints
  */
 import apiClient from '@/shared/services/api/axios-instance'
-import type { Runner, RunnerStatusResponse } from '../types/runners.types'
+import type {
+  CreateSelfHostedRunnerInstallationRequest,
+  Runner,
+  RunnerStatusResponse,
+  SelfHostedRunnerInstallation,
+} from '../types/runners.types'
 
 class RunnersService {
   /**
@@ -35,6 +40,16 @@ class RunnersService {
 
   async restartHostedRunner(id: string): Promise<void> {
     await apiClient.post(`/api/runners/${id}/restart-hosted`)
+  }
+
+  async createSelfHostedInstallation(
+    request: CreateSelfHostedRunnerInstallationRequest
+  ): Promise<SelfHostedRunnerInstallation> {
+    const { data } = await apiClient.post<SelfHostedRunnerInstallation>(
+      '/api/self-hosted-runners/installations',
+      request
+    )
+    return data
   }
 }
 
