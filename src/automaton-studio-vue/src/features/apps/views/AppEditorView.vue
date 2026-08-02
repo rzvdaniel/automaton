@@ -755,7 +755,9 @@ async function handlePublish(request: PublishAppRequest) {
     toast.add({
       severity: 'success',
       summary: 'Published',
-      detail: `App published at ${getPublishedAppUrl(request.publicUrl)}`,
+      detail: request.runtimeVisibility === 'public'
+        ? `App published at ${getPublishedAppUrl(request.publicUrl)}`
+        : 'Private runtime listed with a media-only marketplace preview.',
       life: 5000,
     })
   } catch (err: unknown) {
@@ -1477,6 +1479,8 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       :current-tags="editorStore.currentApp?.tags"
       :requires-auth="editorStore.currentApp?.requiresAuthentication"
       :is-forkable="editorStore.currentApp?.isForkable"
+      :current-runtime-visibility="editorStore.currentApp?.runtimeVisibility"
+      :current-catalog-visibility="editorStore.currentApp?.catalogVisibility"
       :app-name="editorStore.currentApp?.name"
       @publish="handlePublish"
     />

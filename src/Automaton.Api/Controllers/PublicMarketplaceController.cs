@@ -93,7 +93,8 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
                 CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
@@ -162,7 +163,8 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
                 CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
@@ -247,7 +249,8 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
                 CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
@@ -310,7 +313,8 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
                 CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
@@ -397,7 +401,8 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
                 CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
                     a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,

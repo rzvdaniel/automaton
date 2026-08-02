@@ -18,6 +18,8 @@ const props = defineProps<{
   currentTags?: string | null
   requiresAuth?: boolean
   isForkable?: boolean
+  currentRuntimeVisibility?: 'private' | 'public'
+  currentCatalogVisibility?: 'unlisted' | 'listed'
   appName?: string
 }>()
 
@@ -79,8 +81,8 @@ watch(isVisible, async (visible) => {
 
   requiresAuthentication.value = false
   allowRemixing.value = props.isForkable ?? false
-  publishRuntime.value = true
-  listInMarketplace.value = true
+  publishRuntime.value = props.currentRuntimeVisibility !== 'private'
+  listInMarketplace.value = props.currentCatalogVisibility !== 'unlisted'
   selectedCategory.value = props.currentCategory ?? null
   tags.value = props.currentTags ?? ''
   validationError.value = null
