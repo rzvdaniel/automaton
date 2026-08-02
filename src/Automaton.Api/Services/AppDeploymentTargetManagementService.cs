@@ -503,7 +503,8 @@ public sealed partial class AppDeploymentTargetManagementService(
                     target.ExecutionRunner.Name,
                     target.ExecutionRunner.Purpose,
                     target.ExecutionRunner.ApplicationProfile,
-                    dbContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunner.Id),
+                    dbContext.HostedRunners.Any(hosted =>
+                        hosted.RunnerId == target.ExecutionRunner.Id && hosted.DeletedAt == null),
                     string.Equals(
                         target.ExecutionRunner.Status,
                         RunnerStatus.Online.ToString(),
