@@ -1,74 +1,67 @@
 ---
 name: deployment-prod
-description: Use when changing Automaton production deployment scripts, docker-compose.prod.yml, nginx configuration, blue/green deployment, cert scripts, health checks, or production verification.
+description: Use when deploying Automaton to production or changing its production deployment scripts, Docker Compose stack, Traefik configuration and dynamic routing, certificates, blue-green cutover, health checks, rollback, or verification.
 ---
 
 # Production Deployment
+
+Use this skill for both deployment operations and changes to the production deployment machinery. A live deployment requires an explicit user request; editing scripts, Compose, routing, certificates, health checks, or deployment documentation does not authorize a live rollout by itself.
 
 Use this skill when touching:
 
 - `scripts/prod-*.sh`
 - `docker-compose.prod.yml`
-- nginx configuration
+- Traefik static or dynamic configuration
 - certificate scripts
-- blue/green state or upstream switching
+- blue-green state or upstream switching
 - production health checks
 - production verification docs
 
 ## Current production model
 
-Automaton production uses Docker Compose and nginx blue/green upstream switching.
-
-Services use blue/green variants such as:
+Automaton production uses Docker Compose with Traefik dynamic configuration for blue-green traffic switching. API, Studio, and Website use blue-green variants:
 
 - `api-blue` / `api-green`
 - `studio-blue` / `studio-green`
 - `website-blue` / `website-green`
 
-Live color is tracked under:
+The Worker is a single in-place service, not blue-green. Live colors are tracked under these legacy-named deployment state paths, which must not be renamed in documentation until the scripts are migrated:
 
-```txt
+```text
 .prod-runtime/nginx/state/blue-green-state.env
-```
-
-Upstream selectors live under:
-
-```txt
 .prod-runtime/nginx/upstreams/
 ```
 
-## Rules
+Hosted app frontend/backend requests are served directly from the runtime edge to Runner endpoints. API SignalR draining protects control-plane work and Runner state; it is not required for hosted app availability.
 
-- Keep the previous color running until the new color is healthy.
-- Warm up new containers before switching traffic.
-- Make rollback obvious.
-- Do not hide failed warmups with broad `|| true` unless the failure is intentionally non-blocking and documented.
-- Do not reload proxy config before generated upstream files are valid.
-- Do not make rollback harder.
-- Prefer read-only diagnostics before production changes.
-- Consider Cloudflare proxied mode when debugging external access.
-- Managed app traffic is served directly by the runtime edge from runner endpoints; API SignalR draining protects control-plane operations, not app request availability.
-- After API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it. Treat the configured grace period as a maximum timeout, not an unconditional sleep.
-- Preserve rollback when post-cutover local origin verification fails.
-- Internal deployment endpoints must require loopback source addresses or dedicated internal authentication. Never treat all RFC1918 addresses as trusted behind a reverse proxy.
+## Deployment-engineering rules
 
-## Before changing deployment logic
+Before changing deployment logic, identify:
 
-Identify:
+- current live color and target inactive color;
+- affected services;
+- build context, image, and Compose service names;
+- warmup and health endpoints;
+- Traefik/network reachability checks;
+- Traefik dynamic configuration render, file-provider observation/validation, and cutover steps;
+- rollback path if build, health, warmup, or origin verification fails;
+- behavior when Cloudflare proxying is enabled.
 
-- current live color
-- target color
-- affected services
-- warmup endpoint
-- health check command
-- cutover step
-- proxy reload step
-- rollback path
-- what happens if the new color fails health checks
+Preserve these guarantees:
 
-## Verification
+- keep the previous API, Studio, or Website color running until the replacement is healthy and warmed up;
+- do not remove the previous color before cutover verification succeeds;
+- render the Traefik configuration atomically, observe and validate the file-provider update, then cut over; do not treat a Traefik ping alone as configuration validation;
+- do not hide failed warmups with broad `|| true` unless the failure is intentionally non-blocking and documented;
+- after API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it; treat the configured grace period as a maximum timeout, not an unconditional sleep;
+- preserve a rollback path when post-cutover local-origin verification fails;
+- keep Runner reconnects jittered and prevent stale heartbeats/disconnects from overwriting a newer session;
+- internal deployment/drain endpoints must accept loopback requests only or require dedicated internal authentication; never trust all RFC1918 addresses behind a reverse proxy;
+- consider Cloudflare’s proxy/cache behavior when diagnosing public access.
 
-Run syntax checks for changed scripts:
+For Compose changes, reason through service names, networks, volumes, health checks, dependencies, image tags, and restart behavior. A local solution build does not validate Docker build contexts or `COPY` coverage.
+
+Run syntax checks for changed shell scripts, limiting commands to files that exist:
 
 ```bash
 bash -n scripts/prod-redeploy-all.sh
@@ -79,71 +72,106 @@ bash -n scripts/prod-verify.sh
 bash -n scripts/prod-reset-blue-green.sh
 ```
 
-Only run commands for files that exist.
+Read `.agent/harness/verification.md` for the repository verification matrix.
 
-For Docker Compose changes, reason through service names, networks, volumes, health checks, and dependencies.
+## Live deployment workflow
 
-Read:
+The configured production host is available through SSH alias `automaton`:
 
-```txt
-.agent/harness/verification.md
+- checkout: `/opt/automaton`
+- user: `automaton`
+- passwordless sudo: use `sudo -n`
+
+### 1. Preflight
+
+Run read-only diagnostics before changing production:
+
+```powershell
+ssh -o BatchMode=yes automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && sudo -n bash scripts/prod-switch-blue-green.sh status && docker compose -f docker-compose.prod.yml ps"
 ```
 
-## Production connection and redeploy workflow
+If Windows OpenSSH cannot authenticate, do not repeat deployment commands. Load the configured key into the Windows agent and test the alias:
 
-When the user asks to update the live Automaton deployment, connect through the configured SSH alias:
+```powershell
+Start-Service ssh-agent
+ssh-add C:\Users\Razvan\.ssh\automaton
+ssh-add -l
+ssh automaton "hostname"
+```
 
-    ssh automaton
-    cd /opt/automaton
+To persist the agent startup setting, use elevated PowerShell:
 
-The automaton account has passwordless sudo. Use sudo -n so an unattended agent never hangs waiting for a password. Production runtime directories and parts of the checkout may be root-owned.
+```powershell
+Set-Service ssh-agent -StartupType Automatic
+Start-Service ssh-agent
+```
 
-Start with read-only diagnostics:
+Record production HEAD, current live colors, MySQL/RabbitMQ/Worker/Traefik health, and tracked/untracked checkout state.
 
-    ssh automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && sudo -n bash scripts/prod-switch-blue-green.sh status && docker compose -f docker-compose.prod.yml ps"
+### 2. Inspect, compare, and pull
 
-Before pulling:
+Inspect tracked production modifications and compare the deployment revision before pulling. `git status -sb` is not enough: inspect the local diff so local code cannot enter a Docker build unnoticed:
 
-- inspect tracked modifications with git diff --stat
-- preserve unrelated production changes
-- compare modified files with origin/main before deciding whether they are already upstream
-- never reset or discard a tracked production change silently
-- never stage production secrets, private keys, .env, secrets/, virtual environments, backups, or runtime state
+```powershell
+ssh automaton "cd /opt/automaton && git diff HEAD --stat && git diff HEAD --name-status && sudo -n git fetch origin && git log --oneline --decorate -5 origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main"
+```
 
-Pull only with a fast-forward:
+Never reset, clean, stash, overwrite, or delete production state without explicit approval. Treat private keys, `.env`, `secrets/`, `venv/`, `backups/`, database files, generated runtime files, and test data as protected state. If tracked changes are not already represented by `origin/main`, stop and report them. Untracked production-only files may remain during a pull, but report that they were preserved.
 
-    ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+Pull the normal production revision only with fast-forward:
 
-Selectively rebuild services based on the merged diff:
+```powershell
+ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+```
 
-    # API/backend, Infrastructure, migration, or messaging changes
-    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-api.sh"
+If the pull is not fast-forwardable, stop. Do not create a merge commit or discard local state automatically.
 
-    # Studio frontend changes
-    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-studio.sh"
+### 3. Select affected services
 
-    # Worker or messaging changes
-    ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh"
+Use the merged diff rather than redeploying the whole stack by default:
 
-    # Public website changes
-    ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
+| Change area | Action |
+|---|---|
+| `src/Automaton.Api/**`, migrations, or API-only backend changes | Redeploy API |
+| `src/Automaton.Infrastructure/**`, `src/Automaton.Messaging/**`, `src/Automaton.Identity/**`, `system-apps/automaton-infrastructure/**`, or other shared projects referenced by both API and Worker | Redeploy API and rebuild Worker |
+| `src/automaton-studio-vue/**` | Redeploy Studio |
+| `src/Automaton.Worker/**` or Worker runtime/configuration | Rebuild Worker in place |
+| `src/automaton-vue/**` | Redeploy Website |
+| Runner Dockerfile/image or runner provisioning changes | Follow the repository’s current Runner image/provisioning procedure; do not invent a Compose service or claim an existing Runner container was rebuilt |
 
-The API, Studio, and Website scripts use the inactive blue/green color, wait for health, verify network reachability and public warmup, switch nginx/Traefik routing, and remove the previous color after the overlap/reconnect period. The Worker script rebuilds and health-checks the single Worker container. Do not use the full-stack script when only a subset changed.
+Published CLI NuGet packages and Runner Docker Hub images are external artifacts. Verify that the deployed code references the intended version/tag when relevant; their publication alone does not imply rebuilding unrelated services.
 
-For migrations, inspect affected production rows before deployment. If a migration is explicitly disposable and the user authorizes deletion of test data, delete only identified test rows before the API starts. Do not present a destructive development migration as production-safe.
+### 4. Redeploy sequentially
 
-Finish with:
+Run selected commands from `/opt/automaton`, one service at a time:
 
-    ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-verify.sh"
+```powershell
+ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-api.sh"
+ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-studio.sh"
+ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh"
+ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
+```
 
-The handoff should state the pulled commit, any local production change that was preserved or reverted, each redeployed service, successful health/cutover checks, services skipped, migration/data-safety status, and the final live colors:
+API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, render and observe/validate the Traefik file-provider update, cut over dynamic routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
 
-    Pulled main to commit <sha>
-    API redeployed to <color> and passed health/warmup checks
-    Studio redeployed to <color> and passed health/warmup checks
-    Worker rebuilt and restarted successfully
-    Website was unchanged and not redeployed
-    Live colors:
-    API: <color>
-    Studio: <color>
-    Website: <color>
+For API migrations, inspect API startup output or an explicit migration/status check and record the result. Inspect affected production rows before any destructive migration. Delete only explicitly disposable test rows when the user authorizes it; never generalize that into production-safe data conversion.
+
+### 5. Verify and hand off
+
+Run final verification:
+
+```powershell
+ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-verify.sh"
+ssh automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && docker compose -f docker-compose.prod.yml ps"
+```
+
+The handoff must state:
+
+- pulled commit;
+- tracked production changes preserved, reverted with approval, or blocking deployment;
+- protected untracked production state preserved;
+- redeployed services and successful build, health, warmup, cutover, drain, and rollback-safety checks;
+- services intentionally skipped and why;
+- migration status and any data-safety precondition;
+- final API, Studio, and Website live colors;
+- `prod-verify.sh` result and relevant warnings.

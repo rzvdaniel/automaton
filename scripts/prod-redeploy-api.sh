@@ -56,7 +56,7 @@ TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color api)}"
 echo "[INFO] Redeploying production API to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
 deploy_color api "$TARGET_COLOR"
 switch_live_color api "$TARGET_COLOR"
-echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via nginx reload"
+echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via Traefik dynamic configuration"
 
 if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
     signal_api_color_runners_reconnect_when_idle "$CURRENT_COLOR"

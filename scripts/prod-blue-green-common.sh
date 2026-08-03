@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared helpers for nginx-based production blue/green deploy scripts.
+# Shared helpers for Traefik-based production blue-green deploy scripts.
 
 set -euo pipefail
 
