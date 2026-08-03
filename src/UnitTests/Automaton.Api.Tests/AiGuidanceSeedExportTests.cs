@@ -58,7 +58,7 @@ public sealed class AiGuidanceSeedExportTests
             Assert.That(skill, Does.Contain("automaton-privileged-host-apps.md"));
             Assert.That(agents, Does.Contain("automaton-privileged-host-apps.md"));
             Assert.That(privilegedHostGuide, Does.Contain("fixed subprocess only when no stable file or API is suitable"));
-            Assert.That(privilegedHostGuide, Does.Contain("Never expose an endpoint that accepts commands"));
+            Assert.That(privilegedHostGuide, Does.Contain("- expose an endpoint that accepts commands;"));
         });
     }
 
