@@ -1,21 +1,31 @@
 ---
 name: deployment-prod
-description: Use when deploying Automaton to production or changing its production deployment scripts, Docker Compose stack, Traefik/nginx routing, certificates, blue-green cutover, health checks, rollback, or verification.
+description: Use when deploying Automaton to production or changing its production deployment scripts, Docker Compose stack, Traefik configuration and dynamic routing, certificates, blue-green cutover, health checks, rollback, or verification.
 ---
 
 # Production Deployment
 
 Use this skill for both deployment operations and changes to the production deployment machinery. A live deployment requires an explicit user request; editing scripts, Compose, routing, certificates, health checks, or deployment documentation does not authorize a live rollout by itself.
 
+Use this skill when touching:
+
+- `scripts/prod-*.sh`
+- `docker-compose.prod.yml`
+- Traefik static or dynamic configuration
+- certificate scripts
+- blue-green state or upstream switching
+- production health checks
+- production verification docs
+
 ## Current production model
 
-Automaton production uses Docker Compose with nginx upstream selection and Traefik in the request path. API, Studio, and Website use blue-green variants:
+Automaton production uses Docker Compose with Traefik dynamic configuration for blue-green traffic switching. API, Studio, and Website use blue-green variants:
 
 - `api-blue` / `api-green`
 - `studio-blue` / `studio-green`
 - `website-blue` / `website-green`
 
-The Worker is a single in-place service, not blue-green. Live colors are tracked under:
+The Worker is a single in-place service, not blue-green. Live colors are tracked under these legacy-named deployment state paths, which must not be renamed in documentation until the scripts are migrated:
 
 ```text
 .prod-runtime/nginx/state/blue-green-state.env
@@ -33,7 +43,7 @@ Before changing deployment logic, identify:
 - build context, image, and Compose service names;
 - warmup and health endpoints;
 - Traefik/network reachability checks;
-- nginx upstream generation and reload/cutover steps;
+- Traefik dynamic configuration generation and reload/cutover steps;
 - rollback path if build, health, warmup, or origin verification fails;
 - behavior when Cloudflare proxying is enabled.
 
@@ -41,7 +51,7 @@ Preserve these guarantees:
 
 - keep the previous API, Studio, or Website color running until the replacement is healthy and warmed up;
 - do not remove the previous color before cutover verification succeeds;
-- do not reload nginx before generated upstream files are valid;
+- do not reload the reverse proxy before generated Traefik configuration is valid;
 - do not hide failed warmups with broad `|| true` unless the failure is intentionally non-blocking and documented;
 - after API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it; treat the configured grace period as a maximum timeout, not an unconditional sleep;
 - preserve a rollback path when post-cutover local-origin verification fails;
@@ -141,7 +151,7 @@ ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh
 ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
 ```
 
-API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, cut over routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
+API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, switch Traefik dynamic routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
 
 For API migrations, inspect API startup output or an explicit migration/status check and record the result. Inspect affected production rows before any destructive migration. Delete only explicitly disposable test rows when the user authorizes it; never generalize that into production-safe data conversion.
 

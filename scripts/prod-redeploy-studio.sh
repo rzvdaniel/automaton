@@ -55,7 +55,7 @@ TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color studio)}"
 echo "[INFO] Redeploying production Studio to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
 deploy_color studio "$TARGET_COLOR"
 switch_live_color studio "$TARGET_COLOR"
-echo "[INFO] Switched $STUDIO_DOMAIN traffic to studio-$TARGET_COLOR via nginx reload"
+echo "[INFO] Switched $STUDIO_DOMAIN traffic to studio-$TARGET_COLOR via Traefik dynamic configuration"
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
     wait_before_stopping_previous_color studio
