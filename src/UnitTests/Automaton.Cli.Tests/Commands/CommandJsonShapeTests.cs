@@ -3,6 +3,8 @@ using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using NUnit.Framework;
 using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
 using System.Text.Json;
 
 namespace Automaton.Cli.Tests.Commands;
@@ -48,6 +50,19 @@ public class CommandJsonShapeTests
 
         _tempDirectories.Clear();
         Environment.ExitCode = 0;
+    }
+
+    [Test]
+    public async Task NewCommand_HelpOptionDoesNotTreatHelpAsTheAppName()
+    {
+        var projectRoot = CreateProjectRoot();
+        var root = new RootCommand { NewCommand.Build(new ConfigService()) };
+        var parser = new CommandLineBuilder(root).UseHelp().Build();
+
+        var exitCode = await InvokeInDirectoryAsync(parser, projectRoot, ["new", "--help"]);
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(File.Exists(Path.Combine(projectRoot, "automaton.json")), Is.False);
     }
 
     [Test]
@@ -262,6 +277,24 @@ public class CommandJsonShapeTests
         {
             Console.SetOut(originalOut);
             Console.SetIn(originalIn);
+        }
+    }
+
+    private static async Task<int> InvokeInDirectoryAsync(System.CommandLine.Parsing.Parser parser, string workingDirectory, string[] args)
+    {
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        try
+        {
+            Directory.SetCurrentDirectory(workingDirectory);
+            Console.SetOut(TextWriter.Null);
+            Console.SetError(TextWriter.Null);
+            return await parser.InvokeAsync(args);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
         }
     }
 

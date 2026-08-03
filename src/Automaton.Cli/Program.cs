@@ -48,6 +48,7 @@ root.Name = "automaton";
 
 var authorizationCompletion = new CliAuthorizationCompletionService(config);
 var builder = new CommandLineBuilder(root)
+    .UseHelp()
     .AddMiddleware(async (context, next) =>
     {
         var commandName = context.ParseResult.CommandResult.Command.Name;

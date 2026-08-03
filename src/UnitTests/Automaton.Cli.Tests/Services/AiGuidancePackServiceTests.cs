@@ -80,7 +80,8 @@ public class AiGuidancePackServiceTests
         Assert.That(skillContent, Does.Contain("Check whether `automaton.json` exists in the project root"));
         Assert.That(skillContent, Does.Contain("Default to frontend-only unless backend is explicitly needed"));
         Assert.That(skillContent, Does.Contain("Use `automaton validate` when the local contract or deploy shape is unclear"));
-        Assert.That(skillContent, Does.Contain("Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`"));
+        Assert.That(skillContent, Does.Contain("Automaton backends are ordinary HTTP applications"));
+        Assert.That(skillContent, Does.Contain("The initial supported Python convention is FastAPI/ASGI with an entrypoint of `main:app`"));
         Assert.That(skillContent, Does.Not.Contain("python -m py_compile"));
     }
 
