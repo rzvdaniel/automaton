@@ -106,13 +106,13 @@ public class BackendRouteConfigService
     private string BuildConfig(IReadOnlyCollection<RouteTarget> routes)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("http:");
-
         if (routes.Count == 0)
         {
-            builder.AppendLine("  routers: {}");
+            builder.AppendLine("http: {}");
             return builder.ToString();
         }
+
+        builder.AppendLine("http:");
 
         builder.AppendLine("  routers:");
         foreach (var route in routes.Where(route => route.IsDefault))
