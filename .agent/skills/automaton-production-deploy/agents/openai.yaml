@@ -1,0 +1,4 @@
+interface:
+  display_name: "Automaton Production Deploy"
+  short_description: "Deploy Automaton safely with SSH and blue-green checks"
+  default_prompt: "Deploy the requested Automaton changes to production using the automaton SSH alias, preserving state and verifying every cutover."
