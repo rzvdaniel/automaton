@@ -35,6 +35,7 @@ Do not invent a generic project structure before making that decision.
 3. `.automaton/agents/references/llms/automaton-cli-deploy.md` when deploying
 4. `.automaton/agents/references/llms/automaton-cli-install.md` when installing, logging in, or resetting auth
 5. `.automaton/agents/references/llms/automaton-mcp.md` only when MCP is available or explicitly requested
+6. `.automaton/agents/references/llms/automaton-privileged-host-apps.md` when the task involves host metrics, Docker inspection, server monitoring, system information, or a Privileged Host Runner
 
 ## App layout
 

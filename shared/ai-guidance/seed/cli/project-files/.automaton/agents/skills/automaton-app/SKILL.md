@@ -21,6 +21,7 @@ Read these files before making structure, backend, or deploy decisions:
 
 1. `.automaton/agents/references/llms/`
 2. The relevant files under `.automaton/agents/references/llms/*.md`
+3. When the task involves host metrics, Docker inspection, server monitoring, system information, or a Privileged Host Runner, read `.automaton/agents/references/llms/automaton-privileged-host-apps.md` before implementing the backend.
 
 ## First local check
 
@@ -33,9 +34,11 @@ Read these files before making structure, backend, or deploy decisions:
 - Default to frontend-only unless backend is explicitly needed for the user-requested core feature.
 - Frontend source normally lives in `frontend/`.
 - Backend source normally lives in `backend/` when needed.
+- Automaton backends are ordinary HTTP applications. The initial supported Python convention is FastAPI/ASGI with an entrypoint of `main:app`.
+- Expose backend HTTP routes under `/api` and call them from the frontend with same-origin root-relative URLs such as `fetch('/api/todos')`.
 - Finite jobs normally live in `actions/{action-key}/` with an `action.yaml` manifest and Python or Bash entrypoint.
 - Actions use JSON stdin/stdout and stderr logs. Do not scaffold FastAPI or another server for an Action.
-- Never create FastAPI, Flask, Express, aiohttp, uvicorn entrypoints, or custom HTTP listeners under `backend/`; use Automaton controllers that export `handle(action_name, inputs)`.
+- Do not implement an App backend with the Action `handle(action_name, inputs)` contract. Backends and Actions are separate execution surfaces.
 - Use a build step for generated frontend apps.
 - Use `automaton validate` when the local contract or deploy shape is unclear.
 - Run `automaton deploy` before saying the app is done.
