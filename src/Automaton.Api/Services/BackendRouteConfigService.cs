@@ -79,6 +79,20 @@ public class BackendRouteConfigService
         var tempPath = Path.Combine(rootPath, $"{RouteFileName}.tmp");
         var backupPath = Path.Combine(rootPath, $"{RouteFileName}.bak");
 
+        if (routes.Count == 0)
+        {
+            if (File.Exists(targetPath))
+            {
+                File.Copy(targetPath, backupPath, overwrite: true);
+                TryDelete(targetPath);
+            }
+
+            logger.LogInformation(
+                "Removed managed runtime backend routes because no active routes remain at {TargetPath}",
+                targetPath);
+            return;
+        }
+
         var content = BuildConfig(routes);
         await File.WriteAllTextAsync(tempPath, content, new UTF8Encoding(false), cancellationToken);
 
@@ -106,12 +120,6 @@ public class BackendRouteConfigService
     private string BuildConfig(IReadOnlyCollection<RouteTarget> routes)
     {
         var builder = new StringBuilder();
-        if (routes.Count == 0)
-        {
-            builder.AppendLine("http: {}");
-            return builder.ToString();
-        }
-
         builder.AppendLine("http:");
 
         builder.AppendLine("  routers:");
