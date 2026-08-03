@@ -8,6 +8,7 @@ import type {
   Runner,
   RunnerStatusResponse,
   SelfHostedRunnerInstallation,
+  SelfHostedRunnerInstallationStatusResponse,
 } from '../types/runners.types'
 
 class RunnersService {
@@ -48,6 +49,15 @@ class RunnersService {
     const { data } = await apiClient.post<SelfHostedRunnerInstallation>(
       '/api/self-hosted-runners/installations',
       request
+    )
+    return data
+  }
+
+  async getSelfHostedInstallationStatus(
+    installationId: string
+  ): Promise<SelfHostedRunnerInstallationStatusResponse> {
+    const { data } = await apiClient.get<SelfHostedRunnerInstallationStatusResponse>(
+      `/api/self-hosted-runners/installations/${encodeURIComponent(installationId)}/status`
     )
     return data
   }

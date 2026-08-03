@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { RunnerApplicationProfiles } from '../types/runners.types'
+import {
+  RunnerApplicationProfiles,
+  SelfHostedRunnerInstallationStatuses,
+} from '../types/runners.types'
 import {
   canCreateSelfHostedInstallation,
   createSelfHostedInstallationRequest,
+  getSelfHostedInstallationStatusLabel,
+  isSelfHostedInstallationPollingComplete,
   isValidSelfHostedRunnerName,
 } from './self-hosted-installation'
 
@@ -39,5 +44,32 @@ describe('self-hosted Runner installation form', () => {
       runnerName: 'my-runner',
       applicationProfile: 'Standard',
     })
+  })
+
+  it.each([
+    [SelfHostedRunnerInstallationStatuses.CommandCreated, 'Command created'],
+    [SelfHostedRunnerInstallationStatuses.WaitingForEnrollment, 'Waiting for enrollment'],
+    [SelfHostedRunnerInstallationStatuses.RunnerEnrolled, 'Runner enrolled'],
+    [SelfHostedRunnerInstallationStatuses.RunnerConnected, 'Runner connected'],
+    [SelfHostedRunnerInstallationStatuses.Expired, 'Expired'],
+    [SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment, 'Offline after enrollment'],
+  ])('shows %s as %s', (status, label) => {
+    expect(getSelfHostedInstallationStatusLabel(status)).toBe(label)
+  })
+
+  it('stops automatic polling only for connected or expired installations', () => {
+    expect(
+      isSelfHostedInstallationPollingComplete(
+        SelfHostedRunnerInstallationStatuses.RunnerConnected
+      )
+    ).toBe(true)
+    expect(
+      isSelfHostedInstallationPollingComplete(SelfHostedRunnerInstallationStatuses.Expired)
+    ).toBe(true)
+    expect(
+      isSelfHostedInstallationPollingComplete(
+        SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment
+      )
+    ).toBe(false)
   })
 })

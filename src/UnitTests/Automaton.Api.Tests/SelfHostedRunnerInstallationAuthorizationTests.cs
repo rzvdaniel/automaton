@@ -39,6 +39,17 @@ public sealed class SelfHostedRunnerInstallationAuthorizationTests
         Assert.That(attribute.Policy, Is.EqualTo(SelfHostedRunnerInstallationAuthorization.PolicyName));
     }
 
+    [Test]
+    public void InstallationStatusEndpointUsesTheSameFocusedAuthorizationPolicy()
+    {
+        var attribute = typeof(SelfHostedRunnersController)
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .Single();
+
+        Assert.That(attribute.Policy, Is.EqualTo(SelfHostedRunnerInstallationAuthorization.PolicyName));
+    }
+
     private static ClaimsPrincipal CreatePrincipal(ApiKeyScope? scope)
     {
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
