@@ -680,6 +680,18 @@ namespace Automaton.Api.Data
                 entity.Property(e => e.IsFeatured).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsProfileFeatured).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.IsForkable).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.RuntimeVisibility)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(AppRuntimeVisibilities.Private);
+                entity.Property(e => e.CatalogVisibility)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(AppCatalogVisibilities.Unlisted);
+                entity.Property(e => e.MarketplacePreviewMode)
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasDefaultValue(MarketplacePreviewModes.Launchable);
                 entity.Property(e => e.MarketplaceStatus)
                     .IsRequired()
                     .HasMaxLength(40)
@@ -706,6 +718,7 @@ namespace Automaton.Api.Data
                 entity.HasIndex(e => new { e.IsPublished, e.ReviewStatus, e.AccessStatus, e.Category });
                 entity.HasIndex(e => e.ForkedFromAppId);
                 entity.HasIndex(e => new { e.IsPublished, e.IsForkable });
+                entity.HasIndex(e => new { e.CatalogVisibility, e.ReviewStatus, e.AccessStatus, e.Category });
 
                 entity.HasMany(e => e.WebAppScreenshots)
                     .WithOne(e => e.WebApp)

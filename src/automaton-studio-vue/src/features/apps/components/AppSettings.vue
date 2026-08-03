@@ -957,6 +957,7 @@ async function handleSaveTemplateStatus() {
             <AppDeploymentTargets
               v-if="app"
               :app-id="app.id"
+              :project-id="app.projectId"
               :refresh-revision="props.targetsRevision"
               @deploy="emit('deployTarget', $event)"
               @view-logs="emit('viewTargetLogs', $event)"

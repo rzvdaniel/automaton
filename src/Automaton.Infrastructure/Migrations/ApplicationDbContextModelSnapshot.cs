@@ -3813,6 +3813,13 @@ namespace Automaton.Api.Migrations
                     b.Property<string>("AllowedRoles")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("CatalogVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("unlisted");
+
                     b.Property<string>("Category")
                         .HasColumnType("varchar(255)");
 
@@ -3880,6 +3887,13 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("varchar(2000)");
 
+                    b.Property<string>("MarketplacePreviewMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("launchable");
+
                     b.Property<string>("MarketplaceStatus")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -3909,6 +3923,13 @@ namespace Automaton.Api.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("varchar(40)")
                         .HasDefaultValue("approved");
+
+                    b.Property<string>("RuntimeVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("private");
 
                     b.Property<int>("Scope")
                         .HasColumnType("int");
@@ -3959,6 +3980,8 @@ namespace Automaton.Api.Migrations
                     b.HasIndex("IsSample", "IsPublished");
 
                     b.HasIndex("IsPublished", "MarketplaceStatus", "Category");
+
+                    b.HasIndex("CatalogVisibility", "ReviewStatus", "AccessStatus", "Category");
 
                     b.HasIndex("IsPublished", "ReviewStatus", "AccessStatus", "Category");
 

@@ -294,7 +294,7 @@ class AppsService {
 
   async createDeploymentTarget(
     id: string,
-    request: { name: string; slug: string; runnerId?: string | null },
+    request: { name: string; slug: string; runnerId?: string | null; privilegedHostAccessAcknowledged?: boolean },
   ): Promise<AppDeploymentTarget> {
     const { data } = await apiClient.post<AppDeploymentTarget>(`/api/apps/${id}/targets`, request)
     return data
@@ -314,10 +314,11 @@ class AppsService {
     targetId: string,
     runnerId: string | null,
     cleanupDeployedRuntime: boolean,
+    privilegedHostAccessAcknowledged = false,
   ): Promise<AppDeploymentTarget> {
     const { data } = await apiClient.post<AppDeploymentTarget>(
       `/api/apps/${id}/targets/${targetId}/assign-runner`,
-      { runnerId, cleanupDeployedRuntime },
+      { runnerId, cleanupDeployedRuntime, privilegedHostAccessAcknowledged },
     )
     return data
   }
@@ -467,6 +468,9 @@ class AppsService {
       publishedAt: app.publishedAt,
       version: app.version,
       requiresAuthentication: settings.requiresAuthentication ?? app.requiresAuthentication,
+      runtimeVisibility: app.runtimeVisibility,
+      catalogVisibility: app.catalogVisibility,
+      marketplacePreviewMode: app.marketplacePreviewMode,
       created: app.created,
       updated: app.updated,
       executionRunnerId: settings.executionRunnerId ?? app.executionRunnerId,
@@ -517,6 +521,9 @@ class AppsService {
       publishedAt: app.publishedAt,
       version: app.version,
       requiresAuthentication: app.requiresAuthentication,
+      runtimeVisibility: app.runtimeVisibility,
+      catalogVisibility: app.catalogVisibility,
+      marketplacePreviewMode: app.marketplacePreviewMode,
       created: app.created,
       updated: app.updated,
       executionRunnerId: app.executionRunnerId,

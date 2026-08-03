@@ -30,6 +30,14 @@ public static class AutomatonGuidanceSeedCatalog
                 RequiredByDefault: false,
                 IsModelLoadable: true,
                 SortOrder: 200),
+            ["shared/guidance/automaton-privileged-host-apps.md"] = new(
+                "automaton-privileged-host-apps",
+                "Automaton Privileged Host Apps",
+                "Safe host, Docker, and fixed-command integration rules for Apps assigned to Privileged Host Runners.",
+                """["privileged-host","runner","host","docker","security"]""",
+                RequiredByDefault: false,
+                IsModelLoadable: true,
+                SortOrder: 210),
             ["shared/guidance/automaton-media-assets.md"] = new(
                 "automaton-media-assets",
                 "Automaton Media and Static Asset Rules",

@@ -301,7 +301,11 @@ const handlePublishApp = async (request: PublishAppRequest) => {
     toast.add({
       severity: 'success',
       summary: 'Published',
-      detail: `App is now available at ${getPublishedAppUrl(request.publicUrl)}`,
+      detail: request.runtimeVisibility === 'public'
+        ? `App is now available at ${getPublishedAppUrl(request.publicUrl)}`
+        : request.catalogVisibility === 'listed'
+          ? 'Private runtime listed with a media-only marketplace preview.'
+          : 'Private runtime published as an unlisted media preview.',
       life: 5000,
     })
     showPublishDialog.value = false
@@ -704,6 +708,8 @@ const handleRetry = async () => {
       :current-tags="publishingApp?.tags"
       :requires-auth="publishingApp?.requiresAuthentication"
       :is-forkable="publishingApp?.isForkable"
+      :current-runtime-visibility="publishingApp?.runtimeVisibility"
+      :current-catalog-visibility="publishingApp?.catalogVisibility"
       :app-name="publishingApp?.name"
       @publish="handlePublishApp"
     />

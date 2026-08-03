@@ -38,7 +38,7 @@ public class PublicMarketplaceController : ControllerBase
         var query = _dbContext.WebApps
             .AsNoTracking()
             .Where(a =>
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active);
 
@@ -93,7 +93,10 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
+                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
@@ -126,7 +129,7 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.Id == appId &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active)
             .Select(a => new MarketplaceAppDetailsDto
@@ -160,7 +163,10 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
+                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured
@@ -202,7 +208,7 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.Id != app.Id &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active &&
                 a.Category != null &&
@@ -243,7 +249,10 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
+                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
@@ -268,7 +277,7 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.ForkedFromAppId == app.Id &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active)
             .OrderByDescending(a => a.PublishedAt)
@@ -304,7 +313,10 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
+                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
@@ -337,7 +349,7 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.Id == appId &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active)
             .Join(_dbContext.WebAppUsers, a => a.Id, wu => wu.WebAppId, (_, wu) => wu.UserId)
@@ -352,7 +364,7 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .Where(a =>
                 a.Id != appId &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active &&
                 _dbContext.WebAppUsers.Any(wu => wu.WebAppId == a.Id && wu.UserId == creatorUserId))
@@ -389,7 +401,10 @@ public class PublicMarketplaceController : ControllerBase
                 IsForkable = a.IsForkable,
                 IsStarredByCurrentUser = currentUserId.HasValue &&
                     _dbContext.WebAppStars.Any(s => s.WebAppId == a.Id && s.UserId == currentUserId.Value),
-                PublicUrl = a.PublicUrl,
+                PublicUrl = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable ? a.PublicUrl : null,
+                CanLaunch = a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 PublishedAt = a.PublishedAt,
                 UpdatedAt = a.Updated,
                 IsFeatured = a.IsFeatured,
@@ -435,7 +450,9 @@ public class PublicMarketplaceController : ControllerBase
             .AsNoTracking()
             .AnyAsync(a =>
                 a.Id == appId &&
-                a.IsPublished &&
+                a.CatalogVisibility == AppCatalogVisibilities.Listed &&
+                a.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                a.MarketplacePreviewMode == MarketplacePreviewModes.Launchable &&
                 a.ReviewStatus == AppReviewStatuses.Approved &&
                 a.AccessStatus == AppAccessStatuses.Active);
 
@@ -509,6 +526,7 @@ public class MarketplaceAppCardDto
     public bool IsForkable { get; set; }
     public bool IsStarredByCurrentUser { get; set; }
     public string? PublicUrl { get; set; }
+    public bool CanLaunch { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool HasBackendExecution { get; set; }

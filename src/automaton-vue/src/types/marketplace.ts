@@ -14,6 +14,7 @@ export type MarketplaceAppCard = {
   isForkable: boolean
   isStarredByCurrentUser?: boolean
   publicUrl?: string
+  canLaunch: boolean
   publishedAt?: string
   updatedAt?: string
   hasBackendExecution: boolean

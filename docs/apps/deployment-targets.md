@@ -155,4 +155,8 @@ secrets, environment inheritance, or target analytics.
 
 Retries are explicit. There is no scheduler-driven cleanup or deployment retry
 orchestration.
+# Deployment targets and self-hosted Runners
 
+Assign a Runner from an App's **Settings → Deployment Targets** editor. Standard self-hosted and Automaton-hosted Runners can be assigned normally. A Privileged Host Runner requires an explicit host-access acknowledgement because the App may access host files, processes, Docker, services, system state, and secrets.
+
+The App keeps using its assigned Runner until you change the target. Privileged Host Runners are never selected automatically; they must always be explicitly assigned.

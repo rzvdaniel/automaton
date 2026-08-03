@@ -53,6 +53,9 @@ export interface App {
   publishedAt?: string // ISO date string
   version: number
   requiresAuthentication: boolean
+  runtimeVisibility?: 'private' | 'public'
+  catalogVisibility?: 'unlisted' | 'listed'
+  marketplacePreviewMode?: 'launchable' | 'mediaOnly'
   created: string // ISO date string
   updated: string // ISO date string
   executionRunnerId?: string
@@ -135,6 +138,8 @@ export interface AppDeploymentTarget {
     id: string
     name: string
     purpose: string
+    applicationProfile?: string | null
+    isHostedRunner: boolean
     isOnline: boolean
   } | null
   routePath: string
@@ -202,6 +207,9 @@ export interface PublishAppRequest {
   category?: string | null
   tags?: string | null
   isForkable?: boolean
+  runtimeVisibility?: 'private' | 'public'
+  catalogVisibility?: 'unlisted' | 'listed'
+  marketplacePreviewMode?: 'launchable' | 'mediaOnly'
 }
 
 export interface ForkAppRequest {

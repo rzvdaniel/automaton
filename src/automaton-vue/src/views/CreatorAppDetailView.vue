@@ -58,7 +58,7 @@ const tagList = computed(() =>
 )
 
 const launchUrl = computed(() =>
-  app.value?.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
+  app.value?.canLaunch && app.value.publicUrl ? getPublishedAppUrl(app.value.publicUrl) : null,
 )
 
 const publishedLabel = computed(() => {

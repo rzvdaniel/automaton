@@ -11,19 +11,15 @@ Frontend apps are hosted by Automaton.
 
 Backend apps run on a Runner that you control.
 
-## Create an API key
-
-Create an API key in Automaton Studio before installing a Runner.
-
-Open the API Keys menu:
-
-[https://studio.automaton.monster/apikeys](https://studio.automaton.monster/apikeys)
-
-Then create a new API key and copy it before starting the Runner install.
-
 ## Install a Runner
 
-The easiest way is through the CLI:
+In Automaton Studio, open **Runners** and select **Install Self-Hosted Runner**. Give the Runner a name, choose a profile, then copy and run the one-time Docker command on the machine that will run your backend apps.
+
+Choose **Standard** for ordinary application workloads. Choose **Privileged Host** only for trusted apps that need administrator-level access to the machine. That profile can inspect and affect host files, processes, Docker containers, services, system state, and secrets, so Studio requires an acknowledgement before it creates the installation command.
+
+The command contains a short-lived, one-time enrollment credential. Copy it directly to the target machine, do not share it, and return to **Runners** to confirm that the Runner has connected.
+
+The CLI is also available:
 
 ```bash
 automaton runner install
@@ -33,7 +29,7 @@ automaton runner install
 
 - Docker installed
 - Automaton account
-- Automaton API key
+- Access to your Automaton Studio project
 
 ## Verify the connection
 

@@ -42,7 +42,7 @@ public class PublicAppsService
         var publicAppCount = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished &&
+            .Where(w => w.CatalogVisibility == AppCatalogVisibilities.Listed &&
                         w.ReviewStatus == AppReviewStatuses.Approved &&
                         w.AccessStatus == AppAccessStatuses.Active)
             .CountAsync();
@@ -73,7 +73,7 @@ public class PublicAppsService
         var apps = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished &&
+            .Where(w => w.CatalogVisibility == AppCatalogVisibilities.Listed &&
                         w.ReviewStatus == AppReviewStatuses.Approved &&
                         w.AccessStatus == AppAccessStatuses.Active)
             .OrderByDescending(w => w.IsProfileFeatured)
@@ -96,6 +96,8 @@ public class PublicAppsService
                 w.Category,
                 w.PublishedAt,
                 w.PublicUrl,
+                CanLaunch = w.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    w.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 w.ViewCount,
                 w.IsFeatured,
                 w.IsProfileFeatured,
@@ -126,8 +128,9 @@ public class PublicAppsService
             ThumbnailUrl = app.ThumbnailUrl,
             Category = app.Category,
             PublishedAt = app.PublishedAt,
-            AppUrl = BuildPublicAppUrl(app.PublicUrl),
-            PublicUrl = app.PublicUrl,
+            AppUrl = app.CanLaunch ? BuildPublicAppUrl(app.PublicUrl) : string.Empty,
+            PublicUrl = app.CanLaunch ? app.PublicUrl : null,
+            CanLaunch = app.CanLaunch,
             ViewCount = app.ViewCount,
             IsFeatured = app.IsFeatured,
             IsProfileFeatured = app.IsProfileFeatured,
@@ -153,7 +156,7 @@ public class PublicAppsService
         var app = await dataContext.WebAppUsers
             .Where(wu => wu.UserId == user.Id && wu.WebAppId == appId)
             .Join(dataContext.WebApps, wu => wu.WebAppId, w => w.Id, (wu, w) => w)
-            .Where(w => w.IsPublished &&
+            .Where(w => w.CatalogVisibility == AppCatalogVisibilities.Listed &&
                         w.ReviewStatus == AppReviewStatuses.Approved &&
                         w.AccessStatus == AppAccessStatuses.Active)
             .Select(w => new
@@ -173,6 +176,8 @@ public class PublicAppsService
                 w.Tags,
                 w.PublishedAt,
                 w.PublicUrl,
+                CanLaunch = w.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    w.MarketplacePreviewMode == MarketplacePreviewModes.Launchable,
                 w.ViewCount,
                 w.IsFeatured,
                 w.IsProfileFeatured,
@@ -207,8 +212,9 @@ public class PublicAppsService
                 Category = app.Category,
                 Tags = app.Tags,
                 PublishedAt = app.PublishedAt,
-                AppUrl = BuildPublicAppUrl(app.PublicUrl),
-                PublicUrl = app.PublicUrl,
+                AppUrl = app.CanLaunch ? BuildPublicAppUrl(app.PublicUrl) : string.Empty,
+                PublicUrl = app.CanLaunch ? app.PublicUrl : null,
+                CanLaunch = app.CanLaunch,
                 ViewCount = app.ViewCount,
                 IsFeatured = app.IsFeatured,
                 IsProfileFeatured = app.IsProfileFeatured,
@@ -260,6 +266,7 @@ public class PublicAppCard
     public DateTime? PublishedAt { get; set; }
     public string AppUrl { get; set; } = string.Empty;
     public string? PublicUrl { get; set; }
+    public bool CanLaunch { get; set; }
     public int ViewCount { get; set; }
     public int StarCount { get; set; }
     public bool IsFeatured { get; set; }

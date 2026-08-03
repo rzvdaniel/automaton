@@ -10,6 +10,7 @@ import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
 import type { PublishAppRequest } from '../types/apps.types'
 import { getPublishedAppUrl, getPublishedAppsUrlPrefix } from '../utils/public-app-url'
+import { getPublishVisibilityState } from '../utils/publish-visibility'
 
 const props = defineProps<{
   visible: boolean
@@ -18,6 +19,8 @@ const props = defineProps<{
   currentTags?: string | null
   requiresAuth?: boolean
   isForkable?: boolean
+  currentRuntimeVisibility?: 'private' | 'public'
+  currentCatalogVisibility?: 'unlisted' | 'listed'
   appName?: string
 }>()
 
@@ -29,6 +32,8 @@ const emit = defineEmits<{
 const slug = ref('')
 const requiresAuthentication = ref(false)
 const allowRemixing = ref(false)
+const publishRuntime = ref(true)
+const listInMarketplace = ref(true)
 const selectedCategory = ref<string | null>(null)
 const tags = ref('')
 const validationError = ref<string | null>(null)
@@ -77,6 +82,12 @@ watch(isVisible, async (visible) => {
 
   requiresAuthentication.value = false
   allowRemixing.value = props.isForkable ?? false
+  const visibilityState = getPublishVisibilityState(
+    props.currentRuntimeVisibility,
+    props.currentCatalogVisibility,
+  )
+  publishRuntime.value = visibilityState.publishRuntime
+  listInMarketplace.value = visibilityState.listInMarketplace
   selectedCategory.value = props.currentCategory ?? null
   tags.value = props.currentTags ?? ''
   validationError.value = null
@@ -105,6 +116,9 @@ function handlePublish() {
     category: selectedCategory.value,
     tags: tags.value.trim() || null,
     isForkable: allowRemixing.value,
+    runtimeVisibility: publishRuntime.value ? 'public' : 'private',
+    catalogVisibility: listInMarketplace.value ? 'listed' : 'unlisted',
+    marketplacePreviewMode: publishRuntime.value ? 'launchable' : 'mediaOnly',
   })
 }
 
@@ -147,6 +161,28 @@ function close() {
         </small>
         <small v-else-if="isValidSlug" class="text-color-secondary block mt-1">
           Your app will be available at: {{ publicUrl }}
+        </small>
+      </div>
+
+      <div class="field mb-4">
+        <label for="publishRuntime" class="block font-semibold mb-2">Runtime visibility</label>
+        <div class="flex align-items-center gap-3">
+          <InputSwitch id="publishRuntime" v-model="publishRuntime" />
+          <label for="publishRuntime">{{ publishRuntime ? 'Public runtime' : 'Private runtime' }}</label>
+        </div>
+        <small class="text-color-secondary block mt-1 ml-6">
+          {{ publishRuntime ? 'Visitors with the app URL can open the runtime.' : 'Only permitted Studio users can open the runtime.' }}
+        </small>
+      </div>
+
+      <div class="field mb-4">
+        <label for="listInMarketplace" class="block font-semibold mb-2">Marketplace visibility</label>
+        <div class="flex align-items-center gap-3">
+          <InputSwitch id="listInMarketplace" v-model="listInMarketplace" />
+          <label for="listInMarketplace">{{ listInMarketplace ? 'Listed in marketplace' : 'Unlisted' }}</label>
+        </div>
+        <small class="text-color-secondary block mt-1 ml-6">
+          {{ !publishRuntime && listInMarketplace ? 'Private runtime — visitors can view media and fork, but cannot launch it.' : 'Use unlisted to keep the app out of public discovery.' }}
         </small>
       </div>
 
