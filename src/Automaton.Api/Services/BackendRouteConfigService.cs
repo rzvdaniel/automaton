@@ -111,8 +111,6 @@ public class BackendRouteConfigService
         if (routes.Count == 0)
         {
             builder.AppendLine("  routers: {}");
-            builder.AppendLine("  middlewares: {}");
-            builder.AppendLine("  services: {}");
             return builder.ToString();
         }
 
