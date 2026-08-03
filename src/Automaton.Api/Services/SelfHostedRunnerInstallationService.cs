@@ -72,7 +72,59 @@ public sealed class SelfHostedRunnerInstallationService(
             ExpiresAtUtc = expiresAtUtc,
             InstallationCommand = BuildCommand(enrollment, token),
             RequiresHostAccessAcknowledgement = profile == RunnerApplicationProfiles.PrivilegedHost,
-            HostAccessWarning = profile == RunnerApplicationProfiles.PrivilegedHost ? HostAccessWarning : null
+            HostAccessWarning = profile == RunnerApplicationProfiles.PrivilegedHost ? HostAccessWarning : null,
+            Status = SelfHostedRunnerInstallationStatuses.CommandCreated
+        };
+    }
+
+    public async Task<SelfHostedRunnerInstallationStatusResponse?> GetStatusAsync(
+        string installationId,
+        CancellationToken cancellationToken)
+    {
+        var userId = userContextService.GetUserId();
+        if (userId == Guid.Empty)
+            throw new UnauthorizedAccessException("Authenticated user context is required.");
+
+        var enrollment = await db.SelfHostedRunnerEnrollments
+            .FirstOrDefaultAsync(
+                x => x.InstallationId == installationId && x.UserId == userId,
+                cancellationToken);
+        if (enrollment == null) return null;
+
+        var now = DateTime.UtcNow;
+        if (enrollment.Status == RunnerEnrollmentStatuses.Pending && enrollment.ExpiresAtUtc <= now)
+        {
+            enrollment.Status = RunnerEnrollmentStatuses.Expired;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        Runner? runner = null;
+        if (enrollment.RunnerId.HasValue)
+        {
+            runner = await db.Runners
+                .FirstOrDefaultAsync(x => x.Id == enrollment.RunnerId.Value, cancellationToken);
+        }
+
+        var status = enrollment.Status switch
+        {
+            RunnerEnrollmentStatuses.Expired => SelfHostedRunnerInstallationStatuses.Expired,
+            RunnerEnrollmentStatuses.Completed when runner != null &&
+                RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, now)
+                => SelfHostedRunnerInstallationStatuses.RunnerConnected,
+            RunnerEnrollmentStatuses.Completed when runner?.LastConnectedAtUtc != null
+                => SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment,
+            RunnerEnrollmentStatuses.Completed => SelfHostedRunnerInstallationStatuses.RunnerEnrolled,
+            _ => SelfHostedRunnerInstallationStatuses.WaitingForEnrollment
+        };
+
+        return new SelfHostedRunnerInstallationStatusResponse
+        {
+            InstallationId = enrollment.InstallationId,
+            Status = status,
+            ExpiresAtUtc = enrollment.ExpiresAtUtc,
+            RunnerId = runner?.Id,
+            LastConnectedAtUtc = runner?.LastConnectedAtUtc,
+            LastHeartbeatAtUtc = runner?.LastHeartbeatAtUtc
         };
     }
 
@@ -160,9 +212,9 @@ public sealed class SelfHostedRunnerInstallationService(
         var root = $"/opt/automaton/self-hosted-runners/{enrollment.InstallationId}";
         var container = $"automaton-self-hosted-{enrollment.InstallationId[3..15]}";
         var args = enrollment.ApplicationProfile == RunnerApplicationProfiles.PrivilegedHost
-            ? $" {RunnerDockerArguments.PrivilegedHost}"
+            ? $" {RunnerDockerArguments.PrivilegedHostApplication}"
             : string.Empty;
-        return string.Join(" ",
+        var dockerRun = string.Join(" ",
             "docker run -d", $"--name {Quote(container)}", "--restart unless-stopped",
             $"-e AUTOMATON_SERVER_URL={Quote(hostedRunnerOptions.Value.ServerUrl.TrimEnd('/'))}",
             $"-e AUTOMATON_RUNNER_NAME={Quote(enrollment.RunnerName)}",
@@ -170,6 +222,46 @@ public sealed class SelfHostedRunnerInstallationService(
             $"-e AUTOMATON_RUNNER_APPLICATION_PROFILE={Quote(enrollment.ApplicationProfile)}",
             $"-e AUTOMATON_ENROLLMENT_TOKEN={Quote(token)}",
             $"-v {Quote(root + ":/app/config")}", args.Trim(), Quote(hostedRunnerOptions.Value.DockerImage));
+
+        return string.Join('\n',
+            "/bin/sh <<'AUTOMATON_RUNNER_INSTALL'",
+            "set -eu",
+            $"container_name={Quote(container)}",
+            $"runner_image={Quote(hostedRunnerOptions.Value.DockerImage)}",
+            "if ! command -v docker >/dev/null 2>&1; then",
+            "  echo 'Docker is required but was not found.' >&2",
+            "  exit 1",
+            "fi",
+            "if ! docker info >/dev/null 2>&1; then",
+            "  echo 'Docker is installed but the daemon is unavailable.' >&2",
+            "  exit 1",
+            "fi",
+            "docker pull \"$runner_image\"",
+            $"if ! container_id=$({dockerRun}); then",
+            "  echo \"Runner container $container_name could not be created or started.\" >&2",
+            "  exit 1",
+            "fi",
+            "short_id=$(printf '%s' \"$container_id\" | cut -c1-12)",
+            "printf 'Runner container %s started (%s).\\n' \"$container_name\" \"$short_id\"",
+            "sleep 5",
+            "status=$(docker inspect --format '{{.State.Status}}' \"$container_name\" 2>/dev/null || true)",
+            "case \"$status\" in",
+            "  running)",
+            "    echo 'Runner container is running.'",
+            "    echo 'Waiting for it to enroll and connect to Automaton.'",
+            "    ;;",
+            "  restarting|exited|dead)",
+            "    echo \"Runner container failed local startup (status: $status).\" >&2",
+            "    docker logs --tail 80 \"$container_name\" 2>&1 | tail -n 80 | sed -E 's/(re|ak)_[A-Za-z0-9_-]+/[REDACTED]/g' >&2 || true",
+            "    exit 1",
+            "    ;;",
+            "  *)",
+            "    echo \"Runner container startup could not be confirmed (status: ${status:-missing}).\" >&2",
+            "    docker logs --tail 80 \"$container_name\" 2>&1 | tail -n 80 | sed -E 's/(re|ak)_[A-Za-z0-9_-]+/[REDACTED]/g' >&2 || true",
+            "    exit 1",
+            "    ;;",
+            "esac",
+            "AUTOMATON_RUNNER_INSTALL");
     }
 
     private static string GenerateToken() => $"re_{Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()}";

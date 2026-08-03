@@ -25,6 +25,7 @@ public class RunnerHostCloudInitTests
         Assert.That(cloudInit, Does.Not.Contain("AUTOMATON_API_KEY"));
         Assert.That(CountOccurrences(cloudInit, "-v /var/run/docker.sock:/var/run/docker.sock"), Is.EqualTo(1));
         Assert.That(CountOccurrences(cloudInit, "-v /:/host"), Is.EqualTo(1));
+        Assert.That(cloudInit, Does.Contain("--network host"));
     }
 
     [Test]

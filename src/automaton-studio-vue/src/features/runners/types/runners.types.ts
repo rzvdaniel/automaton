@@ -72,6 +72,18 @@ export const RunnerApplicationProfiles = {
 export type RunnerApplicationProfile =
   (typeof RunnerApplicationProfiles)[keyof typeof RunnerApplicationProfiles]
 
+export const SelfHostedRunnerInstallationStatuses = {
+  CommandCreated: 'CommandCreated',
+  WaitingForEnrollment: 'WaitingForEnrollment',
+  RunnerEnrolled: 'RunnerEnrolled',
+  RunnerConnected: 'RunnerConnected',
+  Expired: 'Expired',
+  OfflineAfterEnrollment: 'OfflineAfterEnrollment',
+} as const
+
+export type SelfHostedRunnerInstallationStatus =
+  (typeof SelfHostedRunnerInstallationStatuses)[keyof typeof SelfHostedRunnerInstallationStatuses]
+
 export interface CreateSelfHostedRunnerInstallationRequest {
   runnerName: string
   applicationProfile: RunnerApplicationProfile
@@ -86,6 +98,16 @@ export interface SelfHostedRunnerInstallation {
   installationCommand: string
   requiresHostAccessAcknowledgement: boolean
   hostAccessWarning?: string | null
+  status: SelfHostedRunnerInstallationStatus
+}
+
+export interface SelfHostedRunnerInstallationStatusResponse {
+  installationId: string
+  status: SelfHostedRunnerInstallationStatus
+  expiresAtUtc: string
+  runnerId?: string | null
+  lastConnectedAtUtc?: string | null
+  lastHeartbeatAtUtc?: string | null
 }
 
 /**

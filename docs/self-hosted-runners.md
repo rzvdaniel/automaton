@@ -30,9 +30,11 @@ application profile. Reconnect and heartbeat payloads cannot change those values
 `Standard` uses the normal application Runner container configuration and does not
 mount the Docker socket, host PID namespace, or host root filesystem.
 
-`PrivilegedHost` uses the same approved host-access Docker arguments as the existing
-Infrastructure Runner: `--privileged`, `--user 0`, `--pid host`, `--network host`,
-the Docker socket mount, and `/` mounted at `/host`. It still registers as a normal
+`PrivilegedHost` preserves the approved application host-access arguments:
+`--privileged`, `--user 0`, `--pid host`, the Docker socket mount, and `/` mounted at
+`/host`. Unlike the Infrastructure Runner, it uses Docker bridge isolation rather than
+`--network host`, so its internal FastAPI (`8001`) and runtime gateway (`8080`) listeners
+do not collide with other Runner containers and are not published on the host. It still registers as a normal
 application Runner with the `PrivilegedHost` application profile; it is not an
 Infrastructure Runner and receives no Infrastructure capabilities or authorization.
 
@@ -44,6 +46,14 @@ authorization.
 Self-hosted installations use their own container name, installation identity, and
 configuration directory, so they can coexist with Infrastructure and Automaton-hosted
 Runners on the same physical machine without sharing credentials.
+
+The generated command verifies Docker and the daemon, pulls the configured image,
+creates the container, checks that it remains running after startup, and prints a
+bounded, credential-redacted log tail before failing non-zero for restarting, exited, dead, or missing
+containers. A running container means local startup succeeded; Studio separately
+reports enrollment and connection state. Self-hosted application traffic continues to
+use the existing outbound Runner connection and API tunnel. Direct Traefik runtime
+routes remain a Hosted Runner feature backed by `HostedRunner.RuntimeEndpoint`.
 
 ## Manual testing
 

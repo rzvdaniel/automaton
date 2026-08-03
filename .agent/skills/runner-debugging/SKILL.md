@@ -31,6 +31,7 @@ Backend app files deployed to a runner are runner-side runtime files. Do not con
 - Preserve reconnect behavior unless intentionally changing it.
 - Keep diagnostics actionable but redacted.
 - Keep app backend files isolated per app/user as the current architecture requires.
+- Keep Infrastructure Runner host networking separate from Privileged Host application access. Infrastructure Runners may require `--network host` for host lifecycle workflows; Privileged Host application Runners must keep fixed internal listeners container-private unless an explicit runtime connectivity model allocates a network endpoint or unique published port.
 - Treat App Action `ExecutionId` as an idempotency key. Persist Runner acceptance before starting the process, return the same in-flight or terminal result for duplicates, and never restart a process when a persisted non-terminal acceptance makes the outcome ambiguous.
 - Before reusing or deleting an Automaton-owned Docker volume, inspect it and fail closed unless its managed, resource, owner, and storage-scope labels match the server-derived identity. A deterministic name alone is not proof of ownership.
 - For a destructive operation with multiple targets, validate every target before mutating any of them. A conflict on one volume must leave the container and all other volumes untouched.

@@ -10,12 +10,16 @@ import { useToast } from 'primevue/usetoast'
 import { runnersService } from '../services/runners.service'
 import {
   RunnerApplicationProfiles,
+  SelfHostedRunnerInstallationStatuses,
   type RunnerApplicationProfile,
   type SelfHostedRunnerInstallation,
+  type SelfHostedRunnerInstallationStatus,
 } from '../types/runners.types'
 import {
   canCreateSelfHostedInstallation,
   createSelfHostedInstallationRequest,
+  getSelfHostedInstallationStatusLabel,
+  isSelfHostedInstallationPollingComplete,
   isValidSelfHostedRunnerName,
 } from '../utils/self-hosted-installation'
 
@@ -29,6 +33,9 @@ const acknowledgedHostAccess = ref(false)
 const submitting = ref(false)
 const errorMessage = ref<string | null>(null)
 const installation = ref<SelfHostedRunnerInstallation | null>(null)
+const installationStatus = ref<SelfHostedRunnerInstallationStatus | null>(null)
+const refreshingStatus = ref(false)
+let statusPollTimer: ReturnType<typeof setTimeout> | null = null
 
 const profileOptions = [
   {
@@ -65,7 +72,10 @@ watch(profile, () => {
   acknowledgedHostAccess.value = false
 })
 watch(visible, (isVisible) => {
-  if (!isVisible) reset()
+  if (!isVisible) {
+    stopStatusPolling()
+    reset()
+  }
 })
 
 function reset() {
@@ -74,6 +84,8 @@ function reset() {
   acknowledgedHostAccess.value = false
   errorMessage.value = null
   installation.value = null
+  installationStatus.value = null
+  refreshingStatus.value = false
 }
 
 async function createInstallation() {
@@ -84,12 +96,54 @@ async function createInstallation() {
     installation.value = await runnersService.createSelfHostedInstallation(
       createSelfHostedInstallationRequest(runnerName.value, profile.value)
     )
+    installationStatus.value = installation.value.status
+    scheduleStatusRefresh()
     emit('created')
   } catch {
     errorMessage.value =
       'Unable to create the installation. Check your Runner name and permissions, then try again.'
   } finally {
     submitting.value = false
+  }
+}
+
+function stopStatusPolling() {
+  if (statusPollTimer !== null) {
+    clearTimeout(statusPollTimer)
+    statusPollTimer = null
+  }
+}
+
+function scheduleStatusRefresh() {
+  stopStatusPolling()
+  if (
+    !visible.value ||
+    !installation.value ||
+    (installationStatus.value && isSelfHostedInstallationPollingComplete(installationStatus.value))
+  ) {
+    return
+  }
+  statusPollTimer = setTimeout(() => void refreshStatus(), 2000)
+}
+
+async function refreshStatus() {
+  if (!visible.value || !installation.value || refreshingStatus.value) return
+  refreshingStatus.value = true
+  try {
+    const response = await runnersService.getSelfHostedInstallationStatus(
+      installation.value.installationId
+    )
+    installationStatus.value = response.status
+  } catch {
+    toast.add({
+      severity: 'warn',
+      summary: 'Status unavailable',
+      detail: 'Could not refresh enrollment status. This does not mean the container failed.',
+      life: 3000,
+    })
+  } finally {
+    refreshingStatus.value = false
+    scheduleStatusRefresh()
   }
 }
 
@@ -201,6 +255,21 @@ function close() {
           {{ new Date(installation.expiresAtUtc).toLocaleString() }}</span
         >
       </div>
+      <Message
+        v-if="installationStatus"
+        :severity="
+          installationStatus === SelfHostedRunnerInstallationStatuses.RunnerConnected
+            ? 'success'
+            : installationStatus === SelfHostedRunnerInstallationStatuses.Expired ||
+                installationStatus === SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment
+              ? 'warn'
+              : 'info'
+        "
+        :closable="false"
+        class="mb-3"
+      >
+        {{ getSelfHostedInstallationStatusLabel(installationStatus) }}
+      </Message>
       <pre class="installation-command"><code>{{ installation.installationCommand }}</code></pre>
       <ol class="pl-4 text-color-secondary">
         <li>Run the command on your Docker host.</li>
@@ -220,6 +289,13 @@ function close() {
         />
       </template>
       <template v-else>
+        <Button
+          label="Refresh status"
+          icon="pi pi-refresh"
+          text
+          :loading="refreshingStatus"
+          @click="refreshStatus"
+        />
         <Button label="Copy command" icon="pi pi-copy" @click="copyCommand" />
         <Button label="Close" text @click="close" />
       </template>

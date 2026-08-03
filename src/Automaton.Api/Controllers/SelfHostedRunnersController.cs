@@ -26,4 +26,13 @@ public sealed class SelfHostedRunnersController(
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpGet("installations/{installationId}/status")]
+    public async Task<ActionResult<SelfHostedRunnerInstallationStatusResponse>> GetInstallationStatus(
+        string installationId,
+        CancellationToken cancellationToken)
+    {
+        var status = await installationService.GetStatusAsync(installationId, cancellationToken);
+        return status == null ? NotFound() : Ok(status);
+    }
 }

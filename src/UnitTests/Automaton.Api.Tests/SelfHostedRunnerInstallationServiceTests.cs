@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Automaton.Api.Config;
+using Automaton.Api.Constants;
 using Automaton.Api.Data;
 using Automaton.Api.Models;
 using Automaton.Api.Services;
@@ -33,6 +34,9 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Contain("automaton/runner"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("--privileged"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("/var/run/docker.sock"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
         Assert.That(enrollment.EnrollmentTokenHash, Does.Not.Contain("AUTOMATON_ENROLLMENT_TOKEN"));
         Assert.That(enrollment.EnrollmentTokenHash, Is.Not.EqualTo(string.Empty));
         Assert.That(enrollment.UserId, Is.EqualTo(userId));
@@ -56,9 +60,135 @@ public sealed class SelfHostedRunnerInstallationServiceTests
         Assert.That(response.InstallationCommand, Does.Contain("--pid host"));
         Assert.That(response.InstallationCommand, Does.Contain("/var/run/docker.sock:/var/run/docker.sock"));
         Assert.That(response.InstallationCommand, Does.Contain("-v /:/host"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("--network host"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8001"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("-p 8080"));
         Assert.That(response.InstallationCommand, Does.Contain("AUTOMATON_RUNNER_PURPOSE='Managed'"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("RUNNER_HOST_ID"));
         Assert.That(response.InstallationCommand, Does.Not.Contain("HOSTED_RUNNER_ID"));
+    }
+
+    [Test]
+    public async Task MultiplePrivilegedInstallations_UseDistinctIdentityAndNoHostPorts()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db, Guid.NewGuid());
+
+        var first = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "privileged-one",
+            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
+        }, CancellationToken.None);
+        var second = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "privileged-two",
+            ApplicationProfile = RunnerApplicationProfiles.PrivilegedHost
+        }, CancellationToken.None);
+
+        Assert.That(second.InstallationId, Is.Not.EqualTo(first.InstallationId));
+        Assert.That(second.InstallationCommand, Is.Not.EqualTo(first.InstallationCommand));
+        Assert.That(first.InstallationCommand, Does.Not.Contain("--network host"));
+        Assert.That(second.InstallationCommand, Does.Not.Contain("--network host"));
+        Assert.That(first.InstallationCommand, Does.Not.Contain("-p "));
+        Assert.That(second.InstallationCommand, Does.Not.Contain("-p "));
+    }
+
+    [Test]
+    public async Task Installer_VerifiesStartupAndReportsBoundedFailureWithoutTracingSecrets()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db, Guid.NewGuid());
+
+        var response = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "installer-feedback",
+            ApplicationProfile = RunnerApplicationProfiles.Standard
+        }, CancellationToken.None);
+
+        Assert.That(response.InstallationCommand, Does.Contain("command -v docker"));
+        Assert.That(response.InstallationCommand, Does.Contain("docker info"));
+        Assert.That(response.InstallationCommand, Does.Contain("docker pull"));
+        Assert.That(response.InstallationCommand, Does.Contain("{{.State.Status}}"));
+        Assert.That(response.InstallationCommand, Does.Contain("restarting|exited|dead"));
+        Assert.That(response.InstallationCommand, Does.Contain("docker logs --tail 80"));
+        Assert.That(response.InstallationCommand, Does.Contain("[REDACTED]"));
+        Assert.That(response.InstallationCommand, Does.Contain("exit 1"));
+        Assert.That(response.InstallationCommand, Does.Contain("Runner container is running."));
+        Assert.That(response.InstallationCommand, Does.Contain("Waiting for it to enroll and connect to Automaton."));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("set -x"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("docker inspect $container_name"));
+        Assert.That(response.InstallationCommand, Does.Not.Contain("echo $AUTOMATON_ENROLLMENT_TOKEN"));
+    }
+
+    [Test]
+    public async Task Status_DistinguishesPendingEnrolledConnectedExpiredAndOffline()
+    {
+        await using var db = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var service = CreateService(db, userId);
+        var installation = await service.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "status-runner",
+            ApplicationProfile = RunnerApplicationProfiles.Standard
+        }, CancellationToken.None);
+
+        var pending = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+        Assert.That(pending!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.WaitingForEnrollment));
+
+        var enrollment = await db.SelfHostedRunnerEnrollments.SingleAsync();
+        var runner = new Automaton.Api.Entities.Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = enrollment.RunnerName,
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = RunnerApplicationProfiles.Standard,
+            InstallationId = enrollment.InstallationId,
+            Status = RunnerConnectivityStatuses.Unknown
+        };
+        db.Runners.Add(runner);
+        enrollment.Status = RunnerEnrollmentStatuses.Completed;
+        enrollment.RunnerId = runner.Id;
+        await db.SaveChangesAsync();
+
+        var enrolled = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+        Assert.That(enrolled!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.RunnerEnrolled));
+
+        runner.ConnectionId = "connection";
+        runner.LastConnectedAtUtc = DateTime.UtcNow;
+        runner.LastHeartbeatAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        var connected = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+        Assert.That(connected!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.RunnerConnected));
+
+        runner.ConnectionId = null;
+        runner.LastHeartbeatAtUtc = DateTime.UtcNow.Subtract(RunnerPresenceEvaluator.OfflineThreshold).AddSeconds(-1);
+        await db.SaveChangesAsync();
+        var offline = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+        Assert.That(offline!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.OfflineAfterEnrollment));
+
+        enrollment.Status = RunnerEnrollmentStatuses.Pending;
+        enrollment.RunnerId = null;
+        enrollment.ExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await db.SaveChangesAsync();
+        var expired = await service.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+        Assert.That(expired!.Status, Is.EqualTo(SelfHostedRunnerInstallationStatuses.Expired));
+    }
+
+    [Test]
+    public async Task Status_DoesNotExposeAnotherUsersInstallation()
+    {
+        await using var db = CreateDbContext();
+        var ownerService = CreateService(db, Guid.NewGuid());
+        var installation = await ownerService.CreateAsync(new CreateSelfHostedRunnerInstallationRequest
+        {
+            RunnerName = "private-status",
+            ApplicationProfile = RunnerApplicationProfiles.Standard
+        }, CancellationToken.None);
+
+        var otherUserService = CreateService(db, Guid.NewGuid());
+        var status = await otherUserService.GetStatusAsync(installation.InstallationId, CancellationToken.None);
+
+        Assert.That(status, Is.Null);
     }
 
     [TestCase("unknown")]

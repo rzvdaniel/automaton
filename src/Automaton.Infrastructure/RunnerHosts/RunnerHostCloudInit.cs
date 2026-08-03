@@ -54,7 +54,7 @@ public static class RunnerHostCloudInit
         builder.AppendLine($"  - docker pull {ShellQuote(request.RunnerImage)}");
         builder.AppendLine("  - >-");
         builder.AppendLine("    docker run -d --name automaton-infrastructure-runner");
-        builder.AppendLine($"    --restart unless-stopped {RunnerDockerArguments.PrivilegedHost}");
+        builder.AppendLine($"    --restart unless-stopped {RunnerDockerArguments.InfrastructureHost}");
         builder.AppendLine("    --env-file /etc/automaton/infrastructure-runner.env");
         builder.AppendLine($"    -v {ShellQuote(configPath)}:/app/config");
         builder.AppendLine($"    -v {ShellQuote(workspacePath)}:/automaton/workspace");
