@@ -13,13 +13,15 @@ namespace Automaton.Api.Services;
 
 public class ApiKeyService
 {
-    internal static readonly IReadOnlySet<ApiKeyScope> UserVisibleScopes = new HashSet<ApiKeyScope>
-    {
+    // Keep this as an array because EF Core translates Enumerable.Contains in database queries,
+    // but cannot translate IReadOnlySet.Contains when the set is captured in the expression.
+    internal static readonly ApiKeyScope[] UserVisibleScopes =
+    [
         ApiKeyScope.Developer,
         ApiKeyScope.ReadOnly,
         ApiKeyScope.WorkflowExecution,
         ApiKeyScope.WebApp
-    };
+    ];
 
     private const int RawKeyLength = 40;
     private readonly ApplicationDbContext dbContext;
