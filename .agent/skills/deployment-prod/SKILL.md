@@ -43,7 +43,7 @@ Before changing deployment logic, identify:
 - build context, image, and Compose service names;
 - warmup and health endpoints;
 - Traefik/network reachability checks;
-- Traefik dynamic configuration generation and reload/cutover steps;
+- Traefik dynamic configuration render, file-provider observation/validation, and cutover steps;
 - rollback path if build, health, warmup, or origin verification fails;
 - behavior when Cloudflare proxying is enabled.
 
@@ -51,7 +51,7 @@ Preserve these guarantees:
 
 - keep the previous API, Studio, or Website color running until the replacement is healthy and warmed up;
 - do not remove the previous color before cutover verification succeeds;
-- do not reload the reverse proxy before generated Traefik configuration is valid;
+- render the Traefik configuration atomically, observe and validate the file-provider update, then cut over; do not treat a Traefik ping alone as configuration validation;
 - do not hide failed warmups with broad `|| true` unless the failure is intentionally non-blocking and documented;
 - after API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it; treat the configured grace period as a maximum timeout, not an unconditional sleep;
 - preserve a rollback path when post-cutover local-origin verification fails;
@@ -110,10 +110,10 @@ Record production HEAD, current live colors, MySQL/RabbitMQ/Worker/Traefik healt
 
 ### 2. Inspect, compare, and pull
 
-Inspect tracked production modifications and compare the deployment revision before pulling:
+Inspect tracked production modifications and compare the deployment revision before pulling. `git status -sb` is not enough: inspect the local diff so local code cannot enter a Docker build unnoticed:
 
 ```powershell
-ssh automaton "cd /opt/automaton && sudo -n git fetch origin && git log --oneline --decorate -5 origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main"
+ssh automaton "cd /opt/automaton && git diff HEAD --stat && git diff HEAD --name-status && sudo -n git fetch origin && git log --oneline --decorate -5 origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main"
 ```
 
 Never reset, clean, stash, overwrite, or delete production state without explicit approval. Treat private keys, `.env`, `secrets/`, `venv/`, `backups/`, database files, generated runtime files, and test data as protected state. If tracked changes are not already represented by `origin/main`, stop and report them. Untracked production-only files may remain during a pull, but report that they were preserved.
@@ -132,7 +132,8 @@ Use the merged diff rather than redeploying the whole stack by default:
 
 | Change area | Action |
 |---|---|
-| `src/Automaton.Api/**`, `src/Automaton.Infrastructure/**`, shared backend, migrations, or messaging | Redeploy API; rebuild Worker too when the shared change affects Worker runtime behavior |
+| `src/Automaton.Api/**`, migrations, or API-only backend changes | Redeploy API |
+| `src/Automaton.Infrastructure/**`, `src/Automaton.Messaging/**`, `src/Automaton.Identity/**`, `system-apps/automaton-infrastructure/**`, or other shared projects referenced by both API and Worker | Redeploy API and rebuild Worker |
 | `src/automaton-studio-vue/**` | Redeploy Studio |
 | `src/Automaton.Worker/**` or Worker runtime/configuration | Rebuild Worker in place |
 | `src/automaton-vue/**` | Redeploy Website |
@@ -151,7 +152,7 @@ ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh
 ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
 ```
 
-API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, switch Traefik dynamic routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
+API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, render and observe/validate the Traefik file-provider update, cut over dynamic routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
 
 For API migrations, inspect API startup output or an explicit migration/status check and record the result. Inspect affected production rows before any destructive migration. Delete only explicitly disposable test rows when the user authorizes it; never generalize that into production-safe data conversion.
 
