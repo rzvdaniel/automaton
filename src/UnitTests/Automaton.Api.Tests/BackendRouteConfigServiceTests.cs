@@ -91,15 +91,7 @@ public class BackendRouteConfigServiceTests
         var service = CreateService(dbContext, rootPath);
         await service.RefreshAsync();
 
-        var outputPath = Path.Combine(rootPath, "managed-runtime-routes.yml");
-        var content = await File.ReadAllTextAsync(outputPath);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(content, Does.Contain("routers: {}"));
-            Assert.That(content, Does.Contain("middlewares: {}"));
-            Assert.That(content, Does.Contain("services: {}"));
-        });
+        Assert.That(File.Exists(Path.Combine(rootPath, "managed-runtime-routes.yml")), Is.False);
     }
 
     [Test]
@@ -172,6 +164,82 @@ public class BackendRouteConfigServiceTests
             Assert.That(content, Does.Contain(
                 $"/apps/{appId}/targets/{defaultTarget.Id}/$1"));
         });
+    }
+
+    [Test]
+    public async Task RefreshAsync_RoutesSelfHostedRunnerThroughApiRuntimeTunnel()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.FrontendDeployed = true;
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "Privileged host",
+            Status = "connected",
+            Purpose = "Managed",
+            ApplicationProfile = "PrivilegedHost"
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Self-hosted app",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            DeploymentTargets = { target }
+        });
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+        var content = await File.ReadAllTextAsync(Path.Combine(rootPath, "managed-runtime-routes.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content, Does.Contain("service: \"api-blue-edge\""));
+            Assert.That(content, Does.Contain(
+                $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/api/$1"));
+            Assert.That(content, Does.Not.Contain("http://runner-"));
+        });
+    }
+
+    [Test]
+    public async Task RefreshAsync_DoesNotRouteInfrastructureRunnerThroughRuntimeTunnel()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.FrontendDeployed = true;
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "Infrastructure runner",
+            Status = "connected",
+            Purpose = "Infrastructure"
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Infrastructure target",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            DeploymentTargets = { target }
+        });
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+
+        Assert.That(File.Exists(Path.Combine(rootPath, "managed-runtime-routes.yml")), Is.False);
     }
 
     [Test]
