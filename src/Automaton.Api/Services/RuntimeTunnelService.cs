@@ -2,6 +2,7 @@ using Automaton.Api.Config;
 using Automaton.Api.Data;
 using Automaton.Api.Entities;
 using Automaton.Api.Hubs;
+using Automaton.Api.Enums;
 using Automaton.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -19,6 +20,7 @@ public sealed class RuntimeTunnelService(
     IHubContext<AutomatonHub> hub,
     TunnelRequestRegistry registry,
     IOptions<RuntimeTunnelConfig> options,
+    IOptions<PublishedAppsConfig> publishedAppsOptions,
     ILogger<RuntimeTunnelService> logger)
 {
     private static readonly HashSet<string> HopByHopHeaders = new(StringComparer.OrdinalIgnoreCase)
@@ -28,6 +30,7 @@ public sealed class RuntimeTunnelService(
     };
 
     private readonly RuntimeTunnelConfig config = options.Value;
+    private readonly PublishedAppsConfig publishedAppsConfig = publishedAppsOptions.Value;
 
     public async Task<TunnelResponse> ForwardAsync(
         Guid appId,
@@ -38,6 +41,7 @@ public sealed class RuntimeTunnelService(
     {
         var target = await dbContext.AppDeploymentTargets
             .Include(target => target.ExecutionRunner)
+            .Include(target => target.WebApp)
             .SingleOrDefaultAsync(target =>
                 target.Id == deploymentTargetId &&
                 target.WebAppId == appId &&
@@ -48,11 +52,17 @@ public sealed class RuntimeTunnelService(
         if (target?.ExecutionRunner is not { } runner)
             return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
 
+        if (!IsExpectedAppHost(request.Host.Host, target, publishedAppsConfig))
+            return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
+
         var isHostedRunner = await dbContext.HostedRunners.AnyAsync(hostedRunner =>
             hostedRunner.DeletedAt == null && hostedRunner.RunnerId == runner.Id,
             cancellationToken);
         if (isHostedRunner)
             return Failure(StatusCodes.Status404NotFound, "This app target uses the hosted runtime route.");
+
+        if (!SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(runner.Purpose, runner.ApplicationProfile))
+            return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
 
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
             return Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is not connected.");
@@ -66,19 +76,18 @@ public sealed class RuntimeTunnelService(
 
         var (requestId, responseTask) = registry.Register(
             TimeSpan.FromSeconds(config.TimeoutSeconds), cancellationToken);
-        var runtimePath = $"/apps/{appId:D}/targets/{deploymentTargetId:D}/{path.TrimStart('/')}" + request.QueryString;
         var tunnelRequest = new TunnelRequest
         {
             RequestId = requestId,
             Method = request.Method,
-            Path = runtimePath,
             BodyBytes = body,
             HeaderValues = request.Headers
                 .Where(header => !HopByHopHeaders.Contains(header.Key))
                 .ToDictionary(header => header.Key, header => header.Value.ToArray(), StringComparer.OrdinalIgnoreCase),
             Destination = TunnelDestinations.RuntimeGateway,
             RuntimeAppId = appId,
-            RuntimeDeploymentTargetId = deploymentTargetId
+            RuntimeDeploymentTargetId = deploymentTargetId,
+            RuntimePath = path.TrimStart('/') + request.QueryString
         };
 
         try
@@ -116,12 +125,12 @@ public sealed class RuntimeTunnelService(
         }
     };
 
-    private static async Task<(byte[]? Body, bool TooLarge)> ReadBodyAsync(
+    internal static async Task<(byte[]? Body, bool TooLarge)> ReadBodyAsync(
         HttpRequest request,
         int maxBytes,
         CancellationToken cancellationToken)
     {
-        if (request.ContentLength is null or 0)
+        if (request.ContentLength == 0)
             return (null, false);
 
         await using var body = new MemoryStream();
@@ -139,5 +148,27 @@ public sealed class RuntimeTunnelService(
         return body.Length > maxBytes
             ? (null, true)
             : (body.ToArray(), false);
+    }
+
+    internal static bool IsExpectedAppHost(string host, AppDeploymentTarget target, PublishedAppsConfig publishedAppsConfig)
+    {
+        var baseHost = publishedAppsConfig.PublicBaseUrlHost;
+        const string appsSuffix = ".apps.";
+        var appsMarker = baseHost.IndexOf(appsSuffix, StringComparison.OrdinalIgnoreCase);
+        var suffix = appsMarker >= 0 ? baseHost[appsMarker..] : $".{baseHost}";
+        var privateHost = $"app-{target.WebAppId:N}{suffix}";
+        if (string.Equals(host, privateHost, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!target.IsDefault ||
+            target.WebApp.RuntimeVisibility != AppRuntimeVisibilities.Public ||
+            target.WebApp.AccessStatus != AppAccessStatuses.Active ||
+            string.IsNullOrWhiteSpace(target.WebApp.PublicUrl))
+            return false;
+
+        var publicHost = appsMarker >= 0
+            ? $"{target.WebApp.PublicUrl}{baseHost[appsMarker..]}"
+            : $"{target.WebApp.PublicUrl}.{baseHost}";
+        return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase);
     }
 }

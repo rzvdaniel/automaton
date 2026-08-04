@@ -74,7 +74,7 @@ public class BackendRouteConfigService
                 false))
             .ToListAsync(cancellationToken);
 
-        var selfHostedRoutes = await dbContext.AppDeploymentTargets
+        var selfHostedRouteCandidates = await dbContext.AppDeploymentTargets
             .AsNoTracking()
             .Where(target =>
                 target.ExecutionRunnerId != null &&
@@ -86,21 +86,41 @@ public class BackendRouteConfigService
                 dbContext.Runners.AsNoTracking(),
                 target => target.ExecutionRunnerId,
                 runner => (Guid?)runner.Id,
-                (target, _) => target)
-            .OrderBy(target => target.WebAppId)
-            .ThenBy(target => target.Id)
-            .Select(target => new RouteTarget(
-                target.WebAppId,
-                target.Id,
-                target.IsDefault,
-                publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
-                target.IsDefault &&
-                    target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
-                    target.WebApp.AccessStatus == AppAccessStatuses.Active
-                    ? target.WebApp.PublicUrl
-                    : null,
-                true))
+                (target, runner) => new
+                {
+                    Target = target,
+                    runner.Purpose,
+                    runner.ApplicationProfile
+                })
+            .OrderBy(candidate => candidate.Target.WebAppId)
+            .ThenBy(candidate => candidate.Target.Id)
+            .Select(candidate => new
+            {
+                candidate.Purpose,
+                candidate.ApplicationProfile,
+                candidate.Target.WebAppId,
+                candidate.Target.Id,
+                candidate.Target.IsDefault,
+                Slug = candidate.Target.IsDefault &&
+                    candidate.Target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    candidate.Target.WebApp.AccessStatus == AppAccessStatuses.Active
+                    ? candidate.Target.WebApp.PublicUrl
+                    : null
+            })
             .ToListAsync(cancellationToken);
+
+        var selfHostedRoutes = selfHostedRouteCandidates
+            .Where(candidate => SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(
+                candidate.Purpose,
+                candidate.ApplicationProfile))
+            .Select(candidate => new RouteTarget(
+                candidate.WebAppId,
+                candidate.Id,
+                candidate.IsDefault,
+                publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
+                candidate.Slug,
+                true))
+            .ToList();
 
         var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
 

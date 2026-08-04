@@ -9,20 +9,33 @@ namespace Automaton.Runner.Console.Services;
 public class TunnelForwarderService
 {
     private static readonly ILogger _logger = Log.ForContext<TunnelForwarderService>();
+    private static readonly HashSet<string> HopByHopHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization",
+        "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Content-Length"
+    };
 
     private readonly HttpClient _fastApiClient;
     private readonly HttpClient _runtimeGatewayClient;
     private readonly int _maxBodyBytes;
 
     public TunnelForwarderService(IOptions<TunnelForwarderConfig> config)
+        : this(config, null, null)
+    {
+    }
+
+    internal TunnelForwarderService(
+        IOptions<TunnelForwarderConfig> config,
+        HttpMessageHandler? fastApiHandler,
+        HttpMessageHandler? runtimeGatewayHandler)
     {
         _maxBodyBytes = config.Value.MaxBodyBytes;
-        _fastApiClient = new HttpClient
+        _fastApiClient = new HttpClient(fastApiHandler ?? new HttpClientHandler())
         {
             BaseAddress = new Uri("http://localhost:8001"),
             Timeout = TimeSpan.FromSeconds(config.Value.TimeoutSeconds)
         };
-        _runtimeGatewayClient = new HttpClient
+        _runtimeGatewayClient = new HttpClient(runtimeGatewayHandler ?? new HttpClientHandler())
         {
             BaseAddress = new Uri("http://127.0.0.1:8080"),
             Timeout = TimeSpan.FromSeconds(config.Value.TimeoutSeconds)
@@ -40,17 +53,19 @@ public class TunnelForwarderService
                 TunnelDestinations.RuntimeGateway,
                 StringComparison.Ordinal);
             var client = isRuntimeGateway ? _runtimeGatewayClient : _fastApiClient;
+            var runtimeGatewayPath = string.Empty;
 
-            if (isRuntimeGateway && !IsFixedRuntimeGatewayPath(request))
+            if (isRuntimeGateway && !TryBuildRuntimeGatewayPath(request, out runtimeGatewayPath))
             {
                 tunnelResponse.StatusCode = 400;
                 tunnelResponse.Error = "Runtime tunnel destination is invalid.";
                 return tunnelResponse;
             }
 
+            var requestPath = isRuntimeGateway ? runtimeGatewayPath : request.Path;
             using var httpRequest = new HttpRequestMessage(
                 new HttpMethod(request.Method),
-                request.Path);
+                requestPath);
 
             if (request.BodyBytes != null)
                 httpRequest.Content = new ByteArrayContent(request.BodyBytes);
@@ -63,7 +78,7 @@ public class TunnelForwarderService
                 AddHeader(httpRequest, k, values);
 
             _logger.Debug("Forwarding through {Destination}: {Method} {Path}",
-                isRuntimeGateway ? "runtime gateway" : "FastAPI", request.Method, request.Path);
+                isRuntimeGateway ? "runtime gateway" : "FastAPI", request.Method, requestPath);
 
             using var httpResponse = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
 
@@ -80,6 +95,7 @@ public class TunnelForwarderService
             {
                 tunnelResponse.HeaderValues = httpResponse.Headers
                     .Concat(httpResponse.Content.Headers)
+                    .Where(header => IsForwardableResponseHeader(header.Key))
                     .GroupBy(header => header.Key, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.SelectMany(header => header.Value).ToArray(), StringComparer.OrdinalIgnoreCase);
 
@@ -127,15 +143,44 @@ public class TunnelForwarderService
         return tunnelResponse;
     }
 
-    private static bool IsFixedRuntimeGatewayPath(TunnelRequest request)
+    internal static bool TryBuildRuntimeGatewayPath(TunnelRequest request, out string runtimeGatewayPath)
     {
+        runtimeGatewayPath = string.Empty;
         if (request.RuntimeAppId is not { } appId || request.RuntimeDeploymentTargetId is not { } targetId)
             return false;
 
-        var expectedPrefix = $"/apps/{appId:D}/targets/{targetId:D}/";
-        return request.Path.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase)
-            && !request.Path.Contains("://", StringComparison.Ordinal);
+        var relativePath = request.RuntimePath ?? string.Empty;
+        if (relativePath.StartsWith('/') || relativePath.StartsWith('\\') || relativePath.Contains("\\", StringComparison.Ordinal))
+            return false;
+
+        var queryIndex = relativePath.IndexOf('?');
+        var rawPath = queryIndex >= 0 ? relativePath[..queryIndex] : relativePath;
+        var query = queryIndex >= 0 ? relativePath[queryIndex..] : string.Empty;
+        if (rawPath.Contains("://", StringComparison.Ordinal))
+            return false;
+
+        foreach (var segment in rawPath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string decodedSegment;
+            try
+            {
+                decodedSegment = Uri.UnescapeDataString(segment);
+            }
+            catch (UriFormatException)
+            {
+                return false;
+            }
+
+            if (decodedSegment is "." or ".." || decodedSegment.Contains('\\'))
+                return false;
+        }
+
+        runtimeGatewayPath = $"/apps/{appId:D}/targets/{targetId:D}/{rawPath}{query}";
+        return true;
     }
+
+    internal static bool IsForwardableResponseHeader(string name)
+        => !HopByHopHeaders.Contains(name);
 
     private static void AddHeader(HttpRequestMessage request, string name, IEnumerable<string> values)
     {

@@ -180,7 +180,8 @@ public class BackendRouteConfigServiceTests
             Id = runnerId,
             Name = "Privileged host",
             Status = "connected",
-            Purpose = "managed"
+            Purpose = "Managed",
+            ApplicationProfile = "PrivilegedHost"
         });
         dbContext.WebApps.Add(new WebApp
         {
@@ -205,6 +206,40 @@ public class BackendRouteConfigServiceTests
                 $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/api/$1"));
             Assert.That(content, Does.Not.Contain("http://runner-"));
         });
+    }
+
+    [Test]
+    public async Task RefreshAsync_DoesNotRouteInfrastructureRunnerThroughRuntimeTunnel()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.FrontendDeployed = true;
+        dbContext.Runners.Add(new Runner
+        {
+            Id = runnerId,
+            Name = "Infrastructure runner",
+            Status = "connected",
+            Purpose = "Infrastructure"
+        });
+        dbContext.WebApps.Add(new WebApp
+        {
+            Id = appId,
+            Name = "Infrastructure target",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            DeploymentTargets = { target }
+        });
+        await dbContext.SaveChangesAsync();
+
+        await CreateService(dbContext, rootPath).RefreshAsync();
+
+        Assert.That(File.Exists(Path.Combine(rootPath, "managed-runtime-routes.yml")), Is.False);
     }
 
     [Test]

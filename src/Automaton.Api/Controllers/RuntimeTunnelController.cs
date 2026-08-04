@@ -22,11 +22,22 @@ public sealed class RuntimeTunnelController(RuntimeTunnelService runtimeTunnelSe
         Response.StatusCode = tunnelResponse.StatusCode;
         foreach (var (name, values) in tunnelResponse.HeaderValues)
         {
-            if (!string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase))
+            if (!IsHopByHopResponseHeader(name))
                 Response.Headers[name] = values;
         }
 
         if (tunnelResponse.BodyBytes is { Length: > 0 })
             await Response.Body.WriteAsync(tunnelResponse.BodyBytes, cancellationToken);
     }
+
+    private static bool IsHopByHopResponseHeader(string name)
+        => string.Equals(name, "Connection", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Keep-Alive", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Proxy-Authenticate", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Proxy-Authorization", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "TE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Trailer", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Upgrade", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase);
 }

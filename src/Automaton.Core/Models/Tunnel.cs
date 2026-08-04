@@ -26,6 +26,12 @@ public class TunnelRequest
 
     public Guid? RuntimeAppId { get; set; }
     public Guid? RuntimeDeploymentTargetId { get; set; }
+
+    /// <summary>
+    /// Relative path and query for the fixed runtime gateway. The Runner reconstructs
+    /// the complete gateway path from the trusted App and target identifiers.
+    /// </summary>
+    public string? RuntimePath { get; set; }
 }
 
 public class TunnelResponse
