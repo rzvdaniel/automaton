@@ -22,6 +22,9 @@ Use this skill when touching:
 - Do not include dependency folders, build output, caches, local environment files, secrets, logs, or VCS folders in source archives.
 - Treat `automaton.json` as the local link contract. Preserve it unless the command intentionally relinks the project.
 - Prefer clear actionable errors over generic failures.
+- Set command outcomes through `InvocationContext.ExitCode`; do not rely on
+  `Environment.ExitCode`, which System.CommandLine may overwrite before the
+  process exits. Add an invocation or child-process test for new failure paths.
 - On successful deploy or publish, surface the resulting URL in user-facing output.
 - Do not make interactive prompts mandatory for flows that agents need to run non-interactively; provide flags or safe defaults where practical.
 

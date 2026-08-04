@@ -2,6 +2,7 @@ using Automaton.Cli.Models;
 using Automaton.Cli.Services;
 using Spectre.Console;
 using System.CommandLine;
+using System.CommandLine.Invocation;
 
 namespace Automaton.Cli.Commands;
 
@@ -27,8 +28,10 @@ public static class TargetCommand
             jsonOption,
             environmentOption
         };
-        command.SetHandler(async (bool asJson, string? environmentName) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 var (appName, targets) = await new DeploymentTargetService(config)
@@ -41,13 +44,14 @@ public static class TargetCommand
                 {
                     WriteTargets(appName, targets);
                 }
-                Environment.ExitCode = 0;
+                context.ExitCode = 0;
             }
             catch (Exception ex)
             {
                 WriteError(ex, asJson);
+                context.ExitCode = 1;
             }
-        }, jsonOption, environmentOption);
+        });
         return command;
     }
 
@@ -67,16 +71,16 @@ public static class TargetCommand
             jsonOption,
             environmentOption
         };
-        command.SetHandler(async (
-            string slug,
-            string runner,
-            bool asJson,
-            string? environmentName) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var slug = context.ParseResult.GetValueForArgument(slugArgument);
+            var runner = context.ParseResult.GetValueForOption(runnerOption);
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 var target = await new DeploymentTargetService(config).AddAsync(
-                    Directory.GetCurrentDirectory(), slug, runner, environmentName);
+                    Directory.GetCurrentDirectory(), slug, runner!, environmentName);
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, target });
@@ -86,13 +90,14 @@ public static class TargetCommand
                     AnsiConsole.MarkupLine(
                         $"[green]Target added:[/] {Markup.Escape(target.Slug)} → {Markup.Escape(target.Runner?.Name ?? "unassigned")}");
                 }
-                Environment.ExitCode = 0;
+                context.ExitCode = 0;
             }
             catch (Exception ex)
             {
                 WriteError(ex, asJson);
+                context.ExitCode = 1;
             }
-        }, slugArgument, runnerOption, jsonOption, environmentOption);
+        });
         return command;
     }
 
@@ -107,8 +112,11 @@ public static class TargetCommand
             jsonOption,
             environmentOption
         };
-        command.SetHandler(async (string slug, bool asJson, string? environmentName) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var slug = context.ParseResult.GetValueForArgument(slugArgument);
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 await new DeploymentTargetService(config).RemoveAsync(
@@ -121,13 +129,14 @@ public static class TargetCommand
                 {
                     AnsiConsole.MarkupLine($"[green]Target removed:[/] {Markup.Escape(slug)}");
                 }
-                Environment.ExitCode = 0;
+                context.ExitCode = 0;
             }
             catch (Exception ex)
             {
                 WriteError(ex, asJson);
+                context.ExitCode = 1;
             }
-        }, slugArgument, jsonOption, environmentOption);
+        });
         return command;
     }
 
@@ -142,8 +151,11 @@ public static class TargetCommand
             jsonOption,
             environmentOption
         };
-        command.SetHandler(async (string slug, bool asJson, string? environmentName) =>
+        command.SetHandler(async (InvocationContext context) =>
         {
+            var slug = context.ParseResult.GetValueForArgument(slugArgument);
+            var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 await new DeploymentTargetService(config).DefaultAsync(
@@ -156,13 +168,14 @@ public static class TargetCommand
                 {
                     AnsiConsole.MarkupLine($"[green]Live target:[/] {Markup.Escape(slug)}");
                 }
-                Environment.ExitCode = 0;
+                context.ExitCode = 0;
             }
             catch (Exception ex)
             {
                 WriteError(ex, asJson);
+                context.ExitCode = 1;
             }
-        }, slugArgument, jsonOption, environmentOption);
+        });
         return command;
     }
 
@@ -211,6 +224,5 @@ public static class TargetCommand
         {
             AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(exception.Message)}");
         }
-        Environment.ExitCode = 1;
     }
 }
