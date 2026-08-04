@@ -140,7 +140,7 @@ public static class DeployCommand
                     };
 
                     WriteResult(failure, asJson, verbose, nonInteractive);
-                    Environment.ExitCode = 1;
+                    context.ExitCode = 1;
                     return;
                 }
 
@@ -179,7 +179,7 @@ public static class DeployCommand
                         }
                         if (!publishResult.Success)
                         {
-                            Environment.ExitCode = 1;
+                            context.ExitCode = 1;
                             return;
                         }
 
@@ -209,7 +209,7 @@ public static class DeployCommand
                     WriteResult(result, asJson, verbose, nonInteractive);
                 }
 
-                Environment.ExitCode = result.Success ? 0 : 1;
+                context.ExitCode = result.Success ? 0 : 1;
             }
             catch (Exception ex)
             {
@@ -232,7 +232,7 @@ public static class DeployCommand
                     AnsiConsole.MarkupLine(
                         $"[red]Error:[/] {Markup.Escape(ex.Message)}");
                 }
-                Environment.ExitCode = 1;
+                context.ExitCode = 1;
             }
         });
 
