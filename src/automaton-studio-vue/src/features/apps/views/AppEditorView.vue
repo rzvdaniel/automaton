@@ -46,6 +46,7 @@ import {
   type UiAutomationResult,
 } from '../services/application-automation-bridge'
 import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
+import { resolveViewingTarget } from '../utils/viewing-target'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,6 +85,8 @@ const appNameAutoUpdated = ref(false)
 // Runner selection for AI tool execution
 const selectedRunnerId = ref<string | null>(null)
 const selectedLogTargetId = ref<string | null>(null)
+const deploymentTargets = ref<AppDeploymentTarget[]>([])
+const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
 const targetsRevision = ref(0)
 
 // Active view tab
@@ -400,7 +403,6 @@ onMounted(async () => {
   if (appId.value) {
     try {
       await editorStore.loadApp(appId.value)
-      await backendRuntimeLogClient.subscribe(appId.value)
       await refreshDefaultTarget()
     } catch (err: unknown) {
       toast.add({
@@ -420,17 +422,60 @@ async function refreshDefaultTarget() {
 }
 
 function handleTargetsChanged(targets: AppDeploymentTarget[]) {
-  const defaultTarget = targets.find((target) => target.isDefault)
-  selectedRunnerId.value = defaultTarget?.runner?.id ?? null
-  if (!selectedLogTargetId.value) selectedLogTargetId.value = defaultTarget?.id ?? null
+  deploymentTargets.value = targets
+  if (!selectedRunnerId.value) {
+    selectedRunnerId.value = (targets.find((target) => target.isDefault) ?? targets[0])?.runner?.id ?? null
+  }
+  void selectViewingTargetFromRoute()
+}
+
+async function selectViewingTargetFromRoute() {
+  const requestedSlug = typeof route.query.target === 'string' ? route.query.target : ''
+  const { target, usedFallback } = resolveViewingTarget(deploymentTargets.value, requestedSlug)
+  if (!target) return
+
+  await selectViewingTarget(target, usedFallback)
+}
+
+async function selectViewingTarget(target: AppDeploymentTarget, replaceRoute = false) {
+  selectedViewingTarget.value = target
+  selectedLogTargetId.value = target.id
+
+  if (replaceRoute || route.query.target !== target.slug) {
+    await router.replace({ query: { ...route.query, target: target.slug } })
+  }
+
+  try {
+    if (target.runner) {
+      await backendRuntimeLogClient.subscribe(target.appId, target.id)
+    } else {
+      await backendRuntimeLogClient.unsubscribe(target.appId)
+    }
+  } catch {
+    toast.add({
+      severity: 'warn',
+      summary: 'Live logs unavailable',
+      detail: 'The preview changed, but backend log streaming could not be updated.',
+      life: 4000,
+    })
+  }
+}
+
+function handleSelectViewingTarget(target: AppDeploymentTarget) {
+  void selectViewingTarget(target)
 }
 
 async function handleViewTargetLogs(target: AppDeploymentTarget) {
-  selectedLogTargetId.value = target.id
-  await backendRuntimeLogClient.subscribe(target.appId, target.slug)
-  activeTab.value = 'logs'
-  toast.add({ severity: 'info', summary: `${target.name} activity`, detail: `Live runtime output is now scoped to ${target.slug}.`, life: 2500 })
+  await selectViewingTarget(target)
+  activeTab.value = 'build'
+  toast.add({ severity: 'info', summary: `${target.name} logs`, detail: `Backend logs now show ${target.slug}.`, life: 2500 })
 }
+
+watch(() => route.query.target, () => {
+  if (deploymentTargets.value.length > 0) {
+    void selectViewingTargetFromRoute()
+  }
+})
 
 async function handleDeployTarget(target: AppDeploymentTarget) {
   await handleDeployApp(target.slug, target.name)
@@ -1230,7 +1275,13 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 <div class="build-main-content" :class="{ 'no-pointer-events': isResizing }">
                   <!-- Visual mode workspace - shown in Build tab -->
                   <div v-show="activeTab === 'build'" class="build-visual-view">
-                    <BuildVisualWorkspace :suspend-heavy-rendering="isVisualResizing" :runner-id="selectedRunnerId" />
+                    <BuildVisualWorkspace
+                      :suspend-heavy-rendering="isVisualResizing"
+                      :runner-id="selectedRunnerId"
+                      :targets="deploymentTargets"
+                      :selected-target="selectedViewingTarget"
+                      @select-target="handleSelectViewingTarget"
+                    />
                   </div>
 
                   <!-- Files mode: file tree + editor - shown in Files tab -->
@@ -1366,6 +1417,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
                 <BuildVisualWorkspace
                   :suspend-heavy-rendering="isVisualResizing"
                   :runner-id="selectedRunnerId"
+                  :targets="deploymentTargets"
+                  :selected-target="selectedViewingTarget"
+                  @select-target="handleSelectViewingTarget"
                 />
               </div>
 

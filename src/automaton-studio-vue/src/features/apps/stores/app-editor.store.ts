@@ -1179,6 +1179,7 @@ export const useAppEditorStore = defineStore('appEditor', () => {
       source: 'application',
       level: event.level,
       runnerName: event.runnerName ?? undefined,
+      deploymentTargetId: event.deploymentTargetId,
     })
   }
 

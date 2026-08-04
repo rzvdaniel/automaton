@@ -9,6 +9,43 @@ public sealed class AppDeploymentTargetResolver(
     ResourceAuthorizationService authorizationService,
     IAppRunnerAuthorizationPolicy runnerAuthorizationPolicy) : IAppDeploymentTargetResolver
 {
+    public async Task<AppDeploymentTarget> ResolveByIdAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await authorizationService.CanAccessAppAsync(appId, userId, cancellationToken))
+        {
+            throw new KeyNotFoundException("App not found.");
+        }
+
+        var app = await dbContext.WebApps
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == appId, cancellationToken)
+            ?? throw new KeyNotFoundException("App not found.");
+
+        var target = await dbContext.AppDeploymentTargets
+            .AsNoTracking()
+            .SingleOrDefaultAsync(target =>
+                target.Id == deploymentTargetId && target.WebAppId == appId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException("Deployment target was not found for this App.");
+
+        if (!target.ExecutionRunnerId.HasValue)
+        {
+            throw new AppDeploymentTargetUnassignedException(target.Slug);
+        }
+
+        target.ExecutionRunner = await runnerAuthorizationPolicy.AuthorizeAsync(
+            app,
+            target.ExecutionRunnerId.Value,
+            userId,
+            cancellationToken);
+
+        return target;
+    }
+
     public async Task<AppDeploymentTarget> ResolveAsync(
         Guid appId,
         string? targetSlug,

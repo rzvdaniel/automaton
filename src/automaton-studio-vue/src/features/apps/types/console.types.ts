@@ -29,6 +29,7 @@ export interface ConsoleEntry {
   source: 'application' | 'ai-test'
   level?: 'info' | 'warn' | 'error'
   runnerName?: string
+  deploymentTargetId?: string
 }
 
 /**

@@ -5,21 +5,30 @@ import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppEditorStore } from '../stores/app-editor.store'
-import { APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
+import { DeploymentTargetStatus, type AppDeploymentTarget, APPLICATION_VIEWPORT_SIZES } from '../types/apps.types'
 import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
-import { getOpenAppUrl } from '../utils/public-app-url'
+import { getDeploymentTargetUrl } from '../utils/public-app-url'
+import { getViewingTargetPreviewState } from '../utils/viewing-target'
 
 const props = withDefaults(
   defineProps<{
     suspendHeavyRendering?: boolean
     runnerId?: string | null
+    targets?: AppDeploymentTarget[]
+    selectedTarget?: AppDeploymentTarget | null
   }>(),
   {
     suspendHeavyRendering: false,
     runnerId: null,
+    targets: () => [],
+    selectedTarget: null,
   },
 )
+
+const emit = defineEmits<{
+  selectTarget: [target: AppDeploymentTarget]
+}>()
 
 const editorStore = useAppEditorStore()
 const router = useRouter()
@@ -117,14 +126,14 @@ function startIdleTimer() {
 }
 
 watch(
-  () => editorStore.applicationUrl,
-  (url) => {
-    if (url && showBackendPrompt.value) startIdleTimer()
+  () => props.selectedTarget?.id,
+  (targetId) => {
+    if (targetId && showBackendPrompt.value) startIdleTimer()
   },
 )
 
 onMounted(() => {
-  if (editorStore.applicationUrl && showBackendPrompt.value) startIdleTimer()
+  if (props.selectedTarget && showBackendPrompt.value) startIdleTimer()
 })
 
 onUnmounted(() => {
@@ -149,20 +158,52 @@ const previewViewportStyle = computed(() => {
   }
 })
 
-const canOpenApplication = computed(() => editorStore.hasDeployedFrontend && !!editorStore.currentApp)
+const previewState = computed(() => getViewingTargetPreviewState(props.selectedTarget))
 
-function getOpenApplicationUrl(): string {
-  return editorStore.currentApp ? getOpenAppUrl(editorStore.currentApp) : ''
+const targetPreviewUrl = computed(() => {
+  if (!previewState.value.available || !editorStore.currentApp || !props.selectedTarget) return ''
+
+  return getDeploymentTargetUrl(editorStore.currentApp.id, props.selectedTarget.routePath)
+})
+
+const previewRefreshKey = ref(Date.now())
+const iframePreviewUrl = computed(() => {
+  if (!targetPreviewUrl.value) return ''
+  const runtimeUrl = new URL(targetPreviewUrl.value, window.location.origin)
+  runtimeUrl.searchParams.set('v', previewRefreshKey.value.toString())
+  return runtimeUrl.toString()
+})
+
+const canOpenApplication = computed(() => !!targetPreviewUrl.value)
+
+function getTargetDestinationLabel(target?: AppDeploymentTarget | null): string {
+  if (!target?.runner) return 'No runtime assigned'
+  if (target.runner.isHostedRunner) return 'Automaton Hosted'
+  return target.runner.applicationProfile === 'PrivilegedHost'
+    ? 'Self-hosted · Privileged Host'
+    : 'Self-hosted · Standard'
+}
+
+function getTargetStatusLabel(target: AppDeploymentTarget): string {
+  if (!target.runner) return 'No runtime assigned'
+  if (!target.frontendDeployed) return 'Not deployed'
+  if (!target.runner.isOnline || target.status === DeploymentTargetStatus.RunnerOffline) return 'Offline'
+  return target.status === DeploymentTargetStatus.Running ? 'Running' : target.status
+}
+
+function selectTarget(event: Event): void {
+  const target = props.targets.find((candidate) => candidate.slug === (event.target as HTMLSelectElement).value)
+  if (target) emit('selectTarget', target)
 }
 
 function openApplicationInNewTab(): void {
-  const url = getOpenApplicationUrl()
+  const url = targetPreviewUrl.value
   if (!url) return
   window.open(url, '_blank', 'noopener')
 }
 
 async function copyApplicationLink(): Promise<void> {
-  const url = getOpenApplicationUrl()
+  const url = targetPreviewUrl.value
   if (!url) return
 
   try {
@@ -170,7 +211,7 @@ async function copyApplicationLink(): Promise<void> {
     toast.add({
       severity: 'success',
       summary: 'Copied',
-      detail: 'Authenticated application URL copied to clipboard',
+      detail: 'Target preview URL copied to clipboard',
       life: 2500,
     })
   } catch {
@@ -184,7 +225,7 @@ async function copyApplicationLink(): Promise<void> {
 }
 
 async function refreshApplication(): Promise<void> {
-  await editorStore.refreshApplication()
+  previewRefreshKey.value = Date.now()
 }
 </script>
 
@@ -192,7 +233,26 @@ async function refreshApplication(): Promise<void> {
   <div class="build-visual-workspace">
     <div class="application-shell-header">
       <div class="application-shell-header__title">
-        <span class="application-shell-header__label">Application</span>
+        <div>
+          <span class="application-shell-header__label">Application preview</span>
+          <div class="application-target-picker">
+            <span>Viewing target:</span>
+            <select
+              v-if="targets.length > 1"
+              class="application-target-select"
+              :value="selectedTarget?.slug"
+              aria-label="Viewing target"
+              @change="selectTarget"
+            >
+              <option v-for="target in targets" :key="target.id" :value="target.slug">
+                {{ target.name }}{{ target.isDefault ? ' — Live' : '' }} · {{ getTargetDestinationLabel(target) }} · {{ getTargetStatusLabel(target) }}
+              </option>
+            </select>
+            <span v-else class="application-target-summary">
+              {{ selectedTarget?.name || 'Live' }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
+            </span>
+          </div>
+        </div>
       </div>
       <div class="application-shell-header__actions">
         <button
@@ -202,7 +262,7 @@ async function refreshApplication(): Promise<void> {
           @click="openApplicationInNewTab"
         >
           <i class="pi pi-external-link"></i>
-          <span>Open</span>
+          <span>Open preview</span>
         </button>
         <button
           class="application-shell-action"
@@ -211,7 +271,7 @@ async function refreshApplication(): Promise<void> {
           @click="copyApplicationLink"
         >
           <i class="pi pi-copy"></i>
-          <span>Copy</span>
+          <span>Copy preview link</span>
         </button>
         <button
           class="application-shell-action"
@@ -235,9 +295,9 @@ async function refreshApplication(): Promise<void> {
         >
           <div v-if="isHeavyRenderingSuspended" class="application-loading">
             <iframe
-              v-if="editorStore.applicationUrl"
-              :key="editorStore.applicationUrl"
-              :src="editorStore.applicationUrl"
+              v-if="iframePreviewUrl"
+              :key="iframePreviewUrl"
+              :src="iframePreviewUrl"
               class="application-iframe"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
               title="Running Application"
@@ -251,14 +311,14 @@ async function refreshApplication(): Promise<void> {
             <i class="pi pi-spin pi-spinner text-3xl"></i>
             <p class="mt-2">Loading application...</p>
           </div>
-          <div v-else-if="!editorStore.applicationUrl" class="application-empty">
+          <div v-else-if="!iframePreviewUrl" class="application-empty">
             <i class="pi pi-desktop text-3xl text-color-secondary"></i>
-            <p class="mt-2 text-color-secondary">No deployed application available</p>
+            <p class="mt-2 text-color-secondary">{{ previewState.message }}</p>
           </div>
           <iframe
               v-else
-              :key="editorStore.applicationUrl"
-              :src="editorStore.applicationUrl"
+              :key="iframePreviewUrl"
+              :src="iframePreviewUrl"
               class="application-iframe"
               :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
@@ -331,9 +391,9 @@ async function refreshApplication(): Promise<void> {
           >
             <div v-if="isHeavyRenderingSuspended" class="application-loading">
               <iframe
-                v-if="editorStore.applicationUrl"
-                :key="editorStore.applicationUrl"
-                :src="editorStore.applicationUrl"
+                v-if="iframePreviewUrl"
+                :key="iframePreviewUrl"
+                :src="iframePreviewUrl"
                 class="application-iframe"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
                 title="Running Application"
@@ -347,14 +407,14 @@ async function refreshApplication(): Promise<void> {
               <i class="pi pi-spin pi-spinner text-3xl"></i>
               <p class="mt-2">Loading application...</p>
             </div>
-            <div v-else-if="!editorStore.applicationUrl" class="application-empty">
-              <i class="pi pi-desktop text-3xl text-color-secondary"></i>
-              <p class="mt-2 text-color-secondary">No deployed application available</p>
+            <div v-else-if="!iframePreviewUrl" class="application-empty">
+            <i class="pi pi-desktop text-3xl text-color-secondary"></i>
+            <p class="mt-2 text-color-secondary">{{ previewState.message }}</p>
             </div>
             <iframe
               v-else
-              :key="editorStore.applicationUrl"
-              :src="editorStore.applicationUrl"
+              :key="iframePreviewUrl"
+              :src="iframePreviewUrl"
               class="application-iframe"
               :class="{ 'application-iframe--no-pointer': isHeavyRenderingSuspended }"
               sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-downloads"
@@ -417,11 +477,11 @@ async function refreshApplication(): Promise<void> {
           <div class="logs-tab-bar">
             <div class="logs-tab logs-tab--static active">
               <i class="pi pi-server"></i>
-              Backend
+              Backend logs · {{ selectedTarget?.name || 'Live' }} — {{ selectedTarget?.slug || 'live' }}
               <span v-if="editorStore.consoleEntries.length > 0" class="logs-tab-badge">{{ editorStore.consoleEntries.length }}</span>
             </div>
           </div>
-          <ConsolePanel class="logs-panel" />
+          <ConsolePanel class="logs-panel" :target-id="selectedTarget?.id" />
         </div>
       </SplitterPanel>
     </Splitter>

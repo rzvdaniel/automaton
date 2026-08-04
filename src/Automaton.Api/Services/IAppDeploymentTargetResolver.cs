@@ -9,6 +9,12 @@ public interface IAppDeploymentTargetResolver
         string? targetSlug,
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    Task<AppDeploymentTarget> ResolveByIdAsync(
+        Guid appId,
+        Guid deploymentTargetId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class AppDeploymentTargetUnassignedException(string targetSlug)

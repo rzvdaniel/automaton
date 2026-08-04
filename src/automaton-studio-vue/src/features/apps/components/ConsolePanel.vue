@@ -11,12 +11,18 @@ import { useToast } from 'primevue/usetoast'
 import { useAppEditorStore } from '../stores/app-editor.store'
 import type { ConsoleEntry } from '../types/console.types'
 
+const props = defineProps<{
+  targetId?: string | null
+}>()
+
 const editorStore = useAppEditorStore()
 const toast = useToast()
 
 const entries = computed(() => editorStore.consoleEntries)
 const hasEntries = computed(() => entries.value.length > 0)
-const runtimeEntries = computed(() => entries.value.filter((entry) => entry.type === 'runtime-log'))
+const runtimeEntries = computed(() => entries.value.filter((entry) =>
+  entry.type === 'runtime-log' && (!props.targetId || entry.deploymentTargetId === props.targetId),
+))
 const structuredEntries = computed(() => entries.value.filter((entry) => entry.type !== 'runtime-log'))
 const hasStructuredEntries = computed(() => structuredEntries.value.length > 0)
 const autoScroll = ref(true)

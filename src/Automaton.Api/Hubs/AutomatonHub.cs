@@ -174,7 +174,7 @@ public class AutomatonHub : Hub
         return !string.IsNullOrEmpty(runnerName);
     }
 
-    public async Task JoinAppRuntimeLogs(Guid appId, string? targetSlug = null)
+    public async Task JoinAppRuntimeLogs(Guid appId, Guid deploymentTargetId)
     {
         if (GetRunnerOrNull() != null)
         {
@@ -188,9 +188,9 @@ public class AutomatonHub : Hub
             throw new HubException("App not found or access denied.");
         }
 
-        var target = await deploymentTargetResolver.ResolveAsync(
+        var target = await deploymentTargetResolver.ResolveByIdAsync(
             appId,
-            targetSlug,
+            deploymentTargetId,
             userId,
             Context.ConnectionAborted);
         await Groups.AddToGroupAsync(
@@ -198,11 +198,11 @@ public class AutomatonHub : Hub
             GetAppRuntimeLogsGroupName(appId, target.Id));
     }
 
-    public async Task LeaveAppRuntimeLogs(Guid appId, string? targetSlug = null)
+    public async Task LeaveAppRuntimeLogs(Guid appId, Guid deploymentTargetId)
     {
-        var target = await deploymentTargetResolver.ResolveAsync(
+        var target = await deploymentTargetResolver.ResolveByIdAsync(
             appId,
-            targetSlug,
+            deploymentTargetId,
             GetUserId(),
             Context.ConnectionAborted);
         await Groups.RemoveFromGroupAsync(

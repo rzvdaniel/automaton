@@ -5,11 +5,11 @@ import { AutomatonHubMethods } from '../types/hub.types'
 
 type RuntimeLogHandler = (event: BackendRuntimeLogEvent) => void
 
-class BackendRuntimeLogClient {
+export class BackendRuntimeLogClient {
   private connection: signalR.HubConnection | null = null
   private startPromise: Promise<void> | null = null
   private activeAppId: string | null = null
-  private activeTargetSlug: string | null = null
+  private activeTargetId: string | null = null
   private readonly handlers = new Set<RuntimeLogHandler>()
 
   onLog(handler: RuntimeLogHandler): () => void {
@@ -19,43 +19,41 @@ class BackendRuntimeLogClient {
     }
   }
 
-  async subscribe(appId: string, targetSlug?: string): Promise<void> {
+  async subscribe(appId: string, targetId: string): Promise<void> {
     await this.ensureConnection()
     if (!this.connection) {
       return
     }
 
-    if (this.activeAppId && (this.activeAppId !== appId || this.activeTargetSlug !== (targetSlug ?? null))) {
-      await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, this.activeAppId, this.activeTargetSlug)
+    if (this.activeAppId && (this.activeAppId !== appId || this.activeTargetId !== targetId)) {
+      await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, this.activeAppId, this.activeTargetId)
       this.activeAppId = null
     }
 
     if (!this.activeAppId) {
-      await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, appId, targetSlug ?? null)
+      await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, appId, targetId)
       this.activeAppId = appId
-      this.activeTargetSlug = targetSlug ?? null
+      this.activeTargetId = targetId
     }
   }
 
   async unsubscribe(appId?: string): Promise<void> {
-    if (!this.connection || this.connection.state !== signalR.HubConnectionState.Connected) {
-      if (!appId || this.activeAppId === appId) {
-        this.activeAppId = null
-        this.activeTargetSlug = null
-      }
-      return
-    }
-
-    const targetAppId = appId ?? this.activeAppId
-    if (!targetAppId) {
-      return
-    }
-
-    await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, targetAppId, this.activeTargetSlug)
-    if (this.activeAppId === targetAppId) {
+    if (!this.activeAppId || !this.activeTargetId) {
       this.activeAppId = null
-      this.activeTargetSlug = null
+      this.activeTargetId = null
+      return
     }
+
+    if (appId && appId !== this.activeAppId) {
+      return
+    }
+
+    if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      await this.connection.invoke(AutomatonHubMethods.LeaveAppRuntimeLogs, this.activeAppId, this.activeTargetId)
+    }
+
+    this.activeAppId = null
+    this.activeTargetId = null
   }
 
   private async ensureConnection(): Promise<void> {
@@ -79,8 +77,8 @@ class BackendRuntimeLogClient {
       })
 
       this.connection.onreconnected(async () => {
-        if (this.activeAppId && this.connection) {
-          await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, this.activeAppId, this.activeTargetSlug)
+        if (this.activeAppId && this.activeTargetId && this.connection) {
+          await this.connection.invoke(AutomatonHubMethods.JoinAppRuntimeLogs, this.activeAppId, this.activeTargetId)
         }
       })
     }
