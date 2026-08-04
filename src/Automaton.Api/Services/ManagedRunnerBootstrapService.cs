@@ -44,31 +44,58 @@ public sealed class ManagedRunnerBootstrapService
                 requireOnline: false,
                 cancellationToken: cancellationToken);
 
-            var assignedHostedRunnerIsActive = await dbContext.HostedRunners
+            // Self-hosted application runners intentionally have no HostedRunner row.
+            // Hosted Runner lifecycle checks only apply when the assigned runner is managed.
+            var assignedHostedRunner = await dbContext.HostedRunners
                 .AsNoTracking()
-                .AnyAsync(x =>
+                .FirstOrDefaultAsync(x =>
                     x.RunnerId == assignedRunner.Id &&
-                    x.UserId == ownerId &&
-                    x.DeletedAt == null &&
-                    x.Status != HostedRunnerStatuses.Disabled,
+                    x.UserId == ownerId,
                     cancellationToken);
-            if (!assignedHostedRunnerIsActive)
+            if (assignedHostedRunner != null)
             {
-                throw new InvalidOperationException(
-                    "The assigned Hosted Runner is no longer eligible for App execution.");
+                if (assignedHostedRunner.DeletedAt != null ||
+                    assignedHostedRunner.Status is HostedRunnerStatuses.Disabled or HostedRunnerStatuses.Deleted or HostedRunnerStatuses.Deleting)
+                {
+                    return ManagedRunnerBootstrapResult.Unavailable(
+                        "The assigned Hosted Runner is no longer eligible for App execution.");
+                }
+
+                if (assignedHostedRunner.Status == HostedRunnerStatuses.Failed)
+                {
+                    return ManagedRunnerBootstrapResult.ProvisionFailed(
+                        string.IsNullOrWhiteSpace(assignedHostedRunner.LastError)
+                            ? "The assigned Hosted Runner failed to provision."
+                            : $"The assigned Hosted Runner failed to provision. {assignedHostedRunner.LastError}");
+                }
+
+                if (assignedHostedRunner.Status is HostedRunnerStatuses.Pending or HostedRunnerStatuses.Provisioning or HostedRunnerStatuses.Reprovisioning)
+                {
+                    return await GetInProgressResultAsync(appId, assignedHostedRunner, cancellationToken);
+                }
+
+                if (assignedHostedRunner.Status != HostedRunnerStatuses.Running)
+                {
+                    return ManagedRunnerBootstrapResult.Unavailable(
+                        "The assigned Hosted Runner is not available for App execution.");
+                }
             }
 
-            if (RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow))
-            {
-                return ManagedRunnerBootstrapResult.Ready(assignedRunner.Id);
-            }
-
-            return ManagedRunnerBootstrapResult.Unavailable(
-                "No connected runner is assigned to this app.");
+            return RunnerPresenceEvaluator.IsOnline(assignedRunner.ConnectionId, assignedRunner.LastHeartbeatAtUtc, DateTime.UtcNow)
+                ? ManagedRunnerBootstrapResult.Ready(assignedRunner.Id)
+                : ManagedRunnerBootstrapResult.Unavailable("The assigned Runner is offline.");
         }
         catch (AppDeploymentTargetUnassignedException)
         {
             // Provisioning below creates and assigns the user's managed Runner.
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return ManagedRunnerBootstrapResult.Unavailable(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ManagedRunnerBootstrapResult.Unavailable(ex.Message);
         }
 
         var user = await dbContext.Users
