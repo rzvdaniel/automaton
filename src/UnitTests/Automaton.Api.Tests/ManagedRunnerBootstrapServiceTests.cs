@@ -88,7 +88,7 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_RejectsSoftDeletedHostedRunnerAssignment()
+    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForSoftDeletedHostedRunnerAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -105,11 +105,93 @@ public class ManagedRunnerBootstrapServiceTests
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
-        Assert.That(exception!.Message, Does.Contain("no longer eligible"));
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Does.Contain("no longer eligible"));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.EqualTo(runner.Id));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ReturnsReady_ForConnectedStandardSelfHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId: null);
+        var runner = SeedSelfHostedRunner(db, ownerId, RunnerApplicationProfiles.Standard);
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
+        db.SaveChanges();
+
+        var result = await CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService())
+            .EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.True);
+        Assert.That(result.RunnerId, Is.EqualTo(runner.Id));
+        Assert.That(await db.HostedRunners.AnyAsync(), Is.False);
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ReturnsReady_ForConnectedPrivilegedHostSelfHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId: null);
+        var runner = SeedSelfHostedRunner(db, ownerId, RunnerApplicationProfiles.PrivilegedHost);
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
+        db.SaveChanges();
+
+        var result = await CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService())
+            .EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.True);
+        Assert.That(result.RunnerId, Is.EqualTo(runner.Id));
+        Assert.That(await db.HostedRunners.AnyAsync(), Is.False);
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ReturnsActionableUnavailable_ForOfflineSelfHostedRunner()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId: null);
+        var runner = SeedSelfHostedRunner(db, ownerId, RunnerApplicationProfiles.Standard);
+        runner.ConnectionId = null;
+        runner.LastHeartbeatAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
+        db.SaveChanges();
+
+        var result = await CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService())
+            .EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Is.EqualTo("The assigned Runner is offline."));
+    }
+
+    [Test]
+    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForDisabledHostedRunnerAssignment()
+    {
+        using var db = CreateDbContext();
+        var ownerId = Guid.NewGuid();
+        var planId = SeedHostedRunnerPlan(db, enabled: true);
+        var app = SeedBackendApp(db, ownerId);
+        SeedUser(db, ownerId, planId);
+        var runner = SeedConnectedRunner(db);
+        SeedRunningHostedRunner(db, ownerId, planId, runner);
+        db.HostedRunners.Single().Status = HostedRunnerStatuses.Disabled;
+        app.DeploymentTargets.Single(target => target.IsDefault).ExecutionRunnerId = runner.Id;
+        db.SaveChanges();
+
+        var result = await CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService())
+            .EnsureRunnerAssignmentAsync(app.Id, ownerId);
+
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Does.Contain("no longer eligible"));
     }
 
     [Test]
@@ -160,7 +242,7 @@ public class ManagedRunnerBootstrapServiceTests
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_RejectsLegacyInfrastructureAssignment()
+    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForLegacyInfrastructureAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -188,15 +270,16 @@ public class ManagedRunnerBootstrapServiceTests
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var exception = Assert.ThrowsAsync<UnauthorizedAccessException>(
-            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
-        Assert.That(exception!.Message, Does.Contain("Infrastructure Runners"));
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Does.Contain("Infrastructure Runners"));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.EqualTo(infrastructureRunner.Id));
     }
 
     [Test]
-    public async Task EnsureRunnerAssignmentAsync_RejectsMissingPersistedAssignment()
+    public async Task EnsureRunnerAssignmentAsync_ReturnsUnavailable_ForMissingPersistedAssignment()
     {
         using var db = CreateDbContext();
         var ownerId = Guid.NewGuid();
@@ -209,10 +292,11 @@ public class ManagedRunnerBootstrapServiceTests
 
         var service = CreateService(db, new RecordingEventPublisher(), new RecordingApplicationEventService());
 
-        var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.EnsureRunnerAssignmentAsync(app.Id, ownerId));
+        var result = await service.EnsureRunnerAssignmentAsync(app.Id, ownerId);
 
-        Assert.That(exception!.Message, Does.Contain("not found"));
+        Assert.That(result.IsReady, Is.False);
+        Assert.That(result.State, Is.EqualTo(AppDeployStates.ManagedRuntimeUnavailable));
+        Assert.That(result.Message, Does.Contain("not found"));
         Assert.That((await db.AppDeploymentTargets.SingleAsync(x => x.WebAppId == app.Id && x.IsDefault)).ExecutionRunnerId, Is.Not.Null);
     }
 
@@ -387,6 +471,29 @@ public class ManagedRunnerBootstrapServiceTests
         };
 
         db.Runners.Add(runner);
+        db.SaveChanges();
+        return runner;
+    }
+
+    private static Runner SeedSelfHostedRunner(ApplicationDbContext db, Guid ownerId, string applicationProfile)
+    {
+        var runner = new Runner
+        {
+            Id = Guid.NewGuid(),
+            Name = $"self-hosted-{applicationProfile}",
+            Purpose = RunnerPurposes.Managed,
+            ApplicationProfile = applicationProfile,
+            CapabilitiesJson = RunnerCapabilities.Serialize(
+                RunnerCapabilities.DefaultsForPurpose(RunnerPurposes.Managed),
+                RunnerPurposes.Managed),
+            ConnectionId = "self-hosted-connection",
+            LastHeartbeatAtUtc = DateTime.UtcNow,
+            LastConnectedAtUtc = DateTime.UtcNow,
+            Status = "online"
+        };
+
+        db.Runners.Add(runner);
+        db.RunnerUsers.Add(new RunnerUser { RunnerId = runner.Id, UserId = ownerId });
         db.SaveChanges();
         return runner;
     }
