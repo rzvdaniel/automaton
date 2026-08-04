@@ -21,7 +21,8 @@ public class BackendRouteConfigService
         Guid DeploymentTargetId,
         bool IsDefault,
         string RuntimeEndpoint,
-        string? Slug);
+        string? Slug,
+        bool UsesRuntimeTunnel);
 
     public BackendRouteConfigService(
         ApplicationDbContext dbContext,
@@ -37,7 +38,7 @@ public class BackendRouteConfigService
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        var routes = await dbContext.AppDeploymentTargets
+        var hostedRoutes = await dbContext.AppDeploymentTargets
             .AsNoTracking()
             .Where(target =>
                 target.ExecutionRunnerId != null &&
@@ -69,8 +70,39 @@ public class BackendRouteConfigService
                 x.DeploymentTargetId,
                 x.IsDefault,
                 x.RuntimeEndpoint.Trim(),
-                x.Slug))
+                x.Slug,
+                false))
             .ToListAsync(cancellationToken);
+
+        var selfHostedRoutes = await dbContext.AppDeploymentTargets
+            .AsNoTracking()
+            .Where(target =>
+                target.ExecutionRunnerId != null &&
+                (target.FrontendDeployed || target.BackendDeployed) &&
+                !dbContext.HostedRunners.Any(hostedRunner =>
+                    hostedRunner.DeletedAt == null &&
+                    hostedRunner.RunnerId == target.ExecutionRunnerId))
+            .Join(
+                dbContext.Runners.AsNoTracking(),
+                target => target.ExecutionRunnerId,
+                runner => (Guid?)runner.Id,
+                (target, _) => target)
+            .OrderBy(target => target.WebAppId)
+            .ThenBy(target => target.Id)
+            .Select(target => new RouteTarget(
+                target.WebAppId,
+                target.Id,
+                target.IsDefault,
+                publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
+                target.IsDefault &&
+                    target.WebApp.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    target.WebApp.AccessStatus == AppAccessStatuses.Active
+                    ? target.WebApp.PublicUrl
+                    : null,
+                true))
+            .ToListAsync(cancellationToken);
+
+        var routes = hostedRoutes.Concat(selfHostedRoutes).ToList();
 
         var rootPath = ResolveRootPath();
         Directory.CreateDirectory(rootPath);
@@ -88,7 +120,7 @@ public class BackendRouteConfigService
             }
 
             logger.LogInformation(
-                "Removed managed runtime backend routes because no active routes remain at {TargetPath}",
+                "Removed managed runtime routes because no active routes remain at {TargetPath}",
                 targetPath);
             return;
         }
@@ -112,7 +144,7 @@ public class BackendRouteConfigService
         }
 
         logger.LogInformation(
-            "Refreshed managed runtime backend routes for {RouteCount} app(s) at {TargetPath}",
+            "Refreshed managed runtime routes for {RouteCount} target(s) at {TargetPath}",
             routes.Count,
             targetPath);
     }
@@ -133,7 +165,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/api`)\"");
             builder.AppendLine("      priority: 100");
-            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine("      middlewares:");
             builder.AppendLine($"        - \"{key}-api-rewrite\"");
 
@@ -143,7 +175,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
             builder.AppendLine("      priority: 1");
-            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
         }
 
@@ -158,7 +190,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`{prefix}`)\"");
             builder.AppendLine("      priority: 110");
-            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine($"      middlewares: [\"{key}-rewrite\"]");
         }
 
@@ -172,7 +204,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/api`)\"");
             builder.AppendLine("      priority: 100");
-            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine("      middlewares:");
             builder.AppendLine($"        - \"{key}-api-rewrite\"");
 
@@ -182,7 +214,7 @@ public class BackendRouteConfigService
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
             builder.AppendLine("      priority: 1");
-            builder.AppendLine($"      service: \"{key}\"");
+            builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
         }
 
@@ -193,11 +225,11 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/api/$1\"");
+            builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "api/$1")}\"");
             builder.AppendLine($"    {key}-frontend-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/(.*)$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
+            builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "$1")}\"");
         }
 
         foreach (var route in routes.Where(route => !route.IsDefault))
@@ -207,7 +239,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine($"        regex: \"^{prefix}(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
+            builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "$1")}\"");
         }
 
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
@@ -216,15 +248,15 @@ public class BackendRouteConfigService
             builder.AppendLine($"    {key}-api-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/api(?:/(.*))?$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/api/$1\"");
+            builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "api/$1")}\"");
             builder.AppendLine($"    {key}-frontend-rewrite:");
             builder.AppendLine("      replacePathRegex:");
             builder.AppendLine("        regex: \"^/(.*)$\"");
-            builder.AppendLine($"        replacement: \"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/$1\"");
+            builder.AppendLine($"        replacement: \"{BuildRuntimePath(route, "$1")}\"");
         }
 
         builder.AppendLine("  services:");
-        foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
+        foreach (var route in routes.Where(route => !route.UsesRuntimeTunnel && !string.IsNullOrWhiteSpace(route.Slug)))
         {
             var key = $"slug-{route.AppId:N}";
             builder.AppendLine($"    {key}:");
@@ -233,7 +265,7 @@ public class BackendRouteConfigService
             builder.AppendLine($"          - url: \"{route.RuntimeEndpoint}\"");
         }
 
-        foreach (var route in routes)
+        foreach (var route in routes.Where(route => !route.UsesRuntimeTunnel))
         {
             var key = route.IsDefault
                 ? $"private-{route.AppId:N}"
@@ -249,6 +281,17 @@ public class BackendRouteConfigService
 
     private static string BuildTargetRoutePrefix(Guid appId, Guid deploymentTargetId)
         => $"/a/{appId}/t/{deploymentTargetId}";
+
+    private static string BuildRuntimePath(RouteTarget route, string path)
+    {
+        var gatewayPath = $"/apps/{route.AppId}/targets/{route.DeploymentTargetId}/{path}";
+        return route.UsesRuntimeTunnel
+            ? $"/runtime-tunnel{gatewayPath}"
+            : gatewayPath;
+    }
+
+    private static string GetServiceName(RouteTarget route, string routeServiceName)
+        => route.UsesRuntimeTunnel ? route.RuntimeEndpoint : routeServiceName;
 
     private string BuildPublishedAppHost(string slug)
     {

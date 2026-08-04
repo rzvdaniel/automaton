@@ -3,9 +3,7 @@ namespace Automaton.Runner.Console;
 public class TunnelForwarderConfig
 {
     // Must stay under the server's SignalR MaximumReceiveMessageSizeBytes (currently 1 MB).
-    // Controller responses are JSON only — files are uploaded directly to the server via
-    // POST /api/runner/files and returned as a download URL, so binary content never
-    // travels through this tunnel. 512 KB is generous for any JSON response.
+    // Binary runtime responses are base64 encoded by SignalR, so leave headroom for headers.
     public int MaxBodyBytes { get; set; } = 512 * 1024;
 
     // How long to wait for the local FastAPI process to respond. Set higher for

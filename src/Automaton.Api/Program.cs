@@ -379,6 +379,8 @@ services.AddScoped<WebAppStarService>();
 services.AddScoped<AppStepsService>();
 services.AddScoped<AppsStepExecutionService>();
 services.AddSingleton<TunnelRequestRegistry>();
+services.Configure<RuntimeTunnelConfig>(applicationBuilder.Configuration.GetSection("RuntimeTunnel"));
+services.AddScoped<RuntimeTunnelService>();
 services.AddSingleton<FileUploadRegistry>();
 services.AddSingleton<FileDownloadRegistry>();
 services.AddScoped<AppsControllerExecutionService>();
