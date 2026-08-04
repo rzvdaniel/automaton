@@ -13,7 +13,8 @@ public static class TargetCommand
         command.AddCommand(BuildList(config));
         command.AddCommand(BuildAdd(config));
         command.AddCommand(BuildRemove(config));
-        command.AddCommand(BuildDefault(config));
+        command.AddCommand(BuildPrimary(config));
+        command.AddCommand(BuildDefaultAlias(config));
         return command;
     }
 
@@ -130,12 +131,12 @@ public static class TargetCommand
         return command;
     }
 
-    private static Command BuildDefault(ConfigService config)
+    private static Command BuildPrimary(ConfigService config)
     {
         var slugArgument = new Argument<string>("slug", "Target slug");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var environmentOption = EnvironmentOption();
-        var command = new Command("default", "Make a deployment target the default")
+        var command = new Command("primary", "Promote a deployment target to Live")
         {
             slugArgument,
             jsonOption,
@@ -149,11 +150,11 @@ public static class TargetCommand
                     Directory.GetCurrentDirectory(), slug, environmentName);
                 if (asJson)
                 {
-                    CliJson.Write(new { success = true, defaultTarget = slug });
+                    CliJson.Write(new { success = true, liveTarget = slug });
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[green]Default target:[/] {Markup.Escape(slug)}");
+                    AnsiConsole.MarkupLine($"[green]Live target:[/] {Markup.Escape(slug)}");
                 }
                 Environment.ExitCode = 0;
             }
@@ -162,6 +163,15 @@ public static class TargetCommand
                 WriteError(ex, asJson);
             }
         }, slugArgument, jsonOption, environmentOption);
+        return command;
+    }
+
+    private static Command BuildDefaultAlias(ConfigService config)
+    {
+        var command = BuildPrimary(config);
+        command.Name = "default";
+        command.Description = "Deprecated alias for target primary";
+        command.IsHidden = true;
         return command;
     }
 

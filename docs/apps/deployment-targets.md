@@ -51,6 +51,12 @@ Studio keeps the Live deployment as the primary app experience. The
 **Deployment Targets** settings section exposes creation, editing, Runner
 assignment, deployment, primary-target switching, and deletion when needed.
 
+Legacy cleanup is an explicit maintenance operation. First request
+`POST /api/apps/{appId}/targets/repair-legacy?dryRun=true` to inspect eligible
+targets. Repeat with `dryRun=false` only after review. The repair revalidates
+the target state and deployment-history references inside its transaction; it
+never runs while listing targets or opening Studio.
+
 ## Runtime identity and isolation
 
 Executable Runner state is identified by both:

@@ -14,7 +14,11 @@ public class TargetCommandStructureTests
 
         Assert.That(
             command.Subcommands.Select(item => item.Name),
-            Is.EquivalentTo(new[] { "list", "add", "remove", "default" }));
+            Is.EquivalentTo(new[] { "list", "add", "remove", "primary", "default" }));
+
+        Assert.That(
+            command.Subcommands.Single(item => item.Name == "default").IsHidden,
+            Is.True);
     }
 
     [Test]

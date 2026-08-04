@@ -54,6 +54,14 @@ public sealed class AppDeploymentTargetsController(
         Ok(await targetService.MakeDefaultAsync(
             appId, targetId, userContextService.GetUserId(), cancellationToken));
 
+    [HttpPost("repair-legacy")]
+    public async Task<ActionResult<LegacyDeploymentTargetRepairResult>> RepairLegacy(
+        Guid appId,
+        [FromQuery] bool dryRun = true,
+        CancellationToken cancellationToken = default) =>
+        Ok(await targetService.RepairLegacyTargetsAsync(
+            appId, userContextService.GetUserId(), dryRun, cancellationToken));
+
     [HttpPost("{targetId:guid}/assign-runner")]
     public async Task<ActionResult<AppDeploymentTargetSummary>> AssignRunner(
         Guid appId,

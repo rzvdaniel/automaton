@@ -24,7 +24,6 @@ public sealed partial class AppDeploymentTargetManagementService(
         Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
         await EnsureCanAccessAsync(appId, userId, cancellationToken);
-        await RemoveRedundantLegacyTargetsAsync(appId, cancellationToken);
         var targets = await TargetQuery(appId)
             .OrderByDescending(target => target.IsDefault)
             .ThenBy(target => target.Name)
@@ -146,29 +145,71 @@ public sealed partial class AppDeploymentTargetManagementService(
         return await GetAsync(appId, targetId, userId, cancellationToken);
     }
 
-    /// <summary>
-    /// Removes only inert legacy targets that were created as an extra "default"
-    /// target. This intentionally preserves any target with an assignment,
-    /// deployment state, primary role, or execution history.
-    /// </summary>
-    private async Task RemoveRedundantLegacyTargetsAsync(Guid appId, CancellationToken cancellationToken)
+    public async Task<LegacyDeploymentTargetRepairResult> RepairLegacyTargetsAsync(
+        Guid appId,
+        Guid userId,
+        bool dryRun = true,
+        CancellationToken cancellationToken = default)
     {
-        var candidates = await dbContext.AppDeploymentTargets
-            .Where(target => target.WebAppId == appId &&
-                             !target.IsDefault &&
-                             target.ExecutionRunnerId == null &&
-                             !target.FrontendDeployed &&
-                             !target.BackendDeployed &&
-                             target.LastDeploymentAt == null &&
-                             target.LastSuccessfulDeploymentAt == null &&
-                             (target.Status == DeploymentTargetStatus.Unassigned ||
-                              target.Status == DeploymentTargetStatus.NotDeployed) &&
-                             (target.Name.ToLower() == "default" || target.Slug.ToLower() == "default"))
+        _ = await GetAppForUpdateAsync(appId, userId, cancellationToken);
+        var candidates = await LegacyDefaultCandidates(appId)
+            .Include(target => target.ExecutionRunner)
             .ToListAsync(cancellationToken);
 
+        var unreferencedCandidates = await ExcludeExecutionHistoryAsync(candidates, cancellationToken);
+        if (dryRun)
+        {
+            return new LegacyDeploymentTargetRepairResult(
+                true,
+                unreferencedCandidates.Select(ToSummary).ToList(),
+                0);
+        }
+
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        // Re-query and re-check every predicate while the mutation transaction is open.
+        // AppModuleExecutions is the only table with a deployment-target foreign key.
+        var currentCandidates = await LegacyDefaultCandidates(appId).ToListAsync(cancellationToken);
+        var removable = await ExcludeExecutionHistoryAsync(currentCandidates, cancellationToken);
+        if (removable.Count != 0)
+        {
+            dbContext.AppDeploymentTargets.RemoveRange(removable);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        if (transaction != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return new LegacyDeploymentTargetRepairResult(
+            false,
+            unreferencedCandidates.Select(ToSummary).ToList(),
+            removable.Count);
+    }
+
+    private IQueryable<AppDeploymentTarget> LegacyDefaultCandidates(Guid appId) =>
+        dbContext.AppDeploymentTargets.Where(target =>
+            target.WebAppId == appId &&
+            !target.IsDefault &&
+            target.ExecutionRunnerId == null &&
+            !target.FrontendDeployed &&
+            !target.BackendDeployed &&
+            target.LastDeploymentAt == null &&
+            target.LastSuccessfulDeploymentAt == null &&
+            (target.Status == DeploymentTargetStatus.Unassigned ||
+             target.Status == DeploymentTargetStatus.NotDeployed) &&
+            (target.Name.ToLower() == "default" || target.Slug.ToLower() == "default"));
+
+    private async Task<List<AppDeploymentTarget>> ExcludeExecutionHistoryAsync(
+        IReadOnlyCollection<AppDeploymentTarget> candidates,
+        CancellationToken cancellationToken)
+    {
         if (candidates.Count == 0)
         {
-            return;
+            return [];
         }
 
         var candidateIds = candidates.Select(target => target.Id).ToArray();
@@ -178,14 +219,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             .Select(execution => execution.DeploymentTargetId!.Value)
             .ToListAsync(cancellationToken);
         var referenced = referencedIds.ToHashSet();
-        var removable = candidates.Where(target => !referenced.Contains(target.Id)).ToArray();
-        if (removable.Length == 0)
-        {
-            return;
-        }
-
-        dbContext.AppDeploymentTargets.RemoveRange(removable);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        return candidates.Where(target => !referenced.Contains(target.Id)).ToList();
     }
 
     public async Task<AppDeploymentTargetSummary> AssignRunnerAsync(

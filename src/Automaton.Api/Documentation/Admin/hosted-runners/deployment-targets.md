@@ -47,6 +47,16 @@ Users manage targets from **Apps → open an app → Settings → Deployment Tar
 
 Most users can ignore additional targets and continue using Live.
 
+## Legacy target cleanup
+
+Legacy targets are never removed when an administrator opens an App or lists its targets. Use the explicit repair endpoint only after reviewing its dry-run result:
+
+1. Request `POST /api/apps/{appId}/targets/repair-legacy?dryRun=true`.
+2. Confirm that every returned target is unassigned, undeployed, non-Live, and has no execution history.
+3. Request the same endpoint with `dryRun=false` to remove only the revalidated targets.
+
+The repair operation rechecks the target state and all deployment-target references in its transaction. A changed or referenced target is preserved.
+
 ## Where administrators manage Runner infrastructure
 
 Use **Admin → Runners → Runner Hosts** for Infrastructure Runners and the servers they control.

@@ -27,6 +27,11 @@ public sealed record AppDeploymentTargetSummary(
     AppDeploymentTargetRunnerSummary? Runner,
     string RoutePath);
 
+public sealed record LegacyDeploymentTargetRepairResult(
+    bool DryRun,
+    IReadOnlyList<AppDeploymentTargetSummary> Candidates,
+    int RemovedCount);
+
 public sealed class CreateAppDeploymentTargetRequest
 {
     public string Name { get; init; } = string.Empty;
