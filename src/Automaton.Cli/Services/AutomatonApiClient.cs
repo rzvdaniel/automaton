@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Security.Authentication;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -265,9 +267,102 @@ public class AutomatonApiClient : IDisposable
             query.Add($"targetSlug={Uri.EscapeDataString(targetSlug)}");
         }
         var url = $"api/apps/{appId}/deploy-package{(query.Count > 0 ? $"?{string.Join("&", query)}" : "")}";
-        using var resp = await _http.PostAsync(url, content, ct);
-        await EnsureSuccessAsync(resp);
-        return await ReadJsonAsync(resp, ct);
+        var correlationId = Guid.NewGuid().ToString("N");
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = content
+        };
+        request.Headers.TryAddWithoutValidation("X-Automaton-Correlation-Id", correlationId);
+
+        HttpResponseMessage resp;
+        try
+        {
+            resp = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            if (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            throw new CliHttpRequestException(
+                BuildUploadDiagnostic(_http.BaseAddress, url, GetPackageBytes(zipStream), correlationId, ex),
+                correlationId,
+                ex);
+        }
+
+        using (resp)
+        {
+            await EnsureSuccessAsync(resp);
+            return await ReadJsonAsync(resp, ct);
+        }
+    }
+
+    private static long? GetPackageBytes(Stream stream)
+    {
+        try
+        {
+            return stream.CanSeek ? stream.Length - stream.Position : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static string BuildUploadDiagnostic(
+        Uri? baseAddress,
+        string url,
+        long? packageBytes,
+        string correlationId,
+        Exception exception)
+    {
+        var requestUri = baseAddress is null
+            ? new Uri(url, UriKind.RelativeOrAbsolute)
+            : new Uri(baseAddress, url);
+        var category = exception switch
+        {
+            TaskCanceledException => "Timeout",
+            _ when ContainsException<AuthenticationException>(exception)
+                => "SecureConnectionError",
+            _ when ContainsException<SocketException>(exception)
+                || ContainsException<IOException>(exception) => "ConnectionError",
+            _ => "ConnectionError"
+        };
+        var bytes = packageBytes.HasValue ? packageBytes.Value.ToString() : "unknown";
+        var chain = string.Join(" -> ", ExceptionChain(exception));
+
+        return $"Phase: deploy-package HTTP upload; "
+            + $"Request host/path: {requestUri.Host}{requestUri.AbsolutePath}{requestUri.Query}; "
+            + $"Package bytes: {bytes}; "
+            + $"HTTP request error category: {category}; "
+            + $"Exception chain: {chain}; "
+            + $"Correlation ID: {correlationId}";
+    }
+
+    private static IEnumerable<string> ExceptionChain(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            yield return current is SocketException socket
+                ? $"{current.GetType().Name} {socket.SocketErrorCode}"
+                : current.GetType().Name;
+        }
+    }
+
+    private static bool ContainsException<TException>(Exception exception)
+        where TException : Exception
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is TException)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public async Task<JsonElement> GetManagedRuntimeReadinessAsync(string appId, CancellationToken ct = default)
@@ -461,6 +556,14 @@ public class AutomatonApiClient : IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+}
+
+public sealed class CliHttpRequestException : HttpRequestException
+{
+    public CliHttpRequestException(string message, string correlationId, Exception innerException)
+        : base(message, innerException) => CorrelationId = correlationId;
+
+    public string CorrelationId { get; }
 }
 
 public sealed record CliAuthorizationResponse(
