@@ -5,6 +5,7 @@ import {
   getDeploymentTargetRunnerProjectId,
   isPrivilegedSelfHostedRunner,
   requiresPrivilegedHostAcknowledgement,
+  resolveAutomatonHostedRunnerId,
   shouldResetPrivilegedHostAcknowledgement,
 } from './deployment-target-runner'
 
@@ -40,5 +41,14 @@ describe('deployment target Runner options', () => {
   it('loads Runners in the App project context', () => {
     expect(getDeploymentTargetRunnerProjectId('project-id')).toBe('project-id')
     expect(getDeploymentTargetRunnerProjectId(null)).toBeUndefined()
+  })
+
+  it('does not choose an arbitrary managed Hosted Runner', () => {
+    const hostedA = runner({ id: 'hosted-a', isHostedRunner: true })
+    const hostedB = runner({ id: 'hosted-b', isHostedRunner: true })
+
+    expect(resolveAutomatonHostedRunnerId([hostedA])).toBe('hosted-a')
+    expect(resolveAutomatonHostedRunnerId([hostedA, hostedB])).toBeNull()
+    expect(resolveAutomatonHostedRunnerId([hostedA, hostedB], 'hosted-b')).toBe('hosted-b')
   })
 })

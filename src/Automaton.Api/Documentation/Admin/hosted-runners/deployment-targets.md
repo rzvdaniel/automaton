@@ -43,7 +43,11 @@ The Live target receives the app's normal private URL and, when published, its p
 
 ## Where users manage targets
 
-Users manage targets from **Apps → open an app → Settings → Deployment Targets**. They can view target status and Runner assignment, deploy a target, open its runtime, view logs, edit its name or slug, change its Runner, promote it to Live, and delete an additional target.
+Users manage targets from **Apps → open an app → Settings → Deployment Targets**. The page separates **Live deployment** from **Additional targets**. They can deploy a target, open its preview, view logs, edit its name or slug and destination, promote an additional target to Live, and delete an additional target.
+
+The normal destination label is **Automaton Hosted**, **Self-hosted · Standard**, or **Self-hosted · Privileged Host**. Studio does not expose the identity of an Automaton-managed Hosted Runner in the normal destination selector. An **Advanced** section shows runner and target IDs, runtime transport, and the internal preview URL for troubleshooting.
+
+Promoting asks for confirmation because it changes which deployed target is served through the App's normal private and published URLs. It does not redeploy or reassign either target. The Live target cannot be deleted until another target is promoted.
 
 Most users can ignore additional targets and continue using Live.
 

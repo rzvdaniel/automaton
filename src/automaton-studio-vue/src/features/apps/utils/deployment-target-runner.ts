@@ -34,6 +34,17 @@ export function getDeploymentTargetRunnerOptions(runners: Runner[]) {
     }))
 }
 
+export function resolveAutomatonHostedRunnerId(
+  runners: Runner[],
+  existingRunnerId?: string | null,
+): string | null {
+  const existingRunner = runners.find((runner) => runner.id === existingRunnerId)
+  if (existingRunner?.isHostedRunner) return existingRunner.id
+
+  const hostedRunners = runners.filter((runner) => runner.isHostedRunner)
+  return hostedRunners.length === 1 ? hostedRunners[0]?.id ?? null : null
+}
+
 export function runnerSourceLabel(runner: Runner): string {
   switch (classifyRunner(runner)) {
     case 'automaton-hosted': return 'Automaton-hosted'

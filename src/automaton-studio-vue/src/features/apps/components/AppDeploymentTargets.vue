@@ -18,6 +18,7 @@ import {
   getDeploymentTargetRunnerProjectId,
   isPrivilegedSelfHostedRunner,
   requiresPrivilegedHostAcknowledgement,
+  resolveAutomatonHostedRunnerId,
   shouldResetPrivilegedHostAcknowledgement,
 } from '../utils/deployment-target-runner'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
@@ -41,6 +42,8 @@ const name = ref('')
 const slug = ref('')
 const runnerId = ref<string | null>(null)
 const privilegedHostAccessAcknowledged = ref(false)
+const purpose = ref<'Staging' | 'Canary' | 'Custom'>('Custom')
+const advancedTargetIds = ref<string[]>([])
 
 const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
 const selectedRunnerIsPrivileged = computed(() => isPrivilegedSelfHostedRunner(selectedRunner.value))
@@ -50,6 +53,29 @@ const requiresPrivilegedAcknowledgement = computed(() => requiresPrivilegedHostA
   editingTarget.value?.runner?.id ?? null,
 ))
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
+const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
+const additionalTargets = computed(() => targets.value.filter((target) => !target.isDefault))
+const hostedRunners = computed(() => runners.value.filter((runner) => runner.isHostedRunner))
+const selfHostedRunnerOptions = computed(() => runnerOptions.value.filter((option) => {
+  const runner = runners.value.find((candidate) => candidate.id === option.value)
+  return !runner?.isHostedRunner
+}))
+const hostedDestinationOption = computed(() => {
+  const existingRunnerId = editingTarget.value?.runner?.isHostedRunner ? editingTarget.value.runner.id : null
+  const runner = runners.value.find((candidate) => candidate.id === resolveAutomatonHostedRunnerId(runners.value, existingRunnerId)) ?? null
+  if (runner) return { label: 'Automaton Hosted', value: runner.id, disabled: runner.status !== 'Online' }
+  return {
+    label: hostedRunners.value.length > 1
+      ? 'Automaton Hosted (multiple managed Runners; unavailable here)'
+      : 'Automaton Hosted (unavailable)',
+    value: '__automaton-hosted-unavailable__',
+    disabled: true,
+  }
+})
+const destinationRunnerOptions = computed(() => [
+  hostedDestinationOption.value,
+  ...selfHostedRunnerOptions.value,
+])
 
 const normalizedSlug = computed(() => slug.value
   .trim()
@@ -79,8 +105,18 @@ function openCreate() {
   name.value = ''
   slug.value = ''
   runnerId.value = null
+  purpose.value = 'Custom'
   privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
+}
+
+function applyPurposeSuggestion() {
+  if (purpose.value === 'Custom') return
+  const suggestion = purpose.value === 'Staging'
+    ? { name: 'Staging', slug: 'staging' }
+    : { name: 'Canary', slug: 'canary' }
+  if (!name.value.trim()) name.value = suggestion.name
+  if (!slug.value.trim()) slug.value = suggestion.slug
 }
 
 function openEdit(target: AppDeploymentTarget) {
@@ -88,6 +124,7 @@ function openEdit(target: AppDeploymentTarget) {
   name.value = target.name
   slug.value = target.slug
   runnerId.value = target.runner?.id ?? null
+  purpose.value = 'Custom'
   privilegedHostAccessAcknowledged.value = false
   showEditor.value = true
 }
@@ -162,7 +199,17 @@ watch(runnerId, (nextRunnerId, previousRunnerId) => {
   }
 })
 
-async function makeDefault(target: AppDeploymentTarget) {
+function makeDefault(target: AppDeploymentTarget) {
+  confirm.require({
+    header: 'Promote to Live?',
+    message: 'This changes which deployed target is served through the App’s normal private and published URLs. It does not redeploy either target.',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Promote to Live',
+    accept: () => void promoteToLive(target),
+  })
+}
+
+async function promoteToLive(target: AppDeploymentTarget) {
   busyTargetId.value = target.id
   try {
     await appsService.makeDefaultDeploymentTarget(props.appId, target.id)
@@ -205,13 +252,54 @@ function statusSeverity(status: AppDeploymentTarget['status']) {
 }
 
 function targetRoute(target: AppDeploymentTarget) {
-  if (target.isDefault) return null
+  return target.routePath
+}
+
+function targetPreviewUrl(target: AppDeploymentTarget) {
   return getDeploymentTargetUrl(props.appId, target.routePath)
 }
 
 function openRoute(target: AppDeploymentTarget) {
-  const route = targetRoute(target)
+  const route = targetPreviewUrl(target)
   if (route) window.open(route, '_blank', 'noopener,noreferrer')
+}
+
+function destinationLabel(target: AppDeploymentTarget): string {
+  if (!target.runner) return 'No destination assigned'
+  if (target.runner.isHostedRunner) return 'Automaton Hosted'
+  return target.runner.applicationProfile === 'PrivilegedHost'
+    ? 'Self-hosted · Privileged Host'
+    : 'Self-hosted · Standard'
+}
+
+function runtimeTransport(target: AppDeploymentTarget): string {
+  return target.runner?.isHostedRunner ? 'Direct edge routing' : 'API ↔ Runner tunnel'
+}
+
+function canOpenPreview(target: AppDeploymentTarget): boolean {
+  return !!target.runner && target.frontendDeployed && target.runner.isOnline && target.status !== DeploymentTargetStatus.RunnerOffline
+}
+
+function deploymentState(target: AppDeploymentTarget): string {
+  if (!target.frontendDeployed && !target.backendDeployed) return 'Not deployed'
+  if (target.frontendDeployed && target.backendDeployed) return 'Frontend and backend deployed'
+  return target.frontendDeployed ? 'Frontend deployed' : 'Backend deployed'
+}
+
+function formatDeploymentTime(target: AppDeploymentTarget): string {
+  return target.lastSuccessfulDeploymentAt
+    ? new Date(target.lastSuccessfulDeploymentAt).toLocaleString()
+    : 'Never deployed'
+}
+
+function toggleAdvanced(target: AppDeploymentTarget) {
+  advancedTargetIds.value = advancedTargetIds.value.includes(target.id)
+    ? advancedTargetIds.value.filter((id) => id !== target.id)
+    : [...advancedTargetIds.value, target.id]
+}
+
+function isAdvancedVisible(target: AppDeploymentTarget): boolean {
+  return advancedTargetIds.value.includes(target.id)
 }
 
 function showError(error: unknown, fallback: string) {
@@ -232,53 +320,65 @@ watch(() => props.refreshRevision, load)
     <div class="targets-header">
       <div>
         <h2>Deployment Targets</h2>
-        <p>Every app has one Live deployment. Add named targets only for other Runners.</p>
+        <p>Manage the Live deployment and optional named destinations separately.</p>
       </div>
       <Button label="Add target" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
     </div>
 
-    <Message v-if="!isLoading && targets.length === 1" severity="secondary" :closable="false">
-      You have one deployment target. Add another only when this app needs to run on a different Runner.
-    </Message>
-
     <div v-if="isLoading" class="targets-loading"><i class="pi pi-spin pi-spinner"></i> Loading targets…</div>
-    <div v-else class="target-list">
-      <article v-for="target in targets" :key="target.id" class="target-card">
+    <template v-else>
+      <section class="target-group">
+        <div class="target-group__heading">
+          <h3>Live deployment</h3>
+          <p>The version served by the App’s normal private and published URLs.</p>
+        </div>
+        <article v-if="liveTarget" class="target-card target-card--live">
+          <div class="target-main">
+            <div class="target-title"><strong>{{ liveTarget.name }}</strong><Tag value="Live" severity="success" /><Tag :value="liveTarget.status" :severity="statusSeverity(liveTarget.status)" /></div>
+            <strong class="target-destination">{{ destinationLabel(liveTarget) }}</strong>
+            <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(liveTarget) }}</span><span>{{ deploymentState(liveTarget) }}</span></div>
+            <Message v-if="liveTarget.cleanupPending" severity="warn" :closable="false">Runtime cleanup needs retry. {{ liveTarget.lastCleanupError || 'The previous cleanup did not complete.' }}</Message>
+            <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(liveTarget)" />
+            <div v-if="isAdvancedVisible(liveTarget)" class="advanced-details"><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span><span>Target ID: {{ liveTarget.id }}</span><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span><span>Runtime route: {{ targetRoute(liveTarget) }}</span><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span></div>
+          </div>
+          <div class="target-actions"><Button label="Deploy" icon="pi pi-cloud-upload" size="small" :disabled="liveTarget.runner?.isOnline === false || liveTarget.status === DeploymentTargetStatus.Deploying" @click="emit('deploy', liveTarget)" /><Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(liveTarget)" :title="canOpenPreview(liveTarget) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(liveTarget)" /><Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', liveTarget)" /><Button label="Edit" icon="pi pi-pencil" size="small" text @click="openEdit(liveTarget)" /></div>
+        </article>
+      </section>
+
+      <section class="target-group">
+        <div class="target-group__heading"><h3>Additional targets</h3><p>Use additional targets for staging, canary testing, or a different self-hosted runtime.</p></div>
+        <Message v-if="additionalTargets.length === 0" severity="secondary" :closable="false">No additional targets. Add one only when this app needs another named destination.</Message>
+        <div v-else class="target-list">
+          <article v-for="target in additionalTargets" :key="target.id" class="target-card">
         <div class="target-main">
           <div class="target-title">
             <strong>{{ target.name }}</strong>
-            <Tag v-if="target.isDefault" value="Live" severity="success" />
             <Tag :value="target.status" :severity="statusSeverity(target.status)" />
           </div>
-          <code v-if="!target.isDefault">{{ target.slug }}</code>
-          <div class="target-meta">
-            <span><i class="pi pi-server"></i> {{ target.runner?.name ?? 'No Runner assigned' }}</span>
-            <span v-if="target.runner" :class="target.runner.isOnline ? 'online' : 'offline'">
-              <i class="pi pi-circle-fill"></i> {{ target.runner.isOnline ? 'Online' : 'Offline' }}
-            </span>
-            <span><i class="pi pi-box"></i> {{ target.frontendDeployed || target.backendDeployed ? 'Runtime deployed' : 'Not deployed' }}</span>
-          </div>
+          <strong class="target-destination">{{ destinationLabel(target) }}</strong>
+          <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(target) }}</span><span>{{ deploymentState(target) }}</span></div>
           <Message v-if="target.cleanupPending" severity="warn" :closable="false">
             Runtime cleanup needs retry. {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
           </Message>
-          <button v-if="targetRoute(target)" class="route-link" type="button" @click="openRoute(target)">
-            {{ target.routePath }} <i class="pi pi-external-link"></i>
-          </button>
-          <span v-else class="live-route-note">Uses the app’s normal private and published routes.</span>
+          <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(target)" />
+          <div v-if="isAdvancedVisible(target)" class="advanced-details"><span>Runner: {{ target.runner?.name ?? 'None' }}</span><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span><span>Target ID: {{ target.id }}</span><span>Runtime transport: {{ runtimeTransport(target) }}</span><span>Runtime route: {{ targetRoute(target) }}</span><span>Internal preview URL: {{ targetRoute(target) }}</span></div>
         </div>
         <div class="target-actions">
           <Button label="Deploy" icon="pi pi-cloud-upload" size="small"
-            :disabled="(!target.isDefault && !target.runner) || target.runner?.isOnline === false || target.status === DeploymentTargetStatus.Deploying"
+            :disabled="!target.runner || target.runner?.isOnline === false || target.status === DeploymentTargetStatus.Deploying"
             @click="emit('deploy', target)" />
+          <Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(target)" :title="canOpenPreview(target) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(target)" />
           <Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', target)" />
           <Button icon="pi pi-pencil" aria-label="Edit target" size="small" text @click="openEdit(target)" />
-          <Button v-if="!target.isDefault" label="Promote to Live" size="small" text
+          <Button label="Promote to Live" size="small" text
             :loading="busyTargetId === target.id" @click="makeDefault(target)" />
-          <Button v-if="!target.isDefault" icon="pi pi-trash" aria-label="Delete target" severity="danger"
+          <Button icon="pi pi-trash" aria-label="Delete target" severity="danger"
             size="small" text :loading="busyTargetId === target.id" @click="remove(target)" />
         </div>
       </article>
-    </div>
+        </div>
+      </section>
+    </template>
 
     <Dialog v-model:visible="showEditor" modal :header="editingTarget ? 'Edit deployment target' : 'Add deployment target'"
       class="target-dialog" :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }">
@@ -291,10 +391,16 @@ watch(() => props.refreshRevision, load)
         <InputText id="target-slug" v-model="slug" placeholder="server-eu" />
         <small>Used by the CLI and deployment API: {{ normalizedSlug || 'server-eu' }}</small>
       </div>
+      <div v-if="!editingTarget" class="form-field">
+        <label for="target-purpose">Purpose</label>
+        <Select id="target-purpose" v-model="purpose" :options="['Staging', 'Canary', 'Custom']" @change="applyPurposeSuggestion" />
+        <small>Used to suggest a name and slug; it is not stored separately.</small>
+      </div>
       <div class="form-field">
-        <label for="target-runner">Runner</label>
-        <Select id="target-runner" v-model="runnerId" :options="runnerOptions" option-label="label"
+        <label for="target-runner">Destination</label>
+        <Select id="target-runner" v-model="runnerId" :options="destinationRunnerOptions" option-label="label"
           option-value="value" option-disabled="disabled" show-clear placeholder="Assign later" />
+        <small>Automaton Hosted does not expose the managed Runner identity. Self-hosted destinations are eligible application Runners only.</small>
       </div>
       <Message v-if="selectedRunnerIsPrivileged" severity="warn" :closable="false">
         <strong>Privileged Host access</strong><br>
@@ -319,15 +425,21 @@ watch(() => props.refreshRevision, load)
 .targets-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .targets-header h2 { margin: 0 0 .35rem; font-size: 1.25rem; }
 .targets-header p { margin: 0; color: var(--p-text-muted-color); }
+.target-group { display: flex; flex-direction: column; gap: .75rem; }
+.target-group__heading h3 { margin: 0; font-size: 1rem; }
+.target-group__heading p { margin: .2rem 0 0; color: var(--p-text-muted-color); }
 .target-list { display: grid; gap: .85rem; }
 .target-card { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid var(--p-content-border-color); border-radius: var(--p-border-radius-lg); background: var(--p-content-background); }
+.target-card--live { border-color: color-mix(in srgb, var(--p-green-500) 45%, var(--p-content-border-color)); }
 .target-main { min-width: 0; display: flex; flex-direction: column; gap: .55rem; }
+.target-destination { font-size: .9rem; }
 .target-title, .target-meta, .target-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
 .target-meta { color: var(--p-text-muted-color); font-size: .875rem; }
 .target-meta .pi-circle-fill { font-size: .5rem; }
 .online { color: var(--p-green-600); } .offline { color: var(--p-orange-600); }
 .target-actions { justify-content: flex-end; align-self: center; }
 .route-link { padding: 0; border: 0; background: none; color: var(--p-primary-color); text-align: left; cursor: pointer; width: fit-content; }
+.advanced-details { display: grid; gap: .25rem; padding: .65rem; border-radius: .45rem; background: var(--p-surface-100); color: var(--p-text-muted-color); font-family: var(--p-font-family-monospace, monospace); font-size: .75rem; overflow-wrap: anywhere; }
 .live-route-note, .form-field small { color: var(--p-text-muted-color); font-size: .8rem; }
 .targets-loading { padding: 2rem; text-align: center; color: var(--p-text-muted-color); }
 .form-field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
