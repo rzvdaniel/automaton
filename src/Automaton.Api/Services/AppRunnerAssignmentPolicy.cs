@@ -107,7 +107,7 @@ public sealed class AppRunnerAssignmentPolicy(
             }
         }
 
-        var target = AppDeploymentTarget.CreateDefault(app.Id);
+        var target = AppDeploymentTarget.CreateLive(app.Id);
         app.DeploymentTargets.Add(target);
         return target;
     }

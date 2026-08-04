@@ -14,17 +14,17 @@ deployed component flags, timestamps, route, and cleanup state. A Runner is an
 execution location; it may host several targets, including several targets of
 the same app.
 
-## Default and named targets
+## Live and additional targets
 
 Every new app receives one server-owned target:
 
 ```text
-Name: Default
-Slug: default
+Name: Live
+Slug: live
 IsDefault: true
 ```
 
-The default keeps the normal workflow simple:
+The Live target keeps the normal workflow simple:
 
 ```bash
 automaton deploy
@@ -36,20 +36,20 @@ Advanced users can create and deploy named targets:
 automaton target list
 automaton target add server-eu --runner infra-eu
 automaton deploy server-eu
-automaton target default server-eu
+automaton target primary server-eu
 automaton target remove server-eu
 ```
 
 Target definitions and Runner assignments live in the API database. The local
 `automaton.json` identifies the logical app and does not contain a target map.
-Omitting the target slug always resolves the current default on the server.
+Omitting the target slug resolves the current Live target on the server.
 
-`--publish` and `--open` apply only to the default target. A named target must
+`--publish` and `--open` apply only to the Live target. An additional target must
 already have an assigned Runner.
 
-Studio keeps the default deployment as the primary app experience. The
+Studio keeps the Live deployment as the primary app experience. The
 **Deployment Targets** settings section exposes creation, editing, Runner
-assignment, deployment, logs, default switching, and deletion when needed.
+assignment, deployment, primary-target switching, and deletion when needed.
 
 ## Runtime identity and isolation
 
@@ -81,7 +81,7 @@ workspace.
 
 ## Routing
 
-The default target owns the app-specific private host and, when published, the
+The Live target owns the app-specific private host and, when published, the
 published app host:
 
 ```text
@@ -102,7 +102,7 @@ The edge rewrites every route to the corresponding Runner endpoint:
 /apps/{appId}/targets/{deploymentTargetId}/
 ```
 
-Switching the default changes which target receives the normal private and
+Promoting a target to Live changes which target receives the normal private and
 published routes. It does not copy, delete, or otherwise mutate the old
 target's runtime state.
 

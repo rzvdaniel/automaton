@@ -27,7 +27,7 @@ public class AppDeploymentTargetResolverTests
         Assert.Multiple(() =>
         {
             Assert.That(target.IsDefault, Is.True);
-            Assert.That(target.Slug, Is.EqualTo("default"));
+            Assert.That(target.Slug, Is.EqualTo("live"));
             Assert.That(target.ExecutionRunner?.Id, Is.EqualTo(runner.Id));
         });
     }

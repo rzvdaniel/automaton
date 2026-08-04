@@ -1601,7 +1601,7 @@ namespace Automaton.Api.Data
                 var app = appEntry.Entity;
                 if (!app.DeploymentTargets.Any(target => target.IsDefault))
                 {
-                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateDefault(app.Id));
+                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateLive(app.Id));
                 }
             }
 
@@ -1622,7 +1622,7 @@ namespace Automaton.Api.Data
                 var app = appEntry.Entity;
                 if (!app.DeploymentTargets.Any(target => target.IsDefault))
                 {
-                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateDefault(app.Id));
+                    app.DeploymentTargets.Add(AppDeploymentTarget.CreateLive(app.Id));
                 }
             }
 
@@ -1670,7 +1670,7 @@ namespace Automaton.Api.Data
                 if (defaultCount != 1)
                 {
                     throw new InvalidOperationException(
-                        "Every App must have exactly one default deployment target.");
+                        "Every App must have exactly one primary deployment target.");
                 }
             }
         }
@@ -1712,7 +1712,7 @@ namespace Automaton.Api.Data
                 if (defaultCount != 1)
                 {
                     throw new InvalidOperationException(
-                        "Every App must have exactly one default deployment target.");
+                        "Every App must have exactly one primary deployment target.");
                 }
             }
         }

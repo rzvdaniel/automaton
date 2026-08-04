@@ -24,6 +24,7 @@ public sealed partial class AppDeploymentTargetManagementService(
         Guid appId, Guid userId, CancellationToken cancellationToken = default)
     {
         await EnsureCanAccessAsync(appId, userId, cancellationToken);
+        await RemoveRedundantLegacyTargetsAsync(appId, cancellationToken);
         var targets = await TargetQuery(appId)
             .OrderByDescending(target => target.IsDefault)
             .ThenBy(target => target.Name)
@@ -145,6 +146,48 @@ public sealed partial class AppDeploymentTargetManagementService(
         return await GetAsync(appId, targetId, userId, cancellationToken);
     }
 
+    /// <summary>
+    /// Removes only inert legacy targets that were created as an extra "default"
+    /// target. This intentionally preserves any target with an assignment,
+    /// deployment state, primary role, or execution history.
+    /// </summary>
+    private async Task RemoveRedundantLegacyTargetsAsync(Guid appId, CancellationToken cancellationToken)
+    {
+        var candidates = await dbContext.AppDeploymentTargets
+            .Where(target => target.WebAppId == appId &&
+                             !target.IsDefault &&
+                             target.ExecutionRunnerId == null &&
+                             !target.FrontendDeployed &&
+                             !target.BackendDeployed &&
+                             target.LastDeploymentAt == null &&
+                             target.LastSuccessfulDeploymentAt == null &&
+                             (target.Status == DeploymentTargetStatus.Unassigned ||
+                              target.Status == DeploymentTargetStatus.NotDeployed) &&
+                             (target.Name.ToLower() == "default" || target.Slug.ToLower() == "default"))
+            .ToListAsync(cancellationToken);
+
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var candidateIds = candidates.Select(target => target.Id).ToArray();
+        var referencedIds = await dbContext.AppModuleExecutions
+            .Where(execution => execution.DeploymentTargetId.HasValue &&
+                                candidateIds.Contains(execution.DeploymentTargetId.Value))
+            .Select(execution => execution.DeploymentTargetId!.Value)
+            .ToListAsync(cancellationToken);
+        var referenced = referencedIds.ToHashSet();
+        var removable = candidates.Where(target => !referenced.Contains(target.Id)).ToArray();
+        if (removable.Length == 0)
+        {
+            return;
+        }
+
+        dbContext.AppDeploymentTargets.RemoveRange(removable);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<AppDeploymentTargetSummary> AssignRunnerAsync(
         Guid appId,
         Guid targetId,
@@ -230,7 +273,7 @@ public sealed partial class AppDeploymentTargetManagementService(
             if (target.IsDefault)
             {
                 throw new AppDeploymentTargetConflictException(
-                    "The default deployment target cannot be deleted. Make another target default first.");
+                    "The Live deployment target cannot be deleted. Promote another target to Live first.");
             }
             if (IsDeployed(target))
             {
@@ -485,7 +528,7 @@ public sealed partial class AppDeploymentTargetManagementService(
         new(
             target.Id,
             target.WebAppId,
-            target.Name,
+            target.IsDefault && IsLegacyDefaultTarget(target) ? "Live" : target.Name,
             target.Slug,
             target.IsDefault,
             GetEffectiveStatus(target),
@@ -513,6 +556,10 @@ public sealed partial class AppDeploymentTargetManagementService(
             target.IsDefault
                 ? $"/private/{target.WebAppId:D}"
                 : $"/a/{target.WebAppId:D}/t/{target.Id:D}/");
+
+    private static bool IsLegacyDefaultTarget(AppDeploymentTarget target) =>
+        string.Equals(target.Name, "default", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(target.Slug, "default", StringComparison.OrdinalIgnoreCase);
 
     private static DeploymentTargetStatus GetEffectiveStatus(AppDeploymentTarget target)
     {

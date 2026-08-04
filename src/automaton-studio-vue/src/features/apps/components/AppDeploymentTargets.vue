@@ -166,10 +166,10 @@ async function makeDefault(target: AppDeploymentTarget) {
   busyTargetId.value = target.id
   try {
     await appsService.makeDefaultDeploymentTarget(props.appId, target.id)
-    toast.add({ severity: 'success', summary: 'Default changed', detail: `${target.name} is now the default target.`, life: 2500 })
+    toast.add({ severity: 'success', summary: 'Live target changed', detail: `${target.name} now serves this app’s normal routes.`, life: 2500 })
     await load()
   } catch (error) {
-    showError(error, 'Failed to change the default target')
+    showError(error, 'Failed to promote the Live target')
   } finally {
     busyTargetId.value = null
   }
@@ -232,7 +232,7 @@ watch(() => props.refreshRevision, load)
     <div class="targets-header">
       <div>
         <h2>Deployment Targets</h2>
-        <p>Keep the default deployment simple, or add named targets for other Runners.</p>
+        <p>Every app has one Live deployment. Add named targets only for other Runners.</p>
       </div>
       <Button label="Add target" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
     </div>
@@ -247,10 +247,10 @@ watch(() => props.refreshRevision, load)
         <div class="target-main">
           <div class="target-title">
             <strong>{{ target.name }}</strong>
-            <Tag v-if="target.isDefault" value="Default" severity="success" />
+            <Tag v-if="target.isDefault" value="Live" severity="success" />
             <Tag :value="target.status" :severity="statusSeverity(target.status)" />
           </div>
-          <code>{{ target.slug }}</code>
+          <code v-if="!target.isDefault">{{ target.slug }}</code>
           <div class="target-meta">
             <span><i class="pi pi-server"></i> {{ target.runner?.name ?? 'No Runner assigned' }}</span>
             <span v-if="target.runner" :class="target.runner.isOnline ? 'online' : 'offline'">
@@ -264,7 +264,7 @@ watch(() => props.refreshRevision, load)
           <button v-if="targetRoute(target)" class="route-link" type="button" @click="openRoute(target)">
             {{ target.routePath }} <i class="pi pi-external-link"></i>
           </button>
-          <span v-else class="default-route-note">Uses the app’s normal private and published routes.</span>
+          <span v-else class="live-route-note">Uses the app’s normal private and published routes.</span>
         </div>
         <div class="target-actions">
           <Button label="Deploy" icon="pi pi-cloud-upload" size="small"
@@ -272,7 +272,7 @@ watch(() => props.refreshRevision, load)
             @click="emit('deploy', target)" />
           <Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', target)" />
           <Button icon="pi pi-pencil" aria-label="Edit target" size="small" text @click="openEdit(target)" />
-          <Button v-if="!target.isDefault" label="Make default" size="small" text
+          <Button v-if="!target.isDefault" label="Promote to Live" size="small" text
             :loading="busyTargetId === target.id" @click="makeDefault(target)" />
           <Button v-if="!target.isDefault" icon="pi pi-trash" aria-label="Delete target" severity="danger"
             size="small" text :loading="busyTargetId === target.id" @click="remove(target)" />
@@ -328,7 +328,7 @@ watch(() => props.refreshRevision, load)
 .online { color: var(--p-green-600); } .offline { color: var(--p-orange-600); }
 .target-actions { justify-content: flex-end; align-self: center; }
 .route-link { padding: 0; border: 0; background: none; color: var(--p-primary-color); text-align: left; cursor: pointer; width: fit-content; }
-.default-route-note, .form-field small { color: var(--p-text-muted-color); font-size: .8rem; }
+.live-route-note, .form-field small { color: var(--p-text-muted-color); font-size: .8rem; }
 .targets-loading { padding: 2rem; text-align: center; color: var(--p-text-muted-color); }
 .form-field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
 .form-field label { font-weight: 600; }

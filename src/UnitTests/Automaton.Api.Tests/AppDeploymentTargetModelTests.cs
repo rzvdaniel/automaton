@@ -10,7 +10,7 @@ namespace Automaton.Api.Tests;
 public class AppDeploymentTargetModelTests
 {
     [Test]
-    public async Task SaveChangesAsync_CreatesExactlyOneDefaultTarget_ForNewApp()
+    public async Task SaveChangesAsync_CreatesExactlyOnePrimaryLiveTarget_ForNewApp()
     {
         await using var db = CreateDbContext();
         var app = CreateApp();
@@ -22,8 +22,8 @@ public class AppDeploymentTargetModelTests
         Assert.Multiple(() =>
         {
             Assert.That(target.WebAppId, Is.EqualTo(app.Id));
-            Assert.That(target.Name, Is.EqualTo("Default"));
-            Assert.That(target.Slug, Is.EqualTo("default"));
+            Assert.That(target.Name, Is.EqualTo("Live"));
+            Assert.That(target.Slug, Is.EqualTo("live"));
             Assert.That(target.IsDefault, Is.True);
             Assert.That(target.DefaultConstraintKey, Is.EqualTo(1));
             Assert.That(target.ExecutionRunnerId, Is.Null);
@@ -88,7 +88,7 @@ public class AppDeploymentTargetModelTests
             async () => await db.SaveChangesAsync());
         Assert.That(
             exception!.Message,
-            Does.Contain("exactly one default deployment target"));
+            Does.Contain("exactly one primary deployment target"));
     }
 
     [Test]
@@ -105,7 +105,7 @@ public class AppDeploymentTargetModelTests
 
         Assert.That(
             exception!.Message,
-            Does.Contain("exactly one default deployment target"));
+            Does.Contain("exactly one primary deployment target"));
     }
 
     private static WebApp CreateApp()

@@ -73,7 +73,7 @@ public class AppDeploymentTargetManagementServiceTests
     }
 
     [Test]
-    public async Task Delete_DefaultTargetIsRejected()
+    public async Task Delete_LiveTargetIsRejected()
     {
         await using var fixture = await TestFixtureContext.CreateAsync();
         var target = await fixture.Db.AppDeploymentTargets
@@ -83,7 +83,86 @@ public class AppDeploymentTargetManagementServiceTests
             async () => await fixture.Service.DeleteAsync(
                 fixture.App.Id, target.Id, fixture.UserId));
 
-        Assert.That(exception!.Message, Does.Contain("default"));
+        Assert.That(exception!.Message, Does.Contain("Live"));
+    }
+
+    [Test]
+    public async Task List_RemovesOnlyRedundantUnassignedLegacyDefaultTarget()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        fixture.Db.AppDeploymentTargets.Add(new AppDeploymentTarget
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.App.Id,
+            Name = "Default",
+            Slug = "default",
+            IsDefault = false,
+            Status = DeploymentTargetStatus.Unassigned,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(targets, Has.Count.EqualTo(1));
+            Assert.That(targets.Single().IsDefault, Is.True);
+            Assert.That(targets.Single().Name, Is.EqualTo("Live"));
+        });
+    }
+
+    [Test]
+    public async Task List_PreservesLegacyDefaultTargetWithDeploymentOrExecutionHistory()
+    {
+        await using var fixture = await TestFixtureContext.CreateAsync();
+        var deployed = new AppDeploymentTarget
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.App.Id,
+            Name = "Default",
+            Slug = "legacy-deployed-default",
+            IsDefault = false,
+            FrontendDeployed = true,
+            LastDeploymentAt = DateTimeOffset.UtcNow,
+            Status = DeploymentTargetStatus.Running,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var withHistory = new AppDeploymentTarget
+        {
+            Id = Guid.NewGuid(),
+            WebAppId = fixture.App.Id,
+            Name = "Unused target",
+            Slug = "default",
+            IsDefault = false,
+            Status = DeploymentTargetStatus.Unassigned,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        fixture.Db.AppDeploymentTargets.AddRange(deployed, withHistory);
+        fixture.Db.AppModuleExecutions.Add(new AppModuleExecution
+        {
+            Id = Guid.NewGuid(),
+            AppId = fixture.App.Id,
+            DeploymentTargetId = withHistory.Id,
+            ModuleType = "deployment",
+            ModuleKey = "legacy",
+            TriggerType = "manual",
+            Status = "Completed",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var targets = await fixture.Service.ListAsync(fixture.App.Id, fixture.UserId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(targets.Select(target => target.Id), Does.Contain(deployed.Id));
+            Assert.That(targets.Select(target => target.Id), Does.Contain(withHistory.Id));
+            Assert.That(targets.Count(target => target.IsDefault), Is.EqualTo(1));
+        });
     }
 
     [Test]

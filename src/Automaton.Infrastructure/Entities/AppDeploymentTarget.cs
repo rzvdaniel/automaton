@@ -43,15 +43,19 @@ public sealed class AppDeploymentTarget
         DefaultConstraintKey = IsDefault ? (byte)1 : null;
     }
 
-    public static AppDeploymentTarget CreateDefault(Guid webAppId, Guid? runnerId = null)
+    /// <summary>
+    /// Creates the single primary target for a new app. Internally, <see cref="IsDefault"/>
+    /// remains the persisted primary-target marker for backwards compatibility.
+    /// </summary>
+    public static AppDeploymentTarget CreateLive(Guid webAppId, Guid? runnerId = null)
     {
         var now = DateTimeOffset.UtcNow;
         var target = new AppDeploymentTarget
         {
             Id = Guid.NewGuid(),
             WebAppId = webAppId,
-            Name = "Default",
-            Slug = "default",
+            Name = "Live",
+            Slug = "live",
             ExecutionRunnerId = runnerId,
             IsDefault = true,
             Status = runnerId.HasValue
@@ -63,4 +67,8 @@ public sealed class AppDeploymentTarget
         target.SynchronizeDefaultConstraint();
         return target;
     }
+
+    // Kept for existing callers and historical test fixtures. New apps must use CreateLive.
+    public static AppDeploymentTarget CreateDefault(Guid webAppId, Guid? runnerId = null) =>
+        CreateLive(webAppId, runnerId);
 }
