@@ -54,39 +54,8 @@ public class DeploymentTargetServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(exception!.Message, Does.Contain("missing"));
-            Assert.That(exception.Message, Does.Contain("default (Live)"));
+            Assert.That(exception.Message, Does.Contain("default (default)"));
             Assert.That(exception.Message, Does.Contain("server-eu"));
         });
-    }
-
-    [Test]
-    public void SelectForDeploy_UsesOnlyTargetWithoutPrompting()
-    {
-        Assert.That(
-            DeploymentTargetService.SelectForDeploy([NamedTarget], null, nonInteractive: true),
-            Is.EqualTo(NamedTarget));
-    }
-
-    [Test]
-    public void SelectForDeploy_NonInteractiveRequiresExplicitTargetWhenSeveralAreAvailable()
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            DeploymentTargetService.SelectForDeploy([DefaultTarget, NamedTarget], null, nonInteractive: true));
-
-        Assert.That(exception!.Message, Does.Contain("automaton deploy default"));
-        Assert.That(exception.Message, Does.Contain("automaton deploy server-eu"));
-    }
-
-    [Test]
-    public void Format_ShowsLiveRoleDestinationAndStatus()
-    {
-        var hosted = DefaultTarget with
-        {
-            Runner = new DeploymentTargetRunnerInfo("runner-1", "Hosted Runner", true, IsHostedRunner: true)
-        };
-
-        Assert.That(
-            DeploymentTargetService.Format(hosted),
-            Is.EqualTo("default · Live · Automaton Hosted · Running"));
     }
 }

@@ -197,21 +197,16 @@ public static class TargetCommand
     {
         AnsiConsole.MarkupLine($"[bold]Targets for {Markup.Escape(appName)}[/]");
         var table = new Table()
+            .AddColumn("")
             .AddColumn("Target")
-            .AddColumn("Role")
-            .AddColumn("Destination")
+            .AddColumn("Runner")
             .AddColumn("Status");
         foreach (var target in targets)
         {
-            var destination = target.Runner?.IsHostedRunner == true
-                ? "Automaton Hosted"
-                : target.Runner?.ApplicationProfile == "PrivilegedHost"
-                    ? "Self-hosted · Privileged Host"
-                    : "Self-hosted · Standard";
             table.AddRow(
+                target.IsDefault ? "[green]*[/]" : "",
                 Markup.Escape(target.Slug),
-                target.IsDefault ? "Live" : "Additional",
-                Markup.Escape(destination),
+                Markup.Escape(target.Runner?.Name ?? "unassigned"),
                 Markup.Escape(target.Runner is { IsOnline: false }
                     ? "Runner offline"
                     : target.Status));

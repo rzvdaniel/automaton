@@ -27,7 +27,7 @@ public static class DeployCommand
         var targetArgument = new Argument<string?>(
             "target",
             () => null,
-            "Named deployment target slug; omit to deploy the only target or choose interactively")
+            "Named deployment target slug; omit to deploy the default target")
         {
             Arity = ArgumentArity.ZeroOrOne
         };
@@ -93,11 +93,8 @@ public static class DeployCommand
                 var projectConfig = config.TryLoadProjectConfig(cwd);
                 var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
                 var targetService = new DeploymentTargetService(config);
-                var allTargets = (await targetService.ListAsync(cwd, environmentName, context.GetCancellationToken())).Targets;
-                var target = DeploymentTargetService.SelectForDeploy(
-                    allTargets,
-                    targetSlug,
-                    nonInteractive);
+                var target = await targetService.ResolveAsync(
+                    cwd, targetSlug, environmentName, context.GetCancellationToken());
                 if (!string.IsNullOrWhiteSpace(runner))
                 {
                     target = await targetService.AssignRunnerAsync(
@@ -116,7 +113,7 @@ public static class DeployCommand
                 if (!target.IsDefault && (publish || open))
                 {
                     throw new InvalidOperationException(
-                        "--publish and --open apply only to the Live target.");
+                        "--publish and --open apply only to the default target.");
                 }
                 WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
                 var preparation = new DeployPreparationResult
