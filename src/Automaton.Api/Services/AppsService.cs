@@ -938,31 +938,44 @@ public class AppsService
     /// </summary>
     public string GenerateUniqueSlug(string displayName)
     {
-        // Convert to lowercase and replace spaces with hyphens
-        var slug = displayName.ToLowerInvariant()
-            .Replace(' ', '-')
-    .Replace('_', '-');
+        var originalSlug = NormalizeGeneratedSlug(displayName);
+        var slug = originalSlug;
 
-        // Remove special characters (keep only alphanumeric and hyphens)
-        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
+        // Ensure uniqueness
+        var counter = 1;
+        while (dataContext.WebApps.Any(x => x.PublicUrl == slug))
+        {
+            var suffix = $"-{counter}";
+            var baseLength = Math.Max(1, PublishedAppHostNames.MaximumSlugLength - suffix.Length);
+            var truncatedBase = originalSlug[..Math.Min(originalSlug.Length, baseLength)].TrimEnd('-');
+            slug = $"{truncatedBase}{suffix}";
+            counter++;
+        }
 
-        // Remove multiple consecutive hyphens
-        slug = Regex.Replace(slug, @"\-+", "-");
-
-        // Trim hyphens from start and end
-        slug = slug.Trim('-');
-        if (string.IsNullOrEmpty(slug))
+        if (!PublishedAppHostNames.IsValidPublishedSlug(slug))
         {
             slug = "app";
         }
 
-        // Ensure uniqueness
-        var originalSlug = slug;
-        var counter = 1;
-        while (dataContext.WebApps.Any(x => x.PublicUrl == slug))
+        return slug;
+    }
+
+    internal static string NormalizeGeneratedSlug(string displayName)
+    {
+        var slug = displayName.ToLowerInvariant()
+            .Replace(' ', '-')
+            .Replace('_', '-');
+        slug = Regex.Replace(slug, @"[^a-z0-9\-]", "");
+        slug = Regex.Replace(slug, @"\-+", "-").Trim('-');
+        if (string.IsNullOrEmpty(slug)) slug = "app";
+        if (slug.Length > PublishedAppHostNames.MaximumSlugLength)
         {
-            slug = $"{originalSlug}-{counter}";
-            counter++;
+            slug = slug[..PublishedAppHostNames.MaximumSlugLength].TrimEnd('-');
+        }
+
+        if (PublishedAppHostNames.IsPrivateAppLabel(slug))
+        {
+            slug = "app-generated";
         }
 
         return slug;

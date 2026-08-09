@@ -2,6 +2,8 @@ namespace Automaton.Api.Config;
 
 public static class PublishedAppHostNames
 {
+    public const int MaximumSlugLength = 63;
+
     public static bool IsPrivateAppHost(string host, string appsDomain)
         => TryGetLabel(host, appsDomain, out var label)
             && IsPrivateAppLabel(label);
@@ -13,7 +15,7 @@ public static class PublishedAppHostNames
 
     public static bool IsValidPublishedSlug(string slug)
         => !string.IsNullOrWhiteSpace(slug) &&
-            slug.Length <= 63 &&
+            slug.Length <= MaximumSlugLength &&
             slug[0] != '-' &&
             slug[^1] != '-' &&
             !IsPrivateAppLabel(slug) &&

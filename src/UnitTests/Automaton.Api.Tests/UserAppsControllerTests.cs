@@ -24,6 +24,48 @@ namespace Automaton.Api.Tests;
 public class UserAppsControllerTests
 {
     [Test]
+    public async Task GenerateUniqueSlug_EnforcesPublishedHostContract()
+    {
+        await using var dbContext = CreateDbContext();
+        var httpContext = new DefaultHttpContext();
+        var appsService = CreateAppsService(dbContext, httpContext);
+        var longName = new string('x', 200);
+
+        var generated = appsService.GenerateUniqueSlug(longName);
+
+        Assert.That(generated.Length, Is.LessThanOrEqualTo(PublishedAppHostNames.MaximumSlugLength));
+        Assert.That(PublishedAppHostNames.IsValidPublishedSlug(generated), Is.True);
+    }
+
+    [Test]
+    public async Task GenerateUniqueSlug_AddsBoundedSuffixWhenBaseIsTaken()
+    {
+        await using var dbContext = CreateDbContext();
+        var httpContext = new DefaultHttpContext();
+        var appsService = CreateAppsService(dbContext, httpContext);
+        var baseName = new string('x', 63);
+        dbContext.WebApps.Add(new WebApp { Id = Guid.NewGuid(), PublicUrl = baseName });
+        await dbContext.SaveChangesAsync();
+
+        var generated = appsService.GenerateUniqueSlug(baseName);
+
+        Assert.That(generated.Length, Is.LessThanOrEqualTo(PublishedAppHostNames.MaximumSlugLength));
+        Assert.That(generated, Is.EqualTo($"{new string('x', 61)}-1"));
+    }
+
+    [Test]
+    public async Task GenerateUniqueSlug_DoesNotUseReservedPrivateHostLabel()
+    {
+        await using var dbContext = CreateDbContext();
+        var appsService = CreateAppsService(dbContext, new DefaultHttpContext());
+
+        var generated = appsService.GenerateUniqueSlug("app-162a91472be14b93bd6a607c2afe5107");
+
+        Assert.That(PublishedAppHostNames.IsValidPublishedSlug(generated), Is.True);
+        Assert.That(PublishedAppHostNames.IsPrivateAppLabel(generated), Is.False);
+    }
+
+    [Test]
     public async Task ServeRestrictedApp_ReturnsHtmlUnauthorizedPage_ForAnonymousRequest()
     {
         var appId = Guid.NewGuid();
@@ -42,6 +84,7 @@ public class UserAppsControllerTests
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
+            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             CreatePrivateAppLaunchService())
         {
             ControllerContext = new ControllerContext
@@ -101,6 +144,7 @@ public class UserAppsControllerTests
             NullLogger<UserAppsController>.Instance,
             new StubWebHostEnvironment(),
             Options.Create(new WebAppConfig()),
+            Options.Create(new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" }),
             CreatePrivateAppLaunchService())
         {
             ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
