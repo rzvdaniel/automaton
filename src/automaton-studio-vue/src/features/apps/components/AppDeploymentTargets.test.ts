@@ -50,7 +50,7 @@ describe('AppDeploymentTargets', () => {
     const wrapper = await mountTargets([target(), target({ id: 'canary-id', name: 'Canary', slug: 'canary', isDefault: false })])
 
     expect(wrapper.text()).toContain('Live deployment')
-    expect(wrapper.text()).toContain('Additional targets')
+    expect(wrapper.text()).toContain('Additional environments')
     expect(wrapper.text()).toContain('Automaton Hosted')
     expect(wrapper.text()).not.toContain('hidden-hosted-runner')
   })
@@ -61,10 +61,10 @@ describe('AppDeploymentTargets', () => {
 
     await buttonByText(wrapper, 'Promote to Live').trigger('click')
     expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
-      message: expect.stringContaining('does not redeploy either target'),
+      message: expect.stringContaining('does not redeploy either environment'),
     }))
-    expect(wrapper.find('[aria-label="Delete target"]').exists()).toBe(true)
-    expect(wrapper.findAll('[aria-label="Delete target"]')).toHaveLength(1)
+    expect(wrapper.find('[aria-label="Delete environment"]').exists()).toBe(true)
+    expect(wrapper.findAll('[aria-label="Delete environment"]')).toHaveLength(1)
   })
 
   it('shows raw identifiers only after opening Advanced details', async () => {

@@ -33,6 +33,6 @@ describe('deployment target actions', () => {
 
   it('identifies the viewed target without selecting it', () => {
     const canary = target({ id: 'canary-id', name: 'Canary', slug: 'privileged-canary', isDefault: false, runner: { ...target().runner!, isHostedRunner: false, applicationProfile: 'PrivilegedHost' } })
-    expect(getDeployTargetOptionLabel(canary, 'canary-id')).toBe('privileged-canary · Additional · Self-hosted · Privileged Host · Running · Viewing')
+    expect(getDeployTargetOptionLabel(canary, 'canary-id')).toBe('Canary · Additional · Self-hosted · Privileged Host · Running · Viewing')
   })
 })

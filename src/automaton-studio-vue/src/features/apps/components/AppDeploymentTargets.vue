@@ -94,7 +94,7 @@ async function load() {
     runners.value = runnerData
     emit('targetsChanged', targetData)
   } catch (error) {
-    showError(error, 'Failed to load deployment targets')
+    showError(error, 'Failed to load environments')
   } finally {
     isLoading.value = false
   }
@@ -139,8 +139,8 @@ async function saveTarget() {
       const hasRuntime = editingTarget.value.frontendDeployed || editingTarget.value.backendDeployed
       if (runnerChanged && hasRuntime) {
         confirm.require({
-          header: 'Move deployed target?',
-          message: 'Changing the Runner will stop and remove this target runtime from its current Runner. Continue?',
+          header: 'Move deployed environment?',
+          message: 'Changing the Runner will stop and remove this environment runtime from its current Runner. Continue?',
           icon: 'pi pi-exclamation-triangle',
           acceptClass: 'p-button-danger',
           accept: () => void updateExistingTarget(true),
@@ -157,12 +157,12 @@ async function saveTarget() {
         privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged.value,
       })
       showEditor.value = false
-      toast.add({ severity: 'success', summary: 'Target created', detail: `${name.value.trim()} is ready to configure.`, life: 2500 })
+      toast.add({ severity: 'success', summary: 'Environment created', detail: `${name.value.trim()} is ready to configure.`, life: 2500 })
       await load()
     }
   } catch (error) {
     busyTargetId.value = null
-    showError(error, 'Failed to save deployment target')
+    showError(error, 'Failed to save environment')
   }
 }
 
@@ -184,10 +184,10 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
       )
     }
     showEditor.value = false
-    toast.add({ severity: 'success', summary: 'Target updated', detail: `${name.value.trim()} was updated.`, life: 2500 })
+    toast.add({ severity: 'success', summary: 'Environment updated', detail: `${name.value.trim()} was updated.`, life: 2500 })
     await load()
   } catch (error) {
-    showError(error, 'Failed to update deployment target')
+    showError(error, 'Failed to update environment')
   } finally {
     busyTargetId.value = null
   }
@@ -202,7 +202,7 @@ watch(runnerId, (nextRunnerId, previousRunnerId) => {
 function makeDefault(target: AppDeploymentTarget) {
   confirm.require({
     header: 'Promote to Live?',
-    message: 'This changes which deployed target is served through the App’s normal private and published URLs. It does not redeploy either target.',
+    message: 'This changes which environment is served through the App’s normal private and published URLs. It does not redeploy either environment.',
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Promote to Live',
     accept: () => void promoteToLive(target),
@@ -213,10 +213,10 @@ async function promoteToLive(target: AppDeploymentTarget) {
   busyTargetId.value = target.id
   try {
     await appsService.makeDefaultDeploymentTarget(props.appId, target.id)
-    toast.add({ severity: 'success', summary: 'Live target changed', detail: `${target.name} now serves this app’s normal routes.`, life: 2500 })
+    toast.add({ severity: 'success', summary: 'Live environment changed', detail: `${target.name} now serves this app’s normal routes.`, life: 2500 })
     await load()
   } catch (error) {
-    showError(error, 'Failed to promote the Live target')
+    showError(error, 'Failed to promote the Live environment')
   } finally {
     busyTargetId.value = null
   }
@@ -224,7 +224,7 @@ async function promoteToLive(target: AppDeploymentTarget) {
 
 function remove(target: AppDeploymentTarget) {
   confirm.require({
-    header: 'Delete deployment target?',
+    header: 'Delete environment?',
     message: `${target.name} and its deployed runtime will be removed. Historical execution records are preserved.`,
     icon: 'pi pi-exclamation-triangle',
     acceptClass: 'p-button-danger',
@@ -232,10 +232,10 @@ function remove(target: AppDeploymentTarget) {
       busyTargetId.value = target.id
       try {
         await appsService.deleteDeploymentTarget(props.appId, target.id)
-        toast.add({ severity: 'success', summary: 'Target deleted', detail: `${target.name} was deleted.`, life: 2500 })
+        toast.add({ severity: 'success', summary: 'Environment deleted', detail: `${target.name} was deleted.`, life: 2500 })
         await load()
       } catch (error) {
-        showError(error, 'Failed to delete deployment target')
+      showError(error, 'Failed to delete environment')
       } finally {
         busyTargetId.value = null
       }
@@ -308,7 +308,7 @@ function showError(error: unknown, fallback: string) {
       ?? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
       ?? fallback
     : error instanceof Error ? error.message : fallback
-  toast.add({ severity: 'error', summary: 'Deployment target error', detail, life: 5000 })
+  toast.add({ severity: 'error', summary: 'Environment error', detail, life: 5000 })
 }
 
 onMounted(load)
@@ -319,13 +319,13 @@ watch(() => props.refreshRevision, load)
   <section class="targets-section">
     <div class="targets-header">
       <div>
-        <h2>Deployment Targets</h2>
-        <p>Manage the Live deployment and optional named destinations separately.</p>
+        <h2>Environments</h2>
+        <p>Manage the Live environment and optional named environments separately.</p>
       </div>
-      <Button label="Add target" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
+      <Button label="Add environment" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
     </div>
 
-    <div v-if="isLoading" class="targets-loading"><i class="pi pi-spin pi-spinner"></i> Loading targets…</div>
+    <div v-if="isLoading" class="targets-loading"><i class="pi pi-spin pi-spinner"></i> Loading environments…</div>
     <template v-else>
       <section class="target-group">
         <div class="target-group__heading">
@@ -346,8 +346,8 @@ watch(() => props.refreshRevision, load)
       </section>
 
       <section class="target-group">
-        <div class="target-group__heading"><h3>Additional targets</h3><p>Use additional targets for staging, canary testing, or a different self-hosted runtime.</p></div>
-        <Message v-if="additionalTargets.length === 0" severity="secondary" :closable="false">No additional targets. Add one only when this app needs another named destination.</Message>
+        <div class="target-group__heading"><h3>Additional environments</h3><p>Use additional environments for staging, canary testing, or a different runtime.</p></div>
+        <Message v-if="additionalTargets.length === 0" severity="secondary" :closable="false">No additional environments. Add one only when this app needs another named destination.</Message>
         <div v-else class="target-list">
           <article v-for="target in additionalTargets" :key="target.id" class="target-card">
         <div class="target-main">
@@ -369,10 +369,10 @@ watch(() => props.refreshRevision, load)
             @click="emit('deploy', target)" />
           <Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(target)" :title="canOpenPreview(target) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(target)" />
           <Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', target)" />
-          <Button icon="pi pi-pencil" aria-label="Edit target" size="small" text @click="openEdit(target)" />
+          <Button icon="pi pi-pencil" aria-label="Edit environment" size="small" text @click="openEdit(target)" />
           <Button label="Promote to Live" size="small" text
             :loading="busyTargetId === target.id" @click="makeDefault(target)" />
-          <Button icon="pi pi-trash" aria-label="Delete target" severity="danger"
+          <Button icon="pi pi-trash" aria-label="Delete environment" severity="danger"
             size="small" text :loading="busyTargetId === target.id" @click="remove(target)" />
         </div>
       </article>
@@ -380,14 +380,14 @@ watch(() => props.refreshRevision, load)
       </section>
     </template>
 
-    <Dialog v-model:visible="showEditor" modal :header="editingTarget ? 'Edit deployment target' : 'Add deployment target'"
+    <Dialog v-model:visible="showEditor" modal :header="editingTarget ? 'Edit environment' : 'Add environment'"
       class="target-dialog" :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }">
       <div class="form-field">
         <label for="target-name">Name</label>
         <InputText id="target-name" v-model="name" placeholder="Server EU" autofocus />
       </div>
       <div class="form-field">
-        <label for="target-slug">Slug</label>
+        <label for="target-slug">Environment slug</label>
         <InputText id="target-slug" v-model="slug" placeholder="server-eu" />
         <small>Used by the CLI and deployment API: {{ normalizedSlug || 'server-eu' }}</small>
       </div>
@@ -413,7 +413,7 @@ watch(() => props.refreshRevision, load)
       </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
-        <Button label="Save target" :disabled="!name.trim() || !normalizedSlug || (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)"
+        <Button label="Save environment" :disabled="!name.trim() || !normalizedSlug || (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)"
           :loading="busyTargetId !== null" @click="saveTarget" />
       </template>
     </Dialog>

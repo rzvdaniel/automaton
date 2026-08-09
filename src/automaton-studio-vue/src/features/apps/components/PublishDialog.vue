@@ -149,13 +149,13 @@ function close() {
   >
     <div class="publish-dialog">
       <p class="text-color-secondary mt-0">
-        Publishes the current Live deployment. Additional deployment targets remain private previews.
+        Publishes the current Live environment. Additional environments remain private previews.
       </p>
       <p v-if="liveTargetName || liveTargetSlug" class="text-color-secondary text-sm">
         Publishing Live: {{ liveTargetSlug || liveTargetName || 'Live' }}
       </p>
       <p v-if="viewingTargetSlug && viewingTargetSlug !== liveTargetSlug" class="text-color-secondary text-sm">
-        Currently viewing {{ viewingTargetSlug }}. Additional targets are not published. Publishing still uses Live: {{ liveTargetSlug || liveTargetName || 'Live' }}.
+        Currently viewing: {{ viewingTargetName || viewingTargetSlug }}. Publishing still uses Live: {{ liveTargetName || liveTargetSlug || 'Live' }}. Additional environments remain private previews.
       </p>
       <div class="field mb-4">
         <label for="slug" class="block font-semibold mb-2">Public URL</label>

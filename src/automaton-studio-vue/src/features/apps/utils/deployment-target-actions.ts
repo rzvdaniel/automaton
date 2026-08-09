@@ -7,7 +7,7 @@ export function getDeployTargetOptionLabel(target: AppDeploymentTarget, viewingT
       ? 'Self-hosted · Privileged Host'
       : 'Self-hosted · Standard'
   const viewing = target.id === viewingTargetId ? ' · Viewing' : ''
-  return `${target.slug} · ${target.isDefault ? 'Live' : 'Additional'} · ${destination} · ${target.status}${viewing}`
+  return `${target.name} · ${target.isDefault ? 'Live' : 'Additional'} · ${destination} · ${target.status}${viewing}`
 }
 
 export function getDeployableTargets(targets: AppDeploymentTarget[]): AppDeploymentTarget[] {

@@ -49,9 +49,9 @@ describe('BuildVisualWorkspace target preview', () => {
   it('renders one target as a non-interactive summary', () => {
     const wrapper = mountWorkspace([target()])
 
-    expect(wrapper.find('select[aria-label="Viewing target"]').exists()).toBe(false)
+    expect(wrapper.find('select[aria-label="Environment"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Live · Automaton Hosted · Running')
-    expect(wrapper.text()).toContain('Workspace source · Viewing: live')
+    expect(wrapper.text()).toContain('Workspace source · Environment: Live')
   })
 
   it('renders multiple targets and emits the selected target', async () => {
@@ -59,7 +59,7 @@ describe('BuildVisualWorkspace target preview', () => {
     const canary = target({ id: 'canary-target-id', name: 'Canary', slug: 'canary', isDefault: false })
     const wrapper = mountWorkspace([live, canary])
 
-    const selector = wrapper.get('select[aria-label="Viewing target"]')
+    const selector = wrapper.get('select[aria-label="Environment"]')
     expect(selector.findAll('option')).toHaveLength(2)
     await selector.setValue('canary')
     expect(wrapper.emitted('selectTarget')?.[0]).toEqual([canary])

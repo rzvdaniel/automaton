@@ -618,7 +618,7 @@ async function handleSaveTemplateStatus() {
                 @click="activeSection = 'publishing'"
               />
               <Button
-                label="Deployment Targets"
+                label="Environments"
                 icon="pi pi-server"
                 text
                 :class="{ 'surface-hover': activeSection === 'targets' }"

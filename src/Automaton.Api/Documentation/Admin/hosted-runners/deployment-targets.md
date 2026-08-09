@@ -1,16 +1,16 @@
 ---
-title: Deployment targets and Runner relationships
+title: Environments and Runner relationships
 order: 15
 ---
 
-# Deployment targets and Runner relationships
+# Environments and Runner relationships
 
 Use this page when an administrator needs to understand how an app, its deployed instances, and Runner infrastructure relate to one another.
 
 ## The four concepts
 
 - **App** — the logical product: source code, name, description, ownership, publishing settings, and shared configuration.
-- **Deployment target** — one independently running copy of an app.
+- **Environment** — one independently running copy of an app (stored internally as a deployment target).
 - **Runner** — the execution service assigned to a deployment target.
 - **Runner Host** — the physical or virtual server that may run one or more Runners.
 
@@ -25,7 +25,7 @@ App
 
 Each target owns its Runner assignment, deployed files, backend process and port, logs, deployment state, and private runtime route. Targets can share a Runner without sharing runtime state.
 
-## Live and additional targets
+## Live and additional environments
 
 Every app has one primary target, shown as **Live**. Live is selected when a deployment does not specify a target:
 
@@ -33,7 +33,7 @@ Every app has one primary target, shown as **Live**. Live is selected when a dep
 automaton deploy
 ```
 
-Named targets are optional and are selected by slug:
+Named environments are optional and are selected by slug:
 
 ```bash
 automaton deploy staging
@@ -41,9 +41,9 @@ automaton deploy staging
 
 The Live target receives the app's normal private URL and, when published, its public URL. An additional target has its own private runtime route. Promoting a target to Live changes which running copy receives the normal URLs; it does not copy or delete another target's runtime.
 
-## Where users manage targets
+## Where users manage environments
 
-Users manage targets from **Apps → open an app → Settings → Deployment Targets**. The page separates **Live deployment** from **Additional targets**. They can deploy a target, open its preview, view logs, edit its name or slug and destination, promote an additional target to Live, and delete an additional target.
+Users manage environments from **Apps → open an app → Settings → Environments**. The page separates **Live** from **Additional environments**. They can deploy an environment, open its preview, view logs, edit its name or slug and runtime destination, promote an additional environment to Live, and delete an additional environment.
 
 The normal destination label is **Automaton Hosted**, **Self-hosted · Standard**, or **Self-hosted · Privileged Host**. Studio does not expose the identity of an Automaton-managed Hosted Runner in the normal destination selector. An **Advanced** section shows runner and target IDs, runtime transport, and the internal preview URL for troubleshooting.
 

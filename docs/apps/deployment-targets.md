@@ -1,4 +1,4 @@
-# Deployment Targets
+# Environments
 
 Automaton separates the logical application from each deployed instance:
 
@@ -14,7 +14,7 @@ deployed component flags, timestamps, route, and cleanup state. A Runner is an
 execution location; it may host several targets, including several targets of
 the same app.
 
-## Live and additional targets
+## Live and additional environments
 
 Every new app receives one server-owned target:
 
@@ -30,7 +30,7 @@ The Live target keeps the normal workflow simple:
 automaton deploy
 ```
 
-Advanced users can create and deploy named targets:
+Advanced users can create and deploy named environments:
 
 ```bash
 automaton target list
@@ -47,8 +47,8 @@ Omitting the target slug resolves the current Live target on the server.
 `--publish` and `--open` apply only to the Live target. An additional target must
 already have an assigned Runner.
 
-Studio keeps the Live deployment as the primary app experience. The
-**Deployment Targets** settings section exposes creation, editing, Runner
+Studio keeps the Live environment as the primary app experience. The
+**Environments** settings section exposes creation, editing, Runner
 assignment, deployment, primary-target switching, and deletion when needed.
 
 Legacy cleanup is an explicit maintenance operation. First request

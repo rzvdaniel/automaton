@@ -236,12 +236,12 @@ async function refreshApplication(): Promise<void> {
         <div>
           <span class="application-shell-header__label">Application preview</span>
           <div class="application-target-picker">
-            <span>Viewing target:</span>
+            <span>Environment:</span>
             <select
               v-if="targets.length > 1"
               class="application-target-select"
               :value="selectedTarget?.slug"
-              aria-label="Viewing target"
+              aria-label="Environment"
               @change="selectTarget"
             >
               <option v-for="target in targets" :key="target.id" :value="target.slug">
@@ -252,7 +252,7 @@ async function refreshApplication(): Promise<void> {
               {{ selectedTarget?.name || 'Live' }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
             </span>
           </div>
-          <div class="application-source-context">Workspace source · Viewing: {{ selectedTarget?.slug || 'Live' }}</div>
+          <div class="application-source-context">Workspace source · Environment: {{ selectedTarget?.name || 'Live' }}</div>
         </div>
       </div>
       <div class="application-shell-header__actions">

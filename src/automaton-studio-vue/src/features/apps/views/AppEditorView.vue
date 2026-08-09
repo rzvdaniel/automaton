@@ -1567,30 +1567,30 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
     <Dialog
       v-model:visible="showDeployTargetDialog"
       modal
-      header="Choose deployment target"
+      header="Deploy to environment"
       :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }"
     >
       <p class="text-color-secondary mt-0">
-        Choose where to deploy this App. Deploying a target never promotes it to Live.
+        Choose where to deploy this App workspace. Deploying does not change which environment is Live.
       </p>
-      <label for="top-level-deploy-target" class="font-semibold">Deployment target</label>
+      <label for="top-level-deploy-target" class="font-semibold">Environment</label>
       <select
         id="top-level-deploy-target"
         v-model="selectedDeployTargetSlug"
         class="w-full mt-2 p-2 border-round surface-border"
       >
-        <option :value="null" disabled>Select a target</option>
+        <option :value="null" disabled>Select an environment</option>
         <option v-for="target in deployableTargets" :key="target.id" :value="target.slug">
           {{ getDeployTargetOptionLabel(target, selectedViewingTarget?.id) }}
         </option>
       </select>
       <p v-if="selectedViewingTarget" class="text-color-secondary text-sm mb-0 mt-3">
-        Currently viewing: {{ selectedViewingTarget.name }}. Viewing does not choose a deployment target.
+        Currently viewing: {{ selectedViewingTarget.name }}. Viewing does not choose an environment.
       </p>
       <template #footer>
         <Button label="Cancel" text @click="showDeployTargetDialog = false" />
         <Button
-          :label="selectedDeployTarget ? `Deploy to ${selectedDeployTarget.slug}` : 'Deploy to selected target'"
+          :label="selectedDeployTarget ? `Deploy to ${selectedDeployTarget.name}` : 'Deploy to selected environment'"
           icon="pi pi-cloud-upload"
           :disabled="!selectedDeployTarget"
           @click="confirmTopLevelDeploy"
