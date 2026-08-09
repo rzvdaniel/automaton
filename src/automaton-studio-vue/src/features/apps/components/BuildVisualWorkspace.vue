@@ -262,7 +262,9 @@ async function refreshApplication(): Promise<void> {
                 <div class="application-target-option">
                   <strong>{{ getEnvironmentDisplayName(slotProps.option.target) }}</strong>
                   <span>{{ getTargetDestinationLabel(slotProps.option.target) }}</span>
-                  <span class="application-target-option__status">● {{ getTargetStatusLabel(slotProps.option.target) }}</span>
+                  <span class="application-target-option__status" :class="{ 'application-target-option__status--positive': getTargetStatusLabel(slotProps.option.target) === 'Running' }">
+                    <span class="application-target-option__status-dot">●</span> {{ getTargetStatusLabel(slotProps.option.target) }}
+                  </span>
                 </div>
               </template>
             </Select>
@@ -548,13 +550,13 @@ async function refreshApplication(): Promise<void> {
 .application-target-picker {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   margin-top: 0.35rem;
   min-width: 0;
 }
 
-.application-target-select { min-width: 9rem; }
-.application-target-name { min-width: 9rem; font-size: 0.95rem; font-weight: 600; }
+.application-target-select { width: 11rem; flex: 0 0 11rem; }
+.application-target-name { width: 11rem; flex: 0 0 11rem; font-size: 0.95rem; font-weight: 600; }
 .application-target-context {
   display: inline-flex;
   align-items: center;
@@ -569,6 +571,9 @@ async function refreshApplication(): Promise<void> {
 .application-target-status--positive .application-target-status__dot { color: var(--p-green-500); }
 .application-target-option { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(10rem, 1.5fr) auto; gap: 0.75rem; align-items: center; width: 100%; }
 .application-target-option__status { color: var(--p-text-muted-color); }
+.application-target-option__status-dot { color: var(--p-text-muted-color); font-size: 0.7rem; }
+.application-target-option__status--positive { color: var(--p-green-600); }
+.application-target-option__status--positive .application-target-option__status-dot { color: var(--p-green-500); }
 
 .application-shell-header__actions {
   display: flex;
