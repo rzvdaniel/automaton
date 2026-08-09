@@ -27,11 +27,12 @@ public static class DeployCommand
         var targetArgument = new Argument<string?>(
             "target",
             () => null,
-            "Named deployment target slug; omit to deploy the default target")
+            "Environment slug; omit to deploy the only environment or choose interactively")
         {
             Arity = ArgumentArity.ZeroOrOne
         };
         var runnerOption = new Option<string?>("--runner", "Runner ID or exact runner name to assign before backend deploy when needed");
+        var privilegedAckOption = new Option<bool>("--acknowledge-privileged-host-access", "Acknowledge elevated host access for a new Privileged Host assignment");
         var cleanOption = new Option<bool>(
             "--clean",
             "Wipe all server-side app files before uploading (full replace)");
@@ -55,6 +56,7 @@ public static class DeployCommand
         {
             targetArgument,
             runnerOption,
+            privilegedAckOption,
             cleanOption,
             skipBackendOption,
             dirOption,
@@ -70,6 +72,7 @@ public static class DeployCommand
         {
             var targetSlug = context.ParseResult.GetValueForArgument(targetArgument);
             var runner = context.ParseResult.GetValueForOption(runnerOption);
+            var privilegedAck = context.ParseResult.GetValueForOption(privilegedAckOption);
             var clean = context.ParseResult.GetValueForOption(cleanOption);
             var skipBackend = context.ParseResult.GetValueForOption(skipBackendOption);
             var dir = context.ParseResult.GetValueForOption(dirOption);
@@ -93,8 +96,14 @@ public static class DeployCommand
                 var projectConfig = config.TryLoadProjectConfig(cwd);
                 var resolvedContext = config.ResolveContext(projectConfig, cwd, environmentName);
                 var targetService = new DeploymentTargetService(config);
-                var target = await targetService.ResolveAsync(
-                    cwd, targetSlug, environmentName, context.GetCancellationToken());
+                var allTargets = (await targetService.ListAsync(cwd, environmentName, context.GetCancellationToken())).Targets;
+                var target = !string.IsNullOrWhiteSpace(runner)
+                    ? DeploymentTargetService.SelectEnvironment(allTargets, targetSlug, nonInteractive)
+                    : DeploymentTargetService.SelectForDeploy(allTargets, targetSlug, nonInteractive);
+                if (!string.IsNullOrWhiteSpace(runner) && target.Status == "Deploying")
+                {
+                    throw new InvalidOperationException($"Environment '{target.Slug}' is already Deploying and cannot be reassigned.");
+                }
                 if (!string.IsNullOrWhiteSpace(runner))
                 {
                     target = await targetService.AssignRunnerAsync(
@@ -102,18 +111,21 @@ public static class DeployCommand
                         target,
                         runner,
                         environmentName,
+                        privilegedAck,
+                        nonInteractive,
                         context.GetCancellationToken());
                 }
+                DeploymentTargetService.EnsureDeployable(target);
                 if (!target.IsDefault && target.Runner == null)
                 {
                     throw new InvalidOperationException(
-                        $"Deployment target '{target.Slug}' has no assigned Runner. " +
+                        $"Environment '{target.Slug}' has no assigned Runner. " +
                         $"Assign one with 'automaton deploy {target.Slug} --runner <runner-id-or-name>'.");
                 }
                 if (!target.IsDefault && (publish || open))
                 {
                     throw new InvalidOperationException(
-                        "--publish and --open apply only to the default target.");
+                        "--publish and --open apply only to the Live target.");
                 }
                 WriteDeployHeading(projectConfig?.Name, resolvedContext.AppId, resolvedContext.EnvironmentName, resolvedContext.Server, asJson, nonInteractive, ref headingWritten);
                 var preparation = new DeployPreparationResult
@@ -126,7 +138,7 @@ public static class DeployCommand
                         : [new DeployCheckResult(
                             DeployCheckNames.RunnerAssignment,
                             true,
-                            $"target '{target.Slug}' assigned to Runner {target.Runner.Name}")]
+                            $"environment '{target.Slug}' assigned to Runner {target.Runner.Name}")]
                 };
 
                 if (!preparation.Success)
@@ -408,7 +420,7 @@ public static class DeployCommand
         if (result.Success)
         {
             AnsiConsole.MarkupLine(
-                $"[bold]Target:[/] {Markup.Escape(result.TargetSlug ?? "default")} " +
+                $"[bold]Environment:[/] {Markup.Escape(result.TargetName ?? result.TargetSlug ?? "Live")} " +
                 $"([grey]{Markup.Escape(result.DeploymentMode ?? "default")}[/])");
             AnsiConsole.MarkupLine(
                 $"[bold]Runner:[/] {Markup.Escape(result.RunnerName ?? "managed/default assignment")}");
@@ -581,7 +593,7 @@ public static class DeployCommand
         if (result.Success)
         {
             Console.WriteLine(
-                $"Target: {result.TargetSlug ?? "default"} ({result.DeploymentMode ?? "default"})");
+                $"Environment: {result.TargetName ?? result.TargetSlug ?? "Live"} ({result.DeploymentMode ?? "Live"})");
             Console.WriteLine(
                 $"Runner: {result.RunnerName ?? "managed/default assignment"}");
             if (!string.IsNullOrWhiteSpace(result.OpenAppUrl))

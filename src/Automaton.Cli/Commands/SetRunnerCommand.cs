@@ -12,11 +12,11 @@ public static class SetRunnerCommand
         var runnerArgument = new Argument<string?>(
             "runner", () => null, "Runner ID, slug, or exact Runner name");
         var clearOption = new Option<bool>(
-            "--clear", "Clear the default target's Runner assignment");
+            "--clear", "Clear the Live target's Runner assignment");
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command(
             "set-runner",
-            "Assign or clear the Runner for the default deployment target")
+            "Assign or clear the Runner for the Live environment")
         {
             runnerArgument,
             clearOption,
@@ -53,8 +53,8 @@ public static class SetRunnerCommand
                 else
                 {
                     AnsiConsole.MarkupLine(clear
-                        ? "[green]Cleared the default target's Runner assignment.[/]"
-                        : $"[green]Default target Runner:[/] {Markup.Escape(target.Runner?.Name ?? runner!)}");
+                        ? "[green]Cleared the Live target's Runner assignment.[/]"
+                        : $"[green]Live target Runner:[/] {Markup.Escape(target.Runner?.Name ?? runner!)}");
                 }
                 Environment.ExitCode = 0;
             }

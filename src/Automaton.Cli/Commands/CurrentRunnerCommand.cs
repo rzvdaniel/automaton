@@ -11,7 +11,7 @@ public static class CurrentRunnerCommand
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
         var command = new Command(
             "current-runner",
-            "Show the Runner assigned to the default deployment target")
+            "Show the Runner assigned to the Live environment")
         {
             jsonOption
         };
@@ -36,12 +36,12 @@ public static class CurrentRunnerCommand
                 else if (target.Runner == null)
                 {
                     AnsiConsole.MarkupLine(
-                        "[yellow]The default target has no assigned Runner.[/]");
+                        "[yellow]The Live target has no assigned Runner.[/]");
                 }
                 else
                 {
                     AnsiConsole.MarkupLine(
-                        $"[green]Default target Runner:[/] {Markup.Escape(target.Runner.Name)} ({Markup.Escape(target.Runner.Id)})");
+                        $"[green]Live environment Runner:[/] {Markup.Escape(target.Runner.Name)} ({Markup.Escape(target.Runner.Id)})");
                     AnsiConsole.MarkupLine(target.Runner.IsOnline
                         ? "[green]Status:[/] connected"
                         : "[yellow]Status:[/] offline");

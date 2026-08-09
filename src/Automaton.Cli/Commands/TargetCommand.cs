@@ -63,12 +63,14 @@ public static class TargetCommand
             IsRequired = true
         };
         var jsonOption = new Option<bool>("--json", "Print the result as JSON");
+        var privilegedAckOption = new Option<bool>("--acknowledge-privileged-host-access", "Acknowledge elevated host access for a new Privileged Host assignment");
         var environmentOption = EnvironmentOption();
         var command = new Command("add", "Add a deployment target")
         {
             slugArgument,
             runnerOption,
             jsonOption,
+            privilegedAckOption,
             environmentOption
         };
         command.SetHandler(async (InvocationContext context) =>
@@ -76,11 +78,12 @@ public static class TargetCommand
             var slug = context.ParseResult.GetValueForArgument(slugArgument);
             var runner = context.ParseResult.GetValueForOption(runnerOption);
             var asJson = context.ParseResult.GetValueForOption(jsonOption);
+            var privilegedAck = context.ParseResult.GetValueForOption(privilegedAckOption);
             var environmentName = context.ParseResult.GetValueForOption(environmentOption);
             try
             {
                 var target = await new DeploymentTargetService(config).AddAsync(
-                    Directory.GetCurrentDirectory(), slug, runner!, environmentName);
+                    Directory.GetCurrentDirectory(), slug, runner!, environmentName, privilegedAck, CliInteraction.IsNonInteractive(false, asJson));
                 if (asJson)
                 {
                     CliJson.Write(new { success = true, target });
@@ -88,7 +91,7 @@ public static class TargetCommand
                 else
                 {
                     AnsiConsole.MarkupLine(
-                        $"[green]Target added:[/] {Markup.Escape(target.Slug)} → {Markup.Escape(target.Runner?.Name ?? "unassigned")}");
+                        $"[green]Environment added:[/] {Markup.Escape(target.Slug)} → {Markup.Escape(target.Runner?.Name ?? "unassigned")}");
                 }
                 context.ExitCode = 0;
             }
@@ -166,7 +169,7 @@ public static class TargetCommand
                 }
                 else
                 {
-                    AnsiConsole.MarkupLine($"[green]Live target:[/] {Markup.Escape(slug)}");
+                    AnsiConsole.MarkupLine($"[green]Live environment:[/] {Markup.Escape(slug)}");
                 }
                 context.ExitCode = 0;
             }
@@ -195,18 +198,18 @@ public static class TargetCommand
         string appName,
         IReadOnlyList<DeploymentTargetInfo> targets)
     {
-        AnsiConsole.MarkupLine($"[bold]Targets for {Markup.Escape(appName)}[/]");
+        AnsiConsole.MarkupLine($"[bold]Environments for {Markup.Escape(appName)}[/]");
         var table = new Table()
-            .AddColumn("")
-            .AddColumn("Target")
-            .AddColumn("Runner")
+            .AddColumn("Environment")
+            .AddColumn("Role")
+            .AddColumn("Destination")
             .AddColumn("Status");
         foreach (var target in targets)
         {
             table.AddRow(
-                target.IsDefault ? "[green]*[/]" : "",
-                Markup.Escape(target.Slug),
-                Markup.Escape(target.Runner?.Name ?? "unassigned"),
+                Markup.Escape($"{target.Name} ({target.Slug})"),
+                target.IsDefault ? "Live" : "Additional",
+                Markup.Escape(DeploymentTargetService.FormatDestination(target.Runner)),
                 Markup.Escape(target.Runner is { IsOnline: false }
                     ? "Runner offline"
                     : target.Status));

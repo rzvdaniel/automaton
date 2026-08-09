@@ -83,9 +83,10 @@ public class AutomatonApiClient : IDisposable
         string name,
         string slug,
         string? runnerId,
+        bool privilegedHostAccessAcknowledged = false,
         CancellationToken ct = default)
     {
-        var payload = JsonSerializer.Serialize(new { name, slug, runnerId }, JsonOptions);
+        var payload = JsonSerializer.Serialize(new { name, slug, runnerId, privilegedHostAccessAcknowledged }, JsonOptions);
         using var resp = await PostJsonAsync($"api/apps/{appId}/targets", payload, ct);
         await EnsureSuccessAsync(resp);
         return JsonSerializer.Deserialize<DeploymentTargetInfo>(
@@ -108,10 +109,11 @@ public class AutomatonApiClient : IDisposable
         string targetId,
         string? runnerId,
         bool cleanupDeployedRuntime = false,
+        bool privilegedHostAccessAcknowledged = false,
         CancellationToken ct = default)
     {
         var payload = JsonSerializer.Serialize(
-            new { runnerId, cleanupDeployedRuntime },
+            new { runnerId, cleanupDeployedRuntime, privilegedHostAccessAcknowledged },
             JsonOptions);
         using var resp = await PostJsonAsync(
             $"api/apps/{appId}/targets/{targetId}/assign-runner", payload, ct);

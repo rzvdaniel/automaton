@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using Spectre.Console;
 
 namespace Automaton.Cli.Services;
 
@@ -45,31 +46,123 @@ public sealed class DeploymentTargetService(ConfigService config)
         var available = targets.Count == 0
             ? "(none)"
             : string.Join(", ", targets.Select(candidate =>
-                candidate.IsDefault ? $"{candidate.Slug} (default)" : candidate.Slug));
+                candidate.IsDefault ? $"{candidate.Slug} (Live)" : candidate.Slug));
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(normalized)
-                ? $"This app has no default deployment target. Available targets: {available}."
-                : $"Deployment target '{normalized}' was not found. Available targets: {available}.");
+                ? $"This app has no Live environment. Available environments: {available}."
+                : $"Environment '{normalized}' was not found. Available environments: {available}.");
     }
+
+    public static IReadOnlyList<DeploymentTargetInfo> GetDeployableTargets(
+        IReadOnlyList<DeploymentTargetInfo> targets) => targets
+        .Where(IsDeployable)
+        .ToList();
+
+    public static bool IsDeployable(DeploymentTargetInfo environment) =>
+        environment.Status != "Deploying" &&
+        (environment.Runner is null && environment.IsDefault || environment.Runner is { IsOnline: true });
+
+    public static void EnsureDeployable(DeploymentTargetInfo environment)
+    {
+        if (!IsDeployable(environment))
+        {
+            throw new InvalidOperationException($"Environment '{environment.Slug}' is not deployable in its current state ({environment.Status}).");
+        }
+    }
+
+    public static DeploymentTargetInfo SelectEnvironment(
+        IReadOnlyList<DeploymentTargetInfo> environments,
+        string? slug,
+        bool nonInteractive)
+    {
+        if (!string.IsNullOrWhiteSpace(slug)) return Select(environments, slug);
+        if (environments.Count == 1) return environments[0];
+        if (environments.Count == 0) throw new InvalidOperationException("This app has no environments.");
+        if (nonInteractive)
+        {
+            var slugs = string.Join(", ", environments.Select(environment => environment.Slug));
+            throw new InvalidOperationException($"Multiple environments are available. Specify one explicitly: {slugs}.");
+        }
+        var labels = environments.Select(Format).ToList();
+        var prompt = new SelectionPrompt<string>().AddChoices(labels);
+        prompt.Title = "Select an environment";
+        return environments[labels.IndexOf(AnsiConsole.Prompt(prompt))];
+    }
+
+    public static DeploymentTargetInfo SelectForDeploy(
+        IReadOnlyList<DeploymentTargetInfo> targets,
+        string? slug,
+        bool nonInteractive)
+    {
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            var explicitEnvironment = Select(targets, slug);
+            EnsureDeployable(explicitEnvironment);
+            return explicitEnvironment;
+        }
+
+        var deployable = GetDeployableTargets(targets);
+        if (deployable.Count == 1)
+        {
+            return deployable[0];
+        }
+        if (deployable.Count == 0)
+        {
+            throw new InvalidOperationException("This app has no deployable environments.");
+        }
+        if (nonInteractive)
+        {
+            var commands = string.Join(", ", deployable.Select(target => $"automaton deploy {target.Slug}"));
+            throw new InvalidOperationException($"Multiple deployable environments are available. Choose one explicitly: {commands}.");
+        }
+
+        var labels = deployable.Select(Format).ToList();
+        var prompt = new SelectionPrompt<string>()
+            .AddChoices(labels);
+        prompt.Title = "Select an environment";
+        var selected = Spectre.Console.AnsiConsole.Prompt(prompt);
+        return deployable[labels.IndexOf(selected)];
+    }
+
+    public static string Format(DeploymentTargetInfo target)
+    {
+        var destination = FormatDestination(target.Runner);
+        var status = target.Runner is { IsOnline: false } ? "Runner offline" : target.Status;
+        return $"{target.Name} ({target.Slug}) · {(target.IsDefault ? "Live" : "Additional")} · {destination} · {status}";
+    }
+
+    public static string FormatDestination(DeploymentTargetRunnerInfo? runner) =>
+        runner?.IsHostedRunner == true
+            ? "Automaton Hosted"
+            : runner is null
+                ? "No runtime assigned"
+                : runner.ApplicationProfile == "PrivilegedHost"
+                    ? "Self-hosted · Privileged Host"
+                    : "Self-hosted · Standard";
 
     public async Task<DeploymentTargetInfo> AddAsync(
         string directory,
         string slug,
         string runnerReference,
         string? environmentName = null,
+        bool privilegedHostAccessAcknowledged = false,
+        bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runnerId = await ResolveRunnerIdAsync(
+            var runner = await ResolveRunnerAsync(
                 client, runnerReference, cancellationToken);
+            var acknowledged = await EnsurePrivilegedAcknowledgementAsync(
+                runner.IsPrivilegedHost, privilegedHostAccessAcknowledged, nonInteractive);
             var normalizedSlug = slug.Trim().ToLowerInvariant();
             return await client.CreateDeploymentTargetAsync(
                 appId,
                 normalizedSlug,
                 normalizedSlug,
-                runnerId,
+                runner.Id,
+                acknowledged,
                 cancellationToken);
         }
     }
@@ -79,15 +172,22 @@ public sealed class DeploymentTargetService(ConfigService config)
         DeploymentTargetInfo target,
         string runnerReference,
         string? environmentName = null,
+        bool privilegedHostAccessAcknowledged = false,
+        bool nonInteractive = false,
         CancellationToken cancellationToken = default)
     {
         var (client, appId, _) = CreateClient(directory, environmentName);
         using (client)
         {
-            var runnerId = await ResolveRunnerIdAsync(
+            var runner = await ResolveRunnerAsync(
                 client, runnerReference, cancellationToken);
+            var unchangedPrivilegedAssignment = target.Runner?.Id == runner.Id && target.Runner.ApplicationProfile == "PrivilegedHost";
+            var acknowledged = unchangedPrivilegedAssignment || await EnsurePrivilegedAcknowledgementAsync(
+                runner.IsPrivilegedHost, privilegedHostAccessAcknowledged, nonInteractive);
             await client.AssignDeploymentTargetRunnerAsync(
-                appId, target.Id, runnerId, ct: cancellationToken);
+                appId, target.Id, runner.Id,
+                privilegedHostAccessAcknowledged: acknowledged,
+                ct: cancellationToken);
         }
         return await ResolveAsync(directory, target.Slug, environmentName, cancellationToken);
     }
@@ -156,7 +256,7 @@ public sealed class DeploymentTargetService(ConfigService config)
             project.Name ?? resolved.AppId);
     }
 
-    private static async Task<string> ResolveRunnerIdAsync(
+    private static async Task<(string Id, bool IsPrivilegedHost)> ResolveRunnerAsync(
         AutomatonApiClient client,
         string runnerReference,
         CancellationToken cancellationToken)
@@ -191,7 +291,22 @@ public sealed class DeploymentTargetService(ConfigService config)
             throw new InvalidOperationException(
                 $"Several Runners match '{runnerReference}'. Use the Runner ID.");
         }
-        return matches[0].GetProperty("id").GetString()!;
+        var match = matches[0];
+        var profile = match.TryGetProperty("applicationProfile", out var profileProperty)
+            ? profileProperty.GetString() : null;
+        return (match.GetProperty("id").GetString()!, string.Equals(profile, "PrivilegedHost", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Task<bool> EnsurePrivilegedAcknowledgementAsync(bool isPrivilegedHost, bool acknowledged, bool nonInteractive)
+    {
+        if (!isPrivilegedHost || acknowledged) return Task.FromResult(acknowledged);
+        if (nonInteractive)
+        {
+            throw new InvalidOperationException("Privileged Host assignment requires --acknowledge-privileged-host-access.");
+        }
+        var confirmed = AnsiConsole.Confirm("This environment will run on a Privileged Host Runner.\nThe App container receives elevated host access.\nContinue?", defaultValue: false);
+        if (!confirmed) throw new InvalidOperationException("Privileged Host assignment was not acknowledged.");
+        return Task.FromResult(true);
     }
 
     private static string? ToSlug(string? value)
