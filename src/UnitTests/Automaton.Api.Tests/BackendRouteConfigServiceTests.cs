@@ -59,6 +59,7 @@ public class BackendRouteConfigServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/api`)"));
+            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"\n      priority: 50"));
             Assert.That(content, Does.Contain("tls: {}"));
             Assert.That(content, Does.Not.Contain("certResolver"));
             Assert.That(content, Does.Contain(
@@ -202,8 +203,11 @@ public class BackendRouteConfigServiceTests
         Assert.Multiple(() =>
         {
             Assert.That(content, Does.Contain("service: \"api-blue-edge\""));
+            Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"\n      priority: 50"));
             Assert.That(content, Does.Contain(
                 $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/api/$1"));
+            Assert.That(content, Does.Contain(
+                $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/$1"));
             Assert.That(content, Does.Not.Contain("http://runner-"));
         });
     }
