@@ -971,8 +971,7 @@ public class AppsService
     private static bool IsValidUrlSlug(string slug)
     {
         // URL slug validation: lowercase letters, numbers, hyphens
-        return PublishedAppHostNames.IsValidSlug(slug) &&
-            !PublishedAppHostNames.IsPrivateAppLabel(slug);
+        return PublishedAppHostNames.IsValidPublishedSlug(slug);
     }
 
     internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null, Guid? ownerId = null)

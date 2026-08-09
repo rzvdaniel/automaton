@@ -11,10 +11,12 @@ public static class PublishedAppHostNames
             label.StartsWith("app-", StringComparison.OrdinalIgnoreCase) &&
             label[4..].All(IsHexDigit);
 
-    public static bool IsValidSlug(string slug)
+    public static bool IsValidPublishedSlug(string slug)
         => !string.IsNullOrWhiteSpace(slug) &&
+            slug.Length <= 63 &&
             slug[0] != '-' &&
             slug[^1] != '-' &&
+            !IsPrivateAppLabel(slug) &&
             slug.All(character =>
                 character is >= 'a' and <= 'z' ||
                 character is >= '0' and <= '9' ||
@@ -28,7 +30,7 @@ public static class PublishedAppHostNames
             return false;
         }
 
-        if (!IsValidSlug(label))
+        if (!IsValidPublishedSlug(label))
         {
             return false;
         }
@@ -39,6 +41,9 @@ public static class PublishedAppHostNames
 
     public static string BuildPublishedAppHost(string slug, string appsDomain)
         => $"{slug}.{appsDomain}";
+
+    public static string BuildPrivateAppHost(Guid appId, string appsDomain)
+        => $"app-{appId:N}.{appsDomain}";
 
     private static bool TryGetLabel(string host, string appsDomain, out string label)
     {
@@ -58,7 +63,7 @@ public static class PublishedAppHostNames
             return false;
         }
 
-        label = prefix;
+        label = prefix.ToLowerInvariant();
         return true;
     }
 

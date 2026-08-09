@@ -43,6 +43,7 @@ public class UserAppsController : ControllerBase
     private readonly ILogger<UserAppsController> logger;
     private readonly IWebHostEnvironment environment;
     private readonly WebAppConfig webAppConfig;
+    private readonly PublishedAppsConfig publishedAppsConfig;
     private readonly PrivateAppLaunchService privateAppLaunchService;
 
     public UserAppsController(
@@ -55,6 +56,7 @@ public class UserAppsController : ControllerBase
         ILogger<UserAppsController> logger,
         IWebHostEnvironment environment,
         IOptions<WebAppConfig> webAppConfig,
+        IOptions<PublishedAppsConfig> publishedAppsConfig,
         PrivateAppLaunchService privateAppLaunchService)
     {
         this.dbContext = dbContext;
@@ -66,6 +68,7 @@ public class UserAppsController : ControllerBase
         this.logger = logger;
         this.environment = environment;
         this.webAppConfig = webAppConfig.Value;
+        this.publishedAppsConfig = publishedAppsConfig.Value;
         this.privateAppLaunchService = privateAppLaunchService;
     }
 
@@ -199,12 +202,12 @@ public class UserAppsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> ServePublishedSubdomainAppFile(string? path)
     {
-        var host = Request.Host.Host;
-        var marker = ".apps.";
-        var markerIndex = host.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (markerIndex <= 0) return NotFound();
+        if (!PublishedAppHostNames.TryGetPublishedAppSlug(
+                Request.Host.Host, publishedAppsConfig.PublicBaseUrlHost, out var slug))
+        {
+            return NotFound();
+        }
 
-        var slug = host[..markerIndex];
         return await ServePublishedAppFile(slug, string.IsNullOrWhiteSpace(path) ? "index.html" : path);
     }
 

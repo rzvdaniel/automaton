@@ -185,7 +185,8 @@ public sealed class RuntimeTunnelService(
 
     internal static bool IsExpectedAppHost(string host, AppDeploymentTarget target, PublishedAppsConfig publishedAppsConfig)
     {
-        var privateHost = $"app-{target.WebAppId:N}.{publishedAppsConfig.PublicBaseUrlHost}";
+        var privateHost = PublishedAppHostNames.BuildPrivateAppHost(
+            target.WebAppId, publishedAppsConfig.PublicBaseUrlHost);
         if (string.Equals(host, privateHost, StringComparison.OrdinalIgnoreCase))
             return true;
 

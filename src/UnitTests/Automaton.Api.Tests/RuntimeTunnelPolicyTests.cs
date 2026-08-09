@@ -25,6 +25,24 @@ public class RuntimeTunnelPolicyTests
         Assert.That(slug, Is.EqualTo(expectedSlug));
     }
 
+    [Test]
+    public void PublishedAppHostNames_EnforcesDnsLabelBoundariesAndNormalization()
+    {
+        var validSlug = new string('a', 63);
+        var invalidSlug = new string('a', 64);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(PublishedAppHostNames.IsValidPublishedSlug(validSlug), Is.True);
+            Assert.That(PublishedAppHostNames.IsValidPublishedSlug(invalidSlug), Is.False);
+            Assert.That(PublishedAppHostNames.TryGetPublishedAppSlug(
+                "APP-BUILDER.apps.automaton.monster", "apps.automaton.monster", out var normalized), Is.True);
+            Assert.That(normalized, Is.EqualTo("app-builder"));
+            Assert.That(PublishedAppHostNames.IsValidPublishedSlug(
+                "app-162a91472be14b93bd6a607c2afe5107"), Is.False);
+        });
+    }
+
     [TestCase("Managed", "Standard", true)]
     [TestCase("Managed", "PrivilegedHost", true)]
     [TestCase("Infrastructure", null, false)]

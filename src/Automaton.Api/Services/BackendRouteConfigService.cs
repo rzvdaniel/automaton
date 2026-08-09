@@ -178,7 +178,8 @@ public class BackendRouteConfigService
         foreach (var route in routes.Where(route => route.IsDefault))
         {
             var key = $"private-{route.AppId:N}";
-            var host = BuildPrivateAppHost(route.AppId);
+            var host = PublishedAppHostNames.BuildPrivateAppHost(
+                route.AppId, publishedAppsConfig.PublicBaseUrlHost);
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
@@ -203,7 +204,8 @@ public class BackendRouteConfigService
         {
             var key = $"target-{route.DeploymentTargetId:N}";
             var prefix = BuildTargetRoutePrefix(route.AppId, route.DeploymentTargetId);
-            var host = BuildPrivateAppHost(route.AppId);
+            var host = PublishedAppHostNames.BuildPrivateAppHost(
+                route.AppId, publishedAppsConfig.PublicBaseUrlHost);
             builder.AppendLine($"    {key}:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
@@ -313,15 +315,6 @@ public class BackendRouteConfigService
 
     private static string GetServiceName(RouteTarget route, string routeServiceName)
         => route.UsesRuntimeTunnel ? route.RuntimeEndpoint : routeServiceName;
-
-    private string BuildPrivateAppHost(Guid appId)
-    {
-        var baseHost = publishedAppsConfig.PublicBaseUrlHost;
-        const string appsSuffix = ".apps.";
-        var appsMarker = baseHost.IndexOf(appsSuffix, StringComparison.OrdinalIgnoreCase);
-        var suffix = appsMarker >= 0 ? baseHost[appsMarker..] : $".{baseHost}";
-        return $"app-{appId:N}{suffix}";
-    }
 
     private string ResolveRootPath()
     {
