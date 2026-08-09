@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.Abstractions;
+using Automaton.Api.Config;
+using Microsoft.Extensions.Options;
 
 namespace Automaton.Api.Attributes;
 
@@ -9,15 +11,9 @@ public sealed class PublishedAppSubdomainOnlyAttribute : ActionMethodSelectorAtt
     public override bool IsValidForRequest(RouteContext routeContext, ActionDescriptor action)
     {
         var host = routeContext.HttpContext.Request.Host.Host;
-        var markerIndex = host.IndexOf(".apps.", StringComparison.OrdinalIgnoreCase);
-        if (markerIndex <= 0)
-        {
-            return false;
-        }
-
-        var subdomain = host[..markerIndex];
-        return !subdomain.StartsWith("app-", StringComparison.OrdinalIgnoreCase)
-            || subdomain.Length != 36
-            || !subdomain[4..].All(Uri.IsHexDigit);
+        var config = routeContext.HttpContext.RequestServices
+            .GetRequiredService<IOptions<PublishedAppsConfig>>().Value;
+        return PublishedAppHostNames.TryGetPublishedAppSlug(
+            host, config.PublicBaseUrlHost, out _);
     }
 }

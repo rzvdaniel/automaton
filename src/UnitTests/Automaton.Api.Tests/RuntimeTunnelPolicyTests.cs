@@ -10,6 +10,21 @@ namespace Automaton.Api.Tests;
 [TestFixture]
 public class RuntimeTunnelPolicyTests
 {
+    [TestCase("runner-deployment-diagnostic.apps.automaton.monster", true, "runner-deployment-diagnostic")]
+    [TestCase("app-builder.apps.automaton.monster", true, "app-builder")]
+    [TestCase("app-162a91472be14b93bd6a607c2afe5107.apps.automaton.monster", false, "")]
+    [TestCase("foo.apps.automaton.monster.evil.example", false, "")]
+    [TestCase("foo.bar.apps.automaton.monster", false, "")]
+    [TestCase("apps.automaton.monster", false, "")]
+    public void PublishedAppHostNames_RecognizesOnlyExactSingleLabelHosts(string host, bool expected, string expectedSlug)
+    {
+        var result = PublishedAppHostNames.TryGetPublishedAppSlug(
+            host, "apps.automaton.monster", out var slug);
+
+        Assert.That(result, Is.EqualTo(expected));
+        Assert.That(slug, Is.EqualTo(expectedSlug));
+    }
+
     [TestCase("Managed", "Standard", true)]
     [TestCase("Managed", "PrivilegedHost", true)]
     [TestCase("Infrastructure", null, false)]

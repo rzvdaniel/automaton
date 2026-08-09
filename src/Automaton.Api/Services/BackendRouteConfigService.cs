@@ -217,7 +217,8 @@ public class BackendRouteConfigService
         foreach (var route in routes.Where(route => !string.IsNullOrWhiteSpace(route.Slug)))
         {
             var key = $"slug-{route.AppId:N}";
-            var host = BuildPublishedAppHost(route.Slug!);
+            var host = PublishedAppHostNames.BuildPublishedAppHost(
+                route.Slug!, publishedAppsConfig.PublicBaseUrlHost);
             builder.AppendLine($"    {key}-api:");
             builder.AppendLine("      entryPoints:");
             builder.AppendLine("        - websecure");
@@ -312,19 +313,6 @@ public class BackendRouteConfigService
 
     private static string GetServiceName(RouteTarget route, string routeServiceName)
         => route.UsesRuntimeTunnel ? route.RuntimeEndpoint : routeServiceName;
-
-    private string BuildPublishedAppHost(string slug)
-    {
-        var baseHost = publishedAppsConfig.PublicBaseUrlHost;
-        const string appsSuffix = ".apps.";
-        var appsMarker = baseHost.IndexOf(appsSuffix, StringComparison.OrdinalIgnoreCase);
-        if (appsMarker >= 0)
-        {
-            return $"{slug}{baseHost[appsMarker..]}";
-        }
-
-        return $"{slug}.{baseHost}";
-    }
 
     private string BuildPrivateAppHost(Guid appId)
     {

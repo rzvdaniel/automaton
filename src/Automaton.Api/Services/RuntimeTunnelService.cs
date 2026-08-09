@@ -185,11 +185,7 @@ public sealed class RuntimeTunnelService(
 
     internal static bool IsExpectedAppHost(string host, AppDeploymentTarget target, PublishedAppsConfig publishedAppsConfig)
     {
-        var baseHost = publishedAppsConfig.PublicBaseUrlHost;
-        const string appsSuffix = ".apps.";
-        var appsMarker = baseHost.IndexOf(appsSuffix, StringComparison.OrdinalIgnoreCase);
-        var suffix = appsMarker >= 0 ? baseHost[appsMarker..] : $".{baseHost}";
-        var privateHost = $"app-{target.WebAppId:N}{suffix}";
+        var privateHost = $"app-{target.WebAppId:N}.{publishedAppsConfig.PublicBaseUrlHost}";
         if (string.Equals(host, privateHost, StringComparison.OrdinalIgnoreCase))
             return true;
 
@@ -199,9 +195,8 @@ public sealed class RuntimeTunnelService(
             string.IsNullOrWhiteSpace(target.WebApp.PublicUrl))
             return false;
 
-        var publicHost = appsMarker >= 0
-            ? $"{target.WebApp.PublicUrl}{baseHost[appsMarker..]}"
-            : $"{target.WebApp.PublicUrl}.{baseHost}";
+        var publicHost = PublishedAppHostNames.BuildPublishedAppHost(
+            target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost);
         return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase);
     }
 }
