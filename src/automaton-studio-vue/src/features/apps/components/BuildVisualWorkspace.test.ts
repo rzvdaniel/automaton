@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
+import Select from 'primevue/select'
 import ToastService from 'primevue/toastservice'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { DeploymentTargetStatus, type AppDeploymentTarget } from '../types/apps.types'
@@ -43,6 +44,7 @@ function mountWorkspace(targets: AppDeploymentTarget[], selectedTarget = targets
 describe('BuildVisualWorkspace target preview', () => {
   beforeEach(() => {
     vi.stubGlobal('open', vi.fn())
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
   })
 
@@ -59,9 +61,9 @@ describe('BuildVisualWorkspace target preview', () => {
     const canary = target({ id: 'canary-target-id', name: 'Canary', slug: 'canary', isDefault: false })
     const wrapper = mountWorkspace([live, canary])
 
-    const selector = wrapper.get('select[aria-label="Environment"]')
-    expect(selector.findAll('option')).toHaveLength(2)
-    await selector.setValue('canary')
+    const selector = wrapper.getComponent(Select)
+    expect(selector.props('options')).toHaveLength(2)
+    await selector.vm.$emit('update:modelValue', 'canary')
     expect(wrapper.emitted('selectTarget')?.[0]).toEqual([canary])
   })
 
@@ -73,12 +75,13 @@ describe('BuildVisualWorkspace target preview', () => {
       runner: null, frontendDeployed: false, backendDeployed: false, status: DeploymentTargetStatus.Unassigned })
     const wrapper = mountWorkspace([live, canary, legacy], live)
 
-    const options = wrapper.findAll('option')
+    const selector = wrapper.getComponent(Select)
+    const options = selector.props('options') as Array<{ label: string }>
     expect(options).toHaveLength(2)
-    expect(options[0]?.text()).toContain('Live')
-    expect(options[0]?.text()).not.toContain('hosted-control')
-    expect(options[1]?.text()).toContain('Canary')
-    expect(options[1]?.text()).toContain('Privileged Host')
+    expect(options[0]?.label).toContain('Live')
+    expect(options[0]?.label).not.toContain('hosted-control')
+    expect(options[1]?.label).toContain('Canary')
+    expect(options[1]?.label).toContain('Privileged Host')
   })
 
   it('uses a stable target URL for Open and Copy and reserves cache busting for the iframe', async () => {

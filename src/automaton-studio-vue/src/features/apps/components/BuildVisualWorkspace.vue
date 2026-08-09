@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
+import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -161,6 +162,11 @@ const previewViewportStyle = computed(() => {
 
 const previewState = computed(() => getViewingTargetPreviewState(props.selectedTarget))
 const visibleTargets = computed(() => props.targets.filter((target) => !isRemovableLegacyDefault(target)))
+const targetOptions = computed(() => visibleTargets.value.map((target) => ({
+  value: target.slug,
+  label: `${getEnvironmentDisplayName(target)} · ${getTargetDestinationLabel(target)} · ${getTargetStatusLabel(target)}`,
+  slug: target.slug,
+})))
 
 const targetPreviewUrl = computed(() => {
   if (!previewState.value.available || !editorStore.currentApp || !props.selectedTarget) return ''
@@ -193,8 +199,8 @@ function getTargetStatusLabel(target: AppDeploymentTarget): string {
   return target.status === DeploymentTargetStatus.Running ? 'Running' : target.status
 }
 
-function selectTarget(event: Event): void {
-  const target = visibleTargets.value.find((candidate) => candidate.slug === (event.target as HTMLSelectElement).value)
+function selectTarget(value: string | null | undefined): void {
+  const target = visibleTargets.value.find((candidate) => candidate.slug === value)
   if (target) emit('selectTarget', target)
 }
 
@@ -239,17 +245,16 @@ async function refreshApplication(): Promise<void> {
           <span class="application-shell-header__label">Application preview</span>
           <div class="application-target-picker">
             <span>Environment:</span>
-            <select
+            <Select
               v-if="visibleTargets.length > 1"
+              :model-value="selectedTarget?.slug"
+              :options="targetOptions"
+              option-label="label"
+              option-value="value"
               class="application-target-select"
-              :value="selectedTarget?.slug"
               aria-label="Environment"
-              @change="selectTarget"
-            >
-              <option v-for="target in visibleTargets" :key="target.id" :value="target.slug" :title="target.slug">
-                {{ getEnvironmentDisplayName(target) }} · {{ getTargetDestinationLabel(target) }} · {{ getTargetStatusLabel(target) }}
-              </option>
-            </select>
+              @update:model-value="selectTarget"
+            />
             <span v-else class="application-target-summary">
               {{ getEnvironmentDisplayName(selectedTarget) }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
             </span>
