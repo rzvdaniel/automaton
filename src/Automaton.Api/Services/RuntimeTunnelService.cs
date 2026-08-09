@@ -50,22 +50,47 @@ public sealed class RuntimeTunnelService(
                 cancellationToken);
 
         if (target?.ExecutionRunner is not { } runner)
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
+                appId, deploymentTargetId, request.Host.Host, path, "target-not-found");
             return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
+        }
 
         if (!IsExpectedAppHost(request.Host.Host, target, publishedAppsConfig))
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "unexpected-host");
             return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
+        }
 
         var isHostedRunner = await dbContext.HostedRunners.AnyAsync(hostedRunner =>
             hostedRunner.DeletedAt == null && hostedRunner.RunnerId == runner.Id,
             cancellationToken);
         if (isHostedRunner)
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "hosted-runner");
             return Failure(StatusCodes.Status404NotFound, "This app target uses the hosted runtime route.");
+        }
 
         if (!SelfHostedRuntimeTunnelPolicy.AllowsRuntimeTunnel(runner.Purpose, runner.ApplicationProfile))
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "unsupported-profile");
             return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
+        }
 
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "runner-offline");
             return Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is not connected.");
+        }
 
         if (request.ContentLength is > 0 && request.ContentLength > config.MaxBodyBytes)
             return Failure(StatusCodes.Status413PayloadTooLarge, "The request body exceeds the runtime tunnel limit.");
@@ -94,7 +119,15 @@ public sealed class RuntimeTunnelService(
         {
             await hub.Clients.Client(runner.ConnectionId!)
                 .SendAsync(AutomatonHubMethods.TunnelRequest, tunnelRequest, cancellationToken);
-            return await responseTask;
+            var response = await responseTask;
+            if (response.StatusCode >= StatusCodes.Status400BadRequest)
+            {
+                logger.LogWarning(
+                    "Runner tunnel response: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} StatusCode={StatusCode}",
+                    appId, deploymentTargetId, runner.Id, request.Host.Host, path, response.StatusCode);
+            }
+
+            return response;
         }
         catch (TimeoutException)
         {

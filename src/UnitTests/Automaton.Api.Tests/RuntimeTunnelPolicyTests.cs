@@ -94,6 +94,35 @@ public class RuntimeTunnelPolicyTests
     }
 
     [Test]
+    public void IsExpectedAppHost_AcceptsPublicHostForLiveSelfHostedTarget()
+    {
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId);
+        target.WebApp = new WebApp
+        {
+            Id = appId,
+            Name = "Published app",
+            Summary = string.Empty,
+            Description = string.Empty,
+            Definition = "{}",
+            Created = DateTime.UtcNow,
+            Updated = DateTime.UtcNow,
+            RuntimeVisibility = AppRuntimeVisibilities.Public,
+            AccessStatus = AppAccessStatuses.Active,
+            PublicUrl = "runner-deployment-diagnostic-20260804"
+        };
+        var config = new PublishedAppsConfig { PublicBaseUrl = "https://apps.automaton.monster" };
+
+        Assert.That(RuntimeTunnelService.IsExpectedAppHost(
+            "runner-deployment-diagnostic-20260804.apps.automaton.monster", target, config), Is.True);
+
+        target.IsDefault = false;
+        target.SynchronizeDefaultConstraint();
+        Assert.That(RuntimeTunnelService.IsExpectedAppHost(
+            "runner-deployment-diagnostic-20260804.apps.automaton.monster", target, config), Is.False);
+    }
+
+    [Test]
     public void RunnerPresenceEvaluator_RejectsOfflineRunner()
     {
         Assert.That(RunnerPresenceEvaluator.IsOnline(
