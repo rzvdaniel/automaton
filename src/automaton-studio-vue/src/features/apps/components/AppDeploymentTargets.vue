@@ -22,6 +22,7 @@ import {
   shouldResetPrivilegedHostAcknowledgement,
 } from '../utils/deployment-target-runner'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
+import { getEnvironmentDisplayName } from '../utils/environment-display'
 
 const props = defineProps<{ appId: string; projectId?: string | null; refreshRevision?: number }>()
 const emit = defineEmits<{
@@ -265,7 +266,7 @@ function openRoute(target: AppDeploymentTarget) {
 }
 
 function destinationLabel(target: AppDeploymentTarget): string {
-  if (!target.runner) return 'No destination assigned'
+  if (!target.runner) return 'No runtime assigned'
   if (target.runner.isHostedRunner) return 'Automaton Hosted'
   return target.runner.applicationProfile === 'PrivilegedHost'
     ? 'Self-hosted · Privileged Host'
@@ -281,9 +282,15 @@ function canOpenPreview(target: AppDeploymentTarget): boolean {
 }
 
 function deploymentState(target: AppDeploymentTarget): string {
-  if (!target.frontendDeployed && !target.backendDeployed) return 'Not deployed'
+  if (!target.frontendDeployed && !target.backendDeployed) return ''
   if (target.frontendDeployed && target.backendDeployed) return 'Frontend and backend deployed'
   return target.frontendDeployed ? 'Frontend deployed' : 'Backend deployed'
+}
+
+function canPromote(target: AppDeploymentTarget): boolean {
+  return !!target.runner && target.runner.isOnline &&
+    target.frontendDeployed && target.backendDeployed &&
+    target.status !== DeploymentTargetStatus.Deploying
 }
 
 function formatDeploymentTime(target: AppDeploymentTarget): string {
@@ -329,17 +336,17 @@ watch(() => props.refreshRevision, load)
     <template v-else>
       <section class="target-group">
         <div class="target-group__heading">
-          <h3>Live deployment</h3>
+          <h3>Live environment</h3>
           <p>The version served by the App’s normal private and published URLs.</p>
         </div>
         <article v-if="liveTarget" class="target-card target-card--live">
           <div class="target-main">
-            <div class="target-title"><strong>{{ liveTarget.name }}</strong><Tag value="Live" severity="success" /><Tag :value="liveTarget.status" :severity="statusSeverity(liveTarget.status)" /></div>
+            <div class="target-title"><strong>{{ getEnvironmentDisplayName(liveTarget) }}</strong><Tag value="Live" severity="success" /><Tag :value="liveTarget.status" :severity="statusSeverity(liveTarget.status)" /></div>
             <strong class="target-destination">{{ destinationLabel(liveTarget) }}</strong>
-            <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(liveTarget) }}</span><span>{{ deploymentState(liveTarget) }}</span></div>
+            <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(liveTarget) }}</span><span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span></div>
             <Message v-if="liveTarget.cleanupPending" severity="warn" :closable="false">Runtime cleanup needs retry. {{ liveTarget.lastCleanupError || 'The previous cleanup did not complete.' }}</Message>
             <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(liveTarget)" />
-            <div v-if="isAdvancedVisible(liveTarget)" class="advanced-details"><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span><span>Target ID: {{ liveTarget.id }}</span><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span><span>Runtime route: {{ targetRoute(liveTarget) }}</span><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span></div>
+            <div v-if="isAdvancedVisible(liveTarget)" class="advanced-details"><span>Environment slug: {{ liveTarget.slug }}</span><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span><span>Target ID: {{ liveTarget.id }}</span><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span><span>Runtime route: {{ targetRoute(liveTarget) }}</span><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span></div>
           </div>
           <div class="target-actions"><Button label="Deploy" icon="pi pi-cloud-upload" size="small" :disabled="liveTarget.runner?.isOnline === false || liveTarget.status === DeploymentTargetStatus.Deploying" @click="emit('deploy', liveTarget)" /><Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(liveTarget)" :title="canOpenPreview(liveTarget) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(liveTarget)" /><Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', liveTarget)" /><Button label="Edit" icon="pi pi-pencil" size="small" text @click="openEdit(liveTarget)" /></div>
         </article>
@@ -352,16 +359,16 @@ watch(() => props.refreshRevision, load)
           <article v-for="target in additionalTargets" :key="target.id" class="target-card">
         <div class="target-main">
           <div class="target-title">
-            <strong>{{ target.name }}</strong>
+            <strong>{{ getEnvironmentDisplayName(target) }}</strong>
             <Tag :value="target.status" :severity="statusSeverity(target.status)" />
           </div>
           <strong class="target-destination">{{ destinationLabel(target) }}</strong>
-          <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(target) }}</span><span>{{ deploymentState(target) }}</span></div>
+          <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(target) }}</span><span v-if="deploymentState(target)">{{ deploymentState(target) }}</span></div>
           <Message v-if="target.cleanupPending" severity="warn" :closable="false">
             Runtime cleanup needs retry. {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
           </Message>
           <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(target)" />
-          <div v-if="isAdvancedVisible(target)" class="advanced-details"><span>Runner: {{ target.runner?.name ?? 'None' }}</span><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span><span>Target ID: {{ target.id }}</span><span>Runtime transport: {{ runtimeTransport(target) }}</span><span>Runtime route: {{ targetRoute(target) }}</span><span>Internal preview URL: {{ targetRoute(target) }}</span></div>
+          <div v-if="isAdvancedVisible(target)" class="advanced-details"><span>Environment slug: {{ target.slug }}</span><span>Runner: {{ target.runner?.name ?? 'None' }}</span><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span><span>Target ID: {{ target.id }}</span><span>Runtime transport: {{ runtimeTransport(target) }}</span><span>Runtime route: {{ targetRoute(target) }}</span><span>Internal preview URL: {{ targetRoute(target) }}</span></div>
         </div>
         <div class="target-actions">
           <Button label="Deploy" icon="pi pi-cloud-upload" size="small"
@@ -370,7 +377,7 @@ watch(() => props.refreshRevision, load)
           <Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(target)" :title="canOpenPreview(target) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(target)" />
           <Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', target)" />
           <Button icon="pi pi-pencil" aria-label="Edit environment" size="small" text @click="openEdit(target)" />
-          <Button label="Promote to Live" size="small" text
+          <Button label="Promote to Live" size="small" text :disabled="!canPromote(target)" :title="canPromote(target) ? undefined : 'Deploy this environment on an online runtime before promoting it to Live.'"
             :loading="busyTargetId === target.id" @click="makeDefault(target)" />
           <Button icon="pi pi-trash" aria-label="Delete environment" severity="danger"
             size="small" text :loading="busyTargetId === target.id" @click="remove(target)" />

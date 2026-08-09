@@ -49,10 +49,11 @@ describe('AppDeploymentTargets', () => {
   it('separates the Live deployment from additional targets and hides hosted Runner names', async () => {
     const wrapper = await mountTargets([target(), target({ id: 'canary-id', name: 'Canary', slug: 'canary', isDefault: false })])
 
-    expect(wrapper.text()).toContain('Live deployment')
+    expect(wrapper.text()).toContain('Live environment')
     expect(wrapper.text()).toContain('Additional environments')
     expect(wrapper.text()).toContain('Automaton Hosted')
     expect(wrapper.text()).not.toContain('hidden-hosted-runner')
+    expect(wrapper.text()).toContain('Canary')
   })
 
   it('confirms promotion without redeployment and does not render Live deletion', async () => {
@@ -73,9 +74,24 @@ describe('AppDeploymentTargets', () => {
 
     await buttonByText(wrapper, 'Advanced').trigger('click')
     expect(wrapper.text()).toContain('Target ID: live-id')
+    expect(wrapper.text()).toContain('Environment slug: live')
     expect(wrapper.text()).toContain('Runtime transport: Direct edge routing')
     expect(wrapper.text()).toContain('Runtime route: /private/app-id')
     expect(wrapper.text()).toContain('Internal preview URL:')
+  })
+
+  it('does not offer promotion for an unassigned environment', async () => {
+    const unassigned = target({
+      id: 'unassigned-id', name: 'Default', slug: 'default', isDefault: false,
+      runner: null, frontendDeployed: false, backendDeployed: false,
+      status: DeploymentTargetStatus.Unassigned, lastSuccessfulDeploymentAt: null,
+    })
+    const wrapper = await mountTargets([target(), unassigned])
+
+    const promote = buttonByText(wrapper, 'Promote to Live')
+    expect(promote.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('No runtime assigned')
+    expect(wrapper.text()).not.toContain('No destination assigned')
   })
 
   it('keeps routes target-specific regardless of the destination type', async () => {
