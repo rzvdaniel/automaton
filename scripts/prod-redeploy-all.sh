@@ -87,17 +87,32 @@ deploy_color studio "$TARGET_STUDIO_COLOR"
 echo "[INFO] Redeploying website to $TARGET_WEBSITE_COLOR (current live color: $CURRENT_WEBSITE_COLOR)"
 deploy_color website "$TARGET_WEBSITE_COLOR"
 
+if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
+    if ! snapshot_api_color_runner_ids "$CURRENT_API_COLOR" "$TARGET_API_COLOR"; then
+        exit 1
+    fi
+fi
+
 switch_all_live_colors "$TARGET_API_COLOR" "$TARGET_STUDIO_COLOR" "$TARGET_WEBSITE_COLOR"
 
 echo "[INFO] Traefik is now routing api, studio, and website to the freshly deployed colors"
 
 if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
-    signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"
+    if ! signal_api_color_runners_reconnect_when_idle "$CURRENT_API_COLOR"; then
+        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" || true
+        exit 1
+    fi
+fi
+
+if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
+    if ! drain_api_color_runners "$CURRENT_API_COLOR" "$TARGET_API_COLOR" "$DRAIN_WAIT_SECONDS"; then
+        rollback_all_live_colors "$CURRENT_API_COLOR" "$CURRENT_STUDIO_COLOR" "$CURRENT_WEBSITE_COLOR" || true
+        exit 1
+    fi
 fi
 
 if [[ "$KEEP_PREVIOUS" != "true" ]]; then
     if [[ "$CURRENT_API_COLOR" != "$TARGET_API_COLOR" ]]; then
-        drain_api_color_runners "$CURRENT_API_COLOR" "$DRAIN_WAIT_SECONDS"
         wait_before_stopping_previous_color api
         stop_color api "$CURRENT_API_COLOR"
     fi

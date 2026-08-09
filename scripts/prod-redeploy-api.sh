@@ -55,15 +55,31 @@ TARGET_COLOR="${TARGET_COLOR:-$(resolve_target_color api)}"
 
 echo "[INFO] Redeploying production API to $TARGET_COLOR (current live color: $CURRENT_COLOR)"
 deploy_color api "$TARGET_COLOR"
+
+if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    if ! snapshot_api_color_runner_ids "$CURRENT_COLOR" "$TARGET_COLOR"; then
+        exit 1
+    fi
+fi
+
 switch_live_color api "$TARGET_COLOR"
 echo "[INFO] Switched $API_DOMAIN traffic to api-$TARGET_COLOR via Traefik dynamic configuration"
 
 if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
-    signal_api_color_runners_reconnect_when_idle "$CURRENT_COLOR"
+    if ! signal_api_color_runners_reconnect_when_idle "$CURRENT_COLOR"; then
+        rollback_live_color api "$CURRENT_COLOR" || true
+        exit 1
+    fi
+fi
+
+if [[ "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
+    if ! drain_api_color_runners "$CURRENT_COLOR" "$TARGET_COLOR" "$DRAIN_WAIT_SECONDS"; then
+        rollback_live_color api "$CURRENT_COLOR" || true
+        exit 1
+    fi
 fi
 
 if [[ "$KEEP_PREVIOUS" != "true" && "$CURRENT_COLOR" != "$TARGET_COLOR" ]]; then
-    drain_api_color_runners "$CURRENT_COLOR" "$DRAIN_WAIT_SECONDS"
     stop_color api "$CURRENT_COLOR"
 fi
 

@@ -21,6 +21,7 @@ public sealed class RuntimeTunnelService(
     TunnelRequestRegistry registry,
     IOptions<RuntimeTunnelConfig> options,
     IOptions<PublishedAppsConfig> publishedAppsOptions,
+    ApiInstanceIdentityService apiInstanceIdentityService,
     ILogger<RuntimeTunnelService> logger)
 {
     private static readonly HashSet<string> HopByHopHeaders = new(StringComparer.OrdinalIgnoreCase)
@@ -82,6 +83,15 @@ public sealed class RuntimeTunnelService(
                 "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason}",
                 appId, deploymentTargetId, runner.Id, request.Host.Host, path, "unsupported-profile");
             return Failure(StatusCodes.Status404NotFound, "The deployed app target was not found.");
+        }
+
+        if (!IsCurrentApiInstance(runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId))
+        {
+            logger.LogWarning(
+                "Runtime tunnel request rejected: AppId={AppId} TargetId={TargetId} RunnerId={RunnerId} Host={Host} RuntimePath={RuntimePath} RejectedReason={RejectedReason} RunnerApiInstanceId={RunnerApiInstanceId} CurrentApiInstanceId={CurrentApiInstanceId}",
+                appId, deploymentTargetId, runner.Id, request.Host.Host, path, "runner-wrong-api-instance",
+                runner.ApiInstanceId, apiInstanceIdentityService.ApiInstanceId);
+            return Failure(StatusCodes.Status503ServiceUnavailable, "The assigned Runner is connected to another API instance.");
         }
 
         if (!RunnerPresenceEvaluator.IsOnline(runner.ConnectionId, runner.LastHeartbeatAtUtc, DateTime.UtcNow))
@@ -200,4 +210,8 @@ public sealed class RuntimeTunnelService(
             target.WebApp.PublicUrl, publishedAppsConfig.PublicBaseUrlHost);
         return string.Equals(host, publicHost, StringComparison.OrdinalIgnoreCase);
     }
+
+    internal static bool IsCurrentApiInstance(string? runnerApiInstanceId, string currentApiInstanceId)
+        => !string.IsNullOrWhiteSpace(runnerApiInstanceId) &&
+            string.Equals(runnerApiInstanceId, currentApiInstanceId, StringComparison.Ordinal);
 }

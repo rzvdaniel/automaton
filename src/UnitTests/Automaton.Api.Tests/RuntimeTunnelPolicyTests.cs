@@ -164,4 +164,17 @@ public class RuntimeTunnelPolicyTests
             DateTime.UtcNow - RunnerPresenceEvaluator.OfflineThreshold - TimeSpan.FromSeconds(1),
             DateTime.UtcNow), Is.False);
     }
+
+    [TestCase("api-blue", "api-blue", true)]
+    [TestCase("api-green", "api-blue", false)]
+    [TestCase(null, "api-blue", false)]
+    public void RuntimeTunnel_RequiresRunnerOnCurrentApiInstance(
+        string? runnerApiInstanceId,
+        string currentApiInstanceId,
+        bool expected)
+    {
+        Assert.That(
+            RuntimeTunnelService.IsCurrentApiInstance(runnerApiInstanceId, currentApiInstanceId),
+            Is.EqualTo(expected));
+    }
 }

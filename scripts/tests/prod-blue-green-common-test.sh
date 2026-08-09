@@ -16,9 +16,65 @@ wait_for_api_color_runner_drain() {
     return 2
 }
 
-drain_api_color_runners blue 60
-
-if [[ "$fallback_sleep_seconds" != "60" ]]; then
-    echo "Expected unsupported drain status to use the 60-second fallback, got '${fallback_sleep_seconds:-none}'." >&2
+if drain_api_color_runners blue green 60; then
+    echo "Expected unsupported drain status to fail the deployment." >&2
     exit 1
 fi
+
+if [[ -n "$fallback_sleep_seconds" ]]; then
+    echo "Unsupported drain status must not sleep and continue deployment." >&2
+    exit 1
+fi
+
+live_color="blue"
+blue_running=true
+switch_live_color() {
+    live_color="$2"
+}
+
+verify_live_origin() {
+    [[ "$1" == "api" && "$live_color" == "green" ]]
+}
+
+if ! rollback_live_color api green; then
+    echo "Expected API rollback to verify successfully." >&2
+    exit 1
+fi
+
+if [[ "$live_color" != "green" ]]; then
+    echo "Expected failed migration rollback to restore green as Live." >&2
+    exit 1
+fi
+
+if [[ "$blue_running" != "true" ]]; then
+    echo "Expected failed migration rollback to preserve blue for diagnosis." >&2
+    exit 1
+fi
+
+declare -A live_colors=(
+    [api]=blue
+    [studio]=blue
+    [website]=blue
+)
+
+switch_all_live_colors() {
+    live_colors[api]="$1"
+    live_colors[studio]="$2"
+    live_colors[website]="$3"
+}
+
+verify_live_origin() {
+    [[ "${live_colors[$1]}" == "green" ]]
+}
+
+if ! rollback_all_live_colors green green green; then
+    echo "Expected coordinated rollback to verify successfully." >&2
+    exit 1
+fi
+
+for service in api studio website; do
+    if [[ "${live_colors[$service]}" != "green" ]]; then
+        echo "Expected $service to roll back to green." >&2
+        exit 1
+    fi
+done

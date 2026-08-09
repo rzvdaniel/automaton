@@ -215,6 +215,18 @@ public class AutomatonHub : Hub
         Guid deploymentTargetId)
         => $"app-runtime-logs:{appId:D}:{deploymentTargetId:D}";
 
+    public Task ReconnectWhenIdleAcknowledged(string? reason)
+    {
+        var runner = GetRunner();
+        logger.LogInformation(
+            "Runner acknowledged reconnect-when-idle request: RunnerId={RunnerId} RunnerName={RunnerName} ConnectionId={ConnectionId} Reason={Reason}",
+            runner.Id,
+            runner.Name,
+            Context.ConnectionId,
+            reason);
+        return Task.CompletedTask;
+    }
+
     public async Task Heartbeat()
     {
         var runner = GetRunner();

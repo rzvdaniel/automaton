@@ -54,6 +54,9 @@ Preserve these guarantees:
 - render the Traefik configuration atomically, observe and validate the file-provider update, then cut over; do not treat a Traefik ping alone as configuration validation;
 - do not hide failed warmups with broad `|| true` unless the failure is intentionally non-blocking and documented;
 - after API cutover, request reconnect-when-idle from the old color and poll its drain status before stopping it; treat the configured grace period as a maximum timeout, not an unconditional sleep;
+- preserve the reconnect response and candidate Runner IDs, verify those IDs register on the new API color, and fail the deployment while preserving the old color if signaling or drain verification times out;
+- when using the full-stack deployment path, roll API, Studio, and Website selectors back together if API Runner migration fails; keep all newly built colors running for diagnosis;
+- `--keep-previous` may skip retirement only after migration verification succeeds; it must never bypass Runner migration or rollback checks;
 - preserve a rollback path when post-cutover local-origin verification fails;
 - keep Runner reconnects jittered and prevent stale heartbeats/disconnects from overwriting a newer session;
 - internal deployment/drain endpoints must accept loopback requests only or require dedicated internal authentication; never trust all RFC1918 addresses behind a reverse proxy;

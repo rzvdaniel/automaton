@@ -31,10 +31,11 @@ public class RunnerDrainController : ControllerBase
             ? "API deploy cutover complete. Reconnect to the new live API instance when idle."
             : request!.Reason.Trim();
 
-        var signaled = await runnerService.RequestConnectedRunnersReconnectWhenIdleAsync(reason, cancellationToken);
+        var result = await runnerService.RequestConnectedRunnersReconnectWhenIdleAsync(reason, cancellationToken);
         return Ok(new ReconnectWhenIdleResponse
         {
-            SignaledRunnerCount = signaled,
+            CandidateRunnerIds = result.CandidateRunnerIds,
+            SignaledRunnerCount = result.SignaledRunnerCount,
             Reason = reason
         });
     }
@@ -50,6 +51,44 @@ public class RunnerDrainController : ControllerBase
         return Ok(await runnerService.GetReconnectDrainStatusAsync(cancellationToken));
     }
 
+    [HttpGet("migration-status")]
+    public async Task<ActionResult<RunnerMigrationStatus>> GetMigrationStatus(
+        [FromQuery] string? runnerIds,
+        CancellationToken cancellationToken)
+    {
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
+        {
+            return NotFound();
+        }
+
+        var ids = (runnerIds ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => Guid.TryParse(value, out var id) ? id : (Guid?)null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+
+        if (ids.Length == 0)
+        {
+            return BadRequest("At least one runner ID is required.");
+        }
+
+        return Ok(await runnerService.GetRunnerMigrationStatusAsync(ids, cancellationToken));
+    }
+
+    [HttpGet("migration-candidates")]
+    public async Task<ActionResult<RunnerMigrationStatus>> GetMigrationCandidates(
+        CancellationToken cancellationToken)
+    {
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
+        {
+            return NotFound();
+        }
+
+        return Ok(await runnerService.GetRunnerMigrationCandidatesAsync(cancellationToken));
+    }
+
     private static bool IsLoopback(IPAddress? address)
     {
         return address != null && IPAddress.IsLoopback(address);
@@ -63,6 +102,7 @@ public record ReconnectWhenIdleRequest
 
 public record ReconnectWhenIdleResponse
 {
+    public IReadOnlyList<Guid> CandidateRunnerIds { get; init; } = [];
     public int SignaledRunnerCount { get; init; }
     public string Reason { get; init; } = string.Empty;
 }

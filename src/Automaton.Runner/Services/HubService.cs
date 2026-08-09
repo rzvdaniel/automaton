@@ -61,6 +61,7 @@ public class HubService
     private const string SynchronizeAppActionModulesMethod = "SynchronizeAppActionModules";
     private const string CleanupAppDeploymentTargetMethod = "CleanupAppDeploymentTarget";
     private const string ReconnectWhenIdleMethod = "ReconnectWhenIdle";
+    private const string ReconnectWhenIdleAcknowledgedMethod = "ReconnectWhenIdleAcknowledged";
     private const string HeartbeatMethod = "Heartbeat";
     private const string ReportHostedRunnerStorageMethod = "ReportHostedRunnerStorage";
     private const string ReportRunnerHostStorageMethod = "ReportRunnerHostStorage";
@@ -416,9 +417,17 @@ public class HubService
                 WriteLine($"✅ Accepted by API instance {message.ApiInstanceId} (color: {apiColor})");
             });
 
-            connection.On<string>(ReconnectWhenIdleMethod, (reason) =>
+            connection.On<string>(ReconnectWhenIdleMethod, async (reason) =>
             {
                 HandleReconnectWhenIdle(reason);
+                try
+                {
+                    await connection.InvokeAsync(ReconnectWhenIdleAcknowledgedMethod, reason);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning(ex, "Failed to acknowledge reconnect-when-idle request");
+                }
             });
 
             // Handle incoming file upload chunks — write to runner's local volume

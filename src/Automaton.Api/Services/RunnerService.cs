@@ -783,7 +783,7 @@ public class RunnerService
         return closedCount;
     }
 
-    public async Task<int> RequestConnectedRunnersReconnectWhenIdleAsync(string reason, CancellationToken cancellationToken)
+    public async Task<ReconnectWhenIdleResult> RequestConnectedRunnersReconnectWhenIdleAsync(string reason, CancellationToken cancellationToken)
     {
         var connectedRunners = await dbContext.Runners
             .AsNoTracking()
@@ -812,22 +812,64 @@ public class RunnerService
             signaled,
             apiInstanceIdentityService.ApiInstanceId,
             apiInstanceIdentityService.ApiColor ?? "(unset)");
-        return signaled;
+        return new ReconnectWhenIdleResult
+        {
+            CandidateRunnerIds = connectedRunners.Select(runner => runner.Id).ToArray(),
+            SignaledRunnerCount = signaled
+        };
     }
 
     public async Task<RunnerDrainStatus> GetReconnectDrainStatusAsync(CancellationToken cancellationToken)
     {
-        var connectedRunnerCount = await dbContext.Runners
+        var connectedRunnerIds = await dbContext.Runners
             .AsNoTracking()
-            .CountAsync(x =>
+            .Where(x =>
                 x.ConnectionId != null &&
-                x.ApiInstanceId == apiInstanceIdentityService.ApiInstanceId,
-                cancellationToken);
+                x.ApiInstanceId == apiInstanceIdentityService.ApiInstanceId)
+            .Select(x => x.Id)
+            .ToArrayAsync(cancellationToken);
 
         return new RunnerDrainStatus
         {
-            ConnectedRunnerCount = connectedRunnerCount,
-            Drained = connectedRunnerCount == 0
+            ConnectedRunnerIds = connectedRunnerIds,
+            ConnectedRunnerCount = connectedRunnerIds.Length,
+            Drained = connectedRunnerIds.Length == 0
+        };
+    }
+
+    public async Task<RunnerMigrationStatus> GetRunnerMigrationStatusAsync(
+        IReadOnlyCollection<Guid> runnerIds,
+        CancellationToken cancellationToken)
+    {
+        var connectedRunnerIds = await dbContext.Runners
+            .AsNoTracking()
+            .Where(x => runnerIds.Contains(x.Id) &&
+                x.ConnectionId != null &&
+                x.ApiInstanceId == apiInstanceIdentityService.ApiInstanceId)
+            .Select(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return new RunnerMigrationStatus
+        {
+            ExpectedRunnerIds = runnerIds.ToArray(),
+            ConnectedRunnerIds = connectedRunnerIds,
+            AllConnected = connectedRunnerIds.Length == runnerIds.Count
+        };
+    }
+
+    public async Task<RunnerMigrationStatus> GetRunnerMigrationCandidatesAsync(
+        CancellationToken cancellationToken)
+    {
+        var candidateRunnerIds = await dbContext.Runners
+            .AsNoTracking()
+            .Where(x => x.ConnectionId != null &&
+                x.ApiInstanceId != apiInstanceIdentityService.ApiInstanceId)
+            .Select(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+        return new RunnerMigrationStatus
+        {
+            ExpectedRunnerIds = candidateRunnerIds
         };
     }
 
@@ -1407,6 +1449,20 @@ public class RunnerService
 
 public record RunnerDrainStatus
 {
+    public IReadOnlyList<Guid> ConnectedRunnerIds { get; init; } = [];
     public int ConnectedRunnerCount { get; init; }
     public bool Drained { get; init; }
+}
+
+public record RunnerMigrationStatus
+{
+    public IReadOnlyList<Guid> ExpectedRunnerIds { get; init; } = [];
+    public IReadOnlyList<Guid> ConnectedRunnerIds { get; init; } = [];
+    public bool AllConnected { get; init; }
+}
+
+public record ReconnectWhenIdleResult
+{
+    public IReadOnlyList<Guid> CandidateRunnerIds { get; init; } = [];
+    public int SignaledRunnerCount { get; init; }
 }
