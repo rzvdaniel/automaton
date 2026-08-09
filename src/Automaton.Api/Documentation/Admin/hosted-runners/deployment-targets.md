@@ -51,6 +51,29 @@ Promoting asks for confirmation because it changes which deployed target is serv
 
 Most users can ignore additional targets and continue using Live.
 
+## Environment rollout and migration checklist
+
+Normal users work with **Environments**; administrators may use the underlying
+deployment-target terminology when diagnosing IDs, routes, and Runner state.
+The shared source is deployed into independent environments:
+
+```text
+App → Environment → Runtime destination
+```
+
+Before a migration or rollout, inventory Apps with multiple primary targets,
+no primary target, and redundant unassigned `default` targets. Preserve every
+assigned, deployed, Live, or historically referenced target. Use the repair
+endpoint's dry-run result as the review list, then run the transactional repair
+only after approval. Never delete target rows manually.
+
+For a release that changes target-aware SignalR methods, deploy API and Studio
+together and ask users to refresh existing Studio tabs. Verify one-environment
+deploy/publish, multi-environment preview and logs, Live promotion without
+redeployment, and Privileged Host acknowledgement. If rollback is required,
+restore the previous API and Studio revision without changing the database or
+deployed environment rows, then repeat the route, log, and publish smoke checks.
+
 ## Legacy target cleanup
 
 Legacy targets are never removed when an administrator opens an App or lists its targets. Use the explicit repair endpoint only after reviewing its dry-run result:

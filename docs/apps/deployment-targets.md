@@ -51,11 +51,74 @@ Studio keeps the Live environment as the primary app experience. The
 **Environments** settings section exposes creation, editing, Runner
 assignment, deployment, primary-target switching, and deletion when needed.
 
+## Normal and advanced workflows
+
+For a normal App, the workflow is intentionally short:
+
+```text
+App workspace/source
+  → Live environment
+  → Automaton Hosted runtime
+  → automaton deploy
+  → Publish Live
+```
+
+When an App needs more runtime instances, each environment remains a deployment
+of the same shared source:
+
+```text
+App
+├── Live    → Automaton Hosted
+├── Staging → Self-hosted · Standard
+└── Canary  → Self-hosted · Privileged Host
+```
+
+Viewing an environment changes only preview, Open/Copy/Refresh, and runtime log
+context. Deploying an environment does not promote it. Promoting to Live does
+not deploy it. Publishing is always App-level and uses Live.
+
+Runner assignment, target IDs, slugs, routes, and transport details are
+advanced implementation details. Automaton chooses managed Hosted Runner
+capacity; users select **Automaton Hosted**, not a physical Hosted Runner.
+
 Legacy cleanup is an explicit maintenance operation. First request
 `POST /api/apps/{appId}/targets/repair-legacy?dryRun=true` to inspect eligible
 targets. Repeat with `dryRun=false` only after review. The repair revalidates
 the target state and deployment-history references inside its transaction; it
 never runs while listing targets or opening Studio.
+
+## Migration and acceptance checklist
+
+Before any production rollout, perform a read-only inventory for:
+
+- Apps with more than one `IsDefault` target;
+- Apps with no `IsDefault` target;
+- unassigned, undeployed legacy `default` targets;
+- deployed, assigned, Live, or historically referenced targets that must be preserved.
+
+Use the repair endpoint in dry-run mode first. Review every candidate, then run
+the same operation with `dryRun=false`; the service revalidates state and all
+deployment-history references in a transaction. Do not delete rows manually or
+run cleanup from a list/navigation request.
+
+Acceptance scenarios:
+
+1. A new App has one Live environment and deploys without a selection.
+2. An App with multiple environments changes preview and logs without changing
+   source, deployment selection, promotion, or publishing context.
+3. Deploy requires an explicit environment when several are deployable.
+4. Publishing while viewing Canary still publishes Live.
+5. Hosted, Standard self-hosted, and Privileged Host destinations retain their
+   routing and acknowledgement rules.
+6. Promoting changes normal routes without redeploying either environment.
+7. Offline, unassigned, and failed environments remain inspectable while
+   unavailable environments are not deployed accidentally.
+
+Rollout checklist: release API and Studio together when target-aware SignalR
+methods are involved, refresh existing Studio tabs, run the focused API/CLI/
+Studio suites, and verify Live/private/published and additional preview routes.
+Rollback: stop at the previous API/Studio revision, keep database rows and
+deployed environments intact, and re-run route, log, and publish smoke checks.
 
 ## Runtime identity and isolation
 
