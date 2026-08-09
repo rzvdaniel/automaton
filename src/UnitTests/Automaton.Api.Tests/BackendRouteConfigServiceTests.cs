@@ -213,6 +213,59 @@ public class BackendRouteConfigServiceTests
     }
 
     [Test]
+    public async Task RefreshAsync_ReconcilesRuntimeTunnelServiceWhenApiColorChanges()
+    {
+        var rootPath = CreateTempDirectory();
+        await using var dbContext = CreateDbContext();
+        var previousApiColor = Environment.GetEnvironmentVariable("AUTOMATON_API_COLOR");
+        try
+        {
+            var runnerId = Guid.NewGuid();
+            var appId = Guid.NewGuid();
+            var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+            target.FrontendDeployed = true;
+            dbContext.Runners.Add(new Runner
+            {
+                Id = runnerId,
+                Name = "Privileged host",
+                Status = "connected",
+                Purpose = "Managed",
+                ApplicationProfile = "PrivilegedHost"
+            });
+            dbContext.WebApps.Add(new WebApp
+            {
+                Id = appId,
+                Name = "Color-aware app",
+                Summary = string.Empty,
+                Description = string.Empty,
+                Definition = "{}",
+                Created = DateTime.UtcNow,
+                Updated = DateTime.UtcNow,
+                DeploymentTargets = { target }
+            });
+            await dbContext.SaveChangesAsync();
+
+            var service = CreateService(dbContext, rootPath);
+
+            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", "blue");
+            await service.RefreshAsync();
+            var routesPath = Path.Combine(rootPath, "managed-runtime-routes.yml");
+            var blueContent = await File.ReadAllTextAsync(routesPath);
+            Assert.That(blueContent, Does.Contain("service: \"api-blue-edge\""));
+
+            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", "green");
+            await service.RefreshAsync();
+            var greenContent = await File.ReadAllTextAsync(routesPath);
+            Assert.That(greenContent, Does.Contain("service: \"api-green-edge\""));
+            Assert.That(greenContent, Does.Not.Contain("service: \"api-blue-edge\""));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", previousApiColor);
+        }
+    }
+
+    [Test]
     public async Task RefreshAsync_DoesNotRouteInfrastructureRunnerThroughRuntimeTunnel()
     {
         var rootPath = CreateTempDirectory();

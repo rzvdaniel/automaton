@@ -13,6 +13,7 @@ public class BackendRouteConfigService
 
     private readonly ApplicationDbContext dbContext;
     private readonly PublishedAppsConfig publishedAppsConfig;
+    private readonly string runtimeTunnelServiceName;
     private readonly IWebHostEnvironment environment;
     private readonly ILogger<BackendRouteConfigService> logger;
 
@@ -32,6 +33,7 @@ public class BackendRouteConfigService
     {
         this.dbContext = dbContext;
         this.publishedAppsConfig = publishedAppsConfig.Value;
+        runtimeTunnelServiceName = ResolveRuntimeTunnelServiceName(this.publishedAppsConfig);
         this.environment = environment;
         this.logger = logger;
     }
@@ -117,7 +119,7 @@ public class BackendRouteConfigService
                 candidate.WebAppId,
                 candidate.Id,
                 candidate.IsDefault,
-                publishedAppsConfig.RuntimeTunnelServiceName.Trim(),
+                runtimeTunnelServiceName,
                 candidate.Slug,
                 true))
             .ToList();
@@ -315,6 +317,18 @@ public class BackendRouteConfigService
 
     private static string GetServiceName(RouteTarget route, string routeServiceName)
         => route.UsesRuntimeTunnel ? route.RuntimeEndpoint : routeServiceName;
+
+    private static string ResolveRuntimeTunnelServiceName(PublishedAppsConfig config)
+    {
+        var apiColor = Environment.GetEnvironmentVariable("AUTOMATON_API_COLOR")?.Trim();
+        if (string.Equals(apiColor, "blue", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(apiColor, "green", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"api-{apiColor.ToLowerInvariant()}-edge";
+        }
+
+        return config.RuntimeTunnelServiceName.Trim();
+    }
 
     private string ResolveRootPath()
     {
