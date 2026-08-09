@@ -954,7 +954,8 @@ public class AppsService
 
         if (!PublishedAppHostNames.IsValidPublishedSlug(slug))
         {
-            slug = "app";
+            throw new InvalidOperationException(
+                "Generated published slug violated the published host contract.");
         }
 
         return slug;
