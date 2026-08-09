@@ -9,7 +9,7 @@ import Select from 'primevue/select'
 import apiClient from '@/shared/services/api/axios-instance'
 import { appsService } from '../services/apps.service'
 import type { PublishAppRequest } from '../types/apps.types'
-import { getPublishedAppUrl, getPublishedAppsUrlPrefix } from '../utils/public-app-url'
+import { getPublishedAppUrl } from '../utils/public-app-url'
 import { getPublishVisibilityState } from '../utils/publish-visibility'
 
 const props = defineProps<{
@@ -152,23 +152,20 @@ function close() {
         Publishes the current Live environment. Additional environments remain private previews.
       </p>
       <p v-if="liveTargetName || liveTargetSlug" class="text-color-secondary text-sm">
-        Publishing Live: {{ liveTargetSlug || liveTargetName || 'Live' }}
+        Publishing the Live environment.
       </p>
       <p v-if="viewingTargetSlug && viewingTargetSlug !== liveTargetSlug" class="text-color-secondary text-sm">
-        Currently viewing: {{ viewingTargetName || viewingTargetSlug }}. Publishing still uses Live: {{ liveTargetName || liveTargetSlug || 'Live' }}. Additional environments remain private previews.
+        Currently viewing: {{ viewingTargetName || 'another environment' }}. Additional environments remain private previews.
       </p>
       <div class="field mb-4">
         <label for="slug" class="block font-semibold mb-2">Public URL</label>
-        <div class="p-inputgroup">
-          <span class="p-inputgroup-addon">{{ getPublishedAppsUrlPrefix() }}</span>
-          <InputText
-            id="slug"
-            v-model="slug"
-            placeholder="my-app"
-            :class="{ 'p-invalid': validationMessage && slug.length > 0 }"
-            @input="handleSlugInput"
-          />
-        </div>
+        <InputText
+          id="slug"
+          v-model="slug"
+          placeholder="my-app"
+          :class="{ 'p-invalid': validationMessage && slug.length > 0 }"
+          @input="handleSlugInput"
+        />
         <small v-if="validationMessage" class="p-error block mt-1">
           {{ validationMessage }}
         </small>

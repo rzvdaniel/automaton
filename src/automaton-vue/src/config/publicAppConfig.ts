@@ -48,8 +48,20 @@ export function getPublishedAppUrl(slug?: string | null): string {
   const normalizedSlug = slug?.trim()
   if (!normalizedSlug) return ''
 
+  const encodedSlug = encodeURIComponent(normalizedSlug)
+  const base = new URL(publicAppsBaseUrl, window.location.origin)
+  const host = base.hostname.toLowerCase()
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+  if (!isLocal && host.startsWith('apps.')) {
+    base.hostname = `${encodedSlug}.apps.${host.slice('apps.'.length)}`
+    base.pathname = '/'
+    base.search = ''
+    base.hash = ''
+    return base.toString()
+  }
+
   const pathPrefix = shouldNamespacePublishedApps(publicAppsBaseUrl) ? '/apps' : ''
-  return `${publicAppsBaseUrl}${pathPrefix}/${encodeURIComponent(normalizedSlug)}/`
+  return `${trimTrailingSlash(publicAppsBaseUrl)}${pathPrefix}/${encodedSlug}/`
 }
 
 export function getDeployedAppUrl(appId?: string | null): string {

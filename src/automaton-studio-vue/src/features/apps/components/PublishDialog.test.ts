@@ -12,9 +12,9 @@ describe('PublishDialog', () => {
       props: {
         visible: true,
         appName: 'Demo App',
-        liveTargetName: 'hosted-control',
+        liveTargetName: 'Live',
         liveTargetSlug: 'hosted-control',
-        viewingTargetName: 'privileged-canary',
+        viewingTargetName: 'Canary',
         viewingTargetSlug: 'privileged-canary',
       },
       global: {
@@ -30,8 +30,10 @@ describe('PublishDialog', () => {
     expect(wrapper.text()).toContain('Publish Live')
     expect(wrapper.text()).toContain('Publishes the current Live environment.')
     expect(wrapper.text()).toContain('Additional environments remain private previews.')
-    expect(wrapper.text()).toContain('Publishing Live: hosted-control')
-    expect(wrapper.text()).toContain('Currently viewing: privileged-canary. Publishing still uses Live: hosted-control.')
+    expect(wrapper.text()).toContain('Publishing the Live environment.')
+    expect(wrapper.text()).toContain('Currently viewing: Canary. Additional environments remain private previews.')
+    expect(wrapper.text()).not.toContain('hosted-control')
+    expect(wrapper.text()).not.toContain('privileged-canary')
     expect(wrapper.findAll('button').some((button) => button.text().includes('Publish Live'))).toBe(true)
   })
 })

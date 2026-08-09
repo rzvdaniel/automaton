@@ -424,7 +424,6 @@ onBeforeUnmount(() => {
                 <div class="hero-pills" aria-label="App metadata">
                   <span v-if="app.category" class="hero-pill">{{ app.category }}</span>
                   <span class="hero-pill">{{ app.hasBackendExecution ? 'Backend app' : 'Static app' }}</span>
-                  <span class="hero-pill">{{ app.hasBackendExecution ? 'Runner required' : 'Runner not required' }}</span>
                   <span v-if="app.canRemix" class="hero-pill hero-pill-forkable">Free to fork</span>
                   <span v-if="publishedLabel" class="hero-pill">published {{ publishedLabel }}</span>
                 </div>
@@ -599,11 +598,11 @@ onBeforeUnmount(() => {
                   <div class="runtime-item"><span>Frontend</span><span>Static hosting</span></div>
                   <div class="runtime-item">
                     <span>Backend</span>
-                    <span>{{ app.hasBackendExecution ? 'Requires Runner' : 'Not required' }}</span>
+                    <span>{{ app.hasBackendExecution ? 'Automaton Hosted or self-hosted' : 'Not required' }}</span>
                   </div>
                   <div class="runtime-item">
                     <span>Fork & publish</span>
-                    <span>{{ app.hasBackendExecution ? 'Runner needed' : 'Free' }}</span>
+                    <span>{{ app.hasBackendExecution ? 'Configure a runtime after remixing' : 'Free' }}</span>
                   </div>
                 </div>
               </section>

@@ -49,6 +49,7 @@ import {
 import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
+import { getEnvironmentDisplayName } from '../utils/environment-display'
 import { isRemovableLegacyDefault } from '../utils/environment-display'
 
 const route = useRoute()
@@ -1609,9 +1610,9 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       :current-runtime-visibility="editorStore.currentApp?.runtimeVisibility"
       :current-catalog-visibility="editorStore.currentApp?.catalogVisibility"
       :app-name="editorStore.currentApp?.name"
-      :live-target-name="getLiveTarget(deploymentTargets)?.name"
+      :live-target-name="getLiveTarget(deploymentTargets) ? getEnvironmentDisplayName(getLiveTarget(deploymentTargets)) : undefined"
       :live-target-slug="getLiveTarget(deploymentTargets)?.slug"
-      :viewing-target-name="selectedViewingTarget?.name"
+      :viewing-target-name="selectedViewingTarget ? getEnvironmentDisplayName(selectedViewingTarget) : undefined"
       :viewing-target-slug="selectedViewingTarget?.slug"
       @publish="handlePublish"
     />

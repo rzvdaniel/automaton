@@ -223,7 +223,7 @@ watch(
             <div class="app-body">
               <div>
                 <div class="badge-row">
-                  <span class="badge badge-live">Live app</span>
+                  <span class="badge badge-live">{{ app.canLaunch ? 'Live app' : 'Media preview' }}</span>
                   <span v-if="app.isFeatured" class="badge badge-hot">Featured</span>
                 </div>
                 <h3 class="app-title">{{ app.name }}</h3>
@@ -275,12 +275,12 @@ watch(
         </article>
 
         <aside class="runner-panel">
-          <h2>Backend apps need a Runner</h2>
-          <p>Static apps can be played, forked, and published freely. Backend apps can run on your own Docker runner today, with managed runners rolling out soon.</p>
+          <h2>Backend apps run anywhere</h2>
+          <p>Automaton Hosted is ready to use, and self-hosted runners let you bring your own infrastructure.</p>
           <div class="runner-options">
             <div class="runner-option"><span>Static apps</span><span>Free</span></div>
             <div class="runner-option"><span>Self-hosted Runner</span><span>Available today</span></div>
-            <div class="runner-option"><span>Managed Runner</span><span>Coming soon</span></div>
+            <div class="runner-option"><span>Automaton Hosted</span><span>Ready to use</span></div>
           </div>
         </aside>
       </section>

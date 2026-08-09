@@ -311,7 +311,7 @@ public class UserAppsController : ControllerBase
         var runtimePath = Path.GetExtension(path).Length == 0 ? "index.html" : path;
         if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(runtimePath))
         {
-            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
         }
 
         var runnerContent = await appsControllerExecutionService.ReadRuntimeFrontendFileFromRunnerAsync(
@@ -322,7 +322,7 @@ public class UserAppsController : ControllerBase
         var content = runnerContent?.Content;
         if (content == null)
         {
-            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
         }
 
         var contentType = runnerContent?.ContentType ?? WebAppRuntimeFilePolicy.GetContentType(runtimePath);
@@ -346,13 +346,13 @@ public class UserAppsController : ControllerBase
         var publishedPath = Path.GetExtension(path).Length == 0 ? "index.html" : path;
         if (!WebAppRuntimeFilePolicy.IsAllowedPublicPath(publishedPath))
         {
-            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
         }
 
         var content = await publishedAppStorageService.ReadPublishedFileBytesAsync(slug, publishedPath);
         if (content == null)
         {
-            return NotFound(GetErrorPage("File Not Found", $"The file '{path}' was not found."));
+            return HtmlPage(StatusCodes.Status404NotFound, "File Not Found", $"The file '{path}' was not found.");
         }
 
         var contentType = WebAppRuntimeFilePolicy.GetContentType(publishedPath);
