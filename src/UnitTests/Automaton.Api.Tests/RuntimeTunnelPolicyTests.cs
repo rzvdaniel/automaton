@@ -122,6 +122,7 @@ public class RuntimeTunnelPolicyTests
             "runner-deployment-diagnostic-20260804.apps.automaton.monster", target, config), Is.False);
     }
 
+
     [Test]
     public void RunnerPresenceEvaluator_RejectsOfflineRunner()
     {
