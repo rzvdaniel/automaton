@@ -106,6 +106,16 @@ export interface AppListItem {
   updatedAtUtc: string
   canDelete: boolean
   runner?: { id: string; name: string; purpose: string; connectivityStatus: 'None' | 'Online' | 'Offline' } | null
+  liveEnvironment?: {
+    name: string
+    status: string
+    isHostedRunner: boolean
+    applicationProfile?: string | null
+    runnerOnline: boolean
+    frontendDeployed: boolean
+    backendDeployed: boolean
+    routePath: string
+  } | null
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }
 }
 

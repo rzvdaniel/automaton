@@ -15,7 +15,20 @@ public sealed class AppListItemDto
     public DateTime UpdatedAtUtc { get; init; }
     public bool CanDelete { get; init; }
     public AppListRunnerDto? Runner { get; init; }
+    public AppListEnvironmentDto? LiveEnvironment { get; init; }
     public AppListRuntimeDto Runtime { get; init; } = new();
+}
+
+public sealed class AppListEnvironmentDto
+{
+    public string Name { get; init; } = "Live";
+    public string Status { get; init; } = "Unassigned";
+    public bool IsHostedRunner { get; init; }
+    public string? ApplicationProfile { get; init; }
+    public bool RunnerOnline { get; init; }
+    public bool FrontendDeployed { get; init; }
+    public bool BackendDeployed { get; init; }
+    public string RoutePath { get; init; } = string.Empty;
 }
 
 public sealed class AppListRunnerDto

@@ -11,7 +11,7 @@ import type { AppListItem } from '../types/apps.types'
 import { useAppsStore } from '../stores/apps.store'
 import { appsService } from '../services/apps.service'
 import AppCoverPlaceholder from './AppCoverPlaceholder.vue'
-import { getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
+import { getDeployedAppUrl, getDeploymentTargetUrl, getPublishedAppUrl, getStudioApplicationUrl } from '../utils/public-app-url'
 import { resolveMediaUrl } from '../utils/media-url'
 
 interface Props {
@@ -77,9 +77,23 @@ const deploymentSummary = computed(() => {
   return frontend && backend ? 'Full stack deployed' : frontend ? 'Frontend deployed' : 'Backend deployed'
 })
 
-const runnerStatus = computed(() => props.app.runner?.connectivityStatus ?? 'None')
-const runnerStatusLabel = computed(() => runnerStatus.value === 'None' ? 'Unassigned' : runnerStatus.value)
-const runnerStatusClass = computed(() => `runner-status--${runnerStatus.value.toLowerCase()}`)
+const liveEnvironment = computed(() => props.app.liveEnvironment)
+const liveStatusLabel = computed(() => {
+  const environment = liveEnvironment.value
+  if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
+  if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
+  if (!environment.frontendDeployed && !environment.backendDeployed) return 'Unassigned'
+  return environment.status === 'Running' ? 'Running' : environment.status
+})
+const liveStatusClass = computed(() => liveStatusLabel.value === 'Running' ? 'runner-status--online' : 'runner-status--offline')
+const liveDestinationLabel = computed(() => {
+  const environment = liveEnvironment.value
+  if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
+  if (environment.isHostedRunner) return 'Automaton Hosted'
+  return environment.applicationProfile === 'PrivilegedHost'
+    ? 'Self-hosted · Privileged Host'
+    : 'Self-hosted · Standard'
+})
 
 const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
 const canOpenPublicApp = computed(() => props.app.isPublished && !!props.app.publicUrl)
@@ -92,7 +106,9 @@ const openAppUrl = computed(() => {
     return getPublishedAppUrl(props.app.publicUrl)
   }
 
-  return getStudioApplicationUrl(props.app.id)
+  return liveEnvironment.value?.routePath
+    ? getDeploymentTargetUrl(props.app.id, liveEnvironment.value.routePath)
+    : getDeployedAppUrl(props.app.id)
 })
 const publicAppUrl = computed(() => getPublishedAppUrl(props.app.publicUrl))
 const studioApplicationUrl = computed(() => getStudioApplicationUrl(props.app.id))
@@ -349,8 +365,8 @@ const menuItems = computed(() => {
 
         <div class="app-status-rows">
           <div class="app-status-row">
-            <span>Runner</span>
-            <span class="app-status-value" :aria-label="`${app.runner?.name || 'Unassigned'} · ${runnerStatusLabel}`"><i :class="['runner-status-dot', runnerStatusClass]" aria-hidden="true"></i>{{ app.runner?.name || 'Unassigned' }}<span class="visually-hidden"> · {{ runnerStatusLabel }}</span></span>
+            <span>Live</span>
+            <span class="app-status-value" :aria-label="`${liveDestinationLabel} · ${liveStatusLabel}`"><i :class="['runner-status-dot', liveStatusClass]" aria-hidden="true"></i>{{ liveDestinationLabel }} · {{ liveStatusLabel }}</span>
           </div>
           <div class="app-status-row">
             <span>Deployment</span>

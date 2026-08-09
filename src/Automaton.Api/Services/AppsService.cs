@@ -77,6 +77,23 @@ public class AppsService
                     {
                         Id = r.Id, Name = r.Name, Purpose = r.Purpose,
                         ConnectivityStatus = RunnerPresenceEvaluator.DeriveStatus(r.ConnectionId, r.LastHeartbeatAtUtc, now)
+                    }).FirstOrDefault(),
+                LiveTarget = app.DeploymentTargets
+                    .Where(target => target.IsDefault)
+                    .Select(target => new
+                    {
+                        target.Name,
+                        target.Status,
+                        target.FrontendDeployed,
+                        target.BackendDeployed,
+                        target.Id,
+                        IsHostedRunner = target.ExecutionRunnerId.HasValue && dataContext.HostedRunners.Any(hosted => hosted.RunnerId == target.ExecutionRunnerId && hosted.DeletedAt == null),
+                        Runner = target.ExecutionRunner == null ? null : new
+                        {
+                            target.ExecutionRunner.ApplicationProfile,
+                            target.ExecutionRunner.ConnectionId,
+                            target.ExecutionRunner.LastHeartbeatAtUtc,
+                        },
                     }).FirstOrDefault()
             }).ToListAsync(cancellationToken);
 
@@ -107,6 +124,22 @@ public class AppsService
                 PublicUrl = row.PublicUrl, UpdatedAtUtc = row.Updated,
                 CanDelete = !row.ProjectId.HasValue,
                 Runner = row.Runner,
+                LiveEnvironment = row.LiveTarget == null ? null : new AppListEnvironmentDto
+                {
+                    Name = row.LiveTarget.Name,
+                    Status = row.LiveTarget.Runner == null
+                        ? "Unassigned"
+                        : row.LiveTarget.Status.ToString(),
+                    IsHostedRunner = row.LiveTarget.IsHostedRunner,
+                    ApplicationProfile = row.LiveTarget.Runner?.ApplicationProfile,
+                    RunnerOnline = row.LiveTarget.Runner != null && RunnerPresenceEvaluator.DeriveStatus(
+                        row.LiveTarget.Runner.ConnectionId,
+                        row.LiveTarget.Runner.LastHeartbeatAtUtc,
+                        now) == RunnerStatus.Online,
+                    FrontendDeployed = row.LiveTarget.FrontendDeployed,
+                    BackendDeployed = row.LiveTarget.BackendDeployed,
+                    RoutePath = $"/private/{row.Id:D}",
+                },
                 Runtime = new AppListRuntimeDto
                 {
                     FrontendAvailable = metadata.Frontend.RuntimeAvailable,

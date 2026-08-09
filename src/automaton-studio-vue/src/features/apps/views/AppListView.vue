@@ -41,6 +41,23 @@ const getDeploymentSummary = (app: AppListItem) => {
   return 'Not deployed yet'
 }
 
+const getLiveDestinationLabel = (app: AppListItem) => {
+  const environment = app.liveEnvironment
+  if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
+  if (environment.isHostedRunner) return 'Automaton Hosted'
+  return environment.applicationProfile === 'PrivilegedHost'
+    ? 'Self-hosted · Privileged Host'
+    : 'Self-hosted · Standard'
+}
+
+const getLiveStatusLabel = (app: AppListItem) => {
+  const environment = app.liveEnvironment
+  if (!environment) return app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
+  if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
+  if (!environment.frontendDeployed && !environment.backendDeployed) return 'Unassigned'
+  return environment.status === 'Running' ? 'Running' : environment.status
+}
+
 function openExternal(url: string) {
   window.open(url, '_blank', 'noopener')
 }
@@ -478,7 +495,7 @@ const handleRetry = async () => {
                 <div class="font-semibold text-overflow-ellipsis overflow-hidden white-space-nowrap">{{ app.name }}</div>
                 <Tag :value="app.isPublished ? 'Published' : 'Draft'" :severity="app.isPublished ? 'success' : 'secondary'" class="text-xs" />
               </div>
-              <div class="text-color-secondary text-sm">{{ app.runner?.name || 'Unassigned' }} · {{ app.runner?.connectivityStatus || 'None' }}</div>
+              <div class="text-color-secondary text-sm">Live · {{ getLiveDestinationLabel(app) }} · {{ getLiveStatusLabel(app) }}</div>
               <div v-if="app.tags.length" class="flex flex-wrap gap-1 mt-1">
                 <Tag v-for="tag in app.tags.slice(0, 2)" :key="tag" :value="tag" severity="secondary" class="text-xs" />
               </div>
