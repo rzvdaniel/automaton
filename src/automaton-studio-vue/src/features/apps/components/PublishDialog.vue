@@ -22,6 +22,10 @@ const props = defineProps<{
   currentRuntimeVisibility?: 'private' | 'public'
   currentCatalogVisibility?: 'unlisted' | 'listed'
   appName?: string
+  liveTargetName?: string
+  liveTargetSlug?: string
+  viewingTargetName?: string
+  viewingTargetSlug?: string
 }>()
 
 const emit = defineEmits<{
@@ -138,12 +142,21 @@ function close() {
 <template>
   <Dialog
     v-model:visible="isVisible"
-    header="Publish App"
+    header="Publish Live"
     :modal="true"
     :closable="true"
     :style="{ width: '540px' }"
   >
     <div class="publish-dialog">
+      <p class="text-color-secondary mt-0">
+        Publishes the current Live deployment. Additional deployment targets remain private previews.
+      </p>
+      <p v-if="liveTargetName || liveTargetSlug" class="text-color-secondary text-sm">
+        Publishing Live: {{ liveTargetSlug || liveTargetName || 'Live' }}
+      </p>
+      <p v-if="viewingTargetSlug && viewingTargetSlug !== liveTargetSlug" class="text-color-secondary text-sm">
+        Currently viewing {{ viewingTargetSlug }}. Additional targets are not published. Publishing still uses Live: {{ liveTargetSlug || liveTargetName || 'Live' }}.
+      </p>
       <div class="field mb-4">
         <label for="slug" class="block font-semibold mb-2">Public URL</label>
         <div class="p-inputgroup">
@@ -269,7 +282,7 @@ function close() {
           @click="close"
         />
         <Button
-          label="Publish"
+          label="Publish Live"
           icon="pi pi-upload"
           :disabled="!isValidSlug"
           @click="handlePublish"

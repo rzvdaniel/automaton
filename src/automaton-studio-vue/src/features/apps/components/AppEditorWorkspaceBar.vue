@@ -443,7 +443,7 @@ onBeforeUnmount(() => {
 
       <Button
         v-if="showsEditorActions && !isPublished"
-        label="Publish"
+        label="Publish Live"
         icon="pi pi-globe"
         outlined
         severity="success"
@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
 
       <div v-else-if="showsEditorActions" class="published-actions">
         <Button
-          label="Published"
+          label="Published Live"
           icon="pi pi-globe"
           outlined
           severity="secondary"

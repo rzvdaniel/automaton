@@ -51,6 +51,7 @@ describe('BuildVisualWorkspace target preview', () => {
 
     expect(wrapper.find('select[aria-label="Viewing target"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Live · Automaton Hosted · Running')
+    expect(wrapper.text()).toContain('Workspace source · Viewing: live')
   })
 
   it('renders multiple targets and emits the selected target', async () => {

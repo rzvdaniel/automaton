@@ -7,6 +7,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import ProgressSpinner from 'primevue/progressspinner'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
@@ -47,6 +48,7 @@ import {
 } from '../services/application-automation-bridge'
 import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
+import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,6 +90,11 @@ const selectedLogTargetId = ref<string | null>(null)
 const deploymentTargets = ref<AppDeploymentTarget[]>([])
 const selectedViewingTarget = ref<AppDeploymentTarget | null>(null)
 const targetsRevision = ref(0)
+const showDeployTargetDialog = ref(false)
+const selectedDeployTargetSlug = ref<string | null>(null)
+
+const deployableTargets = computed(() => getDeployableTargets(deploymentTargets.value))
+const selectedDeployTarget = computed(() => deployableTargets.value.find((target) => target.slug === selectedDeployTargetSlug.value) ?? null)
 
 // Active view tab
 const activeTab = ref<'build' | 'files' | 'actions' | 'versions' | 'services' | 'logs' | 'settings'>('build')
@@ -482,6 +489,30 @@ async function handleDeployTarget(target: AppDeploymentTarget) {
   targetsRevision.value += 1
 }
 
+function handleTopLevelDeploy() {
+  const targets = deployableTargets.value
+  if (targets.length === 1) {
+    const target = targets[0]
+    if (target) void handleDeployApp(target.slug, target.name)
+    return
+  }
+
+  if (targets.length > 1) {
+    selectedDeployTargetSlug.value = null
+    showDeployTargetDialog.value = true
+    return
+  }
+
+  toast.add({ severity: 'warn', summary: 'No deployable target', detail: 'Assign an online destination before deploying this App.', life: 4000 })
+}
+
+function confirmTopLevelDeploy() {
+  const target = selectedDeployTarget.value
+  if (!target) return
+  showDeployTargetDialog.value = false
+  void handleDeployApp(target.slug, target.name)
+}
+
 // Cleanup on unmount
 onUnmounted(() => {
   void backendRuntimeLogClient.unsubscribe(appId.value)
@@ -794,6 +825,11 @@ async function handleDeployApp(targetSlug?: string, targetName?: string) {
 
 // Handle publish
 async function handlePublish(request: PublishAppRequest) {
+  if (!getLiveTarget(deploymentTargets.value)) {
+    toast.add({ severity: 'error', summary: 'Publish Live unavailable', detail: 'This App has no Live target.', life: 5000 })
+    return
+  }
+
   try {
     await editorStore.publishApp(request)
     showPublishDialog.value = false
@@ -1206,7 +1242,7 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
         @save-name="saveAppName"
         @cancel-editing="cancelEditingName"
         @save-all="handleSaveAll"
-        @deploy-app="handleDeployApp"
+        @deploy-app="handleTopLevelDeploy"
         @deploy-frontend="handleDeployFrontend"
         @deploy-backend="handleDeployBackend"
         @publish="showPublishDialog = true"
@@ -1528,7 +1564,41 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
     </div>
 
     <!-- Dialogs -->
-    <PublishDialog
+    <Dialog
+      v-model:visible="showDeployTargetDialog"
+      modal
+      header="Choose deployment target"
+      :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }"
+    >
+      <p class="text-color-secondary mt-0">
+        Choose where to deploy this App. Deploying a target never promotes it to Live.
+      </p>
+      <label for="top-level-deploy-target" class="font-semibold">Deployment target</label>
+      <select
+        id="top-level-deploy-target"
+        v-model="selectedDeployTargetSlug"
+        class="w-full mt-2 p-2 border-round surface-border"
+      >
+        <option :value="null" disabled>Select a target</option>
+        <option v-for="target in deployableTargets" :key="target.id" :value="target.slug">
+          {{ getDeployTargetOptionLabel(target, selectedViewingTarget?.id) }}
+        </option>
+      </select>
+      <p v-if="selectedViewingTarget" class="text-color-secondary text-sm mb-0 mt-3">
+        Currently viewing: {{ selectedViewingTarget.name }}. Viewing does not choose a deployment target.
+      </p>
+      <template #footer>
+        <Button label="Cancel" text @click="showDeployTargetDialog = false" />
+        <Button
+          :label="selectedDeployTarget ? `Deploy to ${selectedDeployTarget.slug}` : 'Deploy to selected target'"
+          icon="pi pi-cloud-upload"
+          :disabled="!selectedDeployTarget"
+          @click="confirmTopLevelDeploy"
+        />
+      </template>
+    </Dialog>
+
+      <PublishDialog
       v-model:visible="showPublishDialog"
       :current-slug="editorStore.currentApp?.publicUrl"
       :current-category="editorStore.currentApp?.category"
@@ -1538,6 +1608,10 @@ async function handleAiToolExecuted(toolName: string, args: any, result?: any, t
       :current-runtime-visibility="editorStore.currentApp?.runtimeVisibility"
       :current-catalog-visibility="editorStore.currentApp?.catalogVisibility"
       :app-name="editorStore.currentApp?.name"
+      :live-target-name="getLiveTarget(deploymentTargets)?.name"
+      :live-target-slug="getLiveTarget(deploymentTargets)?.slug"
+      :viewing-target-name="selectedViewingTarget?.name"
+      :viewing-target-slug="selectedViewingTarget?.slug"
       @publish="handlePublish"
     />
 

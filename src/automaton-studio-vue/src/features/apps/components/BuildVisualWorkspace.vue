@@ -252,6 +252,7 @@ async function refreshApplication(): Promise<void> {
               {{ selectedTarget?.name || 'Live' }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
             </span>
           </div>
+          <div class="application-source-context">Workspace source · Viewing: {{ selectedTarget?.slug || 'Live' }}</div>
         </div>
       </div>
       <div class="application-shell-header__actions">
@@ -520,6 +521,12 @@ async function refreshApplication(): Promise<void> {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--p-text-muted-color);
+}
+
+.application-source-context {
+  color: var(--p-text-muted-color);
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
 }
 
 .application-shell-header__actions {
