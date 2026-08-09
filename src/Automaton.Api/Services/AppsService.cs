@@ -8,6 +8,7 @@ using Automaton.Api.Services.Interfaces;
 using Automaton.Api.Constants;
 using Automaton.Api.Entities;
 using Automaton.Api.Data;
+using Automaton.Api.Config;
 
 namespace Automaton.Api.Services;
 
@@ -970,9 +971,8 @@ public class AppsService
     private static bool IsValidUrlSlug(string slug)
     {
         // URL slug validation: lowercase letters, numbers, hyphens
-        return !string.IsNullOrEmpty(slug) &&
-            Regex.IsMatch(slug, @"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$") &&
-            !Regex.IsMatch(slug, @"^app-[0-9a-f]{32}$", RegexOptions.CultureInvariant);
+        return PublishedAppHostNames.IsValidSlug(slug) &&
+            !PublishedAppHostNames.IsPrivateAppLabel(slug);
     }
 
     internal static AppModel MapToModel(WebApp entity, AppDefinition? definition = null, Guid? ownerId = null)

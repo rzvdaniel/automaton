@@ -1,22 +1,34 @@
-using System.Text.RegularExpressions;
-
 namespace Automaton.Api.Config;
 
-public static partial class PublishedAppHostNames
+public static class PublishedAppHostNames
 {
     public static bool IsPrivateAppHost(string host, string appsDomain)
         => TryGetLabel(host, appsDomain, out var label)
-            && PrivateLabelRegex().IsMatch(label);
+            && IsPrivateAppLabel(label);
+
+    public static bool IsPrivateAppLabel(string label)
+        => label.Length == 36 &&
+            label.StartsWith("app-", StringComparison.OrdinalIgnoreCase) &&
+            label[4..].All(IsHexDigit);
+
+    public static bool IsValidSlug(string slug)
+        => !string.IsNullOrWhiteSpace(slug) &&
+            slug[0] != '-' &&
+            slug[^1] != '-' &&
+            slug.All(character =>
+                character is >= 'a' and <= 'z' ||
+                character is >= '0' and <= '9' ||
+                character == '-');
 
     public static bool TryGetPublishedAppSlug(string host, string appsDomain, out string slug)
     {
         slug = string.Empty;
-        if (!TryGetLabel(host, appsDomain, out var label) || PrivateLabelRegex().IsMatch(label))
+        if (!TryGetLabel(host, appsDomain, out var label) || IsPrivateAppLabel(label))
         {
             return false;
         }
 
-        if (!SlugRegex().IsMatch(label))
+        if (!IsValidSlug(label))
         {
             return false;
         }
@@ -50,9 +62,8 @@ public static partial class PublishedAppHostNames
         return true;
     }
 
-    [GeneratedRegex("^app-[0-9a-fA-F]{32}$", RegexOptions.CultureInvariant)]
-    private static partial Regex PrivateLabelRegex();
-
-    [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$", RegexOptions.CultureInvariant)]
-    private static partial Regex SlugRegex();
+    private static bool IsHexDigit(char character)
+        => character is >= '0' and <= '9'
+            or >= 'a' and <= 'f'
+            or >= 'A' and <= 'F';
 }
