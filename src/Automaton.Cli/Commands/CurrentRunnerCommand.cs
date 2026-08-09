@@ -36,12 +36,12 @@ public static class CurrentRunnerCommand
                 else if (target.Runner == null)
                 {
                     AnsiConsole.MarkupLine(
-                        "[yellow]The default target has no assigned Runner.[/]");
+                        "[yellow]The Live target has no assigned Runner.[/]");
                 }
                 else
                 {
                     AnsiConsole.MarkupLine(
-                        $"[green]Default target Runner:[/] {Markup.Escape(target.Runner.Name)} ({Markup.Escape(target.Runner.Id)})");
+                        $"[green]Live target Runner:[/] {Markup.Escape(target.Runner.Name)} ({Markup.Escape(target.Runner.Id)})");
                     AnsiConsole.MarkupLine(target.Runner.IsOnline
                         ? "[green]Status:[/] connected"
                         : "[yellow]Status:[/] offline");

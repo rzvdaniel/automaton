@@ -1,4 +1,5 @@
 using Automaton.Cli.Models;
+using Spectre.Console;
 
 namespace Automaton.Cli.Services;
 
@@ -45,11 +46,60 @@ public sealed class DeploymentTargetService(ConfigService config)
         var available = targets.Count == 0
             ? "(none)"
             : string.Join(", ", targets.Select(candidate =>
-                candidate.IsDefault ? $"{candidate.Slug} (default)" : candidate.Slug));
+                candidate.IsDefault ? $"{candidate.Slug} (Live)" : candidate.Slug));
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(normalized)
-                ? $"This app has no default deployment target. Available targets: {available}."
+                ? $"This app has no Live deployment target. Available targets: {available}."
                 : $"Deployment target '{normalized}' was not found. Available targets: {available}.");
+    }
+
+    public static IReadOnlyList<DeploymentTargetInfo> GetDeployableTargets(
+        IReadOnlyList<DeploymentTargetInfo> targets) => targets
+        .Where(target => target.IsDefault || (target.Runner is { IsOnline: true } && target.Status != "Deploying"))
+        .ToList();
+
+    public static DeploymentTargetInfo SelectForDeploy(
+        IReadOnlyList<DeploymentTargetInfo> targets,
+        string? slug,
+        bool nonInteractive)
+    {
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            return Select(targets, slug);
+        }
+
+        var deployable = GetDeployableTargets(targets);
+        if (deployable.Count == 1)
+        {
+            return deployable[0];
+        }
+        if (deployable.Count == 0)
+        {
+            throw new InvalidOperationException("This app has no deployable targets.");
+        }
+        if (nonInteractive)
+        {
+            var commands = string.Join(", ", deployable.Select(target => $"automaton deploy {target.Slug}"));
+            throw new InvalidOperationException($"Multiple deployable targets are available. Choose one explicitly: {commands}.");
+        }
+
+        var labels = deployable.Select(Format).ToList();
+        var prompt = new SelectionPrompt<string>()
+            .AddChoices(labels);
+        prompt.Title = "Select a deployment target";
+        var selected = Spectre.Console.AnsiConsole.Prompt(prompt);
+        return deployable[labels.IndexOf(selected)];
+    }
+
+    public static string Format(DeploymentTargetInfo target)
+    {
+        var destination = target.Runner?.IsHostedRunner == true
+            ? "Automaton Hosted"
+            : target.Runner?.ApplicationProfile == "PrivilegedHost"
+                ? "Self-hosted · Privileged Host"
+                : "Self-hosted · Standard";
+        var status = target.Runner is { IsOnline: false } ? "Runner offline" : target.Status;
+        return $"{target.Slug} · {(target.IsDefault ? "Live" : "Additional")} · {destination} · {status}";
     }
 
     public async Task<DeploymentTargetInfo> AddAsync(

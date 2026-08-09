@@ -10,16 +10,18 @@ public static class OpenCommand
     {
         var publicOption = new Option<bool>("--public", "Open the published public app URL");
         var privateOption = new Option<bool>("--private", "Open the app in Studio (legacy alias)");
+        var targetArgument = new Argument<string?>("target", () => null, "Target slug to open; omit for Live") { Arity = ArgumentArity.ZeroOrOne };
         var environmentOption = new Option<string?>("--env", "Use a named project environment from ./.automaton/environments/<name>.json");
 
         var cmd = new Command("open", "Open the current app in the browser")
         {
+            targetArgument,
             publicOption,
             privateOption,
             environmentOption
         };
 
-        cmd.SetHandler(async (bool openPublic, bool openPrivate, string? environmentName) =>
+        cmd.SetHandler(async (string? targetSlug, bool openPublic, bool openPrivate, string? environmentName) =>
         {
             if (openPublic && openPrivate)
             {
@@ -55,6 +57,11 @@ public static class OpenCommand
 
                 using var client = new AutomatonApiClient(server!, apiKey!);
                 var app = await client.GetAppAsync(appId!);
+                DeploymentTargetInfo? target = null;
+                if (!string.IsNullOrWhiteSpace(targetSlug))
+                {
+                    target = await new DeploymentTargetService(config).ResolveAsync(cwd, targetSlug, environmentName);
+                }
                 var isPublished = app.TryGetProperty("isPublished", out var publishedProperty) && publishedProperty.GetBoolean();
                 var publicSlug = app.TryGetProperty("publicUrl", out var publicUrlProperty) ? publicUrlProperty.GetString() : null;
 
@@ -73,6 +80,10 @@ public static class OpenCommand
                 else
                 {
                     url = CliAppUrlBuilder.BuildStudioApplicationUrl(server!, appId);
+                    if (target != null)
+                    {
+                        url += $"?target={Uri.EscapeDataString(target.Slug)}";
+                    }
                 }
 
                 CliBrowserService.OpenUrl(url);
@@ -84,7 +95,7 @@ public static class OpenCommand
                 WriteFailure(ex.Message);
                 Environment.ExitCode = 1;
             }
-        }, publicOption, privateOption, environmentOption);
+        }, targetArgument, publicOption, privateOption, environmentOption);
 
         return cmd;
     }

@@ -96,10 +96,14 @@ automaton-dev target list
 automaton-dev deploy server-eu
 ```
 
-`automaton deploy` resolves the server-owned default deployment target.
+`automaton deploy` deploys the only deployable target immediately. When several
+targets are available, interactive terminals show a target picker; CI and other
+non-interactive runs fail closed and print explicit `automaton deploy <target-slug>`
+commands. The Live target is used when no explicit target is needed.
 `automaton deploy <target-slug>` resolves a named target. Target definitions
 and Runner assignments are not stored in `automaton.json`; manage them with
-`automaton target list|add|remove|default`. See
+`automaton target list|add|remove|primary`. The hidden `target default` alias is
+retained only for compatibility. See
 [Deployment Targets](../apps/deployment-targets.md).
 
 ## Named project environments

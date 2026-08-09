@@ -116,7 +116,7 @@ public static class StatusCommand
                 table.AddRow("backend deploy dir", string.IsNullOrWhiteSpace(appConfig.Backend?.DeployDir) ? "-" : appConfig.Backend.DeployDir);
                 table.AddRow("backend scripts", backendScripts.ToString());
                 table.AddRow(
-                    "default target",
+                    "Live target",
                     defaultTarget == null
                         ? "-"
                         : $"{defaultTarget.Slug} → {defaultTarget.Runner?.Name ?? "unassigned"}");

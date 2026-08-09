@@ -3,7 +3,9 @@ namespace Automaton.Cli.Models;
 public sealed record DeploymentTargetRunnerInfo(
     string Id,
     string Name,
-    bool IsOnline);
+    bool IsOnline,
+    bool IsHostedRunner = false,
+    string? ApplicationProfile = null);
 
 public sealed record DeploymentTargetInfo(
     string Id,
