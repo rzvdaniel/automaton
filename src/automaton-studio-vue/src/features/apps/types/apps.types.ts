@@ -48,6 +48,7 @@ export interface App {
   summary: string
   description: string
   isPublished: boolean
+  canLaunchPublicly?: boolean
   isForkable: boolean
   publicUrl?: string
   publishedAt?: string // ISO date string
@@ -102,6 +103,7 @@ export interface AppListItem {
   thumbnailUrl?: string | null
   tags: string[]
   isPublished: boolean
+  canLaunchPublicly?: boolean
   publicUrl?: string | null
   updatedAtUtc: string
   canDelete: boolean
@@ -114,6 +116,7 @@ export interface AppListItem {
     runnerOnline: boolean
     frontendDeployed: boolean
     backendDeployed: boolean
+    isStaticHosting?: boolean
     routePath: string
   } | null
   runtime: { frontendAvailable: boolean; backendAvailable: boolean; frontendDeployedAtUtc?: string | null; backendDeployedAtUtc?: string | null }

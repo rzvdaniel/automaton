@@ -44,6 +44,17 @@ http:
       tls:
         certResolver: cloudflare
 
+    published-apps-wildcard-edge:
+      entryPoints:
+        - websecure
+      rule: "HostRegexp(`^.+\\.__APPS_DOMAIN__$`)"
+      priority: 1
+      service: api-blue-edge
+      middlewares:
+        - api-https-headers
+      tls:
+        certResolver: cloudflare
+
   middlewares:
     api-redirect:
       redirectScheme:

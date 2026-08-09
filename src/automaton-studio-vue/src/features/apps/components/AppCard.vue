@@ -81,13 +81,17 @@ const liveEnvironment = computed(() => props.app.liveEnvironment)
 const liveStatusLabel = computed(() => {
   const environment = liveEnvironment.value
   if (!environment) return props.app.runner?.connectivityStatus === 'Online' ? 'Running' : 'Unassigned'
+  if (environment.isStaticHosting) return 'Available'
   if (!environment.runnerOnline && environment.status !== 'Unassigned') return 'Offline'
   if (!environment.frontendDeployed && !environment.backendDeployed) return 'Unassigned'
   return environment.status === 'Running' ? 'Running' : environment.status
 })
-const liveStatusClass = computed(() => liveStatusLabel.value === 'Running' ? 'runner-status--online' : 'runner-status--offline')
+const liveStatusClass = computed(() => ['Running', 'Available'].includes(liveStatusLabel.value)
+  ? 'runner-status--online'
+  : 'runner-status--offline')
 const liveDestinationLabel = computed(() => {
   const environment = liveEnvironment.value
+  if (environment?.isStaticHosting) return 'Static hosting'
   if (!environment || environment.status === 'Unassigned') return 'No runtime assigned'
   if (environment.isHostedRunner) return 'Automaton Hosted'
   return environment.applicationProfile === 'PrivilegedHost'
@@ -96,7 +100,7 @@ const liveDestinationLabel = computed(() => {
 })
 
 const canOpenPrivateApp = computed(() => props.app.runtime.frontendAvailable)
-const canOpenPublicApp = computed(() => props.app.isPublished && !!props.app.publicUrl)
+const canOpenPublicApp = computed(() => props.app.canLaunchPublicly === true && !!props.app.publicUrl)
 const canOpenApp = computed(() => canOpenPublicApp.value || canOpenPrivateApp.value)
 const primaryAction = computed(() => canOpenApp.value
   ? { label: 'Open', icon: 'pi pi-external-link' }

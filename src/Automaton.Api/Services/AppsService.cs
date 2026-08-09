@@ -66,6 +66,9 @@ public class AppsService
             {
                 app.Id, app.Name, app.Summary, app.Description, app.ThumbnailUrl, app.Tags,
                 app.IsPublished, app.PublicUrl, app.Updated, app.ProjectId,
+                CanLaunchPublicly = app.IsPublished &&
+                    app.RuntimeVisibility == AppRuntimeVisibilities.Public &&
+                    app.AccessStatus == AppAccessStatuses.Active,
                 OwnerId = app.ProjectId.HasValue
                     ? dataContext.Projects.Where(p => p.Id == app.ProjectId.Value).Select(p => (Guid?)p.OwnerId).FirstOrDefault()
                     : app.WebAppUsers.OrderBy(u => u.UserId).Select(u => (Guid?)u.UserId).FirstOrDefault(),
@@ -121,7 +124,7 @@ public class AppsService
                 Id = row.Id, Name = row.Name, Summary = row.Summary ?? string.Empty,
                 Description = row.Description ?? string.Empty,
                 ThumbnailUrl = row.ThumbnailUrl, Tags = ParseTags(row.Tags), IsPublished = row.IsPublished,
-                PublicUrl = row.PublicUrl, UpdatedAtUtc = row.Updated,
+                PublicUrl = row.PublicUrl, CanLaunchPublicly = row.CanLaunchPublicly, UpdatedAtUtc = row.Updated,
                 CanDelete = !row.ProjectId.HasValue,
                 Runner = row.Runner,
                 LiveEnvironment = row.LiveTarget == null ? null : new AppListEnvironmentDto
@@ -138,6 +141,7 @@ public class AppsService
                         now) == RunnerStatus.Online,
                     FrontendDeployed = row.LiveTarget.FrontendDeployed,
                     BackendDeployed = row.LiveTarget.BackendDeployed,
+                    IsStaticHosting = row.LiveTarget.Runner == null && row.LiveTarget.FrontendDeployed,
                     RoutePath = $"/private/{row.Id:D}",
                 },
                 Runtime = new AppListRuntimeDto

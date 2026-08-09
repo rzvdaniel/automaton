@@ -11,6 +11,7 @@ public sealed class AppListItemDto
     public string? ThumbnailUrl { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
     public bool IsPublished { get; init; }
+    public bool CanLaunchPublicly { get; init; }
     public string? PublicUrl { get; init; }
     public DateTime UpdatedAtUtc { get; init; }
     public bool CanDelete { get; init; }
@@ -28,6 +29,7 @@ public sealed class AppListEnvironmentDto
     public bool RunnerOnline { get; init; }
     public bool FrontendDeployed { get; init; }
     public bool BackendDeployed { get; init; }
+    public bool IsStaticHosting { get; init; }
     public string RoutePath { get; init; } = string.Empty;
 }
 

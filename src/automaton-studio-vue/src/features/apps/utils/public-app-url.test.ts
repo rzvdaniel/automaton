@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getDeployedAppUrl, getDeploymentTargetUrl } from './public-app-url'
+import { getDeployedAppUrl, getDeploymentTargetUrl, getPublishedAppUrl } from './public-app-url'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -7,6 +7,13 @@ afterEach(() => {
 })
 
 describe('deployment target URLs', () => {
+  it('uses the canonical production subdomain for published apps', () => {
+    vi.stubEnv('VITE_PUBLIC_APPS_BASE_URL', 'https://apps.automaton.monster')
+    vi.stubGlobal('window', { location: { origin: 'https://studio.automaton.monster' } })
+
+    expect(getPublishedAppUrl('space-invaders')).toBe('https://space-invaders.apps.automaton.monster/')
+  })
+
   it('uses the app-specific private host for a named target route', () => {
     vi.stubEnv('VITE_PUBLIC_APPS_BASE_URL', 'https://apps.automaton.example')
     vi.stubGlobal('window', { location: { origin: 'https://studio.automaton.example' } })
