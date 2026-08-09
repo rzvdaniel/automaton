@@ -233,7 +233,7 @@ public class BackendRouteConfigService
             builder.AppendLine("        - websecure");
             builder.AppendLine("      tls: {}");
             builder.AppendLine($"      rule: \"Host(`{host}`) && PathPrefix(`/`)\"");
-            builder.AppendLine("      priority: 1");
+            builder.AppendLine("      priority: 50");
             builder.AppendLine($"      service: \"{GetServiceName(route, key)}\"");
             builder.AppendLine($"      middlewares: [\"{key}-frontend-rewrite\"]");
         }
