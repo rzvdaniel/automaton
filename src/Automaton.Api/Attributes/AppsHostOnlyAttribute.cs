@@ -9,7 +9,6 @@ public sealed class AppsHostOnlyAttribute : ActionMethodSelectorAttribute
     public override bool IsValidForRequest(RouteContext routeContext, ActionDescriptor action)
     {
         var host = routeContext.HttpContext.Request.Host.Host;
-        return host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase)
-            || host.Contains(".apps.", StringComparison.OrdinalIgnoreCase);
+        return host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase);
     }
 }

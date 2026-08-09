@@ -195,30 +195,14 @@ public class UserAppsController : ControllerBase
     }
 
     [HttpGet("{*path}", Order = -10)]
-    [AppsHostOnly]
+    [PublishedAppSubdomainOnly]
     [AllowAnonymous]
     public async Task<IActionResult> ServePublishedSubdomainAppFile(string? path)
     {
         var host = Request.Host.Host;
         var marker = ".apps.";
         var markerIndex = host.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (markerIndex <= 0)
-        {
-            if (!host.StartsWith("apps.", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound();
-            }
-
-            var segments = (path ?? string.Empty).Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length == 0)
-            {
-                return NotFound();
-            }
-
-            return await ServePublishedAppFile(
-                segments[0],
-                segments.Length == 1 ? "index.html" : string.Join('/', segments.Skip(1)));
-        }
+        if (markerIndex <= 0) return NotFound();
 
         var slug = host[..markerIndex];
         return await ServePublishedAppFile(slug, string.IsNullOrWhiteSpace(path) ? "index.html" : path);
