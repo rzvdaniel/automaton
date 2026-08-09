@@ -49,6 +49,7 @@ import {
 import { getOpenAppUrl, getPublishedAppUrl } from '../utils/public-app-url'
 import { resolveViewingTarget } from '../utils/viewing-target'
 import { getDeployableTargets, getLiveTarget, getDeployTargetOptionLabel } from '../utils/deployment-target-actions'
+import { isRemovableLegacyDefault } from '../utils/environment-display'
 
 const route = useRoute()
 const router = useRouter()
@@ -429,7 +430,7 @@ async function refreshDefaultTarget() {
 }
 
 function handleTargetsChanged(targets: AppDeploymentTarget[]) {
-  deploymentTargets.value = targets
+  deploymentTargets.value = targets.filter((target) => !isRemovableLegacyDefault(target))
   if (!selectedRunnerId.value) {
     selectedRunnerId.value = (targets.find((target) => target.isDefault) ?? targets[0])?.runner?.id ?? null
   }

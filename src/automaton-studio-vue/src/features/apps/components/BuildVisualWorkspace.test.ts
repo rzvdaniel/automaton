@@ -65,6 +65,22 @@ describe('BuildVisualWorkspace target preview', () => {
     expect(wrapper.emitted('selectTarget')?.[0]).toEqual([canary])
   })
 
+  it('keeps technical slugs out of the normal selector and hides a disposable legacy default', () => {
+    const live = target()
+    const canary = target({ id: 'canary-target-id', name: 'privileged-canary', slug: 'privileged-canary', isDefault: false,
+      runner: { id: 'runner-id', name: 'Privileged', purpose: 'Application', applicationProfile: 'PrivilegedHost', isHostedRunner: false, isOnline: true } })
+    const legacy = target({ id: 'legacy-target-id', name: 'Default', slug: 'default', isDefault: false,
+      runner: null, frontendDeployed: false, backendDeployed: false, status: DeploymentTargetStatus.Unassigned })
+    const wrapper = mountWorkspace([live, canary, legacy], live)
+
+    const options = wrapper.findAll('option')
+    expect(options).toHaveLength(2)
+    expect(options[0]?.text()).toContain('Live')
+    expect(options[0]?.text()).not.toContain('hosted-control')
+    expect(options[1]?.text()).toContain('Canary')
+    expect(options[1]?.text()).toContain('Privileged Host')
+  })
+
   it('uses a stable target URL for Open and Copy and reserves cache busting for the iframe', async () => {
     const wrapper = mountWorkspace([target()])
     const iframe = wrapper.get('iframe.application-iframe')

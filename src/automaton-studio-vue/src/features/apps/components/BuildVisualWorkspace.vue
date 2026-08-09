@@ -10,6 +10,7 @@ import { useUserSettings } from '@/shared/composables/useUserSettings'
 import ConsolePanel from './ConsolePanel.vue'
 import { getDeploymentTargetUrl } from '../utils/public-app-url'
 import { getViewingTargetPreviewState } from '../utils/viewing-target'
+import { getEnvironmentDisplayName, isRemovableLegacyDefault } from '../utils/environment-display'
 
 const props = withDefaults(
   defineProps<{
@@ -159,6 +160,7 @@ const previewViewportStyle = computed(() => {
 })
 
 const previewState = computed(() => getViewingTargetPreviewState(props.selectedTarget))
+const visibleTargets = computed(() => props.targets.filter((target) => !isRemovableLegacyDefault(target)))
 
 const targetPreviewUrl = computed(() => {
   if (!previewState.value.available || !editorStore.currentApp || !props.selectedTarget) return ''
@@ -192,7 +194,7 @@ function getTargetStatusLabel(target: AppDeploymentTarget): string {
 }
 
 function selectTarget(event: Event): void {
-  const target = props.targets.find((candidate) => candidate.slug === (event.target as HTMLSelectElement).value)
+  const target = visibleTargets.value.find((candidate) => candidate.slug === (event.target as HTMLSelectElement).value)
   if (target) emit('selectTarget', target)
 }
 
@@ -238,18 +240,18 @@ async function refreshApplication(): Promise<void> {
           <div class="application-target-picker">
             <span>Environment:</span>
             <select
-              v-if="targets.length > 1"
+              v-if="visibleTargets.length > 1"
               class="application-target-select"
               :value="selectedTarget?.slug"
               aria-label="Environment"
               @change="selectTarget"
             >
-              <option v-for="target in targets" :key="target.id" :value="target.slug">
-                {{ target.name }}{{ target.isDefault ? ' — Live' : '' }} · {{ getTargetDestinationLabel(target) }} · {{ getTargetStatusLabel(target) }}
+              <option v-for="target in visibleTargets" :key="target.id" :value="target.slug" :title="target.slug">
+                {{ getEnvironmentDisplayName(target) }} · {{ getTargetDestinationLabel(target) }} · {{ getTargetStatusLabel(target) }}
               </option>
             </select>
             <span v-else class="application-target-summary">
-              {{ selectedTarget?.name || 'Live' }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
+              {{ getEnvironmentDisplayName(selectedTarget) }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
             </span>
           </div>
           <div class="application-source-context">Workspace source · Environment: {{ selectedTarget?.name || 'Live' }}</div>
@@ -476,9 +478,9 @@ async function refreshApplication(): Promise<void> {
         </div>
         <div v-else class="logs-tabbed-container">
           <div class="logs-tab-bar">
-            <div class="logs-tab logs-tab--static active">
+          <div class="logs-tab logs-tab--static active">
               <i class="pi pi-server"></i>
-              Backend logs · {{ selectedTarget?.name || 'Live' }} — {{ selectedTarget?.slug || 'live' }}
+              Backend logs · {{ getEnvironmentDisplayName(selectedTarget) }}
               <span v-if="editorStore.consoleEntries.length > 0" class="logs-tab-badge">{{ editorStore.consoleEntries.length }}</span>
             </div>
           </div>
