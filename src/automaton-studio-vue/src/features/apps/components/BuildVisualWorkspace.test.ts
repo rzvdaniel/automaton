@@ -52,8 +52,10 @@ describe('BuildVisualWorkspace target preview', () => {
     const wrapper = mountWorkspace([target()])
 
     expect(wrapper.find('select[aria-label="Environment"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Live · Automaton Hosted · Running')
-    expect(wrapper.text()).toContain('Workspace source · Environment: Live')
+    expect(wrapper.text()).toContain('Live')
+    expect(wrapper.text()).toContain('Automaton Hosted')
+    expect(wrapper.text()).toContain('Running')
+    expect(wrapper.text()).not.toContain('Workspace source')
   })
 
   it('renders multiple targets and emits the selected target', async () => {

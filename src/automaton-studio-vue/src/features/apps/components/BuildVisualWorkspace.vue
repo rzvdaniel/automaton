@@ -166,6 +166,7 @@ const targetOptions = computed(() => visibleTargets.value.map((target) => ({
   value: target.slug,
   label: `${getEnvironmentDisplayName(target)} · ${getTargetDestinationLabel(target)} · ${getTargetStatusLabel(target)}`,
   slug: target.slug,
+  target,
 })))
 
 const targetPreviewUrl = computed(() => {
@@ -193,7 +194,7 @@ function getTargetDestinationLabel(target?: AppDeploymentTarget | null): string 
 }
 
 function getTargetStatusLabel(target: AppDeploymentTarget): string {
-  if (!target.runner) return 'No runtime assigned'
+  if (!target.runner) return 'Unassigned'
   if (!target.frontendDeployed) return 'Not deployed'
   if (!target.runner.isOnline || target.status === DeploymentTargetStatus.RunnerOffline) return 'Offline'
   return target.status === DeploymentTargetStatus.Running ? 'Running' : target.status
@@ -244,7 +245,6 @@ async function refreshApplication(): Promise<void> {
         <div>
           <span class="application-shell-header__label">Application preview</span>
           <div class="application-target-picker">
-            <span>Environment:</span>
             <Select
               v-if="visibleTargets.length > 1"
               :model-value="selectedTarget?.slug"
@@ -254,12 +254,27 @@ async function refreshApplication(): Promise<void> {
               class="application-target-select"
               aria-label="Environment"
               @update:model-value="selectTarget"
-            />
-            <span v-else class="application-target-summary">
-              {{ getEnvironmentDisplayName(selectedTarget) }} · {{ getTargetDestinationLabel(selectedTarget) }} · {{ selectedTarget ? getTargetStatusLabel(selectedTarget) : '' }}
+            >
+              <template #value>
+                <span>{{ getEnvironmentDisplayName(selectedTarget) }}</span>
+              </template>
+              <template #option="slotProps">
+                <div class="application-target-option">
+                  <strong>{{ getEnvironmentDisplayName(slotProps.option.target) }}</strong>
+                  <span>{{ getTargetDestinationLabel(slotProps.option.target) }}</span>
+                  <span class="application-target-option__status">● {{ getTargetStatusLabel(slotProps.option.target) }}</span>
+                </div>
+              </template>
+            </Select>
+            <span v-else class="application-target-name">{{ getEnvironmentDisplayName(selectedTarget) }}</span>
+            <span v-if="selectedTarget" class="application-target-context">
+              <span>{{ getTargetDestinationLabel(selectedTarget) }}</span>
+              <span class="application-target-status" :class="{ 'application-target-status--positive': getTargetStatusLabel(selectedTarget) === 'Running' }">
+                <span class="application-target-status__dot">●</span>
+                {{ getTargetStatusLabel(selectedTarget) }}
+              </span>
             </span>
           </div>
-          <div class="application-source-context">Workspace source · Environment: {{ selectedTarget?.name || 'Live' }}</div>
         </div>
       </div>
       <div class="application-shell-header__actions">
@@ -530,11 +545,30 @@ async function refreshApplication(): Promise<void> {
   color: var(--p-text-muted-color);
 }
 
-.application-source-context {
-  color: var(--p-text-muted-color);
-  font-size: 0.75rem;
-  margin-top: 0.2rem;
+.application-target-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  min-width: 0;
 }
+
+.application-target-select { min-width: 9rem; }
+.application-target-name { min-width: 9rem; font-size: 0.95rem; font-weight: 600; }
+.application-target-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.application-target-status { display: inline-flex; align-items: center; gap: 0.3rem; }
+.application-target-status__dot { color: var(--p-text-muted-color); font-size: 0.7rem; }
+.application-target-status--positive { color: var(--p-green-600); }
+.application-target-status--positive .application-target-status__dot { color: var(--p-green-500); }
+.application-target-option { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(10rem, 1.5fr) auto; gap: 0.75rem; align-items: center; width: 100%; }
+.application-target-option__status { color: var(--p-text-muted-color); }
 
 .application-shell-header__actions {
   display: flex;
