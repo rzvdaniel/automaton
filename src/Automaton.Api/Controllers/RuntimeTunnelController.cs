@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Automaton.Api.Controllers;
 
 [ApiController]
-[Route("runtime-tunnel/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path}")]
+[Route("runtime-tunnel/apps/{appId:guid}/targets/{deploymentTargetId:guid}/{**path}", Order = -20)]
 [AllowAnonymous]
 public sealed class RuntimeTunnelController(RuntimeTunnelService runtimeTunnelService) : ControllerBase
 {
