@@ -4,9 +4,11 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import type { MenuItem } from 'primevue/menuitem'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { runnersService } from '@/features/runners/services/runners.service'
@@ -45,30 +47,46 @@ const runnerId = ref<string | null>(null)
 const privilegedHostAccessAcknowledged = ref(false)
 const purpose = ref<'Staging' | 'Canary' | 'Custom'>('Custom')
 const advancedTargetIds = ref<string[]>([])
+const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const actionMenuTarget = ref<AppDeploymentTarget | null>(null)
 
 const selectedRunner = computed(() => runners.value.find((runner) => runner.id === runnerId.value))
-const selectedRunnerIsPrivileged = computed(() => isPrivilegedSelfHostedRunner(selectedRunner.value))
-const requiresPrivilegedAcknowledgement = computed(() => requiresPrivilegedHostAcknowledgement(
-  selectedRunner.value,
-  runnerId.value,
-  editingTarget.value?.runner?.id ?? null,
-))
+const selectedRunnerIsPrivileged = computed(() =>
+  isPrivilegedSelfHostedRunner(selectedRunner.value)
+)
+const requiresPrivilegedAcknowledgement = computed(() =>
+  requiresPrivilegedHostAcknowledgement(
+    selectedRunner.value,
+    runnerId.value,
+    editingTarget.value?.runner?.id ?? null
+  )
+)
 const runnerOptions = computed(() => getDeploymentTargetRunnerOptions(runners.value))
 const liveTarget = computed(() => targets.value.find((target) => target.isDefault) ?? null)
 const additionalTargets = computed(() => targets.value.filter((target) => !target.isDefault))
 const hostedRunners = computed(() => runners.value.filter((runner) => runner.isHostedRunner))
-const selfHostedRunnerOptions = computed(() => runnerOptions.value.filter((option) => {
-  const runner = runners.value.find((candidate) => candidate.id === option.value)
-  return !runner?.isHostedRunner
-}))
+const selfHostedRunnerOptions = computed(() =>
+  runnerOptions.value.filter((option) => {
+    const runner = runners.value.find((candidate) => candidate.id === option.value)
+    return !runner?.isHostedRunner
+  })
+)
 const hostedDestinationOption = computed(() => {
-  const existingRunnerId = editingTarget.value?.runner?.isHostedRunner ? editingTarget.value.runner.id : null
-  const runner = runners.value.find((candidate) => candidate.id === resolveAutomatonHostedRunnerId(runners.value, existingRunnerId)) ?? null
-  if (runner) return { label: 'Automaton Hosted', value: runner.id, disabled: runner.status !== 'Online' }
+  const existingRunnerId = editingTarget.value?.runner?.isHostedRunner
+    ? editingTarget.value.runner.id
+    : null
+  const runner =
+    runners.value.find(
+      (candidate) =>
+        candidate.id === resolveAutomatonHostedRunnerId(runners.value, existingRunnerId)
+    ) ?? null
+  if (runner)
+    return { label: 'Automaton Hosted', value: runner.id, disabled: runner.status !== 'Online' }
   return {
-    label: hostedRunners.value.length > 1
-      ? 'Automaton Hosted (multiple managed Runners; unavailable here)'
-      : 'Automaton Hosted (unavailable)',
+    label:
+      hostedRunners.value.length > 1
+        ? 'Automaton Hosted (multiple managed Runners; unavailable here)'
+        : 'Automaton Hosted (unavailable)',
     value: '__automaton-hosted-unavailable__',
     disabled: true,
   }
@@ -78,11 +96,13 @@ const destinationRunnerOptions = computed(() => [
   ...selfHostedRunnerOptions.value,
 ])
 
-const normalizedSlug = computed(() => slug.value
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, ''))
+const normalizedSlug = computed(() =>
+  slug.value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+)
 
 async function load() {
   isLoading.value = true
@@ -113,9 +133,10 @@ function openCreate() {
 
 function applyPurposeSuggestion() {
   if (purpose.value === 'Custom') return
-  const suggestion = purpose.value === 'Staging'
-    ? { name: 'Staging', slug: 'staging' }
-    : { name: 'Canary', slug: 'canary' }
+  const suggestion =
+    purpose.value === 'Staging'
+      ? { name: 'Staging', slug: 'staging' }
+      : { name: 'Canary', slug: 'canary' }
   if (!name.value.trim()) name.value = suggestion.name
   if (!slug.value.trim()) slug.value = suggestion.slug
 }
@@ -141,11 +162,14 @@ async function saveTarget() {
       if (runnerChanged && hasRuntime) {
         confirm.require({
           header: 'Move deployed environment?',
-          message: 'Changing the Runner will stop and remove this environment runtime from its current Runner. Continue?',
+          message:
+            'Changing the Runner will stop and remove this environment runtime from its current Runner. Continue?',
           icon: 'pi pi-exclamation-triangle',
           acceptClass: 'p-button-danger',
           accept: () => void updateExistingTarget(true),
-          reject: () => { busyTargetId.value = null },
+          reject: () => {
+            busyTargetId.value = null
+          },
         })
         return
       }
@@ -158,7 +182,12 @@ async function saveTarget() {
         privilegedHostAccessAcknowledged: privilegedHostAccessAcknowledged.value,
       })
       showEditor.value = false
-      toast.add({ severity: 'success', summary: 'Environment created', detail: `${name.value.trim()} is ready to configure.`, life: 2500 })
+      toast.add({
+        severity: 'success',
+        summary: 'Environment created',
+        detail: `${name.value.trim()} is ready to configure.`,
+        life: 2500,
+      })
       await load()
     }
   } catch (error) {
@@ -181,11 +210,16 @@ async function updateExistingTarget(cleanupDeployedRuntime: boolean) {
         target.id,
         runnerId.value,
         cleanupDeployedRuntime,
-        privilegedHostAccessAcknowledged.value,
+        privilegedHostAccessAcknowledged.value
       )
     }
     showEditor.value = false
-    toast.add({ severity: 'success', summary: 'Environment updated', detail: `${name.value.trim()} was updated.`, life: 2500 })
+    toast.add({
+      severity: 'success',
+      summary: 'Environment updated',
+      detail: `${name.value.trim()} was updated.`,
+      life: 2500,
+    })
     await load()
   } catch (error) {
     showError(error, 'Failed to update environment')
@@ -203,7 +237,8 @@ watch(runnerId, (nextRunnerId, previousRunnerId) => {
 function makeDefault(target: AppDeploymentTarget) {
   confirm.require({
     header: 'Promote to Live?',
-    message: 'This changes which environment is served through the App’s normal private and published URLs. It does not redeploy either environment.',
+    message:
+      'This changes which environment is served through the App’s normal private and published URLs. It does not redeploy either environment.',
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Promote to Live',
     accept: () => void promoteToLive(target),
@@ -214,7 +249,12 @@ async function promoteToLive(target: AppDeploymentTarget) {
   busyTargetId.value = target.id
   try {
     await appsService.makeDefaultDeploymentTarget(props.appId, target.id)
-    toast.add({ severity: 'success', summary: 'Live environment changed', detail: `${target.name} now serves this app’s normal routes.`, life: 2500 })
+    toast.add({
+      severity: 'success',
+      summary: 'Live environment changed',
+      detail: `${target.name} now serves this app’s normal routes.`,
+      life: 2500,
+    })
     await load()
   } catch (error) {
     showError(error, 'Failed to promote the Live environment')
@@ -233,10 +273,15 @@ function remove(target: AppDeploymentTarget) {
       busyTargetId.value = target.id
       try {
         await appsService.deleteDeploymentTarget(props.appId, target.id)
-        toast.add({ severity: 'success', summary: 'Environment deleted', detail: `${target.name} was deleted.`, life: 2500 })
+        toast.add({
+          severity: 'success',
+          summary: 'Environment deleted',
+          detail: `${target.name} was deleted.`,
+          life: 2500,
+        })
         await load()
       } catch (error) {
-      showError(error, 'Failed to delete environment')
+        showError(error, 'Failed to delete environment')
       } finally {
         busyTargetId.value = null
       }
@@ -244,12 +289,12 @@ function remove(target: AppDeploymentTarget) {
   })
 }
 
-function statusSeverity(status: AppDeploymentTarget['status']) {
-  if (status === DeploymentTargetStatus.Running) return 'success'
-  if (status === DeploymentTargetStatus.Failed) return 'danger'
-  if (status === DeploymentTargetStatus.RunnerOffline) return 'warn'
-  if (status === DeploymentTargetStatus.Deploying) return 'info'
-  return 'secondary'
+function statusClass(status: AppDeploymentTarget['status']): string {
+  if (status === DeploymentTargetStatus.Running) return 'target-status--running'
+  if (status === DeploymentTargetStatus.Failed) return 'target-status--failed'
+  if (status === DeploymentTargetStatus.RunnerOffline) return 'target-status--offline'
+  if (status === DeploymentTargetStatus.Deploying) return 'target-status--deploying'
+  return 'target-status--quiet'
 }
 
 function targetRoute(target: AppDeploymentTarget) {
@@ -265,12 +310,12 @@ function openRoute(target: AppDeploymentTarget) {
   if (route) window.open(route, '_blank', 'noopener,noreferrer')
 }
 
-function destinationLabel(target: AppDeploymentTarget): string {
-  if (!target.runner) return 'No runtime assigned'
-  if (target.runner.isHostedRunner) return 'Automaton Hosted'
-  return target.runner.applicationProfile === 'PrivilegedHost'
-    ? 'Self-hosted · Privileged Host'
-    : 'Self-hosted · Standard'
+function isPrivilegedTarget(target: AppDeploymentTarget): boolean {
+  return (
+    !!target.runner &&
+    !target.runner.isHostedRunner &&
+    target.runner.applicationProfile === 'PrivilegedHost'
+  )
 }
 
 function runtimeTransport(target: AppDeploymentTarget): string {
@@ -278,26 +323,79 @@ function runtimeTransport(target: AppDeploymentTarget): string {
 }
 
 function canOpenPreview(target: AppDeploymentTarget): boolean {
-  return !!target.runner && target.frontendDeployed && target.runner.isOnline && target.status !== DeploymentTargetStatus.RunnerOffline
+  return (
+    !!target.runner &&
+    target.frontendDeployed &&
+    target.runner.isOnline &&
+    target.status !== DeploymentTargetStatus.RunnerOffline
+  )
 }
 
 function deploymentState(target: AppDeploymentTarget): string {
   if (!target.frontendDeployed && !target.backendDeployed) return ''
-  if (target.frontendDeployed && target.backendDeployed) return 'Frontend and backend deployed'
-  return target.frontendDeployed ? 'Frontend deployed' : 'Backend deployed'
+  if (target.frontendDeployed && target.backendDeployed) return 'Frontend + backend'
+  return target.frontendDeployed ? 'Frontend' : 'Backend'
 }
 
 function canPromote(target: AppDeploymentTarget): boolean {
-  return !!target.runner && target.runner.isOnline &&
-    target.frontendDeployed && target.backendDeployed &&
+  return (
+    !!target.runner &&
+    target.runner.isOnline &&
+    target.frontendDeployed &&
+    target.backendDeployed &&
     target.status !== DeploymentTargetStatus.Deploying
+  )
 }
 
 function formatDeploymentTime(target: AppDeploymentTarget): string {
+  if (!target.lastSuccessfulDeploymentAt) return 'Never deployed'
+  const elapsedSeconds = Math.max(
+    0,
+    Math.round((Date.now() - new Date(target.lastSuccessfulDeploymentAt).getTime()) / 1000)
+  )
+  if (elapsedSeconds < 60) return 'Deployed just now'
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['year', 31_536_000],
+    ['month', 2_592_000],
+    ['week', 604_800],
+    ['day', 86_400],
+    ['hour', 3_600],
+    ['minute', 60],
+  ]
+  const [, unitSeconds] = units.find(([, seconds]) => elapsedSeconds >= seconds) ?? ['second', 1]
+  const unit = units.find(([, seconds]) => seconds === unitSeconds)?.[0] ?? 'second'
+  return `Deployed ${new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(-Math.round(elapsedSeconds / unitSeconds), unit)}`
+}
+
+function deploymentTimeTitle(target: AppDeploymentTarget): string | undefined {
   return target.lastSuccessfulDeploymentAt
     ? new Date(target.lastSuccessfulDeploymentAt).toLocaleString()
-    : 'Never deployed'
+    : undefined
 }
+
+function toggleActionMenu(target: AppDeploymentTarget, event: Event) {
+  actionMenuTarget.value = target
+  actionMenu.value?.toggle(event)
+}
+
+const actionMenuItems = computed<MenuItem[]>(() => {
+  const target = actionMenuTarget.value
+  if (!target) return []
+  return [
+    { label: 'View logs', icon: 'pi pi-list', command: () => emit('viewLogs', target) },
+    { label: 'Edit environment', icon: 'pi pi-pencil', command: () => openEdit(target) },
+    ...(target.isDefault
+      ? []
+      : [
+          {
+            label: 'Delete environment',
+            icon: 'pi pi-trash',
+            class: 'p-menuitem-danger',
+            command: () => remove(target),
+          },
+        ]),
+  ]
+})
 
 function toggleAdvanced(target: AppDeploymentTarget) {
   advancedTargetIds.value = advancedTargetIds.value.includes(target.id)
@@ -310,11 +408,15 @@ function isAdvancedVisible(target: AppDeploymentTarget): boolean {
 }
 
 function showError(error: unknown, fallback: string) {
-  const detail = typeof error === 'object' && error && 'response' in error
-    ? (error as { response?: { data?: { message?: string; detail?: string } } }).response?.data?.message
-      ?? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-      ?? fallback
-    : error instanceof Error ? error.message : fallback
+  const detail =
+    typeof error === 'object' && error && 'response' in error
+      ? ((error as { response?: { data?: { message?: string; detail?: string } } }).response?.data
+          ?.message ??
+        (error as { response?: { data?: { detail?: string } } }).response?.data?.detail ??
+        fallback)
+      : error instanceof Error
+        ? error.message
+        : fallback
   toast.add({ severity: 'error', summary: 'Environment error', detail, life: 5000 })
 }
 
@@ -332,7 +434,9 @@ watch(() => props.refreshRevision, load)
       <Button label="Add environment" icon="pi pi-plus" :disabled="isLoading" @click="openCreate" />
     </div>
 
-    <div v-if="isLoading" class="targets-loading"><i class="pi pi-spin pi-spinner"></i> Loading environments…</div>
+    <div v-if="isLoading" class="targets-loading">
+      <i class="pi pi-spin pi-spinner"></i> Loading environments…
+    </div>
     <template v-else>
       <section class="target-group">
         <div class="target-group__heading">
@@ -341,54 +445,196 @@ watch(() => props.refreshRevision, load)
         </div>
         <article v-if="liveTarget" class="target-card target-card--live">
           <div class="target-main">
-            <div class="target-title"><strong>{{ getEnvironmentDisplayName(liveTarget) }}</strong><Tag value="Live" severity="success" /><Tag :value="liveTarget.status" :severity="statusSeverity(liveTarget.status)" /></div>
-            <strong class="target-destination">{{ destinationLabel(liveTarget) }}</strong>
-            <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(liveTarget) }}</span><span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span></div>
-            <Message v-if="liveTarget.cleanupPending" severity="warn" :closable="false">Runtime cleanup needs retry. {{ liveTarget.lastCleanupError || 'The previous cleanup did not complete.' }}</Message>
-            <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(liveTarget)" />
-            <div v-if="isAdvancedVisible(liveTarget)" class="advanced-details"><span>Environment slug: {{ liveTarget.slug }}</span><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span><span>Target ID: {{ liveTarget.id }}</span><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span><span>Runtime route: {{ targetRoute(liveTarget) }}</span><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span></div>
+            <div class="target-title">
+              <span class="target-name">{{ getEnvironmentDisplayName(liveTarget) }}</span>
+              <Tag value="LIVE" severity="success" />
+              <span class="target-status" :class="statusClass(liveTarget.status)"
+                ><i class="pi pi-circle-fill"></i>{{ liveTarget.status }}</span
+              >
+            </div>
+            <div class="target-destination">
+              <i class="pi pi-server"></i><span>Automaton Hosted</span>
+            </div>
+            <div class="target-meta" :title="deploymentTimeTitle(liveTarget)">
+              <span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span
+              ><span v-if="deploymentState(liveTarget)">·</span
+              ><span>{{ formatDeploymentTime(liveTarget) }}</span>
+            </div>
+            <Message v-if="liveTarget.cleanupPending" severity="warn" :closable="false"
+              >Runtime cleanup needs retry.
+              {{ liveTarget.lastCleanupError || 'The previous cleanup did not complete.' }}</Message
+            >
+            <Button
+              :label="isAdvancedVisible(liveTarget) ? 'Hide advanced details' : 'Advanced details'"
+              :icon="isAdvancedVisible(liveTarget) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+              :aria-expanded="isAdvancedVisible(liveTarget)"
+              size="small"
+              text
+              class="advanced-toggle"
+              @click="toggleAdvanced(liveTarget)"
+            />
+            <div v-if="isAdvancedVisible(liveTarget)" class="advanced-details">
+              <span>Environment slug: {{ liveTarget.slug }}</span
+              ><span>Runner: {{ liveTarget.runner?.name ?? 'None' }}</span
+              ><span>Runner ID: {{ liveTarget.runner?.id ?? 'None' }}</span
+              ><span>Target ID: {{ liveTarget.id }}</span
+              ><span>Runtime transport: {{ runtimeTransport(liveTarget) }}</span
+              ><span>Runtime route: {{ targetRoute(liveTarget) }}</span
+              ><span>Internal preview URL: {{ targetRoute(liveTarget) }}</span>
+            </div>
           </div>
-          <div class="target-actions"><Button label="Deploy" icon="pi pi-cloud-upload" size="small" :disabled="liveTarget.runner?.isOnline === false || liveTarget.status === DeploymentTargetStatus.Deploying" @click="emit('deploy', liveTarget)" /><Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(liveTarget)" :title="canOpenPreview(liveTarget) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(liveTarget)" /><Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', liveTarget)" /><Button label="Edit" icon="pi pi-pencil" size="small" text @click="openEdit(liveTarget)" /></div>
+          <div class="target-actions">
+            <Button
+              label="Deploy"
+              icon="pi pi-cloud-upload"
+              size="small"
+              :disabled="
+                liveTarget.runner?.isOnline === false ||
+                liveTarget.status === DeploymentTargetStatus.Deploying
+              "
+              @click="emit('deploy', liveTarget)"
+            />
+            <Button
+              label="Open preview"
+              icon="pi pi-external-link"
+              size="small"
+              outlined
+              :disabled="!canOpenPreview(liveTarget)"
+              :title="
+                canOpenPreview(liveTarget)
+                  ? undefined
+                  : 'Preview is unavailable until the target is deployed and its Runner is online.'
+              "
+              @click="openRoute(liveTarget)"
+            />
+            <Button
+              icon="pi pi-ellipsis-h"
+              aria-label="More actions for Live environment"
+              size="small"
+              text
+              @click="toggleActionMenu(liveTarget, $event)"
+            />
+          </div>
         </article>
       </section>
 
       <section class="target-group">
-        <div class="target-group__heading"><h3>Additional environments</h3><p>Use additional environments for staging, canary testing, or a different runtime.</p></div>
-        <Message v-if="additionalTargets.length === 0" severity="secondary" :closable="false">No additional environments. Add one only when this app needs another named destination.</Message>
+        <div class="target-group__heading">
+          <h3>Additional environments</h3>
+          <p>Use additional environments for staging, canary testing, or a different runtime.</p>
+        </div>
+        <Message v-if="additionalTargets.length === 0" severity="secondary" :closable="false"
+          >No additional environments. Add one only when this app needs another named
+          destination.</Message
+        >
         <div v-else class="target-list">
           <article v-for="target in additionalTargets" :key="target.id" class="target-card">
-        <div class="target-main">
-          <div class="target-title">
-            <strong>{{ getEnvironmentDisplayName(target) }}</strong>
-            <Tag :value="target.status" :severity="statusSeverity(target.status)" />
-          </div>
-          <strong class="target-destination">{{ destinationLabel(target) }}</strong>
-          <div class="target-meta"><span>Last deployed: {{ formatDeploymentTime(target) }}</span><span v-if="deploymentState(target)">{{ deploymentState(target) }}</span></div>
-          <Message v-if="target.cleanupPending" severity="warn" :closable="false">
-            Runtime cleanup needs retry. {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
-          </Message>
-          <Button label="Advanced" icon="pi pi-chevron-down" size="small" text @click="toggleAdvanced(target)" />
-          <div v-if="isAdvancedVisible(target)" class="advanced-details"><span>Environment slug: {{ target.slug }}</span><span>Runner: {{ target.runner?.name ?? 'None' }}</span><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span><span>Target ID: {{ target.id }}</span><span>Runtime transport: {{ runtimeTransport(target) }}</span><span>Runtime route: {{ targetRoute(target) }}</span><span>Internal preview URL: {{ targetRoute(target) }}</span></div>
-        </div>
-        <div class="target-actions">
-          <Button label="Deploy" icon="pi pi-cloud-upload" size="small"
-            :disabled="!target.runner || target.runner?.isOnline === false || target.status === DeploymentTargetStatus.Deploying"
-            @click="emit('deploy', target)" />
-          <Button label="Open preview" icon="pi pi-external-link" size="small" outlined :disabled="!canOpenPreview(target)" :title="canOpenPreview(target) ? undefined : 'Preview is unavailable until the target is deployed and its Runner is online.'" @click="openRoute(target)" />
-          <Button label="Logs" icon="pi pi-list" size="small" outlined @click="emit('viewLogs', target)" />
-          <Button icon="pi pi-pencil" aria-label="Edit environment" size="small" text @click="openEdit(target)" />
-          <Button label="Promote to Live" size="small" text :disabled="!canPromote(target)" :title="canPromote(target) ? undefined : 'Deploy this environment on an online runtime before promoting it to Live.'"
-            :loading="busyTargetId === target.id" @click="makeDefault(target)" />
-          <Button icon="pi pi-trash" aria-label="Delete environment" severity="danger"
-            size="small" text :loading="busyTargetId === target.id" @click="remove(target)" />
-        </div>
-      </article>
+            <div class="target-main">
+              <div class="target-title">
+                <span class="target-name">{{ getEnvironmentDisplayName(target) }}</span>
+                <span class="target-status" :class="statusClass(target.status)"
+                  ><i class="pi pi-circle-fill"></i>{{ target.status }}</span
+                >
+              </div>
+              <div class="target-destination">
+                <i class="pi pi-server"></i
+                ><span>{{ target.runner ? 'Self-hosted' : 'No runtime assigned' }}</span
+                ><Tag
+                  v-if="isPrivilegedTarget(target)"
+                  value="Privileged access"
+                  icon="pi pi-shield"
+                  severity="warn"
+                />
+              </div>
+              <div class="target-meta" :title="deploymentTimeTitle(target)">
+                <span v-if="deploymentState(target)">{{ deploymentState(target) }}</span
+                ><span v-if="deploymentState(target)">·</span
+                ><span>{{ formatDeploymentTime(target) }}</span>
+              </div>
+              <Message v-if="target.cleanupPending" severity="warn" :closable="false">
+                Runtime cleanup needs retry.
+                {{ target.lastCleanupError || 'The previous cleanup did not complete.' }}
+              </Message>
+              <Button
+                :label="isAdvancedVisible(target) ? 'Hide advanced details' : 'Advanced details'"
+                :icon="isAdvancedVisible(target) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                :aria-expanded="isAdvancedVisible(target)"
+                size="small"
+                text
+                class="advanced-toggle"
+                @click="toggleAdvanced(target)"
+              />
+              <div v-if="isAdvancedVisible(target)" class="advanced-details">
+                <span>Environment slug: {{ target.slug }}</span
+                ><span>Runner: {{ target.runner?.name ?? 'None' }}</span
+                ><span>Runner ID: {{ target.runner?.id ?? 'None' }}</span
+                ><span>Target ID: {{ target.id }}</span
+                ><span>Runtime transport: {{ runtimeTransport(target) }}</span
+                ><span>Runtime route: {{ targetRoute(target) }}</span
+                ><span>Internal preview URL: {{ targetRoute(target) }}</span>
+              </div>
+            </div>
+            <div class="target-actions">
+              <Button
+                label="Deploy"
+                icon="pi pi-cloud-upload"
+                size="small"
+                :disabled="
+                  !target.runner ||
+                  target.runner?.isOnline === false ||
+                  target.status === DeploymentTargetStatus.Deploying
+                "
+                @click="emit('deploy', target)"
+              />
+              <Button
+                label="Open preview"
+                icon="pi pi-external-link"
+                size="small"
+                outlined
+                :disabled="!canOpenPreview(target)"
+                :title="
+                  canOpenPreview(target)
+                    ? undefined
+                    : 'Preview is unavailable until the target is deployed and its Runner is online.'
+                "
+                @click="openRoute(target)"
+              />
+              <Button
+                label="Promote to Live"
+                size="small"
+                outlined
+                class="promote-action"
+                :disabled="!canPromote(target)"
+                :title="
+                  canPromote(target)
+                    ? undefined
+                    : 'Deploy this environment on an online runtime before promoting it to Live.'
+                "
+                :loading="busyTargetId === target.id"
+                @click="makeDefault(target)"
+              />
+              <Button
+                icon="pi pi-ellipsis-h"
+                :aria-label="`More actions for ${getEnvironmentDisplayName(target)}`"
+                size="small"
+                text
+                @click="toggleActionMenu(target, $event)"
+              />
+            </div>
+          </article>
         </div>
       </section>
     </template>
 
-    <Dialog v-model:visible="showEditor" modal :header="editingTarget ? 'Edit environment' : 'Add environment'"
-      class="target-dialog" :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }">
+    <Menu ref="actionMenu" :model="actionMenuItems" popup />
+
+    <Dialog
+      v-model:visible="showEditor"
+      modal
+      :header="editingTarget ? 'Edit environment' : 'Add environment'"
+      class="target-dialog"
+      :style="{ width: '34rem', maxWidth: 'calc(100vw - 2rem)' }"
+    >
       <div class="form-field">
         <label for="target-name">Name</label>
         <InputText id="target-name" v-model="name" placeholder="Server EU" autofocus />
@@ -400,60 +646,241 @@ watch(() => props.refreshRevision, load)
       </div>
       <div v-if="!editingTarget" class="form-field">
         <label for="target-purpose">Purpose</label>
-        <Select id="target-purpose" v-model="purpose" :options="['Staging', 'Canary', 'Custom']" @change="applyPurposeSuggestion" />
+        <Select
+          id="target-purpose"
+          v-model="purpose"
+          :options="['Staging', 'Canary', 'Custom']"
+          @change="applyPurposeSuggestion"
+        />
         <small>Used to suggest a name and slug; it is not stored separately.</small>
       </div>
       <div class="form-field">
         <label for="target-runner">Destination</label>
-        <Select id="target-runner" v-model="runnerId" :options="destinationRunnerOptions" option-label="label"
-          option-value="value" option-disabled="disabled" show-clear placeholder="Assign later" />
-        <small>Automaton Hosted does not expose the managed Runner identity. Self-hosted destinations are eligible application Runners only.</small>
+        <Select
+          id="target-runner"
+          v-model="runnerId"
+          :options="destinationRunnerOptions"
+          option-label="label"
+          option-value="value"
+          option-disabled="disabled"
+          show-clear
+          placeholder="Assign later"
+        />
+        <small
+          >Automaton Hosted does not expose the managed Runner identity. Self-hosted destinations
+          are eligible application Runners only.</small
+        >
       </div>
       <Message v-if="selectedRunnerIsPrivileged" severity="warn" :closable="false">
-        <strong>Privileged Host access</strong><br>
-        This App may read and modify host files, inspect host processes and Docker containers, affect services and system state, and access host secrets.
+        <strong>Privileged Host access</strong><br />
+        This App may read and modify host files, inspect host processes and Docker containers,
+        affect services and system state, and access host secrets.
         <div v-if="requiresPrivilegedAcknowledgement" class="flex align-items-start gap-2 mt-3">
-          <Checkbox v-model="privilegedHostAccessAcknowledged" input-id="privileged-host-acknowledgement" binary />
-          <label for="privileged-host-acknowledgement">I understand that this App will have administrator-level access to the selected machine.</label>
+          <Checkbox
+            v-model="privilegedHostAccessAcknowledged"
+            input-id="privileged-host-acknowledgement"
+            binary
+          />
+          <label for="privileged-host-acknowledgement"
+            >I understand that this App will have administrator-level access to the selected
+            machine.</label
+          >
         </div>
-        <small v-else class="block mt-3">This existing Privileged Host assignment was previously confirmed.</small>
+        <small v-else class="block mt-3"
+          >This existing Privileged Host assignment was previously confirmed.</small
+        >
       </Message>
       <template #footer>
         <Button label="Cancel" text @click="showEditor = false" />
-        <Button label="Save environment" :disabled="!name.trim() || !normalizedSlug || (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)"
-          :loading="busyTargetId !== null" @click="saveTarget" />
+        <Button
+          label="Save environment"
+          :disabled="
+            !name.trim() ||
+            !normalizedSlug ||
+            (requiresPrivilegedAcknowledgement && !privilegedHostAccessAcknowledged)
+          "
+          :loading="busyTargetId !== null"
+          @click="saveTarget"
+        />
       </template>
     </Dialog>
   </section>
 </template>
 
 <style scoped>
-.targets-section { display: flex; flex-direction: column; gap: 1rem; }
-.targets-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.targets-header h2 { margin: 0 0 .35rem; font-size: 1.25rem; }
-.targets-header p { margin: 0; color: var(--p-text-muted-color); }
-.target-group { display: flex; flex-direction: column; gap: .75rem; }
-.target-group__heading h3 { margin: 0; font-size: 1rem; }
-.target-group__heading p { margin: .2rem 0 0; color: var(--p-text-muted-color); }
-.target-list { display: grid; gap: .85rem; }
-.target-card { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid var(--p-content-border-color); border-radius: var(--p-border-radius-lg); background: var(--p-content-background); }
-.target-card--live { border-color: color-mix(in srgb, var(--p-green-500) 45%, var(--p-content-border-color)); }
-.target-main { min-width: 0; display: flex; flex-direction: column; gap: .55rem; }
-.target-destination { font-size: .9rem; }
-.target-title, .target-meta, .target-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
-.target-meta { color: var(--p-text-muted-color); font-size: .875rem; }
-.target-meta .pi-circle-fill { font-size: .5rem; }
-.online { color: var(--p-green-600); } .offline { color: var(--p-orange-600); }
-.target-actions { justify-content: flex-end; align-self: center; }
-.route-link { padding: 0; border: 0; background: none; color: var(--p-primary-color); text-align: left; cursor: pointer; width: fit-content; }
-.advanced-details { display: grid; gap: .25rem; padding: .65rem; border-radius: .45rem; background: var(--p-surface-100); color: var(--p-text-muted-color); font-family: var(--p-font-family-monospace, monospace); font-size: .75rem; overflow-wrap: anywhere; }
-.live-route-note, .form-field small { color: var(--p-text-muted-color); font-size: .8rem; }
-.targets-loading { padding: 2rem; text-align: center; color: var(--p-text-muted-color); }
-.form-field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
-.form-field label { font-weight: 600; }
+.targets-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.targets-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.targets-header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+.targets-header p {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+.target-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.target-group__heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.target-group__heading p {
+  margin: 0.2rem 0 0;
+  color: var(--p-text-muted-color);
+}
+.target-list {
+  display: grid;
+  gap: 0.85rem;
+}
+.target-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-lg);
+  background: var(--p-content-background);
+}
+.target-card--live {
+  border-left: 4px solid var(--p-green-500);
+  padding-left: calc(1.35rem - 3px);
+  background: color-mix(in srgb, var(--p-green-50) 35%, var(--p-content-background));
+}
+.target-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.target-title,
+.target-meta,
+.target-actions,
+.target-destination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.target-name {
+  color: var(--p-text-color);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.target-destination {
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+}
+.target-destination .pi {
+  color: var(--p-text-secondary-color);
+}
+.target-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.target-status .pi-circle-fill {
+  font-size: 0.45rem;
+}
+.target-status--running {
+  color: var(--p-green-600);
+}
+.target-status--failed {
+  color: var(--p-red-600);
+}
+.target-status--offline {
+  color: var(--p-orange-600);
+}
+.target-status--deploying {
+  color: var(--p-blue-600);
+}
+.target-status--quiet {
+  color: var(--p-text-muted-color);
+}
+.target-meta {
+  color: var(--p-text-muted-color);
+  font-size: 0.875rem;
+}
+.target-actions {
+  justify-content: flex-end;
+  align-self: center;
+  flex: 0 1 auto;
+}
+.target-actions .promote-action {
+  margin-left: 0.35rem;
+}
+.advanced-toggle {
+  align-self: flex-start;
+  padding-left: 0;
+  color: var(--p-text-secondary-color);
+}
+.route-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--p-primary-color);
+  text-align: left;
+  cursor: pointer;
+  width: fit-content;
+}
+.advanced-details {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.65rem;
+  border-radius: 0.45rem;
+  background: var(--p-surface-100);
+  color: var(--p-text-muted-color);
+  font-family: var(--p-font-family-monospace, monospace);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.live-route-note,
+.form-field small {
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+.targets-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--p-text-muted-color);
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.form-field label {
+  font-weight: 600;
+}
 @media (max-width: 700px) {
-  .targets-header, .target-card { flex-direction: column; }
-  .target-actions { align-self: stretch; justify-content: flex-start; }
-  .target-actions :deep(.p-button) { flex: 1 1 auto; }
+  .targets-header,
+  .target-card {
+    flex-direction: column;
+  }
+  .target-actions {
+    align-self: stretch;
+    justify-content: flex-start;
+  }
+  .target-actions :deep(.p-button) {
+    flex: 0 1 auto;
+  }
+  .target-actions .promote-action {
+    margin-left: 0;
+  }
 }
 </style>
