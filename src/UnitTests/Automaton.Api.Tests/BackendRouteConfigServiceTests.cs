@@ -202,7 +202,7 @@ public class BackendRouteConfigServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(content, Does.Contain("service: \"api-blue-edge\""));
+            Assert.That(content, Does.Contain("service: \"api-live-edge\""));
             Assert.That(content, Does.Contain($"Host(`app-{appId:N}.localhost`) && PathPrefix(`/`)\"\n      priority: 50"));
             Assert.That(content, Does.Contain(
                 $"/runtime-tunnel/apps/{appId}/targets/{target.Id}/api/$1"));
@@ -213,18 +213,15 @@ public class BackendRouteConfigServiceTests
     }
 
     [Test]
-    public async Task RefreshAsync_ReconcilesRuntimeTunnelServiceWhenApiColorChanges()
+    public async Task RefreshAsync_UsesStableLiveRuntimeTunnelServiceAcrossApiColorChanges()
     {
         var rootPath = CreateTempDirectory();
         await using var dbContext = CreateDbContext();
-        var previousApiColor = Environment.GetEnvironmentVariable("AUTOMATON_API_COLOR");
-        try
-        {
-            var runnerId = Guid.NewGuid();
-            var appId = Guid.NewGuid();
-            var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
-            target.FrontendDeployed = true;
-            dbContext.Runners.Add(new Runner
+        var runnerId = Guid.NewGuid();
+        var appId = Guid.NewGuid();
+        var target = AppDeploymentTarget.CreateDefault(appId, runnerId);
+        target.FrontendDeployed = true;
+        dbContext.Runners.Add(new Runner
             {
                 Id = runnerId,
                 Name = "Privileged host",
@@ -232,7 +229,7 @@ public class BackendRouteConfigServiceTests
                 Purpose = "Managed",
                 ApplicationProfile = "PrivilegedHost"
             });
-            dbContext.WebApps.Add(new WebApp
+        dbContext.WebApps.Add(new WebApp
             {
                 Id = appId,
                 Name = "Color-aware app",
@@ -243,26 +240,20 @@ public class BackendRouteConfigServiceTests
                 Updated = DateTime.UtcNow,
                 DeploymentTargets = { target }
             });
-            await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
 
-            var service = CreateService(dbContext, rootPath);
+        var service = CreateService(dbContext, rootPath);
 
-            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", "blue");
-            await service.RefreshAsync();
-            var routesPath = Path.Combine(rootPath, "managed-runtime-routes.yml");
-            var blueContent = await File.ReadAllTextAsync(routesPath);
-            Assert.That(blueContent, Does.Contain("service: \"api-blue-edge\""));
+        await service.RefreshAsync();
+        var routesPath = Path.Combine(rootPath, "managed-runtime-routes.yml");
+        var firstContent = await File.ReadAllTextAsync(routesPath);
+            Assert.That(firstContent, Does.Contain("service: \"api-live-edge\""));
 
-            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", "green");
-            await service.RefreshAsync();
-            var greenContent = await File.ReadAllTextAsync(routesPath);
-            Assert.That(greenContent, Does.Contain("service: \"api-green-edge\""));
-            Assert.That(greenContent, Does.Not.Contain("service: \"api-blue-edge\""));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("AUTOMATON_API_COLOR", previousApiColor);
-        }
+        await service.RefreshAsync();
+        var secondContent = await File.ReadAllTextAsync(routesPath);
+            Assert.That(secondContent, Does.Contain("service: \"api-live-edge\""));
+            Assert.That(secondContent, Does.Not.Contain("api-blue-edge"));
+            Assert.That(secondContent, Does.Not.Contain("api-green-edge"));
     }
 
     [Test]

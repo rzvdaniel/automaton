@@ -6,13 +6,13 @@ http:
       rule: "Host(`__API_DOMAIN__`) || Host(`__STUDIO_DOMAIN__`) || Host(`__WEBSITE_DOMAIN__`) || Host(`www.__WEBSITE_DOMAIN__`) || Host(`__APPS_DOMAIN__`) || HostRegexp(`^.+\\.__APPS_DOMAIN__$`)"
       middlewares:
         - api-redirect
-      service: api-blue-edge
+      service: api-live-edge
 
     api-edge:
       entryPoints:
         - websecure
       rule: "Host(`__API_DOMAIN__`)"
-      service: api-blue-edge
+      service: api-live-edge
       middlewares:
         - api-https-headers
       tls:
@@ -38,7 +38,7 @@ http:
       entryPoints:
         - websecure
       rule: "Host(`__APPS_DOMAIN__`)"
-      service: api-blue-edge
+      service: api-live-edge
       middlewares:
         - api-https-headers
       tls:
@@ -49,7 +49,7 @@ http:
         - websecure
       rule: "HostRegexp(`^.+\\.__APPS_DOMAIN__$`)"
       priority: 1
-      service: api-blue-edge
+      service: api-live-edge
       middlewares:
         - api-https-headers
       tls:
@@ -67,7 +67,7 @@ http:
           X-Forwarded-Proto: "https"
 
   services:
-    api-blue-edge:
+    api-live-edge:
       loadBalancer:
         servers:
           - url: "http://api-__API_COLOR__:8080"

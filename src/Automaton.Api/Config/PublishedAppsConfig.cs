@@ -41,6 +41,6 @@ public class PublishedAppsConfig
     /// Traefik service name for the currently live API edge. Self-hosted App routes use it
     /// to enter the API-to-Runner runtime tunnel instead of targeting a Runner directly.
     /// </summary>
-    public string RuntimeTunnelServiceName { get; set; } = "api-blue-edge";
+    public string RuntimeTunnelServiceName { get; set; } = "api-live-edge";
 
 }

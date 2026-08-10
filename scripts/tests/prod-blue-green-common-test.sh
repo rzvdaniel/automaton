@@ -6,6 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../prod-blue-green-common.sh"
 
+template="$REPO_ROOT/docker/traefik/prod/api-edge.yml"
+grep -q 'api-live-edge:' "$template"
+grep -q 'url: "http://api-__API_COLOR__:8080"' "$template"
+if grep -q 'api-blue-edge' "$template"; then
+    echo "The production API edge template must not hardcode the blue runtime service." >&2
+    exit 1
+fi
+
 fallback_sleep_seconds=""
 
 sleep() {
