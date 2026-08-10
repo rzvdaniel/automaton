@@ -175,6 +175,60 @@ describe('AppDeploymentTargets', () => {
     ).toHaveLength(1)
   })
 
+  it('keeps hosted metadata for hosted additional environments', async () => {
+    const hostedCanary = target({
+      id: 'hosted-canary-id',
+      name: 'Hosted Canary',
+      slug: 'hosted-canary',
+      isDefault: false,
+    })
+    const wrapper = await mountTargets([target(), hostedCanary])
+    const card = wrapper
+      .findAll('.target-card')
+      .find((candidate) => candidate.text().includes('Hosted Canary'))
+
+    expect(card?.text()).toContain('Automaton Hosted')
+    expect(card?.text()).not.toContain('Self-hosted')
+  })
+
+  it('shows standard self-hosted metadata when a self-hosted environment is Live', async () => {
+    const liveSelfHosted = target({
+      runner: {
+        id: 'self-hosted-live-runner',
+        name: 'Self-hosted Runner',
+        purpose: 'Application',
+        applicationProfile: 'Standard',
+        isHostedRunner: false,
+        isOnline: true,
+      },
+    })
+    const wrapper = await mountTargets([liveSelfHosted])
+    const card = wrapper.find('.target-card--live')
+
+    expect(card.text()).toContain('Self-hosted')
+    expect(card.text()).not.toContain('Automaton Hosted')
+    expect(card.text()).not.toContain('Privileged access')
+  })
+
+  it('retains privileged access metadata when a privileged environment is Live', async () => {
+    const livePrivileged = target({
+      runner: {
+        id: 'privileged-live-runner',
+        name: 'Privileged Runner',
+        purpose: 'Application',
+        applicationProfile: 'PrivilegedHost',
+        isHostedRunner: false,
+        isOnline: true,
+      },
+    })
+    const wrapper = await mountTargets([livePrivileged])
+    const card = wrapper.find('.target-card--live')
+
+    expect(card.text()).toContain('Self-hosted')
+    expect(card.text()).toContain('Privileged access')
+    expect(card.text()).not.toContain('Automaton Hosted')
+  })
+
   it('only enables promotion when canPromote permits it', async () => {
     const eligible = target({
       id: 'eligible-id',

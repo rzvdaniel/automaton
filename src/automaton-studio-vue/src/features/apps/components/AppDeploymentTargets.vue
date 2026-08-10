@@ -318,6 +318,11 @@ function isPrivilegedTarget(target: AppDeploymentTarget): boolean {
   )
 }
 
+function destinationLabel(target: AppDeploymentTarget): string {
+  if (!target.runner) return 'No runtime assigned'
+  return target.runner.isHostedRunner ? 'Automaton Hosted' : 'Self-hosted'
+}
+
 function runtimeTransport(target: AppDeploymentTarget): string {
   return target.runner?.isHostedRunner ? 'Direct edge routing' : 'API ↔ Runner tunnel'
 }
@@ -453,7 +458,13 @@ watch(() => props.refreshRevision, load)
               >
             </div>
             <div class="target-destination">
-              <i class="pi pi-server"></i><span>Automaton Hosted</span>
+              <i class="pi pi-server"></i><span>{{ destinationLabel(liveTarget) }}</span
+              ><Tag
+                v-if="isPrivilegedTarget(liveTarget)"
+                value="Privileged access"
+                icon="pi pi-shield"
+                severity="warn"
+              />
             </div>
             <div class="target-meta" :title="deploymentTimeTitle(liveTarget)">
               <span v-if="deploymentState(liveTarget)">{{ deploymentState(liveTarget) }}</span
@@ -537,8 +548,7 @@ watch(() => props.refreshRevision, load)
                 >
               </div>
               <div class="target-destination">
-                <i class="pi pi-server"></i
-                ><span>{{ target.runner ? 'Self-hosted' : 'No runtime assigned' }}</span
+                <i class="pi pi-server"></i><span>{{ destinationLabel(target) }}</span
                 ><Tag
                   v-if="isPrivilegedTarget(target)"
                   value="Privileged access"
