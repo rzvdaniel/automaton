@@ -927,7 +927,7 @@ wait_for_api_color_runner_drain() {
 
         local now
         now="$(date +%s)"
-        if [[ "$migration_complete" != "true" && "$all_drained" != "true" &&
+        if [[ "$migration_complete" != "true" &&
               "$MIGRATION_EXPECTED_RUNNER_IDS" != "" &&
               $((now - last_resignal_at)) -ge 10 ]]; then
             echo "[INFO] Retrying reconnect for Runners still attached to the previous API color"
@@ -938,7 +938,7 @@ wait_for_api_color_runner_drain() {
             last_resignal_at="$now"
         fi
 
-        if [[ "$all_drained" == "true" ]]; then
+        if [[ "$all_drained" == "true" && "$migration_complete" == "true" ]]; then
             echo "[INFO] Previous API color runner drain completed"
             return 0
         fi

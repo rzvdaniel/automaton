@@ -14,6 +14,12 @@ if grep -q 'api-blue-edge' "$template"; then
     exit 1
 fi
 
+common_script="$REPO_ROOT/scripts/prod-blue-green-common.sh"
+grep -q 'all_drained.*==.*true.*migration_complete.*==.*true' "$common_script" || {
+    echo "Runner drain must not succeed before migration completes." >&2
+    exit 1
+}
+
 fallback_sleep_seconds=""
 
 sleep() {
