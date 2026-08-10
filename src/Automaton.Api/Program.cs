@@ -393,6 +393,7 @@ services.AddScoped<ScheduledActionExecutionHandler>();
 services.AddHostedService<AppModuleExecutionReconciliationService>();
 services.AddHostedService<HostedRunnerRestartReconciliationService>();
 services.AddHostedService<HostedRunnerLifecycleReconciliationService>();
+services.AddHostedService<ManagedRuntimeRouteReconciliationService>();
 services.AddScoped<IAppDeployCapabilityService, AppDeployCapabilityService>();
 services.AddScoped(typeof(UserImpersonationServiceFactory<>));
 services.AddScoped<FlowsService>();
