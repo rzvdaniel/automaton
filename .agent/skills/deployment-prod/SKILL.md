@@ -116,18 +116,20 @@ Record production HEAD, current live colors, MySQL/RabbitMQ/Worker/Traefik healt
 Inspect tracked production modifications and compare the deployment revision before pulling. `git status -sb` is not enough: inspect the local diff so local code cannot enter a Docker build unnoticed:
 
 ```powershell
-ssh automaton "cd /opt/automaton && git diff HEAD --stat && git diff HEAD --name-status && sudo -n git fetch origin && git log --oneline --decorate -5 origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main"
+ssh automaton "cd /opt/automaton && git status --short && git branch --show-current && git log -1 --oneline && git diff HEAD --stat && git diff HEAD --name-status && gh auth status && git fetch origin && git log --oneline HEAD..origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main && git merge-base --is-ancestor HEAD origin/main"
 ```
 
 Never reset, clean, stash, overwrite, or delete production state without explicit approval. Treat private keys, `.env`, `secrets/`, `venv/`, `backups/`, database files, generated runtime files, and test data as protected state. If tracked changes are not already represented by `origin/main`, stop and report them. Untracked production-only files may remain during a pull, but report that they were preserved.
 
+GitHub authentication belongs to the automaton service user. Network Git operations such as fetch must run without sudo; never run sudo git pull and never configure GitHub credentials for root. The production remote should fetch only main; feature branches are not part of the production checkout. If the remote has a broad fetch refspec, restrict it to main before deployment so git fetch origin does not fetch feature branches.
+
 Pull the normal production revision only with fast-forward:
 
 ```powershell
-ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+ssh automaton "cd /opt/automaton && sudo -n git merge --ff-only origin/main"
 ```
 
-If the pull is not fast-forwardable, stop. Do not create a merge commit or discard local state automatically.
+The fetch must complete before the privileged local merge. If the ancestry check or merge is not fast-forwardable, stop. Do not create a merge commit or discard local state automatically.
 
 ### 3. Select affected services
 

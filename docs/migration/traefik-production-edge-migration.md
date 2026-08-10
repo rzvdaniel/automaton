@@ -87,7 +87,10 @@ On the server:
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 ```
 
 Verify `/opt/automaton/.env` contains:

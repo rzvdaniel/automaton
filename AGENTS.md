@@ -550,6 +550,8 @@ Rules:
 
 ### Production operations workflow
 
+The split-fetch/privileged-local-merge rule below applies only to the production checkout on host automaton at /opt/automaton. It does not restrict normal local development Git operations.
+
 The configured production server is reachable through the SSH alias "automaton" and uses:
 
     Host: automaton
@@ -568,11 +570,11 @@ When the user explicitly asks to update production:
    - If it is not in origin/main, stop and report it before overwriting, committing, or pushing it.
    - Never stage or commit privatekey.xml, publickey.xml, .env, secrets/, venv/, backups, database files, or other production state.
 
-3. Pull the requested revision without creating a merge commit:
+3. Fetch and advance the requested revision without creating a merge commit:
 
-       ssh automaton "cd /opt/automaton && sudo -n git pull --ff-only origin main"
+       ssh automaton "cd /opt/automaton && gh auth status && git fetch origin && git merge-base --is-ancestor HEAD origin/main && sudo -n git merge --ff-only origin/main"
 
-   Use sudo -n for Git/deployment operations when the production checkout or runtime directories are root-owned. Do not prompt interactively for a sudo password.
+   GitHub authentication belongs to the automaton service user. Network Git operations such as fetch must run without sudo; never run sudo git pull and never configure GitHub credentials for root. Production remotes should fetch only main; feature branches are not part of the production checkout. Configure the production remote's fetch refspec so git fetch origin fetches only main. Use sudo -n only for the local fast-forward merge or deployment operations when the checkout/runtime directories are root-owned. Do not prompt interactively for a sudo password.
 
 4. Determine affected containers from the merged diff:
 

@@ -309,11 +309,16 @@ Backward-compatibility note:
 
 ## Full Stack
 
+Production Git authentication belongs to the automaton service user. Configure the production remote to fetch only main; feature branches are not part of the production checkout. Run network Git operations without sudo, then use sudo only for the local fast-forward merge when the checkout requires elevated filesystem permissions:
+
 Normal redeploy:
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 ./scripts/prod-redeploy-all.sh
 ```
 
@@ -321,7 +326,10 @@ Normal redeploy when website CLI downloads changed too:
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 ./scripts/prod-redeploy-all.sh
 ```
 
@@ -441,7 +449,13 @@ A production deploy job should SSH into the server and run a small, boring seque
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git log --oneline HEAD..origin/main
+git diff --stat HEAD..origin/main
+git diff --name-status HEAD..origin/main
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-all.sh --keep-previous
 ./scripts/prod-verify.sh
@@ -459,7 +473,10 @@ For a website-only deploy:
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-website.sh --keep-previous
 ./scripts/prod-verify.sh
@@ -473,7 +490,10 @@ If only the app-host runtime SDK or Traefik runtime-router bootstrap config chan
 
 ```bash
 cd /opt/automaton
-git pull
+gh auth status
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+sudo git merge --ff-only origin/main
 chmod +x ./scripts/prod-*.sh
 ./scripts/prod-redeploy-app-host.sh
 ./scripts/prod-verify.sh
