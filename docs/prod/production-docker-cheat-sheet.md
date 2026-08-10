@@ -309,7 +309,7 @@ Backward-compatibility note:
 
 ## Full Stack
 
-Production Git authentication belongs to the automaton service user. Configure the production remote to fetch only main; feature branches are not part of the production checkout. Run network Git operations without sudo, then use sudo only for the local fast-forward merge when the checkout requires elevated filesystem permissions:
+The following Git commands apply to the production checkout at `/opt/automaton`, not to local development checkouts. Local development may use feature branches normally. Production Git authentication belongs to the `automaton` service user. Configure the production remote to fetch only `main` if required for that checkout. Run network Git operations without sudo, then use sudo only for the local fast-forward merge when the checkout requires elevated filesystem permissions. If operating from another machine, run the same commands through SSH (for example, `ssh automaton "git -C /opt/automaton fetch origin"`).
 
 Normal redeploy:
 

@@ -77,9 +77,48 @@ bash -n scripts/prod-reset-blue-green.sh
 
 Read `.agent/harness/verification.md` for the repository verification matrix.
 
+## Execution context and production Git synchronization
+
+The rules in this section apply only when operating the production checkout at
+`/opt/automaton` on the production host. They do not restrict normal Git
+operations in development checkouts, including fetching, creating, switching,
+and pushing feature branches.
+
+Production operations may be performed either directly from a shell running on
+the production host or from a development machine through SSH. Use whichever
+execution context is available; the required invariant is a safe fast-forward
+to the reviewed `origin/main`, not a particular command wrapper.
+
+On the production host, the normal sequence is:
+
+```bash
+git -C /opt/automaton fetch origin
+git -C /opt/automaton merge-base --is-ancestor HEAD origin/main
+sudo -n git -C /opt/automaton merge --ff-only origin/main
+```
+
+When operating remotely, use the equivalent sequence:
+
+```powershell
+ssh -o BatchMode=yes automaton "git -C /opt/automaton fetch origin"
+ssh -o BatchMode=yes automaton "git -C /opt/automaton merge-base --is-ancestor HEAD origin/main"
+ssh -o BatchMode=yes automaton "sudo -n git -C /opt/automaton merge --ff-only origin/main"
+```
+
+GitHub authentication belongs to the production `automaton` service user.
+Keep network Git operations and privileged local filesystem operations
+separate; do not copy credentials to root merely to make `sudo git pull` work.
+The production remote may intentionally fetch only `main`; that is a property
+of this production checkout, not a repository-wide branch restriction.
+
+If the active environment already has authenticated GitHub access and adequate
+permissions for the production checkout, an equivalent `git pull --ff-only`
+is acceptable after the production-state checks below.
+
 ## Live deployment workflow
 
-The configured production host is available through SSH alias `automaton`:
+The configured production host is available through SSH alias `automaton` when
+the agent is not already running on that host:
 
 - checkout: `/opt/automaton`
 - user: `automaton`
@@ -87,10 +126,21 @@ The configured production host is available through SSH alias `automaton`:
 
 ### 1. Preflight
 
-Run read-only diagnostics before changing production:
+Run read-only diagnostics before changing production. From another machine:
 
 ```powershell
 ssh -o BatchMode=yes automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && sudo -n bash scripts/prod-switch-blue-green.sh status && docker compose -f docker-compose.prod.yml ps"
+```
+
+When already on the production host, run the command body directly from
+`/opt/automaton`:
+
+```bash
+cd /opt/automaton
+git status -sb
+git log -1 --oneline --decorate
+sudo -n bash scripts/prod-switch-blue-green.sh status
+docker compose -f docker-compose.prod.yml ps
 ```
 
 If Windows OpenSSH cannot authenticate, do not repeat deployment commands. Load the configured key into the Windows agent and test the alias:
@@ -113,7 +163,7 @@ Record production HEAD, current live colors, MySQL/RabbitMQ/Worker/Traefik healt
 
 ### 2. Inspect, compare, and pull
 
-Inspect tracked production modifications and compare the deployment revision before pulling. `git status -sb` is not enough: inspect the local diff so local code cannot enter a Docker build unnoticed:
+Inspect tracked production modifications and compare the deployment revision before advancing the production checkout. `git status -sb` is not enough: inspect the production diff so local code cannot enter a Docker build unnoticed:
 
 ```powershell
 ssh automaton "cd /opt/automaton && git status --short && git branch --show-current && git log -1 --oneline && git diff HEAD --stat && git diff HEAD --name-status && gh auth status && git fetch origin && git log --oneline HEAD..origin/main && git diff --stat HEAD..origin/main && git diff --name-status HEAD..origin/main && git merge-base --is-ancestor HEAD origin/main"
@@ -121,15 +171,9 @@ ssh automaton "cd /opt/automaton && git status --short && git branch --show-curr
 
 Never reset, clean, stash, overwrite, or delete production state without explicit approval. Treat private keys, `.env`, `secrets/`, `venv/`, `backups/`, database files, generated runtime files, and test data as protected state. If tracked changes are not already represented by `origin/main`, stop and report them. Untracked production-only files may remain during a pull, but report that they were preserved.
 
-GitHub authentication belongs to the automaton service user. Network Git operations such as fetch must run without sudo; never run sudo git pull and never configure GitHub credentials for root. The production remote should fetch only main; feature branches are not part of the production checkout. If the remote has a broad fetch refspec, restrict it to main before deployment so git fetch origin does not fetch feature branches.
-
-Pull the normal production revision only with fast-forward:
-
-```powershell
-ssh automaton "cd /opt/automaton && sudo -n git merge --ff-only origin/main"
-```
-
-The fetch must complete before the privileged local merge. If the ancestry check or merge is not fast-forwardable, stop. Do not create a merge commit or discard local state automatically.
+The fetch must complete before the privileged local merge. If the ancestry
+check or merge is not fast-forwardable, stop. Do not create a merge commit or
+discard local state automatically.
 
 ### 3. Select affected services
 
@@ -148,7 +192,8 @@ Published CLI NuGet packages and Runner Docker Hub images are external artifacts
 
 ### 4. Redeploy sequentially
 
-Run selected commands from `/opt/automaton`, one service at a time:
+Run selected commands from `/opt/automaton`, one service at a time. From
+another machine, use SSH:
 
 ```powershell
 ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-api.sh"
@@ -156,6 +201,9 @@ ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-studio.sh"
 ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-redeploy-worker.sh"
 ssh automaton "cd /opt/automaton && sudo -n ./scripts/prod-redeploy-website.sh"
 ```
+
+When already on the production host, run the corresponding script directly
+from `/opt/automaton` (for example, `sudo -n ./scripts/prod-redeploy-api.sh`).
 
 API, Studio, and Website scripts deploy to the inactive color, build the image, wait for health, verify Traefik reachability and public warmup, render and observe/validate the Traefik file-provider update, cut over dynamic routing, and retire the old color only after its overlap/drain period. The Worker script rebuilds and health-checks the single Worker container in place; do not describe it as blue-green. If any step fails, stop and preserve the current live service for diagnosis or rollback.
 
@@ -169,6 +217,9 @@ Run final verification:
 ssh automaton "cd /opt/automaton && sudo -n bash scripts/prod-verify.sh"
 ssh automaton "cd /opt/automaton && git status -sb && git log -1 --oneline --decorate && docker compose -f docker-compose.prod.yml ps"
 ```
+
+When already on the production host, run the same verification commands
+directly from `/opt/automaton`.
 
 The handoff must state:
 

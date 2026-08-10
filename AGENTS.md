@@ -550,7 +550,9 @@ Rules:
 
 ### Production operations workflow
 
-The split-fetch/privileged-local-merge rule below applies only to the production checkout on host automaton at /opt/automaton. It does not restrict normal local development Git operations.
+The rules below apply only when operating the production checkout on host automaton at `/opt/automaton`. They do not restrict normal local development Git operations: local checkouts may fetch, create, switch, inspect, and push feature branches normally.
+
+Production operations may run directly on the production host or from a development machine through SSH. The invariant is a safe fast-forward to the reviewed `origin/main`, not a particular command wrapper.
 
 The configured production server is reachable through the SSH alias "automaton" and uses:
 
@@ -570,11 +572,13 @@ When the user explicitly asks to update production:
    - If it is not in origin/main, stop and report it before overwriting, committing, or pushing it.
    - Never stage or commit privatekey.xml, publickey.xml, .env, secrets/, venv/, backups, database files, or other production state.
 
-3. Fetch and advance the requested revision without creating a merge commit:
+3. Fetch and advance the requested production revision without creating a merge commit. On the production host, use the equivalent of:
 
-       ssh automaton "cd /opt/automaton && gh auth status && git fetch origin && git merge-base --is-ancestor HEAD origin/main && sudo -n git merge --ff-only origin/main"
+       git -C /opt/automaton fetch origin
+       git -C /opt/automaton merge-base --is-ancestor HEAD origin/main
+       sudo -n git -C /opt/automaton merge --ff-only origin/main
 
-   GitHub authentication belongs to the automaton service user. Network Git operations such as fetch must run without sudo; never run sudo git pull and never configure GitHub credentials for root. Production remotes should fetch only main; feature branches are not part of the production checkout. Configure the production remote's fetch refspec so git fetch origin fetches only main. Use sudo -n only for the local fast-forward merge or deployment operations when the checkout/runtime directories are root-owned. Do not prompt interactively for a sudo password.
+   From Windows or another development machine, run the equivalent commands through SSH, for example: `ssh automaton "git -C /opt/automaton fetch origin"`, followed by the ancestry check and `ssh automaton "sudo -n git -C /opt/automaton merge --ff-only origin/main"`. GitHub authentication belongs to the automaton service user. Keep network Git operations separate from privileged local filesystem operations; do not copy credentials to root or use interactive sudo. Production remotes may fetch only main; that is a property of the production checkout, not a global Git restriction.
 
 4. Determine affected containers from the merged diff:
 
