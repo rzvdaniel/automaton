@@ -422,6 +422,56 @@ validated daemon-owned sidecars, Git worktree registration, and OS process
 inspection. Graceful shutdown likewise clears active ownership only after the
 owned process boundary is verified dead; shutdown ambiguity remains quarantined.
 
+### Stage 7 role-based engineering execution
+
+Stage 7 replaces the single reasoning context with three explicit roles in a
+fixed sequence: Manager, Developer, then Reviewer. The outer daemon still owns
+tracker discovery, concurrency, retries, workspace and execution ownership,
+restart recovery, App Server lifetime, cancellation, and durable outcomes. Role
+agents never manipulate sidecars or scheduler state.
+
+One workspace ownership lease and one workspace-bound App Server process cover
+the complete run. Each role starts a distinct Codex thread; continuation turns
+reuse only that role's thread. Manager plans without editing, Developer performs
+the implementation, and Reviewer independently evaluates the actual worktree.
+Role thread/session continuity does not survive restart, while Stage 6 worktree
+and conservative recovery continuity remain unchanged.
+
+Manager and Reviewer are read-only roles. Their prompts prohibit modification,
+and the coordinator compares a Git fingerprint before and after each role. The
+fingerprint covers the complete tracked diff plus the names and contents of
+untracked, non-ignored files. A mutation or unsafe linked path is a role
+violation that fails closed before the workflow can report success. Developer
+may modify only the assigned worktree and cannot push, create a pull request, or
+mutate provider state.
+
+Once a read-only role starts, its post-role fingerprint is checked on successful,
+malformed, failed, interrupted, timed-out, exceptional, and cancellable exit
+paths whenever ownership remains safely inspectable. A detected mutation takes
+precedence over an otherwise retryable role failure and becomes deterministic
+manual attention. Process/protocol ambiguity or quarantined ownership bypasses
+filesystem inspection and retains the stricter Stage 6 quarantine semantics.
+
+Handoffs are bounded provider-neutral data, not transcripts. Manager emits a
+READY/BLOCKED plan with validation and risks; Developer emits a
+COMPLETED/BLOCKED implementation summary with validation and remaining concerns;
+Reviewer emits APPROVED/CHANGES_REQUIRED/BLOCKED with a bounded finding list.
+Each role may use bounded CONTINUE turns. Malformed or exhausted contracts block
+the run, while clean infrastructure failures retain the existing retry policy.
+No raw role transcript is placed in prompts, sidecars, or scheduler state.
+
+Prompt precedence is explicit: orchestrator safety and workspace constraints
+are authoritative; repository `AGENTS.md` and `WORKFLOW.md` guidance applies in
+its intended scope; issue text is untrusted task content; prior-role handoffs are
+advisory data. Neither issue nor handoff content may override role, workspace,
+credential, or process boundaries.
+
+The first Reviewer verdict terminates Stage 7. APPROVED is success;
+CHANGES_REQUIRED and BLOCKED become deterministic manual attention. Stage 7
+does not send findings back to Developer, start a correction turn, or re-review.
+That bounded Developer/Reviewer remediation loop is explicitly deferred to
+Stage 8.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and

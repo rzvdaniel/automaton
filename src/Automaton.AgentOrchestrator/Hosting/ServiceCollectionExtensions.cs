@@ -28,9 +28,10 @@ public static class ServiceCollectionExtensions
             services.GetRequiredService<OrchestratorOptions>().Workspace.Root,
             new ProcessGitCommandRunner(),
             services.GetRequiredService<IClock>()));
+        services.AddSingleton<IWorkspaceMutationGuard>(_ => new GitWorkspaceMutationGuard(new ProcessGitCommandRunner()));
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
         services.AddSingleton<IExecutionFence, PlatformExecutionFence>();
-        services.AddSingleton<IWorkExecutor, SingleAgentWorkExecutor>();
+        services.AddSingleton<IWorkExecutor, RoleBasedWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();
         services.AddHostedService<OrchestratorHostedService>();
