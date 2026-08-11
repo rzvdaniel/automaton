@@ -21,6 +21,7 @@ public interface IWorkspaceManager
 {
     Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken cancellationToken);
     Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string lifecycleStatus, CancellationToken cancellationToken);
+    Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }
 public interface ICodexAppServerClient { }

@@ -55,6 +55,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
             Assert.That(Directory.Exists(workspace.Path), Is.True);
             Assert.That(workspace.Branch, Is.EqualTo($"automaton/work/{workspace.Key}"));
             Assert.That(workspace.LifecycleStatus, Is.EqualTo(WorkspaceLifecycleStates.Ready));
+            Assert.That(workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
             Assert.That(workspace.LaunchNonce, Has.Length.EqualTo(32));
             Assert.That(File.ReadAllText(sidecar), Does.Contain("github-issue:acme/widgets:4"));
             Assert.That(git.Commands.Single(command => command.Arguments.Contains("worktree") && command.Arguments.Contains("add")).WorkingDirectory, Is.EqualTo(repositoryRoot));
@@ -80,7 +81,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
     }
 
     [Test]
-    public async Task CreateOrRecoverAsync_RefusesUnownedOrActiveWorkspaceState()
+    public async Task CreateOrRecoverAsync_RefusesActiveOwnershipUntilItIsReleasedWithoutChangingLifecycle()
     {
         var git = new FakeGitCommandRunner();
         var manager = CreateManager(git);
@@ -92,9 +93,20 @@ public sealed class GitWorktreeWorkspaceManagerTests
 
         Directory.Delete(Path.Combine(testRoot, "workspaces", key));
         var workspace = await manager.CreateOrRecoverAsync(request, CancellationToken.None);
-        await manager.UpdateLifecycleAsync(workspace, WorkspaceLifecycleStates.Active, CancellationToken.None);
+        var active = await manager.UpdateExecutionOwnershipAsync(workspace, WorkspaceExecutionOwnershipStates.Active, "active-nonce", CancellationToken.None);
+        var retryable = await manager.UpdateLifecycleAsync(active, WorkspaceLifecycleStates.RetryableFailure, CancellationToken.None);
 
         Assert.ThrowsAsync<WorkspaceOwnershipException>(async () => await manager.CreateOrRecoverAsync(request, CancellationToken.None));
+        Assert.ThrowsAsync<WorkspaceOwnershipException>(async () => await manager.UpdateExecutionOwnershipAsync(retryable, WorkspaceExecutionOwnershipStates.None, "different-nonce", CancellationToken.None));
+
+        var released = await manager.UpdateExecutionOwnershipAsync(retryable, WorkspaceExecutionOwnershipStates.None, retryable.LaunchNonce, CancellationToken.None);
+        var recovered = await manager.CreateOrRecoverAsync(request, CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(released.LifecycleStatus, Is.EqualTo(WorkspaceLifecycleStates.RetryableFailure));
+            Assert.That(released.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.None));
+            Assert.That(recovered.Path, Is.EqualTo(workspace.Path));
+        });
     }
 
     [Test]
@@ -163,6 +175,30 @@ public sealed class GitWorktreeWorkspaceManagerTests
     }
 
     [Test]
+    public async Task CreateOrRecoverAsync_RejectsRegisteredWorktreeOnWrongBranch()
+    {
+        var git = new FakeGitCommandRunner();
+        var manager = CreateManager(git);
+        var workspace = await manager.CreateOrRecoverAsync(Request("work-wrong-reuse"), CancellationToken.None);
+        git.Worktrees[Path.GetFullPath(workspace.Path)] = "other-branch";
+
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(async () => await manager.CreateOrRecoverAsync(Request("work-wrong-reuse"), CancellationToken.None));
+    }
+
+    [Test]
+    public async Task CleanupTerminalAsync_RejectsRegisteredWorktreeOnWrongBranch()
+    {
+        var git = new FakeGitCommandRunner();
+        var manager = CreateManager(git);
+        var workspace = await manager.CreateOrRecoverAsync(Request("work-wrong-cleanup"), CancellationToken.None);
+        var terminal = await manager.UpdateLifecycleAsync(workspace, WorkspaceLifecycleStates.Terminal, CancellationToken.None);
+        git.Worktrees[Path.GetFullPath(workspace.Path)] = "other-branch";
+
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(async () => await manager.CleanupTerminalAsync(terminal, CancellationToken.None));
+        Assert.That(Directory.Exists(workspace.Path), Is.True);
+    }
+
+    [Test]
     public void CreateOrRecoverAsync_RejectsCanonicalRepositoryInsideWorkspaceRoot()
     {
         var manager = new GitWorktreeWorkspaceManager(Path.Combine(testRoot, "workspaces"), new FakeGitCommandRunner(), new FixedClock());
@@ -183,14 +219,14 @@ public sealed class GitWorktreeWorkspaceManagerTests
     private sealed class FakeGitCommandRunner : IGitCommandRunner
     {
         public List<(string WorkingDirectory, IReadOnlyList<string> Arguments)> Commands { get; } = [];
-        public HashSet<string> Worktrees { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Worktrees { get; } = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> branches = new(StringComparer.Ordinal);
 
         public Task<GitCommandResult> RunAsync(string workingDirectory, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
         {
             Commands.Add((workingDirectory, arguments));
             if (arguments.SequenceEqual(new[] { "worktree", "list", "--porcelain" }))
-                return Task.FromResult(new GitCommandResult(0, string.Join("\n", Worktrees.Select(path => "worktree " + path)), string.Empty));
+                return Task.FromResult(new GitCommandResult(0, string.Join("\n\n", Worktrees.Select(worktree => $"worktree {worktree.Key}\nHEAD deadbeef\nbranch refs/heads/{worktree.Value}")), string.Empty));
             if (arguments.Take(3).SequenceEqual(new[] { "show-ref", "--verify", "--quiet" }))
                 return Task.FromResult(new GitCommandResult(branches.Contains(arguments[3]["refs/heads/".Length..]) ? 0 : 1, string.Empty, string.Empty));
             if (arguments.Take(2).SequenceEqual(new[] { "worktree", "add" }))
@@ -199,7 +235,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
                 var path = branchIndex >= 0 ? arguments[branchIndex + 2] : arguments[3];
                 var branch = branchIndex >= 0 ? arguments[branchIndex + 1] : arguments[4];
                 branches.Add(branch);
-                Worktrees.Add(Path.GetFullPath(path));
+                Worktrees[Path.GetFullPath(path)] = branch;
                 Directory.CreateDirectory(path);
                 return Task.FromResult(new GitCommandResult(0, string.Empty, string.Empty));
             }

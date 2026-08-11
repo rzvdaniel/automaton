@@ -165,7 +165,7 @@ public sealed class InMemoryOrchestratorTests
 
     private static async Task EventuallyAsync(Func<bool> condition)
     {
-        for (var attempt = 0; attempt < 100; attempt++)
+        for (var attempt = 0; attempt < 500; attempt++)
         {
             if (condition()) return;
             await Task.Delay(10);

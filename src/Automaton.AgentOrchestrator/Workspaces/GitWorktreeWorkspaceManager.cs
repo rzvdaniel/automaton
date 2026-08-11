@@ -66,13 +66,13 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (sidecar is not null)
         {
             ValidateSidecar(sidecar, request, key, workspacePath, branch);
-            if (sidecar.LifecycleStatus is WorkspaceLifecycleStates.Active or WorkspaceLifecycleStates.Quarantined)
+            if (!string.Equals(sidecar.ExecutionOwnershipStatus, WorkspaceExecutionOwnershipStates.None, StringComparison.Ordinal))
                 throw new WorkspaceOwnershipException("The workspace has unresolved execution ownership and cannot be reused.");
 
             if (Directory.Exists(workspacePath))
             {
                 EnsureNoReparsePoints(workspacePath);
-                await EnsureRegisteredWorktreeAsync(request.Repository.RootPath, workspacePath, cancellationToken);
+                await EnsureRegisteredWorktreeAsync(request.Repository.RootPath, workspacePath, sidecar.Branch, cancellationToken);
                 return ToWorkspace(sidecar);
             }
 
@@ -84,7 +84,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
         var created = new WorkspaceSidecar(
             key, request.WorkItem.Id, request.Repository.Identity, request.Repository.RootPath, workspacePath, branch,
-            WorkspaceLifecycleStates.Preparing, Guid.NewGuid().ToString("N"), clock.UtcNow, clock.UtcNow);
+            WorkspaceLifecycleStates.Preparing, WorkspaceExecutionOwnershipStates.None, Guid.NewGuid().ToString("N"), clock.UtcNow, clock.UtcNow);
         return await CreateWorktreeAsync(request, created, sidecarPath, cancellationToken);
     }
 
@@ -95,9 +95,34 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         var sidecarPath = GetSidecarPath(workspace.Key);
         var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
         ValidateWorkspaceMatchesSidecar(workspace, sidecar);
-        if (sidecar.LifecycleStatus is WorkspaceLifecycleStates.Active or WorkspaceLifecycleStates.Quarantined)
-            throw new WorkspaceOwnershipException("Workspace lifecycle cannot change while execution ownership is unresolved.");
         var updated = sidecar with { LifecycleStatus = lifecycleStatus, UpdatedAtUtc = clock.UtcNow };
+        await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
+    public async Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        if (!IsKnownOwnershipStatus(executionOwnershipStatus) || string.IsNullOrWhiteSpace(launchNonce))
+            throw new WorkspaceException("Workspace execution ownership state is invalid.");
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        if (executionOwnershipStatus == WorkspaceExecutionOwnershipStates.Active
+            && sidecar.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None)
+            throw new WorkspaceOwnershipException("Workspace execution ownership is already unresolved.");
+        if (executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None
+            && sidecar.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.Active)
+            throw new WorkspaceOwnershipException("Only verified active execution ownership can be released.");
+        if (executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None
+            && !string.Equals(launchNonce, sidecar.LaunchNonce, StringComparison.Ordinal))
+            throw new WorkspaceOwnershipException("Execution ownership can be released only with its matching launch nonce.");
+        var updated = sidecar with
+        {
+            ExecutionOwnershipStatus = executionOwnershipStatus,
+            LaunchNonce = launchNonce,
+            UpdatedAtUtc = clock.UtcNow
+        };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
         return ToWorkspace(updated);
     }
@@ -110,10 +135,12 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         ValidateWorkspaceMatchesSidecar(workspace, sidecar);
         if (!string.Equals(sidecar.LifecycleStatus, WorkspaceLifecycleStates.Terminal, StringComparison.Ordinal))
             throw new WorkspaceException("Only terminal daemon-owned workspaces are eligible for cleanup.");
+        if (!string.Equals(sidecar.ExecutionOwnershipStatus, WorkspaceExecutionOwnershipStates.None, StringComparison.Ordinal))
+            throw new WorkspaceOwnershipException("Workspace with unresolved execution ownership cannot be cleaned.");
         ValidateRepository(new WorkspaceRepository(sidecar.RepositoryRootPath, sidecar.RepositoryIdentity));
         EnsureContained(workspace.Path, workspaceRoot);
         EnsureNoReparsePoints(workspace.Path);
-        await EnsureRegisteredWorktreeAsync(sidecar.RepositoryRootPath, workspace.Path, cancellationToken);
+        await EnsureRegisteredWorktreeAsync(sidecar.RepositoryRootPath, workspace.Path, sidecar.Branch, cancellationToken);
 
         var result = await git.RunAsync(sidecar.RepositoryRootPath, ["worktree", "remove", "--force", workspace.Path], cancellationToken);
         EnsureGitSuccess(result, "remove the workspace worktree");
@@ -152,15 +179,21 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         throw new WorkspaceException("Git could not verify the workspace branch.");
     }
 
-    private async Task EnsureRegisteredWorktreeAsync(string repositoryRoot, string workspacePath, CancellationToken cancellationToken)
+    private async Task EnsureRegisteredWorktreeAsync(string repositoryRoot, string workspacePath, string expectedBranch, CancellationToken cancellationToken)
     {
         var result = await git.RunAsync(repositoryRoot, ["worktree", "list", "--porcelain"], cancellationToken);
         EnsureGitSuccess(result, "verify the workspace worktree");
-        var registered = result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => line.StartsWith("worktree ", StringComparison.Ordinal))
-            .Select(line => Path.GetFullPath(line[9..].Trim()))
-            .Any(path => PathsEqual(path, workspacePath));
-        if (!registered) throw new WorkspaceRecoveryException("Workspace is not a registered Git worktree and will not be reused or removed.");
+        var blocks = result.StandardOutput.Replace("\r\n", "\n", StringComparison.Ordinal).Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+        foreach (var block in blocks)
+        {
+            var lines = block.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var registeredPath = lines.FirstOrDefault(line => line.StartsWith("worktree ", StringComparison.Ordinal));
+            if (registeredPath is null || !PathsEqual(registeredPath[9..].Trim(), workspacePath)) continue;
+            var registeredBranch = lines.FirstOrDefault(line => line.StartsWith("branch ", StringComparison.Ordinal));
+            if (string.Equals(registeredBranch, $"branch refs/heads/{expectedBranch}", StringComparison.Ordinal)) return;
+            throw new WorkspaceRecoveryException("Workspace is detached or registered to a different branch and will not be reused or removed.");
+        }
+        throw new WorkspaceRecoveryException("Workspace is not a registered Git worktree and will not be reused or removed.");
     }
 
     private async Task<WorkspaceSidecar?> ReadSidecarAsync(string path, CancellationToken cancellationToken)
@@ -211,7 +244,8 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !PathsEqual(sidecar.WorkspacePath, workspacePath)
             || !string.Equals(sidecar.Branch, branch, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(sidecar.LaunchNonce)
-            || !IsKnownLifecycleStatus(sidecar.LifecycleStatus))
+            || !IsKnownLifecycleStatus(sidecar.LifecycleStatus)
+            || !IsKnownOwnershipStatus(sidecar.ExecutionOwnershipStatus))
             throw new WorkspaceRecoveryException("Workspace sidecar state does not match the requested daemon-owned workspace.");
         EnsureContained(sidecar.WorkspacePath, workspaceRoot);
     }
@@ -221,6 +255,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (!string.Equals(workspace.Key, sidecar.WorkspaceKey, StringComparison.Ordinal)
             || !PathsEqual(workspace.Path, sidecar.WorkspacePath)
             || !string.Equals(workspace.Branch, sidecar.Branch, StringComparison.Ordinal)
+            || !string.Equals(workspace.ExecutionOwnershipStatus, sidecar.ExecutionOwnershipStatus, StringComparison.Ordinal)
             || !string.Equals(workspace.RepositoryIdentity, sidecar.RepositoryIdentity, StringComparison.Ordinal)
             || !string.Equals(workspace.LaunchNonce, sidecar.LaunchNonce, StringComparison.Ordinal))
             throw new WorkspaceRecoveryException("Workspace does not match daemon-owned sidecar state.");
@@ -243,7 +278,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
     private string SidecarRoot() => Path.Combine(workspaceRoot, SidecarDirectoryName);
     private static Workspace ToWorkspace(WorkspaceSidecar sidecar)
-        => new(sidecar.WorkspaceKey, sidecar.WorkspacePath, sidecar.Branch, sidecar.LifecycleStatus, sidecar.LaunchNonce, sidecar.RepositoryIdentity);
+        => new(sidecar.WorkspaceKey, sidecar.WorkspacePath, sidecar.Branch, sidecar.LifecycleStatus, sidecar.ExecutionOwnershipStatus, sidecar.LaunchNonce, sidecar.RepositoryIdentity);
 
     private static void EnsureGitSuccess(GitCommandResult result, string operation)
     {
@@ -258,7 +293,9 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
     private static bool IsKnownLifecycleStatus(string status) => status is WorkspaceLifecycleStates.Preparing or WorkspaceLifecycleStates.Ready
         or WorkspaceLifecycleStates.RetryableFailure or WorkspaceLifecycleStates.Failed or WorkspaceLifecycleStates.Terminal
-        or WorkspaceLifecycleStates.Active or WorkspaceLifecycleStates.Quarantined;
+        ;
+    private static bool IsKnownOwnershipStatus(string status) => status is WorkspaceExecutionOwnershipStates.None
+        or WorkspaceExecutionOwnershipStates.Active or WorkspaceExecutionOwnershipStates.Quarantined;
 
     private static void EnsureContained(string path, string root)
     {
@@ -304,6 +341,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         string WorkspacePath,
         string Branch,
         string LifecycleStatus,
+        string ExecutionOwnershipStatus,
         string LaunchNonce,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset UpdatedAtUtc);
