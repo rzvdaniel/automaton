@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Workflows;
+using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -11,7 +12,16 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IWorkflowLoader, WorkflowLoader>();
-        services.AddSingleton<IWorkTracker, NoopWorkTracker>();
+        services.AddHttpClient();
+        services.AddSingleton<IWorkTracker>(services =>
+        {
+            var options = services.GetRequiredService<OrchestratorOptions>();
+            if (!string.Equals(options.Tracker.Kind, GitHubIssuesTrackerOptions.TrackerKind, StringComparison.OrdinalIgnoreCase)) return new NoopWorkTracker();
+            var trackerOptions = GitHubIssuesTrackerOptions.From(options.Tracker);
+            var client = services.GetRequiredService<IHttpClientFactory>().CreateClient();
+            client.BaseAddress = trackerOptions.ApiBaseUri;
+            return new GitHubIssuesTracker(client, trackerOptions);
+        });
         services.AddSingleton<IWorkExecutor, NoopWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddHostedService<OrchestratorHostedService>();
