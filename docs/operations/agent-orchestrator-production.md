@@ -51,7 +51,7 @@ sudo install -o automaton-agent -g automaton-agent -m 0600 /secure/source/secret
 sudo bash scripts/deploy-agent-orchestrator.sh artifacts/agent-orchestrator/automaton-agent-orchestrator-1.0.0-linux-x64.tar.gz 1.0.0 --activate
 ```
 
-The package command stamps version and Git revision, excludes configuration/secrets/tests, creates a deterministic archive, and writes SHA-256. Deployment verifies checksum and archive paths, refuses to overwrite an existing release, atomically switches `current`, preserves old releases, and does not start unless `--activate` is explicit. It never performs database migration and opens no inbound port.
+The package command stamps version and Git revision, verifies that identity directly from the published assembly, writes the same identity to immutable `build-manifest.json`, excludes configuration/secrets/tests, creates a deterministic archive, and writes SHA-256. Deployment verifies checksum, archive paths, and manifest identity; refuses to overwrite an existing release; atomically switches `current`; preserves old releases; and does not start unless `--activate` is explicit. Activated installs gracefully restart the service and poll until reconciled operator status reports the exact manifest version and revision, so neither an old process nor stale status can satisfy verification. It never performs database migration and opens no inbound port.
 
 ## Health, shutdown, upgrade, and rollback
 

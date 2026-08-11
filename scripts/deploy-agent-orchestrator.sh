@@ -21,6 +21,23 @@ test ! -e "$RELEASE" || { echo "Release already exists; refusing overwrite: $REL
 install -d -o root -g root -m 0755 "$RELEASE"
 tar -xzf "$ARCHIVE" -C "$RELEASE"
 test -x "$RELEASE/Automaton.AgentOrchestrator" || { echo "Release executable is missing." >&2; exit 5; }
+MANIFEST="$RELEASE/build-manifest.json"
+test -r "$MANIFEST" || { echo "Release build manifest is missing." >&2; exit 5; }
+read -r MANIFEST_VERSION MANIFEST_REVISION < <(python3 - "$MANIFEST" <<'PY'
+import json, re, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    value = json.load(stream)
+version = value.get("applicationVersion", "")
+revision = value.get("buildRevision", "")
+valid = value.get("schemaVersion") == 1 and value.get("runtimeIdentifier") == "linux-x64"
+valid = valid and re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._-]*", version or "") is not None
+valid = valid and re.fullmatch(r"[0-9a-fA-F]{7,64}", revision or "") is not None
+if not valid:
+    raise SystemExit("invalid release build manifest")
+print(version, revision)
+PY
+)
+[[ "$MANIFEST_VERSION" == "$VERSION" ]] || { echo "Requested version does not match release manifest." >&2; exit 5; }
 install -o root -g root -m 0644 "$(dirname "$0")/../deploy/agent-orchestrator/automaton-agent-orchestrator.service" /etc/systemd/system/automaton-agent-orchestrator.service
 test -f /etc/automaton-agent-orchestrator/WORKFLOW.md || { echo "Install trusted WORKFLOW.md before activation." >&2; exit 6; }
 test -f /etc/automaton-agent-orchestrator/secrets.env || { echo "Install secrets.env before activation." >&2; exit 6; }
@@ -30,8 +47,11 @@ ln -sfn "$RELEASE" /opt/automaton-agent-orchestrator/.current-new
 mv -Tf /opt/automaton-agent-orchestrator/.current-new /opt/automaton-agent-orchestrator/current
 systemctl daemon-reload
 if [[ "$ACTIVATE" == "--activate" ]]; then
-  systemctl enable --now automaton-agent-orchestrator.service
-  "$(dirname "$0")/agent-orchestrator-health.sh"
+  systemctl enable automaton-agent-orchestrator.service
+  systemctl restart automaton-agent-orchestrator.service
+  "$(dirname "$0")/agent-orchestrator-health.sh" \
+    /var/lib/automaton-agent-orchestrator/workspaces/.automaton-agent-orchestrator/operator/status.json \
+    "$MANIFEST_VERSION" "$MANIFEST_REVISION"
 else
   echo "Installed $VERSION without starting it. Use systemctl start after validation."
 fi

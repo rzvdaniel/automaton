@@ -2,6 +2,13 @@ using Automaton.AgentOrchestrator.Hosting;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Hosting;
 
+if (args is ["--build-identity"])
+{
+    var identity = new AssemblyBuildIdentity().Current;
+    Console.WriteLine($"{identity.Version}\t{identity.Revision}");
+    return;
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 var workflowPath = builder.Configuration["AgentOrchestrator:WorkflowPath"]
     ?? Path.Combine(Environment.CurrentDirectory, "WORKFLOW.md");

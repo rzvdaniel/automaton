@@ -49,6 +49,8 @@ Before changing deployment logic, identify:
 
 Preserve these guarantees:
 
+- an activated in-place service upgrade must restart an already-running process; `enable --now` alone is not upgrade activation;
+- post-activation health must prove the expected immutable artifact identity (version and revision), not merely accept a healthy old process or stale status file;
 - keep the previous API, Studio, or Website color running until the replacement is healthy and warmed up;
 - do not remove the previous color before cutover verification succeeds;
 - render the Traefik configuration atomically, observe and validate the file-provider update, then cut over; do not treat a Traefik ping alone as configuration validation;

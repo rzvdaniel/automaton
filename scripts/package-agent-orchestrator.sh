@@ -7,7 +7,7 @@ OUTPUT="${2:-$ROOT/artifacts/agent-orchestrator}"
 REVISION="${SOURCE_REVISION_ID:-$(git -C "$ROOT" rev-parse HEAD)}"
 [[ "$VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || { echo "Invalid version." >&2; exit 2; }
 [[ "$REVISION" =~ ^[0-9a-fA-F]{7,64}$ ]] || { echo "Invalid source revision." >&2; exit 2; }
-for command in dotnet git tar gzip sha256sum; do command -v "$command" >/dev/null || { echo "Missing prerequisite: $command" >&2; exit 3; }; done
+for command in dotnet git tar gzip sha256sum tr; do command -v "$command" >/dev/null || { echo "Missing prerequisite: $command" >&2; exit 3; }; done
 
 mkdir -p "$OUTPUT"
 STAGING="$(mktemp -d)"
@@ -16,8 +16,15 @@ PUBLISH="$STAGING/Automaton.AgentOrchestrator-$VERSION-linux-x64"
 dotnet publish "$ROOT/src/Automaton.AgentOrchestrator/Automaton.AgentOrchestrator.csproj" -c Release -r linux-x64 --self-contained false -o "$PUBLISH" \
   -p:Version="$VERSION" -p:SourceRevisionId="$REVISION" -p:ContinuousIntegrationBuild=true
 find "$PUBLISH" -type f -name '*.pdb' -delete
+printf '{"schemaVersion":1,"applicationVersion":"%s","buildRevision":"%s","runtimeIdentifier":"linux-x64"}\n' \
+  "$VERSION" "$REVISION" > "$PUBLISH/build-manifest.json"
+read -r STAMPED_VERSION STAMPED_REVISION < <(dotnet "$PUBLISH/Automaton.AgentOrchestrator.dll" --build-identity | tr -d '\r')
+[[ "$STAMPED_VERSION" == "$VERSION" && "$STAMPED_REVISION" == "$REVISION" ]] || {
+  echo "Published assembly identity does not match requested package identity." >&2; exit 4
+}
 test -f "$PUBLISH/Automaton.AgentOrchestrator"
 test -f "$PUBLISH/Automaton.AgentOrchestrator.runtimeconfig.json"
+test -f "$PUBLISH/build-manifest.json"
 if find "$PUBLISH" -type f \( -name '*.env' -o -name 'WORKFLOW.md' -o -name '*Tests*' \) | grep -q .; then
   echo "Release contains forbidden configuration, secret, or test files." >&2; exit 4
 fi
