@@ -56,7 +56,7 @@ public sealed class CodexAppServerClientTests
             {
                 held.Add((id!.Value, method));
                 if (held.Count == 2)
-                    foreach (var request in held.AsEnumerable().Reverse()) transport.Respond(request.Id, new { thread = new { id = request.Method == "thread/start" ? "started" : "resumed", cwd = WorkspacePath } });
+                    foreach (var request in held.AsEnumerable().Reverse()) transport.Respond(request.Id, new { thread = new { id = request.Method == "thread/start" ? "started" : "resumed" }, cwd = WorkspacePath });
             }
         };
         await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
@@ -103,12 +103,53 @@ public sealed class CodexAppServerClientTests
         {
             var (id, method) = Request(message);
             if (method == "initialize") transport.Respond(id!.Value, new { });
-            else if (method == "thread/resume") transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = outside } });
+            else if (method == "thread/resume") transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = outside });
         };
         await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
 
         Assert.ThrowsAsync<CodexProtocolException>(async () => await client.ResumeThreadAsync("existing", CancellationToken.None));
+    }
+
+    [Test]
+    public async Task StartThread_RejectsAWorkspaceMismatch()
+    {
+        var outside = Path.GetFullPath(Path.Combine(WorkspacePath, "..", "outside-workspace"));
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            var (id, method) = Request(message);
+            if (method == "initialize") transport.Respond(id!.Value, new { });
+            else if (method == "thread/start") transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = outside });
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexProtocolException>(async () => await client.StartThreadAsync(CancellationToken.None));
+    }
+
+    [TestCase(false, null)]
+    [TestCase(false, "relative-workspace")]
+    [TestCase(true, null)]
+    [TestCase(true, "relative-workspace")]
+    public async Task ThreadResponse_RejectsMissingOrRelativeWorkspace(bool resume, string? returnedCwd)
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            var (id, method) = Request(message);
+            if (method == "initialize") transport.Respond(id!.Value, new { });
+            else if (method == "thread/start" || method == "thread/resume")
+                transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = returnedCwd });
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexProtocolException>(async () =>
+        {
+            if (resume) await client.ResumeThreadAsync("existing", CancellationToken.None);
+            else await client.StartThreadAsync(CancellationToken.None);
+        });
     }
 
     [TestCase(true)]
@@ -215,7 +256,7 @@ public sealed class CodexAppServerClientTests
         {
             var (id, method) = Request(message);
             if (method == "initialize") transport.Respond(id!.Value, new { });
-            else if (method == "thread/start") transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } });
+            else if (method == "thread/start") transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = WorkspacePath });
             else if (method == "turn/start")
             {
                 transport.Respond(id!.Value, new { turn = new { id = "turn-early", status = "inProgress", items = Array.Empty<object>() } });
@@ -310,8 +351,8 @@ public sealed class CodexAppServerClientTests
         switch (method)
         {
             case "initialize": transport.Respond(id!.Value, new { }); break;
-            case "thread/start": transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } }); break;
-            case "thread/resume": transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } }); break;
+            case "thread/start": transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = WorkspacePath }); break;
+            case "thread/resume": transport.Respond(id!.Value, new { thread = new { id = "thread-1" }, cwd = WorkspacePath }); break;
             case "turn/start": transport.Respond(id!.Value, new { turn = new { id = "turn-1", status = "inProgress", items = Array.Empty<object>() } }); break;
             case "turn/interrupt": transport.Respond(id!.Value, new { }); break;
         }

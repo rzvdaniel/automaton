@@ -99,6 +99,7 @@ public sealed class CodexAppServerClient(
     {
         var result = await RequestAsync(CodexAppServerMethods.ThreadStart, new { cwd = workspacePath }, cancellationToken);
         var id = RequiredNestedId(result, "thread");
+        ValidateResponseWorkspace(result, "thread/start");
         Touch(CodexSessionEventKinds.ThreadStarted, id);
         return new(id);
     }
@@ -107,10 +108,7 @@ public sealed class CodexAppServerClient(
     {
         var result = await RequestAsync(CodexAppServerMethods.ThreadResume, new { threadId, cwd = workspacePath }, cancellationToken);
         var id = RequiredNestedId(result, "thread");
-        var resumedCwd = NestedStringProperty(result, "thread", "cwd")
-            ?? throw new CodexProtocolException("thread/resume response has no workspace path.");
-        if (!PathsEqual(resumedCwd, workspacePath))
-            throw new CodexProtocolException("thread/resume returned a different workspace path.");
+        ValidateResponseWorkspace(result, "thread/resume");
         Touch(CodexSessionEventKinds.ThreadResumed, id);
         return new(id);
     }
@@ -260,6 +258,13 @@ public sealed class CodexAppServerClient(
 
     private static string RequiredNestedId(JsonElement result, string property)
         => NestedStringProperty(result, property, "id") ?? throw new CodexProtocolException($"{property} response has no ID.");
+    private void ValidateResponseWorkspace(JsonElement result, string method)
+    {
+        var returnedCwd = StringProperty(result, "cwd")
+            ?? throw new CodexProtocolException($"{method} response has no workspace path.");
+        if (!PathsEqual(returnedCwd, workspacePath))
+            throw new CodexProtocolException($"{method} returned a different workspace path.");
+    }
     private static bool PathsEqual(string left, string right)
         => string.Equals(
             NormalizeAbsolutePath(left, "App Server workspace path"),

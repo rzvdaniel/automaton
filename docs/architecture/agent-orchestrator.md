@@ -307,7 +307,8 @@ or unbounded transcripts.
 
 Each client is permanently bound to its normalized Stage 3 workspace path.
 `thread/start` always uses that path, and `thread/resume` supplies it as the
-protocol cwd override and rejects a missing or mismatched cwd in the response.
+protocol cwd override. Both operations validate the required top-level `cwd` in
+their 0.147.0 response and reject a missing, relative, or mismatched path.
 Callers cannot provide a different thread working directory.
 
 The configured `codex.turn_timeout_ms` is interpreted at this boundary as a
