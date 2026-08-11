@@ -7,6 +7,7 @@ using NUnit.Framework;
 namespace Automaton.AgentOrchestrator.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public sealed class InMemoryOrchestratorTests
 {
     [Test]
@@ -60,14 +61,16 @@ public sealed class InMemoryOrchestratorTests
     [Test]
     public async Task RetryableFailure_RequeuesWithIncrementedAttempt()
     {
+        var tracker = new FakeTracker(Work("one"));
         var executor = new QueueExecutor(RunOutcome.RetryableFailure("temporary"), RunOutcome.Success());
-        await using var orchestrator = Create(new FakeTracker(Work("one")), executor, initialBackoffMilliseconds: 100);
+        await using var orchestrator = Create(tracker, executor, initialBackoffMilliseconds: 100);
+        tracker.PauseNextRefresh();
 
         await orchestrator.PollAsync(CancellationToken.None);
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued));
-        await orchestrator.PollAsync(CancellationToken.None);
-        await Task.Delay(20);
+        await tracker.WaitUntilRefreshRequestedAsync();
         Assert.That(executor.Attempts, Has.Count.EqualTo(1), "retry-queued work remains claimed until its retry is due");
+        tracker.ReleaseRefresh();
         await EventuallyAsync(() => executor.Attempts.Count == 2);
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Completed && x.Attempt == 2));
 
@@ -109,6 +112,7 @@ public sealed class InMemoryOrchestratorTests
 
         await orchestrator.PollAsync(CancellationToken.None);
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued));
+        await tracker.WaitUntilRefreshRequestedAsync();
         tracker.Upsert(Work("one", "closed"));
         tracker.ReleaseRefresh();
 
@@ -126,6 +130,7 @@ public sealed class InMemoryOrchestratorTests
 
         await orchestrator.PollAsync(CancellationToken.None);
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued));
+        await tracker.WaitUntilRefreshRequestedAsync();
         tracker.Upsert(Work("one", labels: []));
         tracker.ReleaseRefresh();
 
@@ -179,8 +184,8 @@ public sealed class InMemoryOrchestratorTests
     {
         private readonly object gate = new();
         private readonly Dictionary<string, WorkItem> workItems = workItems.ToDictionary(x => x.Id, StringComparer.Ordinal);
-        private TaskCompletionSource? refreshGate;
-        private TaskCompletionSource? pendingRefreshGate;
+        private TaskCompletionSource? refreshRelease;
+        private TaskCompletionSource? refreshRequested;
         public Task<IReadOnlyList<WorkItem>> DiscoverCandidatesAsync(CancellationToken cancellationToken)
         {
             lock (gate) return Task.FromResult<IReadOnlyList<WorkItem>>([.. workItems.Values]);
@@ -188,14 +193,13 @@ public sealed class InMemoryOrchestratorTests
 
         public async Task<WorkItem?> GetByIdAsync(string workItemId, CancellationToken cancellationToken)
         {
-            Task waitForRefresh;
+            Task? release;
             lock (gate)
             {
-                pendingRefreshGate = refreshGate;
-                waitForRefresh = pendingRefreshGate?.Task ?? Task.CompletedTask;
-                refreshGate = null;
+                release = refreshRelease?.Task;
+                refreshRequested?.TrySetResult();
             }
-            await waitForRefresh.WaitAsync(cancellationToken);
+            if (release is not null) await release.WaitAsync(cancellationToken);
             lock (gate) return workItems.GetValueOrDefault(workItemId);
         }
 
@@ -206,18 +210,28 @@ public sealed class InMemoryOrchestratorTests
 
         public void PauseNextRefresh()
         {
-            lock (gate) refreshGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (gate)
+            {
+                refreshRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                refreshRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        public Task WaitUntilRefreshRequestedAsync()
+        {
+            lock (gate) return refreshRequested?.Task ?? Task.CompletedTask;
         }
 
         public void ReleaseRefresh()
         {
             lock (gate)
             {
-                (pendingRefreshGate ?? refreshGate)?.TrySetResult();
-                pendingRefreshGate = null;
-                refreshGate = null;
+                refreshRelease?.TrySetResult();
+                refreshRelease = null;
+                refreshRequested = null;
             }
         }
+
     }
 
     private sealed class QueueExecutor(params RunOutcome[] outcomes) : IWorkExecutor
