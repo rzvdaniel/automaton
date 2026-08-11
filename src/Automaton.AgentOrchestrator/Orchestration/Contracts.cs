@@ -13,6 +13,26 @@ public interface IWorkExecutor
     Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken);
 }
 
+public interface IWorkPublisher
+{
+    Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
+    Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken);
+}
+
+public interface IPullRequestPublisher
+{
+    Task<PullRequestPublication> FindOrCreateAsync(PullRequestPublicationRequest request, CancellationToken cancellationToken);
+    Task<PullRequestPublication?> FindExactAsync(PullRequestPublicationRequest request, int? expectedNumber, CancellationToken cancellationToken);
+}
+
+public sealed record PullRequestPublicationRequest(
+    string Repository,
+    string HeadBranch,
+    string HeadSha,
+    string BaseBranch,
+    string Title,
+    string Body);
+
 public interface IClock { DateTimeOffset UtcNow { get; } }
 
 public interface IWorkspaceMutationGuard
@@ -29,6 +49,7 @@ public interface IWorkspaceManager
     Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
     Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
+    Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken);
     Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }

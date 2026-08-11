@@ -1,5 +1,6 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Logging;
 
@@ -9,13 +10,14 @@ public sealed class StartupReconciler(
     IWorkspaceManager workspaces,
     IWorkTracker tracker,
     IExecutionFence executionFence,
+    IWorkPublisher publisher,
     InMemoryOrchestrator orchestrator,
     OrchestratorOptions options,
     ILogger<StartupReconciler> logger)
 {
     public async Task ReconcileAsync(CancellationToken cancellationToken)
     {
-        var repository = new WorkspaceRepository(options.Repository.Root, options.Repository.Identity);
+        var repository = new WorkspaceRepository(options.Repository.Root, options.Repository.Identity, options.Repository.BaseBranch);
         var records = await workspaces.EnumerateOwnedWorkspacesAsync(repository, cancellationToken);
         var decisions = new List<Action>();
 
@@ -35,6 +37,39 @@ public sealed class StartupReconciler(
             }
 
             var eligible = item is not null && IsEligible(item);
+            if (record.Recovery.State == WorkspaceRecoveryStates.Working)
+            {
+                if (!eligible)
+                {
+                    decisions.Add(() => orchestrator.RestoreIneligible(record.WorkItemId, record.Recovery.NextAttempt,
+                        "work item is absent or no longer eligible during publication recovery"));
+                    continue;
+                }
+
+                if (record.Publication?.State is not (null or PublicationStates.None))
+                {
+                    try
+                    {
+                        var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
+                        if (recovered.Recognized)
+                        {
+                            decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
+                                Math.Max(record.Recovery.LastCompletedAttempt, 1), "draft publication was authoritatively recovered"));
+                            continue;
+                        }
+                    }
+                    catch (PublicationException exception) when (exception.IsRetryable)
+                    {
+                        throw;
+                    }
+                    catch (PublicationException exception)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
+                        continue;
+                    }
+                }
+            }
             switch (record.Recovery.State)
             {
                 case WorkspaceRecoveryStates.Completed:

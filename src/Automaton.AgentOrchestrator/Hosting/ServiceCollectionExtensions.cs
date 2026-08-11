@@ -4,6 +4,7 @@ using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Codex;
+using Automaton.AgentOrchestrator.Publication;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -31,6 +32,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IWorkspaceMutationGuard>(_ => new GitWorkspaceMutationGuard(new ProcessGitCommandRunner()));
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
         services.AddSingleton<IExecutionFence, PlatformExecutionFence>();
+        services.AddSingleton<IPullRequestPublisher>(services =>
+        {
+            var tracker = GitHubIssuesTrackerOptions.From(services.GetRequiredService<OrchestratorOptions>().Tracker);
+            var publication = services.GetRequiredService<OrchestratorOptions>().Publication;
+            if (string.IsNullOrWhiteSpace(publication.GitHubToken))
+                throw new InvalidOperationException("publication.github_token is required for GitHub pull-request publication.");
+            var client = services.GetRequiredService<IHttpClientFactory>().CreateClient();
+            client.BaseAddress = tracker.ApiBaseUri;
+            return new GitHubPullRequestPublisher(client, new(tracker.Owner, tracker.Repository, publication.GitHubToken, tracker.ApiBaseUri));
+        });
+        services.AddSingleton<IWorkPublisher, GitWorkPublisher>();
         services.AddSingleton<IWorkExecutor, RoleBasedWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();

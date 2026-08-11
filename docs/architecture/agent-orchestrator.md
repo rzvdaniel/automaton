@@ -508,6 +508,70 @@ implementation/review convergence inside one isolated workspace, but does not
 publish the branch. Git push, pull-request creation, CI, and provider mutation
 remain Stage 9-or-later capabilities.
 
+### Stage 9 validated draft publication
+
+Publication is a host-owned capability invoked only after an independent
+Reviewer returns `APPROVED`. Immediately after that verdict, the host durably
+advances publication from `none` to `authorized` before validation or any Git
+side effect. Repository state is agent-influenced: commit author, email, and
+subject are provenance evidence but never authorization. Only the sidecar's
+host-owned authorization checkpoint permits publication or restart recovery.
+The daemon then revalidates the assigned worktree root,
+registered branch, absence of conflicts or incomplete Git operations, and the
+configured repository validation commands before staging anything. It creates
+one deterministic commit with an explicit configured bot name and email; agent
+output cannot choose the author, remote, refspec, or credentials. The expected
+remote host and `owner/repo` identity are verified before any credentialed
+network operation. Push uses the exact daemon-owned branch and never force
+pushes.
+
+The publisher is retry-idempotent at each external boundary. An existing local
+commit is adopted only when it is the sole commit above the workspace's durable
+base SHA and its author, email, and subject exactly match daemon policy. An
+existing remote branch is accepted only at that exact commit SHA. GitHub draft
+PR lookup uses the exact configured head and base; one matching open draft is
+reused, duplicates or identity mismatches fail closed, and provider responses
+are validated before durable state advances. Provider pagination is restricted
+to the configured API origin so credentials cannot follow a cross-origin link.
+
+Sidecar schema v4 records only bounded publication recovery metadata: base
+commit provenance, publication phase, commit SHA, remote branch, and draft PR
+number/URL. A crash between an external success and sidecar persistence is
+recovered by authoritative Git remote or GitHub lookup. Older workspaces without
+base provenance cannot be guessed safe for publication. Validation subprocesses
+run in the assigned workspace with a minimal non-secret environment; GitHub
+credentials remain host-side and are never placed in role prompts or Codex child
+configuration.
+
+The ordered phases are `none`, `authorized`, `committed`, `pushed`, and
+`pull-request-created`; sidecar transitions cannot skip authorization or move
+backward. Schema v3 committed/pushed/PR records migrate as authorized history
+because those phases were written only by the Stage 9 host publisher, while
+older or generic `working + none` records remain unapproved.
+
+Startup distinguishes generic interrupted execution from host-authorized
+publication. `working + none` keeps Stage 6's conservative manual-attention
+behavior even when Git metadata perfectly resembles a daemon commit. After
+ownership has been
+proved ended and the tracker item is refreshed as eligible, an exact daemon
+authorization allows the publisher to resume only commit/push/PR
+reconciliation; Manager, Developer, and Reviewer are not rerun. `authorized`
+may safely create the commit after a pre-commit crash, or recognize the exact
+daemon commit when its `committed` write was missed. Durable `committed` and
+`pushed` phases must match that provenance, and remote mismatch fails closed.
+
+`pull-request-created` is not terminal proof by itself. Startup verifies through
+the GitHub adapter that the configured repository, exact head branch/SHA, base
+branch, open state, draft state, and persisted PR number still match. Transient
+provider failure keeps startup reconciliation closed; deterministic absence or
+mismatch becomes manual attention. Only an authoritatively verified draft PR
+reconstructs terminal completion. Quarantined or ambiguous execution ownership
+always wins and prevents publication recovery.
+
+Stage 9 stops at an open draft PR. It does not monitor CI, ingest review
+feedback, mutate issue labels/lifecycle, mark a PR ready, merge, or clean the
+workspace. Those remain later-stage responsibilities.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and
@@ -520,10 +584,9 @@ least-privilege by default.
 - GitHub tracker calls occur in the daemon. The credential is removed from every
   Codex child environment. If provider-native tracker tools are added, the daemon
   exposes narrow host-executed operations with typed inputs/results.
-- A separate, narrowly scoped future Git write/PR capability is required for
-  Stage 9. The initial design does not assume that the tracker credential grants
-  arbitrary Git push access. How agents request this capability remains an open
-  design item.
+- Stage 9 Git write and draft-PR publication remain host-owned capabilities.
+  The tracker/PR API token is not passed to agents, while Git push uses the
+  separately configured host credential mechanism after remote identity checks.
 - The Codex child process gets only the workspace, explicit non-secret
   configuration, its necessary Codex authentication mechanism, and an allowlist
   of safe environment variables. It does not receive production, database,

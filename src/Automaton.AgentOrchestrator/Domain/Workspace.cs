@@ -16,7 +16,7 @@ public static class WorkspaceExecutionOwnershipStates
     public const string Quarantined = "quarantined";
 }
 
-public sealed record WorkspaceRepository(string RootPath, string Identity);
+public sealed record WorkspaceRepository(string RootPath, string Identity, string BaseBranch = "main");
 public sealed record WorkspaceRequest(WorkItem WorkItem, WorkspaceRepository Repository);
 
 public sealed record Workspace(
@@ -26,4 +26,5 @@ public sealed record Workspace(
     string LifecycleStatus,
     string ExecutionOwnershipStatus,
     string LaunchNonce,
-    string RepositoryIdentity);
+    string RepositoryIdentity,
+    string? BaseCommitSha = null);

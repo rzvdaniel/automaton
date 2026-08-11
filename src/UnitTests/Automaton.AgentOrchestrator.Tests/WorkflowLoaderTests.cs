@@ -11,6 +11,7 @@ public sealed class WorkflowLoaderTests
     {
         var variableName = "AUTOMATON_ORCHESTRATOR_TEST_TOKEN";
         Environment.SetEnvironmentVariable(variableName, "test-value");
+        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", "publication-value");
         try
         {
             await using var workflow = await TemporaryWorkflow.CreateAsync("""
@@ -26,6 +27,16 @@ public sealed class WorkflowLoaderTests
                 repository:
                   root: .
                   identity: acme/widgets
+                  base_branch: trunk
+                publication:
+                  validation_commands:
+                    - dotnet test
+                  git_name: Automaton Bot
+                  git_email: bot@example.test
+                  remote_name: upstream
+                  github_host: github.example.test
+                  github_token: $AUTOMATON_ORCHESTRATOR_PR_TOKEN
+                  validation_timeout_ms: 1234
                 workspace:
                   root: workspaces
                 agent:
@@ -60,6 +71,14 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Polling.IntervalMilliseconds, Is.EqualTo(42));
                 Assert.That(definition.Options.Repository.Root, Is.EqualTo(workflow.Directory));
                 Assert.That(definition.Options.Repository.Identity, Is.EqualTo("acme/widgets"));
+                Assert.That(definition.Options.Repository.BaseBranch, Is.EqualTo("trunk"));
+                Assert.That(definition.Options.Publication.ValidationCommands, Is.EqualTo(new[] { "dotnet test" }));
+                Assert.That(definition.Options.Publication.GitName, Is.EqualTo("Automaton Bot"));
+                Assert.That(definition.Options.Publication.GitEmail, Is.EqualTo("bot@example.test"));
+                Assert.That(definition.Options.Publication.RemoteName, Is.EqualTo("upstream"));
+                Assert.That(definition.Options.Publication.GitHubHost, Is.EqualTo("github.example.test"));
+                Assert.That(definition.Options.Publication.GitHubToken, Is.EqualTo("publication-value"));
+                Assert.That(definition.Options.Publication.ValidationTimeoutMilliseconds, Is.EqualTo(1234));
                 Assert.That(definition.Options.Workspace.Root, Is.EqualTo(Path.Combine(workflow.Directory, "workspaces")));
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
                 Assert.That(definition.Options.Agent.ManagerMaxTurns, Is.EqualTo(2));
@@ -70,7 +89,7 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
             });
         }
-        finally { Environment.SetEnvironmentVariable(variableName, null); }
+        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); }
     }
 
     [Test]

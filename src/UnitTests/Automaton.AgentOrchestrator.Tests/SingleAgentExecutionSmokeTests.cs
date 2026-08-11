@@ -44,7 +44,7 @@ public sealed class SingleAgentExecutionSmokeTests
             var clock = new SystemClock();
             var workspaceManager = new GitWorktreeWorkspaceManager(workspaceRoot, new ProcessGitCommandRunner(), clock);
             var factory = new CodexAppServerClientFactory(workspaceManager, options, clock, new PlatformExecutionFence());
-            var executor = new RoleBasedWorkExecutor(workspaceManager, new GitWorkspaceMutationGuard(new ProcessGitCommandRunner()), factory, workflow);
+            var executor = new RoleBasedWorkExecutor(workspaceManager, new GitWorkspaceMutationGuard(new ProcessGitCommandRunner()), factory, new SmokePublisher(), workflow);
             const string sentence = "hello from stage 7";
             var item = new WorkItem(
                 "smoke-item",
@@ -81,5 +81,13 @@ public sealed class SingleAgentExecutionSmokeTests
     {
         foreach (var file in root.EnumerateFiles("*", SearchOption.AllDirectories)) file.Attributes = FileAttributes.Normal;
         root.Delete(recursive: true);
+    }
+
+    private sealed class SmokePublisher : IWorkPublisher
+    {
+        public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
+            => Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://example.invalid/pull/1", true));
+        public Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
+            => Task.FromResult(new PublicationRecoveryResult(false));
     }
 }

@@ -87,7 +87,22 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 TerminalProviderLifecycleStates = StringList(tracker.GetValueOrDefault("terminal_states"), "tracker.terminal_states", ["closed"])
             },
             Polling = new PollingOptions { IntervalMilliseconds = PositiveInt(Section(root, "polling").GetValueOrDefault("interval_ms"), "polling.interval_ms", 30_000) },
-            Repository = new RepositoryOptions { Root = repositoryRoot, Identity = repositoryIdentity },
+            Repository = new RepositoryOptions
+            {
+                Root = repositoryRoot,
+                Identity = repositoryIdentity,
+                BaseBranch = StringValue(repository.GetValueOrDefault("base_branch"), "repository.base_branch", required: false) ?? "main"
+            },
+            Publication = new PublicationOptions
+            {
+                ValidationCommands = StringList(Section(root, "publication").GetValueOrDefault("validation_commands"), "publication.validation_commands"),
+                GitName = StringValue(Section(root, "publication").GetValueOrDefault("git_name"), "publication.git_name", required: false) ?? "Automaton Agent",
+                GitEmail = StringValue(Section(root, "publication").GetValueOrDefault("git_email"), "publication.git_email", required: false) ?? "automaton-agent@users.noreply.github.com",
+                RemoteName = StringValue(Section(root, "publication").GetValueOrDefault("remote_name"), "publication.remote_name", required: false) ?? "origin",
+                GitHubHost = StringValue(Section(root, "publication").GetValueOrDefault("github_host"), "publication.github_host", required: false) ?? "github.com",
+                GitHubToken = ResolveOptionalSecret(Section(root, "publication").GetValueOrDefault("github_token"), "publication.github_token"),
+                ValidationTimeoutMilliseconds = PositiveInt(Section(root, "publication").GetValueOrDefault("validation_timeout_ms"), "publication.validation_timeout_ms", 600_000)
+            },
             Workspace = new WorkspaceOptions { Root = workspaceRoot },
             Agent = new AgentExecutionOptions
             {
@@ -173,6 +188,14 @@ public sealed class WorkflowLoader : IWorkflowLoader
         return ResolveEnvironmentReference(value, field);
     }
 
+    private static string ResolveOptionalSecret(object? value, string field)
+    {
+        if (value is null) return string.Empty;
+        var text = StringValue(value, field)!;
+        if (!text.StartsWith('$')) throw new WorkflowValidationException($"{field} must use an explicit environment-variable reference.");
+        return ResolveEnvironmentReference(text, field);
+    }
+
     private static bool LooksSensitive(string key)
         => key.Contains("token", StringComparison.OrdinalIgnoreCase)
            || key.Contains("secret", StringComparison.OrdinalIgnoreCase)
@@ -191,5 +214,16 @@ public sealed class WorkflowLoader : IWorkflowLoader
             throw new WorkflowValidationException("workspace.root is required for workspace isolation.");
         if (!Directory.Exists(options.Repository.Root))
             throw new WorkflowValidationException("repository.root must reference an existing directory.");
+        if (!IsSafeRefPart(options.Repository.BaseBranch)) throw new WorkflowValidationException("repository.base_branch is invalid.");
+        if (!IsSafeRefPart(options.Publication.RemoteName)) throw new WorkflowValidationException("publication.remote_name is invalid.");
+        if (options.Publication.GitName.Any(char.IsControl) || options.Publication.GitEmail.Any(char.IsControl))
+            throw new WorkflowValidationException("publication Git identity contains control characters.");
     }
+
+    private static bool IsSafeRefPart(string value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !value.Any(char.IsControl)
+           && !value.Contains("..", StringComparison.Ordinal)
+           && value.IndexOfAny([' ', '~', '^', ':', '?', '*', '[', '\\']) < 0
+           && !value.StartsWith('/') && !value.EndsWith('/') && !value.EndsWith('.');
 }
