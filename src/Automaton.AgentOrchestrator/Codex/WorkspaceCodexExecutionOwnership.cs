@@ -7,6 +7,7 @@ namespace Automaton.AgentOrchestrator.Codex;
 public sealed class WorkspaceCodexExecutionOwnership(IWorkspaceManager workspaceManager, Workspace workspace) : ICodexExecutionOwnership
 {
     private Workspace current = workspace;
+    public Workspace? CurrentWorkspace => current;
 
     public async Task AcquireAsync(string launchNonce, CancellationToken cancellationToken)
     {

@@ -71,6 +71,10 @@ public sealed class WorkflowLoader : IWorkflowLoader
         var tracker = Section(root, "tracker");
         var provider = Section(tracker, "provider")
             .ToDictionary(x => x.Key, x => ResolveProviderValue(x.Key, StringValue(x.Value, $"tracker.provider.{x.Key}")!), StringComparer.OrdinalIgnoreCase);
+        var repository = Section(root, "repository");
+        var repositoryRoot = ResolvePath(StringValue(repository.GetValueOrDefault("root"), "repository.root", required: false) ?? ".", workflowDirectory);
+        var repositoryIdentity = StringValue(repository.GetValueOrDefault("identity"), "repository.identity", required: false)
+            ?? new DirectoryInfo(repositoryRoot).Name;
         var workspaceRoot = ResolvePath(StringValue(Section(root, "workspace").GetValueOrDefault("root"), "workspace.root", required: false) ?? string.Empty, workflowDirectory);
         return new OrchestratorOptions
         {
@@ -83,6 +87,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 TerminalProviderLifecycleStates = StringList(tracker.GetValueOrDefault("terminal_states"), "tracker.terminal_states", ["closed"])
             },
             Polling = new PollingOptions { IntervalMilliseconds = PositiveInt(Section(root, "polling").GetValueOrDefault("interval_ms"), "polling.interval_ms", 30_000) },
+            Repository = new RepositoryOptions { Root = repositoryRoot, Identity = repositoryIdentity },
             Workspace = new WorkspaceOptions { Root = workspaceRoot },
             Agent = new AgentExecutionOptions
             {
@@ -172,5 +177,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
             throw new WorkflowValidationException("retry.initial_backoff_ms must not exceed retry.max_backoff_ms.");
         if (string.IsNullOrWhiteSpace(options.Workspace.Root))
             throw new WorkflowValidationException("workspace.root is required for workspace isolation.");
+        if (!Directory.Exists(options.Repository.Root))
+            throw new WorkflowValidationException("repository.root must reference an existing directory.");
     }
 }

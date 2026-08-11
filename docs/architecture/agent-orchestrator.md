@@ -169,8 +169,8 @@ or hand off a transient `RunState` when that external state changes.
 
 Each orchestrated repository will opt in with repository-owned `WORKFLOW.md`:
 optional YAML front matter and a Markdown prompt body, following Symphony's
-contract. The front matter will define typed sections for tracker, polling,
-workspace, agent execution, Codex App Server, concurrency, retry, and
+contract. The front matter will define typed sections for tracker, repository,
+polling, workspace, agent execution, Codex App Server, concurrency, retry, and
 reconciliation. Secrets are prohibited as literal values. A field may reference
 an explicitly allowed environment variable, and configuration validation must
 fail closed if it resolves empty.
@@ -327,6 +327,45 @@ boundary. This is not durable OS fencing: Windows Job Objects, Unix process
 groups/cgroups, and restart-time ownership proof remain deferred to Stage 6.
 Unexpected exit or malformed protocol therefore quarantines workspace ownership
 instead of clearing it and risking a duplicate execution.
+
+### Stage 5 single-agent execution baseline
+
+Stage 5 replaces the production no-op executor with one provider-neutral
+single-agent execution flow. An immutable workflow snapshot supplies the
+configured canonical repository root and identity, the workspace manager
+creates or recovers the isolated worktree, and the workspace-bound App Server
+client starts one new thread for the run. Continuation turns reuse that thread;
+restart-time thread recovery remains deferred to Stage 6.
+
+The initial prompt is a deterministic envelope that separates orchestration
+metadata, untrusted issue body text, and repository-owned workflow guidance. It
+names the assigned worktree and branch, requires applicable `AGENTS.md` and
+repository-local instruction discovery, forbids operations outside that
+worktree, and delegates investigation, implementation, testing, repair, and
+self-review decisions to Codex. Tracker credentials and resolved provider
+configuration are not included in the prompt or child environment.
+
+Each completed turn must end with one strict line:
+
+```text
+AUTOMATON_RESULT: {"status":"CONTINUE|COMPLETED|BLOCKED","summary":"bounded text"}
+```
+
+`CONTINUE` starts another turn on the same thread up to `agent.max_turns`,
+`COMPLETED` maps to scheduler success, and `BLOCKED` or malformed output maps to
+non-retryable manual attention. A failed/interrupted turn or idle timeout is
+retryable only after clean process shutdown releases matching ownership.
+Protocol/process ambiguity remains quarantined and is never immediately reused.
+Workspaces are preserved in `ready`, `retryable-failure`, or `failed` lifecycle
+state; Stage 5 neither closes issues nor pushes branches or creates pull
+requests.
+
+Because Stage 5 deliberately leaves provider lifecycle and opt-in labels
+unchanged, the scheduler keeps a daemon-local stable-work-item-ID suppression
+set for `completed`, `blocked`, and `cancelled` terminal runs. This prevents the
+same still-eligible issue from being immediately dispatched again while normal
+retry-queued work continues unchanged. The suppression set is intentionally not
+durable; restart reconstruction and reconciliation remain Stage 6 work.
 
 ## Trust and security posture
 

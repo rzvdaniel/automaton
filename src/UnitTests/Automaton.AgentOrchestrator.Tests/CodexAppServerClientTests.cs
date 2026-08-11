@@ -25,13 +25,14 @@ public sealed class CodexAppServerClientTests
         var turn = await client.StartTurnAsync(thread.Id, "Do not modify files.", CancellationToken.None);
         transport.Emit("""{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"agentMessage"},"startedAtMs":1}}""");
         transport.Emit("""{"method":"thread/tokenUsage/updated","params":{"threadId":"thread-1","turnId":"turn-1","tokenUsage":{"total":{"inputTokens":12,"outputTokens":5}}}}""");
-        transport.Emit("""{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}}""");
+        transport.Emit("""{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[{"id":"message-1","type":"agentMessage","text":"AUTOMATON_RESULT: {\"status\":\"COMPLETED\",\"summary\":\"done\"}"}]}}}""");
 
         var result = await client.WaitForTurnCompletionAsync(turn, CancellationToken.None);
 
         Assert.Multiple(() =>
         {
             Assert.That(result.Status, Is.EqualTo("completed"));
+            Assert.That(result.FinalResponse, Does.StartWith("AUTOMATON_RESULT:"));
             Assert.That(thread.Id, Is.EqualTo("thread-1"));
             Assert.That(turn.Id, Is.EqualTo("turn-1"));
             Assert.That(client.Events, Has.Some.Matches<CodexSessionEvent>(x => x.Kind == CodexSessionEventKinds.Initialized));
@@ -383,6 +384,7 @@ public sealed class CodexAppServerClientTests
 
     private sealed class RecordingOwnership : ICodexExecutionOwnership
     {
+        public Workspace? CurrentWorkspace => null;
         public string? AcquiredNonce { get; private set; }
         public string? ReleasedNonce { get; private set; }
         public string? QuarantinedNonce { get; private set; }

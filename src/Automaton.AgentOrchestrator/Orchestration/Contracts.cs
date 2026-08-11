@@ -26,6 +26,7 @@ public interface IWorkspaceManager
 }
 public interface ICodexAppServerClient : IAsyncDisposable
 {
+    Workspace? CurrentWorkspace { get; }
     CodexProcessIdentity? ProcessIdentity { get; }
     DateTimeOffset LastActivityUtc { get; }
     IReadOnlyList<CodexSessionEvent> Events { get; }
