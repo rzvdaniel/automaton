@@ -14,6 +14,7 @@ public sealed class InMemoryOrchestrator(
     private readonly object gate = new();
     private readonly Dictionary<string, ActiveRun> activeRuns = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RetryRun> retryRuns = new(StringComparer.Ordinal);
+    private readonly HashSet<string> terminalDispatchSuppression = new(StringComparer.Ordinal);
     private readonly List<RunState> history = [];
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private bool stopping;
@@ -62,7 +63,7 @@ public sealed class InMemoryOrchestrator(
     {
         lock (gate)
         {
-            if (stopping || activeRuns.ContainsKey(item.Id) || retryRuns.ContainsKey(item.Id) || activeRuns.Count >= options.Agent.MaxConcurrentAgents) return false;
+            if (stopping || terminalDispatchSuppression.Contains(item.Id) || activeRuns.ContainsKey(item.Id) || retryRuns.ContainsKey(item.Id) || activeRuns.Count >= options.Agent.MaxConcurrentAgents) return false;
             var cancellation = new CancellationTokenSource();
             var state = new RunState(item.Id, RunStates.Claimed, attempt, clock.UtcNow);
             activeRuns[item.Id] = new ActiveRun(item, attempt, cancellation, Task.CompletedTask, state);
@@ -212,6 +213,8 @@ public sealed class InMemoryOrchestrator(
         {
             activeRuns.Remove(workItemId);
             history.Add(new RunState(workItemId, state, attempt, clock.UtcNow, null, failureReason));
+            if (state is RunStates.Completed or RunStates.Blocked or RunStates.Cancelled)
+                terminalDispatchSuppression.Add(workItemId);
         }
     }
 

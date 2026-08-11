@@ -360,6 +360,13 @@ Workspaces are preserved in `ready`, `retryable-failure`, or `failed` lifecycle
 state; Stage 5 neither closes issues nor pushes branches or creates pull
 requests.
 
+Because Stage 5 deliberately leaves provider lifecycle and opt-in labels
+unchanged, the scheduler keeps a daemon-local stable-work-item-ID suppression
+set for `completed`, `blocked`, and `cancelled` terminal runs. This prevents the
+same still-eligible issue from being immediately dispatched again while normal
+retry-queued work continues unchanged. The suppression set is intentionally not
+durable; restart reconstruction and reconciliation remain Stage 6 work.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and

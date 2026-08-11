@@ -29,6 +29,32 @@ public sealed class InMemoryOrchestratorTests
     }
 
     [Test]
+    public async Task CompletedWorkIsNotRedispatchedWhileProviderIntentRemainsEligible()
+    {
+        var executor = new QueueExecutor(RunOutcome.Success());
+        await using var orchestrator = Create(new FakeTracker(Work("one")), executor);
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Completed));
+        await orchestrator.PollAsync(CancellationToken.None);
+
+        Assert.That(executor.Attempts, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task BlockedWorkIsNotRedispatchedWhileProviderIntentRemainsEligible()
+    {
+        var executor = new QueueExecutor(RunOutcome.PermanentFailure("blocked"));
+        await using var orchestrator = Create(new FakeTracker(Work("one")), executor);
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Blocked));
+        await orchestrator.PollAsync(CancellationToken.None);
+
+        Assert.That(executor.Attempts, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task PollAsync_EnforcesBoundedConcurrency()
     {
         var executor = new BlockingExecutor();
@@ -55,7 +81,12 @@ public sealed class InMemoryOrchestratorTests
         await orchestrator.CancelAsync("one");
 
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Cancelled));
-        Assert.That(executor.WasCancelled, Is.True);
+        await orchestrator.PollAsync(CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(executor.WasCancelled, Is.True);
+            Assert.That(executor.Attempts, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -73,8 +104,29 @@ public sealed class InMemoryOrchestratorTests
         tracker.ReleaseRefresh();
         await EventuallyAsync(() => executor.Attempts.Count == 2);
         await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Completed && x.Attempt == 2));
+        await orchestrator.PollAsync(CancellationToken.None);
 
-        Assert.That(orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued && x.Attempt == 1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued && x.Attempt == 1));
+            Assert.That(executor.Attempts, Has.Count.EqualTo(2), "retryable work retries, then terminal completion is suppressed");
+        });
+    }
+
+    [Test]
+    public async Task RetryExhaustionBlocksAndSuppressesFurtherDispatch()
+    {
+        var executor = new QueueExecutor(
+            RunOutcome.RetryableFailure("first"),
+            RunOutcome.RetryableFailure("second"),
+            RunOutcome.RetryableFailure("third"));
+        await using var orchestrator = Create(new FakeTracker(Work("one")), executor, initialBackoffMilliseconds: 10);
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Blocked && x.Attempt == 3));
+        await orchestrator.PollAsync(CancellationToken.None);
+
+        Assert.That(executor.Attempts, Has.Count.EqualTo(3));
     }
 
     [Test]
