@@ -3,6 +3,7 @@ using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Trackers.GitHub;
 using Automaton.AgentOrchestrator.Workspaces;
+using Automaton.AgentOrchestrator.Codex;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -27,6 +28,7 @@ public static class ServiceCollectionExtensions
             services.GetRequiredService<OrchestratorOptions>().Workspace.Root,
             new ProcessGitCommandRunner(),
             services.GetRequiredService<IClock>()));
+        services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
         services.AddSingleton<IWorkExecutor, NoopWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddHostedService<OrchestratorHostedService>();

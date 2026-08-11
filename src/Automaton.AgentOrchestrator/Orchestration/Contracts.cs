@@ -24,5 +24,21 @@ public interface IWorkspaceManager
     Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }
-public interface ICodexAppServerClient { }
+public interface ICodexAppServerClient : IAsyncDisposable
+{
+    CodexProcessIdentity? ProcessIdentity { get; }
+    DateTimeOffset LastActivityUtc { get; }
+    IReadOnlyList<CodexSessionEvent> Events { get; }
+    Task InitializeAsync(CancellationToken cancellationToken);
+    Task<CodexThread> StartThreadAsync(string cwd, CancellationToken cancellationToken);
+    Task<CodexThread> ResumeThreadAsync(string threadId, CancellationToken cancellationToken);
+    Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken cancellationToken);
+    Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken);
+    Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken);
+}
+
+public interface ICodexAppServerClientFactory
+{
+    ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? childEnvironment = null);
+}
 public interface IRunStateStore { }
