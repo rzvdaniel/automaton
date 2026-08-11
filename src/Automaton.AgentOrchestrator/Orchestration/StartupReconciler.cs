@@ -1,5 +1,6 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +10,7 @@ public sealed class StartupReconciler(
     IWorkspaceManager workspaces,
     IWorkTracker tracker,
     IExecutionFence executionFence,
+    IWorkPublisher publisher,
     InMemoryOrchestrator orchestrator,
     OrchestratorOptions options,
     ILogger<StartupReconciler> logger)
@@ -35,6 +37,36 @@ public sealed class StartupReconciler(
             }
 
             var eligible = item is not null && IsEligible(item);
+            if (record.Recovery.State == WorkspaceRecoveryStates.Working)
+            {
+                if (!eligible)
+                {
+                    decisions.Add(() => orchestrator.RestoreIneligible(record.WorkItemId, record.Recovery.NextAttempt,
+                        "work item is absent or no longer eligible during publication recovery"));
+                    continue;
+                }
+
+                try
+                {
+                    var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
+                    if (recovered.Recognized)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), "draft publication was authoritatively recovered"));
+                        continue;
+                    }
+                }
+                catch (PublicationException exception) when (exception.IsRetryable)
+                {
+                    throw;
+                }
+                catch (PublicationException exception)
+                {
+                    decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                        Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
+                    continue;
+                }
+            }
             switch (record.Recovery.State)
             {
                 case WorkspaceRecoveryStates.Completed:
@@ -61,10 +93,6 @@ public sealed class StartupReconciler(
                     var retryItem = item!;
                     decisions.Add(() => orchestrator.RestoreRetry(retryItem, record.Recovery.NextAttempt,
                         record.Recovery.RetryNotBeforeUtc, record.Recovery.Reason));
-                    break;
-                case WorkspaceRecoveryStates.Working when record.Publication?.State == PublicationStates.PullRequestCreated:
-                    decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
-                        Math.Max(record.Recovery.LastCompletedAttempt, 1), "verified draft publication was durably recorded"));
                     break;
                 case WorkspaceRecoveryStates.Working:
                     decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,

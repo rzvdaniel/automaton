@@ -32,6 +32,8 @@ public sealed record PublicationResult(
     string PullRequestUrl,
     bool Draft);
 
+public sealed record PublicationRecoveryResult(bool Recognized, PublicationResult? Publication = null);
+
 public sealed record PullRequestPublication(
     int Number,
     string Url,

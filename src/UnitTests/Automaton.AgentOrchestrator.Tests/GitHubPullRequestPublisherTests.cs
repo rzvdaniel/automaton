@@ -41,6 +41,23 @@ public sealed class GitHubPullRequestPublisherTests
     }
 
     [Test]
+    public async Task FindExactAsync_VerifiesPersistedNumberAndReturnsAbsenceWithoutCreating()
+    {
+        var foundHandler = new StubHandler(Json("[" + PullJson() + "]"));
+        var found = await Create(foundHandler).FindExactAsync(Request, 42, CancellationToken.None);
+        var missingHandler = new StubHandler(Json("[]"));
+        var missing = await Create(missingHandler).FindExactAsync(Request, 42, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(found!.Number, Is.EqualTo(42)); Assert.That(missing, Is.Null); Assert.That(missingHandler.Requests, Has.Count.EqualTo(1)); });
+    }
+
+    [Test]
+    public void FindExactAsync_RejectsPersistedNumberMismatch()
+    {
+        var handler = new StubHandler(Json("[" + PullJson(43) + "]"));
+        Assert.ThrowsAsync<PublicationException>(() => Create(handler).FindExactAsync(Request, 42, CancellationToken.None));
+    }
+
+    [Test]
     public void FindOrCreateAsync_RejectsDuplicateMatches()
     {
         var handler = new StubHandler(Json("[" + PullJson() + "," + PullJson(43) + "]"));

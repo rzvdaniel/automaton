@@ -16,11 +16,13 @@ public interface IWorkExecutor
 public interface IWorkPublisher
 {
     Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken);
+    Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken);
 }
 
 public interface IPullRequestPublisher
 {
     Task<PullRequestPublication> FindOrCreateAsync(PullRequestPublicationRequest request, CancellationToken cancellationToken);
+    Task<PullRequestPublication?> FindExactAsync(PullRequestPublicationRequest request, int? expectedNumber, CancellationToken cancellationToken);
 }
 
 public sealed record PullRequestPublicationRequest(

@@ -538,11 +538,22 @@ run in the assigned workspace with a minimal non-secret environment; GitHub
 credentials remain host-side and are never placed in role prompts or Codex child
 configuration.
 
-Once the verified draft PR identity is durably recorded, startup reconciliation
-reconstructs terminal completion instead of redispatching the still-open issue.
-Earlier `working` records remain subject to Stage 6's conservative manual-
-attention rule; a partially published record is never treated as proof that the
-external operation completed.
+Startup distinguishes generic interrupted execution from recognizable host-
+owned publication. `working` with no provable daemon publication commit keeps
+Stage 6's conservative manual-attention behavior. After ownership has been
+proved ended and the tracker item is refreshed as eligible, an exact daemon
+commit (including one written before its sidecar update) allows the publisher to
+resume only commit/push/PR reconciliation; Manager, Developer, and Reviewer are
+not rerun. Durable `committed` and `pushed` phases must match that provenance,
+and remote mismatch fails closed.
+
+`pull-request-created` is not terminal proof by itself. Startup verifies through
+the GitHub adapter that the configured repository, exact head branch/SHA, base
+branch, open state, draft state, and persisted PR number still match. Transient
+provider failure keeps startup reconciliation closed; deterministic absence or
+mismatch becomes manual attention. Only an authoritatively verified draft PR
+reconstructs terminal completion. Quarantined or ambiguous execution ownership
+always wins and prevents publication recovery.
 
 Stage 9 stops at an open draft PR. It does not monitor CI, ingest review
 feedback, mutate issue labels/lifecycle, mark a PR ready, merge, or clean the

@@ -21,9 +21,8 @@ public sealed class GitHubPullRequestPublisher(HttpClient client, GitHubPullRequ
     {
         if (!string.Equals(request.Repository, $"{options.Owner}/{options.Repository}", StringComparison.OrdinalIgnoreCase))
             throw new PublicationException("Pull-request repository does not match configured GitHub publication scope.");
-        var matches = await FindAsync(request, "open", cancellationToken);
-        if (matches.Count > 1) throw new PublicationException("Multiple matching open pull requests exist for the publication branch.");
-        if (matches.Count == 1) return NormalizeAndValidate(matches[0], request);
+        var existing = await FindExactAsync(request, null, cancellationToken);
+        if (existing is not null) return existing;
         if ((await FindAsync(request, "closed", cancellationToken)).Count > 0)
             throw new PublicationException("A closed pull request already exists for the publication branch; manual attention is required.");
 
@@ -34,6 +33,22 @@ public sealed class GitHubPullRequestPublisher(HttpClient client, GitHubPullRequ
         var created = await DeserializeAsync<GitHubPullRequest>(response, cancellationToken)
             ?? throw new PublicationException("GitHub returned an empty pull-request response.");
         return NormalizeAndValidate(created, request);
+    }
+
+    public async Task<PullRequestPublication?> FindExactAsync(
+        PullRequestPublicationRequest request,
+        int? expectedNumber,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(request.Repository, $"{options.Owner}/{options.Repository}", StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Pull-request repository does not match configured GitHub publication scope.");
+        var matches = await FindAsync(request, "open", cancellationToken);
+        if (matches.Count > 1) throw new PublicationException("Multiple matching open pull requests exist for the publication branch.");
+        if (matches.Count == 0) return null;
+        var result = NormalizeAndValidate(matches[0], request);
+        if (expectedNumber is not null && result.Number != expectedNumber)
+            throw new PublicationException("GitHub pull-request number does not match durable publication metadata.");
+        return result;
     }
 
     private async Task<List<GitHubPullRequest>> FindAsync(PullRequestPublicationRequest request, string state, CancellationToken cancellationToken)

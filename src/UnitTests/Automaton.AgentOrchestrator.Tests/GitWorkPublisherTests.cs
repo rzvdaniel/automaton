@@ -97,6 +97,71 @@ public sealed class GitWorkPublisherTests
         Assert.Multiple(() => { Assert.That(git.Commands, Has.None.Matches<string>(x => x.Contains(" commit "))); Assert.That(git.Commands, Has.None.Contains("push")); });
     }
 
+    [TestCase(PublicationStates.Committed, false, true)]
+    [TestCase(PublicationStates.Pushed, true, false)]
+    public async Task RecoverAsync_ResumesDurablePartialPublicationWithoutDuplicateCommitOrPush(string state, bool remoteExists, bool expectsPush)
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = remoteExists ? CommitSha : null };
+        var workspaces = new FakeWorkspaces();
+        var prs = new FakePullRequests();
+        var result = await Create(git, workspaces, prs).RecoverAsync(RecoveryRecord(state), Request().WorkItem, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Recognized, Is.True);
+            Assert.That(git.Commands.Any(x => x.StartsWith("push ")), Is.EqualTo(expectsPush));
+            Assert.That(git.Commands, Has.None.Matches<string>(x => x.Contains(" commit ")));
+            Assert.That(prs.CreateRequests, Has.Count.EqualTo(1));
+            Assert.That(workspaces.States.Last().State, Is.EqualTo(PublicationStates.PullRequestCreated));
+        });
+    }
+
+    [Test]
+    public async Task RecoverAsync_ReconstructsMissedSidecarsFromExactRemoteAndExistingPullRequest()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var prs = new FakePullRequests { ExistingForCreate = true };
+        var result = await Create(git, new FakeWorkspaces(), prs).RecoverAsync(RecoveryRecord(PublicationStates.None), Request().WorkItem, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Recognized, Is.True); Assert.That(git.Commands, Has.None.Contains("push")); Assert.That(prs.CreatedCount, Is.Zero); });
+    }
+
+    [Test]
+    public async Task RecoverAsync_VerifiesPersistedPullRequestWithoutCreatingAnother()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var prs = new FakePullRequests();
+        var result = await Create(git, new FakeWorkspaces(), prs).RecoverAsync(RecoveryRecord(PublicationStates.PullRequestCreated), Request().WorkItem, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Recognized, Is.True); Assert.That(prs.VerifyRequests, Has.Count.EqualTo(1)); Assert.That(prs.CreateRequests, Is.Empty); });
+    }
+
+    [Test]
+    public void RecoverAsync_MissingPersistedPullRequestFailsClosed()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var prs = new FakePullRequests { ExactResultMissing = true };
+        var workspaces = new FakeWorkspaces();
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, workspaces, prs).RecoverAsync(RecoveryRecord(PublicationStates.PullRequestCreated), Request().WorkItem, CancellationToken.None));
+        Assert.That(workspaces.States, Is.Empty);
+    }
+
+    [Test]
+    public void RecoverAsync_TransientProviderVerificationDoesNotRegressDurablePhase()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var prs = new FakePullRequests { ExactFailure = new PublicationException("provider unavailable", true) };
+        var workspaces = new FakeWorkspaces();
+        var error = Assert.ThrowsAsync<PublicationException>(() => Create(git, workspaces, prs).RecoverAsync(RecoveryRecord(PublicationStates.PullRequestCreated), Request().WorkItem, CancellationToken.None));
+        Assert.Multiple(() => { Assert.That(error!.IsRetryable, Is.True); Assert.That(workspaces.States, Is.Empty); });
+    }
+
+    [Test]
+    public void RecoverAsync_RemoteMismatchStillFailsClosedWithoutPush()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = new string('c', 40) };
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).RecoverAsync(RecoveryRecord(PublicationStates.Pushed), Request().WorkItem, CancellationToken.None));
+        Assert.That(git.Commands, Has.None.Contains("push"));
+    }
+
     [Test]
     public void PublishAsync_TransientPushFailureIsRetryableAndDoesNotCreatePullRequest()
     {
@@ -120,6 +185,12 @@ public sealed class GitWorkPublisherTests
         Publication = new PublicationOptions { ValidationCommands = validation ?? [], GitName = "Automaton Agent", GitEmail = "agent@example.test", RemoteName = "origin", GitHubHost = "github.com" }
     });
     private PublicationRequest Request() => new(new Workspace("key", workspacePath, "automaton/work/7", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.Active, "nonce", "acme/widgets", BaseSha), new WorkItem("id", "acme/widgets#7", "Fix widget", "body", "open", []), new("READY", "plan", "steps", "tests", "risk"), new("COMPLETED", "done", "tests pass", "none"), new("APPROVED", "good", []));
+    private OwnedWorkspaceRecord RecoveryRecord(string state)
+    {
+        var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
+        var publication = state == PublicationStates.None ? new PublicationRecoveryState(state) : new PublicationRecoveryState(state, CommitSha, workspace.Branch, state == PublicationStates.PullRequestCreated ? 42 : null, state == PublicationStates.PullRequestCreated ? "https://github.com/acme/widgets/pull/42" : null);
+        return new(workspace, "id", new WorkspaceRepository(root, "acme/widgets"), new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working), null, 3, publication);
+    }
 
     private sealed class FakeGit(string path) : IGitCommandRunner
     {
@@ -154,8 +225,17 @@ public sealed class GitWorkPublisherTests
     }
     private sealed class FakePullRequests : IPullRequestPublisher
     {
-        public List<PullRequestPublicationRequest> Requests { get; } = [];
-        public Task<PullRequestPublication> FindOrCreateAsync(PullRequestPublicationRequest request, CancellationToken token) { Requests.Add(request); return Task.FromResult(new PullRequestPublication(42, "https://github.com/acme/widgets/pull/42", request.Repository, request.HeadBranch, request.HeadSha, request.BaseBranch, "open", true)); }
+        public List<PullRequestPublicationRequest> Requests => CreateRequests;
+        public List<PullRequestPublicationRequest> CreateRequests { get; } = [];
+        public List<PullRequestPublicationRequest> VerifyRequests { get; } = [];
+        public bool ExistingForCreate { get; set; }
+        public bool ExactResultMissing { get; set; }
+        public PublicationException? ExactFailure { get; set; }
+        public int CreatedCount { get; private set; }
+        public Task<PullRequestPublication> FindOrCreateAsync(PullRequestPublicationRequest request, CancellationToken token) { CreateRequests.Add(request); if (!ExistingForCreate) CreatedCount++; return Task.FromResult(Result(request, 42)); }
+        public Task<PullRequestPublication?> FindExactAsync(PullRequestPublicationRequest request, int? expectedNumber, CancellationToken token)
+        { VerifyRequests.Add(request); if (ExactFailure is not null) throw ExactFailure; return Task.FromResult<PullRequestPublication?>(ExactResultMissing ? null : Result(request, expectedNumber ?? 42)); }
+        private static PullRequestPublication Result(PullRequestPublicationRequest request, int number) => new(number, "https://github.com/acme/widgets/pull/42", request.Repository, request.HeadBranch, request.HeadSha, request.BaseBranch, "open", true);
     }
     private sealed class FakeWorkspaces : IWorkspaceManager
     {

@@ -87,5 +87,7 @@ public sealed class SingleAgentExecutionSmokeTests
     {
         public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
             => Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://example.invalid/pull/1", true));
+        public Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
+            => Task.FromResult(new PublicationRecoveryResult(false));
     }
 }

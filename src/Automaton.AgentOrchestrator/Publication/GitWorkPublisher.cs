@@ -25,15 +25,7 @@ public sealed class GitWorkPublisher(
     public async Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
     {
         var workspace = request.Workspace;
-        if (workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.Active)
-            throw new PublicationException("Publication requires verified active workspace ownership.");
-        if (!string.Equals(workspace.RepositoryIdentity, options.Repository.Identity, StringComparison.Ordinal))
-            throw new PublicationException("Workspace repository identity does not match publication configuration.");
-        if (string.IsNullOrWhiteSpace(workspace.BaseCommitSha))
-            throw new PublicationException("Workspace base commit provenance is unavailable for safe publication.");
-        _ = RequireSha(workspace.BaseCommitSha);
-        if (PathsEqual(workspace.Path, options.Repository.Root))
-            throw new PublicationException("Publication cannot mutate the canonical repository checkout.");
+        ValidateWorkspaceForPublication(workspace, requireActiveOwnership: true);
 
         await ValidateGitStateAsync(workspace, cancellationToken);
         await RunValidationCommandsAsync(workspace, cancellationToken);
@@ -60,6 +52,77 @@ public sealed class GitWorkPublisher(
         return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
     }
 
+    public async Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
+    {
+        var workspace = record.Workspace;
+        if (workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None)
+            throw new PublicationException("Publication recovery requires execution ownership to be safely released.");
+        ValidateWorkspaceForPublication(workspace, requireActiveOwnership: false);
+        await ValidateGitStateAsync(workspace, cancellationToken);
+        var subject = BuildSubject(workItem);
+        var commitSha = await RecognizeExistingCommitAsync(workspace, subject, cancellationToken);
+        if (commitSha is null)
+        {
+            if (record.Publication?.State is null or PublicationStates.None) return new(false);
+            throw new PublicationException("Durable publication state exists but the daemon publication commit cannot be proven.");
+        }
+
+        await RunValidationCommandsAsync(workspace, cancellationToken);
+        ValidateRecoveryHint(record.Publication, workspace, commitSha);
+        await ValidateRemoteAsync(workspace, cancellationToken);
+        if (record.Publication?.State is null or PublicationStates.None)
+            workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+                new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch), CancellationToken.None);
+
+        var request = new PullRequestPublicationRequest(
+            options.Repository.Identity,
+            workspace.Branch,
+            commitSha,
+            options.Repository.BaseBranch,
+            subject,
+            BuildRecoveryPullRequestBody(workItem));
+
+        PullRequestPublication publication;
+        if (record.Publication?.State == PublicationStates.PullRequestCreated)
+        {
+            await VerifyRemoteBranchAsync(workspace, commitSha, cancellationToken);
+            publication = await pullRequests.FindExactAsync(request, record.Publication.PullRequestNumber, cancellationToken)
+                ?? throw new PublicationException("The durably recorded draft pull request no longer exists or matches publication identity.");
+        }
+        else
+        {
+            if (record.Publication?.State == PublicationStates.Pushed)
+                await VerifyRemoteBranchAsync(workspace, commitSha, cancellationToken);
+            else
+                await PublishBranchAsync(workspace, commitSha, cancellationToken);
+            if (record.Publication?.State != PublicationStates.Pushed)
+                workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+                    new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch), CancellationToken.None);
+            publication = await pullRequests.FindOrCreateAsync(request, cancellationToken);
+        }
+
+        ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
+        await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url), CancellationToken.None);
+        return new(true, new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft));
+    }
+
+    private void ValidateWorkspaceForPublication(Workspace workspace, bool requireActiveOwnership)
+    {
+        var expectedOwnership = requireActiveOwnership ? WorkspaceExecutionOwnershipStates.Active : WorkspaceExecutionOwnershipStates.None;
+        if (workspace.ExecutionOwnershipStatus != expectedOwnership)
+            throw new PublicationException(requireActiveOwnership
+                ? "Publication requires verified active workspace ownership."
+                : "Publication recovery requires execution ownership to be safely released.");
+        if (!string.Equals(workspace.RepositoryIdentity, options.Repository.Identity, StringComparison.Ordinal))
+            throw new PublicationException("Workspace repository identity does not match publication configuration.");
+        if (string.IsNullOrWhiteSpace(workspace.BaseCommitSha))
+            throw new PublicationException("Workspace base commit provenance is unavailable for safe publication.");
+        _ = RequireSha(workspace.BaseCommitSha);
+        if (PathsEqual(workspace.Path, options.Repository.Root))
+            throw new PublicationException("Publication cannot mutate the canonical repository checkout.");
+    }
+
     private async Task ValidateGitStateAsync(Workspace workspace, CancellationToken cancellationToken)
     {
         var root = await GitAsync(workspace.Path, ["rev-parse", "--show-toplevel"], "resolve the publication worktree", cancellationToken);
@@ -83,12 +146,8 @@ public sealed class GitWorkPublisher(
         var head = (await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve publication HEAD", cancellationToken)).StandardOutput.Trim();
         if (!string.Equals(head, workspace.BaseCommitSha, StringComparison.Ordinal))
         {
-            var count = (await GitAsync(workspace.Path, ["rev-list", "--count", $"{workspace.BaseCommitSha}..HEAD"], "inspect publication history", cancellationToken)).StandardOutput.Trim();
-            var provenance = (await GitAsync(workspace.Path, ["log", "-1", "--format=%an%x00%ae%x00%s"], "inspect publication commit provenance", cancellationToken)).StandardOutput.TrimEnd('\r', '\n');
-            var expected = $"{options.Publication.GitName}\0{options.Publication.GitEmail}\0{subject}";
-            if (count != "1" || !string.Equals(provenance, expected, StringComparison.Ordinal))
-                throw new PublicationException("Workspace contains unexpected existing commits; publication provenance is ambiguous.");
-            return RequireSha(head);
+            return await RecognizeExistingCommitAsync(workspace, subject, cancellationToken)
+                ?? throw new PublicationException("Workspace contains unexpected existing commits; publication provenance is ambiguous.");
         }
 
         var status = await GitAsync(workspace.Path, ["status", "--porcelain=v1", "--untracked-files=all"], "inspect publishable changes", cancellationToken);
@@ -99,6 +158,25 @@ public sealed class GitWorkPublisher(
             "create the daemon publication commit", cancellationToken);
         var committed = await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve publication commit", cancellationToken);
         return RequireSha(committed.StandardOutput.Trim());
+    }
+
+    private async Task<string?> RecognizeExistingCommitAsync(Workspace workspace, string subject, CancellationToken cancellationToken)
+    {
+        var head = (await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve publication HEAD", cancellationToken)).StandardOutput.Trim();
+        if (string.Equals(head, workspace.BaseCommitSha, StringComparison.OrdinalIgnoreCase)) return null;
+        var count = (await GitAsync(workspace.Path, ["rev-list", "--count", $"{workspace.BaseCommitSha}..HEAD"], "inspect publication history", cancellationToken)).StandardOutput.Trim();
+        var provenance = (await GitAsync(workspace.Path, ["log", "-1", "--format=%an%x00%ae%x00%s"], "inspect publication commit provenance", cancellationToken)).StandardOutput.TrimEnd('\r', '\n');
+        var expected = $"{options.Publication.GitName}\0{options.Publication.GitEmail}\0{subject}";
+        if (count != "1" || !string.Equals(provenance, expected, StringComparison.Ordinal)) return null;
+        return RequireSha(head);
+    }
+
+    private static void ValidateRecoveryHint(PublicationRecoveryState? hint, Workspace workspace, string commitSha)
+    {
+        if (hint is null || hint.State == PublicationStates.None) return;
+        if (!string.Equals(hint.CommitSha, commitSha, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(hint.RemoteBranch, workspace.Branch, StringComparison.Ordinal))
+            throw new PublicationException("Durable publication metadata does not match the recognized daemon publication commit.");
     }
 
     private async Task ValidateRemoteAsync(Workspace workspace, CancellationToken cancellationToken)
@@ -124,6 +202,13 @@ public sealed class GitWorkPublisher(
         var verified = await ReadRemoteShaAsync(workspace, cancellationToken);
         if (!string.Equals(verified, commitSha, StringComparison.OrdinalIgnoreCase))
             throw new PublicationException("Remote branch SHA does not match the publication commit.");
+    }
+
+    private async Task VerifyRemoteBranchAsync(Workspace workspace, string commitSha, CancellationToken cancellationToken)
+    {
+        var remote = await ReadRemoteShaAsync(workspace, cancellationToken);
+        if (!string.Equals(remote, commitSha, StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Durably published remote branch is missing or has an unexpected SHA.");
     }
 
     private async Task<string?> ReadRemoteShaAsync(Workspace workspace, CancellationToken cancellationToken)
@@ -209,6 +294,12 @@ Source
 Refs {Sanitize(issueReference)}
 """;
         return body.Length <= MaximumBodyLength ? body : body[..MaximumBodyLength];
+    }
+
+    private static string BuildRecoveryPullRequestBody(WorkItem item)
+    {
+        var issueReference = item.Identifier.Contains('#') ? item.Identifier[item.Identifier.LastIndexOf('#')..] : item.Identifier;
+        return $"Automaton recovered an independently approved draft publication for {Sanitize(item.Identifier)}.\n\nSource\nRefs {Sanitize(issueReference)}";
     }
 
     private static string Sanitize(string value) => new string(value.Select(character => char.IsControl(character) ? ' ' : character).ToArray()).Trim();
