@@ -34,6 +34,7 @@ public sealed class WorkflowLoaderTests
                   manager_max_turns: 2
                   developer_max_turns: 6
                   reviewer_max_turns: 3
+                  max_review_rounds: 4
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -64,11 +65,42 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.ManagerMaxTurns, Is.EqualTo(2));
                 Assert.That(definition.Options.Agent.DeveloperMaxTurns, Is.EqualTo(6));
                 Assert.That(definition.Options.Agent.ReviewerMaxTurns, Is.EqualTo(3));
+                Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(4));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
             });
         }
         finally { Environment.SetEnvironmentVariable(variableName, null); }
+    }
+
+    [Test]
+    public async Task LoadAsync_DefaultsAndBoundsReviewRounds()
+    {
+        await using var defaults = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            workspace:
+              root: workspaces
+            ---
+            Prompt
+            """);
+        var definition = await new WorkflowLoader().LoadAsync(defaults.Path, CancellationToken.None);
+        Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(3));
+
+        await using var excessive = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            workspace:
+              root: workspaces
+            agent:
+              max_review_rounds: 11
+            ---
+            Prompt
+            """);
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(() => new WorkflowLoader().LoadAsync(excessive.Path, CancellationToken.None));
+        Assert.That(exception!.Message, Is.EqualTo("agent.max_review_rounds must not exceed 10."));
     }
 
     [Test]

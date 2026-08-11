@@ -50,14 +50,31 @@ public sealed class RoleBasedWorkExecutor(
             var developer = await RunDeveloperAsync(client, developerThread, prompts.Developer(attempt, workspace, manager), cancellationToken);
             if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
 
-            var reviewer = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Reviewer, async () =>
+            var reviewerThread = await client.StartThreadAsync(cancellationToken);
+            var reviewerPrompt = prompts.Reviewer(attempt, workspace, manager, developer);
+            outcome = RunOutcome.PermanentFailure("Maximum review rounds reached without approval.");
+            for (var reviewRound = 1; reviewRound <= workflow.Options.Agent.MaxReviewRounds; reviewRound++)
             {
-                var thread = await client.StartThreadAsync(cancellationToken);
-                return await RunReviewerAsync(client, thread, prompts.Reviewer(attempt, workspace, manager, developer), cancellationToken);
-            }, cancellationToken);
-            outcome = reviewer.Verdict == RoleResultStatuses.Approved
-                ? RunOutcome.Success()
-                : RunOutcome.PermanentFailure(Bounded(reviewer.Summary.Length > 0 ? reviewer.Summary : $"Reviewer returned {reviewer.Verdict}."));
+                var reviewer = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Reviewer,
+                    () => RunReviewerAsync(client, reviewerThread, reviewerPrompt, cancellationToken), cancellationToken);
+                if (reviewer.Verdict == RoleResultStatuses.Approved)
+                {
+                    outcome = RunOutcome.Success();
+                    break;
+                }
+                if (reviewer.Verdict == RoleResultStatuses.Blocked)
+                    throw new RoleBlockedException(reviewer.Summary.Length > 0 ? reviewer.Summary : "Reviewer could not complete a trustworthy review.");
+                if (reviewRound == workflow.Options.Agent.MaxReviewRounds)
+                    throw new RoleBlockedException("Maximum review rounds reached without approval.");
+
+                developer = await RunDeveloperAsync(
+                    client,
+                    developerThread,
+                    prompts.DeveloperRemediation(attempt, workspace, manager, developer, reviewer, reviewRound + 1),
+                    cancellationToken);
+                if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
+                reviewerPrompt = prompts.ReviewerAgain(attempt, workspace, manager, developer, reviewer, reviewRound + 1);
+            }
         }
         catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }

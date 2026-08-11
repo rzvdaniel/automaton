@@ -37,6 +37,7 @@ public sealed class AgentExecutionOptions
     public int ManagerMaxTurns { get; init; } = 2;
     public int DeveloperMaxTurns { get; init; } = 1;
     public int ReviewerMaxTurns { get; init; } = 2;
+    public int MaxReviewRounds { get; init; } = 3;
 }
 public sealed class CodexOptions { public string Command { get; init; } = "codex app-server"; public int TurnTimeoutMilliseconds { get; init; } = 3_600_000; }
 public sealed class RetryOptions { public int MaxAttempts { get; init; } = 3; public int InitialBackoffMilliseconds { get; init; } = 1_000; public int MaxBackoffMilliseconds { get; init; } = 300_000; }
