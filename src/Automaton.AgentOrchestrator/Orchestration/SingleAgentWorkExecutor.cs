@@ -16,7 +16,8 @@ public sealed class RoleBasedWorkExecutor(
     IWorkPublisher publisher,
     WorkflowDefinition workflow,
     ICiShepherd? ciShepherd = null,
-    IReviewFeedbackShepherd? reviewFeedbackShepherd = null) : IWorkExecutor
+    IReviewFeedbackShepherd? reviewFeedbackShepherd = null,
+    IOperatorTelemetry? telemetry = null) : IWorkExecutor
 {
     private const int MaximumResultDetailLength = 512;
 
@@ -32,6 +33,7 @@ public sealed class RoleBasedWorkExecutor(
                 workspace,
                 new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt),
                 cancellationToken);
+            Record("workspace.ready", attempt.WorkItem.Id, "workspace", null, "Daemon-owned workspace is ready.", new Dictionary<string, string> { ["workspaceKey"] = workspace.Key, ["branch"] = workspace.Branch });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bounded(exception.Message)); }
@@ -47,6 +49,7 @@ public sealed class RoleBasedWorkExecutor(
         {
             await client.InitializeAsync(cancellationToken);
 
+            Record("role.started", attempt.WorkItem.Id, "engineering", AgentRoles.Manager, "Manager role started.");
             var manager = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Manager, async () =>
             {
                 var thread = await client.StartThreadAsync(cancellationToken);
@@ -54,11 +57,13 @@ public sealed class RoleBasedWorkExecutor(
             }, cancellationToken);
             if (manager.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(manager.Summary);
 
+            Record("role.started", attempt.WorkItem.Id, "engineering", AgentRoles.Developer, "Developer role started.");
             var developerThread = await client.StartThreadAsync(cancellationToken);
             var developer = await RunDeveloperAsync(client, developerThread, prompts.Developer(attempt, workspace, manager), cancellationToken);
             if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
 
             var reviewerThread = await client.StartThreadAsync(cancellationToken);
+            Record("role.started", attempt.WorkItem.Id, "engineering-review", AgentRoles.Reviewer, "Independent Reviewer role started.");
             var reviewerPrompt = prompts.Reviewer(attempt, workspace, manager, developer);
             ReviewerHandoff? approvedReview = null;
             outcome = RunOutcome.PermanentFailure("Maximum review rounds reached without approval.");
@@ -86,6 +91,7 @@ public sealed class RoleBasedWorkExecutor(
                 reviewerPrompt = prompts.ReviewerAgain(attempt, workspace, manager, developer, reviewer, reviewRound + 1);
             }
             if (approvedReview is null) throw new RoleBlockedException("Reviewer approval was not established for publication.");
+            Record("publication.started", attempt.WorkItem.Id, "publication", null, "Approved workspace publication started.");
             var publication = await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
             publicationStarted = true;
             await client.DisposeAsync();
@@ -93,11 +99,13 @@ public sealed class RoleBasedWorkExecutor(
             var ci = ciShepherd is null
                 ? CiShepherdResult.Success(publication.CommitSha, 0)
                 : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
+            Record("ci.observed", attempt.WorkItem.Id, "ci", null, ci.Succeeded ? "CI shepherding passed." : ci.FailureReason, new Dictionary<string, string> { ["pullRequestNumber"] = publication.PullRequestNumber.ToString(System.Globalization.CultureInfo.InvariantCulture), ["headSha"] = ci.HeadSha ?? publication.CommitSha });
             if (!ci.Succeeded)
                 outcome = ci.IsRetryable ? RunOutcome.RetryableFailure(Bounded(ci.FailureReason ?? "CI shepherding failed.")) : RunOutcome.PermanentFailure(Bounded(ci.FailureReason ?? "CI shepherding failed."));
             else if (reviewFeedbackShepherd is not null)
             {
                 var reviewedHead = ci.HeadSha ?? publication.CommitSha;
+                Record("feedback.waiting", attempt.WorkItem.Id, "human-feedback", null, "Waiting for exact-head human review feedback.", new Dictionary<string, string> { ["headSha"] = reviewedHead, ["pullRequestNumber"] = publication.PullRequestNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) });
                 var feedback = await reviewFeedbackShepherd.ShepherdAsync(
                     new(publication.Repository, publication.PullRequestNumber, publication.Branch, reviewedHead, PublicationRevision: 1 + ci.RemediationRound),
                     client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
@@ -169,6 +177,9 @@ public sealed class RoleBasedWorkExecutor(
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         return outcome;
     }
+
+    private void Record(string eventType, string workItemId, string stage, string? role, string? message, IReadOnlyDictionary<string, string>? metadata = null)
+        => telemetry?.Record(eventType, OperatorEventSeverities.Information, workItemId, stage, role, message, metadata);
 
     private async Task<ManagerHandoff> RunManagerAsync(ICodexAppServerClient client, CodexThread thread, string prompt, CancellationToken cancellationToken)
     {

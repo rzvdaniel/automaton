@@ -660,6 +660,28 @@ feedback round budget, and exact PR/head binding before resuming the human-revie
 wait. Review-feedback credentials are host-side and independent from tracker,
 publication, and CI provider selection.
 
+### Stage 12 observability and operator surface
+
+Stage 12 adds diagnostics without adding autonomy. Authoritative scheduling,
+workspace ownership, publication, CI, and feedback state remain in their Stage
+1-11 models. A read-only projector combines those states into operator schema v1
+and writes an atomic `status.json` plus bounded rotating `events.jsonl` beneath
+the daemon-owned sidecar root, outside every agent-visible worktree.
+
+The status contract includes daemon health/reconciliation state, work-item run
+state and attempt, current stage/role, workspace/branch/PR/exact-SHA identity,
+retry time, execution ownership, CI and feedback state, bounded reasons, and
+timestamps. Structured events cover lifecycle transitions and recovery errors.
+They are diagnostic events rather than business audit records. Messages and
+metadata are bounded, secret-like metadata fields are redacted, and prompts,
+transcripts, provider payloads, credentials, and raw CI output are prohibited.
+
+Failure to project durable state marks the operator surface degraded and emits a
+warning, but it cannot weaken fencing, clear quarantine, or mutate orchestration
+state. The files are an initial local contract for Stage 13 service packaging
+and later Studio consumption; Stage 12 deliberately adds no HTTP service, large
+UI, remote control, automatic merge, or new agent behavior.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and

@@ -9,7 +9,8 @@ public sealed class InMemoryOrchestrator(
     IWorkExecutor executor,
     OrchestratorOptions options,
     IClock clock,
-    ILogger<InMemoryOrchestrator> logger) : IAsyncDisposable
+    ILogger<InMemoryOrchestrator> logger,
+    IOperatorTelemetry? telemetry = null) : IAsyncDisposable
 {
     private readonly object gate = new();
     private readonly Dictionary<string, ActiveRun> activeRuns = new(StringComparer.Ordinal);
@@ -33,6 +34,7 @@ public sealed class InMemoryOrchestrator(
             retryRuns.Remove(workItemId);
             terminalDispatchSuppression.Add(workItemId);
         }
+        telemetry?.Record("run.restored", OperatorEventSeverities.Information, workItemId, "recovery", message: reason, metadata: new Dictionary<string, string> { ["state"] = state, ["attempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 
     public void RestoreRetry(WorkItem item, int nextAttempt, DateTimeOffset? retryNotBeforeUtc, string? reason)
@@ -47,6 +49,7 @@ public sealed class InMemoryOrchestrator(
             history.Add(state);
             retryRuns[item.Id] = new RetryRun(item, nextAttempt, state);
         }
+        telemetry?.Record("run.retry.restored", OperatorEventSeverities.Warning, item.Id, "retry", message: reason, metadata: new Dictionary<string, string> { ["nextAttempt"] = nextAttempt.ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 
     public void RestoreIneligible(string workItemId, int attempt, string? reason)
@@ -122,6 +125,7 @@ public sealed class InMemoryOrchestrator(
             task = Task.Run(() => ExecuteClaimAsync(run));
             activeRuns[item.Id] = run with { Task = task, State = run.State with { State = RunStates.Working, UpdatedAtUtc = clock.UtcNow } };
         }
+        telemetry?.Record("run.started", OperatorEventSeverities.Information, item.Id, "execution", message: "Work item execution started.", metadata: new Dictionary<string, string> { ["attempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 
     private async Task ExecuteClaimAsync(ActiveRun run)
@@ -156,6 +160,7 @@ public sealed class InMemoryOrchestrator(
             retryRuns[run.WorkItem.Id] = new RetryRun(run.WorkItem, run.Attempt + 1, retryState);
             _ = RetryWhenDueAsync(run.WorkItem.Id, delay);
         }
+        telemetry?.Record("run.retry.queued", OperatorEventSeverities.Warning, run.WorkItem.Id, "retry", message: failureReason, metadata: new Dictionary<string, string> { ["nextAttempt"] = (run.Attempt + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 
     private async Task RetryWhenDueAsync(string workItemId, TimeSpan delay)
@@ -258,6 +263,7 @@ public sealed class InMemoryOrchestrator(
             if (state is RunStates.Completed or RunStates.Blocked or RunStates.Cancelled)
                 terminalDispatchSuppression.Add(workItemId);
         }
+        telemetry?.Record("run.completed", state == RunStates.Completed ? OperatorEventSeverities.Information : OperatorEventSeverities.Warning, workItemId, "terminal", message: failureReason, metadata: new Dictionary<string, string> { ["state"] = state, ["attempt"] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 
     private TimeSpan RetryDelay(int completedAttempt)

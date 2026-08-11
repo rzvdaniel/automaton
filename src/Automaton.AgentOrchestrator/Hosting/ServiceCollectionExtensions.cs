@@ -7,6 +7,7 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Ci;
 using Automaton.AgentOrchestrator.ReviewFeedback;
+using Automaton.AgentOrchestrator.Operator;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -16,6 +17,9 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAgentOrchestrator(this IServiceCollection services)
     {
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IOperatorTelemetry>(services => services.GetRequiredService<OrchestratorOptions>().Observability.Enabled
+            ? new FileOperatorTelemetry(services.GetRequiredService<OrchestratorOptions>(), services.GetRequiredService<IClock>())
+            : new NoopOperatorTelemetry());
         services.AddSingleton<IWorkflowLoader, WorkflowLoader>();
         services.AddHttpClient();
         services.AddSingleton<IWorkTracker>(services =>
@@ -81,6 +85,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();
         services.AddHostedService<OrchestratorHostedService>();
+        services.AddHostedService<OperatorStatusHostedService>();
         return services;
     }
 
@@ -97,6 +102,13 @@ public static class ServiceCollectionExtensions
     {
         public Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken cancellationToken)
             => Task.FromResult(new ReviewFeedbackSnapshot(target.HeadSha, ReviewFeedbackStatuses.Approved, []));
+    }
+    private sealed class NoopOperatorTelemetry : IOperatorTelemetry
+    {
+        public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null) { }
+        public OperatorEvent? LatestFor(string workItemId) => null;
+        public void SetDaemonState(string state, string? error = null) { }
+        public (string State, string? LastError) DaemonState() => (OperatorDaemonStates.Running, null);
     }
 
 }

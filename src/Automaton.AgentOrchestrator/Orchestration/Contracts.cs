@@ -71,6 +71,14 @@ public sealed record PullRequestPublicationRequest(
 
 public interface IClock { DateTimeOffset UtcNow { get; } }
 
+public interface IOperatorTelemetry
+{
+    void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null);
+    OperatorEvent? LatestFor(string workItemId);
+    void SetDaemonState(string state, string? error = null);
+    (string State, string? LastError) DaemonState();
+}
+
 public interface IWorkspaceMutationGuard
 {
     Task<string> CaptureAsync(Workspace workspace, CancellationToken cancellationToken);
