@@ -22,6 +22,10 @@ public sealed class SingleAgentWorkExecutor(
             workspace = await workspaceManager.CreateOrRecoverAsync(new(
                 attempt.WorkItem,
                 new WorkspaceRepository(workflow.Options.Repository.Root, workflow.Options.Repository.Identity)), cancellationToken);
+            workspace = await workspaceManager.UpdateRecoveryStateAsync(
+                workspace,
+                new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt),
+                cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bounded(exception.Message)); }
@@ -60,8 +64,18 @@ public sealed class SingleAgentWorkExecutor(
         }
 
         var currentWorkspace = client.CurrentWorkspace ?? workspace;
-        if (cancelled) throw new OperationCanceledException(cancellationToken);
         if (ambiguous || currentWorkspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
+
+        var recovery = cancelled
+            ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Cancelled, attempt.Attempt, attempt.Attempt + 1)
+            : outcome.Succeeded
+                ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Completed, attempt.Attempt, attempt.Attempt + 1)
+                : outcome.IsRetryable
+                    ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.RetryableFailure, attempt.Attempt, attempt.Attempt + 1, Reason: outcome.FailureReason)
+                    : new WorkspaceRecoveryState(WorkspaceRecoveryStates.Blocked, attempt.Attempt, attempt.Attempt + 1, Reason: outcome.FailureReason);
+        try { currentWorkspace = await workspaceManager.UpdateRecoveryStateAsync(currentWorkspace, recovery, CancellationToken.None); }
+        catch (WorkspaceException exception) { return RunOutcome.PermanentFailure(Bounded(exception.Message)); }
+        if (cancelled) throw new OperationCanceledException(cancellationToken);
 
         var lifecycle = outcome.Succeeded
             ? WorkspaceLifecycleStates.Ready

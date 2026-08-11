@@ -29,8 +29,10 @@ public static class ServiceCollectionExtensions
             new ProcessGitCommandRunner(),
             services.GetRequiredService<IClock>()));
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
+        services.AddSingleton<IExecutionFence, PlatformExecutionFence>();
         services.AddSingleton<IWorkExecutor, SingleAgentWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
+        services.AddSingleton<StartupReconciler>();
         services.AddHostedService<OrchestratorHostedService>();
         return services;
     }

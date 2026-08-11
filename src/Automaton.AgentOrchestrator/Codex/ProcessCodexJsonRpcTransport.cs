@@ -12,7 +12,7 @@ public sealed record CodexProcessOptions(
     TimeSpan? ShutdownTimeout = null,
     string? LaunchNonce = null);
 
-public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options) : ICodexJsonRpcTransport
+public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IExecutionFence? executionFence = null) : ICodexJsonRpcTransport
 {
     private static readonly string[] AllowedHostEnvironment = ["PATH", "Path", "PATHEXT", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "CODEX_HOME"];
     private readonly Channel<string> stdout = Channel.CreateUnbounded<string>(new() { SingleReader = true, SingleWriter = true });
@@ -21,13 +21,15 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options) : 
     private Task? stdoutReader;
     private Task? stderrReader;
     private string stderrTail = string.Empty;
+    private readonly IExecutionFence executionFence = executionFence ?? new PlatformExecutionFence();
 
     public string LaunchNonce { get; } = options.LaunchNonce ?? Guid.NewGuid().ToString("N");
     public CodexProcessIdentity? Identity { get; private set; }
+    public DurableExecutionIdentity? DurableIdentity { get; private set; }
     internal IReadOnlyDictionary<string, string>? StartedEnvironment { get; private set; }
     internal string StderrTail => stderrTail;
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (process is not null) throw new InvalidOperationException("Codex App Server process is already started.");
         var (fileName, arguments) = ParseCommand(options.Command);
@@ -46,11 +48,12 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options) : 
             .ToDictionary(entry => (string)entry.Key, entry => Convert.ToString(entry.Value) ?? string.Empty, StringComparer.OrdinalIgnoreCase);
         foreach (var pair in BuildEnvironment(hostEnvironment, options.Environment)) startInfo.Environment[pair.Key] = pair.Value;
         StartedEnvironment = new Dictionary<string, string>(startInfo.Environment.ToDictionary(x => x.Key, x => x.Value ?? string.Empty), StringComparer.OrdinalIgnoreCase);
-        process = Process.Start(startInfo) ?? throw new CodexProtocolException("Unable to launch Codex App Server.");
-        Identity = new(process.Id, process.StartTime.ToUniversalTime(), LaunchNonce);
+        var fenced = await executionFence.LaunchAsync(startInfo, LaunchNonce, cancellationToken);
+        process = fenced.Process;
+        DurableIdentity = fenced.Identity;
+        Identity = new(fenced.Identity.ProcessId, fenced.Identity.ProcessStartedAtUtc, LaunchNonce);
         stdoutReader = ReadStdoutAsync(process, lifetime.Token);
         stderrReader = ReadStderrAsync(process, lifetime.Token);
-        return Task.CompletedTask;
     }
 
     public async Task SendAsync(string message, CancellationToken cancellationToken)
@@ -77,10 +80,12 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options) : 
             try { await process.WaitForExitAsync(timeout.Token); }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(cancellationToken);
+                if (DurableIdentity is null || !await executionFence.TerminateAndVerifyAsync(DurableIdentity, TimeSpan.FromSeconds(5), cancellationToken))
+                    throw new CodexProtocolException("Codex process boundary termination could not be verified.");
             }
         }
+        if (DurableIdentity is not null && !await executionFence.TerminateAndVerifyAsync(DurableIdentity, TimeSpan.FromSeconds(5), cancellationToken))
+            throw new CodexProtocolException("Codex process termination could not be verified.");
         lifetime.Cancel();
         if (stdoutReader is not null) await IgnoreCancellation(stdoutReader);
         if (stderrReader is not null) await IgnoreCancellation(stderrReader);

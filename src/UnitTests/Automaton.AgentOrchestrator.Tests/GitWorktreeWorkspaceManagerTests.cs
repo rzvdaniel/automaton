@@ -2,6 +2,7 @@ using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
 using Automaton.AgentOrchestrator.Workspaces;
 using NUnit.Framework;
+using System.Text.Json.Nodes;
 
 namespace Automaton.AgentOrchestrator.Tests;
 
@@ -207,6 +208,76 @@ public sealed class GitWorktreeWorkspaceManagerTests
 
         Assert.ThrowsAsync<WorkspaceException>(async () => await manager.CreateOrRecoverAsync(request, CancellationToken.None));
     }
+
+    [Test]
+    public async Task EnumerateOwnedWorkspacesAsync_RestoresDurableAttemptAndExecutionIdentity()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("recovery-work"), CancellationToken.None);
+        workspace = await manager.UpdateRecoveryStateAsync(workspace,
+            new WorkspaceRecoveryState(WorkspaceRecoveryStates.RetryableFailure, 2, 3, DateTimeOffset.Parse("2026-01-02T00:00:00Z"), "temporary"), CancellationToken.None);
+        workspace = await manager.UpdateExecutionOwnershipAsync(workspace, WorkspaceExecutionOwnershipStates.Active, "launch-2", CancellationToken.None);
+        await manager.RecordExecutionIdentityAsync(workspace,
+            new DurableExecutionIdentity(456, DateTimeOffset.Parse("2026-01-01T01:00:00Z"), "launch-2", ExecutionFencingKinds.WindowsJob), CancellationToken.None);
+
+        var records = await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None);
+        var record = records.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.SchemaVersion, Is.EqualTo(2));
+            Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.RetryableFailure));
+            Assert.That(record.Recovery.LastCompletedAttempt, Is.EqualTo(2));
+            Assert.That(record.Recovery.NextAttempt, Is.EqualTo(3));
+            Assert.That(record.ExecutionIdentity?.ProcessId, Is.EqualTo(456));
+            Assert.That(record.ExecutionIdentity?.LaunchNonce, Is.EqualTo("launch-2"));
+        });
+    }
+
+    [Test]
+    public async Task EnumerateOwnedWorkspacesAsync_RejectsSidecarBranchTampering()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("tampered-branch"), CancellationToken.None);
+        var sidecarPath = SidecarPath(workspace);
+        var json = JsonNode.Parse(await File.ReadAllTextAsync(sidecarPath))!.AsObject();
+        json["Branch"] = "automaton/work/other";
+        await File.WriteAllTextAsync(sidecarPath, json.ToJsonString());
+
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(() => manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task EnumerateOwnedWorkspacesAsync_CorruptSidecarFailsClosed()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("corrupt-sidecar"), CancellationToken.None);
+        await File.WriteAllTextAsync(SidecarPath(workspace), "{not-json");
+
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(() => manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task EnumerateOwnedWorkspacesAsync_MigratesLegacySidecarConservatively()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("legacy-sidecar"), CancellationToken.None);
+        var sidecarPath = SidecarPath(workspace);
+        var json = JsonNode.Parse(await File.ReadAllTextAsync(sidecarPath))!.AsObject();
+        json.Remove("SchemaVersion");
+        json.Remove("SchedulerState");
+        await File.WriteAllTextAsync(sidecarPath, json.ToJsonString());
+
+        var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.SchemaVersion, Is.EqualTo(2));
+            Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.Blocked));
+            Assert.That(record.Recovery.Reason, Does.Contain("Legacy"));
+        });
+    }
+
+    private string SidecarPath(Workspace workspace)
+        => Path.Combine(testRoot, "workspaces", ".automaton-agent-orchestrator", workspace.Key + ".json");
 
     private GitWorktreeWorkspaceManager CreateManager(FakeGitCommandRunner git)
         => new(Path.Combine(testRoot, "workspaces"), git, new FixedClock());

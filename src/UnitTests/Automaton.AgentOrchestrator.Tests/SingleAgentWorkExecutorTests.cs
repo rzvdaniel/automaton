@@ -241,10 +241,14 @@ public sealed class SingleAgentWorkExecutorTests
     {
         public List<WorkspaceRequest> Requests { get; } = [];
         public List<string> Lifecycles { get; } = [];
+        public List<WorkspaceRecoveryState> RecoveryStates { get; } = [];
         public int CleanupCount { get; private set; }
         public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken cancellationToken) { Requests.Add(request); return Task.FromResult(workspace); }
         public Task<Workspace> UpdateLifecycleAsync(Workspace value, string lifecycleStatus, CancellationToken cancellationToken) { Lifecycles.Add(lifecycleStatus); return Task.FromResult(value with { LifecycleStatus = lifecycleStatus }); }
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.FromResult(value);
+        public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) { RecoveryStates.Add(recoveryState); return Task.FromResult(value); }
+        public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace value, CancellationToken cancellationToken) { CleanupCount++; return Task.CompletedTask; }
     }
 

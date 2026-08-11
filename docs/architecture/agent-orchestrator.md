@@ -322,9 +322,7 @@ The process starts with `UseShellExecute=false`, an argument list, the workspace
 as its current directory, and a minimal allowlisted environment. Tracker tokens
 and Automaton database/runner secrets are neither inherited nor accepted as
 explicit child settings. Stage 4 records PID, start time, and the Stage 3 launch
-nonce and uses `Kill(entireProcessTree: true)` as the portable minimum shutdown
-boundary. This is not durable OS fencing: Windows Job Objects, Unix process
-groups/cgroups, and restart-time ownership proof remain deferred to Stage 6.
+nonce. Stage 6 strengthens this boundary as described below.
 Unexpected exit or malformed protocol therefore quarantines workspace ownership
 instead of clearing it and risking a duplicate execution.
 
@@ -364,8 +362,58 @@ Because Stage 5 deliberately leaves provider lifecycle and opt-in labels
 unchanged, the scheduler keeps a daemon-local stable-work-item-ID suppression
 set for `completed`, `blocked`, and `cancelled` terminal runs. This prevents the
 same still-eligible issue from being immediately dispatched again while normal
-retry-queued work continues unchanged. The suppression set is intentionally not
-durable; restart reconstruction and reconciliation remain Stage 6 work.
+retry-queued work continues unchanged. Stage 6 reconstructs this suppression
+from daemon-owned sidecar state after a restart; the in-memory set remains the
+live scheduler representation.
+
+### Stage 6 restart recovery and execution fencing
+
+Startup polling is gated until the daemon has enumerated and validated every
+owned sidecar/worktree, resolved active execution ownership, refreshed the
+associated tracker items, and reconstructed terminal, retry, and ineligible
+scheduler state. Tracker-wide refresh failure keeps the gate closed; an
+individual quarantined workspace is restored as blocked without preventing
+unrelated safe work from running.
+
+Sidecar schema version 2 keeps workspace lifecycle separate from execution
+ownership and adds bounded scheduler recovery state. It durably records the
+last completed and next attempt, optional retry-not-before time, bounded reason,
+root PID and process start time, launch nonce, optional Unix process-group ID,
+fencing kind, and execution start time. Writes use a same-directory temporary
+file that is flushed and closed before replacement. Future schemas are rejected;
+legacy sidecars are migrated conservatively to blocked, and legacy active
+ownership without sufficient identity is quarantined. Prompts, transcripts,
+credentials, and OS handles are never stored.
+
+On Windows, new App Servers are assigned to a kill-on-close Job Object when
+available and otherwise use the existing process-tree boundary. Job handles are
+live-daemon resources, not durable restart identity. On restart the daemon
+compares the persisted PID and exact start time before terminating the matching
+process tree. On Linux, App Servers lead a new session/process group; PID and
+start time remain the primary identity and the persisted process-group ID scopes
+termination. PID reuse never authorizes killing the new process. Inspection
+failure, incomplete identity, failed verified termination, or any descendant
+ownership ambiguity fails closed to quarantine. Unsupported platforms cannot
+clear unresolved active ownership after restart.
+
+Stage 6 preserves workspace continuity, not live Codex session continuity. It
+never adopts old stdio, reconnects to an App Server, or resumes an in-progress
+turn. A matching old execution is terminated and verified dead (or proven
+already dead), ownership is cleared with its matching nonce, and any eligible
+retry starts a fresh App Server and thread in the preserved worktree.
+
+The durable outcome reconstructs completed, blocked, and cancelled suppression.
+A retryable failure is refreshed against current provider lifecycle and labels,
+then resumes at its persisted next attempt and optional due time; exceeding the
+configured attempt limit becomes blocked. The executor persists the intended
+attempt before launching and persists the completed attempt/next state before
+publishing its workspace lifecycle transition. Ambiguity therefore favors a
+blocked or quarantined run over resetting an attempt or launching twice.
+
+Recovery deliberately uses no database: authoritative inputs are tracker state,
+validated daemon-owned sidecars, Git worktree registration, and OS process
+inspection. Graceful shutdown likewise clears active ownership only after the
+owned process boundary is verified dead; shutdown ambiguity remains quarantined.
 
 ## Trust and security posture
 

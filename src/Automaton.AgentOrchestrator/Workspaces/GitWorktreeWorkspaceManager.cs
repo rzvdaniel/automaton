@@ -36,6 +36,7 @@ public sealed class ProcessGitCommandRunner : IGitCommandRunner
 
 public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 {
+    private const int CurrentSchemaVersion = 2;
     private const string SidecarDirectoryName = ".automaton-agent-orchestrator";
     private readonly string workspaceRoot;
     private readonly IGitCommandRunner git;
@@ -65,6 +66,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
         if (sidecar is not null)
         {
+            sidecar = await MigrateSidecarAsync(sidecarPath, sidecar, cancellationToken);
             ValidateSidecar(sidecar, request, key, workspacePath, branch);
             if (!string.Equals(sidecar.ExecutionOwnershipStatus, WorkspaceExecutionOwnershipStates.None, StringComparison.Ordinal))
                 throw new WorkspaceOwnershipException("The workspace has unresolved execution ownership and cannot be reused.");
@@ -84,7 +86,8 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
         var created = new WorkspaceSidecar(
             key, request.WorkItem.Id, request.Repository.Identity, request.Repository.RootPath, workspacePath, branch,
-            WorkspaceLifecycleStates.Preparing, WorkspaceExecutionOwnershipStates.None, Guid.NewGuid().ToString("N"), clock.UtcNow, clock.UtcNow);
+            WorkspaceLifecycleStates.Preparing, WorkspaceExecutionOwnershipStates.None, Guid.NewGuid().ToString("N"), clock.UtcNow, clock.UtcNow,
+            CurrentSchemaVersion, WorkspaceRecoveryStates.Ready);
         return await CreateWorktreeAsync(request, created, sidecarPath, cancellationToken);
     }
 
@@ -121,10 +124,91 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         {
             ExecutionOwnershipStatus = executionOwnershipStatus,
             LaunchNonce = launchNonce,
+            ProcessId = executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None ? null : sidecar.ProcessId,
+            ProcessStartedAtUtc = executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None ? null : sidecar.ProcessStartedAtUtc,
+            ProcessGroupId = executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None ? null : sidecar.ProcessGroupId,
+            FencingKind = executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None ? null : sidecar.FencingKind,
+            ExecutionStartedAtUtc = executionOwnershipStatus == WorkspaceExecutionOwnershipStates.None ? null : sidecar.ExecutionStartedAtUtc,
             UpdatedAtUtc = clock.UtcNow
         };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
         return ToWorkspace(updated);
+    }
+
+    public async Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(identity);
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        if (sidecar.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.Active
+            || !string.Equals(sidecar.LaunchNonce, identity.LaunchNonce, StringComparison.Ordinal))
+            throw new WorkspaceOwnershipException("Process identity can be recorded only for matching active ownership.");
+        var updated = sidecar with
+        {
+            ProcessId = identity.ProcessId,
+            ProcessStartedAtUtc = identity.ProcessStartedAtUtc,
+            ProcessGroupId = identity.ProcessGroupId,
+            FencingKind = identity.FencingKind,
+            ExecutionStartedAtUtc = identity.ExecutionStartedAtUtc ?? clock.UtcNow,
+            UpdatedAtUtc = clock.UtcNow
+        };
+        await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
+    public async Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(recoveryState);
+        if (!IsKnownRecoveryState(recoveryState.State) || recoveryState.LastCompletedAttempt < 0 || recoveryState.NextAttempt < 1)
+            throw new WorkspaceRecoveryException("Workspace scheduler recovery state is invalid.");
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        var updated = sidecar with
+        {
+            SchedulerState = recoveryState.State,
+            LastCompletedAttempt = recoveryState.LastCompletedAttempt,
+            NextAttempt = recoveryState.NextAttempt,
+            RetryNotBeforeUtc = recoveryState.RetryNotBeforeUtc,
+            RecoveryReason = Bound(recoveryState.Reason),
+            UpdatedAtUtc = clock.UtcNow
+        };
+        await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
+    public async Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken)
+    {
+        repository = repository with { RootPath = Path.GetFullPath(repository.RootPath) };
+        ValidateRepository(repository);
+        var sidecarRoot = SidecarRoot();
+        if (!Directory.Exists(sidecarRoot)) return [];
+        EnsureNoReparsePoints(sidecarRoot);
+        var records = new List<OwnedWorkspaceRecord>();
+        foreach (var path in Directory.EnumerateFiles(sidecarRoot, "*.json", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureContained(path, sidecarRoot);
+            var sidecar = await ReadSidecarAsync(path, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar disappeared during enumeration.");
+            sidecar = await MigrateSidecarAsync(path, sidecar, cancellationToken);
+            var key = Path.GetFileNameWithoutExtension(path);
+            if (!string.Equals(key, CreateKey(sidecar.WorkItemId), StringComparison.Ordinal))
+                throw new WorkspaceRecoveryException("Workspace sidecar key does not match its stable work item identity.");
+            var expectedPath = GetWorkspacePath(key);
+            var request = new WorkspaceRequest(new WorkItem(sidecar.WorkItemId, sidecar.WorkItemId, string.Empty, null, string.Empty, []), repository);
+            var expectedBranch = $"automaton/work/{key}";
+            ValidateSidecar(sidecar, request, key, expectedPath, expectedBranch);
+            if (Directory.Exists(expectedPath))
+            {
+                EnsureNoReparsePoints(expectedPath);
+                await EnsureRegisteredWorktreeAsync(repository.RootPath, expectedPath, expectedBranch, cancellationToken);
+            }
+            records.Add(ToRecoveryRecord(sidecar));
+        }
+        return records;
     }
 
     public async Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken)
@@ -213,6 +297,28 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         }
     }
 
+    private async Task<WorkspaceSidecar> MigrateSidecarAsync(string path, WorkspaceSidecar sidecar, CancellationToken cancellationToken)
+    {
+        if (sidecar.SchemaVersion > CurrentSchemaVersion)
+            throw new WorkspaceRecoveryException("Workspace sidecar schema version is newer than this daemon supports.");
+        if (sidecar.SchemaVersion == CurrentSchemaVersion) return sidecar;
+        if (sidecar.SchemaVersion != 0)
+            throw new WorkspaceRecoveryException("Workspace sidecar schema version is unsupported.");
+        var migrated = sidecar with
+        {
+            SchemaVersion = CurrentSchemaVersion,
+            SchedulerState = WorkspaceRecoveryStates.Blocked,
+            NextAttempt = Math.Max(1, sidecar.NextAttempt),
+            RecoveryReason = "Legacy sidecar requires conservative manual recovery.",
+            ExecutionOwnershipStatus = sidecar.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Active
+                ? WorkspaceExecutionOwnershipStates.Quarantined
+                : sidecar.ExecutionOwnershipStatus,
+            UpdatedAtUtc = clock.UtcNow
+        };
+        await WriteSidecarAsync(path, migrated, cancellationToken);
+        return migrated;
+    }
+
     private async Task WriteSidecarAsync(string path, WorkspaceSidecar sidecar, CancellationToken cancellationToken)
     {
         EnsureContained(path, SidecarRoot());
@@ -220,7 +326,10 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         EnsureNoReparsePoints(SidecarRoot());
         var temporaryPath = path + ".tmp";
         await using (var stream = File.Create(temporaryPath))
+        {
             await JsonSerializer.SerializeAsync(stream, sidecar, json, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+        }
         File.Move(temporaryPath, path, true);
     }
 
@@ -244,6 +353,10 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !PathsEqual(sidecar.WorkspacePath, workspacePath)
             || !string.Equals(sidecar.Branch, branch, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(sidecar.LaunchNonce)
+            || sidecar.SchemaVersion != CurrentSchemaVersion
+            || !IsKnownRecoveryState(sidecar.SchedulerState)
+            || sidecar.LastCompletedAttempt < 0
+            || sidecar.NextAttempt < 1
             || !IsKnownLifecycleStatus(sidecar.LifecycleStatus)
             || !IsKnownOwnershipStatus(sidecar.ExecutionOwnershipStatus))
             throw new WorkspaceRecoveryException("Workspace sidecar state does not match the requested daemon-owned workspace.");
@@ -279,6 +392,16 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
     private string SidecarRoot() => Path.Combine(workspaceRoot, SidecarDirectoryName);
     private static Workspace ToWorkspace(WorkspaceSidecar sidecar)
         => new(sidecar.WorkspaceKey, sidecar.WorkspacePath, sidecar.Branch, sidecar.LifecycleStatus, sidecar.ExecutionOwnershipStatus, sidecar.LaunchNonce, sidecar.RepositoryIdentity);
+    private static OwnedWorkspaceRecord ToRecoveryRecord(WorkspaceSidecar sidecar)
+        => new(
+            ToWorkspace(sidecar),
+            sidecar.WorkItemId,
+            new WorkspaceRepository(sidecar.RepositoryRootPath, sidecar.RepositoryIdentity),
+            new WorkspaceRecoveryState(sidecar.SchedulerState, sidecar.LastCompletedAttempt, sidecar.NextAttempt, sidecar.RetryNotBeforeUtc, sidecar.RecoveryReason),
+            sidecar.ProcessId is { } processId && sidecar.ProcessStartedAtUtc is { } started && sidecar.FencingKind is { } fencing
+                ? new DurableExecutionIdentity(processId, started, sidecar.LaunchNonce, fencing, sidecar.ProcessGroupId, sidecar.ExecutionStartedAtUtc)
+                : null,
+            sidecar.SchemaVersion);
 
     private static void EnsureGitSuccess(GitCommandResult result, string operation)
     {
@@ -296,6 +419,10 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         ;
     private static bool IsKnownOwnershipStatus(string status) => status is WorkspaceExecutionOwnershipStates.None
         or WorkspaceExecutionOwnershipStates.Active or WorkspaceExecutionOwnershipStates.Quarantined;
+    private static bool IsKnownRecoveryState(string status) => status is WorkspaceRecoveryStates.Ready or WorkspaceRecoveryStates.Working
+        or WorkspaceRecoveryStates.Completed or WorkspaceRecoveryStates.Blocked or WorkspaceRecoveryStates.Cancelled
+        or WorkspaceRecoveryStates.RetryableFailure or WorkspaceRecoveryStates.Ineligible;
+    private static string? Bound(string? value) => value is null || value.Length <= 512 ? value : value[..512];
 
     private static void EnsureContained(string path, string root)
     {
@@ -344,7 +471,18 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         string ExecutionOwnershipStatus,
         string LaunchNonce,
         DateTimeOffset CreatedAtUtc,
-        DateTimeOffset UpdatedAtUtc);
+        DateTimeOffset UpdatedAtUtc,
+        int SchemaVersion = 0,
+        string SchedulerState = WorkspaceRecoveryStates.Ready,
+        int LastCompletedAttempt = 0,
+        int NextAttempt = 1,
+        DateTimeOffset? RetryNotBeforeUtc = null,
+        string? RecoveryReason = null,
+        int? ProcessId = null,
+        DateTimeOffset? ProcessStartedAtUtc = null,
+        int? ProcessGroupId = null,
+        string? FencingKind = null,
+        DateTimeOffset? ExecutionStartedAtUtc = null);
 }
 
 public class WorkspaceException(string message) : Exception(message);

@@ -7,7 +7,8 @@ namespace Automaton.AgentOrchestrator.Codex;
 public sealed class CodexAppServerClientFactory(
     IWorkspaceManager workspaceManager,
     OrchestratorOptions options,
-    IClock clock) : ICodexAppServerClientFactory
+    IClock clock,
+    IExecutionFence executionFence) : ICodexAppServerClientFactory
 {
     public ICodexAppServerClient Create(Workspace workspace, IReadOnlyDictionary<string, string>? childEnvironment = null)
     {
@@ -15,7 +16,7 @@ public sealed class CodexAppServerClientFactory(
             options.Codex.Command,
             workspace.Path,
             childEnvironment,
-            TimeSpan.FromSeconds(5)));
+            TimeSpan.FromSeconds(5)), executionFence);
         return new CodexAppServerClient(
             transport,
             new WorkspaceCodexExecutionOwnership(workspaceManager, workspace),
