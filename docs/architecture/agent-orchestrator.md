@@ -791,3 +791,8 @@ single-daemon, single-repository recovery contract is proven.
 - `src/Automaton.Api/Services/GitHubTokenService.cs`
 - `src/Automaton.Infrastructure/Entities/UserGitHubToken.cs`
 - `docs/architecture/action-schedules.md`
+## Stage 13: portable daemon and Linux production packaging
+
+The orchestrator application remains platform-neutral and continues to build and run directly on Windows. Linux/systemd is the first production packaging target, so Linux filesystem locations, account permissions, resource limits, shell tooling, and service-manager behavior stay in deployment assets rather than core orchestration contracts.
+
+Production runs as a dedicated unprivileged identity with immutable versioned releases, trusted configuration outside workspaces, durable daemon-owned state, an isolated Codex home, and separately named host-side provider credentials. Startup fails closed on missing prerequisites or overlapping trust boundaries. Graceful termination preserves Stage 6 ownership evidence before a bounded service-manager process-tree kill. Operator status includes build version/revision; packages exclude secrets and configuration and are checksum-verified before an atomic release-link switch. Rollback is explicit and must respect durable sidecar compatibility.

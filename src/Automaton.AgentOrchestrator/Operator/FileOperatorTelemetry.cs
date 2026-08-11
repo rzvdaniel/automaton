@@ -35,7 +35,7 @@ public sealed class FileOperatorTelemetry : IOperatorTelemetry
 
     public void Record(string eventType, string severity, string? workItemId = null, string? stage = null, string? role = null, string? message = null, IReadOnlyDictionary<string, string>? metadata = null)
     {
-        var entry = new OperatorEvent(Interlocked.Increment(ref sequence), clock.UtcNow, Bound(eventType, 100) ?? "unknown", NormalizeSeverity(severity), Bound(workItemId, 200), Bound(stage, 100), Bound(role, 100), Bound(message, MaximumMessageLength), Sanitize(metadata));
+        var entry = new OperatorEvent(Interlocked.Increment(ref sequence), clock.UtcNow, Bound(eventType, 100) ?? "unknown", NormalizeSeverity(severity), Bound(workItemId, 200), Bound(stage, 100), Bound(role, 100), SanitizeDiagnostic(message, MaximumMessageLength), Sanitize(metadata));
         lock (gate)
         {
             if (entry.WorkItemId is not null) latest[entry.WorkItemId] = entry;
@@ -84,6 +84,18 @@ public sealed class FileOperatorTelemetry : IOperatorTelemetry
             result[key] = IsSensitive(key) ? "[REDACTED]" : Bound(pair.Value, MaximumMetadataValueLength) ?? string.Empty;
         }
         return result;
+    }
+
+    internal static string? SanitizeDiagnostic(string? value, int maximum = MaximumMessageLength)
+    {
+        var bounded = Bound(value, maximum);
+        if (bounded is null) return null;
+        var sensitive = bounded.Contains("authorization", StringComparison.OrdinalIgnoreCase)
+            || bounded.Contains("bearer ", StringComparison.OrdinalIgnoreCase)
+            || bounded.Contains("token=", StringComparison.OrdinalIgnoreCase)
+            || bounded.Contains("password=", StringComparison.OrdinalIgnoreCase)
+            || (Uri.TryCreate(bounded, UriKind.Absolute, out var uri) && (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query)));
+        return sensitive ? "[REDACTED: sensitive diagnostic]" : bounded;
     }
 
     private static bool IsSensitive(string key) => key.Contains("token", StringComparison.OrdinalIgnoreCase) || key.Contains("secret", StringComparison.OrdinalIgnoreCase) || key.Contains("password", StringComparison.OrdinalIgnoreCase) || key.Contains("authorization", StringComparison.OrdinalIgnoreCase) || key.Contains("connection", StringComparison.OrdinalIgnoreCase) || key.Contains("key", StringComparison.OrdinalIgnoreCase);
