@@ -24,5 +24,5 @@ fi
 ARCHIVE="$OUTPUT/automaton-agent-orchestrator-$VERSION-linux-x64.tar.gz"
 EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$ROOT" show -s --format=%ct "$REVISION")}"
 tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner -C "$PUBLISH" -cf - . | gzip -n > "$ARCHIVE"
-sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+(cd "$(dirname "$ARCHIVE")" && sha256sum "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256")
 echo "$ARCHIVE"
