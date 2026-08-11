@@ -26,6 +26,7 @@ public sealed class InMemoryOrchestrator(
     public async Task PollAsync(CancellationToken cancellationToken)
     {
         if (IsStopping()) return;
+        await DispatchDueRetriesAsync(cancellationToken);
         var candidates = await tracker.DiscoverCandidatesAsync(cancellationToken);
         foreach (var candidate in candidates)
         {
@@ -110,19 +111,99 @@ public sealed class InMemoryOrchestrator(
             var retryState = new RunState(run.WorkItem.Id, RunStates.RetryQueued, run.Attempt, clock.UtcNow, clock.UtcNow.Add(delay), failureReason);
             history.Add(retryState);
             retryRuns[run.WorkItem.Id] = new RetryRun(run.WorkItem, run.Attempt + 1, retryState);
-            _ = RetryWhenDueAsync(run.WorkItem, run.Attempt + 1, delay);
+            _ = RetryWhenDueAsync(run.WorkItem.Id, delay);
         }
     }
 
-    private async Task RetryWhenDueAsync(WorkItem item, int attempt, TimeSpan delay)
+    private async Task RetryWhenDueAsync(string workItemId, TimeSpan delay)
     {
         try
         {
             await Task.Delay(delay, lifetimeCancellation.Token);
-            lock (gate) retryRuns.Remove(item.Id);
-            if (!IsStopping() && TryClaim(item, attempt)) StartClaim(item, attempt);
+            await TryDispatchDueRetryAsync(workItemId, lifetimeCancellation.Token);
         }
         catch (OperationCanceledException) { }
+    }
+
+    private async Task DispatchDueRetriesAsync(CancellationToken cancellationToken)
+    {
+        string[] dueRetryIds;
+        lock (gate)
+        {
+            dueRetryIds = retryRuns.Values
+                .Where(x => !x.IsDispatching && x.State.RetryAtUtc <= clock.UtcNow)
+                .Select(x => x.WorkItem.Id)
+                .ToArray();
+        }
+        foreach (var workItemId in dueRetryIds)
+            await TryDispatchDueRetryAsync(workItemId, cancellationToken);
+    }
+
+    private async Task TryDispatchDueRetryAsync(string workItemId, CancellationToken cancellationToken)
+    {
+        RetryRun retry;
+        lock (gate)
+        {
+            if (stopping
+                || !retryRuns.TryGetValue(workItemId, out var currentRetry)
+                || currentRetry.IsDispatching
+                || currentRetry.State.RetryAtUtc > clock.UtcNow) return;
+            retry = currentRetry with { IsDispatching = true };
+            retryRuns[workItemId] = retry;
+        }
+
+        WorkItem? refreshed;
+        try { refreshed = await tracker.GetByIdAsync(workItemId, cancellationToken); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { RestoreRetry(workItemId); return; }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Retry refresh failed for work item {WorkItemId}", workItemId);
+            RestoreRetry(workItemId);
+            return;
+        }
+
+        if (refreshed is null || !IsEligible(refreshed))
+        {
+            ReleaseRetry(workItemId, RunStates.Ineligible);
+            return;
+        }
+
+        if (TryClaimRetry(workItemId, refreshed, retry.NextAttempt)) StartClaim(refreshed, retry.NextAttempt);
+    }
+
+    private bool TryClaimRetry(string workItemId, WorkItem refreshed, int attempt)
+    {
+        lock (gate)
+        {
+            if (stopping || !retryRuns.ContainsKey(workItemId)) return false;
+            if (activeRuns.Count >= options.Agent.MaxConcurrentAgents)
+            {
+                var retry = retryRuns[workItemId];
+                retryRuns[workItemId] = retry with { IsDispatching = false };
+                return false;
+            }
+            retryRuns.Remove(workItemId);
+            var cancellation = new CancellationTokenSource();
+            activeRuns[workItemId] = new ActiveRun(refreshed, attempt, cancellation, Task.CompletedTask, new RunState(workItemId, RunStates.Claimed, attempt, clock.UtcNow));
+            return true;
+        }
+    }
+
+    private void RestoreRetry(string workItemId)
+    {
+        lock (gate)
+        {
+            if (retryRuns.TryGetValue(workItemId, out var retry)) retryRuns[workItemId] = retry with { IsDispatching = false };
+        }
+    }
+
+    private void ReleaseRetry(string workItemId, string state)
+    {
+        lock (gate)
+        {
+            if (!retryRuns.Remove(workItemId, out var retry)) return;
+            history.Add(new RunState(workItemId, state, retry.NextAttempt, clock.UtcNow));
+        }
     }
 
     private void Complete(string workItemId, string state, int attempt, string? failureReason)
@@ -153,5 +234,5 @@ public sealed class InMemoryOrchestrator(
     }
 
     private sealed record ActiveRun(WorkItem WorkItem, int Attempt, CancellationTokenSource Cancellation, Task Task, RunState State);
-    private sealed record RetryRun(WorkItem WorkItem, int NextAttempt, RunState State);
+    private sealed record RetryRun(WorkItem WorkItem, int NextAttempt, RunState State, bool IsDispatching = false);
 }

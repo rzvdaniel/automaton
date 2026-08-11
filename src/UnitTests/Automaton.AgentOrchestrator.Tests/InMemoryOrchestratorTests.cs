@@ -75,6 +75,65 @@ public sealed class InMemoryOrchestratorTests
     }
 
     [Test]
+    public async Task DueRetry_RemainsQueuedWhenCapacityIsFullThenRunsWithIncrementedAttempt()
+    {
+        var tracker = new FakeTracker(Work("retry"), Work("blocker"));
+        var executor = new RetryAndBlockingExecutor();
+        await using var orchestrator = Create(tracker, executor, maxConcurrent: 1, initialBackoffMilliseconds: 50);
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "retry" && x.State == RunStates.RetryQueued));
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => executor.Attempts.Any(x => x.WorkItem.Id == "blocker"));
+        await Task.Delay(75);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.WorkItemId == "retry" && x.State == RunStates.RetryQueued));
+            Assert.That(executor.Attempts.Count(x => x.WorkItem.Id == "retry"), Is.EqualTo(1));
+        });
+
+        executor.ReleaseBlocker();
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "blocker" && x.State == RunStates.Completed));
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => executor.Attempts.Any(x => x.WorkItem.Id == "retry" && x.Attempt == 2));
+    }
+
+    [Test]
+    public async Task DueRetry_ReleasesWhenProviderLifecycleBecomesTerminal()
+    {
+        var tracker = new FakeTracker(Work("one"));
+        var executor = new QueueExecutor(RunOutcome.RetryableFailure("temporary"));
+        await using var orchestrator = Create(tracker, executor, initialBackoffMilliseconds: 30);
+        tracker.PauseNextRefresh();
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued));
+        tracker.Upsert(Work("one", "closed"));
+        tracker.ReleaseRefresh();
+
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Ineligible));
+        Assert.That(executor.Attempts, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task DueRetry_ReleasesWhenRequiredLabelIsRemoved()
+    {
+        var tracker = new FakeTracker(Work("one"));
+        var executor = new QueueExecutor(RunOutcome.RetryableFailure("temporary"));
+        await using var orchestrator = Create(tracker, executor, initialBackoffMilliseconds: 30);
+        tracker.PauseNextRefresh();
+
+        await orchestrator.PollAsync(CancellationToken.None);
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.RetryQueued));
+        tracker.Upsert(Work("one", labels: []));
+        tracker.ReleaseRefresh();
+
+        await EventuallyAsync(() => orchestrator.Snapshot().Any(x => x.WorkItemId == "one" && x.State == RunStates.Ineligible));
+        Assert.That(executor.Attempts, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task StopAsync_CancelsActiveWorkAndPreventsFutureDispatch()
     {
         var executor = new BlockingExecutor();
@@ -118,8 +177,40 @@ public sealed class InMemoryOrchestratorTests
 
     private sealed class FakeTracker(params WorkItem[] workItems) : IWorkTracker
     {
-        public Task<IReadOnlyList<WorkItem>> DiscoverCandidatesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WorkItem>>(workItems);
-        public Task<WorkItem?> GetByIdAsync(string workItemId, CancellationToken cancellationToken) => Task.FromResult(workItems.SingleOrDefault(x => x.Id == workItemId));
+        private readonly object gate = new();
+        private readonly Dictionary<string, WorkItem> workItems = workItems.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        private TaskCompletionSource? refreshGate;
+        public Task<IReadOnlyList<WorkItem>> DiscoverCandidatesAsync(CancellationToken cancellationToken)
+        {
+            lock (gate) return Task.FromResult<IReadOnlyList<WorkItem>>([.. workItems.Values]);
+        }
+
+        public async Task<WorkItem?> GetByIdAsync(string workItemId, CancellationToken cancellationToken)
+        {
+            Task waitForRefresh;
+            lock (gate)
+            {
+                waitForRefresh = refreshGate?.Task ?? Task.CompletedTask;
+                refreshGate = null;
+            }
+            await waitForRefresh.WaitAsync(cancellationToken);
+            lock (gate) return workItems.GetValueOrDefault(workItemId);
+        }
+
+        public void Upsert(WorkItem workItem)
+        {
+            lock (gate) workItems[workItem.Id] = workItem;
+        }
+
+        public void PauseNextRefresh()
+        {
+            lock (gate) refreshGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void ReleaseRefresh()
+        {
+            lock (gate) refreshGate?.TrySetResult();
+        }
     }
 
     private sealed class QueueExecutor(params RunOutcome[] outcomes) : IWorkExecutor
@@ -147,5 +238,21 @@ public sealed class InMemoryOrchestratorTests
         }
 
         public void Release(RunOutcome outcome) => release.TrySetResult(outcome);
+    }
+
+    private sealed class RetryAndBlockingExecutor : IWorkExecutor
+    {
+        private readonly TaskCompletionSource<RunOutcome> blockerRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public List<RunAttempt> Attempts { get; } = [];
+
+        public Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
+        {
+            Attempts.Add(attempt);
+            if (attempt.WorkItem.Id == "retry")
+                return Task.FromResult(attempt.Attempt == 1 ? RunOutcome.RetryableFailure("temporary") : RunOutcome.Success());
+            return blockerRelease.Task.WaitAsync(cancellationToken);
+        }
+
+        public void ReleaseBlocker() => blockerRelease.TrySetResult(RunOutcome.Success());
     }
 }

@@ -6,6 +6,7 @@ namespace Automaton.AgentOrchestrator.Domain;
 /// </summary>
 public static class RunStates
 {
+    public const string Ineligible = "ineligible";
     public const string Eligible = "eligible";
     public const string Claimed = "claimed";
     public const string Working = "working";
