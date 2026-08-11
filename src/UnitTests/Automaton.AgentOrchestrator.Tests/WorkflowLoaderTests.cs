@@ -125,6 +125,23 @@ public sealed class WorkflowLoaderTests
         });
     }
 
+    [Test]
+    public async Task LoadAsync_RequiresWorkspaceRootForIsolation()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            ---
+            Prompt
+            """);
+
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(async () =>
+            await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+
+        Assert.That(exception!.Message, Is.EqualTo("workspace.root is required for workspace isolation."));
+    }
+
     private sealed class TemporaryWorkflow : IAsyncDisposable
     {
         private TemporaryWorkflow(string directory, string path) { Directory = directory; Path = path; }

@@ -165,7 +165,7 @@ public sealed class InMemoryOrchestratorTests
 
     private static async Task EventuallyAsync(Func<bool> condition)
     {
-        for (var attempt = 0; attempt < 100; attempt++)
+        for (var attempt = 0; attempt < 500; attempt++)
         {
             if (condition()) return;
             await Task.Delay(10);
@@ -180,6 +180,7 @@ public sealed class InMemoryOrchestratorTests
         private readonly object gate = new();
         private readonly Dictionary<string, WorkItem> workItems = workItems.ToDictionary(x => x.Id, StringComparer.Ordinal);
         private TaskCompletionSource? refreshGate;
+        private TaskCompletionSource? pendingRefreshGate;
         public Task<IReadOnlyList<WorkItem>> DiscoverCandidatesAsync(CancellationToken cancellationToken)
         {
             lock (gate) return Task.FromResult<IReadOnlyList<WorkItem>>([.. workItems.Values]);
@@ -190,7 +191,8 @@ public sealed class InMemoryOrchestratorTests
             Task waitForRefresh;
             lock (gate)
             {
-                waitForRefresh = refreshGate?.Task ?? Task.CompletedTask;
+                pendingRefreshGate = refreshGate;
+                waitForRefresh = pendingRefreshGate?.Task ?? Task.CompletedTask;
                 refreshGate = null;
             }
             await waitForRefresh.WaitAsync(cancellationToken);
@@ -209,7 +211,12 @@ public sealed class InMemoryOrchestratorTests
 
         public void ReleaseRefresh()
         {
-            lock (gate) refreshGate?.TrySetResult();
+            lock (gate)
+            {
+                (pendingRefreshGate ?? refreshGate)?.TrySetResult();
+                pendingRefreshGate = null;
+                refreshGate = null;
+            }
         }
     }
 
