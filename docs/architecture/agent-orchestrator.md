@@ -585,8 +585,10 @@ though GitHub implements all three concerns initially.
 
 Configured required check names are matched case-insensitively against the
 normalized union of Check Runs and legacy commit-status contexts for the exact
-published SHA. With no configured names, every signal in that union participates
-in the result. Duplicate names aggregate conservatively: any failure wins, then
+published SHA. Because GitHub returns legacy status history newest-first, only
+the first/latest exact-SHA record for each case-insensitive legacy context enters
+that union. With no configured names, every current signal in the union
+participates in the result. Duplicate names aggregate conservatively: any failure wins, then
 pending, and only all-successful matches pass; unknown terminal states are
 indeterminate. Missing required signals and an empty observed union remain
 pending, preventing either a failing legacy status or the post-push

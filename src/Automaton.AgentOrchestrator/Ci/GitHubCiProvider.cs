@@ -70,6 +70,7 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
     private async Task<IReadOnlyList<CommitStatus>> GetCommitStatusesAsync(string headSha, CancellationToken cancellationToken)
     {
         var statuses = new List<CommitStatus>();
+        var observedContexts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Uri? next = new(options.ApiBaseUri, $"repos/{Encode(options.Owner)}/{Encode(options.Repository)}/commits/{headSha}/statuses?per_page=100");
         for (var pageNumber = 0; next is not null; pageNumber++)
         {
@@ -79,7 +80,12 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
             {
                 var body = await DeserializeAsync<CommitStatus[]>(page.Response, cancellationToken)
                     ?? throw new CiProviderException("GitHub commit-status response was malformed.");
-                statuses.AddRange(body);
+                foreach (var status in body)
+                {
+                    if (string.Equals(status.Sha, headSha, StringComparison.OrdinalIgnoreCase)
+                        && observedContexts.Add(status.Context ?? string.Empty))
+                        statuses.Add(status);
+                }
                 next = ParseNext(page.Response);
             }
         }

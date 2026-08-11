@@ -66,11 +66,12 @@ public sealed class GitHubCiProviderTests
         Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(expected)); Assert.That(snapshot.Checks, Has.Count.EqualTo(2)); });
     }
 
-    [TestCase("failure", CiStatuses.Failed)]
-    [TestCase("pending", CiStatuses.Pending)]
-    public async Task GetAsync_DuplicateNameUsesConservativeAggregate(string legacyState, string expected)
+    [TestCase("success", "failure", CiStatuses.Failed)]
+    [TestCase("success", "pending", CiStatuses.Pending)]
+    [TestCase("failure", "success", CiStatuses.Failed)]
+    public async Task GetAsync_DuplicateNameUsesConservativeAggregate(string checkConclusion, string legacyState, string expected)
     {
-        var handler = new StubHandler(Json(Pull()), Json(Checks(Check("build", "completed", "success", Sha))), Json(Statuses(Status("BUILD", legacyState, Sha))));
+        var handler = new StubHandler(Json(Pull()), Json(Checks(Check("build", "completed", checkConclusion, Sha))), Json(Statuses(Status("BUILD", legacyState, Sha))));
         var snapshot = await Create(handler, ["build"]).GetAsync(Target, CancellationToken.None);
         Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(expected)); Assert.That(snapshot.Checks, Has.Count.EqualTo(2)); });
     }
@@ -97,6 +98,54 @@ public sealed class GitHubCiProviderTests
         var handler = new StubHandler(Json(Pull()), Json(Checks()), Json(Statuses(Status("old", "failure", new string('b', 40)))));
         var snapshot = await Create(handler, []).GetAsync(Target, CancellationToken.None);
         Assert.That(snapshot.Status, Is.EqualTo(CiStatuses.Pending));
+    }
+
+    [TestCase("success", "failure", CiStatuses.Passed)]
+    [TestCase("failure", "success", CiStatuses.Failed)]
+    [TestCase("success", "pending", CiStatuses.Passed)]
+    public async Task GetAsync_UsesNewestLegacyStatusForContext(string latestState, string olderState, string expected)
+    {
+        var handler = new StubHandler(
+            Json(Pull()),
+            Json(Checks()),
+            Json(Statuses(Status("security-scan", latestState, Sha), Status("security-scan", olderState, Sha))));
+        var snapshot = await Create(handler, []).GetAsync(Target, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(expected)); Assert.That(snapshot.Checks, Has.Count.EqualTo(1)); });
+    }
+
+    [Test]
+    public async Task GetAsync_CollapsesLegacyHistoryCaseInsensitivelyForRequiredCheck()
+    {
+        var handler = new StubHandler(
+            Json(Pull()),
+            Json(Checks()),
+            Json(Statuses(Status("Security-Scan", "success", Sha), Status("SECURITY-SCAN", "failure", Sha))));
+        var snapshot = await Create(handler, ["security-scan"]).GetAsync(Target, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(CiStatuses.Passed)); Assert.That(snapshot.Checks, Has.Count.EqualTo(1)); });
+    }
+
+    [Test]
+    public async Task GetAsync_NewestLegacyStatusOnFirstPageWinsAcrossPagination()
+    {
+        var first = Json(Statuses(Status("security-scan", "success", Sha)), "<https://api.github.test/repos/acme/widgets/commits/x/statuses?page=2>; rel=\"next\"");
+        var handler = new StubHandler(Json(Pull()), Json(Checks()), first, Json(Statuses(Status("SECURITY-SCAN", "failure", Sha))));
+        var snapshot = await Create(handler, []).GetAsync(Target, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(CiStatuses.Passed)); Assert.That(snapshot.Checks, Has.Count.EqualTo(1)); });
+    }
+
+    [Test]
+    public async Task GetAsync_EmptyRequiredListUsesOnlyLatestLegacyContexts()
+    {
+        var handler = new StubHandler(
+            Json(Pull()),
+            Json(Checks()),
+            Json(Statuses(
+                Status("build", "success", Sha),
+                Status("build", "failure", Sha),
+                Status("security-scan", "success", Sha),
+                Status("security-scan", "pending", Sha))));
+        var snapshot = await Create(handler, []).GetAsync(Target, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(snapshot.Status, Is.EqualTo(CiStatuses.Passed)); Assert.That(snapshot.Checks, Has.Count.EqualTo(2)); });
     }
 
     [Test]
