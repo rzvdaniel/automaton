@@ -577,14 +577,20 @@ workspace. Those remain later-stage responsibilities.
 Stage 10 observes CI through the provider-neutral `ICiProvider` contract using
 `CiTarget(repository identity, PR number, head branch, exact head SHA)` and
 normalized `CiSnapshot`/`CiCheck` values. Orchestration reasons only about
-`pending`, `passed`, `failed`, and `indeterminate`; GitHub check-run payloads,
-conclusions, pagination, and opaque IDs remain inside `GitHubCiProvider`. The CI
+`pending`, `passed`, `failed`, and `indeterminate`; GitHub Checks and legacy
+commit-status payloads, conclusions/states, pagination, and opaque IDs remain
+inside `GitHubCiProvider`. The CI
 provider is configured independently from `IWorkTracker` and publication even
 though GitHub implements all three concerns initially.
 
-Configured required check names are matched on the exact published SHA. Missing
-required checks and an empty observed check set remain pending, preventing the
-post-push workflow-creation race from becoming false green. Pending checks do
+Configured required check names are matched case-insensitively against the
+normalized union of Check Runs and legacy commit-status contexts for the exact
+published SHA. With no configured names, every signal in that union participates
+in the result. Duplicate names aggregate conservatively: any failure wins, then
+pending, and only all-successful matches pass; unknown terminal states are
+indeterminate. Missing required signals and an empty observed union remain
+pending, preventing either a failing legacy status or the post-push
+workflow-creation race from becoming false green. Pending checks do
 not start agents. Polling defaults to 30 seconds, has a configured total timeout,
 and is cancellation-aware. Provider 429/5xx/network failures retry observation;
 authentication, malformed state, PR/head mismatch, timeout, and indeterminate

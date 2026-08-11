@@ -19,6 +19,7 @@ public sealed class CiProviderException(string message, bool isRetryable = false
 public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions options) : ICiProvider
 {
     private const int MaximumResponseBytes = 256 * 1024;
+    private const int MaximumPages = 100;
     private static readonly Regex NextLink = new("<(?<url>[^>]+)>;\\s*rel=\"next\"", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -36,24 +37,53 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
             || !string.Equals(pull.Base?.Repository?.FullName, target.RepositoryIdentity, StringComparison.OrdinalIgnoreCase))
             throw new CiProviderException("GitHub pull-request head does not match the exact CI target.");
 
-        var all = new List<CheckRun>();
-        Uri? next = new(options.ApiBaseUri, $"repos/{Encode(options.Owner)}/{Encode(options.Repository)}/commits/{target.HeadSha}/check-runs?per_page=100");
-        while (next is not null)
-        {
-            var page = await GetResponseAsync(next, cancellationToken);
-            using (page.Response)
-            {
-                var body = await DeserializeAsync<ChecksResponse>(page.Response, cancellationToken);
-                all.AddRange(body?.CheckRuns ?? []);
-                next = ParseNext(page.Response);
-            }
-        }
-
-        var normalized = all.Where(check => string.Equals(check.HeadSha, target.HeadSha, StringComparison.OrdinalIgnoreCase))
-            .Select(Normalize).ToArray();
+        var checkRuns = await GetCheckRunsAsync(target.HeadSha, cancellationToken);
+        var commitStatuses = await GetCommitStatusesAsync(target.HeadSha, cancellationToken);
+        var normalized = checkRuns.Where(check => string.Equals(check.HeadSha, target.HeadSha, StringComparison.OrdinalIgnoreCase))
+            .Select(Normalize)
+            .Concat(commitStatuses.Where(status => string.Equals(status.Sha, target.HeadSha, StringComparison.OrdinalIgnoreCase)).Select(Normalize))
+            .ToArray();
         var selected = SelectRequired(normalized);
         var status = Aggregate(selected);
         return new(target.HeadSha.ToLowerInvariant(), status, selected);
+    }
+
+    private async Task<IReadOnlyList<CheckRun>> GetCheckRunsAsync(string headSha, CancellationToken cancellationToken)
+    {
+        var checks = new List<CheckRun>();
+        Uri? next = new(options.ApiBaseUri, $"repos/{Encode(options.Owner)}/{Encode(options.Repository)}/commits/{headSha}/check-runs?per_page=100");
+        for (var pageNumber = 0; next is not null; pageNumber++)
+        {
+            if (pageNumber >= MaximumPages) throw new CiProviderException("GitHub CI pagination exceeded the allowed page count.");
+            var page = await GetResponseAsync(next, cancellationToken);
+            using (page.Response)
+            {
+                var body = await DeserializeAsync<ChecksResponse>(page.Response, cancellationToken)
+                    ?? throw new CiProviderException("GitHub check-runs response was malformed.");
+                checks.AddRange(body.CheckRuns ?? throw new CiProviderException("GitHub check-runs response was malformed."));
+                next = ParseNext(page.Response);
+            }
+        }
+        return checks;
+    }
+
+    private async Task<IReadOnlyList<CommitStatus>> GetCommitStatusesAsync(string headSha, CancellationToken cancellationToken)
+    {
+        var statuses = new List<CommitStatus>();
+        Uri? next = new(options.ApiBaseUri, $"repos/{Encode(options.Owner)}/{Encode(options.Repository)}/commits/{headSha}/statuses?per_page=100");
+        for (var pageNumber = 0; next is not null; pageNumber++)
+        {
+            if (pageNumber >= MaximumPages) throw new CiProviderException("GitHub CI pagination exceeded the allowed page count.");
+            var page = await GetResponseAsync(next, cancellationToken);
+            using (page.Response)
+            {
+                var body = await DeserializeAsync<CommitStatus[]>(page.Response, cancellationToken)
+                    ?? throw new CiProviderException("GitHub commit-status response was malformed.");
+                statuses.AddRange(body);
+                next = ParseNext(page.Response);
+            }
+        }
+        return statuses;
     }
 
     private IReadOnlyList<CiCheck> SelectRequired(IReadOnlyList<CiCheck> checks)
@@ -70,9 +100,9 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
 
     private static string Aggregate(IReadOnlyList<CiCheck> checks)
     {
-        if (checks.Any(check => check.Status == CiStatuses.Indeterminate)) return CiStatuses.Indeterminate;
         if (checks.Any(check => check.Status == CiStatuses.Failed)) return CiStatuses.Failed;
         if (checks.Any(check => check.Status == CiStatuses.Pending)) return CiStatuses.Pending;
+        if (checks.Any(check => check.Status == CiStatuses.Indeterminate)) return CiStatuses.Indeterminate;
         return checks.Count > 0 && checks.All(check => check.Status == CiStatuses.Passed) ? CiStatuses.Passed : CiStatuses.Indeterminate;
     }
 
@@ -86,6 +116,22 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
             : CiStatuses.Indeterminate;
         var summary = Bound(check.Output?.Summary ?? check.Output?.Title, 2000);
         return new(Bound(check.Name, 200) ?? "unnamed-check", status, conclusion, Bound(check.DetailsUrl, 2048), summary, check.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static CiCheck Normalize(CommitStatus commitStatus)
+    {
+        var providerStatus = commitStatus.State?.ToLowerInvariant();
+        var status = providerStatus is "success" ? CiStatuses.Passed
+            : providerStatus is "pending" ? CiStatuses.Pending
+            : providerStatus is "failure" or "error" ? CiStatuses.Failed
+            : CiStatuses.Indeterminate;
+        return new(
+            Bound(commitStatus.Context, 200) ?? "unnamed-status",
+            status,
+            providerStatus,
+            Bound(commitStatus.TargetUrl, 2048),
+            Bound(commitStatus.Description, 2000),
+            commitStatus.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private async Task<T?> GetJsonAsync<T>(Uri uri, CancellationToken cancellationToken)
@@ -152,4 +198,5 @@ public sealed class GitHubCiProvider(HttpClient client, GitHubCiProviderOptions 
     private sealed class ChecksResponse { [JsonPropertyName("check_runs")] public CheckRun[]? CheckRuns { get; init; } }
     private sealed class CheckRun { public long Id { get; init; } public string? Name { get; init; } public string? Status { get; init; } public string? Conclusion { get; init; } [JsonPropertyName("head_sha")] public string? HeadSha { get; init; } [JsonPropertyName("details_url")] public string? DetailsUrl { get; init; } public CheckOutput? Output { get; init; } }
     private sealed class CheckOutput { public string? Title { get; init; } public string? Summary { get; init; } }
+    private sealed class CommitStatus { public long Id { get; init; } public string? State { get; init; } public string? Context { get; init; } public string? Description { get; init; } [JsonPropertyName("target_url")] public string? TargetUrl { get; init; } public string? Sha { get; init; } }
 }
