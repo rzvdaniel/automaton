@@ -13,6 +13,7 @@ public sealed class WorkflowLoaderTests
         Environment.SetEnvironmentVariable(variableName, "test-value");
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", "publication-value");
         Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", "ci-value");
+        Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", "feedback-value");
         try
         {
             await using var workflow = await TemporaryWorkflow.CreateAsync("""
@@ -49,6 +50,14 @@ public sealed class WorkflowLoaderTests
                   poll_interval_ms: 25
                   timeout_ms: 5000
                   max_remediation_rounds: 2
+                review_feedback:
+                  enabled: true
+                  kind: github
+                  github_token: $AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN
+                  github_api_base_url: https://api.github.example.test/
+                  automation_login: automaton-bot
+                  poll_interval_ms: 75
+                  max_remediation_rounds: 4
                 workspace:
                   root: workspaces
                 agent:
@@ -96,6 +105,10 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Ci.PollIntervalMilliseconds, Is.EqualTo(25));
                 Assert.That(definition.Options.Ci.TimeoutMilliseconds, Is.EqualTo(5000));
                 Assert.That(definition.Options.Ci.MaxRemediationRounds, Is.EqualTo(2));
+                Assert.That(definition.Options.ReviewFeedback.GitHubToken, Is.EqualTo("feedback-value"));
+                Assert.That(definition.Options.ReviewFeedback.AutomationLogin, Is.EqualTo("automaton-bot"));
+                Assert.That(definition.Options.ReviewFeedback.PollIntervalMilliseconds, Is.EqualTo(75));
+                Assert.That(definition.Options.ReviewFeedback.MaxRemediationRounds, Is.EqualTo(4));
                 Assert.That(definition.Options.Workspace.Root, Is.EqualTo(Path.Combine(workflow.Directory, "workspaces")));
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
                 Assert.That(definition.Options.Agent.ManagerMaxTurns, Is.EqualTo(2));
@@ -106,7 +119,7 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
             });
         }
-        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); }
+        finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", null); }
     }
 
     [Test]

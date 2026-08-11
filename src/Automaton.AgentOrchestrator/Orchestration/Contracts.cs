@@ -25,6 +25,23 @@ public interface ICiRemediator
 
 public interface ICiPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }
 
+public interface IReviewFeedbackProvider
+{
+    Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken cancellationToken);
+}
+
+public interface IReviewFeedbackShepherd
+{
+    Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem workItem, CancellationToken cancellationToken);
+}
+
+public interface IReviewFeedbackRemediator
+{
+    Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken cancellationToken);
+}
+
+public interface IReviewFeedbackPollDelay { Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken); }
+
 public interface IWorkExecutor
 {
     Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken);
@@ -70,6 +87,7 @@ public interface IWorkspaceManager
     Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
     Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken);
     Task<Workspace> UpdateCiStateAsync(Workspace workspace, CiRecoveryState ciState, CancellationToken cancellationToken) => Task.FromResult(workspace);
+    Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState feedbackState, CancellationToken cancellationToken) => Task.FromResult(workspace);
     Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }

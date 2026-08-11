@@ -5,6 +5,7 @@ using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Ci;
+using Automaton.AgentOrchestrator.ReviewFeedback;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -14,7 +15,8 @@ public sealed class RoleBasedWorkExecutor(
     ICodexAppServerClientFactory clientFactory,
     IWorkPublisher publisher,
     WorkflowDefinition workflow,
-    ICiShepherd? ciShepherd = null) : IWorkExecutor
+    ICiShepherd? ciShepherd = null,
+    IReviewFeedbackShepherd? reviewFeedbackShepherd = null) : IWorkExecutor
 {
     private const int MaximumResultDetailLength = 512;
 
@@ -40,6 +42,7 @@ public sealed class RoleBasedWorkExecutor(
         var ambiguous = false;
         var cancelled = false;
         var disposedForCi = false;
+        var publicationStarted = false;
         try
         {
             await client.InitializeAsync(cancellationToken);
@@ -84,6 +87,7 @@ public sealed class RoleBasedWorkExecutor(
             }
             if (approvedReview is null) throw new RoleBlockedException("Reviewer approval was not established for publication.");
             var publication = await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
+            publicationStarted = true;
             await client.DisposeAsync();
             disposedForCi = true;
             var ci = ciShepherd is null
@@ -91,6 +95,14 @@ public sealed class RoleBasedWorkExecutor(
                 : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
             if (!ci.Succeeded)
                 outcome = ci.IsRetryable ? RunOutcome.RetryableFailure(Bounded(ci.FailureReason ?? "CI shepherding failed.")) : RunOutcome.PermanentFailure(Bounded(ci.FailureReason ?? "CI shepherding failed."));
+            else if (reviewFeedbackShepherd is not null)
+            {
+                var reviewedHead = ci.HeadSha ?? publication.CommitSha;
+                var feedback = await reviewFeedbackShepherd.ShepherdAsync(
+                    new(publication.Repository, publication.PullRequestNumber, publication.Branch, reviewedHead, PublicationRevision: 1 + ci.RemediationRound),
+                    client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
+                if (!feedback.Succeeded) outcome = RunOutcome.PermanentFailure(Bounded(feedback.FailureReason ?? "Human review feedback remediation failed."));
+            }
         }
         catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
@@ -101,6 +113,10 @@ public sealed class RoleBasedWorkExecutor(
                 : RunOutcome.PermanentFailure(Bounded(exception.Message));
         }
         catch (CiProviderException exception)
+        {
+            outcome = exception.IsRetryable ? RunOutcome.RetryableFailure(Bounded(exception.Message)) : RunOutcome.PermanentFailure(Bounded(exception.Message));
+        }
+        catch (ReviewFeedbackProviderException exception)
         {
             outcome = exception.IsRetryable ? RunOutcome.RetryableFailure(Bounded(exception.Message)) : RunOutcome.PermanentFailure(Bounded(exception.Message));
         }
@@ -130,7 +146,9 @@ public sealed class RoleBasedWorkExecutor(
         var currentWorkspace = client.CurrentWorkspace ?? workspace;
         if (ambiguous || currentWorkspace.ExecutionOwnershipStatus == WorkspaceExecutionOwnershipStates.Quarantined) return outcome;
 
-        var recovery = cancelled
+        var recovery = cancelled && publicationStarted
+            ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt, Reason: "daemon stopped during post-publication reconciliation")
+            : cancelled
             ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Cancelled, attempt.Attempt, attempt.Attempt + 1)
             : outcome.Succeeded
                 ? new WorkspaceRecoveryState(WorkspaceRecoveryStates.Completed, attempt.Attempt, attempt.Attempt + 1)

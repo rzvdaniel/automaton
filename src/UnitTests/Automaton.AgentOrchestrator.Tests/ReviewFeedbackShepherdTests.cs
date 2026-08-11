@@ -1,0 +1,69 @@
+using Automaton.AgentOrchestrator.Domain;
+using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.ReviewFeedback;
+using Automaton.AgentOrchestrator.Workflows;
+using NUnit.Framework;
+
+namespace Automaton.AgentOrchestrator.Tests;
+
+[TestFixture]
+public sealed class ReviewFeedbackShepherdTests
+{
+    private static readonly string Sha1 = new('a', 40);
+    private static readonly string Sha2 = new('b', 40);
+    private static readonly ReviewFeedbackTarget Target = new("acme/widgets", 42, "automaton/work/7", Sha1);
+
+    [Test]
+    public async Task AwaitingHumanDoesNotLaunchAgentThenApprovalCompletes()
+    {
+        var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.AwaitingHuman), Snapshot(Sha1, ReviewFeedbackStatuses.Approved)]);
+        var result = await fixture.Shepherd.ShepherdAsync(Target, Workspace(), Work(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Succeeded, Is.True); Assert.That(fixture.Remediator.Requests, Is.Empty); Assert.That(fixture.Delay.Count, Is.EqualTo(1)); });
+    }
+
+    [Test]
+    public async Task ActionableFeedbackRequiresReviewPublicationCiAndNewHeadApproval()
+    {
+        var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.Actionable), Snapshot(Sha2, ReviewFeedbackStatuses.Approved)], [Publication(Sha2)]);
+        var result = await fixture.Shepherd.ShepherdAsync(Target, Workspace(), Work(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Succeeded, Is.True); Assert.That(result.HeadSha, Is.EqualTo(Sha2)); Assert.That(fixture.Remediator.Requests, Has.Count.EqualTo(1)); Assert.That(fixture.Ci.Targets.Single().HeadSha, Is.EqualTo(Sha2)); });
+    }
+
+    [Test]
+    public async Task RoundLimitFailsClosedWithoutAnotherAgent()
+    {
+        var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.Actionable)], maxRounds: 0);
+        var result = await fixture.Shepherd.ShepherdAsync(Target, Workspace(), Work(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Succeeded, Is.False); Assert.That(fixture.Remediator.Requests, Is.Empty); });
+    }
+
+    [Test]
+    public async Task RepublishedRevisionMustPassCiBeforeNextFeedbackObservation()
+    {
+        var fixture = Create([Snapshot(Sha1, ReviewFeedbackStatuses.Actionable)], [Publication(Sha2)], ciSuccess: false);
+        var result = await fixture.Shepherd.ShepherdAsync(Target, Workspace(), Work(), CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Succeeded, Is.False); Assert.That(fixture.Provider.Targets, Has.Count.EqualTo(1)); });
+    }
+
+    private static Fixture Create(IReadOnlyList<ReviewFeedbackSnapshot> snapshots, IReadOnlyList<PublicationResult>? publications = null, int maxRounds = 2, bool ciSuccess = true)
+    {
+        var provider = new FakeProvider(snapshots); var remediator = new FakeRemediator(publications ?? []); var ci = new FakeCi(ciSuccess); var delay = new FakeDelay();
+        var options = new OrchestratorOptions { ReviewFeedback = new ReviewFeedbackOptions { Enabled = true, PollIntervalMilliseconds = 1, MaxRemediationRounds = maxRounds } };
+        return new(new(provider, remediator, ci, new FakeWorkspaces(), new FakeClock(), delay, options), provider, remediator, ci, delay);
+    }
+    private static ReviewFeedbackSnapshot Snapshot(string sha, string status) => new(sha, status, status == ReviewFeedbackStatuses.Actionable ? [new("1", ReviewFeedbackKinds.ReviewComment, "alice", "fix")] : []);
+    private static PublicationResult Publication(string sha) => new("acme/widgets", "automaton/work/7", sha, 42, "url", true);
+    private static Workspace Workspace() => new("key", "C:/workspace", "automaton/work/7", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "nonce", "acme/widgets");
+    private static WorkItem Work() => new("id", "#7", "Fix", null, "open", ["agent:ready"]);
+    private sealed record Fixture(ReviewFeedbackShepherd Shepherd, FakeProvider Provider, FakeRemediator Remediator, FakeCi Ci, FakeDelay Delay);
+    private sealed class FakeProvider(IEnumerable<ReviewFeedbackSnapshot> values) : IReviewFeedbackProvider { private readonly Queue<ReviewFeedbackSnapshot> values = new(values); public List<ReviewFeedbackTarget> Targets { get; } = []; public Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken token) { Targets.Add(target); return Task.FromResult(values.Dequeue()); } }
+    private sealed class FakeRemediator(IEnumerable<PublicationResult> values) : IReviewFeedbackRemediator { private readonly Queue<PublicationResult> values = new(values); public List<ReviewFeedbackRemediationRequest> Requests { get; } = []; public Task<PublicationResult> RemediateAsync(ReviewFeedbackRemediationRequest request, CancellationToken token) { Requests.Add(request); return Task.FromResult(values.Dequeue()); } }
+    private sealed class FakeCi(bool success) : ICiShepherd { public List<CiTarget> Targets { get; } = []; public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(success ? CiShepherdResult.Success(target.HeadSha, 0) : CiShepherdResult.Blocked("failed", target.HeadSha, 0)); } }
+    private sealed class FakeDelay : IReviewFeedbackPollDelay { public int Count { get; private set; } public Task DelayAsync(TimeSpan delay, CancellationToken token) { Count++; return Task.CompletedTask; } }
+    private sealed class FakeClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-01-01T00:00:00Z"); }
+    private sealed class FakeWorkspaces : IWorkspaceManager
+    {
+        public Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState state, CancellationToken token) => Task.FromResult(workspace);
+        public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string state, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string state, string nonce, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState state, CancellationToken token) => throw new NotSupportedException(); public Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState state, CancellationToken token) => throw new NotSupportedException(); public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken token) => throw new NotSupportedException(); public Task CleanupTerminalAsync(Workspace workspace, CancellationToken token) => throw new NotSupportedException();
+    }
+}

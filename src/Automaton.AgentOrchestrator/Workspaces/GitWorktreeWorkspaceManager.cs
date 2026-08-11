@@ -36,7 +36,7 @@ public sealed class ProcessGitCommandRunner : IGitCommandRunner
 
 public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
     private const string SidecarDirectoryName = ".automaton-agent-orchestrator";
     private readonly string workspaceRoot;
     private readonly IGitCommandRunner git;
@@ -215,6 +215,10 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             CiRemediationRound = beginsRevision ? 0 : sidecar.CiRemediationRound,
             CiObservedAtUtc = beginsRevision ? null : sidecar.CiObservedAtUtc,
             CiFailureReason = beginsRevision ? null : sidecar.CiFailureReason,
+            ReviewFeedbackStatus = beginsRevision ? null : sidecar.ReviewFeedbackStatus,
+            ReviewFeedbackHeadSha = beginsRevision ? null : sidecar.ReviewFeedbackHeadSha,
+            ReviewFeedbackRemediationRound = beginsRevision ? 0 : sidecar.ReviewFeedbackRemediationRound,
+            ReviewFeedbackObservedAtUtc = beginsRevision ? null : sidecar.ReviewFeedbackObservedAtUtc,
             UpdatedAtUtc = clock.UtcNow
         };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
@@ -235,6 +239,26 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !string.Equals(sidecar.PublicationCommitSha, ciState.HeadSha, StringComparison.OrdinalIgnoreCase))
             throw new WorkspaceRecoveryException("CI state must bind to the exact durable publication head.");
         var updated = sidecar with { CiStatus = ciState.Status, CiHeadSha = ciState.HeadSha, CiRemediationRound = ciState.RemediationRound, CiObservedAtUtc = ciState.LastObservedAtUtc, CiFailureReason = Bound(ciState.FailureReason), UpdatedAtUtc = clock.UtcNow };
+        await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
+    public async Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState feedbackState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(feedbackState);
+        if (feedbackState.Status is not (ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable or ReviewFeedbackStatuses.Approved)
+            || !IsSha(feedbackState.HeadSha) || feedbackState.RemediationRound < 0)
+            throw new WorkspaceRecoveryException("Workspace review feedback recovery state is invalid.");
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        if (sidecar.PublicationState != PublicationStates.PullRequestCreated
+            || !string.Equals(sidecar.PublicationCommitSha, feedbackState.HeadSha, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(sidecar.CiStatus, CiStatuses.Passed, StringComparison.Ordinal)
+            || !string.Equals(sidecar.CiHeadSha, feedbackState.HeadSha, StringComparison.OrdinalIgnoreCase))
+            throw new WorkspaceRecoveryException("Review feedback state must bind to an exact durable publication head that passed CI.");
+        var updated = sidecar with { ReviewFeedbackStatus = feedbackState.Status, ReviewFeedbackHeadSha = feedbackState.HeadSha, ReviewFeedbackRemediationRound = feedbackState.RemediationRound, ReviewFeedbackObservedAtUtc = feedbackState.LastObservedAtUtc, UpdatedAtUtc = clock.UtcNow };
         await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
         return ToWorkspace(updated);
     }
@@ -361,9 +385,9 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (sidecar.SchemaVersion > CurrentSchemaVersion)
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is newer than this daemon supports.");
         if (sidecar.SchemaVersion == CurrentSchemaVersion) return sidecar;
-        if (sidecar.SchemaVersion is not (0 or 2 or 3 or 4))
+        if (sidecar.SchemaVersion is not (0 or 2 or 3 or 4 or 5))
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is unsupported.");
-        var migrated = sidecar.SchemaVersion is 2 or 3 or 4
+        var migrated = sidecar.SchemaVersion is 2 or 3 or 4 or 5
             ? sidecar with
             {
                 SchemaVersion = CurrentSchemaVersion,
@@ -441,6 +465,12 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || sidecar.PublicationState is not (PublicationStates.None or PublicationStates.Authorized or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated)
             || (sidecar.CiStatus is not null && sidecar.CiStatus is not (CiStatuses.Pending or CiStatuses.Passed or CiStatuses.Failed or CiStatuses.Indeterminate))
             || (sidecar.CiStatus is not null && (!IsSha(sidecar.CiHeadSha) || sidecar.CiRemediationRound < 0 || sidecar.PublicationState != PublicationStates.PullRequestCreated || !string.Equals(sidecar.CiHeadSha, sidecar.PublicationCommitSha, StringComparison.OrdinalIgnoreCase)))
+            || (sidecar.ReviewFeedbackStatus is not null && sidecar.ReviewFeedbackStatus is not (ReviewFeedbackStatuses.AwaitingHuman or ReviewFeedbackStatuses.Actionable or ReviewFeedbackStatuses.Approved))
+            || (sidecar.ReviewFeedbackStatus is not null && (!IsSha(sidecar.ReviewFeedbackHeadSha) || sidecar.ReviewFeedbackRemediationRound < 0
+                || sidecar.PublicationState != PublicationStates.PullRequestCreated
+                || !string.Equals(sidecar.ReviewFeedbackHeadSha, sidecar.PublicationCommitSha, StringComparison.OrdinalIgnoreCase)
+                || sidecar.CiStatus != CiStatuses.Passed
+                || !string.Equals(sidecar.ReviewFeedbackHeadSha, sidecar.CiHeadSha, StringComparison.OrdinalIgnoreCase)))
             || !IsKnownLifecycleStatus(sidecar.LifecycleStatus)
             || !IsKnownOwnershipStatus(sidecar.ExecutionOwnershipStatus))
             throw new WorkspaceRecoveryException("Workspace sidecar state does not match the requested daemon-owned workspace.");
@@ -525,7 +555,8 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
                 : null,
             sidecar.SchemaVersion,
             new PublicationRecoveryState(sidecar.PublicationState, sidecar.PublicationCommitSha, sidecar.PublicationRemoteBranch, sidecar.PullRequestNumber, sidecar.PullRequestUrl, sidecar.PublicationRevision, sidecar.AuthorizedParentSha),
-            sidecar.CiStatus is null || sidecar.CiHeadSha is null ? null : new CiRecoveryState(sidecar.CiStatus, sidecar.CiHeadSha, sidecar.CiRemediationRound, sidecar.CiObservedAtUtc, sidecar.CiFailureReason));
+            sidecar.CiStatus is null || sidecar.CiHeadSha is null ? null : new CiRecoveryState(sidecar.CiStatus, sidecar.CiHeadSha, sidecar.CiRemediationRound, sidecar.CiObservedAtUtc, sidecar.CiFailureReason),
+            sidecar.ReviewFeedbackStatus is null || sidecar.ReviewFeedbackHeadSha is null ? null : new ReviewFeedbackRecoveryState(sidecar.ReviewFeedbackStatus, sidecar.ReviewFeedbackHeadSha, sidecar.ReviewFeedbackRemediationRound, sidecar.ReviewFeedbackObservedAtUtc));
 
     private async Task<string> ResolveBaseShaAsync(string repositoryRoot, string baseBranch, CancellationToken cancellationToken)
     {
@@ -631,7 +662,11 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         string? CiHeadSha = null,
         int CiRemediationRound = 0,
         DateTimeOffset? CiObservedAtUtc = null,
-        string? CiFailureReason = null);
+        string? CiFailureReason = null,
+        string? ReviewFeedbackStatus = null,
+        string? ReviewFeedbackHeadSha = null,
+        int ReviewFeedbackRemediationRound = 0,
+        DateTimeOffset? ReviewFeedbackObservedAtUtc = null);
 }
 
 public class WorkspaceException(string message) : Exception(message);

@@ -108,6 +108,24 @@ public sealed class StartupReconcilerTests
     }
 
     [Test]
+    public async Task RestartAfterCiPassResumesExactHeadHumanFeedbackRound()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 3, new string('0', 40)),
+            Ci = new(CiStatuses.Passed, sha, 1),
+            ReviewFeedback = new(ReviewFeedbackStatuses.AwaitingHuman, sha, 2)
+        };
+        var ci = new FakeCiShepherd { Result = CiShepherdResult.Success(sha, 0) };
+        var feedback = new FakeReviewFeedbackShepherd { Result = ReviewFeedbackResult.Success(sha, 2) };
+        var fixture = Create(record, ciShepherd: ci, feedbackShepherd: feedback);
+        fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", sha, 42, "https://github.com/acme/widgets/pull/42", true));
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(feedback.Targets.Single().HeadSha, Is.EqualTo(sha)); Assert.That(feedback.Targets.Single().RemediationRound, Is.EqualTo(2)); Assert.That(feedback.Targets.Single().PublicationRevision, Is.EqualTo(3)); Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed)); });
+    }
+
+    [Test]
     public void TransientPublicationVerificationFailureKeepsStartupGateClosed()
     {
         var fixture = Create(Record(WorkspaceRecoveryStates.Working) with { Publication = new(PublicationStates.PullRequestCreated, new string('a', 40), "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42") });
@@ -240,7 +258,7 @@ public sealed class StartupReconcilerTests
         Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.False);
     }
 
-    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead, FakeCiShepherd? ciShepherd = null)
+    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead, FakeCiShepherd? ciShepherd = null, FakeReviewFeedbackShepherd? feedbackShepherd = null)
     {
         var tracker = new FakeTracker(item ?? Work());
         var executor = new RecordingExecutor();
@@ -255,7 +273,7 @@ public sealed class StartupReconcilerTests
         var workspaces = new FakeWorkspaceManager(record);
         var fence = new FakeFence(fenceClassification);
         var publisher = new FakePublisher();
-        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd);
+        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd, feedbackShepherd);
         return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher);
     }
 
@@ -312,6 +330,12 @@ public sealed class StartupReconcilerTests
         public List<CiTarget> Targets { get; } = [];
         public CiShepherdResult Result { get; set; } = CiShepherdResult.Blocked("not configured", new string('0', 40), 0);
         public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(Result); }
+    }
+    private sealed class FakeReviewFeedbackShepherd : IReviewFeedbackShepherd
+    {
+        public List<ReviewFeedbackTarget> Targets { get; } = [];
+        public ReviewFeedbackResult Result { get; set; } = ReviewFeedbackResult.Blocked("not configured", new string('0', 40), 0);
+        public Task<ReviewFeedbackResult> ShepherdAsync(ReviewFeedbackTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(Result); }
     }
     private sealed class FakeFence(string classification) : IExecutionFence
     {

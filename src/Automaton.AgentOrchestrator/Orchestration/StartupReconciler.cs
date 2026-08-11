@@ -2,6 +2,7 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Ci;
+using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Logging;
 
@@ -15,7 +16,8 @@ public sealed class StartupReconciler(
     InMemoryOrchestrator orchestrator,
     OrchestratorOptions options,
     ILogger<StartupReconciler> logger,
-    ICiShepherd? ciShepherd = null)
+    ICiShepherd? ciShepherd = null,
+    IReviewFeedbackShepherd? reviewFeedbackShepherd = null)
 {
     public async Task ReconcileAsync(CancellationToken cancellationToken)
     {
@@ -58,8 +60,11 @@ public sealed class StartupReconciler(
                         var ci = recovered.Publication is not null && ciShepherd is not null
                             ? await ciShepherd.ShepherdAsync(new(recovered.Publication.Repository, recovered.Publication.PullRequestNumber, recovered.Publication.Branch, recovered.Publication.CommitSha), record.Workspace, item!, cancellationToken)
                             : CiShepherdResult.Success(recovered.Publication?.CommitSha ?? record.Publication?.CommitSha ?? string.Empty, record.Ci?.RemediationRound ?? 0);
-                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded ? RunStates.Completed : RunStates.Blocked,
-                            Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? "draft publication and CI were authoritatively recovered"));
+                        var feedback = ci.Succeeded && recovered.Publication is not null && reviewFeedbackShepherd is not null
+                            ? await reviewFeedbackShepherd.ShepherdAsync(new(recovered.Publication.Repository, recovered.Publication.PullRequestNumber, recovered.Publication.Branch, ci.HeadSha ?? recovered.Publication.CommitSha, record.ReviewFeedback?.RemediationRound ?? 0, record.Publication?.Revision ?? 1), record.Workspace, item!, cancellationToken)
+                            : ReviewFeedbackResult.Success(ci.HeadSha ?? recovered.Publication?.CommitSha ?? string.Empty, record.ReviewFeedback?.RemediationRound ?? 0);
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded && feedback.Succeeded ? RunStates.Completed : RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? feedback.FailureReason ?? "draft publication, CI, and human review were authoritatively recovered"));
                         continue;
                         }
                     }
@@ -79,8 +84,11 @@ public sealed class StartupReconciler(
                 && record.Publication is { State: PublicationStates.PullRequestCreated, CommitSha: not null, PullRequestNumber: not null })
             {
                 var ci = await ciShepherd.ShepherdAsync(new(record.Workspace.RepositoryIdentity, record.Publication.PullRequestNumber.Value, record.Workspace.Branch, record.Publication.CommitSha), record.Workspace, item!, cancellationToken);
-                decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded ? RunStates.Completed : RunStates.Blocked,
-                    Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason));
+                var feedback = ci.Succeeded && reviewFeedbackShepherd is not null
+                    ? await reviewFeedbackShepherd.ShepherdAsync(new(record.Workspace.RepositoryIdentity, record.Publication.PullRequestNumber.Value, record.Workspace.Branch, ci.HeadSha ?? record.Publication.CommitSha, record.ReviewFeedback?.RemediationRound ?? 0, record.Publication.Revision), record.Workspace, item!, cancellationToken)
+                    : ReviewFeedbackResult.Success(ci.HeadSha ?? record.Publication.CommitSha, record.ReviewFeedback?.RemediationRound ?? 0);
+                decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded && feedback.Succeeded ? RunStates.Completed : RunStates.Blocked,
+                    Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? feedback.FailureReason));
                 continue;
             }
             switch (record.Recovery.State)

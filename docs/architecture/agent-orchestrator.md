@@ -624,6 +624,42 @@ head passes configured CI. The PR remains draft. Human comments, reviews,
 requested changes, ready-for-review transition, workflow reruns, merge, issue
 mutation, and human acceptance remain Stage 11-or-later concerns.
 
+### Stage 11 human review feedback loop
+
+Stage 11 adds a separate provider-neutral `IReviewFeedbackProvider` boundary.
+The coordinator supplies an exact repository, PR number, daemon branch, and head
+SHA and receives only normalized `ReviewFeedbackSnapshot` and bounded feedback
+items. `GitHubReviewFeedbackProvider` is the first adapter; it validates the same
+open PR and exact head before reading review submissions and inline PR review
+comments. General PR conversation comments are deliberately excluded in this
+stage. Bot actors, the configured automation identity, CI messages, other issue
+discussion, and feedback attached only to another commit are not actionable.
+
+The latest exact-head review submission per case-insensitive human identity is
+authoritative. `CHANGES_REQUESTED` and exact-head inline review comments are
+actionable; an exact-head human `APPROVED` submission with no actionable current
+feedback completes the autonomous loop and hands the still-unmerged PR back to
+the human. Awaiting human input only polls with cancellation and never starts an
+agent. Feedback is untrusted advisory text, bounded before prompting, and cannot
+grant authority or change repository/workspace/provider policy.
+
+Each actionable feedback round creates fresh Developer and independent Reviewer
+threads. Reviewer remains read-only and every code change requires its explicit
+structured approval. The host then authorizes exactly the next publication
+revision, fast-forwards the same branch and PR without force, and runs the full
+Stage 10 CI shepherd against the new exact SHA before reading more feedback.
+Feedback rounds are bounded by `review_feedback.max_remediation_rounds`; exhaustion,
+identity drift, malformed provider data, or failed CI becomes manual attention.
+The daemon never posts comments, submits reviews, marks the PR ready, merges,
+closes the issue, or approves on behalf of a human.
+
+Sidecar schema v6 adds minimal exact-head feedback status, observation time, and
+remediation round. A new publication revision clears stale CI and feedback state.
+Restart recovery preserves execution fencing, publication provenance, CI, the
+feedback round budget, and exact PR/head binding before resuming the human-review
+wait. Review-feedback credentials are host-side and independent from tracker,
+publication, and CI provider selection.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and

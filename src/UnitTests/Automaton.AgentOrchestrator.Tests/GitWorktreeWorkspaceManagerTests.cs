@@ -239,7 +239,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = records.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(5));
+            Assert.That(record.SchemaVersion, Is.EqualTo(6));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.RetryableFailure));
             Assert.That(record.Recovery.LastCompletedAttempt, Is.EqualTo(2));
             Assert.That(record.Recovery.NextAttempt, Is.EqualTo(3));
@@ -305,7 +305,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         await File.WriteAllTextAsync(sidecarPath, json.ToJsonString());
 
         var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
-        Assert.Multiple(() => { Assert.That(record.SchemaVersion, Is.EqualTo(5)); Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.Committed)); });
+        Assert.Multiple(() => { Assert.That(record.SchemaVersion, Is.EqualTo(6)); Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.Committed)); });
     }
 
     [Test]
@@ -333,12 +333,13 @@ public sealed class GitWorktreeWorkspaceManagerTests
         workspace = await manager.UpdatePublicationStateAsync(workspace, new(PublicationStates.Committed, first, workspace.Branch, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
         workspace = await manager.UpdatePublicationStateAsync(workspace, new(PublicationStates.Pushed, first, workspace.Branch, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
         workspace = await manager.UpdatePublicationStateAsync(workspace, new(PublicationStates.PullRequestCreated, first, workspace.Branch, 42, "https://github.test/pull/42", 1, workspace.BaseCommitSha), CancellationToken.None);
-        workspace = await manager.UpdateCiStateAsync(workspace, new(CiStatuses.Pending, first, 0, DateTimeOffset.Parse("2026-01-01T00:00:00Z")), CancellationToken.None);
+        workspace = await manager.UpdateCiStateAsync(workspace, new(CiStatuses.Passed, first, 0, DateTimeOffset.Parse("2026-01-01T00:00:00Z")), CancellationToken.None);
+        workspace = await manager.UpdateReviewFeedbackStateAsync(workspace, new(ReviewFeedbackStatuses.Actionable, first, 1, DateTimeOffset.Parse("2026-01-01T00:01:00Z")), CancellationToken.None);
 
         workspace = await manager.UpdatePublicationStateAsync(workspace, new(PublicationStates.Authorized, RemoteBranch: workspace.Branch, PullRequestNumber: 42,
             PullRequestUrl: "https://github.test/pull/42", Revision: 2, AuthorizedParentSha: first), CancellationToken.None);
         var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
-        Assert.Multiple(() => { Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.Authorized)); Assert.That(record.Publication.Revision, Is.EqualTo(2)); Assert.That(record.Publication.AuthorizedParentSha, Is.EqualTo(first)); Assert.That(record.Ci, Is.Null); });
+        Assert.Multiple(() => { Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.Authorized)); Assert.That(record.Publication.Revision, Is.EqualTo(2)); Assert.That(record.Publication.AuthorizedParentSha, Is.EqualTo(first)); Assert.That(record.Ci, Is.Null); Assert.That(record.ReviewFeedback, Is.Null); });
     }
 
     [Test]
@@ -386,7 +387,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(5));
+            Assert.That(record.SchemaVersion, Is.EqualTo(6));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.Blocked));
             Assert.That(record.Recovery.Reason, Does.Contain("Legacy"));
         });
