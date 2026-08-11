@@ -117,11 +117,12 @@ The initial normalized models are:
 WorkflowDefinition  raw front matter, rendered prompt template, source location
 OrchestratorOptions resolved, validated runtime policy snapshot
 WorkItem            provider-neutral id, display identifier, title, body,
-                    labels, state, URL, assignment and timestamps
+                    labels, provider lifecycle state, URL, assignment and timestamps
 Workspace           root-contained absolute path, workspace key, branch, lifecycle state
 RunAttempt          work item + workspace + attempt number + timestamps + outcome
 LiveSession         App Server process/thread/turn identity and last activity/usage
-RunState            claimed/running/retry/blocked/completed lifecycle representation
+RunState            transient orchestration lifecycle (eligibility, claim,
+                    execution phase, retry, block, handoff, completion)
 ```
 
 Key interfaces proposed for implementation:
@@ -141,6 +142,29 @@ typed, version-aware session events rather than parsed CLI text. `IRunStateStore
 is filesystem-backed initially, with a replaceable contract should reconstruction
 prove insufficient later.
 
+### Provider lifecycle, external intent, and orchestration state
+
+These are intentionally separate contracts. `WorkItem.ProviderLifecycleState`
+means only the provider-native lifecycle returned by the tracker. For GitHub
+Issues it is normally `open` or `closed`; it must not be overloaded with an
+orchestrator phase such as `reviewing` or `retrying`.
+
+`WorkItem.Labels` retains normalized provider labels. Configured `agent:*`
+labels are durable, externally visible intent or handoff signals when useful:
+`agent:ready` opts an open issue into dispatch, and later labels may express
+durable outcomes such as `agent:blocked` or `agent:human-review`. They are not
+required—and should not be written—for every short-lived execution transition.
+
+`RunState` is daemon-owned and transient. It represents the richer lifecycle
+needed to operate a run, including `ineligible`, `eligible`, `claimed`,
+`workspace-preparing`, `working`, `reviewing`, `rework`, `retry-queued`,
+`blocked`, `human-review`, `cancelled`, and `completed`. Its values are not
+GitHub states or labels. This prevents a GitHub close event, a durable handoff
+label, and a currently running Codex session from being represented by one
+ambiguous `State` property. The scheduler derives eligibility from the current
+provider lifecycle plus configured label policy, while reconciliation can stop
+or hand off a transient `RunState` when that external state changes.
+
 ## Workflow contract
 
 Each orchestrated repository will opt in with repository-owned `WORKFLOW.md`:
@@ -152,12 +176,12 @@ an explicitly allowed environment variable, and configuration validation must
 fail closed if it resolves empty.
 
 The initial GitHub profile will require an explicit repository and opt-in label,
-for example `agent:ready`. It will list only open GitHub Issues in that
-repository, exclude pull requests, and preserve provider metadata only inside
-the adapter/normalized `WorkItem`. GitHub Issues is first because Automaton
-already has GitHub user-facing integration and the target source repository is
-Git-based; the abstraction keeps a future tracker possible without coupling the
-orchestrator to GitHub.
+for example `agent:ready`. It will list only provider-`open` GitHub Issues in
+that repository, exclude pull requests, and preserve provider metadata only
+inside the adapter/normalized `WorkItem`. GitHub Issues is first because
+Automaton already has GitHub user-facing integration and the target source
+repository is Git-based; the abstraction keeps a future tracker possible without
+coupling the orchestrator to GitHub.
 
 Workflow reload should eventually validate a replacement before applying it;
 an invalid reload retains the last known-good configuration and blocks new
@@ -198,9 +222,36 @@ replacement character alone is insufficient.
 Each workspace receives a daemon-owned, non-repository sidecar state directory
 under the configured workspace root. It records the stable work ID, repository
 identity, branch, worktree path, attempt state, App Server PID/start identity,
-thread ID, turn ID, timestamps, and redacted outcome metadata. It must never be
-committed with agent changes or contain raw credentials or unbounded transcript
-payloads.
+thread ID, turn ID, a durable run/launch nonce, timestamps, and redacted outcome
+metadata. It must never be committed with agent changes or contain raw
+credentials or unbounded transcript payloads.
+
+### Exclusive execution ownership invariant
+
+**At most one active agent execution may own a workspace at any time.** A
+`RunAttempt` owns a workspace only after the daemon has recorded its unique
+run/launch nonce and established a daemon-owned process boundary for the App
+Server and every child it starts. The future implementation must use the
+appropriate host mechanism—such as a process group, Windows Job Object, cgroup,
+or equivalent—not a bare PID alone. The nonce binds the sidecar, the scheduler
+claim, and that process ownership boundary so a recycled PID cannot be mistaken
+for an earlier execution.
+
+Before recovery or redispatch, the daemon must establish exclusive ownership. An
+old execution is allowed only one of these outcomes:
+
+1. identify it safely from its durable nonce and process boundary, then reclaim
+   and resume it;
+2. identify it safely, terminate its complete owned process boundary, and verify
+   termination before a replacement execution starts; or
+3. when ownership or termination cannot be established safely, quarantine the
+   workspace and mark the run blocked for operator action.
+
+It must never declare an unverifiable process dead merely because it cannot be
+attached to, then start another agent in the same workspace. Platform-specific
+fencing, descendant-process discovery, and termination verification are deferred
+to the workspace, App Server, and restart-recovery stages; this invariant is
+non-negotiable for all of them.
 
 Restart recovery is tracker-and-filesystem first:
 
@@ -208,10 +259,12 @@ Restart recovery is tracker-and-filesystem first:
 2. refresh their tracker work items;
 3. remove only safely contained terminal workspaces under configured cleanup
    policy;
-4. treat a prior process as dead unless process identity, executable and workspace
-   ownership can be safely verified; never attach to an arbitrary PID;
-5. resume a valid work item from its recorded thread when the App Server supports
-   it, otherwise start a fresh turn with a compact recovery summary;
+4. establish exclusive execution ownership using the prior run nonce and daemon
+   process boundary; safely reclaim, terminate-and-verify, or quarantine as
+   required by the invariant above;
+5. only after exclusive ownership is established, resume a valid work item from
+   its recorded thread when the App Server supports it, otherwise start a fresh
+   turn with a compact recovery summary;
 6. rebuild claims/retry scheduling from current tracker eligibility and sidecars.
 
 There is no orchestrator database in the initial design. Filesystem sidecars are
