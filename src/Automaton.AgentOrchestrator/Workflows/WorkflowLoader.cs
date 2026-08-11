@@ -92,7 +92,11 @@ public sealed class WorkflowLoader : IWorkflowLoader
             Agent = new AgentExecutionOptions
             {
                 MaxConcurrentAgents = PositiveInt(Section(root, "agent").GetValueOrDefault("max_concurrent_agents"), "agent.max_concurrent_agents", 1),
-                MaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("max_turns"), "agent.max_turns", 1)
+                MaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("max_turns"), "agent.max_turns", 1),
+                ManagerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("manager_max_turns"), "agent.manager_max_turns", 2),
+                DeveloperMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("developer_max_turns"), "agent.developer_max_turns",
+                    PositiveInt(Section(root, "agent").GetValueOrDefault("max_turns"), "agent.max_turns", 1)),
+                ReviewerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("reviewer_max_turns"), "agent.reviewer_max_turns", 2)
             },
             Codex = new CodexOptions
             {

@@ -31,6 +31,9 @@ public sealed class WorkflowLoaderTests
                 agent:
                   max_concurrent_agents: 2
                   max_turns: 5
+                  manager_max_turns: 2
+                  developer_max_turns: 6
+                  reviewer_max_turns: 3
                 codex:
                   command: codex app-server
                   turn_timeout_ms: 99
@@ -58,6 +61,9 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Repository.Identity, Is.EqualTo("acme/widgets"));
                 Assert.That(definition.Options.Workspace.Root, Is.EqualTo(Path.Combine(workflow.Directory, "workspaces")));
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
+                Assert.That(definition.Options.Agent.ManagerMaxTurns, Is.EqualTo(2));
+                Assert.That(definition.Options.Agent.DeveloperMaxTurns, Is.EqualTo(6));
+                Assert.That(definition.Options.Agent.ReviewerMaxTurns, Is.EqualTo(3));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
             });

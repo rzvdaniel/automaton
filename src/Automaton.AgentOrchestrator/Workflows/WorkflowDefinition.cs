@@ -30,7 +30,14 @@ public sealed class TrackerOptions
 public sealed class PollingOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
 public sealed class RepositoryOptions { public string Root { get; init; } = string.Empty; public string Identity { get; init; } = string.Empty; }
 public sealed class WorkspaceOptions { public string Root { get; init; } = string.Empty; }
-public sealed class AgentExecutionOptions { public int MaxConcurrentAgents { get; init; } = 1; public int MaxTurns { get; init; } = 1; }
+public sealed class AgentExecutionOptions
+{
+    public int MaxConcurrentAgents { get; init; } = 1;
+    public int MaxTurns { get; init; } = 1;
+    public int ManagerMaxTurns { get; init; } = 2;
+    public int DeveloperMaxTurns { get; init; } = 1;
+    public int ReviewerMaxTurns { get; init; } = 2;
+}
 public sealed class CodexOptions { public string Command { get; init; } = "codex app-server"; public int TurnTimeoutMilliseconds { get; init; } = 3_600_000; }
 public sealed class RetryOptions { public int MaxAttempts { get; init; } = 3; public int InitialBackoffMilliseconds { get; init; } = 1_000; public int MaxBackoffMilliseconds { get; init; } = 300_000; }
 public sealed class ReconciliationOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
