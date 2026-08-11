@@ -231,6 +231,28 @@ public sealed class GitWorkPublisherTests
         Assert.Multiple(() => { Assert.That(subject.Length, Is.LessThanOrEqualTo(120)); Assert.That(subject, Does.Not.Contain("\n")); Assert.That(subject, Does.StartWith("acme/widgets#1: A")); });
     }
 
+    [Test]
+    public async Task PublishRevisionAsync_CreatesFastForwardCommitWithFreshBoundAuthorizationAndReusesPullRequest()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var states = new FakeWorkspaces();
+        var prs = new FakePullRequests();
+        var current = new PublicationResult("acme/widgets", "automaton/work/7", CommitSha, 42, "https://github.com/acme/widgets/pull/42", true);
+        var result = await Create(git, states, prs).PublishRevisionAsync(new(Request().Workspace, Request().WorkItem, current,
+            new(RoleResultStatuses.Completed, "fixed", "tests", "none"), new(RoleResultStatuses.Approved, "approved", []), 2), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.CommitSha, Is.EqualTo(FakeGit.RevisionSha));
+            Assert.That(result.PullRequestNumber, Is.EqualTo(42));
+            Assert.That(states.States.Select(x => x.State), Is.EqualTo(new[] { PublicationStates.Authorized, PublicationStates.Committed, PublicationStates.Pushed, PublicationStates.PullRequestCreated }));
+            Assert.That(states.States.All(x => x.Revision == 2 && x.AuthorizedParentSha == CommitSha), Is.True);
+            Assert.That(git.Commands.Single(x => x.StartsWith("push ")), Does.Not.Contain("force"));
+            Assert.That(prs.VerifyRequests, Has.Count.EqualTo(1));
+            Assert.That(prs.CreateRequests, Is.Empty);
+        });
+    }
+
     private GitWorkPublisher Create(FakeGit git, FakeWorkspaces workspaces, FakePullRequests prs, IReadOnlyList<string>? validation = null) => new(git, workspaces, prs, new OrchestratorOptions
     {
         Repository = new RepositoryOptions { Root = root, Identity = "acme/widgets", BaseBranch = "main" },
@@ -246,10 +268,12 @@ public sealed class GitWorkPublisherTests
 
     private sealed class FakeGit(string path) : IGitCommandRunner
     {
+        public static readonly string RevisionSha = new('d', 40);
         public bool HasChanges { get; set; } = true;
         public bool Unmerged { get; set; }
         public bool Committed { get; set; }
         public bool PushFailure { get; set; }
+        public bool RevisionCommitted { get; set; }
         public string? RemoteSha { get; set; }
         public string RemoteUrl { get; set; } = "git@github.com:acme/widgets.git";
         public string Provenance { get; set; } = "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget";
@@ -263,15 +287,16 @@ public sealed class GitWorkPublisherTests
             if (command == "rev-parse refs/heads/main") return Ok(BaseSha);
             if (command == "diff --name-only --diff-filter=U") return Ok(Unmerged ? "conflicted.txt" : "");
             if (command.StartsWith("rev-parse --git-path ")) return Ok(Path.Combine(path, ".git", "absent-" + args[^1]));
-            if (command == "rev-parse HEAD") return Ok(Committed ? CommitSha : BaseSha);
+            if (command == "rev-parse HEAD") return Ok(RevisionCommitted ? RevisionSha : Committed ? CommitSha : BaseSha);
+            if (command == "rev-parse HEAD^") return Ok(CommitSha);
             if (command.StartsWith("rev-list --count ")) return Ok("1");
-            if (command == "log -1 --format=%an%x00%ae%x00%s") return Ok(Provenance);
+            if (command == "log -1 --format=%an%x00%ae%x00%s") return Ok(RevisionCommitted ? "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget (CI fix 1)" : Provenance);
             if (command == "status --porcelain=v1 --untracked-files=all") return Ok(HasChanges ? " M file.txt" : "");
             if (command == "add --all") return Ok("");
-            if (args.Contains("commit")) { Committed = true; return Ok(""); }
+            if (args.Contains("commit")) { if (Committed) RevisionCommitted = true; else Committed = true; return Ok(""); }
             if (command == "remote get-url origin") return Ok(RemoteUrl);
             if (command.StartsWith("ls-remote --heads ")) return Ok(RemoteSha is null ? "" : RemoteSha + "\trefs/heads/automaton/work/7");
-            if (command.StartsWith("push ")) { if (PushFailure) return Task.FromResult(new GitCommandResult(1, "", "connection reset")); RemoteSha = CommitSha; return Ok(""); }
+            if (command.StartsWith("push ")) { if (PushFailure) return Task.FromResult(new GitCommandResult(1, "", "connection reset")); RemoteSha = RevisionCommitted ? RevisionSha : CommitSha; return Ok(""); }
             throw new AssertionException("Unexpected git command: " + command);
         }
         private static Task<GitCommandResult> Ok(string output) => Task.FromResult(new GitCommandResult(0, output + "\n", ""));

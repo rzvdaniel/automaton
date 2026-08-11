@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Publication;
+using Automaton.AgentOrchestrator.Ci;
 using Automaton.AgentOrchestrator.Workflows;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +14,8 @@ public sealed class StartupReconciler(
     IWorkPublisher publisher,
     InMemoryOrchestrator orchestrator,
     OrchestratorOptions options,
-    ILogger<StartupReconciler> logger)
+    ILogger<StartupReconciler> logger,
+    ICiShepherd? ciShepherd = null)
 {
     public async Task ReconcileAsync(CancellationToken cancellationToken)
     {
@@ -51,11 +53,14 @@ public sealed class StartupReconciler(
                     try
                     {
                         var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
-                        if (recovered.Recognized)
-                        {
-                            decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
-                                Math.Max(record.Recovery.LastCompletedAttempt, 1), "draft publication was authoritatively recovered"));
-                            continue;
+                    if (recovered.Recognized)
+                    {
+                        var ci = recovered.Publication is not null && ciShepherd is not null
+                            ? await ciShepherd.ShepherdAsync(new(recovered.Publication.Repository, recovered.Publication.PullRequestNumber, recovered.Publication.Branch, recovered.Publication.CommitSha), record.Workspace, item!, cancellationToken)
+                            : CiShepherdResult.Success(recovered.Publication?.CommitSha ?? record.Publication?.CommitSha ?? string.Empty, record.Ci?.RemediationRound ?? 0);
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded ? RunStates.Completed : RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason ?? "draft publication and CI were authoritatively recovered"));
+                        continue;
                         }
                     }
                     catch (PublicationException exception) when (exception.IsRetryable)
@@ -69,6 +74,14 @@ public sealed class StartupReconciler(
                         continue;
                     }
                 }
+            }
+            if (record.Recovery.State == WorkspaceRecoveryStates.Completed && record.Ci is not null && eligible && ciShepherd is not null
+                && record.Publication is { State: PublicationStates.PullRequestCreated, CommitSha: not null, PullRequestNumber: not null })
+            {
+                var ci = await ciShepherd.ShepherdAsync(new(record.Workspace.RepositoryIdentity, record.Publication.PullRequestNumber.Value, record.Workspace.Branch, record.Publication.CommitSha), record.Workspace, item!, cancellationToken);
+                decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, ci.Succeeded ? RunStates.Completed : RunStates.Blocked,
+                    Math.Max(record.Recovery.LastCompletedAttempt, 1), ci.FailureReason));
+                continue;
             }
             switch (record.Recovery.State)
             {

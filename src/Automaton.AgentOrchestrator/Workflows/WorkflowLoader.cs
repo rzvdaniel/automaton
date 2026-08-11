@@ -103,6 +103,17 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 GitHubToken = ResolveOptionalSecret(Section(root, "publication").GetValueOrDefault("github_token"), "publication.github_token"),
                 ValidationTimeoutMilliseconds = PositiveInt(Section(root, "publication").GetValueOrDefault("validation_timeout_ms"), "publication.validation_timeout_ms", 600_000)
             },
+            Ci = new CiOptions
+            {
+                Enabled = BooleanValue(Section(root, "ci").GetValueOrDefault("enabled"), "ci.enabled", true),
+                Kind = StringValue(Section(root, "ci").GetValueOrDefault("kind"), "ci.kind", required: false) ?? "github",
+                GitHubToken = ResolveOptionalSecret(Section(root, "ci").GetValueOrDefault("github_token"), "ci.github_token"),
+                GitHubApiBaseUrl = StringValue(Section(root, "ci").GetValueOrDefault("github_api_base_url"), "ci.github_api_base_url", required: false) ?? "https://api.github.com/",
+                RequiredChecks = StringList(Section(root, "ci").GetValueOrDefault("required_checks"), "ci.required_checks"),
+                PollIntervalMilliseconds = PositiveInt(Section(root, "ci").GetValueOrDefault("poll_interval_ms"), "ci.poll_interval_ms", 30_000),
+                TimeoutMilliseconds = PositiveInt(Section(root, "ci").GetValueOrDefault("timeout_ms"), "ci.timeout_ms", 3_600_000),
+                MaxRemediationRounds = NonNegativeInt(Section(root, "ci").GetValueOrDefault("max_remediation_rounds"), "ci.max_remediation_rounds", 2, 10)
+            },
             Workspace = new WorkspaceOptions { Root = workspaceRoot },
             Agent = new AgentExecutionOptions
             {
@@ -166,6 +177,22 @@ public sealed class WorkflowLoader : IWorkflowLoader
         return result;
     }
 
+    private static int NonNegativeInt(object? value, string field, int defaultValue, int maximum)
+    {
+        if (value is null) return defaultValue;
+        if (!int.TryParse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture), out var number) || number < 0 || number > maximum)
+            throw new WorkflowValidationException($"{field} must be between 0 and {maximum}.");
+        return number;
+    }
+
+    private static bool BooleanValue(object? value, string field, bool defaultValue)
+    {
+        if (value is null) return defaultValue;
+        if (!bool.TryParse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture), out var result))
+            throw new WorkflowValidationException($"{field} must be true or false.");
+        return result;
+    }
+
     private static string ResolvePath(string value, string workflowDirectory)
         => string.IsNullOrWhiteSpace(value) ? string.Empty : Path.GetFullPath(ResolveEnvironmentReference(value, "workspace.root"), workflowDirectory);
 
@@ -218,6 +245,10 @@ public sealed class WorkflowLoader : IWorkflowLoader
         if (!IsSafeRefPart(options.Publication.RemoteName)) throw new WorkflowValidationException("publication.remote_name is invalid.");
         if (options.Publication.GitName.Any(char.IsControl) || options.Publication.GitEmail.Any(char.IsControl))
             throw new WorkflowValidationException("publication Git identity contains control characters.");
+        if (options.Ci.RequiredChecks.Any(name => string.IsNullOrWhiteSpace(name) || name.Length > 200 || name.Any(char.IsControl)))
+            throw new WorkflowValidationException("ci.required_checks contains an invalid check name.");
+        if (!Uri.TryCreate(options.Ci.GitHubApiBaseUrl, UriKind.Absolute, out var ciApi) || ciApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(ciApi.UserInfo))
+            throw new WorkflowValidationException("ci.github_api_base_url must be an HTTPS origin without credentials.");
     }
 
     private static bool IsSafeRefPart(string value)

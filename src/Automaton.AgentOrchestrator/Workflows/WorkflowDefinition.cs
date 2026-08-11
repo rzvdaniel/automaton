@@ -12,6 +12,7 @@ public sealed class OrchestratorOptions
     public PollingOptions Polling { get; init; } = new();
     public RepositoryOptions Repository { get; init; } = new();
     public PublicationOptions Publication { get; init; } = new();
+    public CiOptions Ci { get; init; } = new();
     public WorkspaceOptions Workspace { get; init; } = new();
     public AgentExecutionOptions Agent { get; init; } = new();
     public CodexOptions Codex { get; init; } = new();
@@ -39,6 +40,17 @@ public sealed class PublicationOptions
     public string GitHubHost { get; init; } = "github.com";
     public string GitHubToken { get; init; } = string.Empty;
     public int ValidationTimeoutMilliseconds { get; init; } = 600_000;
+}
+public sealed class CiOptions
+{
+    public bool Enabled { get; init; } = true;
+    public string Kind { get; init; } = "github";
+    public string GitHubToken { get; init; } = string.Empty;
+    public string GitHubApiBaseUrl { get; init; } = "https://api.github.com/";
+    public IReadOnlyList<string> RequiredChecks { get; init; } = [];
+    public int PollIntervalMilliseconds { get; init; } = 30_000;
+    public int TimeoutMilliseconds { get; init; } = 3_600_000;
+    public int MaxRemediationRounds { get; init; } = 2;
 }
 public sealed class WorkspaceOptions { public string Root { get; init; } = string.Empty; }
 public sealed class AgentExecutionOptions

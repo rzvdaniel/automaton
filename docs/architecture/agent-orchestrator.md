@@ -572,6 +572,58 @@ Stage 9 stops at an open draft PR. It does not monitor CI, ingest review
 feedback, mutate issue labels/lifecycle, mark a PR ready, merge, or clean the
 workspace. Those remain later-stage responsibilities.
 
+### Stage 10 exact-head CI shepherding
+
+Stage 10 observes CI through the provider-neutral `ICiProvider` contract using
+`CiTarget(repository identity, PR number, head branch, exact head SHA)` and
+normalized `CiSnapshot`/`CiCheck` values. Orchestration reasons only about
+`pending`, `passed`, `failed`, and `indeterminate`; GitHub Checks and legacy
+commit-status payloads, conclusions/states, pagination, and opaque IDs remain
+inside `GitHubCiProvider`. The CI
+provider is configured independently from `IWorkTracker` and publication even
+though GitHub implements all three concerns initially.
+
+Configured required check names are matched case-insensitively against the
+normalized union of Check Runs and legacy commit-status contexts for the exact
+published SHA. Because GitHub returns legacy status history newest-first, only
+the first/latest exact-SHA record for each case-insensitive legacy context enters
+that union. With no configured names, every current signal in the union
+participates in the result. Duplicate names aggregate conservatively: any failure wins, then
+pending, and only all-successful matches pass; unknown terminal states are
+indeterminate. Missing required signals and an empty observed union remain
+pending, preventing either a failing legacy status or the post-push
+workflow-creation race from becoming false green. Pending checks do
+not start agents. Polling defaults to 30 seconds, has a configured total timeout,
+and is cancellation-aware. Provider 429/5xx/network failures retry observation;
+authentication, malformed state, PR/head mismatch, timeout, and indeterminate
+results fail closed. Check output is normalized and bounded rather than storing
+or prompting with raw logs.
+
+Definitive failure starts a bounded CI remediation round with a fresh App Server,
+Developer thread, and independent read-only Reviewer thread. Their bounded
+CHANGES_REQUIRED loop reuses only those two threads for that round. CI context
+is advisory untrusted data. Reviewer APPROVED creates a new host authorization
+bound to the current published parent SHA and monotonically increasing
+publication revision. The daemon creates one new commit, fast-forwards the same
+work branch without force, verifies the remote SHA and existing draft PR number
+and new head SHA, then observes only that new SHA. Unexpected local/remote/PR
+advancement fails closed.
+
+Sidecar schema v5 stores the publication revision/authorized parent and minimal
+CI recovery state: exact head SHA, normalized state, remediation round, bounded
+reason, and observation timestamp. A new publication revision clears stale CI
+state. Startup first preserves Stage 6 ownership/quarantine and tracker
+eligibility, verifies incomplete publication through Stage 9 recovery, then
+resumes exact-head CI observation. A durable pass is trusted only while provider
+and PR identity still match that head; durable failure may start a remaining
+bounded remediation round. Manager and the original Stage 8 threads are never
+resurrected.
+
+Stage 10 success means only that the current independently approved draft PR
+head passes configured CI. The PR remains draft. Human comments, reviews,
+requested changes, ready-for-review transition, workflow reruns, merge, issue
+mutation, and human acceptance remain Stage 11-or-later concerns.
+
 ## Trust and security posture
 
 The daemon is a privileged automation boundary and must be opt-in and

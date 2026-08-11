@@ -4,6 +4,7 @@ using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Publication;
+using Automaton.AgentOrchestrator.Ci;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -12,7 +13,8 @@ public sealed class RoleBasedWorkExecutor(
     IWorkspaceMutationGuard mutationGuard,
     ICodexAppServerClientFactory clientFactory,
     IWorkPublisher publisher,
-    WorkflowDefinition workflow) : IWorkExecutor
+    WorkflowDefinition workflow,
+    ICiShepherd? ciShepherd = null) : IWorkExecutor
 {
     private const int MaximumResultDetailLength = 512;
 
@@ -37,6 +39,7 @@ public sealed class RoleBasedWorkExecutor(
         RunOutcome outcome;
         var ambiguous = false;
         var cancelled = false;
+        var disposedForCi = false;
         try
         {
             await client.InitializeAsync(cancellationToken);
@@ -80,7 +83,14 @@ public sealed class RoleBasedWorkExecutor(
                 reviewerPrompt = prompts.ReviewerAgain(attempt, workspace, manager, developer, reviewer, reviewRound + 1);
             }
             if (approvedReview is null) throw new RoleBlockedException("Reviewer approval was not established for publication.");
-            await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
+            var publication = await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
+            await client.DisposeAsync();
+            disposedForCi = true;
+            var ci = ciShepherd is null
+                ? CiShepherdResult.Success(publication.CommitSha, 0)
+                : await ciShepherd.ShepherdAsync(new(publication.Repository, publication.PullRequestNumber, publication.Branch, publication.CommitSha), client.CurrentWorkspace ?? workspace, attempt.WorkItem, cancellationToken);
+            if (!ci.Succeeded)
+                outcome = ci.IsRetryable ? RunOutcome.RetryableFailure(Bounded(ci.FailureReason ?? "CI shepherding failed.")) : RunOutcome.PermanentFailure(Bounded(ci.FailureReason ?? "CI shepherding failed."));
         }
         catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
@@ -89,6 +99,10 @@ public sealed class RoleBasedWorkExecutor(
             outcome = exception.IsRetryable
                 ? RunOutcome.RetryableFailure(Bounded(exception.Message))
                 : RunOutcome.PermanentFailure(Bounded(exception.Message));
+        }
+        catch (CiProviderException exception)
+        {
+            outcome = exception.IsRetryable ? RunOutcome.RetryableFailure(Bounded(exception.Message)) : RunOutcome.PermanentFailure(Bounded(exception.Message));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -106,7 +120,7 @@ public sealed class RoleBasedWorkExecutor(
                 : RunOutcome.RetryableFailure(Bounded(exception.Message));
         }
 
-        try { await client.DisposeAsync(); }
+        try { if (!disposedForCi) await client.DisposeAsync(); }
         catch (Exception exception)
         {
             ambiguous = true;
