@@ -170,5 +170,7 @@ public sealed class WorkflowLoader : IWorkflowLoader
         if (options.Tracker.TerminalProviderLifecycleStates.Count == 0) throw new WorkflowValidationException("tracker.terminal_states must not be empty.");
         if (options.Retry.InitialBackoffMilliseconds > options.Retry.MaxBackoffMilliseconds)
             throw new WorkflowValidationException("retry.initial_backoff_ms must not exceed retry.max_backoff_ms.");
+        if (string.IsNullOrWhiteSpace(options.Workspace.Root))
+            throw new WorkflowValidationException("workspace.root is required for workspace isolation.");
     }
 }
