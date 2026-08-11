@@ -10,6 +10,7 @@ public sealed class OrchestratorOptions
 {
     public TrackerOptions Tracker { get; init; } = new();
     public PollingOptions Polling { get; init; } = new();
+    public RepositoryOptions Repository { get; init; } = new();
     public WorkspaceOptions Workspace { get; init; } = new();
     public AgentExecutionOptions Agent { get; init; } = new();
     public CodexOptions Codex { get; init; } = new();
@@ -27,6 +28,7 @@ public sealed class TrackerOptions
 }
 
 public sealed class PollingOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
+public sealed class RepositoryOptions { public string Root { get; init; } = string.Empty; public string Identity { get; init; } = string.Empty; }
 public sealed class WorkspaceOptions { public string Root { get; init; } = string.Empty; }
 public sealed class AgentExecutionOptions { public int MaxConcurrentAgents { get; init; } = 1; public int MaxTurns { get; init; } = 1; }
 public sealed class CodexOptions { public string Command { get; init; } = "codex app-server"; public int TurnTimeoutMilliseconds { get; init; } = 3_600_000; }

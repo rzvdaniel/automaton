@@ -32,6 +32,7 @@ public interface ICodexJsonRpcTransport : IAsyncDisposable
 
 public interface ICodexExecutionOwnership
 {
+    Workspace? CurrentWorkspace { get; }
     Task AcquireAsync(string launchNonce, CancellationToken cancellationToken);
     Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken);
     Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken);
@@ -39,6 +40,7 @@ public interface ICodexExecutionOwnership
 
 public sealed class NoopCodexExecutionOwnership : ICodexExecutionOwnership
 {
+    public Workspace? CurrentWorkspace => null;
     public Task AcquireAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -67,6 +69,7 @@ public sealed class CodexAppServerClient(
     private DateTimeOffset lastActivityUtc;
     private bool stopping;
 
+    public Workspace? CurrentWorkspace => ownership.CurrentWorkspace;
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
     public IReadOnlyList<CodexSessionEvent> Events { get { lock (events) return events.ToArray(); } }
@@ -242,7 +245,7 @@ public sealed class CodexAppServerClient(
         var failure = NestedStringProperty(parameters, "turn", "error", "message");
         var kind = status switch { "completed" => CodexSessionEventKinds.TurnCompleted, "interrupted" => CodexSessionEventKinds.TurnInterrupted, _ => CodexSessionEventKinds.TurnFailed };
         Touch(kind, threadId, turnId, failure);
-        var result = new CodexTurnResult(threadId, turnId, status, failure);
+        var result = new CodexTurnResult(threadId, turnId, status, failure, ExtractFinalResponse(parameters));
         lock (turnGate)
         {
             if (turns.TryGetValue(turnId, out var completion)) completion.TrySetResult(result);
@@ -288,6 +291,18 @@ public sealed class CodexAppServerClient(
         earlyTurnResults[result.TurnId] = (result, node);
     }
     private static string? StringProperty(JsonElement element, string name) => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    private static string? ExtractFinalResponse(JsonElement parameters)
+    {
+        if (parameters.ValueKind != JsonValueKind.Object
+            || !parameters.TryGetProperty("turn", out var turn)
+            || !turn.TryGetProperty("items", out var items)
+            || items.ValueKind != JsonValueKind.Array) return null;
+        string? response = null;
+        foreach (var item in items.EnumerateArray())
+            if (StringProperty(item, "type") == "agentMessage" && StringProperty(item, "text") is { } text)
+                response = text;
+        return response is null ? null : response.Length <= 16_384 ? response : response[..16_384];
+    }
     private static string? NestedStringProperty(JsonElement element, params string[] path) { foreach (var name in path) { if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out element)) return null; } return element.ValueKind == JsonValueKind.String ? element.GetString() : null; }
     private static long? FindLong(JsonElement element, string name) { if (element.ValueKind == JsonValueKind.Object) { foreach (var property in element.EnumerateObject()) { if (property.NameEquals(name) && property.Value.TryGetInt64(out var number)) return number; var nested = FindLong(property.Value, name); if (nested is not null) return nested; } } return null; }
     private static string Bounded(string value) => value.Length <= 512 ? value : value[..512];

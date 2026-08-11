@@ -29,7 +29,7 @@ public static class ServiceCollectionExtensions
             new ProcessGitCommandRunner(),
             services.GetRequiredService<IClock>()));
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
-        services.AddSingleton<IWorkExecutor, NoopWorkExecutor>();
+        services.AddSingleton<IWorkExecutor, SingleAgentWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddHostedService<OrchestratorHostedService>();
         return services;
@@ -41,9 +41,4 @@ public static class ServiceCollectionExtensions
         public Task<WorkItem?> GetByIdAsync(string workItemId, CancellationToken cancellationToken) => Task.FromResult<WorkItem?>(null);
     }
 
-    private sealed class NoopWorkExecutor : IWorkExecutor
-    {
-        public Task<RunOutcome> ExecuteAsync(RunAttempt attempt, CancellationToken cancellationToken)
-            => Task.FromResult(RunOutcome.PermanentFailure("No work executor is configured."));
-    }
 }

@@ -23,6 +23,9 @@ public sealed class WorkflowLoaderTests
                     - agent:ready
                 polling:
                   interval_ms: 42
+                repository:
+                  root: .
+                  identity: acme/widgets
                 workspace:
                   root: workspaces
                 agent:
@@ -51,6 +54,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Tracker.Provider["token"], Is.EqualTo("test-value"));
                 Assert.That(definition.Options.Tracker.RequiredLabels, Is.EqualTo(new[] { "agent:ready" }));
                 Assert.That(definition.Options.Polling.IntervalMilliseconds, Is.EqualTo(42));
+                Assert.That(definition.Options.Repository.Root, Is.EqualTo(workflow.Directory));
+                Assert.That(definition.Options.Repository.Identity, Is.EqualTo("acme/widgets"));
                 Assert.That(definition.Options.Workspace.Root, Is.EqualTo(Path.Combine(workflow.Directory, "workspaces")));
                 Assert.That(definition.Options.Agent.MaxConcurrentAgents, Is.EqualTo(2));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
@@ -140,6 +145,28 @@ public sealed class WorkflowLoaderTests
             await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
 
         Assert.That(exception!.Message, Is.EqualTo("workspace.root is required for workspace isolation."));
+    }
+
+    [Test]
+    public async Task LoadAsync_RejectsMissingCanonicalRepositoryRoot()
+    {
+        await using var workflow = await TemporaryWorkflow.CreateAsync("""
+            ---
+            tracker:
+              kind: fake
+            repository:
+              root: missing-repository
+              identity: acme/widgets
+            workspace:
+              root: workspaces
+            ---
+            Prompt
+            """);
+
+        var exception = Assert.ThrowsAsync<WorkflowValidationException>(async () =>
+            await new WorkflowLoader().LoadAsync(workflow.Path, CancellationToken.None));
+
+        Assert.That(exception!.Message, Is.EqualTo("repository.root must reference an existing directory."));
     }
 
     private sealed class TemporaryWorkflow : IAsyncDisposable

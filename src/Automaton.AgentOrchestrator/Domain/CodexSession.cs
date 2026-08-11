@@ -27,5 +27,5 @@ public sealed record CodexSessionEvent(
 
 public sealed record CodexThread(string Id);
 public sealed record CodexTurn(string Id, string ThreadId);
-public sealed record CodexTurnResult(string ThreadId, string TurnId, string Status, string? FailureReason = null);
+public sealed record CodexTurnResult(string ThreadId, string TurnId, string Status, string? FailureReason = null, string? FinalResponse = null);
 public sealed record CodexProcessIdentity(int ProcessId, DateTimeOffset StartedAtUtc, string LaunchNonce);
