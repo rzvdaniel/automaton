@@ -22,6 +22,9 @@ public interface IWorkspaceManager
     Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken cancellationToken);
     Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string lifecycleStatus, CancellationToken cancellationToken);
     Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
+    Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken);
+    Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
+    Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken);
     Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken);
 }
 public interface ICodexAppServerClient : IAsyncDisposable

@@ -388,7 +388,9 @@ public sealed class CodexAppServerClientTests
         public string? AcquiredNonce { get; private set; }
         public string? ReleasedNonce { get; private set; }
         public string? QuarantinedNonce { get; private set; }
+        public DurableExecutionIdentity? DurableIdentity { get; private set; }
         public Task AcquireAsync(string launchNonce, CancellationToken cancellationToken) { AcquiredNonce = launchNonce; return Task.CompletedTask; }
+        public Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken) { DurableIdentity = identity; return Task.CompletedTask; }
         public Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken) { ReleasedNonce = launchNonce; return Task.CompletedTask; }
         public Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken) { QuarantinedNonce = launchNonce; return Task.CompletedTask; }
     }
@@ -398,6 +400,9 @@ public sealed class CodexAppServerClientTests
         public List<(string Status, string Nonce)> Transitions { get; } = [];
         public Task<Workspace> CreateOrRecoverAsync(WorkspaceRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string lifecycleStatus, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.FromResult(workspace);
+        public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) => Task.FromResult(workspace);
+        public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken)
         {
@@ -411,12 +416,18 @@ public sealed class CodexAppServerClientTests
         private readonly Channel<string> messages = Channel.CreateUnbounded<string>();
         public string LaunchNonce { get; } = "launch-nonce";
         public CodexProcessIdentity? Identity { get; private set; }
+        public DurableExecutionIdentity? DurableIdentity { get; private set; }
         public Action<string>? OnSend { get; set; }
         public Exception? SendFailure { get; set; }
         public List<string> Methods { get; } = [];
         public List<string> Messages { get; } = [];
         public bool StopCalled { get; private set; }
-        public Task StartAsync(CancellationToken cancellationToken) { Identity = new(42, DateTimeOffset.UtcNow, LaunchNonce); return Task.CompletedTask; }
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            Identity = new(42, DateTimeOffset.UtcNow, LaunchNonce);
+            DurableIdentity = new(Identity.ProcessId, Identity.StartedAtUtc, LaunchNonce, ExecutionFencingKinds.PortableProcessTree);
+            return Task.CompletedTask;
+        }
         public Task SendAsync(string message, CancellationToken cancellationToken)
         {
             Methods.Add(Request(message).Method);

@@ -24,6 +24,7 @@ public interface ICodexJsonRpcTransport : IAsyncDisposable
 {
     string LaunchNonce { get; }
     CodexProcessIdentity? Identity { get; }
+    DurableExecutionIdentity? DurableIdentity { get; }
     Task StartAsync(CancellationToken cancellationToken);
     Task SendAsync(string message, CancellationToken cancellationToken);
     IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken);
@@ -34,6 +35,7 @@ public interface ICodexExecutionOwnership
 {
     Workspace? CurrentWorkspace { get; }
     Task AcquireAsync(string launchNonce, CancellationToken cancellationToken);
+    Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken);
     Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken);
 }
@@ -42,6 +44,7 @@ public sealed class NoopCodexExecutionOwnership : ICodexExecutionOwnership
 {
     public Workspace? CurrentWorkspace => null;
     public Task AcquireAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task QuarantineAsync(string launchNonce, CancellationToken cancellationToken) => Task.CompletedTask;
 }
@@ -84,6 +87,8 @@ public sealed class CodexAppServerClient(
         try
         {
             await transport.StartAsync(cancellationToken);
+            if (transport.DurableIdentity is not { } identity) throw new CodexProtocolException("Codex process identity was not established.");
+            await ownership.RecordProcessIdentityAsync(identity, cancellationToken);
             Touch(CodexSessionEventKinds.ProcessStarted);
             reader = ReadAsync(lifetime.Token);
             var initializeResult = await RequestAsync(CodexAppServerMethods.Initialize, new { clientInfo = new { name = "automaton-agent-orchestrator", version = "stage-4" }, capabilities = new { experimentalApi = false } }, cancellationToken);
@@ -313,7 +318,12 @@ public sealed class CodexAppServerClient(
     {
         stopping = true;
         lifetime.Cancel();
-        await transport.StopAsync(CancellationToken.None);
+        try { await transport.StopAsync(CancellationToken.None); }
+        catch
+        {
+            await QuarantineAsync();
+            throw;
+        }
         if (reader is not null) await reader;
         if (launchNonce is not null && Volatile.Read(ref ownershipQuarantined) == 0) await ownership.ReleaseAsync(launchNonce, CancellationToken.None);
         await transport.DisposeAsync();

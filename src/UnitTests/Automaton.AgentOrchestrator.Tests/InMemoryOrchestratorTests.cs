@@ -210,12 +210,16 @@ public sealed class InMemoryOrchestratorTests
     }
 
     private static InMemoryOrchestrator Create(FakeTracker tracker, IWorkExecutor executor, int maxConcurrent = 2, int initialBackoffMilliseconds = 10)
-        => new(tracker, executor, new OrchestratorOptions
+    {
+        var orchestrator = new InMemoryOrchestrator(tracker, executor, new OrchestratorOptions
         {
             Tracker = new TrackerOptions { Kind = "fake", RequiredLabels = ["agent:ready"], ActiveProviderLifecycleStates = ["open"], TerminalProviderLifecycleStates = ["closed"] },
             Agent = new AgentExecutionOptions { MaxConcurrentAgents = maxConcurrent, MaxTurns = 1 },
             Retry = new RetryOptions { MaxAttempts = 3, InitialBackoffMilliseconds = initialBackoffMilliseconds, MaxBackoffMilliseconds = 100 }
         }, new FixedClock(), NullLogger<InMemoryOrchestrator>.Instance);
+        orchestrator.CompleteStartupReconciliation();
+        return orchestrator;
+    }
 
     private static WorkItem Work(string id, string providerLifecycleState = "open", IReadOnlyList<string>? labels = null)
         => new(id, $"FAKE-{id}", id, null, providerLifecycleState, labels ?? ["agent:ready"]);

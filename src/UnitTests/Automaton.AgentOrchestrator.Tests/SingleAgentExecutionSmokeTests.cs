@@ -43,7 +43,7 @@ public sealed class SingleAgentExecutionSmokeTests
                 options);
             var clock = new SystemClock();
             var workspaceManager = new GitWorktreeWorkspaceManager(workspaceRoot, new ProcessGitCommandRunner(), clock);
-            var factory = new CodexAppServerClientFactory(workspaceManager, options, clock);
+            var factory = new CodexAppServerClientFactory(workspaceManager, options, clock, new PlatformExecutionFence());
             var executor = new SingleAgentWorkExecutor(workspaceManager, factory, workflow);
             const string sentence = "Stage 5 real smoke completed safely.";
             var item = new WorkItem(

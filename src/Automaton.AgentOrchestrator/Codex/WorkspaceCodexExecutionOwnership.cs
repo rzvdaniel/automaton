@@ -14,6 +14,11 @@ public sealed class WorkspaceCodexExecutionOwnership(IWorkspaceManager workspace
         current = await workspaceManager.UpdateExecutionOwnershipAsync(current, WorkspaceExecutionOwnershipStates.Active, launchNonce, cancellationToken);
     }
 
+    public async Task RecordProcessIdentityAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken)
+    {
+        current = await workspaceManager.RecordExecutionIdentityAsync(current, identity, cancellationToken);
+    }
+
     public async Task ReleaseAsync(string launchNonce, CancellationToken cancellationToken)
     {
         if (!string.Equals(current.LaunchNonce, launchNonce, StringComparison.Ordinal)) throw new WorkspaceOwnershipException("Codex launch nonce does not match workspace ownership.");

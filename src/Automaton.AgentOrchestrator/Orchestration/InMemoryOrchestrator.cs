@@ -17,7 +17,49 @@ public sealed class InMemoryOrchestrator(
     private readonly HashSet<string> terminalDispatchSuppression = new(StringComparer.Ordinal);
     private readonly List<RunState> history = [];
     private readonly CancellationTokenSource lifetimeCancellation = new();
+    private bool startupReconciled;
     private bool stopping;
+
+    public bool IsStartupReconciled { get { lock (gate) return startupReconciled; } }
+
+    public void RestoreTerminalState(string workItemId, string state, int attempt, string? reason)
+    {
+        if (state is not (RunStates.Completed or RunStates.Blocked or RunStates.Cancelled))
+            throw new ArgumentException("Only terminal run states can be restored.", nameof(state));
+        lock (gate)
+        {
+            history.RemoveAll(x => x.WorkItemId == workItemId);
+            history.Add(new RunState(workItemId, state, attempt, clock.UtcNow, null, reason));
+            retryRuns.Remove(workItemId);
+            terminalDispatchSuppression.Add(workItemId);
+        }
+    }
+
+    public void RestoreRetry(WorkItem item, int nextAttempt, DateTimeOffset? retryNotBeforeUtc, string? reason)
+    {
+        if (nextAttempt < 1) throw new ArgumentOutOfRangeException(nameof(nextAttempt));
+        lock (gate)
+        {
+            if (terminalDispatchSuppression.Contains(item.Id)) return;
+            var retryAt = retryNotBeforeUtc ?? clock.UtcNow;
+            var state = new RunState(item.Id, RunStates.RetryQueued, Math.Max(0, nextAttempt - 1), clock.UtcNow, retryAt, reason);
+            history.RemoveAll(x => x.WorkItemId == item.Id);
+            history.Add(state);
+            retryRuns[item.Id] = new RetryRun(item, nextAttempt, state);
+        }
+    }
+
+    public void RestoreIneligible(string workItemId, int attempt, string? reason)
+    {
+        lock (gate)
+        {
+            history.RemoveAll(x => x.WorkItemId == workItemId);
+            history.Add(new RunState(workItemId, RunStates.Ineligible, attempt, clock.UtcNow, null, reason));
+            retryRuns.Remove(workItemId);
+        }
+    }
+
+    public void CompleteStartupReconciliation() { lock (gate) startupReconciled = true; }
 
     public IReadOnlyList<RunState> Snapshot()
     {
@@ -26,7 +68,7 @@ public sealed class InMemoryOrchestrator(
 
     public async Task PollAsync(CancellationToken cancellationToken)
     {
-        if (IsStopping()) return;
+        if (IsStopping() || !IsStartupReconciled) return;
         await DispatchDueRetriesAsync(cancellationToken);
         var candidates = await tracker.DiscoverCandidatesAsync(cancellationToken);
         foreach (var candidate in candidates)
