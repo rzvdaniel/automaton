@@ -97,6 +97,35 @@ public sealed class GitHubIssuesTrackerTests
         });
     }
 
+    [TestCase(HttpStatusCode.NotFound)]
+    [TestCase(HttpStatusCode.Gone)]
+    public void DiscoverCandidatesAsync_TreatsRepositoryAbsenceAsTrackerFailure(HttpStatusCode statusCode)
+    {
+        var tracker = Create(new StubHandler(new HttpResponseMessage(statusCode)));
+
+        var exception = Assert.ThrowsAsync<GitHubTrackerException>(async () => await tracker.DiscoverCandidatesAsync(CancellationToken.None));
+
+        Assert.That(exception!.StatusCode, Is.EqualTo(statusCode));
+    }
+
+    [Test]
+    public void DiscoverCandidatesAsync_RejectsCrossOriginPaginationBeforeSendingCredentials()
+    {
+        var handler = new StubHandler(JsonResponse("""
+            [{"number":4,"state":"open","title":"ready","labels":[{"name":"agent:ready"}]}]
+            """, "<https://attacker.example/issues?page=2>; rel=\"next\""));
+        var tracker = Create(handler);
+
+        var exception = Assert.ThrowsAsync<GitHubTrackerProtocolException>(async () => await tracker.DiscoverCandidatesAsync(CancellationToken.None));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Not.Contain("host-token"));
+            Assert.That(handler.Requests, Has.Count.EqualTo(1));
+            Assert.That(handler.Requests[0].RequestUri!.Host, Is.EqualTo("api.github.test"));
+        });
+    }
+
     [Test]
     public void Options_RequireExplicitRepositoryScopeAndHostToken()
     {

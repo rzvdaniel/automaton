@@ -21,11 +21,10 @@ public sealed class GitHubIssuesTracker(HttpClient client, GitHubIssuesTrackerOp
         while (next is not null)
         {
             using var response = await SendAsync(next, cancellationToken);
-            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone) return [];
             EnsureSuccess(response);
             var issues = await DeserializeAsync<GitHubIssue[]>(response, cancellationToken) ?? [];
             result.AddRange(issues.Where(IsEligibleIssue).Select(Normalize));
-            next = ParseNextLink(response, options.ApiBaseUri);
+            next = ParseNextLink(response);
         }
         return result;
     }
@@ -74,12 +73,22 @@ public sealed class GitHubIssuesTracker(HttpClient client, GitHubIssuesTrackerOp
         return value.StartsWith(prefix, StringComparison.Ordinal) && long.TryParse(value[prefix.Length..], out number) && number > 0;
     }
 
-    private static Uri? ParseNextLink(HttpResponseMessage response, Uri baseUri)
+    private Uri? ParseNextLink(HttpResponseMessage response)
     {
         if (!response.Headers.TryGetValues("Link", out var links)) return null;
         var match = NextLink.Match(string.Join(",", links));
-        return match.Success && Uri.TryCreate(baseUri, match.Groups["url"].Value, out var next) ? next : null;
+        if (!match.Success) return null;
+        if (!Uri.TryCreate(options.ApiBaseUri, match.Groups["url"].Value, out var next))
+            throw new GitHubTrackerProtocolException("GitHub Issues pagination returned an invalid next link.");
+        if (!HasConfiguredApiOrigin(next))
+            throw new GitHubTrackerProtocolException("GitHub Issues pagination next link is outside the configured API origin.");
+        return next;
     }
+
+    private bool HasConfiguredApiOrigin(Uri uri)
+        => string.Equals(uri.Scheme, options.ApiBaseUri.Scheme, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(uri.Host, options.ApiBaseUri.Host, StringComparison.OrdinalIgnoreCase)
+           && uri.Port == options.ApiBaseUri.Port;
 
     private static async Task<T?> DeserializeAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
         => await JsonSerializer.DeserializeAsync<T>(await response.Content.ReadAsStreamAsync(cancellationToken), JsonOptions, cancellationToken);
@@ -111,3 +120,5 @@ public sealed class GitHubTrackerException(HttpStatusCode statusCode) : Exceptio
 {
     public HttpStatusCode StatusCode { get; } = statusCode;
 }
+
+public sealed class GitHubTrackerProtocolException(string message) : Exception(message);
