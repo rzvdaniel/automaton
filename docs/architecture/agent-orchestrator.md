@@ -305,6 +305,11 @@ Wire method names and JSON shapes remain confined to the Codex adapter; the
 orchestrator receives bounded typed session events and IDs instead of raw lines
 or unbounded transcripts.
 
+Each client is permanently bound to its normalized Stage 3 workspace path.
+`thread/start` always uses that path, and `thread/resume` supplies it as the
+protocol cwd override and rejects a missing or mismatched cwd in the response.
+Callers cannot provide a different thread working directory.
+
 The configured `codex.turn_timeout_ms` is interpreted at this boundary as a
 meaningful-activity idle timeout. Responses, notifications, item activity, and
 usage updates refresh it, so healthy long-running turns are not killed merely

@@ -30,7 +30,7 @@ public interface ICodexAppServerClient : IAsyncDisposable
     DateTimeOffset LastActivityUtc { get; }
     IReadOnlyList<CodexSessionEvent> Events { get; }
     Task InitializeAsync(CancellationToken cancellationToken);
-    Task<CodexThread> StartThreadAsync(string cwd, CancellationToken cancellationToken);
+    Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken);
     Task<CodexThread> ResumeThreadAsync(string threadId, CancellationToken cancellationToken);
     Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken cancellationToken);
     Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken);

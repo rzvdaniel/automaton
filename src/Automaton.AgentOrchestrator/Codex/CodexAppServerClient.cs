@@ -48,12 +48,18 @@ public sealed class CodexAppServerClient(
     ICodexJsonRpcTransport transport,
     ICodexExecutionOwnership ownership,
     IClock clock,
-    TimeSpan idleTimeout) : ICodexAppServerClient, IAsyncDisposable
+    TimeSpan idleTimeout,
+    string workspacePath) : ICodexAppServerClient, IAsyncDisposable
 {
+    private const int MaximumEarlyTurnResults = 64;
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> pending = [];
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<CodexTurnResult>> turns = [];
+    private readonly object turnGate = new();
+    private readonly Dictionary<string, TaskCompletionSource<CodexTurnResult>> turns = [];
+    private readonly Dictionary<string, (CodexTurnResult Result, LinkedListNode<string> Node)> earlyTurnResults = [];
+    private readonly LinkedList<string> earlyTurnOrder = [];
     private readonly List<CodexSessionEvent> events = [];
     private readonly CancellationTokenSource lifetime = new();
+    private readonly string workspacePath = NormalizeAbsolutePath(workspacePath, "Assigned workspace path");
     private long nextRequestId;
     private Task? reader;
     private string? launchNonce;
@@ -64,6 +70,8 @@ public sealed class CodexAppServerClient(
     public CodexProcessIdentity? ProcessIdentity => transport.Identity;
     public DateTimeOffset LastActivityUtc => lastActivityUtc;
     public IReadOnlyList<CodexSessionEvent> Events { get { lock (events) return events.ToArray(); } }
+    internal int PendingRequestCount => pending.Count;
+    internal int BufferedEarlyTurnResultCount { get { lock (turnGate) return earlyTurnResults.Count; } }
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -87,9 +95,9 @@ public sealed class CodexAppServerClient(
         }
     }
 
-    public async Task<CodexThread> StartThreadAsync(string cwd, CancellationToken cancellationToken)
+    public async Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken)
     {
-        var result = await RequestAsync(CodexAppServerMethods.ThreadStart, new { cwd }, cancellationToken);
+        var result = await RequestAsync(CodexAppServerMethods.ThreadStart, new { cwd = workspacePath }, cancellationToken);
         var id = RequiredNestedId(result, "thread");
         Touch(CodexSessionEventKinds.ThreadStarted, id);
         return new(id);
@@ -97,8 +105,12 @@ public sealed class CodexAppServerClient(
 
     public async Task<CodexThread> ResumeThreadAsync(string threadId, CancellationToken cancellationToken)
     {
-        var result = await RequestAsync(CodexAppServerMethods.ThreadResume, new { threadId }, cancellationToken);
+        var result = await RequestAsync(CodexAppServerMethods.ThreadResume, new { threadId, cwd = workspacePath }, cancellationToken);
         var id = RequiredNestedId(result, "thread");
+        var resumedCwd = NestedStringProperty(result, "thread", "cwd")
+            ?? throw new CodexProtocolException("thread/resume response has no workspace path.");
+        if (!PathsEqual(resumedCwd, workspacePath))
+            throw new CodexProtocolException("thread/resume returned a different workspace path.");
         Touch(CodexSessionEventKinds.ThreadResumed, id);
         return new(id);
     }
@@ -108,14 +120,25 @@ public sealed class CodexAppServerClient(
         var input = new[] { new { type = "text", text = prompt, text_elements = Array.Empty<object>() } };
         var result = await RequestAsync(CodexAppServerMethods.TurnStart, new { threadId, input }, cancellationToken);
         var id = RequiredNestedId(result, "turn");
-        turns.TryAdd(id, new(TaskCreationOptions.RunContinuationsAsynchronously));
+        lock (turnGate)
+        {
+            var completion = new TaskCompletionSource<CodexTurnResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!turns.TryAdd(id, completion)) throw new CodexProtocolException("Duplicate turn ID.");
+            if (earlyTurnResults.Remove(id, out var earlyResult))
+            {
+                earlyTurnOrder.Remove(earlyResult.Node);
+                completion.TrySetResult(earlyResult.Result);
+            }
+        }
         Touch(CodexSessionEventKinds.TurnStarted, threadId, id);
         return new(id, threadId);
     }
 
     public async Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken)
     {
-        if (!turns.TryGetValue(turn.Id, out var completion)) throw new CodexProtocolException("Unknown turn ID.");
+        TaskCompletionSource<CodexTurnResult> completion;
+        lock (turnGate)
+            if (!turns.TryGetValue(turn.Id, out completion!)) throw new CodexProtocolException("Unknown turn ID.");
         try
         {
             while (true)
@@ -138,7 +161,7 @@ public sealed class CodexAppServerClient(
             await InterruptTurnAsync(turn.ThreadId, turn.Id, CancellationToken.None);
             throw;
         }
-        finally { turns.TryRemove(turn.Id, out _); }
+        finally { lock (turnGate) turns.Remove(turn.Id); }
     }
 
     public async Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken)
@@ -149,9 +172,13 @@ public sealed class CodexAppServerClient(
         var id = Interlocked.Increment(ref nextRequestId);
         var completion = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!pending.TryAdd(id, completion)) throw new InvalidOperationException("JSON-RPC request correlation failed.");
-        await SendAsync(new { id, method, @params = parameters }, cancellationToken);
-        using var registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
-        try { return await completion.Task; } finally { pending.TryRemove(id, out _); }
+        try
+        {
+            await SendAsync(new { id, method, @params = parameters }, cancellationToken);
+            using var registration = cancellationToken.Register(() => completion.TrySetCanceled(cancellationToken));
+            return await completion.Task;
+        }
+        finally { pending.TryRemove(id, out _); }
     }
 
     private Task NotifyAsync(string method, CancellationToken cancellationToken) => SendAsync(new { method }, cancellationToken);
@@ -217,7 +244,12 @@ public sealed class CodexAppServerClient(
         var failure = NestedStringProperty(parameters, "turn", "error", "message");
         var kind = status switch { "completed" => CodexSessionEventKinds.TurnCompleted, "interrupted" => CodexSessionEventKinds.TurnInterrupted, _ => CodexSessionEventKinds.TurnFailed };
         Touch(kind, threadId, turnId, failure);
-        if (turns.TryGetValue(turnId, out var completion)) completion.TrySetResult(new(threadId, turnId, status, failure));
+        var result = new CodexTurnResult(threadId, turnId, status, failure);
+        lock (turnGate)
+        {
+            if (turns.TryGetValue(turnId, out var completion)) completion.TrySetResult(result);
+            else BufferEarlyTurnResult(result);
+        }
     }
 
     private async Task QuarantineAsync()
@@ -228,12 +260,34 @@ public sealed class CodexAppServerClient(
 
     private static string RequiredNestedId(JsonElement result, string property)
         => NestedStringProperty(result, property, "id") ?? throw new CodexProtocolException($"{property} response has no ID.");
+    private static bool PathsEqual(string left, string right)
+        => string.Equals(
+            NormalizeAbsolutePath(left, "App Server workspace path"),
+            NormalizeAbsolutePath(right, "Assigned workspace path"),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    private static string NormalizeAbsolutePath(string path, string description)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+            throw new CodexProtocolException($"{description} must be absolute.");
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+    }
+    private void BufferEarlyTurnResult(CodexTurnResult result)
+    {
+        if (earlyTurnResults.ContainsKey(result.TurnId)) return;
+        while (earlyTurnResults.Count >= MaximumEarlyTurnResults && earlyTurnOrder.First is { } oldest)
+        {
+            earlyTurnOrder.RemoveFirst();
+            earlyTurnResults.Remove(oldest.Value);
+        }
+        var node = earlyTurnOrder.AddLast(result.TurnId);
+        earlyTurnResults[result.TurnId] = (result, node);
+    }
     private static string? StringProperty(JsonElement element, string name) => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     private static string? NestedStringProperty(JsonElement element, params string[] path) { foreach (var name in path) { if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out element)) return null; } return element.ValueKind == JsonValueKind.String ? element.GetString() : null; }
     private static long? FindLong(JsonElement element, string name) { if (element.ValueKind == JsonValueKind.Object) { foreach (var property in element.EnumerateObject()) { if (property.NameEquals(name) && property.Value.TryGetInt64(out var number)) return number; var nested = FindLong(property.Value, name); if (nested is not null) return nested; } } return null; }
     private static string Bounded(string value) => value.Length <= 512 ? value : value[..512];
     private void Touch(string kind, string? threadId = null, string? turnId = null, string? detail = null, long? inputTokens = null, long? outputTokens = null) { lastActivityUtc = clock.UtcNow; lock (events) { events.Add(new(kind, lastActivityUtc, threadId, turnId, Bounded(detail ?? string.Empty), inputTokens, outputTokens)); if (events.Count > 512) events.RemoveAt(0); } }
-    private void FailAll(Exception exception) { foreach (var request in pending.Values) request.TrySetException(exception); foreach (var turn in turns.Values) turn.TrySetException(exception); }
+    private void FailAll(Exception exception) { foreach (var request in pending.Values) request.TrySetException(exception); lock (turnGate) foreach (var turn in turns.Values) turn.TrySetException(exception); }
 
     public async ValueTask DisposeAsync()
     {

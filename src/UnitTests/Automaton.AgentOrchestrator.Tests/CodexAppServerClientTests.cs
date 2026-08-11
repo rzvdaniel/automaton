@@ -10,16 +10,18 @@ namespace Automaton.AgentOrchestrator.Tests;
 [TestFixture]
 public sealed class CodexAppServerClientTests
 {
+    private static readonly string WorkspacePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+
     [Test]
     public async Task Session_InitializesStartsThreadAndTurnAndNormalizesNotifications()
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => RespondNormally(transport, message);
         var ownership = new RecordingOwnership();
-        await using var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2));
+        await using var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
 
         await client.InitializeAsync(CancellationToken.None);
-        var thread = await client.StartThreadAsync(Path.GetTempPath(), CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
         var turn = await client.StartTurnAsync(thread.Id, "Do not modify files.", CancellationToken.None);
         transport.Emit("""{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"agentMessage"},"startedAtMs":1}}""");
         transport.Emit("""{"method":"thread/tokenUsage/updated","params":{"threadId":"thread-1","turnId":"turn-1","tokenUsage":{"total":{"inputTokens":12,"outputTokens":5}}}}""");
@@ -54,13 +56,13 @@ public sealed class CodexAppServerClientTests
             {
                 held.Add((id!.Value, method));
                 if (held.Count == 2)
-                    foreach (var request in held.AsEnumerable().Reverse()) transport.Respond(request.Id, new { thread = new { id = request.Method == "thread/start" ? "started" : "resumed" } });
+                    foreach (var request in held.AsEnumerable().Reverse()) transport.Respond(request.Id, new { thread = new { id = request.Method == "thread/start" ? "started" : "resumed", cwd = WorkspacePath } });
             }
         };
-        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2));
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
 
-        var startedTask = client.StartThreadAsync(Path.GetTempPath(), CancellationToken.None);
+        var startedTask = client.StartThreadAsync(CancellationToken.None);
         var resumedTask = client.ResumeThreadAsync("existing", CancellationToken.None);
         var started = await startedTask;
         var resumed = await resumedTask;
@@ -70,6 +72,43 @@ public sealed class CodexAppServerClientTests
             Assert.That(started.Id, Is.EqualTo("started"));
             Assert.That(resumed.Id, Is.EqualTo("resumed"));
         });
+    }
+
+    [Test]
+    public async Task ThreadStartAndResume_AreBoundToTheAssignedWorkspace()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message => RespondNormally(transport, message);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        await client.StartThreadAsync(CancellationToken.None);
+        await client.ResumeThreadAsync("existing", CancellationToken.None);
+
+        var requests = transport.Messages.Select(ParseMessage).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(requests.Single(x => x.Method == "thread/start").Cwd, Is.EqualTo(WorkspacePath));
+            Assert.That(requests.Single(x => x.Method == "thread/resume").Cwd, Is.EqualTo(WorkspacePath));
+            Assert.That(typeof(ICodexAppServerClient).GetMethod(nameof(ICodexAppServerClient.StartThreadAsync))!.GetParameters(), Has.Length.EqualTo(1), "the public contract has no caller-supplied cwd");
+        });
+    }
+
+    [Test]
+    public async Task ResumeThread_RejectsAWorkspaceMismatch()
+    {
+        var outside = Path.GetFullPath(Path.Combine(WorkspacePath, "..", "outside-workspace"));
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            var (id, method) = Request(message);
+            if (method == "initialize") transport.Respond(id!.Value, new { });
+            else if (method == "thread/resume") transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = outside } });
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+
+        Assert.ThrowsAsync<CodexProtocolException>(async () => await client.ResumeThreadAsync("existing", CancellationToken.None));
     }
 
     [TestCase(true)]
@@ -85,7 +124,7 @@ public sealed class CodexAppServerClientTests
             if (malformed) transport.Emit("not-json");
             else transport.Emit(JsonSerializer.Serialize(new { id, error = new { code = -32600, message = "bad request" } }));
         };
-        var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2));
+        var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
 
         Assert.ThrowsAsync<CodexProtocolException>(async () => await client.InitializeAsync(CancellationToken.None));
         Assert.That(ownership.QuarantinedNonce, Is.EqualTo(transport.LaunchNonce));
@@ -98,7 +137,7 @@ public sealed class CodexAppServerClientTests
         var transport = new ScriptedTransport();
         transport.OnSend = message => { var (id, method) = Request(message); if (method == "initialize") transport.Respond(id!.Value, new { }); };
         var ownership = new RecordingOwnership();
-        await using var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2));
+        await using var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
 
         transport.Complete();
@@ -112,9 +151,9 @@ public sealed class CodexAppServerClientTests
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => RespondNormally(transport, message);
-        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromMilliseconds(40));
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromMilliseconds(40), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
-        var thread = await client.StartThreadAsync(Path.GetTempPath(), CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
         var first = await client.StartTurnAsync(thread.Id, "wait", CancellationToken.None);
 
         Assert.ThrowsAsync<CodexIdleTimeoutException>(async () => await client.WaitForTurnCompletionAsync(first, CancellationToken.None));
@@ -130,9 +169,9 @@ public sealed class CodexAppServerClientTests
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => RespondNormally(transport, message);
-        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2));
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
-        var thread = await client.StartThreadAsync(Path.GetTempPath(), CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
         var failed = await client.StartTurnAsync(thread.Id, "fail", CancellationToken.None);
         transport.Emit("""{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"failed","error":{"message":"controlled failure"},"items":[]}}}""");
 
@@ -153,9 +192,9 @@ public sealed class CodexAppServerClientTests
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => RespondNormally(transport, message);
-        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2));
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
-        var thread = await client.StartThreadAsync(Path.GetTempPath(), CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
         var turn = await client.StartTurnAsync(thread.Id, "interrupt", CancellationToken.None);
         transport.Emit("""{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"interrupted","items":[]}}}""");
 
@@ -169,12 +208,54 @@ public sealed class CodexAppServerClientTests
     }
 
     [Test]
+    public async Task ImmediateTurnCompletion_IsRetainedUntilTurnRegistration()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message =>
+        {
+            var (id, method) = Request(message);
+            if (method == "initialize") transport.Respond(id!.Value, new { });
+            else if (method == "thread/start") transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } });
+            else if (method == "turn/start")
+            {
+                transport.Respond(id!.Value, new { turn = new { id = "turn-early", status = "inProgress", items = Array.Empty<object>() } });
+                transport.Emit("""{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-early","status":"completed","items":[]}}}""");
+            }
+        };
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromMilliseconds(100), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        var thread = await client.StartThreadAsync(CancellationToken.None);
+
+        var turn = await client.StartTurnAsync(thread.Id, "complete immediately", CancellationToken.None);
+        var result = await client.WaitForTurnCompletionAsync(turn, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(new CodexTurnResult("thread-1", "turn-early", "completed")));
+            Assert.That(client.BufferedEarlyTurnResultCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task SendFailure_RemovesPendingRequestCorrelation()
+    {
+        var transport = new ScriptedTransport();
+        transport.OnSend = message => RespondNormally(transport, message);
+        await using var client = new CodexAppServerClient(transport, new RecordingOwnership(), new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
+        await client.InitializeAsync(CancellationToken.None);
+        transport.SendFailure = new IOException("controlled send failure");
+
+        Assert.ThrowsAsync<IOException>(async () => await client.StartThreadAsync(CancellationToken.None));
+        Assert.That(client.PendingRequestCount, Is.Zero);
+    }
+
+    [Test]
     public async Task Dispose_StopsProcessAndReleasesMatchingOwnership()
     {
         var transport = new ScriptedTransport();
         transport.OnSend = message => { var (id, method) = Request(message); if (method == "initialize") transport.Respond(id!.Value, new { }); };
         var ownership = new RecordingOwnership();
-        var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2));
+        var client = new CodexAppServerClient(transport, ownership, new SystemClock(), TimeSpan.FromSeconds(2), WorkspacePath);
         await client.InitializeAsync(CancellationToken.None);
 
         await client.DisposeAsync();
@@ -229,7 +310,8 @@ public sealed class CodexAppServerClientTests
         switch (method)
         {
             case "initialize": transport.Respond(id!.Value, new { }); break;
-            case "thread/start": transport.Respond(id!.Value, new { thread = new { id = "thread-1" } }); break;
+            case "thread/start": transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } }); break;
+            case "thread/resume": transport.Respond(id!.Value, new { thread = new { id = "thread-1", cwd = WorkspacePath } }); break;
             case "turn/start": transport.Respond(id!.Value, new { turn = new { id = "turn-1", status = "inProgress", items = Array.Empty<object>() } }); break;
             case "turn/interrupt": transport.Respond(id!.Value, new { }); break;
         }
@@ -240,6 +322,16 @@ public sealed class CodexAppServerClientTests
         using var document = JsonDocument.Parse(message);
         var root = document.RootElement;
         return (root.TryGetProperty("id", out var id) ? id.GetInt64() : null, root.GetProperty("method").GetString()!);
+    }
+
+    private static (string Method, string? Cwd) ParseMessage(string message)
+    {
+        using var document = JsonDocument.Parse(message);
+        var root = document.RootElement;
+        var parameters = root.TryGetProperty("params", out var value) ? value : default;
+        return (
+            root.GetProperty("method").GetString()!,
+            parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("cwd", out var cwd) ? cwd.GetString() : null);
     }
 
     private static async Task EventuallyAsync(Func<bool> condition)
@@ -277,10 +369,19 @@ public sealed class CodexAppServerClientTests
         public string LaunchNonce { get; } = "launch-nonce";
         public CodexProcessIdentity? Identity { get; private set; }
         public Action<string>? OnSend { get; set; }
+        public Exception? SendFailure { get; set; }
         public List<string> Methods { get; } = [];
+        public List<string> Messages { get; } = [];
         public bool StopCalled { get; private set; }
         public Task StartAsync(CancellationToken cancellationToken) { Identity = new(42, DateTimeOffset.UtcNow, LaunchNonce); return Task.CompletedTask; }
-        public Task SendAsync(string message, CancellationToken cancellationToken) { Methods.Add(Request(message).Method); OnSend?.Invoke(message); return Task.CompletedTask; }
+        public Task SendAsync(string message, CancellationToken cancellationToken)
+        {
+            Methods.Add(Request(message).Method);
+            Messages.Add(message);
+            if (SendFailure is { } failure) { SendFailure = null; return Task.FromException(failure); }
+            OnSend?.Invoke(message);
+            return Task.CompletedTask;
+        }
         public IAsyncEnumerable<string> ReadAllAsync(CancellationToken cancellationToken) => messages.Reader.ReadAllAsync(cancellationToken);
         public Task StopAsync(CancellationToken cancellationToken) { StopCalled = true; messages.Writer.TryComplete(); return Task.CompletedTask; }
         public void Respond(long id, object result) => Emit(JsonSerializer.Serialize(new { id, result }));

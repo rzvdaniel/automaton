@@ -17,7 +17,7 @@ public sealed class CodexAppServerSmokeTests
             command,
             TestContext.CurrentContext.WorkDirectory,
             ShutdownTimeout: TimeSpan.FromSeconds(5)));
-        await using var client = new CodexAppServerClient(transport, new NoopCodexExecutionOwnership(), new SystemClock(), TimeSpan.FromSeconds(10));
+        await using var client = new CodexAppServerClient(transport, new NoopCodexExecutionOwnership(), new SystemClock(), TimeSpan.FromSeconds(10), TestContext.CurrentContext.WorkDirectory);
 
         await client.InitializeAsync(CancellationToken.None);
 
