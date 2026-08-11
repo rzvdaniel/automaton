@@ -511,7 +511,12 @@ remain Stage 9-or-later capabilities.
 ### Stage 9 validated draft publication
 
 Publication is a host-owned capability invoked only after an independent
-Reviewer returns `APPROVED`. The daemon revalidates the assigned worktree root,
+Reviewer returns `APPROVED`. Immediately after that verdict, the host durably
+advances publication from `none` to `authorized` before validation or any Git
+side effect. Repository state is agent-influenced: commit author, email, and
+subject are provenance evidence but never authorization. Only the sidecar's
+host-owned authorization checkpoint permits publication or restart recovery.
+The daemon then revalidates the assigned worktree root,
 registered branch, absence of conflicts or incomplete Git operations, and the
 configured repository validation commands before staging anything. It creates
 one deterministic commit with an explicit configured bot name and email; agent
@@ -529,7 +534,7 @@ reused, duplicates or identity mismatches fail closed, and provider responses
 are validated before durable state advances. Provider pagination is restricted
 to the configured API origin so credentials cannot follow a cross-origin link.
 
-Sidecar schema v3 records only bounded publication recovery metadata: base
+Sidecar schema v4 records only bounded publication recovery metadata: base
 commit provenance, publication phase, commit SHA, remote branch, and draft PR
 number/URL. A crash between an external success and sidecar persistence is
 recovered by authoritative Git remote or GitHub lookup. Older workspaces without
@@ -538,14 +543,22 @@ run in the assigned workspace with a minimal non-secret environment; GitHub
 credentials remain host-side and are never placed in role prompts or Codex child
 configuration.
 
-Startup distinguishes generic interrupted execution from recognizable host-
-owned publication. `working` with no provable daemon publication commit keeps
-Stage 6's conservative manual-attention behavior. After ownership has been
+The ordered phases are `none`, `authorized`, `committed`, `pushed`, and
+`pull-request-created`; sidecar transitions cannot skip authorization or move
+backward. Schema v3 committed/pushed/PR records migrate as authorized history
+because those phases were written only by the Stage 9 host publisher, while
+older or generic `working + none` records remain unapproved.
+
+Startup distinguishes generic interrupted execution from host-authorized
+publication. `working + none` keeps Stage 6's conservative manual-attention
+behavior even when Git metadata perfectly resembles a daemon commit. After
+ownership has been
 proved ended and the tracker item is refreshed as eligible, an exact daemon
-commit (including one written before its sidecar update) allows the publisher to
-resume only commit/push/PR reconciliation; Manager, Developer, and Reviewer are
-not rerun. Durable `committed` and `pushed` phases must match that provenance,
-and remote mismatch fails closed.
+authorization allows the publisher to resume only commit/push/PR
+reconciliation; Manager, Developer, and Reviewer are not rerun. `authorized`
+may safely create the commit after a pre-commit crash, or recognize the exact
+daemon commit when its `committed` write was missed. Durable `committed` and
+`pushed` phases must match that provenance, and remote mismatch fails closed.
 
 `pull-request-created` is not terminal proof by itself. Startup verifies through
 the GitHub adapter that the configured repository, exact head branch/SHA, base

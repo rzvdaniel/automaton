@@ -24,8 +24,12 @@ public sealed class GitWorkPublisher(
 
     public async Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
     {
+        if (!string.Equals(request.Reviewer.Verdict, RoleResultStatuses.Approved, StringComparison.Ordinal))
+            throw new PublicationException("Durable publication authorization requires independent Reviewer approval.");
         var workspace = request.Workspace;
         ValidateWorkspaceForPublication(workspace, requireActiveOwnership: true);
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Authorized), CancellationToken.None);
 
         await ValidateGitStateAsync(workspace, cancellationToken);
         await RunValidationCommandsAsync(workspace, cancellationToken);
@@ -58,21 +62,25 @@ public sealed class GitWorkPublisher(
         if (workspace.ExecutionOwnershipStatus != WorkspaceExecutionOwnershipStates.None)
             throw new PublicationException("Publication recovery requires execution ownership to be safely released.");
         ValidateWorkspaceForPublication(workspace, requireActiveOwnership: false);
+        var recoveryState = record.Publication?.State ?? PublicationStates.None;
+        if (recoveryState == PublicationStates.None) return new(false);
         await ValidateGitStateAsync(workspace, cancellationToken);
         var subject = BuildSubject(workItem);
-        var commitSha = await RecognizeExistingCommitAsync(workspace, subject, cancellationToken);
-        if (commitSha is null)
-        {
-            if (record.Publication?.State is null or PublicationStates.None) return new(false);
-            throw new PublicationException("Durable publication state exists but the daemon publication commit cannot be proven.");
-        }
-
         await RunValidationCommandsAsync(workspace, cancellationToken);
-        ValidateRecoveryHint(record.Publication, workspace, commitSha);
         await ValidateRemoteAsync(workspace, cancellationToken);
-        if (record.Publication?.State is null or PublicationStates.None)
+        string commitSha;
+        if (recoveryState == PublicationStates.Authorized)
+        {
+            commitSha = await PrepareCommitAsync(workspace, subject, cancellationToken);
             workspace = await workspaces.UpdatePublicationStateAsync(workspace,
                 new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch), CancellationToken.None);
+        }
+        else
+        {
+            commitSha = await RecognizeExistingCommitAsync(workspace, subject, cancellationToken)
+                ?? throw new PublicationException("Durable publication state exists but the daemon publication commit cannot be proven.");
+            ValidateRecoveryHint(record.Publication, workspace, commitSha);
+        }
 
         var request = new PullRequestPublicationRequest(
             options.Repository.Identity,

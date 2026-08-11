@@ -5,6 +5,7 @@ namespace Automaton.AgentOrchestrator.Domain;
 public static class PublicationStates
 {
     public const string None = "none";
+    public const string Authorized = "authorized";
     public const string Committed = "committed";
     public const string Pushed = "pushed";
     public const string PullRequestCreated = "pull-request-created";

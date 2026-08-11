@@ -32,7 +32,7 @@ public sealed class GitWorkPublisherTests
             Assert.That(result.CommitSha, Is.EqualTo(CommitSha));
             Assert.That(git.Commands.Any(x => x.Contains("commit") && x.Contains("user.name=Automaton Agent") && x.Contains("user.email=agent@example.test")), Is.True);
             Assert.That(git.Commands.Single(x => x.Contains("push")), Does.Not.Contain("--force"));
-            Assert.That(workspaces.States.Select(x => x.State), Is.EqualTo(new[] { PublicationStates.Committed, PublicationStates.Pushed, PublicationStates.PullRequestCreated }));
+            Assert.That(workspaces.States.Select(x => x.State), Is.EqualTo(new[] { PublicationStates.Authorized, PublicationStates.Committed, PublicationStates.Pushed, PublicationStates.PullRequestCreated }));
             Assert.That(prs.Requests.Single().HeadSha, Is.EqualTo(CommitSha));
         });
     }
@@ -44,6 +44,24 @@ public sealed class GitWorkPublisherTests
         var prs = new FakePullRequests();
         Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), prs).PublishAsync(Request(), CancellationToken.None));
         Assert.Multiple(() => { Assert.That(git.Commands, Has.None.Contains("push")); Assert.That(prs.Requests, Is.Empty); });
+    }
+
+    [Test]
+    public void PublishAsync_PersistsAuthorizationBeforeCommitValidationCanFail()
+    {
+        var git = new FakeGit(workspacePath) { HasChanges = false };
+        var workspaces = new FakeWorkspaces();
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, workspaces, new FakePullRequests()).PublishAsync(Request(), CancellationToken.None));
+        Assert.That(workspaces.States.Select(x => x.State), Is.EqualTo(new[] { PublicationStates.Authorized }));
+    }
+
+    [Test]
+    public void PublishAsync_RejectsNonApprovedReviewBeforeAuthorization()
+    {
+        var workspaces = new FakeWorkspaces();
+        var request = Request() with { Reviewer = new ReviewerHandoff(RoleResultStatuses.Blocked, "blocked", []) };
+        Assert.ThrowsAsync<PublicationException>(() => Create(new FakeGit(workspacePath), workspaces, new FakePullRequests()).PublishAsync(request, CancellationToken.None));
+        Assert.That(workspaces.States, Is.Empty);
     }
 
     [Test]
@@ -117,11 +135,45 @@ public sealed class GitWorkPublisherTests
     }
 
     [Test]
-    public async Task RecoverAsync_ReconstructsMissedSidecarsFromExactRemoteAndExistingPullRequest()
+    public async Task RecoverAsync_AuthorizedWithoutCommitCreatesOneDaemonCommitAndContinues()
+    {
+        var git = new FakeGit(workspacePath);
+        var states = new FakeWorkspaces();
+        var result = await Create(git, states, new FakePullRequests()).RecoverAsync(RecoveryRecord(PublicationStates.Authorized), Request().WorkItem, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(result.Recognized, Is.True); Assert.That(git.Commands.Count(x => x.Contains("commit")), Is.EqualTo(1)); Assert.That(states.States.First().State, Is.EqualTo(PublicationStates.Committed)); });
+    }
+
+    [Test]
+    public async Task RecoverAsync_AuthorizedExactCommitReconstructsMissedCommittedWrite()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true };
+        var states = new FakeWorkspaces();
+        await Create(git, states, new FakePullRequests()).RecoverAsync(RecoveryRecord(PublicationStates.Authorized), Request().WorkItem, CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(git.Commands, Has.None.Matches<string>(x => x.Contains(" commit "))); Assert.That(states.States.First().State, Is.EqualTo(PublicationStates.Committed)); });
+    }
+
+    [Test]
+    public void RecoverAsync_UnapprovedBotLookingCommitIsNeverInspectedOrPublished()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
+        var prs = new FakePullRequests();
+        var result = Create(git, new FakeWorkspaces(), prs).RecoverAsync(RecoveryRecord(PublicationStates.None), Request().WorkItem, CancellationToken.None).GetAwaiter().GetResult();
+        Assert.Multiple(() => { Assert.That(result.Recognized, Is.False); Assert.That(git.Commands, Is.Empty); Assert.That(prs.Requests, Is.Empty); });
+    }
+
+    [Test]
+    public void RecoverAsync_AuthorizedUnexpectedCommitFailsClosed()
+    {
+        var git = new FakeGit(workspacePath) { Committed = true, Provenance = "Developer\0developer@example.test\0other" };
+        Assert.ThrowsAsync<PublicationException>(() => Create(git, new FakeWorkspaces(), new FakePullRequests()).RecoverAsync(RecoveryRecord(PublicationStates.Authorized), Request().WorkItem, CancellationToken.None));
+    }
+
+    [Test]
+    public async Task RecoverAsync_AuthorizedStateReconstructsMissedSidecarsFromExactRemoteAndExistingPullRequest()
     {
         var git = new FakeGit(workspacePath) { Committed = true, RemoteSha = CommitSha };
         var prs = new FakePullRequests { ExistingForCreate = true };
-        var result = await Create(git, new FakeWorkspaces(), prs).RecoverAsync(RecoveryRecord(PublicationStates.None), Request().WorkItem, CancellationToken.None);
+        var result = await Create(git, new FakeWorkspaces(), prs).RecoverAsync(RecoveryRecord(PublicationStates.Authorized), Request().WorkItem, CancellationToken.None);
         Assert.Multiple(() => { Assert.That(result.Recognized, Is.True); Assert.That(git.Commands, Has.None.Contains("push")); Assert.That(prs.CreatedCount, Is.Zero); });
     }
 
@@ -188,7 +240,7 @@ public sealed class GitWorkPublisherTests
     private OwnedWorkspaceRecord RecoveryRecord(string state)
     {
         var workspace = Request().Workspace with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.None };
-        var publication = state == PublicationStates.None ? new PublicationRecoveryState(state) : new PublicationRecoveryState(state, CommitSha, workspace.Branch, state == PublicationStates.PullRequestCreated ? 42 : null, state == PublicationStates.PullRequestCreated ? "https://github.com/acme/widgets/pull/42" : null);
+        var publication = state is PublicationStates.None or PublicationStates.Authorized ? new PublicationRecoveryState(state) : new PublicationRecoveryState(state, CommitSha, workspace.Branch, state == PublicationStates.PullRequestCreated ? 42 : null, state == PublicationStates.PullRequestCreated ? "https://github.com/acme/widgets/pull/42" : null);
         return new(workspace, "id", new WorkspaceRepository(root, "acme/widgets"), new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working), null, 3, publication);
     }
 
@@ -200,6 +252,7 @@ public sealed class GitWorkPublisherTests
         public bool PushFailure { get; set; }
         public string? RemoteSha { get; set; }
         public string RemoteUrl { get; set; } = "git@github.com:acme/widgets.git";
+        public string Provenance { get; set; } = "Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget";
         public List<string> Commands { get; } = [];
         public Task<GitCommandResult> RunAsync(string cwd, IReadOnlyList<string> args, CancellationToken token)
         {
@@ -212,7 +265,7 @@ public sealed class GitWorkPublisherTests
             if (command.StartsWith("rev-parse --git-path ")) return Ok(Path.Combine(path, ".git", "absent-" + args[^1]));
             if (command == "rev-parse HEAD") return Ok(Committed ? CommitSha : BaseSha);
             if (command.StartsWith("rev-list --count ")) return Ok("1");
-            if (command == "log -1 --format=%an%x00%ae%x00%s") return Ok("Automaton Agent\0agent@example.test\0acme/widgets#7: Fix widget");
+            if (command == "log -1 --format=%an%x00%ae%x00%s") return Ok(Provenance);
             if (command == "status --porcelain=v1 --untracked-files=all") return Ok(HasChanges ? " M file.txt" : "");
             if (command == "add --all") return Ok("");
             if (args.Contains("commit")) { Committed = true; return Ok(""); }

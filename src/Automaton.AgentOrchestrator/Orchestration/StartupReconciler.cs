@@ -46,25 +46,28 @@ public sealed class StartupReconciler(
                     continue;
                 }
 
-                try
+                if (record.Publication?.State is not (null or PublicationStates.None))
                 {
-                    var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
-                    if (recovered.Recognized)
+                    try
                     {
-                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
-                            Math.Max(record.Recovery.LastCompletedAttempt, 1), "draft publication was authoritatively recovered"));
+                        var recovered = await publisher.RecoverAsync(record, item!, cancellationToken);
+                        if (recovered.Recognized)
+                        {
+                            decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
+                                Math.Max(record.Recovery.LastCompletedAttempt, 1), "draft publication was authoritatively recovered"));
+                            continue;
+                        }
+                    }
+                    catch (PublicationException exception) when (exception.IsRetryable)
+                    {
+                        throw;
+                    }
+                    catch (PublicationException exception)
+                    {
+                        decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
+                            Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
                         continue;
                     }
-                }
-                catch (PublicationException exception) when (exception.IsRetryable)
-                {
-                    throw;
-                }
-                catch (PublicationException exception)
-                {
-                    decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,
-                        Math.Max(record.Recovery.LastCompletedAttempt, 1), exception.Message));
-                    continue;
                 }
             }
             switch (record.Recovery.State)

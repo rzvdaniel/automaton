@@ -36,7 +36,7 @@ public sealed class ProcessGitCommandRunner : IGitCommandRunner
 
 public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
     private const string SidecarDirectoryName = ".automaton-agent-orchestrator";
     private readonly string workspaceRoot;
     private readonly IGitCommandRunner git;
@@ -185,12 +185,18 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(publicationState);
-        if (publicationState.State is not (PublicationStates.None or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated))
+        if (publicationState.State is not (PublicationStates.None or PublicationStates.Authorized or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated))
             throw new WorkspaceRecoveryException("Workspace publication recovery state is invalid.");
         ValidatePublicationState(publicationState.State, publicationState.CommitSha, publicationState.RemoteBranch, publicationState.PullRequestNumber, publicationState.PullRequestUrl);
         var sidecarPath = GetSidecarPath(workspace.Key);
         var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
         ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        var currentRank = PublicationRank(sidecar.PublicationState);
+        var requestedRank = PublicationRank(publicationState.State);
+        if (publicationState.State == PublicationStates.Authorized && currentRank >= requestedRank)
+            return ToWorkspace(sidecar);
+        if (requestedRank != currentRank + 1)
+            throw new WorkspaceRecoveryException("Workspace publication state transition is not authorized.");
         var updated = sidecar with
         {
             PublicationState = publicationState.State,
@@ -326,13 +332,16 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (sidecar.SchemaVersion > CurrentSchemaVersion)
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is newer than this daemon supports.");
         if (sidecar.SchemaVersion == CurrentSchemaVersion) return sidecar;
-        if (sidecar.SchemaVersion is not (0 or 2))
+        if (sidecar.SchemaVersion is not (0 or 2 or 3))
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is unsupported.");
-        var migrated = sidecar.SchemaVersion == 2
+        var migrated = sidecar.SchemaVersion is 2 or 3
             ? sidecar with
             {
                 SchemaVersion = CurrentSchemaVersion,
-                PublicationState = PublicationStates.None,
+                PublicationState = sidecar.SchemaVersion == 3
+                    && sidecar.PublicationState is PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated
+                        ? sidecar.PublicationState
+                        : PublicationStates.None,
                 UpdatedAtUtc = clock.UtcNow
             }
             : sidecar with
@@ -395,7 +404,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || sidecar.LastCompletedAttempt < 0
             || sidecar.NextAttempt < 1
             || (sidecar.BaseCommitSha is not null && !IsSha(sidecar.BaseCommitSha))
-            || sidecar.PublicationState is not (PublicationStates.None or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated)
+            || sidecar.PublicationState is not (PublicationStates.None or PublicationStates.Authorized or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated)
             || !IsKnownLifecycleStatus(sidecar.LifecycleStatus)
             || !IsKnownOwnershipStatus(sidecar.ExecutionOwnershipStatus))
             throw new WorkspaceRecoveryException("Workspace sidecar state does not match the requested daemon-owned workspace.");
@@ -405,10 +414,10 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
     private static void ValidatePublicationState(string state, string? commitSha, string? remoteBranch, int? pullRequestNumber, string? pullRequestUrl)
     {
-        if (state == PublicationStates.None)
+        if (state is PublicationStates.None or PublicationStates.Authorized)
         {
             if (commitSha is not null || remoteBranch is not null || pullRequestNumber is not null || pullRequestUrl is not null)
-                throw new WorkspaceRecoveryException("Empty publication state contains unexpected recovery metadata.");
+                throw new WorkspaceRecoveryException("Pre-commit publication state contains unexpected recovery metadata.");
             return;
         }
         if (commitSha is null || commitSha.Length != 40 || !commitSha.All(Uri.IsHexDigit) || string.IsNullOrWhiteSpace(remoteBranch))
@@ -419,6 +428,16 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (state != PublicationStates.PullRequestCreated && (pullRequestNumber is not null || pullRequestUrl is not null))
             throw new WorkspaceRecoveryException("Workspace publication phase contains premature pull-request metadata.");
     }
+
+    private static int PublicationRank(string state) => state switch
+    {
+        PublicationStates.None => 0,
+        PublicationStates.Authorized => 1,
+        PublicationStates.Committed => 2,
+        PublicationStates.Pushed => 3,
+        PublicationStates.PullRequestCreated => 4,
+        _ => throw new WorkspaceRecoveryException("Workspace publication recovery state is invalid.")
+    };
 
     private void ValidateWorkspaceMatchesSidecar(Workspace workspace, WorkspaceSidecar sidecar)
     {

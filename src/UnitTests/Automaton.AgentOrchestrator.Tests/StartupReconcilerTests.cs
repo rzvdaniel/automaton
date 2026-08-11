@@ -66,6 +66,7 @@ public sealed class StartupReconcilerTests
         });
     }
 
+    [TestCase(PublicationStates.Authorized)]
     [TestCase(PublicationStates.Committed)]
     [TestCase(PublicationStates.Pushed)]
     public async Task PartialPublicationRecoveryCompletesWithoutRunningRoleExecutor(string publicationState)
@@ -78,6 +79,16 @@ public sealed class StartupReconcilerTests
         await fixture.Orchestrator.PollAsync(CancellationToken.None);
 
         Assert.Multiple(() => { Assert.That(fixture.Publisher.RecoveryRequests, Has.Count.EqualTo(1)); Assert.That(fixture.Executor.Attempts, Is.Empty); Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed)); });
+    }
+
+    [Test]
+    public async Task WorkingWithoutDurableAuthorizationNeverEntersPublicationRecovery()
+    {
+        var fixture = Create(Record(WorkspaceRecoveryStates.Working));
+        fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", new string('a', 40), 42, "https://github.com/acme/widgets/pull/42", true));
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await fixture.Orchestrator.PollAsync(CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(fixture.Publisher.RecoveryRequests, Is.Empty); Assert.That(fixture.Executor.Attempts, Is.Empty); Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked)); });
     }
 
     [Test]

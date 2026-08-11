@@ -239,7 +239,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = records.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(3));
+            Assert.That(record.SchemaVersion, Is.EqualTo(4));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.RetryableFailure));
             Assert.That(record.Recovery.LastCompletedAttempt, Is.EqualTo(2));
             Assert.That(record.Recovery.NextAttempt, Is.EqualTo(3));
@@ -254,6 +254,12 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var manager = CreateManager(new FakeGitCommandRunner());
         var workspace = await manager.CreateOrRecoverAsync(Request("published-work"), CancellationToken.None);
         var sha = new string('b', 40);
+        workspace = await manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Authorized), CancellationToken.None);
+        workspace = await manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Committed, sha, workspace.Branch), CancellationToken.None);
+        workspace = await manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Pushed, sha, workspace.Branch), CancellationToken.None);
         await manager.UpdatePublicationStateAsync(workspace,
             new PublicationRecoveryState(PublicationStates.PullRequestCreated, sha, workspace.Branch, 42, "https://github.com/acme/widgets/pull/42"), CancellationToken.None);
 
@@ -274,6 +280,47 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var workspace = await manager.CreateOrRecoverAsync(Request("invalid-publication"), CancellationToken.None);
         Assert.ThrowsAsync<WorkspaceRecoveryException>(() => manager.UpdatePublicationStateAsync(workspace,
             new PublicationRecoveryState(PublicationStates.PullRequestCreated, new string('b', 40), workspace.Branch), CancellationToken.None));
+    }
+
+    [Test]
+    public async Task PublicationStateCannotSkipHostAuthorization()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("unauthorized-publication"), CancellationToken.None);
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(() => manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Committed, new string('b', 40), workspace.Branch), CancellationToken.None));
+    }
+
+    [Test]
+    public async Task SchemaThreeCommittedPublicationMigratesAsHostAuthorizedHistory()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("schema-three-publication"), CancellationToken.None);
+        var sidecarPath = SidecarPath(workspace);
+        var json = JsonNode.Parse(await File.ReadAllTextAsync(sidecarPath))!.AsObject();
+        json["SchemaVersion"] = 3;
+        json["PublicationState"] = PublicationStates.Committed;
+        json["PublicationCommitSha"] = new string('b', 40);
+        json["PublicationRemoteBranch"] = workspace.Branch;
+        await File.WriteAllTextAsync(sidecarPath, json.ToJsonString());
+
+        var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
+        Assert.Multiple(() => { Assert.That(record.SchemaVersion, Is.EqualTo(4)); Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.Committed)); });
+    }
+
+    [Test]
+    public async Task SchemaThreeCannotManufactureNewAuthorizedState()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("schema-three-forged-authorization"), CancellationToken.None);
+        var sidecarPath = SidecarPath(workspace);
+        var json = JsonNode.Parse(await File.ReadAllTextAsync(sidecarPath))!.AsObject();
+        json["SchemaVersion"] = 3;
+        json["PublicationState"] = PublicationStates.Authorized;
+        await File.WriteAllTextAsync(sidecarPath, json.ToJsonString());
+
+        var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
+        Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.None));
     }
 
     [Test]
@@ -313,7 +360,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(3));
+            Assert.That(record.SchemaVersion, Is.EqualTo(4));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.Blocked));
             Assert.That(record.Recovery.Reason, Does.Contain("Legacy"));
         });
