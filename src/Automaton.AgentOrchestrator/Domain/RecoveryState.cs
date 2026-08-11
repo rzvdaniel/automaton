@@ -41,4 +41,5 @@ public sealed record OwnedWorkspaceRecord(
     DurableExecutionIdentity? ExecutionIdentity,
     int SchemaVersion,
     PublicationRecoveryState? Publication = null,
-    CiRecoveryState? Ci = null);
+    CiRecoveryState? Ci = null,
+    ReviewFeedbackRecoveryState? ReviewFeedback = null);

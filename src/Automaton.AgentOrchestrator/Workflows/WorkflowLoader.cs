@@ -114,6 +114,16 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 TimeoutMilliseconds = PositiveInt(Section(root, "ci").GetValueOrDefault("timeout_ms"), "ci.timeout_ms", 3_600_000),
                 MaxRemediationRounds = NonNegativeInt(Section(root, "ci").GetValueOrDefault("max_remediation_rounds"), "ci.max_remediation_rounds", 2, 10)
             },
+            ReviewFeedback = new ReviewFeedbackOptions
+            {
+                Enabled = BooleanValue(Section(root, "review_feedback").GetValueOrDefault("enabled"), "review_feedback.enabled", true),
+                Kind = StringValue(Section(root, "review_feedback").GetValueOrDefault("kind"), "review_feedback.kind", required: false) ?? "github",
+                GitHubToken = ResolveOptionalSecret(Section(root, "review_feedback").GetValueOrDefault("github_token"), "review_feedback.github_token"),
+                GitHubApiBaseUrl = StringValue(Section(root, "review_feedback").GetValueOrDefault("github_api_base_url"), "review_feedback.github_api_base_url", required: false) ?? "https://api.github.com/",
+                AutomationLogin = StringValue(Section(root, "review_feedback").GetValueOrDefault("automation_login"), "review_feedback.automation_login", required: false) ?? string.Empty,
+                PollIntervalMilliseconds = PositiveInt(Section(root, "review_feedback").GetValueOrDefault("poll_interval_ms"), "review_feedback.poll_interval_ms", 60_000),
+                MaxRemediationRounds = NonNegativeInt(Section(root, "review_feedback").GetValueOrDefault("max_remediation_rounds"), "review_feedback.max_remediation_rounds", 3, 10)
+            },
             Workspace = new WorkspaceOptions { Root = workspaceRoot },
             Agent = new AgentExecutionOptions
             {
@@ -249,6 +259,8 @@ public sealed class WorkflowLoader : IWorkflowLoader
             throw new WorkflowValidationException("ci.required_checks contains an invalid check name.");
         if (!Uri.TryCreate(options.Ci.GitHubApiBaseUrl, UriKind.Absolute, out var ciApi) || ciApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(ciApi.UserInfo))
             throw new WorkflowValidationException("ci.github_api_base_url must be an HTTPS origin without credentials.");
+        if (!Uri.TryCreate(options.ReviewFeedback.GitHubApiBaseUrl, UriKind.Absolute, out var feedbackApi) || feedbackApi.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(feedbackApi.UserInfo))
+            throw new WorkflowValidationException("review_feedback.github_api_base_url must be an HTTPS origin without credentials.");
     }
 
     private static bool IsSafeRefPart(string value)

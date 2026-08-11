@@ -6,6 +6,7 @@ using Automaton.AgentOrchestrator.Workspaces;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Ci;
+using Automaton.AgentOrchestrator.ReviewFeedback;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -60,6 +61,22 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICiPollDelay, SystemCiPollDelay>();
         services.AddSingleton<ICiRemediator, CodexCiRemediator>();
         services.AddSingleton<ICiShepherd, CiShepherd>();
+        services.AddSingleton<IReviewFeedbackProvider>(services =>
+        {
+            var options = services.GetRequiredService<OrchestratorOptions>();
+            if (!options.ReviewFeedback.Enabled) return new DisabledReviewFeedbackProvider();
+            if (!string.Equals(options.ReviewFeedback.Kind, "github", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Only the GitHub review feedback provider is supported in Stage 11.");
+            if (string.IsNullOrWhiteSpace(options.ReviewFeedback.GitHubToken)) throw new InvalidOperationException("review_feedback.github_token is required for GitHub review feedback observation.");
+            var identity = options.Repository.Identity.Split('/');
+            if (identity.Length != 2) throw new InvalidOperationException("repository.identity must be owner/repo for GitHub review feedback.");
+            var api = new Uri(options.ReviewFeedback.GitHubApiBaseUrl, UriKind.Absolute);
+            var client = services.GetRequiredService<IHttpClientFactory>().CreateClient();
+            client.BaseAddress = api;
+            return new GitHubReviewFeedbackProvider(client, new(identity[0], identity[1], options.ReviewFeedback.GitHubToken, api, options.ReviewFeedback.AutomationLogin));
+        });
+        services.AddSingleton<IReviewFeedbackPollDelay, SystemReviewFeedbackPollDelay>();
+        services.AddSingleton<IReviewFeedbackRemediator, CodexReviewFeedbackRemediator>();
+        services.AddSingleton<IReviewFeedbackShepherd, ReviewFeedbackShepherd>();
         services.AddSingleton<IWorkExecutor, RoleBasedWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();
@@ -75,6 +92,11 @@ public static class ServiceCollectionExtensions
     private sealed class DisabledCiProvider : ICiProvider
     {
         public Task<CiSnapshot> GetAsync(CiTarget target, CancellationToken cancellationToken) => Task.FromResult(new CiSnapshot(target.HeadSha, CiStatuses.Passed, []));
+    }
+    private sealed class DisabledReviewFeedbackProvider : IReviewFeedbackProvider
+    {
+        public Task<ReviewFeedbackSnapshot> GetAsync(ReviewFeedbackTarget target, CancellationToken cancellationToken)
+            => Task.FromResult(new ReviewFeedbackSnapshot(target.HeadSha, ReviewFeedbackStatuses.Approved, []));
     }
 
 }
