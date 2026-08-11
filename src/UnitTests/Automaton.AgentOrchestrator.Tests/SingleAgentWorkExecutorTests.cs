@@ -58,17 +58,113 @@ public sealed class SingleAgentWorkExecutorTests
         });
     }
 
-    [TestCase("CHANGES_REQUIRED")]
-    [TestCase("BLOCKED")]
-    public async Task NonApprovedReviewerVerdictIsPermanentManualAttention(string verdict)
+    [Test]
+    public async Task ReviewerBlockedIsPermanentWithoutRemediation()
     {
-        var fixture = Create(ManagerReady(), DeveloperCompleted(), Reviewer(verdict, "review did not approve"));
+        var fixture = Create(ManagerReady(), DeveloperCompleted(), Reviewer("BLOCKED", "review did not approve"));
         var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.False);
             Assert.That(outcome.IsRetryable, Is.False);
             Assert.That(outcome.FailureReason, Is.EqualTo("review did not approve"));
+        });
+    }
+
+    [Test]
+    public async Task ChangesRequiredRunsRemediationAndReReviewOnExistingThreadsUntilApproved()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(),
+            Reviewer("CHANGES_REQUIRED", "fix validation", "add regression test"),
+            DeveloperCompleted(), ReviewerApproved());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(fixture.Client.StartedThreadIds, Is.EqualTo(new[] { "thread-1", "thread-2", "thread-3" }));
+            Assert.That(fixture.Client.TurnThreadIds, Is.EqualTo(new[] { "thread-1", "thread-2", "thread-3", "thread-2", "thread-3" }));
+            Assert.That(fixture.Client.Prompts[3], Does.Contain("REMEDIATION FOR REVIEW ROUND 2"));
+            Assert.That(fixture.Client.Prompts[3], Does.Contain("add regression test"));
+            Assert.That(fixture.Client.Prompts[4], Does.Contain("REVIEW ROUND 2"));
+        });
+    }
+
+    [Test]
+    public async Task TwoRemediationsCanReachApprovalOnThirdReview()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "round one", "finding A"),
+            DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "round two", "finding C"),
+            DeveloperCompleted(), ReviewerApproved());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(fixture.Client.StartedThreadIds, Has.Count.EqualTo(3));
+            Assert.That(fixture.Client.TurnThreadIds, Is.EqualTo(new[] { "thread-1", "thread-2", "thread-3", "thread-2", "thread-3", "thread-2", "thread-3" }));
+            Assert.That(fixture.Client.Prompts[5], Does.Contain("finding C"));
+            Assert.That(fixture.Client.Prompts[5], Does.Not.Contain("finding A"));
+        });
+    }
+
+    [Test]
+    public async Task ReviewRoundLimitEndsInDeterministicManualAttention()
+    {
+        var fixture = CreateWithReviewRounds(2,
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "one", "A"),
+            DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "two", "B"));
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Is.EqualTo("Maximum review rounds reached without approval."));
+            Assert.That(fixture.Client.StartedThreadIds, Has.Count.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public async Task DeveloperBlockedDuringRemediationStopsBeforeAnotherReview()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "fix needed", "A"),
+            DeveloperBlocked("remediation unavailable"));
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Is.EqualTo("remediation unavailable"));
+            Assert.That(fixture.Client.TurnThreadIds, Is.EqualTo(new[] { "thread-1", "thread-2", "thread-3", "thread-2" }));
+        });
+    }
+
+    [Test]
+    public async Task RemediationPromptsUseLatestStructuredHandoffsWithoutRawTranscriptsOrSecrets()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(finalPrefix: "RAW_DEVELOPER_TRANSCRIPT\n"),
+            Reviewer("CHANGES_REQUIRED", "fix now", "blocking issue", "RAW_REVIEWER_TRANSCRIPT\n"),
+            DeveloperCompleted(), ReviewerApproved());
+        await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        var remediation = fixture.Client.Prompts[3];
+        var reReview = fixture.Client.Prompts[4];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(remediation, Does.Contain("fix now"));
+            Assert.That(remediation, Does.Contain("blocking issue"));
+            Assert.That(remediation, Does.Contain("Implement widget safely"));
+            Assert.That(remediation, Does.Contain("Implementation complete"));
+            Assert.That(remediation, Does.Not.Contain("RAW_REVIEWER_TRANSCRIPT"));
+            Assert.That(remediation, Does.Not.Contain("RAW_DEVELOPER_TRANSCRIPT"));
+            Assert.That(remediation, Does.Not.Contain(CanonicalRoot));
+            Assert.That(reReview, Does.Contain("inspect the actual current workspace"));
+            Assert.That(reReview, Does.Contain("do not trust Developer claims blindly"));
+            Assert.That(reReview, Does.Contain("regressions or new blocking issues"));
         });
     }
 
@@ -224,6 +320,32 @@ public sealed class SingleAgentWorkExecutorTests
     }
 
     [Test]
+    public async Task ReviewerMutationDuringReReviewBlocks()
+    {
+        var fixture = CreateWithFingerprints(
+            ["manager", "manager", "review-1", "review-1", "review-2-before", "review-2-after"],
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "fix", "A"),
+            DeveloperCompleted(), ReviewerApproved());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Does.Contain("reviewer violated its read-only"));
+        });
+    }
+
+    [Test]
+    public async Task FailedReReviewWithUnchangedFingerprintRemainsRetryable()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "fix", "A"),
+            DeveloperCompleted(), FailedTurn());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        Assert.That(outcome.IsRetryable, Is.True);
+    }
+
+    [Test]
     public void CancellationStillPersistsAndPropagates()
     {
         var fixture = Create();
@@ -266,6 +388,26 @@ public sealed class SingleAgentWorkExecutorTests
     }
 
     [Test]
+    public async Task ProtocolAmbiguityDuringReReviewPreservesQuarantine()
+    {
+        var fixture = Create(
+            ManagerReady(), DeveloperCompleted(), Reviewer("CHANGES_REQUIRED", "fix", "A"),
+            DeveloperCompleted());
+        fixture.Client.WaitFailure = new CodexProtocolException("re-review transport ambiguity");
+        fixture.Client.WaitFailureAtCall = 5;
+        fixture.Client.Quarantined = true;
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(fixture.Client.CurrentWorkspace!.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
+            Assert.That(fixture.Workspaces.Lifecycles, Is.Empty);
+        });
+    }
+
+    [Test]
     public void ReviewerContractRejectsTooManyOrOversizedFindings()
     {
         var tooMany = string.Join(',', Enumerable.Range(1, 21).Select(_ => "{\"severity\":\"minor\",\"description\":\"x\"}"));
@@ -276,9 +418,15 @@ public sealed class SingleAgentWorkExecutorTests
         });
     }
 
-    private static Fixture Create(params CodexTurnResult[] results) => CreateWithFingerprints([], results);
+    private static Fixture Create(params CodexTurnResult[] results) => CreateCore(3, [], results);
+
+    private static Fixture CreateWithReviewRounds(int maxReviewRounds, params CodexTurnResult[] results)
+        => CreateCore(maxReviewRounds, [], results);
 
     private static Fixture CreateWithFingerprints(IEnumerable<string> fingerprints, params CodexTurnResult[] results)
+        => CreateCore(3, fingerprints, results);
+
+    private static Fixture CreateCore(int maxReviewRounds, IEnumerable<string> fingerprints, params CodexTurnResult[] results)
     {
         var workspace = new Workspace("work-123", WorkspacePath, "automaton/work/work-123", WorkspaceLifecycleStates.Ready, WorkspaceExecutionOwnershipStates.None, "reserved", "acme/widgets");
         var manager = new FakeWorkspaceManager(workspace);
@@ -289,7 +437,7 @@ public sealed class SingleAgentWorkExecutorTests
         {
             Repository = new RepositoryOptions { Root = CanonicalRoot, Identity = "acme/widgets" },
             Workspace = new WorkspaceOptions { Root = "C:\\isolated-workspaces" },
-            Agent = new AgentExecutionOptions { MaxConcurrentAgents = 1, MaxTurns = 2, ManagerMaxTurns = 2, DeveloperMaxTurns = 2, ReviewerMaxTurns = 2 }
+            Agent = new AgentExecutionOptions { MaxConcurrentAgents = 1, MaxTurns = 2, ManagerMaxTurns = 2, DeveloperMaxTurns = 2, ReviewerMaxTurns = 2, MaxReviewRounds = maxReviewRounds }
         });
         return new(new RoleBasedWorkExecutor(manager, guard, factory, workflow), manager, factory, client);
     }
@@ -302,7 +450,7 @@ public sealed class SingleAgentWorkExecutorTests
     private static CodexTurnResult DeveloperBlocked(string reason) => Developer("BLOCKED", reason);
     private static CodexTurnResult Developer(string status, string summary, string finalPrefix = "") => Completed($"{finalPrefix}AUTOMATON_DEVELOPER_RESULT: {{\"status\":\"{status}\",\"summary\":\"{summary}\",\"validation\":\"Tests passed\",\"remainingConcerns\":\"None\"}}");
     private static CodexTurnResult ReviewerApproved() => Reviewer("APPROVED", "review approved");
-    private static CodexTurnResult Reviewer(string verdict, string summary, string finding = "") => Completed($"AUTOMATON_REVIEW_RESULT: {{\"verdict\":\"{verdict}\",\"summary\":\"{summary}\",\"findings\":[{{\"severity\":\"minor\",\"description\":\"{finding}\"}}]}}");
+    private static CodexTurnResult Reviewer(string verdict, string summary, string finding = "", string finalPrefix = "") => Completed($"{finalPrefix}AUTOMATON_REVIEW_RESULT: {{\"verdict\":\"{verdict}\",\"summary\":\"{summary}\",\"findings\":[{{\"severity\":\"minor\",\"description\":\"{finding}\"}}]}}");
     private static CodexTurnResult Completed(string response) => new("unused", Guid.NewGuid().ToString("N"), "completed", FinalResponse: response);
     private static CodexTurnResult FailedTurn() => TurnFailure("failed");
     private static CodexTurnResult TurnFailure(string status) => new("unused", Guid.NewGuid().ToString("N"), status, "temporary model failure");
@@ -346,6 +494,8 @@ public sealed class SingleAgentWorkExecutorTests
         public bool Quarantined { get; set; }
         public Exception? InitializeFailure { get; set; }
         public Exception? WaitFailure { get; set; }
+        public int? WaitFailureAtCall { get; set; }
+        private int waitCallCount;
         public Task InitializeAsync(CancellationToken cancellationToken) { current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active, LaunchNonce = "run" }; if (InitializeFailure is not null) throw InitializeFailure; return Task.CompletedTask; }
         public Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken) { var id = $"thread-{StartedThreadIds.Count + 1}"; StartedThreadIds.Add(id); return Task.FromResult(new CodexThread(id)); }
         public Task<CodexThread> ResumeThreadAsync(string threadId, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -353,7 +503,8 @@ public sealed class SingleAgentWorkExecutorTests
         public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (WaitFailure is not null)
+            waitCallCount++;
+            if (WaitFailure is not null && (WaitFailureAtCall is null || WaitFailureAtCall == waitCallCount))
             {
                 if (Quarantined) current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Quarantined };
                 throw WaitFailure;

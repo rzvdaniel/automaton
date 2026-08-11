@@ -96,7 +96,8 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 ManagerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("manager_max_turns"), "agent.manager_max_turns", 2),
                 DeveloperMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("developer_max_turns"), "agent.developer_max_turns",
                     PositiveInt(Section(root, "agent").GetValueOrDefault("max_turns"), "agent.max_turns", 1)),
-                ReviewerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("reviewer_max_turns"), "agent.reviewer_max_turns", 2)
+                ReviewerMaxTurns = PositiveInt(Section(root, "agent").GetValueOrDefault("reviewer_max_turns"), "agent.reviewer_max_turns", 2),
+                MaxReviewRounds = BoundedPositiveInt(Section(root, "agent").GetValueOrDefault("max_review_rounds"), "agent.max_review_rounds", 3, 10)
             },
             Codex = new CodexOptions
             {
@@ -141,6 +142,13 @@ public sealed class WorkflowLoader : IWorkflowLoader
         if (!int.TryParse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture), out var number) || number <= 0)
             throw new WorkflowValidationException($"{field} must be a positive integer.");
         return number;
+    }
+
+    private static int BoundedPositiveInt(object? value, string field, int defaultValue, int maximum)
+    {
+        var result = PositiveInt(value, field, defaultValue);
+        if (result > maximum) throw new WorkflowValidationException($"{field} must not exceed {maximum}.");
+        return result;
     }
 
     private static string ResolvePath(string value, string workflowDirectory)

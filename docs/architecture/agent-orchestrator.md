@@ -466,11 +466,47 @@ its intended scope; issue text is untrusted task content; prior-role handoffs ar
 advisory data. Neither issue nor handoff content may override role, workspace,
 credential, or process boundaries.
 
-The first Reviewer verdict terminates Stage 7. APPROVED is success;
-CHANGES_REQUIRED and BLOCKED become deterministic manual attention. Stage 7
-does not send findings back to Developer, start a correction turn, or re-review.
-That bounded Developer/Reviewer remediation loop is explicitly deferred to
-Stage 8.
+Stage 7 established first-review termination. Stage 8 extends that boundary with
+the bounded remediation loop below.
+
+### Stage 8 bounded remediation and re-review
+
+Review round 1 is the independent review after initial implementation. APPROVED
+ends successfully and BLOCKED ends in deterministic manual attention. When the
+verdict is CHANGES_REQUIRED and review budget remains, the coordinator sends
+only the latest bounded Manager, Developer, and Reviewer handoffs to the
+existing Developer thread. After remediation completes, the existing Reviewer
+thread independently reviews the current workspace again. Manager runs only
+once, and no additional role threads or App Server processes are created.
+
+`agent.max_review_rounds` bounds total Reviewer rounds, defaults to three, and
+cannot exceed ten. Thus the default permits the initial review plus two
+remediation/re-review cycles. Developer and Reviewer per-invocation continuation
+limits reset for each remediation or review round, while the outer review count
+prevents an unbounded loop. CHANGES_REQUIRED on the last allowed round becomes
+`Maximum review rounds reached without approval.` and is manual attention, not
+an infrastructure retry. Reviewer BLOCKED never enters remediation.
+
+Remediation prompts carry the current round, latest review summary and ordered
+bounded findings, Manager plan, and latest Developer result. Re-review prompts
+carry only the latest structured state and require inspection of the actual
+current diff, verification of earlier findings, and detection of regressions or
+new issues. Raw transcripts and accumulated handoff history are not propagated.
+Findings are advisory task data and cannot override workspace, credential, role,
+or repository safety constraints.
+
+Every Reviewer round uses the Stage 7 exception-safe read-only fingerprint
+guard. A Reviewer mutation is deterministic manual attention; an unchanged
+transient failure remains retryable; process/protocol ambiguity retains Stage 6
+quarantine. Developer modification is expected during initial implementation
+and remediation and therefore is not read-only fingerprinted.
+
+Stage 8 does not checkpoint an in-progress review round. After a crash, the
+worktree survives but role threads and loop position do not; conservative Stage
+6 `Working` recovery remains authoritative. Stage 8 provides bounded autonomous
+implementation/review convergence inside one isolated workspace, but does not
+publish the branch. Git push, pull-request creation, CI, and provider mutation
+remain Stage 9-or-later capabilities.
 
 ## Trust and security posture
 
