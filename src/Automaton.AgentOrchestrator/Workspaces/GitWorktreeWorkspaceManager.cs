@@ -36,7 +36,7 @@ public sealed class ProcessGitCommandRunner : IGitCommandRunner
 
 public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
     private const string SidecarDirectoryName = ".automaton-agent-orchestrator";
     private readonly string workspaceRoot;
     private readonly IGitCommandRunner git;
@@ -84,10 +84,11 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (Directory.Exists(workspacePath))
             throw new WorkspaceRecoveryException("A workspace directory without daemon-owned sidecar state cannot be reused or removed.");
 
+        var baseCommitSha = await ResolveBaseShaAsync(request.Repository.RootPath, request.Repository.BaseBranch, cancellationToken);
         var created = new WorkspaceSidecar(
             key, request.WorkItem.Id, request.Repository.Identity, request.Repository.RootPath, workspacePath, branch,
             WorkspaceLifecycleStates.Preparing, WorkspaceExecutionOwnershipStates.None, Guid.NewGuid().ToString("N"), clock.UtcNow, clock.UtcNow,
-            CurrentSchemaVersion, WorkspaceRecoveryStates.Ready);
+            CurrentSchemaVersion, WorkspaceRecoveryStates.Ready, BaseCommitSha: baseCommitSha, BaseBranch: request.Repository.BaseBranch);
         return await CreateWorktreeAsync(request, created, sidecarPath, cancellationToken);
     }
 
@@ -180,6 +181,29 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         return ToWorkspace(updated);
     }
 
+    public async Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(publicationState);
+        if (publicationState.State is not (PublicationStates.None or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated))
+            throw new WorkspaceRecoveryException("Workspace publication recovery state is invalid.");
+        ValidatePublicationState(publicationState.State, publicationState.CommitSha, publicationState.RemoteBranch, publicationState.PullRequestNumber, publicationState.PullRequestUrl);
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        var updated = sidecar with
+        {
+            PublicationState = publicationState.State,
+            PublicationCommitSha = publicationState.CommitSha,
+            PublicationRemoteBranch = publicationState.RemoteBranch,
+            PullRequestNumber = publicationState.PullRequestNumber,
+            PullRequestUrl = Bound(publicationState.PullRequestUrl),
+            UpdatedAtUtc = clock.UtcNow
+        };
+        await WriteSidecarAsync(sidecarPath, updated, cancellationToken);
+        return ToWorkspace(updated);
+    }
+
     public async Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken)
     {
         repository = repository with { RootPath = Path.GetFullPath(repository.RootPath) };
@@ -244,7 +268,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         var branchExists = await BranchExistsAsync(request.Repository.RootPath, sidecar.Branch, cancellationToken);
         var arguments = branchExists
             ? new[] { "worktree", "add", "--force", sidecar.WorkspacePath, sidecar.Branch }
-            : new[] { "worktree", "add", "-b", sidecar.Branch, sidecar.WorkspacePath, "HEAD" };
+            : new[] { "worktree", "add", "-b", sidecar.Branch, sidecar.WorkspacePath, sidecar.BaseCommitSha! };
         var result = await git.RunAsync(request.Repository.RootPath, arguments, cancellationToken);
         if (result.ExitCode != 0)
         {
@@ -302,9 +326,16 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         if (sidecar.SchemaVersion > CurrentSchemaVersion)
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is newer than this daemon supports.");
         if (sidecar.SchemaVersion == CurrentSchemaVersion) return sidecar;
-        if (sidecar.SchemaVersion != 0)
+        if (sidecar.SchemaVersion is not (0 or 2))
             throw new WorkspaceRecoveryException("Workspace sidecar schema version is unsupported.");
-        var migrated = sidecar with
+        var migrated = sidecar.SchemaVersion == 2
+            ? sidecar with
+            {
+                SchemaVersion = CurrentSchemaVersion,
+                PublicationState = PublicationStates.None,
+                UpdatedAtUtc = clock.UtcNow
+            }
+            : sidecar with
         {
             SchemaVersion = CurrentSchemaVersion,
             SchedulerState = WorkspaceRecoveryStates.Blocked,
@@ -336,6 +367,11 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
     private void ValidateRepository(WorkspaceRepository repository)
     {
         if (string.IsNullOrWhiteSpace(repository.Identity)) throw new WorkspaceException("Workspace repository identity is required.");
+        if (string.IsNullOrWhiteSpace(repository.BaseBranch) || repository.BaseBranch.Any(char.IsControl)
+            || repository.BaseBranch.Contains("..", StringComparison.Ordinal)
+            || repository.BaseBranch.IndexOfAny([' ', '~', '^', ':', '?', '*', '[', '\\']) >= 0
+            || repository.BaseBranch.StartsWith('/') || repository.BaseBranch.EndsWith('/') || repository.BaseBranch.EndsWith('.'))
+            throw new WorkspaceException("Configured repository base branch is invalid.");
         if (string.IsNullOrWhiteSpace(repository.RootPath) || !Directory.Exists(repository.RootPath))
             throw new WorkspaceException("Configured canonical repository root does not exist.");
         var repositoryRoot = Path.GetFullPath(repository.RootPath);
@@ -348,6 +384,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
     {
         if (!string.Equals(sidecar.WorkItemId, request.WorkItem.Id, StringComparison.Ordinal)
             || !string.Equals(sidecar.RepositoryIdentity, request.Repository.Identity, StringComparison.Ordinal)
+            || (sidecar.BaseBranch is not null && !string.Equals(sidecar.BaseBranch, request.Repository.BaseBranch, StringComparison.Ordinal))
             || !PathsEqual(sidecar.RepositoryRootPath, request.Repository.RootPath)
             || !string.Equals(sidecar.WorkspaceKey, key, StringComparison.Ordinal)
             || !PathsEqual(sidecar.WorkspacePath, workspacePath)
@@ -357,10 +394,30 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !IsKnownRecoveryState(sidecar.SchedulerState)
             || sidecar.LastCompletedAttempt < 0
             || sidecar.NextAttempt < 1
+            || (sidecar.BaseCommitSha is not null && !IsSha(sidecar.BaseCommitSha))
+            || sidecar.PublicationState is not (PublicationStates.None or PublicationStates.Committed or PublicationStates.Pushed or PublicationStates.PullRequestCreated)
             || !IsKnownLifecycleStatus(sidecar.LifecycleStatus)
             || !IsKnownOwnershipStatus(sidecar.ExecutionOwnershipStatus))
             throw new WorkspaceRecoveryException("Workspace sidecar state does not match the requested daemon-owned workspace.");
+        ValidatePublicationState(sidecar.PublicationState, sidecar.PublicationCommitSha, sidecar.PublicationRemoteBranch, sidecar.PullRequestNumber, sidecar.PullRequestUrl);
         EnsureContained(sidecar.WorkspacePath, workspaceRoot);
+    }
+
+    private static void ValidatePublicationState(string state, string? commitSha, string? remoteBranch, int? pullRequestNumber, string? pullRequestUrl)
+    {
+        if (state == PublicationStates.None)
+        {
+            if (commitSha is not null || remoteBranch is not null || pullRequestNumber is not null || pullRequestUrl is not null)
+                throw new WorkspaceRecoveryException("Empty publication state contains unexpected recovery metadata.");
+            return;
+        }
+        if (commitSha is null || commitSha.Length != 40 || !commitSha.All(Uri.IsHexDigit) || string.IsNullOrWhiteSpace(remoteBranch))
+            throw new WorkspaceRecoveryException("Workspace publication recovery metadata is invalid.");
+        if (state == PublicationStates.PullRequestCreated
+            && (pullRequestNumber is null or <= 0 || !Uri.TryCreate(pullRequestUrl, UriKind.Absolute, out _)))
+            throw new WorkspaceRecoveryException("Workspace pull-request recovery metadata is invalid.");
+        if (state != PublicationStates.PullRequestCreated && (pullRequestNumber is not null || pullRequestUrl is not null))
+            throw new WorkspaceRecoveryException("Workspace publication phase contains premature pull-request metadata.");
     }
 
     private void ValidateWorkspaceMatchesSidecar(Workspace workspace, WorkspaceSidecar sidecar)
@@ -370,6 +427,7 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
             || !string.Equals(workspace.Branch, sidecar.Branch, StringComparison.Ordinal)
             || !string.Equals(workspace.ExecutionOwnershipStatus, sidecar.ExecutionOwnershipStatus, StringComparison.Ordinal)
             || !string.Equals(workspace.RepositoryIdentity, sidecar.RepositoryIdentity, StringComparison.Ordinal)
+            || !string.Equals(workspace.BaseCommitSha, sidecar.BaseCommitSha, StringComparison.Ordinal)
             || !string.Equals(workspace.LaunchNonce, sidecar.LaunchNonce, StringComparison.Ordinal))
             throw new WorkspaceRecoveryException("Workspace does not match daemon-owned sidecar state.");
         EnsureContained(workspace.Path, workspaceRoot);
@@ -391,17 +449,29 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
 
     private string SidecarRoot() => Path.Combine(workspaceRoot, SidecarDirectoryName);
     private static Workspace ToWorkspace(WorkspaceSidecar sidecar)
-        => new(sidecar.WorkspaceKey, sidecar.WorkspacePath, sidecar.Branch, sidecar.LifecycleStatus, sidecar.ExecutionOwnershipStatus, sidecar.LaunchNonce, sidecar.RepositoryIdentity);
+        => new(sidecar.WorkspaceKey, sidecar.WorkspacePath, sidecar.Branch, sidecar.LifecycleStatus, sidecar.ExecutionOwnershipStatus, sidecar.LaunchNonce, sidecar.RepositoryIdentity, sidecar.BaseCommitSha);
     private static OwnedWorkspaceRecord ToRecoveryRecord(WorkspaceSidecar sidecar)
         => new(
             ToWorkspace(sidecar),
             sidecar.WorkItemId,
-            new WorkspaceRepository(sidecar.RepositoryRootPath, sidecar.RepositoryIdentity),
+            new WorkspaceRepository(sidecar.RepositoryRootPath, sidecar.RepositoryIdentity, sidecar.BaseBranch ?? "main"),
             new WorkspaceRecoveryState(sidecar.SchedulerState, sidecar.LastCompletedAttempt, sidecar.NextAttempt, sidecar.RetryNotBeforeUtc, sidecar.RecoveryReason),
             sidecar.ProcessId is { } processId && sidecar.ProcessStartedAtUtc is { } started && sidecar.FencingKind is { } fencing
                 ? new DurableExecutionIdentity(processId, started, sidecar.LaunchNonce, fencing, sidecar.ProcessGroupId, sidecar.ExecutionStartedAtUtc)
                 : null,
-            sidecar.SchemaVersion);
+            sidecar.SchemaVersion,
+            new PublicationRecoveryState(sidecar.PublicationState, sidecar.PublicationCommitSha, sidecar.PublicationRemoteBranch, sidecar.PullRequestNumber, sidecar.PullRequestUrl));
+
+    private async Task<string> ResolveBaseShaAsync(string repositoryRoot, string baseBranch, CancellationToken cancellationToken)
+    {
+        var result = await git.RunAsync(repositoryRoot, ["rev-parse", $"refs/heads/{baseBranch}"], cancellationToken);
+        EnsureGitSuccess(result, "resolve the workspace base commit");
+        var sha = result.StandardOutput.Trim();
+        if (!IsSha(sha)) throw new WorkspaceRecoveryException("Git returned an invalid workspace base commit.");
+        return sha;
+    }
+
+    private static bool IsSha(string? value) => value is { Length: 40 } && value.All(Uri.IsHexDigit);
 
     private static void EnsureGitSuccess(GitCommandResult result, string operation)
     {
@@ -482,7 +552,14 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         DateTimeOffset? ProcessStartedAtUtc = null,
         int? ProcessGroupId = null,
         string? FencingKind = null,
-        DateTimeOffset? ExecutionStartedAtUtc = null);
+        DateTimeOffset? ExecutionStartedAtUtc = null,
+        string? BaseCommitSha = null,
+        string PublicationState = PublicationStates.None,
+        string? PublicationCommitSha = null,
+        string? PublicationRemoteBranch = null,
+        int? PullRequestNumber = null,
+        string? PullRequestUrl = null,
+        string? BaseBranch = null);
 }
 
 public class WorkspaceException(string message) : Exception(message);

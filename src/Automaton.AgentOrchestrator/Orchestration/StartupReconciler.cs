@@ -15,7 +15,7 @@ public sealed class StartupReconciler(
 {
     public async Task ReconcileAsync(CancellationToken cancellationToken)
     {
-        var repository = new WorkspaceRepository(options.Repository.Root, options.Repository.Identity);
+        var repository = new WorkspaceRepository(options.Repository.Root, options.Repository.Identity, options.Repository.BaseBranch);
         var records = await workspaces.EnumerateOwnedWorkspacesAsync(repository, cancellationToken);
         var decisions = new List<Action>();
 
@@ -61,6 +61,10 @@ public sealed class StartupReconciler(
                     var retryItem = item!;
                     decisions.Add(() => orchestrator.RestoreRetry(retryItem, record.Recovery.NextAttempt,
                         record.Recovery.RetryNotBeforeUtc, record.Recovery.Reason));
+                    break;
+                case WorkspaceRecoveryStates.Working when record.Publication?.State == PublicationStates.PullRequestCreated:
+                    decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Completed,
+                        Math.Max(record.Recovery.LastCompletedAttempt, 1), "verified draft publication was durably recorded"));
                     break;
                 case WorkspaceRecoveryStates.Working:
                     decisions.Add(() => orchestrator.RestoreTerminalState(record.WorkItemId, RunStates.Blocked,

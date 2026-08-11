@@ -50,6 +50,21 @@ public sealed class StartupReconcilerTests
     }
 
     [Test]
+    public async Task DurableVerifiedDraftPublicationSuppressesRedispatchAfterCrashWindow()
+    {
+        var publication = new PublicationRecoveryState(PublicationStates.PullRequestCreated, new string('a', 40), "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42");
+        var fixture = Create(Record(WorkspaceRecoveryStates.Working) with { Publication = publication });
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await fixture.Orchestrator.PollAsync(CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.Executor.Attempts, Is.Empty);
+            Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed));
+        });
+    }
+
+    [Test]
     public async Task RetryWhoseTrackerItemBecameIneligibleDoesNotRun()
     {
         var fixture = Create(Record(WorkspaceRecoveryStates.RetryableFailure), Work(labels: ["bug"]));
@@ -225,6 +240,7 @@ public sealed class StartupReconcilerTests
         public Task<Workspace> UpdateLifecycleAsync(Workspace workspace, string lifecycleStatus, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task CleanupTerminalAsync(Workspace workspace, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

@@ -3,6 +3,7 @@ using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Workflows;
 using Automaton.AgentOrchestrator.Workspaces;
+using Automaton.AgentOrchestrator.Publication;
 
 namespace Automaton.AgentOrchestrator.Orchestration;
 
@@ -10,6 +11,7 @@ public sealed class RoleBasedWorkExecutor(
     IWorkspaceManager workspaceManager,
     IWorkspaceMutationGuard mutationGuard,
     ICodexAppServerClientFactory clientFactory,
+    IWorkPublisher publisher,
     WorkflowDefinition workflow) : IWorkExecutor
 {
     private const int MaximumResultDetailLength = 512;
@@ -21,7 +23,7 @@ public sealed class RoleBasedWorkExecutor(
         {
             workspace = await workspaceManager.CreateOrRecoverAsync(new(
                 attempt.WorkItem,
-                new WorkspaceRepository(workflow.Options.Repository.Root, workflow.Options.Repository.Identity)), cancellationToken);
+                new WorkspaceRepository(workflow.Options.Repository.Root, workflow.Options.Repository.Identity, workflow.Options.Repository.BaseBranch)), cancellationToken);
             workspace = await workspaceManager.UpdateRecoveryStateAsync(
                 workspace,
                 new WorkspaceRecoveryState(WorkspaceRecoveryStates.Working, Math.Max(0, attempt.Attempt - 1), attempt.Attempt),
@@ -52,6 +54,7 @@ public sealed class RoleBasedWorkExecutor(
 
             var reviewerThread = await client.StartThreadAsync(cancellationToken);
             var reviewerPrompt = prompts.Reviewer(attempt, workspace, manager, developer);
+            ReviewerHandoff? approvedReview = null;
             outcome = RunOutcome.PermanentFailure("Maximum review rounds reached without approval.");
             for (var reviewRound = 1; reviewRound <= workflow.Options.Agent.MaxReviewRounds; reviewRound++)
             {
@@ -60,6 +63,7 @@ public sealed class RoleBasedWorkExecutor(
                 if (reviewer.Verdict == RoleResultStatuses.Approved)
                 {
                     outcome = RunOutcome.Success();
+                    approvedReview = reviewer;
                     break;
                 }
                 if (reviewer.Verdict == RoleResultStatuses.Blocked)
@@ -75,9 +79,17 @@ public sealed class RoleBasedWorkExecutor(
                 if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
                 reviewerPrompt = prompts.ReviewerAgain(attempt, workspace, manager, developer, reviewer, reviewRound + 1);
             }
+            if (approvedReview is null) throw new RoleBlockedException("Reviewer approval was not established for publication.");
+            await publisher.PublishAsync(new(client.CurrentWorkspace ?? workspace, attempt.WorkItem, manager, developer, approvedReview), cancellationToken);
         }
         catch (RoleBlockedException exception) { outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (RoleInfrastructureException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
+        catch (PublicationException exception)
+        {
+            outcome = exception.IsRetryable
+                ? RunOutcome.RetryableFailure(Bounded(exception.Message))
+                : RunOutcome.PermanentFailure(Bounded(exception.Message));
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             cancelled = true;

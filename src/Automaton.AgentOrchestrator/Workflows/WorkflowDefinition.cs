@@ -11,6 +11,7 @@ public sealed class OrchestratorOptions
     public TrackerOptions Tracker { get; init; } = new();
     public PollingOptions Polling { get; init; } = new();
     public RepositoryOptions Repository { get; init; } = new();
+    public PublicationOptions Publication { get; init; } = new();
     public WorkspaceOptions Workspace { get; init; } = new();
     public AgentExecutionOptions Agent { get; init; } = new();
     public CodexOptions Codex { get; init; } = new();
@@ -28,7 +29,17 @@ public sealed class TrackerOptions
 }
 
 public sealed class PollingOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
-public sealed class RepositoryOptions { public string Root { get; init; } = string.Empty; public string Identity { get; init; } = string.Empty; }
+public sealed class RepositoryOptions { public string Root { get; init; } = string.Empty; public string Identity { get; init; } = string.Empty; public string BaseBranch { get; init; } = "main"; }
+public sealed class PublicationOptions
+{
+    public IReadOnlyList<string> ValidationCommands { get; init; } = [];
+    public string GitName { get; init; } = "Automaton Agent";
+    public string GitEmail { get; init; } = "automaton-agent@users.noreply.github.com";
+    public string RemoteName { get; init; } = "origin";
+    public string GitHubHost { get; init; } = "github.com";
+    public string GitHubToken { get; init; } = string.Empty;
+    public int ValidationTimeoutMilliseconds { get; init; } = 600_000;
+}
 public sealed class WorkspaceOptions { public string Root { get; init; } = string.Empty; }
 public sealed class AgentExecutionOptions
 {

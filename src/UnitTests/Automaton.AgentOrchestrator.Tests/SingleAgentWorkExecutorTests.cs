@@ -1,6 +1,7 @@
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Orchestration;
+using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Workflows;
 using NUnit.Framework;
 
@@ -28,6 +29,8 @@ public sealed class SingleAgentWorkExecutorTests
             Assert.That(fixture.Client.Prompts[2], Does.Contain("ROLE: REVIEWER"));
             Assert.That(fixture.Factory.CreateCount, Is.EqualTo(1));
             Assert.That(fixture.Client.Disposed, Is.True);
+            Assert.That(fixture.Publisher.Requests, Has.Count.EqualTo(1));
+            Assert.That(fixture.Publisher.Requests[0].Reviewer.Verdict, Is.EqualTo(RoleResultStatuses.Approved));
         });
     }
 
@@ -42,6 +45,25 @@ public sealed class SingleAgentWorkExecutorTests
             Assert.That(outcome.IsRetryable, Is.False);
             Assert.That(outcome.FailureReason, Is.EqualTo("missing decision"));
             Assert.That(fixture.Client.StartedThreadIds, Has.Count.EqualTo(1));
+            Assert.That(fixture.Publisher.Requests, Is.Empty);
+        });
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task PublicationFailureIsClassifiedWithoutRepeatingRoleExecution(bool retryable)
+    {
+        var fixture = Create(ManagerReady(), DeveloperCompleted(), ReviewerApproved());
+        fixture.Publisher.Failure = new PublicationException("publication failed", retryable);
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.False);
+            Assert.That(outcome.IsRetryable, Is.EqualTo(retryable));
+            Assert.That(outcome.FailureReason, Is.EqualTo("publication failed"));
+            Assert.That(fixture.Publisher.Requests, Has.Count.EqualTo(1));
         });
     }
 
@@ -232,6 +254,9 @@ public sealed class SingleAgentWorkExecutorTests
             Assert.That(combined, Does.Contain("assigned_workspace"));
             Assert.That(combined, Does.Contain(WorkspacePath.Replace("\\", "\\\\", StringComparison.Ordinal)));
             Assert.That(combined, Does.Contain("root AGENTS.md"));
+            Assert.That(combined, Does.Contain("Do not push"));
+            Assert.That(combined, Does.Contain("create a PR"));
+            Assert.That(combined, Does.Contain("mutate provider state"));
             Assert.That(combined, Does.Not.Contain(CanonicalRoot));
             Assert.That(combined, Does.Not.Contain(token));
             Assert.That(fixture.Factory.ChildEnvironment, Is.Empty);
@@ -366,6 +391,7 @@ public sealed class SingleAgentWorkExecutorTests
         {
             Assert.That(outcome.IsRetryable, Is.False);
             Assert.That(fixture.Client.CurrentWorkspace!.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
+            Assert.That(fixture.Publisher.Requests, Is.Empty);
             Assert.That(fixture.Workspaces.Lifecycles, Is.Empty);
         });
     }
@@ -439,7 +465,8 @@ public sealed class SingleAgentWorkExecutorTests
             Workspace = new WorkspaceOptions { Root = "C:\\isolated-workspaces" },
             Agent = new AgentExecutionOptions { MaxConcurrentAgents = 1, MaxTurns = 2, ManagerMaxTurns = 2, DeveloperMaxTurns = 2, ReviewerMaxTurns = 2, MaxReviewRounds = maxReviewRounds }
         });
-        return new(new RoleBasedWorkExecutor(manager, guard, factory, workflow), manager, factory, client);
+        var publisher = new FakePublisher();
+        return new(new RoleBasedWorkExecutor(manager, guard, factory, publisher, workflow), manager, factory, client, publisher);
     }
 
     private static RunAttempt Attempt() => new(new WorkItem("issue-42", "ACME-42", "Correct the widget", "Full issue body", "open", ["agent:ready", "bug"]), 1, DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
@@ -455,7 +482,18 @@ public sealed class SingleAgentWorkExecutorTests
     private static CodexTurnResult FailedTurn() => TurnFailure("failed");
     private static CodexTurnResult TurnFailure(string status) => new("unused", Guid.NewGuid().ToString("N"), status, "temporary model failure");
 
-    private sealed record Fixture(RoleBasedWorkExecutor Executor, FakeWorkspaceManager Workspaces, FakeCodexFactory Factory, FakeCodexClient Client);
+    private sealed record Fixture(RoleBasedWorkExecutor Executor, FakeWorkspaceManager Workspaces, FakeCodexFactory Factory, FakeCodexClient Client, FakePublisher Publisher);
+    private sealed class FakePublisher : IWorkPublisher
+    {
+        public List<PublicationRequest> Requests { get; } = [];
+        public PublicationException? Failure { get; set; }
+        public Task<PublicationResult> PublishAsync(PublicationRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            if (Failure is not null) throw Failure;
+            return Task.FromResult(new PublicationResult(request.Workspace.RepositoryIdentity, request.Workspace.Branch, new string('a', 40), 1, "https://github.com/acme/widgets/pull/1", true));
+        }
+    }
     private sealed class FakeMutationGuard(IEnumerable<string> fingerprints) : IWorkspaceMutationGuard
     {
         private readonly Queue<string> values = new(fingerprints);
@@ -469,6 +507,7 @@ public sealed class SingleAgentWorkExecutorTests
         public Task<Workspace> UpdateExecutionOwnershipAsync(Workspace value, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Workspace> RecordExecutionIdentityAsync(Workspace value, DurableExecutionIdentity identity, CancellationToken cancellationToken) => Task.FromResult(value);
         public Task<Workspace> UpdateRecoveryStateAsync(Workspace value, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken) => Task.FromResult(value);
+        public Task<Workspace> UpdatePublicationStateAsync(Workspace value, PublicationRecoveryState publicationState, CancellationToken cancellationToken) => Task.FromResult(value);
         public Task<IReadOnlyList<OwnedWorkspaceRecord>> EnumerateOwnedWorkspacesAsync(WorkspaceRepository repository, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OwnedWorkspaceRecord>>([]);
         public Task CleanupTerminalAsync(Workspace value, CancellationToken cancellationToken) => Task.CompletedTask;
     }

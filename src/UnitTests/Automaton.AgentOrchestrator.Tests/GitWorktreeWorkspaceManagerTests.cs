@@ -210,6 +210,21 @@ public sealed class GitWorktreeWorkspaceManagerTests
     }
 
     [Test]
+    public async Task CreateAsync_UsesConfiguredBaseBranchCommitRatherThanCanonicalHead()
+    {
+        var git = new FakeGitCommandRunner();
+        var manager = CreateManager(git);
+        var request = Request("base-branch") with { Repository = new WorkspaceRepository(repositoryRoot, "local-test", "trunk") };
+        await manager.CreateOrRecoverAsync(request, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(git.Commands, Has.Some.Matches<(string, IReadOnlyList<string>)>(x => x.Item2.SequenceEqual(new[] { "rev-parse", "refs/heads/trunk" })));
+            Assert.That(git.Commands, Has.Some.Matches<(string, IReadOnlyList<string>)>(x => x.Item2.Count >= 6 && x.Item2.Take(3).SequenceEqual(new[] { "worktree", "add", "-b" }) && x.Item2[^1] == new string('a', 40)));
+        });
+    }
+
+    [Test]
     public async Task EnumerateOwnedWorkspacesAsync_RestoresDurableAttemptAndExecutionIdentity()
     {
         var manager = CreateManager(new FakeGitCommandRunner());
@@ -224,13 +239,41 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = records.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(2));
+            Assert.That(record.SchemaVersion, Is.EqualTo(3));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.RetryableFailure));
             Assert.That(record.Recovery.LastCompletedAttempt, Is.EqualTo(2));
             Assert.That(record.Recovery.NextAttempt, Is.EqualTo(3));
             Assert.That(record.ExecutionIdentity?.ProcessId, Is.EqualTo(456));
             Assert.That(record.ExecutionIdentity?.LaunchNonce, Is.EqualTo("launch-2"));
         });
+    }
+
+    [Test]
+    public async Task PublicationRecoveryState_RoundTripsBoundedStageMetadata()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("published-work"), CancellationToken.None);
+        var sha = new string('b', 40);
+        await manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, sha, workspace.Branch, 42, "https://github.com/acme/widgets/pull/42"), CancellationToken.None);
+
+        var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Workspace.BaseCommitSha, Is.EqualTo(new string('a', 40)));
+            Assert.That(record.Publication!.State, Is.EqualTo(PublicationStates.PullRequestCreated));
+            Assert.That(record.Publication.CommitSha, Is.EqualTo(sha));
+            Assert.That(record.Publication.PullRequestNumber, Is.EqualTo(42));
+        });
+    }
+
+    [Test]
+    public async Task UpdatePublicationStateAsync_RejectsIncompletePullRequestIdentity()
+    {
+        var manager = CreateManager(new FakeGitCommandRunner());
+        var workspace = await manager.CreateOrRecoverAsync(Request("invalid-publication"), CancellationToken.None);
+        Assert.ThrowsAsync<WorkspaceRecoveryException>(() => manager.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, new string('b', 40), workspace.Branch), CancellationToken.None));
     }
 
     [Test]
@@ -270,7 +313,7 @@ public sealed class GitWorktreeWorkspaceManagerTests
         var record = (await manager.EnumerateOwnedWorkspacesAsync(Request("unused").Repository, CancellationToken.None)).Single();
         Assert.Multiple(() =>
         {
-            Assert.That(record.SchemaVersion, Is.EqualTo(2));
+            Assert.That(record.SchemaVersion, Is.EqualTo(3));
             Assert.That(record.Recovery.State, Is.EqualTo(WorkspaceRecoveryStates.Blocked));
             Assert.That(record.Recovery.Reason, Does.Contain("Legacy"));
         });
@@ -296,6 +339,8 @@ public sealed class GitWorktreeWorkspaceManagerTests
         public Task<GitCommandResult> RunAsync(string workingDirectory, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
         {
             Commands.Add((workingDirectory, arguments));
+            if (arguments.Count == 2 && arguments[0] == "rev-parse" && arguments[1].StartsWith("refs/heads/", StringComparison.Ordinal))
+                return Task.FromResult(new GitCommandResult(0, new string('a', 40) + "\n", string.Empty));
             if (arguments.SequenceEqual(new[] { "worktree", "list", "--porcelain" }))
                 return Task.FromResult(new GitCommandResult(0, string.Join("\n\n", Worktrees.Select(worktree => $"worktree {worktree.Key}\nHEAD deadbeef\nbranch refs/heads/{worktree.Value}")), string.Empty));
             if (arguments.Take(3).SequenceEqual(new[] { "show-ref", "--verify", "--quiet" }))
