@@ -19,6 +19,7 @@ public sealed class OrchestratorOptions
     public CodexOptions Codex { get; init; } = new();
     public RetryOptions Retry { get; init; } = new();
     public ReconciliationOptions Reconciliation { get; init; } = new();
+    public ObservabilityOptions Observability { get; init; } = new();
 }
 
 public sealed class TrackerOptions
@@ -76,3 +77,9 @@ public sealed class AgentExecutionOptions
 public sealed class CodexOptions { public string Command { get; init; } = "codex app-server"; public int TurnTimeoutMilliseconds { get; init; } = 3_600_000; }
 public sealed class RetryOptions { public int MaxAttempts { get; init; } = 3; public int InitialBackoffMilliseconds { get; init; } = 1_000; public int MaxBackoffMilliseconds { get; init; } = 300_000; }
 public sealed class ReconciliationOptions { public int IntervalMilliseconds { get; init; } = 30_000; }
+public sealed class ObservabilityOptions
+{
+    public bool Enabled { get; init; } = true;
+    public int SnapshotIntervalMilliseconds { get; init; } = 10_000;
+    public int MaximumEventFileBytes { get; init; } = 5 * 1024 * 1024;
+}

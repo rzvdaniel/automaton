@@ -15,7 +15,8 @@ public sealed class CiShepherd(
     IWorkspaceManager workspaces,
     IClock clock,
     ICiPollDelay delay,
-    OrchestratorOptions options) : ICiShepherd
+    OrchestratorOptions options,
+    IOperatorTelemetry? telemetry = null) : ICiShepherd
 {
     public async Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem workItem, CancellationToken cancellationToken)
     {
@@ -24,6 +25,8 @@ public sealed class CiShepherd(
         for (var round = 0; round <= options.Ci.MaxRemediationRounds; round++)
         {
             var observation = await ObserveAsync(current, workspace, round, cancellationToken);
+            telemetry?.Record("ci.snapshot", observation.Status == CiStatuses.Failed ? OperatorEventSeverities.Warning : OperatorEventSeverities.Information,
+                workItem.Id, "ci", message: observation.Status, metadata: new Dictionary<string, string> { ["headSha"] = current.HeadSha, ["round"] = round.ToString(System.Globalization.CultureInfo.InvariantCulture) });
             if (observation.Status == CiStatuses.Passed) return CiShepherdResult.Success(current.HeadSha, round);
             if (observation.Status != CiStatuses.Failed)
                 return CiShepherdResult.Blocked(observation.Checks.FirstOrDefault()?.FailureSummary ?? "CI state is indeterminate.", current.HeadSha, round);
@@ -31,6 +34,8 @@ public sealed class CiShepherd(
                 return CiShepherdResult.Blocked("CI still fails after the configured remediation rounds.", current.HeadSha, round);
 
             var publication = await remediator.RemediateAsync(new(current, workspace, workItem, observation, round + 1), cancellationToken);
+            telemetry?.Record("ci.remediation.published", OperatorEventSeverities.Information, workItem.Id, "ci-remediation", AgentRoles.Developer,
+                "CI remediation revision was independently approved and published.", new Dictionary<string, string> { ["headSha"] = publication.CommitSha });
             if (!string.Equals(publication.Repository, current.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
                 || publication.PullRequestNumber != current.PullRequestNumber
                 || !string.Equals(publication.Branch, current.HeadBranch, StringComparison.Ordinal)

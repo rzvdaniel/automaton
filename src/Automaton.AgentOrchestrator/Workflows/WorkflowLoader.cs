@@ -146,7 +146,13 @@ public sealed class WorkflowLoader : IWorkflowLoader
                 InitialBackoffMilliseconds = PositiveInt(Section(root, "retry").GetValueOrDefault("initial_backoff_ms"), "retry.initial_backoff_ms", 1_000),
                 MaxBackoffMilliseconds = PositiveInt(Section(root, "retry").GetValueOrDefault("max_backoff_ms"), "retry.max_backoff_ms", 300_000)
             },
-            Reconciliation = new ReconciliationOptions { IntervalMilliseconds = PositiveInt(Section(root, "reconciliation").GetValueOrDefault("interval_ms"), "reconciliation.interval_ms", 30_000) }
+            Reconciliation = new ReconciliationOptions { IntervalMilliseconds = PositiveInt(Section(root, "reconciliation").GetValueOrDefault("interval_ms"), "reconciliation.interval_ms", 30_000) },
+            Observability = new ObservabilityOptions
+            {
+                Enabled = BooleanValue(Section(root, "observability").GetValueOrDefault("enabled"), "observability.enabled", true),
+                SnapshotIntervalMilliseconds = PositiveInt(Section(root, "observability").GetValueOrDefault("snapshot_interval_ms"), "observability.snapshot_interval_ms", 10_000),
+                MaximumEventFileBytes = PositiveInt(Section(root, "observability").GetValueOrDefault("maximum_event_file_bytes"), "observability.maximum_event_file_bytes", 5 * 1024 * 1024)
+            }
         };
     }
 

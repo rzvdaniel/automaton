@@ -76,6 +76,10 @@ public sealed class WorkflowLoaderTests
                   max_backoff_ms: 9
                 reconciliation:
                   interval_ms: 17
+                observability:
+                  enabled: true
+                  snapshot_interval_ms: 250
+                  maximum_event_file_bytes: 4096
                 ---
                 # Engineering task
                 Work on {{ issue.identifier }}.
@@ -117,6 +121,8 @@ public sealed class WorkflowLoaderTests
                 Assert.That(definition.Options.Agent.MaxReviewRounds, Is.EqualTo(4));
                 Assert.That(definition.Options.Retry.MaxAttempts, Is.EqualTo(4));
                 Assert.That(definition.Options.Reconciliation.IntervalMilliseconds, Is.EqualTo(17));
+                Assert.That(definition.Options.Observability.SnapshotIntervalMilliseconds, Is.EqualTo(250));
+                Assert.That(definition.Options.Observability.MaximumEventFileBytes, Is.EqualTo(4096));
             });
         }
         finally { Environment.SetEnvironmentVariable(variableName, null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_PR_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_CI_TOKEN", null); Environment.SetEnvironmentVariable("AUTOMATON_ORCHESTRATOR_FEEDBACK_TOKEN", null); }
