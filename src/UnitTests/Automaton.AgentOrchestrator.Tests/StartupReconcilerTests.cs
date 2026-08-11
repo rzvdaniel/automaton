@@ -92,6 +92,22 @@ public sealed class StartupReconcilerTests
     }
 
     [Test]
+    public async Task RestartWithPendingCiVerifiesPublicationAndResumesExactHeadObservation()
+    {
+        var sha = new string('a', 40);
+        var record = Record(WorkspaceRecoveryStates.Working) with
+        {
+            Publication = new(PublicationStates.PullRequestCreated, sha, "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42", 1, new string('0', 40)),
+            Ci = new(CiStatuses.Pending, sha, 0)
+        };
+        var ci = new FakeCiShepherd { Result = CiShepherdResult.Success(sha, 0) };
+        var fixture = Create(record, ciShepherd: ci);
+        fixture.Publisher.Result = new(true, new("acme/widgets", "automaton/work/work-key", sha, 42, "https://github.com/acme/widgets/pull/42", true));
+        await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        Assert.Multiple(() => { Assert.That(ci.Targets.Single().HeadSha, Is.EqualTo(sha)); Assert.That(fixture.Executor.Attempts, Is.Empty); Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Completed)); });
+    }
+
+    [Test]
     public void TransientPublicationVerificationFailureKeepsStartupGateClosed()
     {
         var fixture = Create(Record(WorkspaceRecoveryStates.Working) with { Publication = new(PublicationStates.PullRequestCreated, new string('a', 40), "automaton/work/work-key", 42, "https://github.com/acme/widgets/pull/42") });
@@ -224,7 +240,7 @@ public sealed class StartupReconcilerTests
         Assert.That(fixture.Orchestrator.IsStartupReconciled, Is.False);
     }
 
-    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead)
+    private static Fixture Create(OwnedWorkspaceRecord record, WorkItem? item = null, string fenceClassification = ExecutionIdentityClassifications.Dead, FakeCiShepherd? ciShepherd = null)
     {
         var tracker = new FakeTracker(item ?? Work());
         var executor = new RecordingExecutor();
@@ -239,7 +255,7 @@ public sealed class StartupReconcilerTests
         var workspaces = new FakeWorkspaceManager(record);
         var fence = new FakeFence(fenceClassification);
         var publisher = new FakePublisher();
-        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance);
+        var reconciler = new StartupReconciler(workspaces, tracker, fence, publisher, orchestrator, options, NullLogger<StartupReconciler>.Instance, ciShepherd);
         return new(orchestrator, reconciler, tracker, executor, workspaces, fence, publisher);
     }
 
@@ -290,6 +306,12 @@ public sealed class StartupReconcilerTests
             if (Failure is not null) throw Failure;
             return Task.FromResult(Result);
         }
+    }
+    private sealed class FakeCiShepherd : ICiShepherd
+    {
+        public List<CiTarget> Targets { get; } = [];
+        public CiShepherdResult Result { get; set; } = CiShepherdResult.Blocked("not configured", new string('0', 40), 0);
+        public Task<CiShepherdResult> ShepherdAsync(CiTarget target, Workspace workspace, WorkItem item, CancellationToken token) { Targets.Add(target); return Task.FromResult(Result); }
     }
     private sealed class FakeFence(string classification) : IExecutionFence
     {

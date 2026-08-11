@@ -29,7 +29,7 @@ public sealed class GitWorkPublisher(
         var workspace = request.Workspace;
         ValidateWorkspaceForPublication(workspace, requireActiveOwnership: true);
         workspace = await workspaces.UpdatePublicationStateAsync(workspace,
-            new PublicationRecoveryState(PublicationStates.Authorized), CancellationToken.None);
+            new PublicationRecoveryState(PublicationStates.Authorized, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
 
         await ValidateGitStateAsync(workspace, cancellationToken);
         await RunValidationCommandsAsync(workspace, cancellationToken);
@@ -37,11 +37,11 @@ public sealed class GitWorkPublisher(
         await ValidateRemoteAsync(workspace, cancellationToken);
         var commitSha = await PrepareCommitAsync(workspace, subject, cancellationToken);
         workspace = await workspaces.UpdatePublicationStateAsync(workspace,
-            new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch), CancellationToken.None);
+            new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
 
         await PublishBranchAsync(workspace, commitSha, cancellationToken);
         workspace = await workspaces.UpdatePublicationStateAsync(workspace,
-            new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch), CancellationToken.None);
+            new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch, Revision: 1, AuthorizedParentSha: workspace.BaseCommitSha), CancellationToken.None);
 
         var publication = await pullRequests.FindOrCreateAsync(new(
             options.Repository.Identity,
@@ -52,8 +52,65 @@ public sealed class GitWorkPublisher(
             BuildPullRequestBody(request)), cancellationToken);
         ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
         await workspaces.UpdatePublicationStateAsync(workspace,
-            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url), CancellationToken.None);
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url, 1, workspace.BaseCommitSha), CancellationToken.None);
         return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
+    }
+
+    public async Task<PublicationResult> PublishRevisionAsync(PublicationRevisionRequest request, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(request.Reviewer.Verdict, RoleResultStatuses.Approved, StringComparison.Ordinal))
+            throw new PublicationException("CI remediation publication requires independent Reviewer approval.");
+        if (request.Revision < 2 || request.CurrentPublication.PullRequestNumber <= 0 || !request.CurrentPublication.Draft)
+            throw new PublicationException("CI remediation publication identity is invalid.");
+        var workspace = request.Workspace;
+        ValidateWorkspaceForPublication(workspace, requireActiveOwnership: true);
+        if (!string.Equals(request.CurrentPublication.Repository, workspace.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(request.CurrentPublication.Branch, workspace.Branch, StringComparison.Ordinal))
+            throw new PublicationException("CI remediation publication does not match the daemon-owned workspace.");
+
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Authorized, RemoteBranch: workspace.Branch,
+                PullRequestNumber: request.CurrentPublication.PullRequestNumber, PullRequestUrl: request.CurrentPublication.PullRequestUrl,
+                Revision: request.Revision, AuthorizedParentSha: request.CurrentPublication.CommitSha), CancellationToken.None);
+        await ValidateGitStateAsync(workspace, cancellationToken);
+        await RunValidationCommandsAsync(workspace, cancellationToken);
+        await ValidateRemoteAsync(workspace, cancellationToken);
+        var subject = BuildRevisionSubject(request.WorkItem, request.Revision);
+        var commitSha = await PrepareRevisionCommitAsync(workspace, request.CurrentPublication.CommitSha, subject, cancellationToken);
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch,
+                request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, request.Revision, request.CurrentPublication.CommitSha), CancellationToken.None);
+        await PublishFastForwardAsync(workspace, request.CurrentPublication.CommitSha, commitSha, cancellationToken);
+        workspace = await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch,
+                request.CurrentPublication.PullRequestNumber, request.CurrentPublication.PullRequestUrl, request.Revision, request.CurrentPublication.CommitSha), CancellationToken.None);
+        var lookup = new PullRequestPublicationRequest(options.Repository.Identity, workspace.Branch, commitSha, options.Repository.BaseBranch, subject, "CI remediation publication");
+        var publication = await pullRequests.FindExactAsync(lookup, request.CurrentPublication.PullRequestNumber, cancellationToken)
+            ?? throw new PublicationException("The existing draft pull request did not advance to the CI remediation commit.");
+        ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
+        await workspaces.UpdatePublicationStateAsync(workspace,
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url, request.Revision, request.CurrentPublication.CommitSha), CancellationToken.None);
+        return new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft);
+    }
+
+    public async Task ValidateRevisionBaseAsync(Workspace workspace, PublicationResult currentPublication, CancellationToken cancellationToken)
+    {
+        ValidateWorkspaceForPublication(workspace, requireActiveOwnership: false);
+        if (!string.Equals(currentPublication.Repository, workspace.RepositoryIdentity, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(currentPublication.Branch, workspace.Branch, StringComparison.Ordinal)
+            || currentPublication.PullRequestNumber <= 0 || !currentPublication.Draft)
+            throw new PublicationException("CI remediation base publication identity is invalid.");
+        await ValidateGitStateAsync(workspace, cancellationToken);
+        await ValidateRemoteAsync(workspace, cancellationToken);
+        var head = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "verify CI remediation local head", cancellationToken)).StandardOutput.Trim());
+        if (!string.Equals(head, currentPublication.CommitSha, StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Local workspace HEAD does not match the published CI target.");
+        var status = await GitAsync(workspace.Path, ["status", "--porcelain=v1", "--untracked-files=all"], "verify clean CI remediation base", cancellationToken);
+        if (!string.IsNullOrWhiteSpace(status.StandardOutput)) throw new PublicationException("Workspace contains unrelated changes before CI remediation.");
+        await VerifyRemoteBranchAsync(workspace, currentPublication.CommitSha, cancellationToken);
+        var lookup = new PullRequestPublicationRequest(options.Repository.Identity, workspace.Branch, currentPublication.CommitSha, options.Repository.BaseBranch, string.Empty, string.Empty);
+        _ = await pullRequests.FindExactAsync(lookup, currentPublication.PullRequestNumber, cancellationToken)
+            ?? throw new PublicationException("Draft pull-request identity no longer matches the CI remediation base.");
     }
 
     public async Task<PublicationRecoveryResult> RecoverAsync(OwnedWorkspaceRecord record, WorkItem workItem, CancellationToken cancellationToken)
@@ -66,18 +123,24 @@ public sealed class GitWorkPublisher(
         if (recoveryState == PublicationStates.None) return new(false);
         await ValidateGitStateAsync(workspace, cancellationToken);
         var subject = BuildSubject(workItem);
+        var revision = record.Publication?.Revision ?? 1;
+        var authorizedParent = record.Publication?.AuthorizedParentSha ?? workspace.BaseCommitSha;
         await RunValidationCommandsAsync(workspace, cancellationToken);
         await ValidateRemoteAsync(workspace, cancellationToken);
         string commitSha;
         if (recoveryState == PublicationStates.Authorized)
         {
-            commitSha = await PrepareCommitAsync(workspace, subject, cancellationToken);
+            commitSha = revision == 1
+                ? await PrepareCommitAsync(workspace, subject, cancellationToken)
+                : await PrepareRevisionCommitAsync(workspace, authorizedParent!, BuildRevisionSubject(workItem, revision), cancellationToken);
             workspace = await workspaces.UpdatePublicationStateAsync(workspace,
-                new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch), CancellationToken.None);
+                new PublicationRecoveryState(PublicationStates.Committed, commitSha, workspace.Branch, record.Publication?.PullRequestNumber, record.Publication?.PullRequestUrl, revision, authorizedParent), CancellationToken.None);
         }
         else
         {
-            commitSha = await RecognizeExistingCommitAsync(workspace, subject, cancellationToken)
+            commitSha = await (revision == 1
+                ? RecognizeExistingCommitAsync(workspace, subject, cancellationToken)
+                : RecognizeRevisionCommitAsync(workspace, authorizedParent!, BuildRevisionSubject(workItem, revision), cancellationToken))
                 ?? throw new PublicationException("Durable publication state exists but the daemon publication commit cannot be proven.");
             ValidateRecoveryHint(record.Publication, workspace, commitSha);
         }
@@ -101,17 +164,22 @@ public sealed class GitWorkPublisher(
         {
             if (record.Publication?.State == PublicationStates.Pushed)
                 await VerifyRemoteBranchAsync(workspace, commitSha, cancellationToken);
+            else if (revision > 1)
+                await PublishFastForwardAsync(workspace, authorizedParent!, commitSha, cancellationToken);
             else
                 await PublishBranchAsync(workspace, commitSha, cancellationToken);
             if (record.Publication?.State != PublicationStates.Pushed)
                 workspace = await workspaces.UpdatePublicationStateAsync(workspace,
-                    new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch), CancellationToken.None);
-            publication = await pullRequests.FindOrCreateAsync(request, cancellationToken);
+                    new PublicationRecoveryState(PublicationStates.Pushed, commitSha, workspace.Branch, record.Publication?.PullRequestNumber, record.Publication?.PullRequestUrl, revision, authorizedParent), CancellationToken.None);
+            publication = revision > 1
+                ? await pullRequests.FindExactAsync(request, record.Publication?.PullRequestNumber, cancellationToken)
+                    ?? throw new PublicationException("The existing draft pull request did not advance to the recovered CI remediation commit.")
+                : await pullRequests.FindOrCreateAsync(request, cancellationToken);
         }
 
         ValidatePullRequest(publication, workspace, commitSha, options.Repository.BaseBranch);
         await workspaces.UpdatePublicationStateAsync(workspace,
-            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url), CancellationToken.None);
+            new PublicationRecoveryState(PublicationStates.PullRequestCreated, commitSha, workspace.Branch, publication.Number, publication.Url, revision, authorizedParent), CancellationToken.None);
         return new(true, new(options.Repository.Identity, workspace.Branch, commitSha, publication.Number, publication.Url, publication.Draft));
     }
 
@@ -179,6 +247,35 @@ public sealed class GitWorkPublisher(
         return RequireSha(head);
     }
 
+    private async Task<string> PrepareRevisionCommitAsync(Workspace workspace, string expectedParent, string subject, CancellationToken cancellationToken)
+    {
+        var head = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve CI remediation HEAD", cancellationToken)).StandardOutput.Trim());
+        if (!string.Equals(head, expectedParent, StringComparison.OrdinalIgnoreCase))
+        {
+            var parent = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD^"], "resolve CI remediation parent", cancellationToken)).StandardOutput.Trim());
+            var provenance = (await GitAsync(workspace.Path, ["log", "-1", "--format=%an%x00%ae%x00%s"], "inspect CI remediation provenance", cancellationToken)).StandardOutput.TrimEnd('\r', '\n');
+            if (!string.Equals(parent, expectedParent, StringComparison.OrdinalIgnoreCase)
+                || provenance != $"{options.Publication.GitName}\0{options.Publication.GitEmail}\0{subject}")
+                throw new PublicationException("CI remediation commit provenance is ambiguous.");
+            return head;
+        }
+        var status = await GitAsync(workspace.Path, ["status", "--porcelain=v1", "--untracked-files=all"], "inspect CI remediation changes", cancellationToken);
+        if (string.IsNullOrWhiteSpace(status.StandardOutput)) throw new PublicationException("Approved CI remediation has no changes to publish.");
+        await GitAsync(workspace.Path, ["add", "--all"], "stage CI remediation changes", cancellationToken);
+        await GitAsync(workspace.Path, ["-c", $"user.name={options.Publication.GitName}", "-c", $"user.email={options.Publication.GitEmail}", "commit", "-m", subject], "create CI remediation commit", cancellationToken);
+        return RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve CI remediation commit", cancellationToken)).StandardOutput.Trim());
+    }
+
+    private async Task<string?> RecognizeRevisionCommitAsync(Workspace workspace, string expectedParent, string subject, CancellationToken cancellationToken)
+    {
+        var head = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD"], "resolve CI remediation HEAD", cancellationToken)).StandardOutput.Trim());
+        if (string.Equals(head, expectedParent, StringComparison.OrdinalIgnoreCase)) return null;
+        var parent = RequireSha((await GitAsync(workspace.Path, ["rev-parse", "HEAD^"], "resolve CI remediation parent", cancellationToken)).StandardOutput.Trim());
+        var provenance = (await GitAsync(workspace.Path, ["log", "-1", "--format=%an%x00%ae%x00%s"], "inspect CI remediation provenance", cancellationToken)).StandardOutput.TrimEnd('\r', '\n');
+        return string.Equals(parent, expectedParent, StringComparison.OrdinalIgnoreCase)
+            && provenance == $"{options.Publication.GitName}\0{options.Publication.GitEmail}\0{subject}" ? head : null;
+    }
+
     private static void ValidateRecoveryHint(PublicationRecoveryState? hint, Workspace workspace, string commitSha)
     {
         if (hint is null || hint.State == PublicationStates.None) return;
@@ -217,6 +314,17 @@ public sealed class GitWorkPublisher(
         var remote = await ReadRemoteShaAsync(workspace, cancellationToken);
         if (!string.Equals(remote, commitSha, StringComparison.OrdinalIgnoreCase))
             throw new PublicationException("Durably published remote branch is missing or has an unexpected SHA.");
+    }
+
+    private async Task PublishFastForwardAsync(Workspace workspace, string expectedRemoteParent, string commitSha, CancellationToken cancellationToken)
+    {
+        var existing = await ReadRemoteShaAsync(workspace, cancellationToken);
+        if (string.Equals(existing, commitSha, StringComparison.OrdinalIgnoreCase)) return;
+        if (!string.Equals(existing, expectedRemoteParent, StringComparison.OrdinalIgnoreCase))
+            throw new PublicationException("Remote work branch advanced outside the authorized CI remediation revision.");
+        var push = await git.RunAsync(workspace.Path, ["push", "--porcelain", options.Publication.RemoteName, $"HEAD:refs/heads/{workspace.Branch}"], cancellationToken);
+        if (push.ExitCode != 0) throw ClassifyGitNetworkFailure(push.StandardError, "Git could not fast-forward the CI remediation branch.");
+        await VerifyRemoteBranchAsync(workspace, commitSha, cancellationToken);
     }
 
     private async Task<string?> ReadRemoteShaAsync(Workspace workspace, CancellationToken cancellationToken)
@@ -281,6 +389,13 @@ public sealed class GitWorkPublisher(
     {
         var value = Sanitize($"{item.Identifier}: {item.Title}");
         return value.Length <= MaximumSubjectLength ? value : value[..MaximumSubjectLength].TrimEnd();
+    }
+    internal static string BuildRevisionSubject(WorkItem item, int revision)
+    {
+        var suffix = $" (CI fix {revision - 1})";
+        var root = BuildSubject(item);
+        if (root.Length + suffix.Length > MaximumSubjectLength) root = root[..(MaximumSubjectLength - suffix.Length)].TrimEnd();
+        return root + suffix;
     }
 
     private static string BuildPullRequestBody(PublicationRequest request)

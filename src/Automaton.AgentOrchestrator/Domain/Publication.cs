@@ -16,7 +16,9 @@ public sealed record PublicationRecoveryState(
     string? CommitSha = null,
     string? RemoteBranch = null,
     int? PullRequestNumber = null,
-    string? PullRequestUrl = null);
+    string? PullRequestUrl = null,
+    int Revision = 1,
+    string? AuthorizedParentSha = null);
 
 public sealed record PublicationRequest(
     Workspace Workspace,
@@ -34,6 +36,14 @@ public sealed record PublicationResult(
     bool Draft);
 
 public sealed record PublicationRecoveryResult(bool Recognized, PublicationResult? Publication = null);
+
+public sealed record PublicationRevisionRequest(
+    Workspace Workspace,
+    WorkItem WorkItem,
+    PublicationResult CurrentPublication,
+    DeveloperHandoff Developer,
+    ReviewerHandoff Reviewer,
+    int Revision);
 
 public sealed record PullRequestPublication(
     int Number,
