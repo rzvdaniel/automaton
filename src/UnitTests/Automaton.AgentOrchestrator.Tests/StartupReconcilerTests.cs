@@ -78,10 +78,12 @@ public sealed class StartupReconcilerTests
     {
         var fixture = Create(Record(WorkspaceRecoveryStates.Working, active: true), fenceClassification: classification);
         await fixture.Reconciler.ReconcileAsync(CancellationToken.None);
+        await fixture.Orchestrator.PollAsync(CancellationToken.None);
 
         Assert.Multiple(() =>
         {
             Assert.That(fixture.Fence.TerminationCount, Is.Zero);
+            Assert.That(fixture.Executor.Attempts, Is.Empty);
             Assert.That(fixture.Workspaces.Records.Single().Workspace.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
             Assert.That(fixture.Orchestrator.Snapshot(), Has.Some.Matches<RunState>(x => x.State == RunStates.Blocked));
         });

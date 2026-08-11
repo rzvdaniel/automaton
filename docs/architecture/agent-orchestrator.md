@@ -389,9 +389,16 @@ On Windows, new App Servers are assigned to a kill-on-close Job Object when
 available and otherwise use the existing process-tree boundary. Job handles are
 live-daemon resources, not durable restart identity. On restart the daemon
 compares the persisted PID and exact start time before terminating the matching
-process tree. On Linux, App Servers lead a new session/process group; PID and
-start time remain the primary identity and the persisted process-group ID scopes
-termination. PID reuse never authorizes killing the new process. Inspection
+process tree. A missing root is sufficient restart proof only for a recorded
+`windows-job` execution, because closing the daemon-owned kill-on-close handle
+also fences descendants. A `portable-process-tree` execution with a missing root
+remains ambiguous: its descendants cannot be proven absent after restart, so the
+workspace is quarantined. On Linux, App Servers lead a new session/process
+group; PID and start time remain the primary identity and the persisted
+process-group ID scopes termination. A missing Linux root is dead only when the
+process group is proven absent; an existing or uninspectable group is ambiguous.
+Unknown fencing kinds also fail closed. PID reuse never authorizes killing the
+new process. Inspection
 failure, incomplete identity, failed verified termination, or any descendant
 ownership ambiguity fails closed to quarantine. Unsupported platforms cannot
 clear unresolved active ownership after restart.

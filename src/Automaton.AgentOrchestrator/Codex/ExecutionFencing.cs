@@ -17,6 +17,21 @@ public static class ExecutionIdentityClassifications
 public sealed record ExecutionIdentityInspection(string Classification, string? Detail = null);
 public sealed record FencedProcess(Process Process, DurableExecutionIdentity Identity);
 
+internal static class ExecutionRootInspectionStates
+{
+    public const string Missing = "missing";
+    public const string Live = "live";
+    public const string Ambiguous = "ambiguous";
+}
+
+internal sealed record ExecutionRootInspection(string State, DateTimeOffset? StartedAtUtc = null);
+
+internal interface IRestartProcessInspector
+{
+    ExecutionRootInspection InspectRoot(int processId);
+    bool? IsProcessGroupAbsent(int processGroupId);
+}
+
 public interface IExecutionFence
 {
     Task<FencedProcess> LaunchAsync(ProcessStartInfo startInfo, string launchNonce, CancellationToken cancellationToken);
@@ -27,6 +42,10 @@ public interface IExecutionFence
 public sealed class PlatformExecutionFence : IExecutionFence
 {
     private readonly ConcurrentDictionary<string, SafeFileHandle> windowsJobs = new(StringComparer.Ordinal);
+    private readonly IRestartProcessInspector restartInspector;
+
+    public PlatformExecutionFence() : this(new PlatformRestartProcessInspector()) { }
+    internal PlatformExecutionFence(IRestartProcessInspector restartInspector) => this.restartInspector = restartInspector;
 
     public Task<FencedProcess> LaunchAsync(ProcessStartInfo startInfo, string launchNonce, CancellationToken cancellationToken)
     {
@@ -49,32 +68,28 @@ public sealed class PlatformExecutionFence : IExecutionFence
     public Task<ExecutionIdentityInspection> InspectAsync(DurableExecutionIdentity identity, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
-            return Task.FromResult(new ExecutionIdentityInspection(ExecutionIdentityClassifications.Ambiguous, "Restart process inspection is unsupported on this platform."));
-        try
+        var root = restartInspector.InspectRoot(identity.ProcessId);
+        return Task.FromResult(root.State switch
         {
-            using var process = Process.GetProcessById(identity.ProcessId);
-            var started = new DateTimeOffset(process.StartTime.ToUniversalTime());
-            return Task.FromResult(started == identity.ProcessStartedAtUtc
-                ? new ExecutionIdentityInspection(ExecutionIdentityClassifications.MatchingLive)
-                : new ExecutionIdentityInspection(ExecutionIdentityClassifications.Reused));
-        }
-        catch (ArgumentException) { return Task.FromResult(ClassifyMissingRoot(identity)); }
-        catch (InvalidOperationException) { return Task.FromResult(ClassifyMissingRoot(identity)); }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or UnauthorizedAccessException)
-        {
-            return Task.FromResult(new ExecutionIdentityInspection(ExecutionIdentityClassifications.Ambiguous, "Process identity inspection failed."));
-        }
+            ExecutionRootInspectionStates.Live when root.StartedAtUtc == identity.ProcessStartedAtUtc
+                => new ExecutionIdentityInspection(ExecutionIdentityClassifications.MatchingLive),
+            ExecutionRootInspectionStates.Live => new ExecutionIdentityInspection(ExecutionIdentityClassifications.Reused),
+            ExecutionRootInspectionStates.Missing => ClassifyMissingRoot(identity),
+            _ => new ExecutionIdentityInspection(ExecutionIdentityClassifications.Ambiguous, "Process identity inspection failed.")
+        });
     }
 
-    private static ExecutionIdentityInspection ClassifyMissingRoot(DurableExecutionIdentity identity)
+    private ExecutionIdentityInspection ClassifyMissingRoot(DurableExecutionIdentity identity)
     {
-        if (OperatingSystem.IsLinux() && identity.FencingKind == ExecutionFencingKinds.UnixProcessGroup && identity.ProcessGroupId is { } groupId)
+        if (identity.FencingKind == ExecutionFencingKinds.WindowsJob)
+            return new(ExecutionIdentityClassifications.Dead);
+        if (identity.FencingKind == ExecutionFencingKinds.UnixProcessGroup && identity.ProcessGroupId is { } groupId)
         {
-            if (NativeMethods.Kill(-groupId, 0) == 0 || Marshal.GetLastPInvokeError() != NativeMethods.NoSuchProcess)
-                return new(ExecutionIdentityClassifications.Ambiguous, "The root process is absent but process-group ownership cannot be proven clear.");
+            return restartInspector.IsProcessGroupAbsent(groupId) == true
+                ? new(ExecutionIdentityClassifications.Dead)
+                : new(ExecutionIdentityClassifications.Ambiguous, "The root process is absent but process-group ownership cannot be proven clear.");
         }
-        return new(ExecutionIdentityClassifications.Dead);
+        return new(ExecutionIdentityClassifications.Ambiguous, "The root process is absent but descendant ownership cannot be proven clear.");
     }
 
     public async Task<bool> TerminateAndVerifyAsync(DurableExecutionIdentity identity, TimeSpan timeout, CancellationToken cancellationToken)
@@ -205,6 +220,32 @@ public sealed class PlatformExecutionFence : IExecutionFence
             public JobObjectBasicLimitInformation BasicLimitInformation;
             public IoCounters IoInfo;
             public UIntPtr ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
+        }
+    }
+
+    private sealed class PlatformRestartProcessInspector : IRestartProcessInspector
+    {
+        public ExecutionRootInspection InspectRoot(int processId)
+        {
+            if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux()) return new(ExecutionRootInspectionStates.Ambiguous);
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                return new(ExecutionRootInspectionStates.Live, new DateTimeOffset(process.StartTime.ToUniversalTime()));
+            }
+            catch (ArgumentException) { return new(ExecutionRootInspectionStates.Missing); }
+            catch (InvalidOperationException) { return new(ExecutionRootInspectionStates.Missing); }
+            catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or UnauthorizedAccessException)
+            {
+                return new(ExecutionRootInspectionStates.Ambiguous);
+            }
+        }
+
+        public bool? IsProcessGroupAbsent(int processGroupId)
+        {
+            if (!OperatingSystem.IsLinux()) return null;
+            if (NativeMethods.Kill(-processGroupId, 0) == 0) return false;
+            return Marshal.GetLastPInvokeError() == NativeMethods.NoSuchProcess ? true : null;
         }
     }
 }
