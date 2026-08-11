@@ -445,6 +445,13 @@ violation that fails closed before the workflow can report success. Developer
 may modify only the assigned worktree and cannot push, create a pull request, or
 mutate provider state.
 
+Once a read-only role starts, its post-role fingerprint is checked on successful,
+malformed, failed, interrupted, timed-out, exceptional, and cancellable exit
+paths whenever ownership remains safely inspectable. A detected mutation takes
+precedence over an otherwise retryable role failure and becomes deterministic
+manual attention. Process/protocol ambiguity or quarantined ownership bypasses
+filesystem inspection and retains the stricter Stage 6 quarantine semantics.
+
 Handoffs are bounded provider-neutral data, not transcripts. Manager emits a
 READY/BLOCKED plan with validation and risks; Developer emits a
 COMPLETED/BLOCKED implementation summary with validation and remaining concerns;

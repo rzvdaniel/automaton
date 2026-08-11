@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Automaton.AgentOrchestrator.Codex;
 using Automaton.AgentOrchestrator.Domain;
 using Automaton.AgentOrchestrator.Workflows;
@@ -38,20 +39,22 @@ public sealed class RoleBasedWorkExecutor(
         {
             await client.InitializeAsync(cancellationToken);
 
-            var managerBefore = await mutationGuard.CaptureAsync(workspace, cancellationToken);
-            var managerThread = await client.StartThreadAsync(cancellationToken);
-            var manager = await RunManagerAsync(client, managerThread, prompts.Manager(attempt, workspace), cancellationToken);
-            await EnsureUnchangedAsync(workspace, managerBefore, AgentRoles.Manager, cancellationToken);
+            var manager = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Manager, async () =>
+            {
+                var thread = await client.StartThreadAsync(cancellationToken);
+                return await RunManagerAsync(client, thread, prompts.Manager(attempt, workspace), cancellationToken);
+            }, cancellationToken);
             if (manager.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(manager.Summary);
 
             var developerThread = await client.StartThreadAsync(cancellationToken);
             var developer = await RunDeveloperAsync(client, developerThread, prompts.Developer(attempt, workspace, manager), cancellationToken);
             if (developer.Status == RoleResultStatuses.Blocked) throw new RoleBlockedException(developer.Summary);
 
-            var reviewerBefore = await mutationGuard.CaptureAsync(workspace, cancellationToken);
-            var reviewerThread = await client.StartThreadAsync(cancellationToken);
-            var reviewer = await RunReviewerAsync(client, reviewerThread, prompts.Reviewer(attempt, workspace, manager, developer), cancellationToken);
-            await EnsureUnchangedAsync(workspace, reviewerBefore, AgentRoles.Reviewer, cancellationToken);
+            var reviewer = await RunReadOnlyRoleAsync(client, workspace, AgentRoles.Reviewer, async () =>
+            {
+                var thread = await client.StartThreadAsync(cancellationToken);
+                return await RunReviewerAsync(client, thread, prompts.Reviewer(attempt, workspace, manager, developer), cancellationToken);
+            }, cancellationToken);
             outcome = reviewer.Verdict == RoleResultStatuses.Approved
                 ? RunOutcome.Success()
                 : RunOutcome.PermanentFailure(Bounded(reviewer.Summary.Length > 0 ? reviewer.Summary : $"Reviewer returned {reviewer.Verdict}."));
@@ -155,11 +158,36 @@ public sealed class RoleBasedWorkExecutor(
         return result;
     }
 
-    private async Task EnsureUnchangedAsync(Workspace workspace, string before, string role, CancellationToken cancellationToken)
+    private async Task<T> RunReadOnlyRoleAsync<T>(
+        ICodexAppServerClient client,
+        Workspace workspace,
+        string role,
+        Func<Task<T>> execute,
+        CancellationToken cancellationToken)
     {
-        var after = await mutationGuard.CaptureAsync(workspace, cancellationToken);
+        var before = await mutationGuard.CaptureAsync(workspace, cancellationToken);
+        T? result = default;
+        Exception? failure = null;
+        try { result = await execute(); }
+        catch (Exception exception) { failure = exception; }
+
+        if (failure is CodexProtocolException
+            || string.Equals(client.CurrentWorkspace?.ExecutionOwnershipStatus, WorkspaceExecutionOwnershipStates.Quarantined, StringComparison.Ordinal))
+        {
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+            throw new CodexProtocolException($"{role} execution ownership became quarantined.");
+        }
+
+        string after;
+        try { after = await mutationGuard.CaptureAsync(workspace, CancellationToken.None); }
+        catch (Exception exception)
+        {
+            throw new RoleBlockedException($"{role} workspace could not be safely verified after execution: {Bounded(exception.Message)}");
+        }
         if (!string.Equals(before, after, StringComparison.Ordinal))
             throw new RoleBlockedException($"{role} violated its read-only workspace boundary.");
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return result!;
     }
 
     private static string Bounded(string value) => value.Length <= MaximumResultDetailLength ? value : value[..MaximumResultDetailLength];

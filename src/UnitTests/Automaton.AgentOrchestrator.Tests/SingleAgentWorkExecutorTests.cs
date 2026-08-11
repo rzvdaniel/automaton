@@ -168,15 +168,58 @@ public sealed class SingleAgentWorkExecutorTests
     }
 
     [Test]
-    public async Task FailedRoleTurnIsRetryableAndPreservesWorkspace()
+    public async Task FailedManagerWithUnchangedFingerprintIsRetryableAndPreservesWorkspace()
     {
-        var fixture = Create(new CodexTurnResult("thread-1", "turn-1", "failed", "temporary model failure"));
+        var fixture = Create(FailedTurn());
         var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
         Assert.Multiple(() =>
         {
             Assert.That(outcome.IsRetryable, Is.True);
             Assert.That(fixture.Workspaces.Lifecycles, Is.EqualTo(new[] { WorkspaceLifecycleStates.RetryableFailure }));
             Assert.That(fixture.Client.Disposed, Is.True);
+        });
+    }
+
+    [TestCase("failed")]
+    [TestCase("interrupted")]
+    public async Task ManagerMutationOverridesTransientTurnFailure(string turnStatus)
+    {
+        var fixture = CreateWithFingerprints(["before", "after"], TurnFailure(turnStatus));
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Does.Contain("manager violated its read-only"));
+            Assert.That(fixture.Client.StartedThreadIds, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task ReviewerMutationOverridesTransientTurnFailure()
+    {
+        var fixture = CreateWithFingerprints(
+            ["manager", "manager", "review-before", "review-after"],
+            ManagerReady(), DeveloperCompleted(), FailedTurn());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(outcome.FailureReason, Does.Contain("reviewer violated its read-only"));
+        });
+    }
+
+    [Test]
+    public async Task FailedReviewerWithUnchangedFingerprintRemainsRetryable()
+    {
+        var fixture = Create(ManagerReady(), DeveloperCompleted(), FailedTurn());
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.True);
+            Assert.That(outcome.FailureReason, Is.EqualTo("temporary model failure"));
         });
     }
 
@@ -197,6 +240,23 @@ public sealed class SingleAgentWorkExecutorTests
         fixture.Client.InitializeFailure = new CodexProtocolException("malformed response");
         fixture.Client.Quarantined = true;
         var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsRetryable, Is.False);
+            Assert.That(fixture.Client.CurrentWorkspace!.ExecutionOwnershipStatus, Is.EqualTo(WorkspaceExecutionOwnershipStates.Quarantined));
+            Assert.That(fixture.Workspaces.Lifecycles, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task ProtocolAmbiguityDuringReadOnlyRoleBypassesMutationDowngradeAndPreservesQuarantine()
+    {
+        var fixture = CreateWithFingerprints(["before", "after"]);
+        fixture.Client.WaitFailure = new CodexProtocolException("transport ambiguity");
+        fixture.Client.Quarantined = true;
+
+        var outcome = await fixture.Executor.ExecuteAsync(Attempt(), CancellationToken.None);
+
         Assert.Multiple(() =>
         {
             Assert.That(outcome.IsRetryable, Is.False);
@@ -244,6 +304,8 @@ public sealed class SingleAgentWorkExecutorTests
     private static CodexTurnResult ReviewerApproved() => Reviewer("APPROVED", "review approved");
     private static CodexTurnResult Reviewer(string verdict, string summary, string finding = "") => Completed($"AUTOMATON_REVIEW_RESULT: {{\"verdict\":\"{verdict}\",\"summary\":\"{summary}\",\"findings\":[{{\"severity\":\"minor\",\"description\":\"{finding}\"}}]}}");
     private static CodexTurnResult Completed(string response) => new("unused", Guid.NewGuid().ToString("N"), "completed", FinalResponse: response);
+    private static CodexTurnResult FailedTurn() => TurnFailure("failed");
+    private static CodexTurnResult TurnFailure(string status) => new("unused", Guid.NewGuid().ToString("N"), status, "temporary model failure");
 
     private sealed record Fixture(RoleBasedWorkExecutor Executor, FakeWorkspaceManager Workspaces, FakeCodexFactory Factory, FakeCodexClient Client);
     private sealed class FakeMutationGuard(IEnumerable<string> fingerprints) : IWorkspaceMutationGuard
@@ -283,11 +345,21 @@ public sealed class SingleAgentWorkExecutorTests
         public bool Disposed { get; private set; }
         public bool Quarantined { get; set; }
         public Exception? InitializeFailure { get; set; }
+        public Exception? WaitFailure { get; set; }
         public Task InitializeAsync(CancellationToken cancellationToken) { current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Active, LaunchNonce = "run" }; if (InitializeFailure is not null) throw InitializeFailure; return Task.CompletedTask; }
         public Task<CodexThread> StartThreadAsync(CancellationToken cancellationToken) { var id = $"thread-{StartedThreadIds.Count + 1}"; StartedThreadIds.Add(id); return Task.FromResult(new CodexThread(id)); }
         public Task<CodexThread> ResumeThreadAsync(string threadId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CodexTurn> StartTurnAsync(string threadId, string prompt, CancellationToken cancellationToken) { TurnThreadIds.Add(threadId); Prompts.Add(prompt); return Task.FromResult(new CodexTurn($"turn-{Prompts.Count}", threadId)); }
-        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken) { cancellationToken.ThrowIfCancellationRequested(); return Task.FromResult(results.Dequeue() with { ThreadId = turn.ThreadId, TurnId = turn.Id }); }
+        public Task<CodexTurnResult> WaitForTurnCompletionAsync(CodexTurn turn, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (WaitFailure is not null)
+            {
+                if (Quarantined) current = current with { ExecutionOwnershipStatus = WorkspaceExecutionOwnershipStates.Quarantined };
+                throw WaitFailure;
+            }
+            return Task.FromResult(results.Dequeue() with { ThreadId = turn.ThreadId, TurnId = turn.Id });
+        }
         public Task InterruptTurnAsync(string threadId, string turnId, CancellationToken cancellationToken) => Task.CompletedTask;
         public ValueTask DisposeAsync() { Disposed = true; current = current with { ExecutionOwnershipStatus = Quarantined ? WorkspaceExecutionOwnershipStates.Quarantined : WorkspaceExecutionOwnershipStates.None }; return ValueTask.CompletedTask; }
     }
