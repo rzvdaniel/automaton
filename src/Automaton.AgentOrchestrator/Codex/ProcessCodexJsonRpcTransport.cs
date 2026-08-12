@@ -26,7 +26,16 @@ public sealed class ProcessCodexJsonRpcTransport(CodexProcessOptions options, IE
     public string LaunchNonce { get; } = options.LaunchNonce ?? Guid.NewGuid().ToString("N");
     public CodexProcessIdentity? Identity { get; private set; }
     public DurableExecutionIdentity? DurableIdentity { get; private set; }
-    public bool? IsProcessAlive => process is null ? null : !process.HasExited;
+    public bool? IsProcessAlive
+    {
+        get
+        {
+            try { return process is null ? null : !process.HasExited; }
+            catch (InvalidOperationException) { return null; }
+            catch (NotSupportedException) { return null; }
+            catch (System.ComponentModel.Win32Exception) { return null; }
+        }
+    }
     internal IReadOnlyDictionary<string, string>? StartedEnvironment { get; private set; }
     internal string StderrTail => stderrTail;
 

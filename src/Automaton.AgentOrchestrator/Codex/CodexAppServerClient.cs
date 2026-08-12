@@ -222,7 +222,7 @@ public sealed class CodexAppServerClient(
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
         lastActivityUtc = clock.UtcNow;
-        LastEventType = root.TryGetProperty("method", out var eventMethod) ? eventMethod.GetString() : "response";
+        LastEventType = ClassifyEvent(root);
         if (root.TryGetProperty("id", out var id) && id.TryGetInt64(out var requestId))
         {
             if (!pending.TryGetValue(requestId, out var completion)) return;
@@ -246,6 +246,20 @@ public sealed class CodexAppServerClient(
             case CodexAppServerMethods.TurnCompleted: CompleteTurn(parameters, threadId, turnId); break;
             default: Touch(CodexSessionEventKinds.ItemActivity, threadId, turnId, method); break;
         }
+    }
+
+    private static string ClassifyEvent(JsonElement root)
+    {
+        if (!root.TryGetProperty("method", out var methodProperty)) return "response";
+        return methodProperty.GetString() switch
+        {
+            CodexAppServerMethods.TurnStarted => CodexAppServerMethods.TurnStarted,
+            CodexAppServerMethods.ItemStarted => CodexAppServerMethods.ItemStarted,
+            CodexAppServerMethods.ItemCompleted => CodexAppServerMethods.ItemCompleted,
+            CodexAppServerMethods.TokenUsageUpdated => CodexAppServerMethods.TokenUsageUpdated,
+            CodexAppServerMethods.TurnCompleted => CodexAppServerMethods.TurnCompleted,
+            _ => "unknown-notification"
+        };
     }
 
     private void CompleteTurn(JsonElement parameters, string? threadId, string? turnId)
