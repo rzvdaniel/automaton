@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IBuildIdentity, AssemblyBuildIdentity>();
+        services.AddSingleton<IGitCommandRunner, ProcessGitCommandRunner>();
         services.AddSingleton<IOrchestratorStatusQuery>(services =>
         {
             var options = services.GetRequiredService<OrchestratorOptions>();
@@ -41,9 +42,9 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IWorkspaceManager>(services => new GitWorktreeWorkspaceManager(
             services.GetRequiredService<OrchestratorOptions>().Workspace.Root,
-            new ProcessGitCommandRunner(),
+            services.GetRequiredService<IGitCommandRunner>(),
             services.GetRequiredService<IClock>()));
-        services.AddSingleton<IWorkspaceMutationGuard>(_ => new GitWorkspaceMutationGuard(new ProcessGitCommandRunner()));
+        services.AddSingleton<IWorkspaceMutationGuard>(services => new GitWorkspaceMutationGuard(services.GetRequiredService<IGitCommandRunner>()));
         services.AddSingleton<ICodexAppServerClientFactory, CodexAppServerClientFactory>();
         services.AddSingleton<IExecutionFence, PlatformExecutionFence>();
         services.AddSingleton<IPullRequestPublisher>(services =>
