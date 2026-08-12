@@ -422,6 +422,28 @@ validated daemon-owned sidecars, Git worktree registration, and OS process
 inspection. Graceful shutdown likewise clears active ownership only after the
 owned process boundary is verified dead; shutdown ambiguity remains quarantined.
 
+### Explicit operator retry of blocked publication recovery
+
+`blocked` is terminal on ordinary startup; the daemon never automatically
+retries it. A stopped daemon may receive one explicit, provider-neutral local
+operator command, `--retry-blocked <stable-work-item-id>`, for the narrow case
+where a prior run reached the durable publication authorization checkpoint.
+The command performs a compare-and-set transition from `Blocked` to `Working`
+and advances the persisted attempt exactly once. It requires an eligible current
+work item, released (non-quarantined) ownership, a validated daemon-owned
+workspace/worktree and branch, and publication state of `Authorized`,
+`Committed`, `Pushed`, or `PullRequestCreated`; a run with no publication
+authorization is rejected. It performs no role, Git push, PR, or CI operation;
+normal startup recovery remains responsible for the subsequent publication
+path and idempotency checks.
+
+The command is intentionally a local stopped-daemon operation rather than a
+live control channel. Rejections and accepted requests emit bounded audit
+events (`run.operator_retry_rejected` and `run.operator_retry_requested`),
+including only stable IDs, categories, workspace keys, and attempt/state
+metadata. Quarantined or actively owned workspaces cannot be retried, and the
+operator transition cannot clear quarantine or bypass process-fencing proof.
+
 ### Stage 7 role-based engineering execution
 
 Stage 7 replaces the single reasoning context with three explicit roles in a

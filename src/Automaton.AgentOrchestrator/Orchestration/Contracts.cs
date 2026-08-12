@@ -93,6 +93,8 @@ public interface IWorkspaceManager
     Task<Workspace> UpdateExecutionOwnershipAsync(Workspace workspace, string executionOwnershipStatus, string launchNonce, CancellationToken cancellationToken);
     Task<Workspace> RecordExecutionIdentityAsync(Workspace workspace, DurableExecutionIdentity identity, CancellationToken cancellationToken);
     Task<Workspace> UpdateRecoveryStateAsync(Workspace workspace, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken);
+    Task<Workspace> TransitionRecoveryStateAsync(Workspace workspace, string expectedState, string? expectedPublicationState, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken)
+        => UpdateRecoveryStateAsync(workspace, recoveryState, cancellationToken);
     Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken);
     Task<Workspace> UpdateCiStateAsync(Workspace workspace, CiRecoveryState ciState, CancellationToken cancellationToken) => Task.FromResult(workspace);
     Task<Workspace> UpdateReviewFeedbackStateAsync(Workspace workspace, ReviewFeedbackRecoveryState feedbackState, CancellationToken cancellationToken) => Task.FromResult(workspace);

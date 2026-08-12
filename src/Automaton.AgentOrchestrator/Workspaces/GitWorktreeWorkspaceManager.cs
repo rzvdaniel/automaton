@@ -181,6 +181,18 @@ public sealed class GitWorktreeWorkspaceManager : IWorkspaceManager
         return ToWorkspace(updated);
     }
 
+    public async Task<Workspace> TransitionRecoveryStateAsync(Workspace workspace, string expectedState, string? expectedPublicationState, WorkspaceRecoveryState recoveryState, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        var sidecarPath = GetSidecarPath(workspace.Key);
+        var sidecar = await ReadSidecarAsync(sidecarPath, cancellationToken) ?? throw new WorkspaceRecoveryException("Workspace sidecar state is missing.");
+        ValidateWorkspaceMatchesSidecar(workspace, sidecar);
+        if (!string.Equals(sidecar.SchedulerState, expectedState, StringComparison.Ordinal)
+            || (expectedPublicationState is not null && !string.Equals(sidecar.PublicationState, expectedPublicationState, StringComparison.Ordinal)))
+            throw new WorkspaceRecoveryException("Workspace recovery state changed before operator authorization could be applied.");
+        return await UpdateRecoveryStateAsync(ToWorkspace(sidecar), recoveryState, cancellationToken);
+    }
+
     public async Task<Workspace> UpdatePublicationStateAsync(Workspace workspace, PublicationRecoveryState publicationState, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);

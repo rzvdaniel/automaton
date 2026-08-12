@@ -93,6 +93,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IWorkExecutor, RoleBasedWorkExecutor>();
         services.AddSingleton<InMemoryOrchestrator>();
         services.AddSingleton<StartupReconciler>();
+        services.AddSingleton<IBlockedRunRecoveryOperator, BlockedRunRecoveryOperator>();
         services.AddHostedService<OrchestratorHostedService>();
         services.AddHostedService<OperatorStatusHostedService>();
         return services;
