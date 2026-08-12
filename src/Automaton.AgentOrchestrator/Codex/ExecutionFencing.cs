@@ -16,6 +16,12 @@ public static class ExecutionIdentityClassifications
 
 public sealed record ExecutionIdentityInspection(string Classification, string? Detail = null);
 public sealed record FencedProcess(Process Process, DurableExecutionIdentity Identity);
+public sealed class CodexLaunchException(string category, string reason, Exception? inner = null)
+    : CodexProtocolException($"Codex launch failed ({category}): {reason}", inner)
+{
+    public string Category { get; } = category;
+    public string SafeReason { get; } = reason;
+}
 
 internal static class ExecutionRootInspectionStates
 {
@@ -51,7 +57,15 @@ public sealed class PlatformExecutionFence : IExecutionFence
     {
         cancellationToken.ThrowIfCancellationRequested();
         var effective = OperatingSystem.IsLinux() ? WrapWithNewSession(startInfo) : startInfo;
-        var process = Process.Start(effective) ?? throw new CodexProtocolException("Unable to launch Codex App Server.");
+        Process process;
+        try
+        {
+            process = Process.Start(effective) ?? throw new InvalidOperationException("Process.Start returned no process.");
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException or UnauthorizedAccessException)
+        {
+            throw new CodexLaunchException("process-start", "The Codex process could not be started.", exception);
+        }
         var fencingKind = OperatingSystem.IsLinux() ? ExecutionFencingKinds.UnixProcessGroup : ExecutionFencingKinds.PortableProcessTree;
         int? processGroupId = OperatingSystem.IsLinux() ? process.Id : null;
         if (OperatingSystem.IsWindows() && TryAssignWindowsJob(process, launchNonce)) fencingKind = ExecutionFencingKinds.WindowsJob;

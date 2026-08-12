@@ -135,6 +135,16 @@ public sealed class RoleBasedWorkExecutor(
         }
         catch (CodexIdleTimeoutException exception) { outcome = RunOutcome.RetryableFailure(Bounded(exception.Message)); }
         catch (CodexProcessExitedException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
+        catch (CodexLaunchException exception)
+        {
+            telemetry?.Record("codex.launch.failed", OperatorEventSeverities.Error, attempt.WorkItem.Id, "execution", message: "Codex launch failed before durable process identity was recorded.", metadata: new Dictionary<string, string>
+            {
+                ["category"] = exception.Category,
+                ["reason"] = "process start failed"
+            });
+            ambiguous = true;
+            outcome = RunOutcome.PermanentFailure("Codex launch failed; execution ownership was quarantined.");
+        }
         catch (CodexProtocolException exception) { ambiguous = true; outcome = RunOutcome.PermanentFailure(Bounded(exception.Message)); }
         catch (Exception exception)
         {
