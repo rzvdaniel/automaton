@@ -8,6 +8,7 @@ using Automaton.AgentOrchestrator.Publication;
 using Automaton.AgentOrchestrator.Ci;
 using Automaton.AgentOrchestrator.ReviewFeedback;
 using Automaton.AgentOrchestrator.Operator;
+using Automaton.AgentOrchestrator.Integration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Automaton.AgentOrchestrator.Hosting;
@@ -18,6 +19,12 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IBuildIdentity, AssemblyBuildIdentity>();
+        services.AddSingleton<IOrchestratorStatusQuery>(services =>
+        {
+            var options = services.GetRequiredService<OrchestratorOptions>();
+            var path = Path.Combine(options.Workspace.Root, ".automaton-agent-orchestrator", "operator", "status.json");
+            return new FileOrchestratorStatusQuery(path);
+        });
         services.AddSingleton<IOperatorTelemetry>(services => services.GetRequiredService<OrchestratorOptions>().Observability.Enabled
             ? new FileOperatorTelemetry(services.GetRequiredService<OrchestratorOptions>(), services.GetRequiredService<IClock>())
             : new NoopOperatorTelemetry());

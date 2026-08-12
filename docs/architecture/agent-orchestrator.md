@@ -754,6 +754,23 @@ multi-tracker support, an expansive UI, generic workflow DAGs, remote execution,
 and a persistent orchestration database. They should be designed only after the
 single-daemon, single-repository recovery contract is proven.
 
+### Stage 14 optional integration boundary
+
+Stage 14 defines a separately versioned, provider-neutral, read-only status query
+contract and a bounded local adapter over the Stage 12 operator snapshot. The
+contract is owned by the standalone orchestrator rather than Studio and carries
+daemon/run identity, health and reconciliation, current stage/role, workspace,
+branch/PR/exact-SHA, CI/feedback/ownership state, bounded reasons, timestamps,
+and build identity. Missing or unsupported status is explicitly unavailable.
+
+Automaton API/Studio remains an optional future consumer. It supplies no daemon
+configuration, credentials, persistence, recovery, or availability dependency.
+Stage 14 adds no inbound service, remote commands, database projection, or UI.
+Future remote reads require dedicated read-only authentication; future control
+commands require an independently versioned and audited authorization boundary.
+The detailed contract and compatibility rules are recorded in
+`agent-orchestrator-integration-boundary.md`.
+
 ## Stage 1 plan
 
 1. Create the minimal host/core boundary and a repository-owned `WORKFLOW.md`
